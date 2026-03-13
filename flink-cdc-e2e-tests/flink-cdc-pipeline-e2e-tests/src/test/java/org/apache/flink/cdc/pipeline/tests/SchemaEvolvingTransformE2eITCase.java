@@ -270,11 +270,7 @@ class SchemaEvolvingTransformE2eITCase extends PipelineTestEnvironment {
                                 + (triggerError ? "  error.on.schema.change: true\n" : "\n")
                                 + "transform:\n"
                                 + "  - source-table: %s.\\.*\n"
-                                + "    projection: CAST(id AS VARCHAR) || ' -> ' || name AS uid, *, id * id AS id_square, 'age < 20' as tag\n"
-                                + "    filter: age < 20\n"
-                                + "  - source-table: %s.\\.*\n"
-                                + "    projection: CAST(id AS VARCHAR) || ' -> ' || name AS uid, *, 0 - id * id AS id_square, 'age >= 20' as tag\n"
-                                + "    filter: age >= 20\n"
+                                + "    projection: CAST(id AS VARCHAR) || ' -> ' || name AS uid, *, CASE WHEN age < 20 THEN id * id WHEN age >= 20 THEN 0 - id * id END AS id_square, CASE WHEN age < 20 THEN 'age < 20' WHEN age >= 20 THEN 'age >= 20' END as tag\n"
                                 + (mergeTable
                                         ? String.format(
                                                 "route:\n"
@@ -291,7 +287,6 @@ class SchemaEvolvingTransformE2eITCase extends PipelineTestEnvironment {
                         MYSQL_TEST_PASSWORD,
                         dbName,
                         mergeTable ? "(members|new_members)" : "members",
-                        dbName,
                         dbName,
                         behavior,
                         parallelism);

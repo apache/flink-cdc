@@ -323,16 +323,6 @@ class PostTransformOperatorTest {
                     .options(ImmutableMap.of("key1", "value1", "key2", "value2"))
                     .build();
 
-    private static final TableId COLUMN_SQUARE_TABLE =
-            TableId.tableId("my_company", "my_branch", "column_square");
-    private static final Schema COLUMN_SQUARE_SCHEMA =
-            Schema.newBuilder()
-                    .physicalColumn("col1", DataTypes.INT().notNull())
-                    .physicalColumn("col2", DataTypes.INT())
-                    .physicalColumn("square_col2", DataTypes.INT())
-                    .primaryKey("col1")
-                    .build();
-
     private static final TableId COMPARE_TABLEID =
             TableId.tableId("my_company", "my_branch", "compare_table");
     private static final Schema COMPARE_SCHEMA =
@@ -461,112 +451,6 @@ class PostTransformOperatorTest {
         Assertions.assertThat(
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
                 .isEqualTo(new StreamRecord<>(insertEventExpect));
-        transform.processElement(new StreamRecord<>(updateEvent));
-        Assertions.assertThat(
-                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
-                .isEqualTo(new StreamRecord<>(updateEventExpect));
-        transformFunctionEventEventOperatorTestHarness.close();
-    }
-
-    @Test
-    void testDataChangeEventTransformTwice() throws Exception {
-        PostTransformOperator transform =
-                PostTransformOperator.newBuilder()
-                        .addTransform(
-                                CUSTOMERS_TABLEID.identifier(),
-                                "*, concat(col1, '1') col12",
-                                "col1 = '1'")
-                        .addTransform(
-                                CUSTOMERS_TABLEID.identifier(),
-                                "*, concat(col1, '2') col12",
-                                "col1 = '2'")
-                        .build();
-        RegularEventOperatorTestHarness<PostTransformOperator, Event>
-                transformFunctionEventEventOperatorTestHarness =
-                        RegularEventOperatorTestHarness.with(transform, 1);
-        // Initialization
-        transformFunctionEventEventOperatorTestHarness.open();
-        // Create table
-        CreateTableEvent createTableEvent =
-                new CreateTableEvent(CUSTOMERS_TABLEID, CUSTOMERS_SCHEMA);
-        BinaryRecordDataGenerator recordDataGenerator =
-                new BinaryRecordDataGenerator(((RowType) CUSTOMERS_SCHEMA.toRowDataType()));
-        // Insert
-        DataChangeEvent insertEvent =
-                DataChangeEvent.insertEvent(
-                        CUSTOMERS_TABLEID,
-                        recordDataGenerator.generate(
-                                new Object[] {
-                                    new BinaryStringData("1"), new BinaryStringData("2"), null
-                                }));
-        DataChangeEvent insertEventExpect =
-                DataChangeEvent.insertEvent(
-                        CUSTOMERS_TABLEID,
-                        recordDataGenerator.generate(
-                                new Object[] {
-                                    new BinaryStringData("1"),
-                                    new BinaryStringData("2"),
-                                    new BinaryStringData("11")
-                                }));
-        // Insert
-        DataChangeEvent insertEvent2 =
-                DataChangeEvent.insertEvent(
-                        CUSTOMERS_TABLEID,
-                        recordDataGenerator.generate(
-                                new Object[] {
-                                    new BinaryStringData("2"), new BinaryStringData("2"), null
-                                }));
-        DataChangeEvent insertEvent2Expect =
-                DataChangeEvent.insertEvent(
-                        CUSTOMERS_TABLEID,
-                        recordDataGenerator.generate(
-                                new Object[] {
-                                    new BinaryStringData("2"),
-                                    new BinaryStringData("2"),
-                                    new BinaryStringData("22")
-                                }));
-        // Update
-        DataChangeEvent updateEvent =
-                DataChangeEvent.updateEvent(
-                        CUSTOMERS_TABLEID,
-                        recordDataGenerator.generate(
-                                new Object[] {
-                                    new BinaryStringData("1"), new BinaryStringData("2"), null
-                                }),
-                        recordDataGenerator.generate(
-                                new Object[] {
-                                    new BinaryStringData("1"), new BinaryStringData("3"), null
-                                }));
-        DataChangeEvent updateEventExpect =
-                DataChangeEvent.updateEvent(
-                        CUSTOMERS_TABLEID,
-                        recordDataGenerator.generate(
-                                new Object[] {
-                                    new BinaryStringData("1"),
-                                    new BinaryStringData("2"),
-                                    new BinaryStringData("11")
-                                }),
-                        recordDataGenerator.generate(
-                                new Object[] {
-                                    new BinaryStringData("1"),
-                                    new BinaryStringData("3"),
-                                    new BinaryStringData("11")
-                                }));
-
-        transform.processElement(new StreamRecord<>(createTableEvent));
-        Assertions.assertThat(
-                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
-                .isEqualTo(
-                        new StreamRecord<>(
-                                new CreateTableEvent(CUSTOMERS_TABLEID, CUSTOMERS_SCHEMA)));
-        transform.processElement(new StreamRecord<>(insertEvent));
-        Assertions.assertThat(
-                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
-                .isEqualTo(new StreamRecord<>(insertEventExpect));
-        transform.processElement(new StreamRecord<>(insertEvent2));
-        Assertions.assertThat(
-                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
-                .isEqualTo(new StreamRecord<>(insertEvent2Expect));
         transform.processElement(new StreamRecord<>(updateEvent));
         Assertions.assertThat(
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
@@ -825,68 +709,6 @@ class PostTransformOperatorTest {
         Assertions.assertThat(
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
                 .isEqualTo(new StreamRecord<>(deleteEventExpect));
-        transformFunctionEventEventOperatorTestHarness.close();
-    }
-
-    @Test
-    void testDataChangeEventTransformWithDuplicateColumns() throws Exception {
-        PostTransformOperator transform =
-                PostTransformOperator.newBuilder()
-                        .addTransform(
-                                COLUMN_SQUARE_TABLE.identifier(),
-                                "col1, col2, col2 * col2 as square_col2",
-                                "col2 < 3 OR col2 > 5")
-                        .build();
-        RegularEventOperatorTestHarness<PostTransformOperator, Event>
-                transformFunctionEventEventOperatorTestHarness =
-                        RegularEventOperatorTestHarness.with(transform, 1);
-        // Initialization
-        transformFunctionEventEventOperatorTestHarness.open();
-        // Create table
-        CreateTableEvent createTableEvent =
-                new CreateTableEvent(COLUMN_SQUARE_TABLE, COLUMN_SQUARE_SCHEMA);
-        BinaryRecordDataGenerator recordDataGenerator =
-                new BinaryRecordDataGenerator(((RowType) COLUMN_SQUARE_SCHEMA.toRowDataType()));
-        // Insert
-        DataChangeEvent insertEvent =
-                DataChangeEvent.insertEvent(
-                        COLUMN_SQUARE_TABLE,
-                        recordDataGenerator.generate(new Object[] {1, 1, null}));
-        DataChangeEvent insertEventExpect =
-                DataChangeEvent.insertEvent(
-                        COLUMN_SQUARE_TABLE, recordDataGenerator.generate(new Object[] {1, 1, 1}));
-
-        DataChangeEvent insertEvent2 =
-                DataChangeEvent.insertEvent(
-                        COLUMN_SQUARE_TABLE,
-                        recordDataGenerator.generate(new Object[] {6, 6, null}));
-        DataChangeEvent insertEventExpect2 =
-                DataChangeEvent.insertEvent(
-                        COLUMN_SQUARE_TABLE, recordDataGenerator.generate(new Object[] {6, 6, 36}));
-
-        DataChangeEvent insertEvent3 =
-                DataChangeEvent.insertEvent(
-                        COLUMN_SQUARE_TABLE,
-                        recordDataGenerator.generate(new Object[] {4, 4, null}));
-
-        transform.processElement(new StreamRecord<>(createTableEvent));
-        Assertions.assertThat(
-                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
-                .isEqualTo(
-                        new StreamRecord<>(
-                                new CreateTableEvent(COLUMN_SQUARE_TABLE, COLUMN_SQUARE_SCHEMA)));
-        transform.processElement(new StreamRecord<>(insertEvent));
-        Assertions.assertThat(
-                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
-                .isEqualTo(new StreamRecord<>(insertEventExpect));
-        transform.processElement(new StreamRecord<>(insertEvent2));
-        Assertions.assertThat(
-                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
-                .isEqualTo(new StreamRecord<>(insertEventExpect2));
-        transform.processElement(new StreamRecord<>(insertEvent3));
-        Assertions.assertThat(
-                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
-                .isNull();
         transformFunctionEventEventOperatorTestHarness.close();
     }
 
@@ -1259,21 +1081,12 @@ class PostTransformOperatorTest {
                         .addTransform(
                                 TIMESTAMPDIFF_TABLEID.identifier(),
                                 "col1, TIMESTAMPDIFF(SECOND, LOCALTIMESTAMP, CAST(CURRENT_TIMESTAMP AS TIMESTAMP)) as second_diff,"
-                                        + " TIMESTAMPDIFF(MINUTE, LOCALTIMESTAMP, CAST(CURRENT_TIMESTAMP AS TIMESTAMP)) as minute_diff,"
-                                        + " TIMESTAMPDIFF(HOUR, LOCALTIMESTAMP, CAST(CURRENT_TIMESTAMP AS TIMESTAMP)) as hour_diff,"
-                                        + " TIMESTAMPDIFF(DAY, LOCALTIMESTAMP, CAST(CURRENT_TIMESTAMP AS TIMESTAMP)) as day_diff,"
-                                        + " TIMESTAMPDIFF(MONTH, LOCALTIMESTAMP, CAST(CURRENT_TIMESTAMP AS TIMESTAMP)) as month_diff,"
-                                        + " TIMESTAMPDIFF(YEAR, LOCALTIMESTAMP, CAST(CURRENT_TIMESTAMP AS TIMESTAMP)) as year_diff",
-                                "col1='1'")
-                        .addTransform(
-                                TIMESTAMPDIFF_TABLEID.identifier(),
-                                "col1, TIMESTAMPDIFF(SECOND, LOCALTIMESTAMP, CAST(NOW() AS TIMESTAMP)) as second_diff,"
-                                        + " TIMESTAMPDIFF(MINUTE, LOCALTIMESTAMP, CAST(NOW() AS TIMESTAMP)) as minute_diff,"
-                                        + " TIMESTAMPDIFF(HOUR, LOCALTIMESTAMP, CAST(NOW() AS TIMESTAMP)) as hour_diff,"
-                                        + " TIMESTAMPDIFF(DAY, LOCALTIMESTAMP, CAST(NOW() AS TIMESTAMP)) as day_diff,"
-                                        + " TIMESTAMPDIFF(MONTH, LOCALTIMESTAMP, CAST(NOW() AS TIMESTAMP)) as month_diff,"
-                                        + " TIMESTAMPDIFF(YEAR, LOCALTIMESTAMP, CAST(NOW() AS TIMESTAMP)) as year_diff",
-                                "col1='2'")
+                                        + " CASE WHEN col1='1' THEN TIMESTAMPDIFF(MINUTE, LOCALTIMESTAMP, CAST(CURRENT_TIMESTAMP AS TIMESTAMP)) WHEN col1='2' THEN TIMESTAMPDIFF(MINUTE, LOCALTIMESTAMP, CAST(NOW() AS TIMESTAMP)) END as minute_diff,"
+                                        + " CASE WHEN col1='1' THEN TIMESTAMPDIFF(HOUR, LOCALTIMESTAMP, CAST(CURRENT_TIMESTAMP AS TIMESTAMP)) WHEN col1='2' THEN TIMESTAMPDIFF(HOUR, LOCALTIMESTAMP, CAST(NOW() AS TIMESTAMP)) END as hour_diff,"
+                                        + " CASE WHEN col1='1' THEN TIMESTAMPDIFF(DAY, LOCALTIMESTAMP, CAST(CURRENT_TIMESTAMP AS TIMESTAMP)) WHEN col1='2' THEN TIMESTAMPDIFF(DAY, LOCALTIMESTAMP, CAST(NOW() AS TIMESTAMP)) END as day_diff,"
+                                        + " CASE WHEN col1='1' THEN TIMESTAMPDIFF(MONTH, LOCALTIMESTAMP, CAST(CURRENT_TIMESTAMP AS TIMESTAMP)) WHEN col1='2' THEN TIMESTAMPDIFF(MONTH, LOCALTIMESTAMP, CAST(NOW() AS TIMESTAMP)) END as month_diff,"
+                                        + " CASE WHEN col1='1' THEN TIMESTAMPDIFF(YEAR, LOCALTIMESTAMP, CAST(CURRENT_TIMESTAMP AS TIMESTAMP)) WHEN col1='2' THEN TIMESTAMPDIFF(YEAR, LOCALTIMESTAMP, CAST(NOW() AS TIMESTAMP)) END as year_diff",
+                                null)
                         .addTimezone("Asia/Shanghai")
                         .build();
         RegularEventOperatorTestHarness<PostTransformOperator, Event>
@@ -1336,51 +1149,11 @@ class PostTransformOperatorTest {
                         .addTransform(
                                 TIMESTAMPDIFF_DATA_TABLEID.identifier(),
                                 "col1, time_interval_unit,"
-                                        + " TIMESTAMPDIFF(SECOND, start_timestamp, end_timestamp) as timestamp_timestamp,"
-                                        + " TIMESTAMPDIFF(SECOND, start_timestamp, end_timestamp_ltz) as timestamp_timestamp_ltz,"
-                                        + " TIMESTAMPDIFF(SECOND, start_timestamp_ltz, end_timestamp) as timestamp_ltz_timestamp,"
-                                        + " TIMESTAMPDIFF(SECOND, start_timestamp_ltz, end_timestamp_ltz) as timestamp_ltz_timestamp_ltz",
-                                "time_interval_unit='SECOND'")
-                        .addTransform(
-                                TIMESTAMPDIFF_DATA_TABLEID.identifier(),
-                                "col1, time_interval_unit,"
-                                        + " TIMESTAMPDIFF(MINUTE, start_timestamp, end_timestamp) as timestamp_timestamp,"
-                                        + " TIMESTAMPDIFF(MINUTE, start_timestamp, end_timestamp_ltz) as timestamp_timestamp_ltz,"
-                                        + " TIMESTAMPDIFF(MINUTE, start_timestamp_ltz, end_timestamp) as timestamp_ltz_timestamp,"
-                                        + " TIMESTAMPDIFF(MINUTE, start_timestamp_ltz, end_timestamp_ltz) as timestamp_ltz_timestamp_ltz",
-                                "time_interval_unit='MINUTE'")
-                        .addTransform(
-                                TIMESTAMPDIFF_DATA_TABLEID.identifier(),
-                                "col1, time_interval_unit,"
-                                        + " TIMESTAMPDIFF(HOUR, start_timestamp, end_timestamp) as timestamp_timestamp,"
-                                        + " TIMESTAMPDIFF(HOUR, start_timestamp, end_timestamp_ltz) as timestamp_timestamp_ltz,"
-                                        + " TIMESTAMPDIFF(HOUR, start_timestamp_ltz, end_timestamp) as timestamp_ltz_timestamp,"
-                                        + " TIMESTAMPDIFF(HOUR, start_timestamp_ltz, end_timestamp_ltz) as timestamp_ltz_timestamp_ltz",
-                                "time_interval_unit='HOUR'")
-                        .addTransform(
-                                TIMESTAMPDIFF_DATA_TABLEID.identifier(),
-                                "col1, time_interval_unit,"
-                                        + " TIMESTAMPDIFF(DAY, start_timestamp, end_timestamp) as timestamp_timestamp,"
-                                        + " TIMESTAMPDIFF(DAY, start_timestamp, end_timestamp_ltz) as timestamp_timestamp_ltz,"
-                                        + " TIMESTAMPDIFF(DAY, start_timestamp_ltz, end_timestamp) as timestamp_ltz_timestamp,"
-                                        + " TIMESTAMPDIFF(DAY, start_timestamp_ltz, end_timestamp_ltz) as timestamp_ltz_timestamp_ltz",
-                                "time_interval_unit='DAY'")
-                        .addTransform(
-                                TIMESTAMPDIFF_DATA_TABLEID.identifier(),
-                                "col1, time_interval_unit,"
-                                        + " TIMESTAMPDIFF(MONTH, start_timestamp, end_timestamp) as timestamp_timestamp,"
-                                        + " TIMESTAMPDIFF(MONTH, start_timestamp, end_timestamp_ltz) as timestamp_timestamp_ltz,"
-                                        + " TIMESTAMPDIFF(MONTH, start_timestamp_ltz, end_timestamp) as timestamp_ltz_timestamp,"
-                                        + " TIMESTAMPDIFF(MONTH, start_timestamp_ltz, end_timestamp_ltz) as timestamp_ltz_timestamp_ltz",
-                                "time_interval_unit='MONTH'")
-                        .addTransform(
-                                TIMESTAMPDIFF_DATA_TABLEID.identifier(),
-                                "col1, time_interval_unit,"
-                                        + " TIMESTAMPDIFF(YEAR, start_timestamp, end_timestamp) as timestamp_timestamp,"
-                                        + " TIMESTAMPDIFF(YEAR, start_timestamp, end_timestamp_ltz) as timestamp_timestamp_ltz,"
-                                        + " TIMESTAMPDIFF(YEAR, start_timestamp_ltz, end_timestamp) as timestamp_ltz_timestamp,"
-                                        + " TIMESTAMPDIFF(YEAR, start_timestamp_ltz, end_timestamp_ltz) as timestamp_ltz_timestamp_ltz",
-                                "time_interval_unit='YEAR'")
+                                        + " CASE WHEN time_interval_unit='SECOND' THEN TIMESTAMPDIFF(SECOND, start_timestamp, end_timestamp) WHEN time_interval_unit='MINUTE' THEN TIMESTAMPDIFF(MINUTE, start_timestamp, end_timestamp)  WHEN time_interval_unit='HOUR' THEN TIMESTAMPDIFF(HOUR, start_timestamp, end_timestamp) WHEN time_interval_unit='DAY' THEN TIMESTAMPDIFF(DAY, start_timestamp, end_timestamp) WHEN time_interval_unit='MONTH' THEN TIMESTAMPDIFF(MONTH, start_timestamp, end_timestamp) WHEN time_interval_unit='YEAR' THEN TIMESTAMPDIFF(YEAR, start_timestamp, end_timestamp) END as timestamp_timestamp,"
+                                        + " CASE WHEN time_interval_unit='SECOND' THEN TIMESTAMPDIFF(SECOND, start_timestamp, end_timestamp_ltz) WHEN time_interval_unit='MINUTE' THEN TIMESTAMPDIFF(MINUTE, start_timestamp, end_timestamp_ltz) WHEN time_interval_unit='HOUR' THEN TIMESTAMPDIFF(HOUR, start_timestamp, end_timestamp_ltz) WHEN time_interval_unit='DAY' THEN TIMESTAMPDIFF(DAY, start_timestamp, end_timestamp_ltz) WHEN time_interval_unit='MONTH' THEN TIMESTAMPDIFF(MONTH, start_timestamp, end_timestamp_ltz) WHEN time_interval_unit='YEAR' THEN TIMESTAMPDIFF(YEAR, start_timestamp, end_timestamp_ltz) END as timestamp_timestamp_ltz,"
+                                        + " CASE WHEN time_interval_unit='SECOND' THEN TIMESTAMPDIFF(SECOND, start_timestamp_ltz, end_timestamp) WHEN time_interval_unit='MINUTE' THEN TIMESTAMPDIFF(MINUTE, start_timestamp_ltz, end_timestamp) WHEN time_interval_unit='HOUR' THEN TIMESTAMPDIFF(HOUR, start_timestamp_ltz, end_timestamp) WHEN time_interval_unit='DAY' THEN TIMESTAMPDIFF(DAY, start_timestamp_ltz, end_timestamp) WHEN time_interval_unit='MONTH' THEN TIMESTAMPDIFF(MONTH, start_timestamp_ltz, end_timestamp) WHEN time_interval_unit='YEAR' THEN TIMESTAMPDIFF(YEAR, start_timestamp_ltz, end_timestamp) END as timestamp_ltz_timestamp,"
+                                        + " CASE WHEN time_interval_unit='SECOND' THEN TIMESTAMPDIFF(SECOND, start_timestamp_ltz, end_timestamp_ltz) WHEN time_interval_unit='MINUTE' THEN TIMESTAMPDIFF(MINUTE, start_timestamp_ltz, end_timestamp_ltz) WHEN time_interval_unit='HOUR' THEN TIMESTAMPDIFF(HOUR, start_timestamp_ltz, end_timestamp_ltz) WHEN time_interval_unit='DAY' THEN TIMESTAMPDIFF(DAY, start_timestamp_ltz, end_timestamp_ltz) WHEN time_interval_unit='MONTH' THEN TIMESTAMPDIFF(MONTH, start_timestamp_ltz, end_timestamp_ltz) WHEN time_interval_unit='YEAR' THEN TIMESTAMPDIFF(YEAR, start_timestamp_ltz, end_timestamp_ltz) END as timestamp_ltz_timestamp_ltz",
+                                null)
                         .addTimezone("UTC")
                         .build();
         RegularEventOperatorTestHarness<PostTransformOperator, Event>
@@ -1676,22 +1449,14 @@ class PostTransformOperatorTest {
                 PostTransformOperator.newBuilder()
                         .addTransform(
                                 TIMESTAMPADD_TABLEID.identifier(),
-                                "col1, DATE_FORMAT(TIMESTAMPADD(SECOND, 1, TO_TIMESTAMP('2024-10-01 00:00:00')), 'yyyy-MM-dd HH:mm:ss') as second_add,"
-                                        + " DATE_FORMAT(TIMESTAMPADD(MINUTE, 1, TO_TIMESTAMP('2024-10-01 00:00:00')), 'yyyy-MM-dd HH:mm:ss') as minute_add,"
-                                        + " DATE_FORMAT(TIMESTAMPADD(HOUR, 1, TO_TIMESTAMP('2024-10-01 00:00:00')), 'yyyy-MM-dd HH:mm:ss') as hour_add,"
-                                        + " DATE_FORMAT(TIMESTAMPADD(DAY, 1, TO_TIMESTAMP('2024-10-01 00:00:00')), 'yyyy-MM-dd HH:mm:ss') as day_add,"
-                                        + " DATE_FORMAT(TIMESTAMPADD(MONTH, 1, TO_TIMESTAMP('2024-10-01 00:00:00')), 'yyyy-MM-dd HH:mm:ss') as month_add,"
-                                        + " DATE_FORMAT(TIMESTAMPADD(YEAR, 1, TO_TIMESTAMP('2024-10-01 00:00:00')), 'yyyy-MM-dd HH:mm:ss') as year_add",
-                                "col1='1'")
-                        .addTransform(
-                                TIMESTAMPADD_TABLEID.identifier(),
-                                "col1, DATE_FORMAT(TIMESTAMPADD(SECOND, -1, TO_TIMESTAMP('2024-10-01 00:00:00')), 'yyyy-MM-dd HH:mm:ss') as second_add,"
-                                        + " DATE_FORMAT(TIMESTAMPADD(MINUTE, -1, TO_TIMESTAMP('2024-10-01 00:00:00')), 'yyyy-MM-dd HH:mm:ss') as minute_add,"
-                                        + " DATE_FORMAT(TIMESTAMPADD(HOUR, -1, TO_TIMESTAMP('2024-10-01 00:00:00')), 'yyyy-MM-dd HH:mm:ss') as hour_add,"
-                                        + " DATE_FORMAT(TIMESTAMPADD(DAY, -1, TO_TIMESTAMP('2024-10-01 00:00:00')), 'yyyy-MM-dd HH:mm:ss') as day_add,"
-                                        + " DATE_FORMAT(TIMESTAMPADD(MONTH, -1, TO_TIMESTAMP('2024-10-01 00:00:00')), 'yyyy-MM-dd HH:mm:ss') as month_add,"
-                                        + " DATE_FORMAT(TIMESTAMPADD(YEAR, -1, TO_TIMESTAMP('2024-10-01 00:00:00')), 'yyyy-MM-dd HH:mm:ss') as year_add",
-                                "col1='2'")
+                                "col1, "
+                                        + "CASE WHEN col1='1' THEN DATE_FORMAT(TIMESTAMPADD(SECOND, 1, TO_TIMESTAMP('2024-10-01 00:00:00')), 'yyyy-MM-dd HH:mm:ss') WHEN col1='2' THEN DATE_FORMAT(TIMESTAMPADD(SECOND, -1, TO_TIMESTAMP('2024-10-01 00:00:00')), 'yyyy-MM-dd HH:mm:ss') END as second_add,"
+                                        + "CASE WHEN col1='1' THEN DATE_FORMAT(TIMESTAMPADD(MINUTE, 1, TO_TIMESTAMP('2024-10-01 00:00:00')), 'yyyy-MM-dd HH:mm:ss') WHEN col1='2' THEN DATE_FORMAT(TIMESTAMPADD(MINUTE, -1, TO_TIMESTAMP('2024-10-01 00:00:00')), 'yyyy-MM-dd HH:mm:ss') END as minute_add,"
+                                        + "CASE WHEN col1='1' THEN DATE_FORMAT(TIMESTAMPADD(HOUR, 1, TO_TIMESTAMP('2024-10-01 00:00:00')), 'yyyy-MM-dd HH:mm:ss') WHEN col1='2' THEN DATE_FORMAT(TIMESTAMPADD(HOUR, -1, TO_TIMESTAMP('2024-10-01 00:00:00')), 'yyyy-MM-dd HH:mm:ss') END as hour_add,"
+                                        + "CASE WHEN col1='1' THEN DATE_FORMAT(TIMESTAMPADD(DAY, 1, TO_TIMESTAMP('2024-10-01 00:00:00')), 'yyyy-MM-dd HH:mm:ss') WHEN col1='2' THEN DATE_FORMAT(TIMESTAMPADD(DAY, -1, TO_TIMESTAMP('2024-10-01 00:00:00')), 'yyyy-MM-dd HH:mm:ss') END as day_add,"
+                                        + "CASE WHEN col1='1' THEN DATE_FORMAT(TIMESTAMPADD(MONTH, 1, TO_TIMESTAMP('2024-10-01 00:00:00')), 'yyyy-MM-dd HH:mm:ss') WHEN col1='2' THEN DATE_FORMAT(TIMESTAMPADD(MONTH, -1, TO_TIMESTAMP('2024-10-01 00:00:00')), 'yyyy-MM-dd HH:mm:ss') END as month_add,"
+                                        + "CASE WHEN col1='1' THEN DATE_FORMAT(TIMESTAMPADD(YEAR, 1, TO_TIMESTAMP('2024-10-01 00:00:00')), 'yyyy-MM-dd HH:mm:ss') WHEN col1='2' THEN DATE_FORMAT(TIMESTAMPADD(YEAR, -1, TO_TIMESTAMP('2024-10-01 00:00:00')), 'yyyy-MM-dd HH:mm:ss') END as year_add",
+                                null)
                         .addTimezone("UTC")
                         .build();
         RegularEventOperatorTestHarness<PostTransformOperator, Event>
@@ -1771,39 +1536,9 @@ class PostTransformOperatorTest {
                         .addTransform(
                                 TIMESTAMPADD_DATA_TABLEID.identifier(),
                                 "col1, time_interval_unit, interval_value,"
-                                        + " TIMESTAMPADD(SECOND, interval_value, time_point_timestamp) as time_point_timestamp,"
-                                        + " TIMESTAMPADD(SECOND, interval_value, time_point_timestamp_ltz) as time_point_timestamp_ltz",
-                                "time_interval_unit='SECOND'")
-                        .addTransform(
-                                TIMESTAMPADD_DATA_TABLEID.identifier(),
-                                "col1, time_interval_unit, interval_value,"
-                                        + " TIMESTAMPADD(MINUTE, interval_value, time_point_timestamp) as time_point_timestamp,"
-                                        + " TIMESTAMPADD(MINUTE, interval_value, time_point_timestamp_ltz) as time_point_timestamp_ltz",
-                                "time_interval_unit='MINUTE'")
-                        .addTransform(
-                                TIMESTAMPADD_DATA_TABLEID.identifier(),
-                                "col1, time_interval_unit, interval_value,"
-                                        + " TIMESTAMPADD(HOUR, interval_value, time_point_timestamp) as time_point_timestamp,"
-                                        + " TIMESTAMPADD(HOUR, interval_value, time_point_timestamp_ltz) as time_point_timestamp_ltz",
-                                "time_interval_unit='HOUR'")
-                        .addTransform(
-                                TIMESTAMPADD_DATA_TABLEID.identifier(),
-                                "col1, time_interval_unit, interval_value,"
-                                        + " TIMESTAMPADD(DAY, interval_value, time_point_timestamp) as time_point_timestamp,"
-                                        + " TIMESTAMPADD(DAY, interval_value, time_point_timestamp_ltz) as time_point_timestamp_ltz",
-                                "time_interval_unit='DAY'")
-                        .addTransform(
-                                TIMESTAMPADD_DATA_TABLEID.identifier(),
-                                "col1, time_interval_unit, interval_value,"
-                                        + " TIMESTAMPADD(MONTH, interval_value, time_point_timestamp) as time_point_timestamp,"
-                                        + " TIMESTAMPADD(MONTH, interval_value, time_point_timestamp_ltz) as time_point_timestamp_ltz",
-                                "time_interval_unit='MONTH'")
-                        .addTransform(
-                                TIMESTAMPADD_DATA_TABLEID.identifier(),
-                                "col1, time_interval_unit, interval_value,"
-                                        + " TIMESTAMPADD(YEAR, interval_value, time_point_timestamp) as time_point_timestamp,"
-                                        + " TIMESTAMPADD(YEAR, interval_value, time_point_timestamp_ltz) as time_point_timestamp_ltz",
-                                "time_interval_unit='YEAR'")
+                                        + " CASE WHEN time_interval_unit='SECOND' THEN TIMESTAMPADD(SECOND, interval_value, time_point_timestamp) WHEN time_interval_unit='MINUTE' THEN TIMESTAMPADD(MINUTE, interval_value, time_point_timestamp) WHEN time_interval_unit='HOUR' THEN TIMESTAMPADD(HOUR, interval_value, time_point_timestamp) WHEN time_interval_unit='DAY' THEN TIMESTAMPADD(DAY, interval_value, time_point_timestamp) WHEN time_interval_unit='MONTH' THEN TIMESTAMPADD(MONTH, interval_value, time_point_timestamp) WHEN time_interval_unit='YEAR' THEN TIMESTAMPADD(YEAR, interval_value, time_point_timestamp) END as time_point_timestamp,"
+                                        + " CASE WHEN time_interval_unit='SECOND' THEN TIMESTAMPADD(SECOND, interval_value, time_point_timestamp_ltz) WHEN time_interval_unit='MINUTE' THEN TIMESTAMPADD(MINUTE, interval_value, time_point_timestamp_ltz) WHEN time_interval_unit='HOUR' THEN TIMESTAMPADD(HOUR, interval_value, time_point_timestamp_ltz) WHEN time_interval_unit='DAY' THEN TIMESTAMPADD(DAY, interval_value, time_point_timestamp_ltz) WHEN time_interval_unit='MONTH' THEN TIMESTAMPADD(MONTH, interval_value, time_point_timestamp_ltz) WHEN time_interval_unit='YEAR' THEN TIMESTAMPADD(YEAR, interval_value, time_point_timestamp_ltz) END as time_point_timestamp_ltz",
+                                null)
                         .addTimezone("UTC")
                         .build();
         RegularEventOperatorTestHarness<PostTransformOperator, Event>
@@ -2135,153 +1870,18 @@ class PostTransformOperatorTest {
                         .addTransform(
                                 CAST_TABLEID.identifier(),
                                 "col1"
-                                        + ",cast(col1 as int) as castInt"
-                                        + ",cast(col1 as boolean) as castBoolean"
-                                        + ",cast(col1 as tinyint) as castTinyint"
-                                        + ",cast(col1 as smallint) as castSmallint"
-                                        + ",cast(col1 as bigint) as castBigint"
-                                        + ",cast(col1 as float) as castFloat"
-                                        + ",cast(col1 as double) as castDouble"
-                                        + ",cast(col1 as char) as castChar"
-                                        + ",cast(col1 as varchar) as castVarchar"
-                                        + ",cast(col1 as DECIMAL(4,2)) as castDecimal"
-                                        + ", castTimestamp",
-                                "col1 = '1'")
-                        .addTransform(
-                                CAST_TABLEID.identifier(),
-                                "col1"
-                                        + ",cast(castInt as int) as castInt"
-                                        + ",cast(castInt as boolean) as castBoolean"
-                                        + ",cast(castInt as tinyint) as castTinyint"
-                                        + ",cast(castInt as smallint) as castSmallint"
-                                        + ",cast(castInt as bigint) as castBigint"
-                                        + ",cast(castInt as float) as castFloat"
-                                        + ",cast(castInt as double) as castDouble"
-                                        + ",cast(castInt as char) as castChar"
-                                        + ",cast(castInt as varchar) as castVarchar"
-                                        + ",cast(castInt as DECIMAL(4,2)) as castDecimal"
-                                        + ", castTimestamp",
-                                "col1 = '2'")
-                        .addTransform(
-                                CAST_TABLEID.identifier(),
-                                "col1"
-                                        + ",cast(castBoolean as int) as castInt"
-                                        + ",cast(castBoolean as boolean) as castBoolean"
-                                        + ",cast(castBoolean as tinyint) as castTinyint"
-                                        + ",cast(castBoolean as smallint) as castSmallint"
-                                        + ",cast(castBoolean as bigint) as castBigint"
-                                        + ",castFloat"
-                                        + ",castDouble"
-                                        + ",cast(castBoolean as char) as castChar"
-                                        + ",cast(castBoolean as varchar) as castVarchar"
-                                        + ",castDecimal"
-                                        + ", castTimestamp",
-                                "col1 = '3'")
-                        .addTransform(
-                                CAST_TABLEID.identifier(),
-                                "col1"
-                                        + ",cast(castTinyint as int) as castInt"
-                                        + ",cast(castTinyint as boolean) as castBoolean"
-                                        + ",cast(castTinyint as tinyint) as castTinyint"
-                                        + ",cast(castTinyint as smallint) as castSmallint"
-                                        + ",cast(castTinyint as bigint) as castBigint"
-                                        + ",cast(castTinyint as float) as castFloat"
-                                        + ",cast(castTinyint as double) as castDouble"
-                                        + ",cast(castTinyint as char) as castChar"
-                                        + ",cast(castTinyint as varchar) as castVarchar"
-                                        + ",cast(castTinyint as DECIMAL(4,2)) as castDecimal"
-                                        + ", castTimestamp",
-                                "col1 = '4'")
-                        .addTransform(
-                                CAST_TABLEID.identifier(),
-                                "col1"
-                                        + ",cast(castSmallint as int) as castInt"
-                                        + ",cast(castSmallint as boolean) as castBoolean"
-                                        + ",cast(castSmallint as tinyint) as castTinyint"
-                                        + ",cast(castSmallint as smallint) as castSmallint"
-                                        + ",cast(castSmallint as bigint) as castBigint"
-                                        + ",cast(castSmallint as float) as castFloat"
-                                        + ",cast(castSmallint as double) as castDouble"
-                                        + ",cast(castSmallint as char) as castChar"
-                                        + ",cast(castSmallint as varchar) as castVarchar"
-                                        + ",cast(castSmallint as DECIMAL(4,2)) as castDecimal"
-                                        + ", castTimestamp",
-                                "col1 = '5'")
-                        .addTransform(
-                                CAST_TABLEID.identifier(),
-                                "col1"
-                                        + ",cast(castBigint as int) as castInt"
-                                        + ",cast(castBigint as boolean) as castBoolean"
-                                        + ",cast(castBigint as tinyint) as castTinyint"
-                                        + ",cast(castBigint as smallint) as castSmallint"
-                                        + ",cast(castBigint as bigint) as castBigint"
-                                        + ",cast(castBigint as float) as castFloat"
-                                        + ",cast(castBigint as double) as castDouble"
-                                        + ",cast(castBigint as char) as castChar"
-                                        + ",cast(castBigint as varchar) as castVarchar"
-                                        + ",cast(castBigint as DECIMAL(4,2)) as castDecimal"
-                                        + ", castTimestamp",
-                                "col1 = '6'")
-                        .addTransform(
-                                CAST_TABLEID.identifier(),
-                                "col1"
-                                        + ",castInt"
-                                        + ",cast(castFloat as boolean) as castBoolean"
-                                        + ",castTinyint"
-                                        + ",castSmallint"
-                                        + ",castBigint"
-                                        + ",cast(castFloat as float) as castFloat"
-                                        + ",cast(castFloat as double) as castDouble"
-                                        + ",cast(castFloat as char) as castChar"
-                                        + ",cast(castFloat as varchar) as castVarchar"
-                                        + ",cast(castFloat as DECIMAL(4,2)) as castDecimal"
-                                        + ", castTimestamp",
-                                "col1 = '7'")
-                        .addTransform(
-                                CAST_TABLEID.identifier(),
-                                "col1"
-                                        + ",castInt"
-                                        + ",cast(castDouble as boolean) as castBoolean"
-                                        + ",castTinyint"
-                                        + ",castSmallint"
-                                        + ",castBigint"
-                                        + ",cast(castDouble as float) as castFloat"
-                                        + ",cast(castDouble as double) as castDouble"
-                                        + ",cast(castDouble as char) as castChar"
-                                        + ",cast(castDouble as varchar) as castVarchar"
-                                        + ",cast(castDouble as DECIMAL(4,2)) as castDecimal"
-                                        + ", castTimestamp",
-                                "col1 = '8'")
-                        .addTransform(
-                                CAST_TABLEID.identifier(),
-                                "col1"
-                                        + ",castInt"
-                                        + ",cast(castDecimal as boolean) as castBoolean"
-                                        + ",castTinyint"
-                                        + ",castSmallint"
-                                        + ",castBigint"
-                                        + ",cast(castDecimal as float) as castFloat"
-                                        + ",cast(castDecimal as double) as castDouble"
-                                        + ",cast(castDecimal as char) as castChar"
-                                        + ",cast(castDecimal as varchar) as castVarchar"
-                                        + ",cast(castDecimal as DECIMAL(4,2)) as castDecimal"
-                                        + ", castTimestamp",
-                                "col1 = '9'")
-                        .addTransform(
-                                CAST_TABLEID.identifier(),
-                                "col1"
-                                        + ",castInt"
-                                        + ",castBoolean"
-                                        + ",castTinyint"
-                                        + ",castSmallint"
-                                        + ",castBigint"
-                                        + ",castFloat"
-                                        + ",castDouble"
-                                        + ",castChar"
-                                        + ",cast(castTimestamp as varchar) as castVarchar"
-                                        + ",castDecimal"
-                                        + ",cast('1970-01-01T00:00:01.234' as TIMESTAMP(3)) as castTimestamp",
-                                "col1 = '10'")
+                                        + ",CASE WHEN col1 = '1' THEN cast(col1 as int) WHEN col1 = '2' THEN cast(castInt as int) WHEN col1 = '3' THEN cast(castBoolean as int) WHEN col1 = '4' THEN cast(castTinyint as int) WHEN col1 = '5' THEN cast(castSmallint as int) WHEN col1 = '6' THEN cast(castBigint as int) WHEN col1 = '7' THEN castInt WHEN col1 = '8' THEN castInt WHEN col1 = '9' THEN castInt WHEN col1 = '10' THEN castInt END as castInt"
+                                        + ",CASE WHEN col1 = '1' THEN cast(col1 as boolean) WHEN col1 = '2' THEN cast(castInt as boolean) WHEN col1 = '3' THEN cast(castBoolean as boolean) WHEN col1 = '4' THEN cast(castTinyint as boolean) WHEN col1 = '5' THEN cast(castSmallint as boolean) WHEN col1 = '6' THEN cast(castBigint as boolean) WHEN col1 = '7' THEN cast(castFloat as boolean) WHEN col1 = '8' THEN cast(castDouble as boolean) WHEN col1 = '9' THEN cast(castDecimal as boolean) WHEN col1 = '10' THEN castBoolean END as castBoolean"
+                                        + ",CASE WHEN col1 = '1' THEN cast(col1 as tinyint) WHEN col1 = '2' THEN cast(castInt as tinyint) WHEN col1 = '3' THEN cast(castBoolean as tinyint) WHEN col1 = '4' THEN cast(castTinyint as tinyint) WHEN col1 = '5' THEN cast(castSmallint as tinyint) WHEN col1 = '6' THEN cast(castBigint as tinyint) WHEN col1 = '7' THEN castTinyint WHEN col1 = '8' THEN castTinyint WHEN col1 = '9' THEN castTinyint WHEN col1 = '10' THEN castTinyint END as castTinyint"
+                                        + ",CASE WHEN col1 = '1' THEN cast(col1 as smallint) WHEN col1 = '2' THEN cast(castInt as smallint) WHEN col1 = '3' THEN cast(castBoolean as smallint) WHEN col1 = '4' THEN cast(castTinyint as smallint) WHEN col1 = '5' THEN cast(castSmallint as smallint) WHEN col1 = '6' THEN cast(castBigint as smallint) WHEN col1 = '7' THEN castSmallint WHEN col1 = '8' THEN castSmallint WHEN col1 = '9' THEN castSmallint WHEN col1 = '10' THEN castSmallint END as castSmallint"
+                                        + ",CASE WHEN col1 = '1' THEN cast(col1 as bigint) WHEN col1 = '2' THEN cast(castInt as bigint) WHEN col1 = '3' THEN cast(castBoolean as bigint) WHEN col1 = '4' THEN cast(castTinyint as bigint) WHEN col1 = '5' THEN cast(castSmallint as bigint) WHEN col1 = '6' THEN cast(castBigint as bigint) WHEN col1 = '7' THEN castBigint WHEN col1 = '8' THEN castBigint WHEN col1 = '9' THEN castBigint WHEN col1 = '10' THEN castBigint END as castBigint"
+                                        + ",CASE WHEN col1 = '1' THEN cast(col1 as float) WHEN col1 = '2' THEN cast(castInt as float) WHEN col1 = '3' THEN castFloat WHEN col1 = '4' THEN cast(castTinyint as float) WHEN col1 = '5' THEN cast(castSmallint as float) WHEN col1 = '6' THEN cast(castBigint as float) WHEN col1 = '7' THEN cast(castFloat as float) WHEN col1 = '8' THEN cast(castDouble as float) WHEN col1 = '9' THEN cast(castDecimal as float) WHEN col1 = '10' THEN castFloat END as castFloat"
+                                        + ",CASE WHEN col1 = '1' THEN cast(col1 as double) WHEN col1 = '2' THEN cast(castInt as double) WHEN col1 = '3' THEN castDouble WHEN col1 = '4' THEN cast(castTinyint as double) WHEN col1 = '5' THEN cast(castSmallint as double) WHEN col1 = '6' THEN cast(castBigint as double) WHEN col1 = '7' THEN cast(castFloat as double) WHEN col1 = '8' THEN cast(castDouble as double) WHEN col1 = '9' THEN cast(castDecimal as double) WHEN col1 = '10' THEN castDouble END as castDouble"
+                                        + ",CASE WHEN col1 = '1' THEN cast(col1 as char) WHEN col1 = '2' THEN cast(castInt as char) WHEN col1 = '3' THEN cast(castBoolean as char) WHEN col1 = '4' THEN cast(castTinyint as char) WHEN col1 = '5' THEN cast(castSmallint as char) WHEN col1 = '6' THEN cast(castBigint as char) WHEN col1 = '7' THEN cast(castFloat as char) WHEN col1 = '8' THEN cast(castDouble as char) WHEN col1 = '9' THEN cast(castDecimal as char) WHEN col1 = '10' THEN castChar END as castChar"
+                                        + ",CASE WHEN col1 = '1' THEN cast(col1 as varchar) WHEN col1 = '2' THEN cast(castInt as varchar) WHEN col1 = '3' THEN cast(castBoolean as varchar) WHEN col1 = '4' THEN cast(castTinyint as varchar) WHEN col1 = '5' THEN cast(castSmallint as varchar) WHEN col1 = '6' THEN cast(castBigint as varchar) WHEN col1 = '7' THEN cast(castFloat as varchar) WHEN col1 = '8' THEN cast(castDouble as varchar) WHEN col1 = '9' THEN cast(castDecimal as varchar) WHEN col1 = '10' THEN cast(castTimestamp as varchar) END as castVarchar"
+                                        + ",CASE WHEN col1 = '1' THEN cast(col1 as DECIMAL(4,2)) WHEN col1 = '2' THEN cast(castInt as DECIMAL(4,2)) WHEN col1 = '3' THEN castDecimal WHEN col1 = '4' THEN cast(castTinyint as DECIMAL(4,2)) WHEN col1 = '5' THEN cast(castSmallint as DECIMAL(4,2)) WHEN col1 = '6' THEN cast(castBigint as DECIMAL(4,2)) WHEN col1 = '7' THEN cast(castFloat as DECIMAL(4,2)) WHEN col1 = '8' THEN cast(castDouble as DECIMAL(4,2)) WHEN col1 = '9' THEN cast(castDecimal as DECIMAL(4,2)) WHEN col1 = '10' THEN castDecimal END as castDecimal"
+                                        + ",CASE WHEN col1 = '1' THEN castTimestamp WHEN col1 = '2' THEN castTimestamp WHEN col1 = '3' THEN castTimestamp WHEN col1 = '4' THEN castTimestamp WHEN col1 = '5' THEN castTimestamp WHEN col1 = '6' THEN castTimestamp WHEN col1 = '7' THEN castTimestamp WHEN col1 = '8' THEN castTimestamp WHEN col1 = '9' THEN castTimestamp WHEN col1 = '10' THEN cast('1970-01-01T00:00:01.234' as TIMESTAMP(3)) END as castTimestamp",
+                                null)
                         .addTimezone("UTC")
                         .build();
         RegularEventOperatorTestHarness<PostTransformOperator, Event>

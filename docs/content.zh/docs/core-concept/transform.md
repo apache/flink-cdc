@@ -346,13 +346,13 @@ transform:
 transform:
   - source-table: mydb.web_order
     projection: id, order_id
-    filter: UPPER(province) = 'SHANGHAI'
-    description: classification mapping example
-  - source-table: mydb.web_order
+    description: 具体匹配规则
+  - source-table: mydb.\.*
     projection: order_id as id, id as order_id
-    filter: UPPER(province) = 'BEIJING'
-    description: classification mapping example
+    description: 兜底规则
 ```
+
+这里 `mydb.web_order` 将被第一条规则处理，而 `mydb` 里的所有其他表将被第二条规则处理。
 
 ## 用户自定义函数
 用户自定义函数（UDF）可以在转换规则中使用。

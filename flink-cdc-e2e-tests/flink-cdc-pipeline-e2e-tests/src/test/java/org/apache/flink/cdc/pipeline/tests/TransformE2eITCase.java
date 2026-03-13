@@ -188,11 +188,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                                 + "\n"
                                 + "transform:\n"
                                 + "  - source-table: %s.\\.*\n"
-                                + "    projection: ID, VERSION, 'Type-A' AS CATEGORY\n"
-                                + "    filter: ID > 1008\n"
-                                + "  - source-table: %s.\\.*\n"
-                                + "    projection: ID, VERSION, 'Type-B' AS CATEGORY\n"
-                                + "    filter: ID <= 1008\n"
+                                + "    projection: ID, VERSION, CASE WHEN ID > 1008 THEN 'Type-A' WHEN ID <= 1008 THEN 'Type-B' END AS CATEGORY\n"
                                 + "\n"
                                 + "pipeline:\n"
                                 + "  execution.runtime-mode: %s\n"
@@ -201,7 +197,6 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
                         startupMode,
-                        transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
                         runtimeMode,
@@ -612,11 +607,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                                 + "  type: values\n"
                                 + "transform:\n"
                                 + "  - source-table: %s.TABLEALPHA\n"
-                                + "    projection: ID, VERSION, PRICEALPHA, AGEALPHA, 'Juvenile' AS ROLENAME\n"
-                                + "    filter: AGEALPHA < 18\n"
-                                + "  - source-table: %s.TABLEALPHA\n"
-                                + "    projection: ID, VERSION, PRICEALPHA, AGEALPHA, NAMEALPHA AS ROLENAME\n"
-                                + "    filter: AGEALPHA >= 18\n"
+                                + "    projection: ID, VERSION, PRICEALPHA, AGEALPHA, CASE WHEN AGEALPHA < 18 THEN 'Juvenile' WHEN AGEALPHA >= 18 THEN NAMEALPHA END AS ROLENAME\n"
                                 + "pipeline:\n"
                                 + "  execution.runtime-mode: %s\n"
                                 + "  parallelism: %d",
@@ -703,7 +694,6 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
                         startupMode,
-                        transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
                         runtimeMode,

@@ -176,7 +176,7 @@
   primary-key: id_
   expect: |-
     CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`array_string_` ARRAY<STRING>}, primaryKeys=id_, options=()}
-    DataChangeEvent{tableId=foo.bar.baz, before=[1, [one, one, two, three, five]], after=[-1, [二, san, 五, qi, 十一]], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[-1, [二, san, 五, qi, 十一]], op=INSERT, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[-1, [二, san, 五, qi, 十一]], after=[], op=DELETE, meta=()}
 - do: Map Subscripting
   projection: |-
@@ -248,6 +248,7 @@
   expect: |-
     CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`map_int_string_` MAP<INT, STRING>}, primaryKeys=id_, options=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, {1 -> one, 2 -> two, 3 -> three}], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, {1 -> one, 2 -> two, 3 -> three}], after=[], op=DELETE, meta=()}
 - do: Record Subscripting With Index
   projection: |-
     id_
@@ -282,7 +283,7 @@
   primary-key: id_
   expect: |-
     CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`complex_row_` ROW<`name` STRING, `length` INT>}, primaryKeys=id_, options=()}
-    DataChangeEvent{tableId=foo.bar.baz, before=[1, {name: STRING -> Alice, length: INT -> 5}], after=[-1, {name: STRING -> Derrida, length: INT -> 7}], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[-1, {name: STRING -> Derrida, length: INT -> 7}], op=INSERT, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[-1, {name: STRING -> Derrida, length: INT -> 7}], after=[], op=DELETE, meta=()}
 - do: Variant Object Subscripting With String Key
   projection: |-

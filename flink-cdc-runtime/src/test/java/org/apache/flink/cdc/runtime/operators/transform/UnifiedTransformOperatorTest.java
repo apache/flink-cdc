@@ -487,7 +487,7 @@ class UnifiedTransformOperatorTest {
                 .updatePreTransformed(
                         new Object[] {"id004", 18, "NeoReference004", 2018},
                         new Object[] {"id004", 10, "NeoReference004", 2018})
-                .updatePostTransformed()
+                .deletePostTransformed("id004", "ID004", 19, "neoreference004")
                 .deleteSource("id001", "Alice", 17, "Reference001", 2021)
                 .deletePreTransformed("id001", 17, "Reference001", 2021)
                 .deletePostTransformed("id001", "ID001", 18, "reference001")
@@ -1032,7 +1032,7 @@ class UnifiedTransformOperatorTest {
                         new Object[] {"1004", "Colin", 10, "NeoReference004", 2018})
                 .updatePreTransformed(
                         new Object[] {"1004", 19, 2018}, new Object[] {"1004", 10, 2018})
-                .updatePostTransformed()
+                .deletePostTransformed("1004", 20, 1023L, "19")
                 .deleteSource("1001", "Alice", 17, "Reference001", 2021)
                 .deletePreTransformed("1001", 17, 2021)
                 .deletePostTransformed("1001", 18, 1018L, "17")
