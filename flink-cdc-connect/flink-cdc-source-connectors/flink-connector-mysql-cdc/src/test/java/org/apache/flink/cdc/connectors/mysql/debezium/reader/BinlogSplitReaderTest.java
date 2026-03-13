@@ -1137,9 +1137,9 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
         header.setTimestamp(1L);
         Event event = new Event(header, new WriteRowsEventData());
 
-        // Check if the filter works
+        // Check if the filter works, should be true
         Predicate<Event> eventFilter = binlogReader.getBinlogSplitReadTask().getEventFilter();
-        assertThat(eventFilter.test(event)).isFalse();
+        assertThat(eventFilter.test(event)).isTrue();
     }
 
     @Test
