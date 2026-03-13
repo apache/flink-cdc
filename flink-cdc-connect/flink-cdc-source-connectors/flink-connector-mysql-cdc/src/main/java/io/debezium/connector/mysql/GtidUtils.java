@@ -29,11 +29,33 @@ import java.util.function.Predicate;
 public class GtidUtils {
 
     /**
+     * Fixes old channels' GTID ranges by filling prefix gaps using server GTID intervals.
+     *
+     * <p>This is the shared logic between EARLIEST and LATEST modes. For UUIDs present in the
+     * checkpoint, non-contiguous GTID ranges are corrected via {@link #fixRestoredGtidSet} to avoid
+     * MySQL replaying pre-checkpoint transactions.
+     *
+     * @param availableServerGtidSet the relevant (filtered) server GTID set
+     * @param purgedServerGtid the GTID set already purged from the MySQL server
+     * @param checkpointGtidSet the GTID set restored from checkpoint
+     * @return the fixed GTID set for old channels
+     */
+    public static GtidSet fixOldChannelsGtidSet(
+            GtidSet availableServerGtidSet, GtidSet purgedServerGtid, GtidSet checkpointGtidSet) {
+        return fixRestoredGtidSet(
+                mergeGtidSetInto(
+                        availableServerGtidSet.retainAll(
+                                uuid -> checkpointGtidSet.forServerWithId(uuid) != null),
+                        purgedServerGtid),
+                checkpointGtidSet);
+    }
+
+    /**
      * Computes the merged GTID set for the LATEST new-channel-position mode.
      *
      * <p>For old channels (UUIDs present in checkpoint), non-contiguous GTID ranges are fixed via
-     * {@link #fixRestoredGtidSet} to avoid MySQL replaying pre-checkpoint transactions. For new
-     * channels (UUIDs not in checkpoint), the server's full GTID is used to skip all history.
+     * {@link #fixOldChannelsGtidSet}. For new channels (UUIDs not in checkpoint), the server's full
+     * GTID is used to skip all history.
      *
      * @param availableServerGtidSet the GTID set currently available on the MySQL server
      * @param purgedServerGtid the GTID set already purged from the MySQL server
@@ -53,12 +75,8 @@ public class GtidUtils {
 
         // Step 1: Fix old channels' GTID ranges
         GtidSet fixedOldChannelsGtid =
-                fixRestoredGtidSet(
-                        mergeGtidSetInto(
-                                relevantAvailableServerGtidSet.retainAll(
-                                        uuid -> checkpointGtidSet.forServerWithId(uuid) != null),
-                                purgedServerGtid),
-                        checkpointGtidSet);
+                fixOldChannelsGtidSet(
+                        relevantAvailableServerGtidSet, purgedServerGtid, checkpointGtidSet);
 
         // Step 2: For new channels, use server's full GTID to skip all history
         GtidSet newChannelsGtid =
