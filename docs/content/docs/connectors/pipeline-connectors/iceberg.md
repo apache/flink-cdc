@@ -41,6 +41,8 @@ How to create Pipeline
 
 The pipeline for reading data from MySQL and sink to Iceberg can be defined as follows:
 
+### Hadoop Catalog Example
+
 ```yaml
 source:
   type: mysql
@@ -63,20 +65,60 @@ pipeline:
   parallelism: 2
 ```
 
+### AWS Glue Catalog Example
+
+```yaml
+source:
+  type: mysql
+  name: MySQL Source
+  hostname: 127.0.0.1
+  port: 3306
+  username: admin
+  password: pass
+  tables: adb.\.*, bdb.user_table_[0-9]+, [app|web].order_\.*
+  server-id: 5401-5404
+
+sink:
+  type: iceberg
+  name: Iceberg Sink
+  catalog.properties.type: glue
+  catalog.properties.warehouse: s3://my-bucket/warehouse
+  catalog.properties.io-impl: org.apache.iceberg.aws.s3.S3FileIO
+  catalog.properties.client.region: us-east-1
+  catalog.properties.glue.skip-archive: true
+
+pipeline:
+  name: MySQL to Iceberg via Glue Pipeline
+  parallelism: 2
+```
+
 ***Note:***
-If `catalog.properties.type` is hadoop, you need to configure the following dependencies manually, and pass it with `--jar` argument of Flink CDC CLI when submitting YAML pipeline jobs.
+Depending on the catalog type, you may need to add extra JARs manually and pass them with the `--jar` argument of Flink CDC CLI when submitting YAML pipeline jobs.
+
 <div class="wy-table-responsive">
 <table class="colwidths-auto docutils">
     <thead>
       <tr>
+        <th class="text-left">Catalog Type</th>
         <th class="text-left">Dependency Item</th>
         <th class="text-left">Description</th>
       </tr>
     </thead>
     <tbody>
       <tr>
-        <td><a href="https://mvnrepository.com/artifact/org.apache.flink/flink-shaded-hadoop-2-uber/2.8.3-10.0 ">  org.apache.flink:flink-shaded-hadoop-2-uber:2.8.3-10.0</a></td>
-        <td>Used for Hadoop dependencies.</td>
+        <td>hadoop</td>
+        <td><a href="https://mvnrepository.com/artifact/org.apache.flink/flink-shaded-hadoop-2-uber/2.8.3-10.0">org.apache.flink:flink-shaded-hadoop-2-uber:2.8.3-10.0</a></td>
+        <td>Provides Hadoop filesystem dependencies.</td>
+      </tr>
+      <tr>
+        <td>glue</td>
+        <td><a href="https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-aws">org.apache.iceberg:iceberg-aws</a></td>
+        <td>Provides AWS Glue Catalog and S3 FileIO implementation.</td>
+      </tr>
+      <tr>
+        <td>glue</td>
+        <td><a href="https://mvnrepository.com/artifact/software.amazon.awssdk/bundle">software.amazon.awssdk:bundle</a></td>
+        <td>AWS SDK bundle required by iceberg-aws.</td>
       </tr>
     </tbody>
 </table>
@@ -115,21 +157,63 @@ Pipeline Connector Options
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Metastore of Iceberg catalog, supports <code>hadoop</code> and <code>hive</code>.</td>
+      <td>Metastore type of Iceberg catalog, supports <code>hadoop</code>, <code>hive</code>, and <code>glue</code>. Alternatively, you can use <code>catalog.properties.catalog-impl</code> to specify a custom catalog class directly.</td>
+    </tr>
+    <tr>
+      <td>catalog.properties.catalog-impl</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>Custom catalog implementation class. Use this instead of <code>catalog.properties.type</code> when you need a specific catalog class, e.g. <code>org.apache.iceberg.aws.glue.GlueCatalog</code>.</td>
     </tr>
     <tr>
       <td>catalog.properties.warehouse</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>The warehouse root path of catalog.</td>
+      <td>The warehouse root path of the Iceberg catalog, used by all catalog types. For <code>hadoop</code> and <code>hive</code> catalogs, this is typically a local or distributed filesystem path. For <code>glue</code> catalog, this is typically an object storage path like <code>s3://my-bucket/warehouse</code>.</td>
     </tr>
     <tr>
       <td>catalog.properties.uri</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Uri of metastore server.</td>
+      <td>URI of the metastore server (e.g. Hive Metastore thrift URI).</td>
+    </tr>
+    <tr>
+      <td>catalog.properties.io-impl</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>Custom FileIO implementation class. For AWS S3, use <code>org.apache.iceberg.aws.s3.S3FileIO</code>.</td>
+    </tr>
+    <tr>
+      <td>catalog.properties.client.region</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>The AWS region for the Glue catalog client (e.g. <code>us-east-1</code>).</td>
+    </tr>
+    <tr>
+      <td>catalog.properties.glue.id</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>The Glue catalog ID (AWS account ID). By default, the caller's AWS account ID is used.</td>
+    </tr>
+    <tr>
+      <td>catalog.properties.glue.skip-archive</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">true</td>
+      <td>Boolean</td>
+      <td>Whether to skip archiving older table versions in Glue.</td>
+    </tr>
+    <tr>
+      <td>catalog.properties.glue.skip-name-validation</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>Whether to skip name validation for Glue catalog.</td>
     </tr>
     <tr>
       <td>partition.key</td>
