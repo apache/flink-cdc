@@ -22,8 +22,10 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import java.util.function.Predicate;
 import java.util.stream.Stream;
 
+import static io.debezium.connector.mysql.GtidUtils.computeLatestModeGtidSet;
 import static io.debezium.connector.mysql.GtidUtils.fixRestoredGtidSet;
 import static io.debezium.connector.mysql.GtidUtils.mergeGtidSetInto;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -83,6 +85,75 @@ class GtidUtilsTest {
                         "A:1-20:30-35:45-50:60-65:75-80"));
     }
 
+    /** Tests {@link GtidUtils#computeLatestModeGtidSet} for FLINK-39149. */
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("latestModeGtidSetsProvider")
+    void testLatestModeGtidMerge(
+            String description,
+            String serverGtidStr,
+            String checkpointGtidStr,
+            String expectedMergedStr) {
+        GtidSet serverGtidSet = new GtidSet(serverGtidStr);
+        GtidSet checkpointGtidSet = new GtidSet(checkpointGtidStr);
+
+        GtidSet mergedGtidSet =
+                computeLatestModeGtidSet(serverGtidSet, new GtidSet(""), checkpointGtidSet, null);
+
+        assertThat(mergedGtidSet).hasToString(expectedMergedStr);
+
+        // Verify MySQL would not replay pre-checkpoint transactions
+        GtidSet transactionsToSend = serverGtidSet.subtract(mergedGtidSet);
+        for (GtidSet.UUIDSet uuidSet : checkpointGtidSet.getUUIDSets()) {
+            String uuid = uuidSet.getUUID();
+            long earliestCheckpointTx =
+                    uuidSet.getIntervals().stream()
+                            .mapToLong(GtidSet.Interval::getStart)
+                            .min()
+                            .orElse(1);
+            if (earliestCheckpointTx > 1) {
+                GtidSet.UUIDSet toSendUuidSet = transactionsToSend.forServerWithId(uuid);
+                if (toSendUuidSet != null) {
+                    for (GtidSet.Interval interval : toSendUuidSet.getIntervals()) {
+                        assertThat(interval.getStart())
+                                .as(
+                                        "Should not replay pre-checkpoint transactions for UUID %s",
+                                        uuid)
+                                .isGreaterThan(earliestCheckpointTx);
+                    }
+                }
+            }
+        }
+    }
+
+    private static Stream<Arguments> latestModeGtidSetsProvider() {
+        return Stream.of(
+                Arguments.of(
+                        "Old channel with non-contiguous GTID, new channel present",
+                        "aaa-111:1-10000,bbb-222:1-3000",
+                        "aaa-111:5000-8000",
+                        "aaa-111:1-8000,bbb-222:1-3000"),
+                Arguments.of(
+                        "Mixed old channels (contiguous and non-contiguous) with new channel",
+                        "aaa-111:1-10000,bbb-222:1-3000,ccc-333:1-5000",
+                        "aaa-111:5000-8000,bbb-222:1-2000",
+                        "aaa-111:1-8000,bbb-222:1-2000,ccc-333:1-5000"),
+                Arguments.of(
+                        "All old channels, no new channels",
+                        "aaa-111:1-10000,bbb-222:1-3000",
+                        "aaa-111:1-8000,bbb-222:1-2000",
+                        "aaa-111:1-8000,bbb-222:1-2000"),
+                Arguments.of(
+                        "Contiguous checkpoint GTID, no regression",
+                        "aaa-111:1-10000,bbb-222:1-3000",
+                        "aaa-111:1-8000",
+                        "aaa-111:1-8000,bbb-222:1-3000"),
+                Arguments.of(
+                        "Only new channels, checkpoint has unknown UUID",
+                        "aaa-111:1-10000,bbb-222:1-3000",
+                        "xxx-999:1-500",
+                        "aaa-111:1-10000,bbb-222:1-3000,xxx-999:1-500"));
+    }
+
     @Test
     void testMergingGtidSets() {
         GtidSet base = new GtidSet("A:1-100");
@@ -95,5 +166,66 @@ class GtidUtilsTest {
         base = new GtidSet("A:1-100,B:1-100");
         toMerge = new GtidSet("A:1-10,C:1-10");
         assertThat(mergeGtidSetInto(base, toMerge)).hasToString("A:1-100,B:1-100,C:1-10");
+    }
+
+    /** Tests {@link GtidUtils#computeLatestModeGtidSet} with {@code gtidSourceFilter}. */
+    @Test
+    void testLatestModeGtidMergeWithSourceFilter() {
+        GtidSet availableServerGtidSet =
+                new GtidSet("aaa-111:1-10000,bbb-222:1-3000,ccc-333:1-5000");
+        GtidSet checkpointGtidSet = new GtidSet("aaa-111:5000-8000,bbb-222:1-2000");
+        Predicate<String> gtidSourceFilter = uuid -> !uuid.equals("ccc-333");
+
+        GtidSet mergedGtidSet =
+                computeLatestModeGtidSet(
+                        availableServerGtidSet,
+                        new GtidSet(""),
+                        checkpointGtidSet,
+                        gtidSourceFilter);
+
+        assertThat(mergedGtidSet.toString()).contains("aaa-111:1-8000");
+        assertThat(mergedGtidSet.toString()).contains("bbb-222:1-2000");
+        assertThat(mergedGtidSet.toString()).doesNotContain("ccc-333");
+    }
+
+    /** Tests {@link GtidUtils#computeLatestModeGtidSet} with purged GTID. */
+    @Test
+    void testLatestModeGtidMergeWithPurgedGtid() {
+        GtidSet availableServerGtidSet = new GtidSet("aaa-111:50-10000,bbb-222:1-3000");
+        GtidSet purgedServerGtid = new GtidSet("aaa-111:1-49");
+        GtidSet checkpointGtidSet = new GtidSet("aaa-111:5000-8000");
+
+        GtidSet mergedGtidSet =
+                computeLatestModeGtidSet(
+                        availableServerGtidSet, purgedServerGtid, checkpointGtidSet, null);
+
+        assertThat(mergedGtidSet.toString()).contains("aaa-111:50-8000");
+        assertThat(mergedGtidSet.toString()).contains("bbb-222:1-3000");
+
+        // Verify no pre-checkpoint replay
+        GtidSet transactionsToSend = availableServerGtidSet.subtract(mergedGtidSet);
+        GtidSet.UUIDSet aaaToSend = transactionsToSend.forServerWithId("aaa-111");
+        if (aaaToSend != null) {
+            for (GtidSet.Interval interval : aaaToSend.getIntervals()) {
+                assertThat(interval.getStart())
+                        .as("Should not request pre-checkpoint transactions")
+                        .isGreaterThanOrEqualTo(8001);
+            }
+        }
+    }
+
+    /** Tests {@link GtidUtils#computeLatestModeGtidSet} with a completely purged UUID. */
+    @Test
+    void testLatestModeGtidMergeWithFullyPurgedChannel() {
+        GtidSet availableServerGtidSet = new GtidSet("bbb-222:1-3000");
+        GtidSet purgedServerGtid = new GtidSet("aaa-111:1-500");
+        GtidSet checkpointGtidSet = new GtidSet("aaa-111:200-400");
+
+        GtidSet mergedGtidSet =
+                computeLatestModeGtidSet(
+                        availableServerGtidSet, purgedServerGtid, checkpointGtidSet, null);
+
+        assertThat(mergedGtidSet.toString()).contains("aaa-111:1-400");
+        assertThat(mergedGtidSet.toString()).contains("bbb-222:1-3000");
     }
 }
