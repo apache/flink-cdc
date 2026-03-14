@@ -460,6 +460,13 @@ Only valid for cdc 1.x version. During a snapshot operation, the connector will 
         For example updating an already updated value in snapshot, or deleting an already deleted entry in snapshot. These replayed change log events should be handled specially.
       </td>
     </tr>
+    <tr>
+      <td>ignore-no-primary-key-table</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>Whether to skip tables without primary keys. If set to true, the connector will skip tables that don't have a primary key.</td>
+    </tr>
     </tbody>
 </table>
 </div>
@@ -665,7 +672,7 @@ Flink performs checkpoints for the source periodically, in case of failover, the
 
 When performing incremental snapshot reading, MySQL CDC source need a criterion which used to split the table.
 MySQL CDC Source use a splitting column to split the table to multiple splits (chunks). By default, MySQL CDC source will identify the primary key column of the table and use the first column in primary key as the splitting column.
-If there is no primary key in the table, user must specify `scan.incremental.snapshot.chunk.key-column`, 
+If there is no primary key in the table, users must specify scan.incremental.snapshot.chunk.key-column as the chunk key, or set ignore-no-primary-key-table to true to skip tables without primary keys,
 otherwise incremental snapshot reading will fail and you can disable `scan.incremental.snapshot.enabled` to fallback to old snapshot reading mechanism.
 Please note that using a column not in primary key as a chunk key can result in slower table query performance.
 
@@ -890,6 +897,9 @@ Using a **non-primary key column** as the `scan.incremental.snapshot.chunk.key-c
     - **Split 1:** Contains the record `[id=0, pid=4]`
 
 Since the order of processing these records cannot be guaranteed, the final value of `pid` for `id=0` may end up being either `2` or `4`, leading to potential data inconsistencies.
+
+Starting from version 3.5.0, MySQL CDC provides an option to ignore tables without primary keys. 
+When `ignore-no-primary-key-table` is set to `true`, the connector will skip tables that don't have a primary key.
 
 ### About converting binary type data to base64 encoded data
 
