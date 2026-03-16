@@ -41,6 +41,7 @@ import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledIfSystemProperty;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
@@ -54,6 +55,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 /** Tests for {@link CompactionOperator}. */
+@DisabledIfSystemProperty(named = "flink.profile", matches = "flink2")
 public class CompactionOperatorTest {
 
     @TempDir public static java.nio.file.Path temporaryFolder;

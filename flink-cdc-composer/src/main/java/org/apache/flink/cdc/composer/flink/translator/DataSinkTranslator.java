@@ -40,9 +40,10 @@ import org.apache.flink.core.io.SimpleVersionedSerializer;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.streaming.api.connector.sink2.CommittableMessage;
 import org.apache.flink.streaming.api.connector.sink2.CommittableMessageTypeInfo;
+import org.apache.flink.streaming.api.connector.sink2.SupportsPreCommitTopology;
+import org.apache.flink.streaming.api.connector.sink2.SupportsPreWriteTopology;
 import org.apache.flink.streaming.api.connector.sink2.WithPostCommitTopology;
 import org.apache.flink.streaming.api.connector.sink2.WithPreCommitTopology;
-import org.apache.flink.streaming.api.connector.sink2.WithPreWriteTopology;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.SinkFunction;
@@ -129,8 +130,8 @@ public class DataSinkTranslator {
             OperatorUidGenerator operatorUidGenerator) {
         DataStream<Event> stream = input;
         // Pre-write topology
-        if (sink instanceof WithPreWriteTopology) {
-            stream = ((WithPreWriteTopology<Event>) sink).addPreWriteTopology(stream);
+        if (sink instanceof SupportsPreWriteTopology) {
+            stream = ((SupportsPreWriteTopology<Event>) sink).addPreWriteTopology(stream);
         }
 
         if (sink instanceof TwoPhaseCommittingSink) {
@@ -193,6 +194,8 @@ public class DataSinkTranslator {
         if (sink instanceof WithPreCommitTopology) {
             preCommitted =
                     ((WithPreCommitTopology<Event, CommT>) sink).addPreCommitTopology(written);
+        } else if (sink instanceof SupportsPreCommitTopology) {
+            preCommitted = ((SupportsPreCommitTopology) sink).addPreCommitTopology(written);
         }
 
         // TODO: Hard coding checkpoint
@@ -221,7 +224,7 @@ public class DataSinkTranslator {
         // during Flink 1.18 to 1.19. Remove this when Flink 1.18 is no longer supported.
         try {
             return (SimpleVersionedSerializer<CommT>)
-                    sink.getClass().getDeclaredMethod("getCommittableSerializer").invoke(sink);
+                    sink.getClass().getMethod("getCommittableSerializer").invoke(sink);
         } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
             throw new RuntimeException("Failed to get CommittableSerializer", e);
         }

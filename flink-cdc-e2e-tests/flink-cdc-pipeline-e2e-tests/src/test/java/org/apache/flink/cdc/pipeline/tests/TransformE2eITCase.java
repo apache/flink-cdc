@@ -27,7 +27,6 @@ import org.apache.flink.cdc.runtime.operators.transform.PreTransformOperator;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
@@ -52,7 +51,6 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** E2e tests for the {@link PreTransformOperator} and {@link PostTransformOperator}. */
-@EnabledIfSystemProperty(named = "specifiedFlinkVersion", matches = "^1.*")
 class TransformE2eITCase extends PipelineTestEnvironment {
     private static final Logger LOG = LoggerFactory.getLogger(TransformE2eITCase.class);
 

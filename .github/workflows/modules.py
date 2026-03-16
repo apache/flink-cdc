@@ -43,6 +43,16 @@ MODULES_PIPELINE_CONNECTORS = [
     "flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-values"
 ]
 
+MODULES_PIPELINE_CONNECTORS_2_X = [
+    "flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-mysql",
+    "flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-oracle",
+    "flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-fluss",
+    "flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-values",
+    "flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-postgres",
+    "flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-iceberg",
+    "flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-maxcompute"
+]
+
 MODULES_MYSQL_SOURCE = [
     "flink-cdc-connect/flink-cdc-source-connectors/flink-connector-mysql-cdc",
     "flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-mysql-cdc"
@@ -152,6 +162,7 @@ ALL_MODULES = set(
     MODULES_CORE +
     MODULES_CORE_2_X +
     MODULES_PIPELINE_CONNECTORS +
+    MODULES_PIPELINE_CONNECTORS_2_X +
     MODULES_MYSQL_SOURCE +
     MODULES_MYSQL_PIPELINE +
     MODULES_POSTGRES_SOURCE +

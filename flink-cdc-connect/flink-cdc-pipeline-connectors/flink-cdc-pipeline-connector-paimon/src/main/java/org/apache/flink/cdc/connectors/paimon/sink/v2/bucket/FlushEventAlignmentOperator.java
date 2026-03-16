@@ -19,8 +19,8 @@ package org.apache.flink.cdc.connectors.paimon.sink.v2.bucket;
 
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
+import org.apache.flink.cdc.runtime.operators.AbstractStreamOperatorAdapter;
 import org.apache.flink.cdc.runtime.operators.schema.regular.SchemaOperator;
-import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
@@ -31,7 +31,7 @@ import java.util.Map;
 import java.util.Set;
 
 /** Align {@link FlushEvent}s broadcasted by {@link BucketAssignOperator}. */
-public class FlushEventAlignmentOperator extends AbstractStreamOperator<Event>
+public class FlushEventAlignmentOperator extends AbstractStreamOperatorAdapter<Event>
         implements OneInputStreamOperator<Event, Event> {
 
     private transient int totalTasksNumber;

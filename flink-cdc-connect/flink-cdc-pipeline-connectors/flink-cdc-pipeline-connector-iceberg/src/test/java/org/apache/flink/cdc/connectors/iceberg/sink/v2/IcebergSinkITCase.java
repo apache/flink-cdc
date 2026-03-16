@@ -17,7 +17,6 @@
 
 package org.apache.flink.cdc.connectors.iceberg.sink.v2;
 
-import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.connector.sink2.Sink;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
@@ -32,6 +31,7 @@ import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.connectors.iceberg.sink.IcebergMetadataApplier;
 import org.apache.flink.cdc.connectors.iceberg.sink.v2.compaction.CompactionOptions;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
+import org.apache.flink.configuration.RestartStrategyOptions;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
@@ -80,7 +80,9 @@ public class IcebergSinkITCase {
         env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.setParallelism(DEFAULT_PARALLELISM);
         env.enableCheckpointing(1000);
-        env.setRestartStrategy(RestartStrategies.noRestart());
+        env.configure(
+                new org.apache.flink.configuration.Configuration()
+                        .set(RestartStrategyOptions.RESTART_STRATEGY, "none"));
         String warehouse =
                 new File(temporaryFolder.toFile(), UUID.randomUUID().toString()).toString();
         catalogOptions.put("type", "hadoop");

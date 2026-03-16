@@ -40,4 +40,13 @@ public abstract class RichParallelSourceFunction<OUT> extends AbstractRichFuncti
     }
 
     public void open(Configuration parameters) throws Exception {}
+
+    @Override
+    public void run(
+            org.apache.flink.streaming.api.functions.source.legacy.SourceFunction.SourceContext<OUT>
+                    sourceContext)
+            throws Exception {
+        // Delegate to the new SourceFunction.run method
+        SourceFunction.super.run(sourceContext);
+    }
 }

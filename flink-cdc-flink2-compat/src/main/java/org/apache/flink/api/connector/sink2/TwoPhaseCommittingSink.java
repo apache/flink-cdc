@@ -25,4 +25,15 @@ import org.apache.flink.annotation.Internal;
  */
 @Internal
 public interface TwoPhaseCommittingSink<InputT, CommT>
-        extends Sink<InputT>, SupportsCommitter<CommT> {}
+        extends Sink<InputT>, SupportsCommitter<CommT> {
+
+    /**
+     * Compatibility adapter for PrecommittingSinkWriter.
+     *
+     * <p>In Flink 1.x, this was an inner interface of TwoPhaseCommittingSink. In Flink 2.x, this
+     * concept is replaced by CommittingSinkWriter directly. This adapter provides backward
+     * compatibility.
+     */
+    @Internal
+    interface PrecommittingSinkWriter<InputT, CommT> extends CommittingSinkWriter<InputT, CommT> {}
+}

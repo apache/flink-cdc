@@ -23,7 +23,6 @@ import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
@@ -38,7 +37,6 @@ import java.util.function.Function;
 import java.util.stream.IntStream;
 
 /** E2e tests for routing features. */
-@EnabledIfSystemProperty(named = "specifiedFlinkVersion", matches = "^1.*")
 class RouteE2eITCase extends PipelineTestEnvironment {
     private static final Logger LOG = LoggerFactory.getLogger(RouteE2eITCase.class);
 

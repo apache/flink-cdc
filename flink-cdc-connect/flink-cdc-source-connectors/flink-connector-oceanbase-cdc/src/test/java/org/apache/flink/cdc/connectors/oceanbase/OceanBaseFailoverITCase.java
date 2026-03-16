@@ -18,8 +18,8 @@
 package org.apache.flink.cdc.connectors.oceanbase;
 
 import org.apache.flink.api.common.JobID;
-import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.cdc.connectors.utils.ExternalResourceProxy;
+import org.apache.flink.cdc.connectors.utils.RestartStrategyUtils;
 import org.apache.flink.runtime.minicluster.RpcServiceSharing;
 import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
 import org.apache.flink.streaming.api.CheckpointingMode;
@@ -152,7 +152,8 @@ public class OceanBaseFailoverITCase extends OceanBaseSourceTestBase {
                 FailoverType.TM,
                 FailoverPhase.BINLOG,
                 new String[] {tableName, "customers_1"},
-                RestartStrategies.fixedDelayRestart(1, 0),
+                1,
+                0,
                 tableName,
                 chunkColumnName);
     }
@@ -191,7 +192,8 @@ public class OceanBaseFailoverITCase extends OceanBaseSourceTestBase {
                 FailoverType.JM,
                 FailoverPhase.BINLOG,
                 new String[] {tableName, "customers_1"},
-                RestartStrategies.fixedDelayRestart(1, 0),
+                1,
+                0,
                 tableName,
                 chunkColumnName);
     }
@@ -252,7 +254,8 @@ public class OceanBaseFailoverITCase extends OceanBaseSourceTestBase {
                 failoverType,
                 failoverPhase,
                 captureCustomerTables,
-                RestartStrategies.fixedDelayRestart(1, 0),
+                1,
+                0,
                 tableName,
                 chunkColumnName);
     }
@@ -263,7 +266,8 @@ public class OceanBaseFailoverITCase extends OceanBaseSourceTestBase {
             FailoverType failoverType,
             FailoverPhase failoverPhase,
             String[] captureCustomerTables,
-            RestartStrategies.RestartStrategyConfiguration restartStrategyConfiguration,
+            int restartAttempts,
+            long delayBetweenAttempts,
             String tableName,
             String chunkColumnName)
             throws Exception {
@@ -273,7 +277,8 @@ public class OceanBaseFailoverITCase extends OceanBaseSourceTestBase {
                 failoverType,
                 failoverPhase,
                 captureCustomerTables,
-                restartStrategyConfiguration,
+                restartAttempts,
+                delayBetweenAttempts,
                 false,
                 tableName,
                 chunkColumnName);
@@ -285,7 +290,8 @@ public class OceanBaseFailoverITCase extends OceanBaseSourceTestBase {
             FailoverType failoverType,
             FailoverPhase failoverPhase,
             String[] captureCustomerTables,
-            RestartStrategies.RestartStrategyConfiguration restartStrategyConfiguration,
+            int restartAttempts,
+            long delayBetweenAttempts,
             boolean skipSnapshotBackfill,
             String tableName,
             String chunkColumnName)
@@ -297,7 +303,8 @@ public class OceanBaseFailoverITCase extends OceanBaseSourceTestBase {
 
         env.setParallelism(parallelism);
         env.enableCheckpointing(200L);
-        env.setRestartStrategy(restartStrategyConfiguration);
+        RestartStrategyUtils.configureFixedDelayRestartStrategy(
+                env, restartAttempts, delayBetweenAttempts);
         String sourceDDL =
                 format(
                         "CREATE TABLE customers ("

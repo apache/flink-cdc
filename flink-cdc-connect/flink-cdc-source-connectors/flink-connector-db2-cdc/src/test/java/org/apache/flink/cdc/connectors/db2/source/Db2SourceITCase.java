@@ -18,10 +18,10 @@
 package org.apache.flink.cdc.connectors.db2.source;
 
 import org.apache.flink.api.common.JobID;
-import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.cdc.connectors.db2.Db2TestBase;
 import org.apache.flink.cdc.connectors.db2.source.Db2SourceBuilder.Db2IncrementalSource;
 import org.apache.flink.cdc.connectors.utils.ExternalResourceProxy;
+import org.apache.flink.cdc.connectors.utils.RestartStrategyUtils;
 import org.apache.flink.runtime.highavailability.nonha.embedded.HaLeadershipControl;
 import org.apache.flink.runtime.minicluster.MiniCluster;
 import org.apache.flink.runtime.minicluster.RpcServiceSharing;
@@ -148,7 +148,7 @@ class Db2SourceITCase extends Db2TestBase {
 
         env.setParallelism(parallelism);
         env.enableCheckpointing(1000L);
-        env.setRestartStrategy(RestartStrategies.fixedDelayRestart(1, 0));
+        RestartStrategyUtils.configureFixedDelayRestartStrategy(env, 1, 0);
 
         String sourceDDL =
                 format(

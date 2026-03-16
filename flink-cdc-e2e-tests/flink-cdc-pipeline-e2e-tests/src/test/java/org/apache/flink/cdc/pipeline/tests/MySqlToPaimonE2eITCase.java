@@ -26,7 +26,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.Container;
@@ -49,7 +48,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /** End-to-end tests for mysql cdc to Paimon pipeline job. */
-@EnabledIfSystemProperty(named = "specifiedFlinkVersion", matches = "^1.*")
 class MySqlToPaimonE2eITCase extends PipelineTestEnvironment {
     private static final Logger LOG = LoggerFactory.getLogger(MySqlToPaimonE2eITCase.class);
 
@@ -108,8 +106,8 @@ class MySqlToPaimonE2eITCase extends PipelineTestEnvironment {
                                 + "\n"
                                 + "pipeline:\n"
                                 + "  schema.change.behavior: evolve\n"
-                                + "  parallelism: 4",
-                        MYSQL_TEST_USER, MYSQL_TEST_PASSWORD, database, warehouse);
+                                + "  parallelism: %s",
+                        MYSQL_TEST_USER, MYSQL_TEST_PASSWORD, database, warehouse, parallelism);
         Path paimonCdcConnector = TestUtils.getResource("paimon-cdc-pipeline-connector.jar");
         Path hadoopJar = TestUtils.getResource("flink-shade-hadoop.jar");
         submitPipelineJob(pipelineJob, paimonCdcConnector, hadoopJar);

@@ -86,7 +86,6 @@ public class IcebergSink
         return dataStream;
     }
 
-    @Override
     public Committer<WriteResultWrapper> createCommitter() {
         return new IcebergCommitter(catalogOptions);
     }
@@ -103,6 +102,7 @@ public class IcebergSink
         return new WriteResultWrapperSerializer();
     }
 
+    @Deprecated
     @Override
     public SinkWriter<Event> createWriter(InitContext context) {
         long lastCheckpointId =

@@ -404,6 +404,17 @@ public abstract class PipelineTestEnvironment extends TestLogger {
     }
 
     protected String getFlinkDockerImageTag() {
+        String customImage = System.getProperty("flink.docker.image");
+        if (customImage != null && !customImage.isEmpty()) {
+            return customImage;
+        }
+        String registry = System.getProperty("flink.docker.registry", "");
+        if (!registry.isEmpty()) {
+            if (System.getProperty("java.specification.version").equals("17")) {
+                return String.format("%s/flink:%s-scala_2.12-java17", registry, flinkVersion);
+            }
+            return String.format("%s/flink:%s-scala_2.12-java11", registry, flinkVersion);
+        }
         if (System.getProperty("java.specification.version").equals("17")) {
             return String.format("flink:%s-scala_2.12-java17", flinkVersion);
         }

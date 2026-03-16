@@ -145,7 +145,10 @@ public abstract class SourceSplitSerializer
             }
             TableId tableId = TableId.parse(in.readUTF(), useCatalogBeforeSchema);
             String splitId = in.readUTF();
-            RowType splitKeyType = (RowType) LogicalTypeParser.parse(in.readUTF());
+            RowType splitKeyType =
+                    (RowType)
+                            LogicalTypeParser.parse(
+                                    in.readUTF(), Thread.currentThread().getContextClassLoader());
             Object[] splitBoundaryStart = SerializerUtils.serializedStringToRow(in.readUTF());
             Object[] splitBoundaryEnd = SerializerUtils.serializedStringToRow(in.readUTF());
             Offset highWatermark = readOffsetPosition(version, in);

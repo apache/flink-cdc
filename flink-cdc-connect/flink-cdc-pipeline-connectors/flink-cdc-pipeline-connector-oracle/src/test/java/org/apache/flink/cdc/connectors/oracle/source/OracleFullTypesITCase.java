@@ -18,7 +18,6 @@
 package org.apache.flink.cdc.connectors.oracle.source;
 
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
-import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.data.DecimalData;
@@ -37,6 +36,7 @@ import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.connectors.oracle.factory.OracleDataSourceFactory;
 import org.apache.flink.cdc.connectors.oracle.source.config.OracleSourceConfigFactory;
 import org.apache.flink.cdc.connectors.oracle.table.OracleReadableMetaData;
+import org.apache.flink.cdc.connectors.utils.RestartStrategyUtils;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.util.CloseableIterator;
 
@@ -92,7 +92,7 @@ public class OracleFullTypesITCase extends OracleSourceTestBase {
     public void before() throws Exception {
         env.setParallelism(DEFAULT_PARALLELISM);
         env.enableCheckpointing(200);
-        env.setRestartStrategy(RestartStrategies.noRestart());
+        RestartStrategyUtils.configureNoRestartStrategy(env);
         Connection conn = getJdbcConnectionAsDBA();
         conn.createStatement().execute("GRANT ANALYZE ANY TO " + CONNECTOR_USER);
     }

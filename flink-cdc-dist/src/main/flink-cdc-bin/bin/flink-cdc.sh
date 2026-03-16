@@ -71,6 +71,22 @@ done
 for jar in $(find "$FLINK_CDC_LIB" -name "*.jar" -type f); do
   CLASSPATH=$CLASSPATH:$jar
 done
+# Add additional JARs specified by --jar arguments to classpath
+for ((i=0; i < ${#args[@]}; i++)); do
+    case "${args[i]}" in
+        --jar=*)
+            jar_path="${args[i]#*=}"
+            if [[ -f "$jar_path" ]]; then
+                CLASSPATH=$CLASSPATH:$jar_path
+            fi
+            ;;
+        --jar)
+            if [[ -n "${args[i+1]}" && -f "${args[i+1]}" ]]; then
+                CLASSPATH=$CLASSPATH:${args[i+1]}
+            fi
+            ;;
+    esac
+done
 # Add Hadoop classpath, which is defined in config.sh
 CLASSPATH=$CLASSPATH:$INTERNAL_HADOOP_CLASSPATHS
 # Trim classpath

@@ -135,7 +135,10 @@ public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MyS
         if (splitKind == SNAPSHOT_SPLIT_FLAG) {
             TableId tableId = TableId.parse(in.readUTF());
             String splitId = in.readUTF();
-            RowType splitKeyType = (RowType) LogicalTypeParser.parse(in.readUTF());
+            RowType splitKeyType =
+                    (RowType)
+                            LogicalTypeParser.parse(
+                                    in.readUTF(), Thread.currentThread().getContextClassLoader());
             Object[] splitBoundaryStart = serializedStringToRow(in.readUTF());
             Object[] splitBoundaryEnd = serializedStringToRow(in.readUTF());
             BinlogOffset highWatermark = readBinlogPosition(version, in);

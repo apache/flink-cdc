@@ -17,15 +17,16 @@
 
 package org.apache.flink.cdc.connectors.postgres.source;
 
-import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.cdc.connectors.postgres.PostgresTestBase;
 import org.apache.flink.cdc.connectors.postgres.testutils.PostgresTestUtils;
 import org.apache.flink.cdc.connectors.postgres.testutils.UniqueDatabase;
 import org.apache.flink.cdc.connectors.utils.ExternalResourceProxy;
+import org.apache.flink.cdc.connectors.utils.RestartStrategyUtils;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.configuration.StateRecoveryOptions;
 import org.apache.flink.core.execution.JobClient;
+import org.apache.flink.core.execution.SavepointFormatType;
 import org.apache.flink.runtime.checkpoint.CheckpointException;
-import org.apache.flink.runtime.jobgraph.SavepointConfigOptions;
 import org.apache.flink.runtime.minicluster.RpcServiceSharing;
 import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -41,6 +42,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.condition.DisabledIfSystemProperty;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -65,6 +67,7 @@ import static java.lang.String.format;
  * this test will pass until close
  */
 @Timeout(value = 300, unit = TimeUnit.SECONDS)
+@DisabledIfSystemProperty(named = "flink.profile", matches = "flink2")
 class NewlyAddedTableITCase extends PostgresTestBase {
 
     private static final String DB_NAME_PREFIX = "postgres";
@@ -896,7 +899,9 @@ class NewlyAddedTableITCase extends PostgresTestBase {
         // retry 600 times, it takes 100 milliseconds per time, at most retry 1 minute
         while (retryTimes < 600) {
             try {
-                return jobClient.triggerSavepoint(savepointDirectory).get();
+                return jobClient
+                        .triggerSavepoint(savepointDirectory, SavepointFormatType.DEFAULT)
+                        .get();
             } catch (Exception e) {
                 Optional<CheckpointException> exception =
                         ExceptionUtils.findThrowable(e, CheckpointException.class);
@@ -916,13 +921,13 @@ class NewlyAddedTableITCase extends PostgresTestBase {
             String finishedSavePointPath, int parallelism) throws Exception {
         Configuration configuration = new Configuration();
         if (finishedSavePointPath != null) {
-            configuration.setString(SavepointConfigOptions.SAVEPOINT_PATH, finishedSavePointPath);
+            configuration.set(StateRecoveryOptions.SAVEPOINT_PATH, finishedSavePointPath);
         }
         StreamExecutionEnvironment env =
                 StreamExecutionEnvironment.getExecutionEnvironment(configuration);
         env.setParallelism(parallelism);
         env.enableCheckpointing(200L);
-        env.setRestartStrategy(RestartStrategies.fixedDelayRestart(3, 100L));
+        RestartStrategyUtils.configureFixedDelayRestartStrategy(env, 3, 100L);
         return env;
     }
 

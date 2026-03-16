@@ -77,11 +77,27 @@ jobs:
     with:
       java-versions: "[11]"
       modules: "['doris, elasticsearch, fluss, hudi, iceberg, kafka, maxcompute, mysql-pipeline, oceanbase-pipeline, paimon, postgres-pipeline, starrocks, oracle-pipeline']"
+  pipeline-connectors-ut-2-x:
+    name: Pipeline Connectors Unit Tests 2.x
+    uses: ./.github/workflows/flink_cdc_base.yml
+    with:
+      java-versions: "[11]"
+      flink-versions: "['2.2.0']"
+      custom-maven-parameter: "-Pflink2"
+      modules: "['pipeline_connectors_2_x']"
   source-ut:
     name: Source Unit Tests
     uses: ./.github/workflows/flink_cdc_base.yml
     with:
       java-versions: "[11]"
+      modules: "['mysql-source', 'postgres-source, oceanbase-source, tidb, vitess', 'oracle, sqlserver', 'db2, mongodb']"
+  source-ut-2-x:
+    name: Source Unit Tests 2.x
+    uses: ./.github/workflows/flink_cdc_base.yml
+    with:
+      java-versions: "[11]"
+      flink-versions: "['2.2.0']"
+      custom-maven-parameter: "-Pflink2"
       modules: "['mysql-source', 'postgres-source, oceanbase-source, tidb, vitess', 'oracle, sqlserver', 'db2, mongodb']"
   pipeline_e2e:
     strategy:

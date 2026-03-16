@@ -31,6 +31,7 @@ import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
 import org.apache.flink.streaming.api.operators.collect.CollectResultIterator;
+import org.apache.flink.streaming.api.operators.collect.CollectResultIteratorAdapter;
 import org.apache.flink.streaming.api.operators.collect.CollectSinkOperator;
 import org.apache.flink.streaming.api.operators.collect.CollectSinkOperatorFactory;
 import org.apache.flink.streaming.api.operators.collect.CollectStreamSink;
@@ -161,21 +162,28 @@ class MongoDBMetricsITCase extends MongoDBSourceTestBase {
     private <T> CollectResultIterator<T> addCollector(
             StreamExecutionEnvironment env, DataStream<T> stream) {
         TypeSerializer<T> serializer =
-                stream.getTransformation().getOutputType().createSerializer(env.getConfig()); //
+                stream.getTransformation()
+                        .getOutputType()
+                        .createSerializer(env.getConfig().getSerializerConfig());
         String accumulatorName = "dataStreamCollect_" + UUID.randomUUID();
         CollectSinkOperatorFactory<T> factory =
                 new CollectSinkOperatorFactory<>(serializer, accumulatorName);
+        CollectStreamSink<T> sink = new CollectStreamSink<>(stream, factory);
+        // Set both name and uid to the same value. The uid is used by Flink to generate
+        // OperatorID via StreamGraphHasherV2.generateUserSpecifiedHash(uid), and the same
+        // uid string must be passed to CollectResultIteratorAdapter for coordinator lookup.
+        String operatorUid = "Data stream collect sink";
+        sink.name(operatorUid).uid(operatorUid);
         CollectSinkOperator<T> operator = (CollectSinkOperator<T>) factory.getOperator();
+        env.addOperator(sink.getTransformation());
         CollectResultIterator<T> iterator =
-                new CollectResultIterator<>(
-                        operator.getOperatorIdFuture(),
+                new CollectResultIteratorAdapter<>(
+                        operatorUid,
+                        operator,
                         serializer,
                         accumulatorName,
                         env.getCheckpointConfig(),
                         10000L);
-        CollectStreamSink<T> sink = new CollectStreamSink<>(stream, factory);
-        sink.name("Data stream collect sink");
-        env.addOperator(sink.getTransformation());
         return iterator;
     }
 

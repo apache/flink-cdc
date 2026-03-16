@@ -24,7 +24,6 @@ import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -43,7 +42,6 @@ import static org.apache.flink.cdc.connectors.postgres.PostgresTestBase.getJdbcC
 import static org.apache.flink.cdc.connectors.postgres.PostgresTestBase.getSlotName;
 
 /** End-to-end tests for postgres cdc pipeline job. */
-@EnabledIfSystemProperty(named = "specifiedFlinkVersion", matches = "^1.*")
 public class PostgresE2eITCase extends PipelineTestEnvironment {
     private static final Logger LOG = LoggerFactory.getLogger(PostgresE2eITCase.class);
 
