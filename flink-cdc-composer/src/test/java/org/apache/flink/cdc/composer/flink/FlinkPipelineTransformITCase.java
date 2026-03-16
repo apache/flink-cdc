@@ -253,17 +253,8 @@ class FlinkPipelineTransformITCase {
                 Arrays.asList(
                         new TransformDef(
                                 "default_namespace.default_schema.\\.*",
-                                "*, 'YOUNG' AS category",
-                                "age < 20",
+                                "*, CASE WHEN age < 20 THEN 'YOUNG' WHEN age >= 20 THEN 'OLD' END AS category",
                                 null,
-                                null,
-                                null,
-                                null,
-                                null),
-                        new TransformDef(
-                                "default_namespace.default_schema.\\.*",
-                                "*, 'OLD' AS category",
-                                "age >= 20",
                                 null,
                                 null,
                                 null,
@@ -288,17 +279,8 @@ class FlinkPipelineTransformITCase {
                 Arrays.asList(
                         new TransformDef(
                                 "default_namespace.default_schema.\\.*",
-                                "id,age,'Juvenile' AS roleName",
-                                "age < 18",
+                                "id,age, CASE WHEN age < 18 THEN 'Juvenile' WHEN age >= 18 THEN name END AS roleName",
                                 null,
-                                null,
-                                null,
-                                null,
-                                null),
-                        new TransformDef(
-                                "default_namespace.default_schema.\\.*",
-                                "id,age,name AS roleName",
-                                "age >= 18",
                                 null,
                                 null,
                                 null,
@@ -317,42 +299,7 @@ class FlinkPipelineTransformITCase {
 
     @ParameterizedTest
     @EnumSource
-    void testMultiTransformWithAsterisk(ValuesDataSink.SinkApi sinkApi) throws Exception {
-        runGenericTransformTest(
-                sinkApi,
-                Arrays.asList(
-                        new TransformDef(
-                                "default_namespace.default_schema.mytable2",
-                                "*,'Juvenile' AS roleName",
-                                "age < 18",
-                                null,
-                                null,
-                                null,
-                                null,
-                                null),
-                        new TransformDef(
-                                "default_namespace.default_schema.mytable2",
-                                "id,name,age,description,name AS roleName",
-                                "age >= 18",
-                                null,
-                                null,
-                                null,
-                                null,
-                                null)),
-                Arrays.asList(
-                        "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT,`name` STRING,`age` INT}, primaryKeys=id, options=()}",
-                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, Alice, 18], op=INSERT, meta=()}",
-                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[2, Bob, 20], op=INSERT, meta=()}",
-                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[2, Bob, 20], after=[2, Bob, 30], op=UPDATE, meta=()}",
-                        "CreateTableEvent{tableId=default_namespace.default_schema.mytable2, schema=columns={`id` BIGINT NOT NULL,`name` VARCHAR(255),`age` TINYINT,`description` STRING,`roleName` STRING}, primaryKeys=id, options=()}",
-                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[3, Carol, 15, student, Juvenile], op=INSERT, meta=()}",
-                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[4, Derrida, 25, student, Derrida], op=INSERT, meta=()}",
-                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[4, Derrida, 25, student, Derrida], after=[], op=DELETE, meta=()}"));
-    }
-
-    @ParameterizedTest
-    @EnumSource
-    void testMultiTransformMissingProjection(ValuesDataSink.SinkApi sinkApi) throws Exception {
+    void testMissingProjection(ValuesDataSink.SinkApi sinkApi) throws Exception {
         runGenericTransformTest(
                 sinkApi,
                 Arrays.asList(
@@ -364,170 +311,14 @@ class FlinkPipelineTransformITCase {
                                 null,
                                 null,
                                 null,
-                                null),
-                        new TransformDef(
-                                "default_namespace.default_schema.mytable2",
-                                "id,UPPER(name) AS name,age,description",
-                                "age >= 18",
-                                null,
-                                null,
-                                null,
-                                null,
                                 null)),
                 Arrays.asList(
                         "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT,`name` STRING,`age` INT}, primaryKeys=id, options=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, Alice, 18], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[2, Bob, 20], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[2, Bob, 20], after=[2, Bob, 30], op=UPDATE, meta=()}",
-                        "CreateTableEvent{tableId=default_namespace.default_schema.mytable2, schema=columns={`id` BIGINT NOT NULL,`name` STRING,`age` TINYINT,`description` STRING}, primaryKeys=id, options=()}",
-                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[3, Carol, 15, student], op=INSERT, meta=()}",
-                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[4, DERRIDA, 25, student], op=INSERT, meta=()}",
-                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[4, DERRIDA, 25, student], after=[], op=DELETE, meta=()}"));
-    }
-
-    @ParameterizedTest
-    @EnumSource
-    @Disabled("to be fixed in FLINK-37132")
-    void testMultiTransformSchemaColumnsCompatibilityWithNullProjection(
-            ValuesDataSink.SinkApi sinkApi) {
-        TransformDef nullProjection =
-                new TransformDef(
-                        "default_namespace.default_schema.mytable2",
-                        null,
-                        "age < 18",
-                        null,
-                        null,
-                        null,
-                        null,
-                        null);
-
-        assertThatThrownBy(
-                        () ->
-                                runGenericTransformTest(
-                                        sinkApi,
-                                        Arrays.asList(
-                                                nullProjection,
-                                                new TransformDef(
-                                                        "default_namespace.default_schema.mytable2",
-                                                        // reference part column
-                                                        "id,UPPER(name) AS name",
-                                                        "age >= 18",
-                                                        null,
-                                                        null,
-                                                        null,
-                                                        null,
-                                                        null)),
-                                        Collections.emptyList()))
-                .rootCause()
-                .isExactlyInstanceOf(IllegalStateException.class)
-                .hasMessage(
-                        "Unable to merge schema columns={`id` BIGINT,`name` VARCHAR(255),`age` TINYINT,`description` STRING}, primaryKeys=id, options=() "
-                                + "and columns={`id` BIGINT,`name` STRING}, primaryKeys=id, options=() with different column counts.");
-    }
-
-    @ParameterizedTest
-    @EnumSource
-    @Disabled("to be fixed in FLINK-37132")
-    void testMultiTransformSchemaColumnsCompatibilityWithEmptyProjection(
-            ValuesDataSink.SinkApi sinkApi) {
-        TransformDef emptyProjection =
-                new TransformDef(
-                        "default_namespace.default_schema.mytable2",
-                        "",
-                        "age < 18",
-                        null,
-                        null,
-                        null,
-                        null,
-                        null);
-
-        assertThatThrownBy(
-                        () ->
-                                runGenericTransformTest(
-                                        sinkApi,
-                                        Arrays.asList(
-                                                emptyProjection,
-                                                new TransformDef(
-                                                        "default_namespace.default_schema.mytable2",
-                                                        // reference part column
-                                                        "id,UPPER(name) AS name",
-                                                        "age >= 18",
-                                                        null,
-                                                        null,
-                                                        null,
-                                                        null,
-                                                        null)),
-                                        Collections.emptyList()))
-                .rootCause()
-                .isExactlyInstanceOf(IllegalStateException.class)
-                .hasMessage(
-                        "Unable to merge schema columns={`id` BIGINT,`name` VARCHAR(255),`age` TINYINT,`description` STRING}, primaryKeys=id, options=() "
-                                + "and columns={`id` BIGINT,`name` STRING}, primaryKeys=id, options=() with different column counts.");
-    }
-
-    @ParameterizedTest
-    @EnumSource
-    void testMultiTransformWithNullEmptyAsteriskProjections(ValuesDataSink.SinkApi sinkApi)
-            throws Exception {
-        TransformDef nullProjection =
-                new TransformDef(
-                        "default_namespace.default_schema.mytable2",
-                        null,
-                        "age < 18",
-                        null,
-                        null,
-                        null,
-                        null,
-                        null);
-
-        TransformDef emptyProjection =
-                new TransformDef(
-                        "default_namespace.default_schema.mytable2",
-                        "",
-                        "age < 18",
-                        null,
-                        null,
-                        null,
-                        null,
-                        null);
-
-        TransformDef asteriskProjection =
-                new TransformDef(
-                        "default_namespace.default_schema.mytable2",
-                        "*",
-                        "age < 18",
-                        null,
-                        null,
-                        null,
-                        null,
-                        null);
-
-        runGenericTransformTest(
-                sinkApi,
-                Arrays.asList(
-                        // Setting projection as null, '', or * should be equivalent
-                        nullProjection,
-                        emptyProjection,
-                        asteriskProjection,
-                        new TransformDef(
-                                "default_namespace.default_schema.mytable2",
-                                // reference all column
-                                "id,UPPER(name) AS name,age,description",
-                                "age >= 18",
-                                null,
-                                null,
-                                null,
-                                null,
-                                null)),
-                Arrays.asList(
-                        "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT,`name` STRING,`age` INT}, primaryKeys=id, options=()}",
-                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, Alice, 18], op=INSERT, meta=()}",
-                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[2, Bob, 20], op=INSERT, meta=()}",
-                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[2, Bob, 20], after=[2, Bob, 30], op=UPDATE, meta=()}",
-                        "CreateTableEvent{tableId=default_namespace.default_schema.mytable2, schema=columns={`id` BIGINT NOT NULL,`name` STRING,`age` TINYINT,`description` STRING}, primaryKeys=id, options=()}",
-                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[3, Carol, 15, student], op=INSERT, meta=()}",
-                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[4, DERRIDA, 25, student], op=INSERT, meta=()}",
-                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[4, DERRIDA, 25, student], after=[], op=DELETE, meta=()}"));
+                        "CreateTableEvent{tableId=default_namespace.default_schema.mytable2, schema=columns={`id` BIGINT NOT NULL,`name` VARCHAR(255),`age` TINYINT,`description` STRING}, primaryKeys=id, options=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[3, Carol, 15, student], op=INSERT, meta=()}"));
     }
 
     /** This tests if transform generates metadata info correctly. */
@@ -1237,39 +1028,6 @@ class FlinkPipelineTransformITCase {
 
     @ParameterizedTest
     @EnumSource
-    void testTransformMergingIncompatibleRules(ValuesDataSink.SinkApi apiVersion) {
-        Assertions.assertThatThrownBy(
-                        () ->
-                                runGenericTransformTest(
-                                        apiVersion,
-                                        Arrays.asList(
-                                                new TransformDef(
-                                                        "\\.*.\\.*.mytable1",
-                                                        "*, 'rule_1_matched' AS rule_1_matched",
-                                                        "id > 0",
-                                                        null,
-                                                        "id",
-                                                        null,
-                                                        null,
-                                                        null),
-                                                new TransformDef(
-                                                        "\\.*.\\.*.\\.*",
-                                                        "*, 'rule_fallback' AS rule_fallback",
-                                                        null,
-                                                        null,
-                                                        "id",
-                                                        null,
-                                                        null,
-                                                        null)),
-                                        Collections.emptyList()))
-                .rootCause()
-                .isExactlyInstanceOf(IllegalArgumentException.class)
-                .hasMessage(
-                        "Trying to merge transformed schemas [columns={`id` INT,`name` STRING,`age` INT,`rule_1_matched` STRING}, primaryKeys=id, partitionKeys=id, options=(), columns={`id` INT,`name` STRING,`age` INT,`rule_fallback` STRING}, primaryKeys=id, partitionKeys=id, options=()], but got more than one column name views: [[id, name, age, rule_1_matched], [id, name, age, rule_fallback]]");
-    }
-
-    @ParameterizedTest
-    @EnumSource
     void testTransformWithFallbackRules(ValuesDataSink.SinkApi apiVersion) throws Exception {
         runGenericTransformTest(
                 apiVersion,
@@ -1295,6 +1053,40 @@ class FlinkPipelineTransformITCase {
                 Arrays.asList(
                         "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT NOT NULL,`name` STRING,`age` INT,`rule_1_matched` STRING}, primaryKeys=id, partitionKeys=id, options=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, Alice, 18, rule_1_matched], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[2, Bob, 20, rule_1_matched], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[2, Bob, 20, rule_1_matched], after=[2, Bob, 30, rule_1_matched], op=UPDATE, meta=()}",
+                        "CreateTableEvent{tableId=default_namespace.default_schema.mytable2, schema=columns={`id` BIGINT NOT NULL,`name` VARCHAR(255),`age` TINYINT,`description` STRING,`rule_fallback` STRING}, primaryKeys=id, partitionKeys=id, options=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[3, Carol, 15, student, rule_fallback], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[4, Derrida, 25, student, rule_fallback], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[4, Derrida, 25, student, rule_fallback], after=[], op=DELETE, meta=()}"));
+    }
+
+    @ParameterizedTest
+    @EnumSource
+    void testTransformFilterWithFallbackRules(ValuesDataSink.SinkApi apiVersion) throws Exception {
+        runGenericTransformTest(
+                apiVersion,
+                Arrays.asList(
+                        new TransformDef(
+                                "\\.*.\\.*.mytable1",
+                                "*, 'rule_1_matched' AS rule_1_matched",
+                                "id > 1",
+                                null,
+                                "id",
+                                null,
+                                null,
+                                null),
+                        new TransformDef(
+                                "\\.*.\\.*.\\.*",
+                                "*, 'rule_fallback' AS rule_fallback",
+                                null,
+                                null,
+                                "id",
+                                null,
+                                null,
+                                null)),
+                Arrays.asList(
+                        "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT NOT NULL,`name` STRING,`age` INT,`rule_1_matched` STRING}, primaryKeys=id, partitionKeys=id, options=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[2, Bob, 20, rule_1_matched], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[2, Bob, 20, rule_1_matched], after=[2, Bob, 30, rule_1_matched], op=UPDATE, meta=()}",
                         "CreateTableEvent{tableId=default_namespace.default_schema.mytable2, schema=columns={`id` BIGINT NOT NULL,`name` VARCHAR(255),`age` TINYINT,`description` STRING,`rule_fallback` STRING}, primaryKeys=id, partitionKeys=id, options=()}",
