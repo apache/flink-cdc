@@ -19,11 +19,16 @@ package org.apache.flink.cdc.connectors.postgres.source;
 
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
+import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
+import org.apache.flink.cdc.common.event.AddColumnEvent;
+import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
+import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.factories.Factory;
@@ -78,6 +83,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -105,7 +111,9 @@ public class PostgresPipelineITCase extends PostgresTestBase {
     }
 
     @AfterEach
-    public void after() throws SQLException {
+    public void after() throws Exception {
+        // sleep 1000ms to wait until connections are closed.
+        Thread.sleep(1000L);
         inventoryDatabase.removeSlot(slotName);
     }
 
@@ -596,6 +604,298 @@ public class PostgresPipelineITCase extends PostgresTestBase {
     }
 
     @Test
+    public void testSchemaChangeWithDataInserts() throws Exception {
+        inventoryDatabase.createAndInitialize();
+        PostgresSourceConfigFactory configFactory =
+                (PostgresSourceConfigFactory)
+                        new PostgresSourceConfigFactory()
+                                .hostname(POSTGRES_CONTAINER.getHost())
+                                .port(POSTGRES_CONTAINER.getMappedPort(POSTGRESQL_PORT))
+                                .username(TEST_USER)
+                                .password(TEST_PASSWORD)
+                                .databaseList(inventoryDatabase.getDatabaseName())
+                                .tableList("inventory.products")
+                                .startupOptions(StartupOptions.initial())
+                                .serverTimeZone("UTC");
+        configFactory.database(inventoryDatabase.getDatabaseName());
+        configFactory.slotName(slotName);
+        configFactory.decodingPluginName("pgoutput");
+        configFactory.enableSchemaChange(true);
+
+        FlinkSourceProvider sourceProvider =
+                (FlinkSourceProvider)
+                        new PostgresDataSource(configFactory).getEventSourceProvider();
+
+        StreamExecutionEnvironment testEnv = StreamExecutionEnvironment.getExecutionEnvironment();
+        testEnv.setParallelism(1);
+        testEnv.enableCheckpointing(1000);
+
+        DataStreamSource<Event> source =
+                testEnv.fromSource(
+                        sourceProvider.getSource(),
+                        WatermarkStrategy.noWatermarks(),
+                        PostgresDataSourceFactory.IDENTIFIER,
+                        new EventTypeInfo());
+
+        TypeSerializer<Event> serializer =
+                source.getTransformation().getOutputType().createSerializer(testEnv.getConfig());
+        CheckpointedCollectResultBuffer<Event> resultBuffer =
+                new CheckpointedCollectResultBuffer<>(serializer);
+        String accumulatorName = "dataStreamCollect_" + UUID.randomUUID();
+        CollectResultIterator<Event> iterator =
+                addCollector(testEnv, source, resultBuffer, serializer, accumulatorName);
+
+        JobClient jobClient = testEnv.executeAsync("testSchemaChangeWithDataInserts");
+        iterator.setJobClient(jobClient);
+
+        try {
+            // Wait for snapshot phase to complete (9 rows in products)
+            List<Event> snapshotEvents =
+                    fetchEvent(iterator, 9, (event) -> !(event instanceof CreateTableEvent));
+            assertThat(snapshotEvents).hasSize(9);
+
+            // Wait for stream phase to stabilize
+            Thread.sleep(1000);
+            TableId tableId = TableId.tableId("inventory", "products");
+
+            // Build expected event list in order
+            List<Event> expectedLog = new ArrayList<>();
+
+            // --- Original schema: (id, name, description, weight) ---
+            RowType rowType1 =
+                    RowType.of(
+                            new DataType[] {
+                                DataTypes.INT().notNull(),
+                                DataTypes.VARCHAR(255).notNull(),
+                                DataTypes.VARCHAR(512),
+                                DataTypes.DOUBLE()
+                            },
+                            new String[] {"id", "name", "description", "weight"});
+            BinaryRecordDataGenerator gen1 = new BinaryRecordDataGenerator(rowType1);
+
+            // --- After ADD COLUMN: (id, name, description, weight, category) ---
+            RowType rowType2 =
+                    RowType.of(
+                            new DataType[] {
+                                DataTypes.INT().notNull(),
+                                DataTypes.VARCHAR(255).notNull(),
+                                DataTypes.VARCHAR(512),
+                                DataTypes.DOUBLE(),
+                                DataTypes.VARCHAR(100)
+                            },
+                            new String[] {"id", "name", "description", "weight", "category"});
+            BinaryRecordDataGenerator gen2 = new BinaryRecordDataGenerator(rowType2);
+
+            // --- After DROP COLUMN 'description': (id, name, weight, category) ---
+            RowType rowType3 =
+                    RowType.of(
+                            new DataType[] {
+                                DataTypes.INT().notNull(),
+                                DataTypes.VARCHAR(255).notNull(),
+                                DataTypes.DOUBLE(),
+                                DataTypes.VARCHAR(100)
+                            },
+                            new String[] {"id", "name", "weight", "category"});
+            BinaryRecordDataGenerator gen3 = new BinaryRecordDataGenerator(rowType3);
+
+            // --- After ALTER COLUMN TYPE weight -> DECIMAL(10,2): (id, name, weight, category) ---
+            RowType rowType4 =
+                    RowType.of(
+                            new DataType[] {
+                                DataTypes.INT().notNull(),
+                                DataTypes.VARCHAR(255).notNull(),
+                                DataTypes.DECIMAL(10, 2),
+                                DataTypes.VARCHAR(100)
+                            },
+                            new String[] {"id", "name", "weight", "category"});
+            BinaryRecordDataGenerator gen4 = new BinaryRecordDataGenerator(rowType4);
+
+            // --- After RENAME COLUMN category -> product_category: (id, name, weight,
+            // product_category) ---
+            RowType rowType5 =
+                    RowType.of(
+                            new DataType[] {
+                                DataTypes.INT().notNull(),
+                                DataTypes.VARCHAR(255).notNull(),
+                                DataTypes.DECIMAL(10, 2),
+                                DataTypes.VARCHAR(100)
+                            },
+                            new String[] {"id", "name", "weight", "product_category"});
+            BinaryRecordDataGenerator gen5 = new BinaryRecordDataGenerator(rowType5);
+
+            try (Connection conn =
+                            getJdbcConnection(
+                                    POSTGRES_CONTAINER, inventoryDatabase.getDatabaseName());
+                    Statement stmt = conn.createStatement()) {
+
+                // Insert before ADD COLUMN (id=110)
+                stmt.execute(
+                        "INSERT INTO inventory.products VALUES (default, 'before_add_col', 'desc1', 1.0)");
+                expectedLog.add(
+                        DataChangeEvent.insertEvent(
+                                tableId,
+                                gen1.generate(
+                                        new Object[] {
+                                            110,
+                                            BinaryStringData.fromString("before_add_col"),
+                                            BinaryStringData.fromString("desc1"),
+                                            1.0
+                                        })));
+
+                // ADD COLUMN category
+                stmt.execute("ALTER TABLE inventory.products ADD COLUMN category VARCHAR(100)");
+                expectedLog.add(
+                        new AddColumnEvent(
+                                tableId,
+                                Collections.singletonList(
+                                        new AddColumnEvent.ColumnWithPosition(
+                                                org.apache.flink.cdc.common.schema.Column
+                                                        .physicalColumn(
+                                                                "category",
+                                                                DataTypes.VARCHAR(100),
+                                                                null,
+                                                                null)))));
+
+                // Insert after ADD COLUMN (id=111)
+                stmt.execute(
+                        "INSERT INTO inventory.products VALUES (default, 'after_add_col', 'desc2', 2.0, 'electronics')");
+                expectedLog.add(
+                        DataChangeEvent.insertEvent(
+                                tableId,
+                                gen2.generate(
+                                        new Object[] {
+                                            111,
+                                            BinaryStringData.fromString("after_add_col"),
+                                            BinaryStringData.fromString("desc2"),
+                                            2.0,
+                                            BinaryStringData.fromString("electronics")
+                                        })));
+
+                // Insert before DROP COLUMN (id=112)
+                stmt.execute(
+                        "INSERT INTO inventory.products VALUES (default, 'before_drop_col', 'desc3', 3.0, 'books')");
+                expectedLog.add(
+                        DataChangeEvent.insertEvent(
+                                tableId,
+                                gen2.generate(
+                                        new Object[] {
+                                            112,
+                                            BinaryStringData.fromString("before_drop_col"),
+                                            BinaryStringData.fromString("desc3"),
+                                            3.0,
+                                            BinaryStringData.fromString("books")
+                                        })));
+
+                // DROP COLUMN description
+                stmt.execute("ALTER TABLE inventory.products DROP COLUMN description");
+                expectedLog.add(
+                        new DropColumnEvent(tableId, Collections.singletonList("description")));
+
+                // Insert after DROP COLUMN (id=113)
+                stmt.execute(
+                        "INSERT INTO inventory.products VALUES (default, 'after_drop_col', 4.0, 'toys')");
+                expectedLog.add(
+                        DataChangeEvent.insertEvent(
+                                tableId,
+                                gen3.generate(
+                                        new Object[] {
+                                            113,
+                                            BinaryStringData.fromString("after_drop_col"),
+                                            4.0,
+                                            BinaryStringData.fromString("toys")
+                                        })));
+
+                // Insert before ALTER COLUMN TYPE (id=114)
+                stmt.execute(
+                        "INSERT INTO inventory.products VALUES (default, 'before_alter_type', 5.0, 'food')");
+                expectedLog.add(
+                        DataChangeEvent.insertEvent(
+                                tableId,
+                                gen3.generate(
+                                        new Object[] {
+                                            114,
+                                            BinaryStringData.fromString("before_alter_type"),
+                                            5.0,
+                                            BinaryStringData.fromString("food")
+                                        })));
+
+                // ALTER COLUMN TYPE weight -> DECIMAL(10,2)
+                stmt.execute(
+                        "ALTER TABLE inventory.products ALTER COLUMN weight TYPE DECIMAL(10,2)");
+                expectedLog.add(
+                        new AlterColumnTypeEvent(
+                                tableId,
+                                Collections.singletonMap("weight", DataTypes.DECIMAL(10, 2))));
+
+                // Insert after ALTER COLUMN TYPE (id=115)
+                stmt.execute(
+                        "INSERT INTO inventory.products VALUES (default, 'after_alter_type', 6.00, 'sports')");
+                expectedLog.add(
+                        DataChangeEvent.insertEvent(
+                                tableId,
+                                gen4.generate(
+                                        new Object[] {
+                                            115,
+                                            BinaryStringData.fromString("after_alter_type"),
+                                            DecimalData.fromBigDecimal(
+                                                    new java.math.BigDecimal("6.00"), 10, 2),
+                                            BinaryStringData.fromString("sports")
+                                        })));
+
+                // Insert before RENAME COLUMN (id=116)
+                stmt.execute(
+                        "INSERT INTO inventory.products VALUES (default, 'before_rename_col', 7.00, 'clothing')");
+                expectedLog.add(
+                        DataChangeEvent.insertEvent(
+                                tableId,
+                                gen4.generate(
+                                        new Object[] {
+                                            116,
+                                            BinaryStringData.fromString("before_rename_col"),
+                                            DecimalData.fromBigDecimal(
+                                                    new java.math.BigDecimal("7.00"), 10, 2),
+                                            BinaryStringData.fromString("clothing")
+                                        })));
+
+                // RENAME COLUMN category -> product_category
+                stmt.execute(
+                        "ALTER TABLE inventory.products RENAME COLUMN category TO product_category");
+                expectedLog.add(
+                        new RenameColumnEvent(
+                                tableId, Collections.singletonMap("category", "product_category")));
+
+                // Insert after RENAME COLUMN (id=117)
+                stmt.execute(
+                        "INSERT INTO inventory.products VALUES (default, 'after_rename_col', 8.00, 'garden')");
+                expectedLog.add(
+                        DataChangeEvent.insertEvent(
+                                tableId,
+                                gen5.generate(
+                                        new Object[] {
+                                            117,
+                                            BinaryStringData.fromString("after_rename_col"),
+                                            DecimalData.fromBigDecimal(
+                                                    new java.math.BigDecimal("8.00"), 10, 2),
+                                            BinaryStringData.fromString("garden")
+                                        })));
+            }
+
+            // Collect streaming events (filter out CreateTableEvents)
+            List<Event> actualLog = fetchEvent(iterator, expectedLog.size(), (event) -> true);
+
+            assertThat(actualLog).isEqualTo(expectedLog);
+
+        } finally {
+            try {
+                iterator.close();
+                jobClient.cancel().get();
+            } catch (Exception e) {
+                LOG.warn("Failed to cancel job: {}", e.getMessage());
+            }
+        }
+    }
+
+    @Test
     public void testDatabaseNameWithHyphenEndToEnd() throws Exception {
         // Create a real database with hyphen to verify full CDC sync works
         // This test verifies the fix for FLINK-38512
@@ -773,6 +1073,18 @@ public class PostgresPipelineITCase extends PostgresTestBase {
         }
         // Also ensure we've received at least one or many side events.
         assertThat(sideResults).isNotEmpty();
+        return result;
+    }
+
+    private List<Event> fetchEvent(Iterator<Event> iter, int size, Predicate<Event> predicate) {
+        List<Event> result = new ArrayList<>(size);
+        while (size > 0 && iter.hasNext()) {
+            Event event = iter.next();
+            if (predicate.test(event)) {
+                result.add(event);
+                size--;
+            }
+        }
         return result;
     }
 
