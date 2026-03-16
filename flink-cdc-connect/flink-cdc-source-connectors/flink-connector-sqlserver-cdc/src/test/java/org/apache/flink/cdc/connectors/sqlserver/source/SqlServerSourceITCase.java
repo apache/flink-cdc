@@ -19,13 +19,13 @@ package org.apache.flink.cdc.connectors.sqlserver.source;
 
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
-import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
 import org.apache.flink.cdc.connectors.base.source.utils.hooks.SnapshotPhaseHook;
 import org.apache.flink.cdc.connectors.base.source.utils.hooks.SnapshotPhaseHooks;
 import org.apache.flink.cdc.connectors.sqlserver.source.config.SqlServerSourceConfig;
 import org.apache.flink.cdc.connectors.sqlserver.source.dialect.SqlServerDialect;
 import org.apache.flink.cdc.connectors.sqlserver.testutils.TestTable;
+import org.apache.flink.cdc.connectors.utils.RestartStrategyUtils;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -147,7 +147,8 @@ class SqlServerSourceITCase extends SqlServerSourceTestBase {
                 FailoverPhase.SNAPSHOT,
                 new String[] {"dbo.customers"},
                 true,
-                RestartStrategies.fixedDelayRestart(1, 0),
+                1,
+                0,
                 null);
     }
 
@@ -315,7 +316,8 @@ class SqlServerSourceITCase extends SqlServerSourceTestBase {
                 FailoverPhase.NEVER,
                 new String[] {"dbo.customers"},
                 false,
-                RestartStrategies.noRestart(),
+                0,
+                0,
                 chunkColumn);
 
         // since `scan.incremental.snapshot.chunk.key-column` is set, an exception should not occur.
@@ -415,7 +417,8 @@ class SqlServerSourceITCase extends SqlServerSourceTestBase {
                 failoverPhase,
                 captureCustomerTables,
                 false,
-                RestartStrategies.fixedDelayRestart(1, 0),
+                1,
+                0,
                 null);
     }
 
@@ -426,13 +429,7 @@ class SqlServerSourceITCase extends SqlServerSourceTestBase {
             String[] captureCustomerTables)
             throws Exception {
         testSqlServerParallelSource(
-                parallelism,
-                failoverType,
-                failoverPhase,
-                captureCustomerTables,
-                false,
-                RestartStrategies.fixedDelayRestart(1, 0),
-                null);
+                parallelism, failoverType, failoverPhase, captureCustomerTables, false, 1, 0, null);
     }
 
     private void testSqlServerParallelSource(
@@ -441,7 +438,8 @@ class SqlServerSourceITCase extends SqlServerSourceTestBase {
             FailoverPhase failoverPhase,
             String[] captureCustomerTables,
             boolean skipSnapshotBackfill,
-            RestartStrategies.RestartStrategyConfiguration restartStrategyConfiguration,
+            int restartAttempts,
+            long delayBetweenAttempts,
             String chunkColumn)
             throws Exception {
         testSqlServerParallelSource(
@@ -451,7 +449,8 @@ class SqlServerSourceITCase extends SqlServerSourceTestBase {
                 failoverPhase,
                 captureCustomerTables,
                 skipSnapshotBackfill,
-                restartStrategyConfiguration,
+                restartAttempts,
+                delayBetweenAttempts,
                 chunkColumn);
     }
 
@@ -462,7 +461,8 @@ class SqlServerSourceITCase extends SqlServerSourceTestBase {
             FailoverPhase failoverPhase,
             String[] captureCustomerTables,
             boolean skipSnapshotBackfill,
-            RestartStrategies.RestartStrategyConfiguration restartStrategyConfiguration,
+            int restartAttempts,
+            long delayBetweenAttempts,
             String chunkColumn)
             throws Exception {
 
@@ -474,7 +474,12 @@ class SqlServerSourceITCase extends SqlServerSourceTestBase {
 
         env.setParallelism(parallelism);
         env.enableCheckpointing(200L);
-        env.setRestartStrategy(restartStrategyConfiguration);
+        if (restartAttempts > 0) {
+            RestartStrategyUtils.configureFixedDelayRestartStrategy(
+                    env, restartAttempts, delayBetweenAttempts);
+        } else {
+            RestartStrategyUtils.configureNoRestartStrategy(env);
+        }
 
         String sourceDDL =
                 format(

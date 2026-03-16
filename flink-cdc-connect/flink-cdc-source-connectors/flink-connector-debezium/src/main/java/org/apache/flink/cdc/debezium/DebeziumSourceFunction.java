@@ -250,12 +250,12 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
                 restoredOffsetState = new String(serializedOffset, StandardCharsets.UTF_8);
                 LOG.info(
                         "Consumer subtask {} starts to read from specified offset {}.",
-                        getRuntimeContext().getIndexOfThisSubtask(),
+                        getRuntimeContext().getTaskInfo().getIndexOfThisSubtask(),
                         restoredOffsetState);
             } else {
                 LOG.info(
                         "Consumer subtask {} has no restore state.",
-                        getRuntimeContext().getIndexOfThisSubtask());
+                        getRuntimeContext().getTaskInfo().getIndexOfThisSubtask());
             }
         }
     }
@@ -272,7 +272,7 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
         }
         LOG.info(
                 "Consumer subtask {} restored offset state: {}.",
-                getRuntimeContext().getIndexOfThisSubtask(),
+                getRuntimeContext().getTaskInfo().getIndexOfThisSubtask(),
                 restoredOffsetState);
     }
 
@@ -298,7 +298,7 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
         }
         LOG.info(
                 "Consumer subtask {} restored history records state: {} with {} records.",
-                getRuntimeContext().getIndexOfThisSubtask(),
+                getRuntimeContext().getTaskInfo().getIndexOfThisSubtask(),
                 engineInstanceName,
                 recordsCount);
     }
@@ -482,7 +482,7 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
             if (posInMap == -1) {
                 LOG.warn(
                         "Consumer subtask {} received confirmation for unknown checkpoint id {}",
-                        getRuntimeContext().getIndexOfThisSubtask(),
+                        getRuntimeContext().getTaskInfo().getIndexOfThisSubtask(),
                         checkpointId);
                 return;
             }
@@ -497,7 +497,7 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
             if (serializedOffsets == null || serializedOffsets.length == 0) {
                 LOG.debug(
                         "Consumer subtask {} has empty checkpoint state.",
-                        getRuntimeContext().getIndexOfThisSubtask());
+                        getRuntimeContext().getTaskInfo().getIndexOfThisSubtask());
                 return;
             }
 

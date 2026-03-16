@@ -17,7 +17,6 @@
 
 package org.apache.flink.cdc.connectors.hudi.sink;
 
-import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
@@ -32,6 +31,7 @@ import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.connectors.hudi.sink.v2.HudiSink;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.configuration.RestartStrategyOptions;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.data.RowData;
@@ -105,7 +105,7 @@ public class HudiSinkITCase {
         env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.setParallelism(DEFAULT_PARALLELISM);
         env.enableCheckpointing(1000);
-        env.setRestartStrategy(RestartStrategies.noRestart());
+        env.configure(new Configuration().set(RestartStrategyOptions.RESTART_STRATEGY, "none"));
         String warehouse =
                 new File(temporaryFolder.toFile(), UUID.randomUUID().toString()).toString();
         Files.createDirectory(Paths.get(warehouse));

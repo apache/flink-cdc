@@ -64,6 +64,47 @@ public class MongoDBTestUtils {
         }
     }
 
+    /**
+     * Waits for the sink to contain the expected results. This method is useful when the exact
+     * number of intermediate changelog messages is not deterministic (e.g., due to Flink 2.x
+     * ChangelogNormalize optimizations that skip emitting UPDATE_AFTER when row content is
+     * unchanged).
+     *
+     * @param sinkName name of the sink table
+     * @param expected expected final results
+     * @throws InterruptedException if interrupted while waiting
+     */
+    public static void waitForSinkResult(String sinkName, List<String> expected)
+            throws InterruptedException {
+        waitForSinkResult(sinkName, expected, 10, TimeUnit.MINUTES);
+    }
+
+    public static void waitForSinkResult(
+            String sinkName, List<String> expected, long timeout, TimeUnit timeUnit)
+            throws InterruptedException {
+        long deadline = System.nanoTime() + timeUnit.toNanos(timeout);
+        while (true) {
+            List<String> actual = TestValuesTableFactory.getResultsAsStrings(sinkName);
+            if (actual.size() >= expected.size()
+                    && actual.containsAll(expected)
+                    && expected.containsAll(actual)) {
+                return;
+            }
+            if (System.nanoTime() > deadline) {
+                Assertions.fail(
+                        "Wait for sink result timeout, expected: \n"
+                                + String.join("\n", expected)
+                                + "\nactual: \n"
+                                + String.join("\n", actual)
+                                + "\nraw results: \n"
+                                + String.join(
+                                        "\n",
+                                        TestValuesTableFactory.getRawResultsAsStrings(sinkName)));
+            }
+            Thread.sleep(100);
+        }
+    }
+
     public static int sinkSize(String sinkName) {
         synchronized (TestValuesTableFactory.class) {
             try {

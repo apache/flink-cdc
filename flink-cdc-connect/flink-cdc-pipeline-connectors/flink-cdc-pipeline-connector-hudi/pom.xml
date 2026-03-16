@@ -41,6 +41,8 @@ limitations under the License.
         <avro.version>1.11.4</avro.version>
         <httpcore.version>4.4.16</httpcore.version>
         <httpclient.version>4.5.14</httpclient.version>
+        <flink.hadoop.compatibility.version>${flink.1.x.version}</flink.hadoop.compatibility.version>
+        <hudi.flink.major.version>1.20</hudi.flink.major.version>
     </properties>
 
     <dependencies>
@@ -94,7 +96,7 @@ limitations under the License.
 
         <dependency>
             <groupId>org.apache.hudi</groupId>
-            <artifactId>hudi-flink${flink.major.version}.x</artifactId>
+            <artifactId>hudi-flink${hudi.flink.major.version}.x</artifactId>
             <version>${hudi.version}</version>
         </dependency>
 
@@ -111,10 +113,12 @@ limitations under the License.
             <scope>provided</scope>
         </dependency>
 
+        <!-- flink-hadoop-compatibility is only available in Flink 1.x.
+             Use a dedicated version property to avoid using deprecated API. -->
         <dependency>
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-hadoop-compatibility_2.12</artifactId>
-            <version>${flink.version}</version>
+            <version>${flink.hadoop.compatibility.version}</version>
             <scope>provided</scope>
         </dependency>
 

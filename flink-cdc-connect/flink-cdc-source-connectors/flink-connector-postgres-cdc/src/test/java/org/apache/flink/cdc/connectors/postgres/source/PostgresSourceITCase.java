@@ -19,7 +19,6 @@ package org.apache.flink.cdc.connectors.postgres.source;
 
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
-import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.connectors.base.source.utils.hooks.SnapshotPhaseHook;
 import org.apache.flink.cdc.connectors.base.source.utils.hooks.SnapshotPhaseHooks;
@@ -30,6 +29,7 @@ import org.apache.flink.cdc.connectors.postgres.testutils.TestTable;
 import org.apache.flink.cdc.connectors.postgres.testutils.TestTableId;
 import org.apache.flink.cdc.connectors.postgres.testutils.UniqueDatabase;
 import org.apache.flink.cdc.connectors.utils.ExternalResourceProxy;
+import org.apache.flink.cdc.connectors.utils.RestartStrategyUtils;
 import org.apache.flink.core.execution.JobClient;
 import org.apache.flink.runtime.minicluster.RpcServiceSharing;
 import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
@@ -271,7 +271,8 @@ class PostgresSourceITCase extends PostgresTestBase {
                                         PostgresTestUtils.FailoverType.NONE,
                                         PostgresTestUtils.FailoverPhase.NEVER,
                                         new String[] {"customers_no_pk"},
-                                        RestartStrategies.noRestart());
+                                        0,
+                                        0);
                             })
                     .hasStackTraceContaining(
                             "To use incremental snapshot, 'scan.incremental.snapshot.chunk.key-column' must be set when the table doesn't have primary keys.");
@@ -282,7 +283,8 @@ class PostgresSourceITCase extends PostgresTestBase {
                     PostgresTestUtils.FailoverType.NONE,
                     PostgresTestUtils.FailoverPhase.NEVER,
                     new String[] {"customers_no_pk"},
-                    RestartStrategies.noRestart());
+                    0,
+                    0);
         }
     }
 
@@ -294,7 +296,8 @@ class PostgresSourceITCase extends PostgresTestBase {
                 PostgresTestUtils.FailoverType.TM,
                 PostgresTestUtils.FailoverPhase.SNAPSHOT,
                 new String[] {"Customers"},
-                RestartStrategies.fixedDelayRestart(1, 0),
+                1,
+                0,
                 Collections.singletonMap("scan.incremental.snapshot.backfill.skip", "true"));
     }
 
@@ -306,7 +309,8 @@ class PostgresSourceITCase extends PostgresTestBase {
                 PostgresTestUtils.FailoverType.TM,
                 PostgresTestUtils.FailoverPhase.SNAPSHOT,
                 new String[] {"Customers"},
-                RestartStrategies.fixedDelayRestart(1, 0),
+                1,
+                0,
                 Collections.singletonMap(
                         "scan.incremental.snapshot.unbounded-chunk-first.enabled", "true"));
     }
@@ -323,7 +327,8 @@ class PostgresSourceITCase extends PostgresTestBase {
                 PostgresTestUtils.FailoverType.JM,
                 PostgresTestUtils.FailoverPhase.STREAM,
                 new String[] {"Customers"},
-                RestartStrategies.fixedDelayRestart(1, 0),
+                1,
+                0,
                 options,
                 this::checkStreamDataWithDDLDuringFailover);
     }
@@ -339,7 +344,8 @@ class PostgresSourceITCase extends PostgresTestBase {
                 PostgresTestUtils.FailoverType.NONE,
                 PostgresTestUtils.FailoverPhase.NEVER,
                 new String[] {"Customers"},
-                RestartStrategies.fixedDelayRestart(1, 0),
+                1,
+                0,
                 options);
     }
 
@@ -586,7 +592,8 @@ class PostgresSourceITCase extends PostgresTestBase {
                 PostgresTestUtils.FailoverType.JM,
                 PostgresTestUtils.FailoverPhase.STREAM,
                 new String[] {"Customers"},
-                RestartStrategies.fixedDelayRestart(1, 0),
+                1,
+                0,
                 options,
                 this::checkStreamDataWithHook);
     }
@@ -602,7 +609,8 @@ class PostgresSourceITCase extends PostgresTestBase {
                 PostgresTestUtils.FailoverType.NONE,
                 PostgresTestUtils.FailoverPhase.NEVER,
                 new String[] {"Customers"},
-                RestartStrategies.noRestart(),
+                0,
+                0,
                 Collections.singletonMap(
                         "scan.incremental.snapshot.chunk.key-column", chunkColumn));
 
@@ -631,7 +639,8 @@ class PostgresSourceITCase extends PostgresTestBase {
                 PostgresTestUtils.FailoverType.NONE,
                 PostgresTestUtils.FailoverPhase.NEVER,
                 new String[] {"Customers"},
-                RestartStrategies.noRestart(),
+                0,
+                0,
                 options);
         try (PostgresConnection connection = getConnection()) {
             assertThat(getCountOfTable(connection, tableId)).isGreaterThan(0);
@@ -651,7 +660,8 @@ class PostgresSourceITCase extends PostgresTestBase {
                 PostgresTestUtils.FailoverType.TM,
                 PostgresTestUtils.FailoverPhase.STREAM,
                 new String[] {"Customers"},
-                RestartStrategies.fixedDelayRestart(1, 0),
+                1,
+                0,
                 options,
                 this::checkStreamDataWithTestLsn);
     }
@@ -665,7 +675,8 @@ class PostgresSourceITCase extends PostgresTestBase {
                 PostgresTestUtils.FailoverType.NONE,
                 PostgresTestUtils.FailoverPhase.NEVER,
                 new String[] {"Customers"},
-                RestartStrategies.fixedDelayRestart(1, 0),
+                1,
+                0,
                 Collections.singletonMap("scan.read-changelog-as-append-only.enabled", "true"),
                 this::checkStreamDataAsAppend);
     }
@@ -782,7 +793,8 @@ class PostgresSourceITCase extends PostgresTestBase {
                 failoverType,
                 failoverPhase,
                 captureCustomerTables,
-                RestartStrategies.fixedDelayRestart(1, 0));
+                1,
+                0);
     }
 
     private void testPostgresParallelSource(
@@ -791,7 +803,8 @@ class PostgresSourceITCase extends PostgresTestBase {
             PostgresTestUtils.FailoverType failoverType,
             PostgresTestUtils.FailoverPhase failoverPhase,
             String[] captureCustomerTables,
-            RestartStrategies.RestartStrategyConfiguration restartStrategyConfiguration)
+            int restartAttempts,
+            long delayBetweenAttempts)
             throws Exception {
         testPostgresParallelSource(
                 parallelism,
@@ -799,7 +812,8 @@ class PostgresSourceITCase extends PostgresTestBase {
                 failoverType,
                 failoverPhase,
                 captureCustomerTables,
-                restartStrategyConfiguration,
+                restartAttempts,
+                delayBetweenAttempts,
                 new HashMap<>());
     }
 
@@ -809,7 +823,8 @@ class PostgresSourceITCase extends PostgresTestBase {
             PostgresTestUtils.FailoverType failoverType,
             PostgresTestUtils.FailoverPhase failoverPhase,
             String[] captureCustomerTables,
-            RestartStrategies.RestartStrategyConfiguration restartStrategyConfiguration,
+            int restartAttempts,
+            long delayBetweenAttempts,
             Map<String, String> otherOptions)
             throws Exception {
         testPostgresParallelSource(
@@ -818,7 +833,8 @@ class PostgresSourceITCase extends PostgresTestBase {
                 failoverType,
                 failoverPhase,
                 captureCustomerTables,
-                restartStrategyConfiguration,
+                restartAttempts,
+                delayBetweenAttempts,
                 otherOptions,
                 this::checkStreamData);
     }
@@ -829,7 +845,8 @@ class PostgresSourceITCase extends PostgresTestBase {
             PostgresTestUtils.FailoverType failoverType,
             PostgresTestUtils.FailoverPhase failoverPhase,
             String[] captureCustomerTables,
-            RestartStrategies.RestartStrategyConfiguration restartStrategyConfiguration,
+            int restartAttempts,
+            long delayBetweenAttempts,
             Map<String, String> otherOptions,
             StreamDataChecker streamDataChecker)
             throws Exception {
@@ -838,7 +855,8 @@ class PostgresSourceITCase extends PostgresTestBase {
 
         env.setParallelism(parallelism);
         env.enableCheckpointing(200L);
-        env.setRestartStrategy(restartStrategyConfiguration);
+        RestartStrategyUtils.configureFixedDelayRestartStrategy(
+                env, restartAttempts, delayBetweenAttempts);
 
         tEnv.executeSql(getSourceDDL(scanStartupMode, captureCustomerTables, otherOptions));
         TableResult tableResult = tEnv.executeSql("select * from customers");

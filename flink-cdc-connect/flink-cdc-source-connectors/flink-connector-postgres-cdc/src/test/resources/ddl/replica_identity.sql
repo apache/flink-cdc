@@ -27,8 +27,9 @@ CREATE TABLE products (
 );
 ALTER SEQUENCE products_id_seq RESTART WITH 101;
 
--- USE default REPLICA IDENTITY
--- ALTER TABLE products REPLICA IDENTITY FULL;
+-- Enable REPLICA IDENTITY FULL to capture before values for UPDATE/DELETE operations
+-- This is required for upsert changelog mode to work correctly
+ALTER TABLE products REPLICA IDENTITY FULL;
 
 INSERT INTO products
 VALUES (default,'scooter','Small 2-wheel scooter',3.14),

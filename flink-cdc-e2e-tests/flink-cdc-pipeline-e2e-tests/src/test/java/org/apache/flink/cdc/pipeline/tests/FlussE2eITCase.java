@@ -26,7 +26,6 @@ import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
@@ -49,7 +48,6 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /** An End-to-end test case for Fluss pipeline connector. */
-@EnabledIfSystemProperty(named = "specifiedFlinkVersion", matches = "^1.*")
 @Testcontainers
 public class FlussE2eITCase extends PipelineTestEnvironment {
 

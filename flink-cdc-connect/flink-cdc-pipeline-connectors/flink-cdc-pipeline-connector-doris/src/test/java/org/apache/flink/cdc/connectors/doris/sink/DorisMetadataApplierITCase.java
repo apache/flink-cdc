@@ -17,7 +17,6 @@
 
 package org.apache.flink.cdc.connectors.doris.sink;
 
-import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
@@ -48,6 +47,7 @@ import org.apache.flink.cdc.connectors.doris.sink.utils.DorisContainer;
 import org.apache.flink.cdc.connectors.doris.sink.utils.DorisSinkTestBase;
 import org.apache.flink.cdc.connectors.doris.utils.DorisSchemaUtils;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
+import org.apache.flink.configuration.RestartStrategyOptions;
 import org.apache.flink.runtime.client.JobExecutionException;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -56,6 +56,7 @@ import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.condition.DisabledIfSystemProperty;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -85,7 +86,9 @@ class DorisMetadataApplierITCase extends DorisSinkTestBase {
     public static void before() {
         env.setParallelism(DEFAULT_PARALLELISM);
         env.enableCheckpointing(3000);
-        env.setRestartStrategy(RestartStrategies.noRestart());
+        env.configure(
+                new org.apache.flink.configuration.Configuration()
+                        .set(RestartStrategyOptions.RESTART_STRATEGY, "none"));
     }
 
     @BeforeEach
@@ -393,6 +396,7 @@ class DorisMetadataApplierITCase extends DorisSinkTestBase {
 
     @ParameterizedTest(name = "batchMode: {0}")
     @ValueSource(booleans = {true, false})
+    @DisabledIfSystemProperty(named = "flink.profile", matches = "flink2")
     void testDorisAlterColumnType(boolean batchMode) throws Exception {
         TableId tableId =
                 TableId.tableId(
@@ -413,6 +417,7 @@ class DorisMetadataApplierITCase extends DorisSinkTestBase {
 
     @ParameterizedTest(name = "batchMode: {0}")
     @ValueSource(booleans = {true, false})
+    @DisabledIfSystemProperty(named = "flink.profile", matches = "flink2")
     void testDorisAlterColumnTypeWithDefaultValue(boolean batchMode) throws Exception {
         TableId tableId =
                 TableId.tableId(

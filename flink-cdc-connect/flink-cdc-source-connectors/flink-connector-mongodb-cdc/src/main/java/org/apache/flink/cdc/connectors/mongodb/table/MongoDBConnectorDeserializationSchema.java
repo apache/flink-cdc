@@ -696,6 +696,10 @@ public class MongoDBConnectorDeserializationSchema
                         .map(this::createConverter)
                         .toArray(DeserializationRuntimeConverter[]::new);
         final String[] fieldNames = rowType.getFieldNames().toArray(new String[0]);
+        final LogicalType[] fieldTypes =
+                rowType.getFields().stream()
+                        .map(RowType.RowField::getType)
+                        .toArray(LogicalType[]::new);
 
         return (docObj) -> {
             if (!docObj.isDocument()) {
@@ -712,7 +716,12 @@ public class MongoDBConnectorDeserializationSchema
             for (int i = 0; i < arity; i++) {
                 String fieldName = fieldNames[i];
                 BsonValue fieldValue = document.get(fieldName);
-                Object convertedField = convertField(fieldConverters[i], fieldValue);
+                Object convertedField =
+                        convertField(
+                                fieldConverters[i],
+                                fieldValue,
+                                fieldTypes[i],
+                                document.containsKey(fieldName));
                 row.setField(i, convertedField);
             }
             return row;
@@ -776,6 +785,74 @@ public class MongoDBConnectorDeserializationSchema
             return null;
         } else {
             return fieldConverter.convert(fieldValue);
+        }
+    }
+
+    private Object convertField(
+            DeserializationRuntimeConverter fieldConverter,
+            BsonValue fieldValue,
+            LogicalType fieldType,
+            boolean fieldPresent)
+            throws Exception {
+        if (fieldValue == null) {
+            // For NOT NULL fields that are missing from the document (e.g., DELETE events
+            // only contain _id), return the default value for the type
+            if (!fieldPresent && !fieldType.isNullable()) {
+                return getDefaultValueForType(fieldType);
+            }
+            return null;
+        } else {
+            return fieldConverter.convert(fieldValue);
+        }
+    }
+
+    /** Returns the default value for a non-nullable type when the field is missing. */
+    private Object getDefaultValueForType(LogicalType type) {
+        switch (type.getTypeRoot()) {
+            case BOOLEAN:
+                return false;
+            case TINYINT:
+                return (byte) 0;
+            case SMALLINT:
+                return (short) 0;
+            case INTEGER:
+            case INTERVAL_YEAR_MONTH:
+                return 0;
+            case BIGINT:
+            case INTERVAL_DAY_TIME:
+                return 0L;
+            case DATE:
+                return 0; // days since epoch
+            case TIME_WITHOUT_TIME_ZONE:
+                return 0; // milliseconds since midnight
+            case TIMESTAMP_WITHOUT_TIME_ZONE:
+            case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
+                return TimestampData.fromEpochMillis(0L);
+            case FLOAT:
+                return 0.0f;
+            case DOUBLE:
+                return 0.0d;
+            case CHAR:
+            case VARCHAR:
+                return StringData.fromString("");
+            case BINARY:
+            case VARBINARY:
+                return new byte[0];
+            case DECIMAL:
+                DecimalType decimalType = (DecimalType) type;
+                return DecimalData.fromBigDecimal(
+                        java.math.BigDecimal.ZERO,
+                        decimalType.getPrecision(),
+                        decimalType.getScale());
+            case ARRAY:
+                return new GenericArrayData(new Object[0]);
+            case MAP:
+            case MULTISET:
+                return new GenericMapData(new java.util.HashMap<>());
+            case ROW:
+                return new GenericRowData(0);
+            default:
+                return null;
         }
     }
 

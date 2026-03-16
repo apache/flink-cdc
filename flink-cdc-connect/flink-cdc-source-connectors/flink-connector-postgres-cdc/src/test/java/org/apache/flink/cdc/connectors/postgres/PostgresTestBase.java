@@ -178,19 +178,47 @@ public abstract class PostgresTestBase extends AbstractTestBase {
 
     protected void waitForSinkResult(String sinkName, List<String> expected)
             throws InterruptedException {
+        waitForSinkResult(sinkName, expected, 120000L); // default 2 minutes timeout
+    }
+
+    protected void waitForSinkResult(String sinkName, List<String> expected, long timeoutMillis)
+            throws InterruptedException {
+        List<String> sortedExpected = expected.stream().sorted().collect(Collectors.toList());
         List<String> actual = TestValuesTableFactory.getResultsAsStrings(sinkName);
-        actual = actual.stream().sorted().collect(Collectors.toList());
-        while (actual.size() != expected.size() || !actual.equals(expected)) {
+        List<String> sortedActual = actual.stream().sorted().collect(Collectors.toList());
+        long start = System.currentTimeMillis();
+        while (!sortedActual.equals(sortedExpected)) {
+            if (System.currentTimeMillis() - start > timeoutMillis) {
+                throw new AssertionError(
+                        "Timeout waiting for sink result. Expected: "
+                                + sortedExpected
+                                + ", but got: "
+                                + sortedActual);
+            }
             actual =
                     TestValuesTableFactory.getResultsAsStrings(sinkName).stream()
                             .sorted()
                             .collect(Collectors.toList());
+            sortedActual = actual;
             sleep(1000);
         }
     }
 
     protected void waitForSinkSize(String sinkName, int expectedSize) throws InterruptedException {
+        waitForSinkSize(sinkName, expectedSize, 120000L); // default 2 minutes timeout
+    }
+
+    protected void waitForSinkSize(String sinkName, int expectedSize, long timeoutMillis)
+            throws InterruptedException {
+        long start = System.currentTimeMillis();
         while (sinkSize(sinkName) < expectedSize) {
+            if (System.currentTimeMillis() - start > timeoutMillis) {
+                throw new AssertionError(
+                        "Timeout waiting for sink size. Expected: "
+                                + expectedSize
+                                + ", but got: "
+                                + sinkSize(sinkName));
+            }
             sleep(100);
         }
     }

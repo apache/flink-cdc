@@ -607,17 +607,14 @@ class EventRecordSerializationSchemaTest {
             throw new UnsupportedOperationException();
         }
 
-        @Override
         public int getSubtaskId() {
             throw new UnsupportedOperationException();
         }
 
-        @Override
         public int getNumberOfParallelSubtasks() {
             throw new UnsupportedOperationException();
         }
 
-        @Override
         public int getAttemptNumber() {
             throw new UnsupportedOperationException();
         }
@@ -648,7 +645,6 @@ class EventRecordSerializationSchemaTest {
             throw new UnsupportedOperationException();
         }
 
-        @Override
         public JobID getJobId() {
             throw new UnsupportedOperationException();
         }

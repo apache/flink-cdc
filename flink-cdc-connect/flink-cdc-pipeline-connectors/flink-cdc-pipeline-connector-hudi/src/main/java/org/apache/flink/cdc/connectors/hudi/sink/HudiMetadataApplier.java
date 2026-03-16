@@ -490,11 +490,12 @@ public class HudiMetadataApplier implements MetadataApplier {
 
         // Create new CatalogTable with same options and comment
         CatalogTable catalogTable =
-                CatalogTable.of(
-                        tableSchema,
-                        existingTable.getComment(),
-                        existingTable.getPartitionKeys(),
-                        existingTable.getOptions());
+                CatalogTable.newBuilder()
+                        .schema(tableSchema)
+                        .comment(existingTable.getComment())
+                        .partitionKeys(existingTable.getPartitionKeys())
+                        .options(existingTable.getOptions())
+                        .build();
 
         return new ResolvedCatalogTable(catalogTable, newSchema);
     }
@@ -626,11 +627,13 @@ public class HudiMetadataApplier implements MetadataApplier {
 
         // Create CatalogTable
         CatalogTable catalogTable =
-                CatalogTable.of(
-                        tableSchema,
-                        cdcSchema.comment(),
-                        partitionKeys != null ? partitionKeys : Collections.emptyList(),
-                        tableOptions);
+                CatalogTable.newBuilder()
+                        .schema(tableSchema)
+                        .comment(cdcSchema.comment())
+                        .partitionKeys(
+                                partitionKeys != null ? partitionKeys : Collections.emptyList())
+                        .options(tableOptions)
+                        .build();
 
         return new ResolvedCatalogTable(catalogTable, resolvedSchema);
     }

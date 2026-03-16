@@ -19,7 +19,6 @@ package org.apache.flink.cdc.connectors.oracle.source;
 
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
-import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.connectors.base.source.utils.hooks.SnapshotPhaseHook;
@@ -29,6 +28,7 @@ import org.apache.flink.cdc.connectors.oracle.source.utils.OracleConnectionUtils
 import org.apache.flink.cdc.connectors.oracle.testutils.OracleTestUtils.FailoverPhase;
 import org.apache.flink.cdc.connectors.oracle.testutils.OracleTestUtils.FailoverType;
 import org.apache.flink.cdc.connectors.oracle.testutils.TestTable;
+import org.apache.flink.cdc.connectors.utils.RestartStrategyUtils;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -132,7 +132,7 @@ public class OracleSourceITCase extends OracleSourceTestBase {
                 FailoverPhase.SNAPSHOT,
                 new String[] {"CUSTOMERS"},
                 true,
-                RestartStrategies.fixedDelayRestart(1, 0),
+                true,
                 null);
     }
 
@@ -392,7 +392,7 @@ public class OracleSourceITCase extends OracleSourceTestBase {
                 FailoverPhase.NEVER,
                 new String[] {"CUSTOMERS"},
                 false,
-                RestartStrategies.noRestart(),
+                false,
                 chunkColumn);
 
         // since `scan.incremental.snapshot.chunk.key-column` is set, an exception should not occur.
@@ -405,7 +405,7 @@ public class OracleSourceITCase extends OracleSourceTestBase {
         StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
         env.setParallelism(1);
         env.enableCheckpointing(5000L);
-        env.setRestartStrategy(RestartStrategies.noRestart());
+        RestartStrategyUtils.configureNoRestartStrategy(env);
 
         long currentScn = 0L;
         try (Connection connection = getJdbcConnectionAsDBA();
@@ -592,13 +592,7 @@ public class OracleSourceITCase extends OracleSourceTestBase {
             String[] captureCustomerTables)
             throws Exception {
         testOracleParallelSource(
-                parallelism,
-                failoverType,
-                failoverPhase,
-                captureCustomerTables,
-                false,
-                RestartStrategies.fixedDelayRestart(1, 0),
-                null);
+                parallelism, failoverType, failoverPhase, captureCustomerTables, false, true, null);
     }
 
     private void testOracleParallelSource(
@@ -607,7 +601,7 @@ public class OracleSourceITCase extends OracleSourceTestBase {
             FailoverPhase failoverPhase,
             String[] captureCustomerTables,
             boolean skipSnapshotBackfill,
-            RestartStrategies.RestartStrategyConfiguration restartStrategyConfiguration,
+            boolean fixedDelayRestart,
             String chunkColumn)
             throws Exception {
         createAndInitialize("customer.sql");
@@ -616,7 +610,11 @@ public class OracleSourceITCase extends OracleSourceTestBase {
 
         env.setParallelism(parallelism);
         env.enableCheckpointing(200L);
-        env.setRestartStrategy(restartStrategyConfiguration);
+        if (fixedDelayRestart) {
+            RestartStrategyUtils.configureFixedDelayRestartStrategy(env, 1, 0);
+        } else {
+            RestartStrategyUtils.configureNoRestartStrategy(env);
+        }
 
         String sourceDDL =
                 format(

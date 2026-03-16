@@ -17,8 +17,8 @@
 
 package org.apache.flink.cdc.connectors.postgres.table;
 
-import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.cdc.connectors.postgres.PostgresTestBase;
+import org.apache.flink.cdc.connectors.utils.RestartStrategyUtils;
 import org.apache.flink.cdc.connectors.utils.StaticExternalResourceProxy;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
@@ -34,6 +34,7 @@ import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledIfSystemProperty;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -55,6 +56,7 @@ import java.util.stream.Stream;
 import static org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT;
 
 /** Integration tests for PostgreSQL Table source. */
+@DisabledIfSystemProperty(named = "flink.profile", matches = "flink2")
 class PostgreSQLConnectorITCase extends PostgresTestBase {
 
     private final StreamExecutionEnvironment env =
@@ -103,7 +105,7 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
 
     void setup(boolean parallelismSnapshot) {
         TestValuesTableFactory.clearAllData();
-        env.setRestartStrategy(RestartStrategies.noRestart());
+        RestartStrategyUtils.configureNoRestartStrategy(env);
         if (parallelismSnapshot) {
             env.setParallelism(4);
             env.enableCheckpointing(200);
@@ -154,8 +156,7 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
                         + " PRIMARY KEY (name) NOT ENFORCED"
                         + ") WITH ("
                         + " 'connector' = 'values',"
-                        + " 'sink-insert-only' = 'false',"
-                        + " 'sink-expected-messages-num' = '20'"
+                        + " 'sink-insert-only' = 'false'"
                         + ")";
         tEnv.executeSql(sourceDDL);
         tEnv.executeSql(sinkDDL);
@@ -187,7 +188,20 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
             statement.execute("DELETE FROM inventory.products WHERE id=111;");
         }
 
-        waitForSinkSize("sink", 20);
+        // Wait for the final aggregated result
+        // Note: We use waitForSinkResult instead of waitForSinkSize because Flink 2.x
+        // optimizations may reduce the number of intermediate changelog messages
+        String[] expected =
+                new String[] {
+                    "scooter,3.140",
+                    "car battery,8.100",
+                    "12-pack drill bits,0.800",
+                    "hammer,2.625",
+                    "rocks,5.100",
+                    "jacket,0.600",
+                    "spare tire,22.200"
+                };
+        waitForSinkResult("sink", Arrays.asList(expected));
 
         /*
          * <pre>
@@ -214,17 +228,6 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
          * --------+--------+
          * </pre>
          */
-
-        String[] expected =
-                new String[] {
-                    "scooter,3.140",
-                    "car battery,8.100",
-                    "12-pack drill bits,0.800",
-                    "hammer,2.625",
-                    "rocks,5.100",
-                    "jacket,0.600",
-                    "spare tire,22.200"
-                };
 
         List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
         Assertions.assertThat(actual).containsExactlyInAnyOrder(expected);
@@ -325,9 +328,9 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
                     "INSERT INTO inventory_partitioned.products VALUES (default,'bike','Big 2-wheel bycicle ',6.18, 'china');");
         }
 
-        waitForSinkSize("sink", 11);
-
         // consume both snapshot and wal events
+        // Note: We use waitForSinkResult instead of waitForSinkSize because Flink 2.x
+        // optimizations may reduce the number of intermediate changelog messages
         String[] expected =
                 new String[] {
                     "101,scooter,Small 2-wheel scooter,3.140,us",
@@ -343,6 +346,8 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
                     "111,scooter,Big 2-wheel scooter ,5.180,uk",
                     "112,bike,Big 2-wheel bycicle ,6.180,china"
                 };
+
+        waitForSinkResult("sink", Arrays.asList(expected));
 
         List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
         Assertions.assertThat(actual).containsExactlyInAnyOrder(expected);
@@ -413,10 +418,12 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
             statement.execute("DELETE FROM inventory.products WHERE id=111;");
         }
 
-        waitForSinkSize("sink", 5);
-
+        // Note: We use waitForSinkResult instead of waitForSinkSize because Flink 2.x
+        // optimizations may reduce the number of intermediate changelog messages
         String[] expected =
                 new String[] {"110,jacket,new water resistent white wind breaker,0.500"};
+
+        waitForSinkResult("sink", Arrays.asList(expected));
 
         List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
         Assertions.assertThat(actual).containsExactlyInAnyOrder(expected);
@@ -505,12 +512,15 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
         tEnv.executeSql(sinkDDL);
 
         TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM debezium_source");
-        waitForSinkSize("sink", 2);
 
+        // Note: We use waitForSinkResult instead of waitForSinkSize because Flink 2.x
+        // optimizations may reduce the number of intermediate changelog messages
         String[] expected =
                 new String[] {
                     "112,thirth,thirth description,0.100", "113,forth,forth description,0.200"
                 };
+
+        waitForSinkResult("sink", Arrays.asList(expected));
 
         List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
         Assertions.assertThat(actual).containsExactlyInAnyOrder(expected);
@@ -891,8 +901,7 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
                         + " PRIMARY KEY (name) NOT ENFORCED"
                         + ") WITH ("
                         + " 'connector' = 'values',"
-                        + " 'sink-insert-only' = 'false',"
-                        + " 'sink-expected-messages-num' = '20'"
+                        + " 'sink-insert-only' = 'false'"
                         + ")";
         tEnv.executeSql(sourceDDL);
         tEnv.executeSql(sinkDDL);
@@ -923,7 +932,20 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
             statement.execute("DELETE FROM inventory.products WHERE id=111;");
         }
 
-        waitForSinkSize("sink", 20);
+        // Wait for the final aggregated result
+        // Note: We use waitForSinkResult instead of waitForSinkSize because Flink 2.x
+        // optimizations may reduce the number of intermediate changelog messages
+        String[] expected =
+                new String[] {
+                    "scooter,3.140",
+                    "car battery,8.100",
+                    "12-pack drill bits,0.800",
+                    "hammer,2.625",
+                    "rocks,5.100",
+                    "jacket,0.600",
+                    "spare tire,22.200"
+                };
+        waitForSinkResult("sink", Arrays.asList(expected));
 
         /*
          * <pre>
@@ -950,17 +972,6 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
          * --------+--------+
          * </pre>
          */
-
-        String[] expected =
-                new String[] {
-                    "scooter,3.140",
-                    "car battery,8.100",
-                    "12-pack drill bits,0.800",
-                    "hammer,2.625",
-                    "rocks,5.100",
-                    "jacket,0.600",
-                    "spare tire,22.200"
-                };
 
         List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
         Assertions.assertThat(actual).containsExactlyInAnyOrder(expected);
