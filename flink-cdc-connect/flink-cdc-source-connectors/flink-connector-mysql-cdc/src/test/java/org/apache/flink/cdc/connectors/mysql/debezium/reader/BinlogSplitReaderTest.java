@@ -143,6 +143,7 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
             binaryLogClient.disconnect();
         }
         customerDatabase.dropDatabase();
+        customerDatabaseNoGtid.dropDatabase();
     }
 
     @Test
@@ -520,6 +521,68 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
                     "+I[2002, user_23, Shanghai, 123567891234]",
                     "+I[2003, user_24, Shanghai, 123567891234]"
                 };
+        List<String> actual = readBinlogSplits(dataType, reader, expected.length);
+        assertEqualsInOrder(Arrays.asList(expected), actual);
+
+        reader.close();
+    }
+
+    @Test
+    void testDmlStatementFilteringWithStatementBinlogFormat() throws Exception {
+        customerDatabaseNoGtid.createAndInitialize();
+        MySqlSourceConfig sourceConfig =
+                getConfig(
+                        MYSQL_CONTAINER_NOGTID,
+                        customerDatabaseNoGtid,
+                        StartupOptions.latest(),
+                        new String[] {"customers"});
+        binaryLogClient = DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
+        mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig);
+
+        // Create reader and submit splits
+        MySqlBinlogSplit split = createBinlogSplit(sourceConfig);
+        BinlogSplitReader reader = createBinlogReader(sourceConfig);
+        reader.submitSplit(split);
+
+        // Simulate pt-table-checksum: use an independent JDBC connection to set session-level
+        // binlog_format to STATEMENT, then execute DML statements that will appear as QueryEvents
+        // in binlog. These should be filtered by isDmlStatement() in handleQueryEvent().
+        String qualifiedTableName = customerDatabaseNoGtid.qualifiedTableName("customers");
+        try (Connection conn = customerDatabaseNoGtid.getJdbcConnection();
+                Statement stmt = conn.createStatement()) {
+            stmt.execute("SET SESSION binlog_format = 'STATEMENT'");
+            // REPLACE INTO - the key DML that was missing from the filter before DBZ-9428
+            stmt.execute(
+                    "REPLACE INTO "
+                            + qualifiedTableName
+                            + " VALUES(103, 'user_3', 'Shanghai', '123567891234')");
+            // Other DML statements in STATEMENT mode
+            stmt.execute(
+                    "INSERT INTO "
+                            + qualifiedTableName
+                            + " VALUES(9999, 'pt_checksum_user', 'TestCity', '000000000000')");
+            stmt.execute(
+                    "UPDATE " + qualifiedTableName + " SET address = 'PtCity' WHERE id = 9999");
+            stmt.execute("DELETE FROM " + qualifiedTableName + " WHERE id = 9999");
+            // Restore ROW mode for subsequent normal DML
+            stmt.execute("SET SESSION binlog_format = 'ROW'");
+        }
+
+        // Execute a normal ROW-mode DML to verify the reader is still healthy
+        mySqlConnection.execute(
+                "INSERT INTO "
+                        + qualifiedTableName
+                        + " VALUES(2001, 'user_22', 'Shanghai', '123567891234')");
+        mySqlConnection.commit();
+
+        final DataType dataType =
+                DataTypes.ROW(
+                        DataTypes.FIELD("id", DataTypes.BIGINT()),
+                        DataTypes.FIELD("name", DataTypes.STRING()),
+                        DataTypes.FIELD("address", DataTypes.STRING()),
+                        DataTypes.FIELD("phone_number", DataTypes.STRING()));
+        // Only the ROW-mode INSERT should be captured; STATEMENT-mode DMLs are filtered out
+        String[] expected = new String[] {"+I[2001, user_22, Shanghai, 123567891234]"};
         List<String> actual = readBinlogSplits(dataType, reader, expected.length);
         assertEqualsInOrder(Arrays.asList(expected), actual);
 
