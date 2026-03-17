@@ -19,6 +19,7 @@ package org.apache.flink.cdc.composer.definition;
 
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.cdc.common.pipeline.RouteMode;
 import org.apache.flink.cdc.common.pipeline.RuntimeExecutionMode;
 import org.apache.flink.cdc.common.types.LocalZonedTimestampType;
 import org.apache.flink.cdc.composer.PipelineComposer;
@@ -32,6 +33,7 @@ import java.util.TimeZone;
 
 import static org.apache.flink.cdc.common.pipeline.PipelineOptions.PIPELINE_EXECUTION_RUNTIME_MODE;
 import static org.apache.flink.cdc.common.pipeline.PipelineOptions.PIPELINE_LOCAL_TIME_ZONE;
+import static org.apache.flink.cdc.common.pipeline.PipelineOptions.PIPELINE_ROUTE_MODE;
 
 /**
  * Definition of a pipeline.
@@ -100,6 +102,10 @@ public class PipelineDef {
         return routes;
     }
 
+    public RouteMode getRouteMode() {
+        return config.get(PIPELINE_ROUTE_MODE);
+    }
+
     public List<TransformDef> getTransforms() {
         return transforms;
     }
@@ -125,6 +131,8 @@ public class PipelineDef {
                 + sink
                 + ", routes="
                 + routes
+                + ", routeMode="
+                + getRouteMode()
                 + ", transforms="
                 + transforms
                 + ", udfs="
