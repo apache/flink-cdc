@@ -83,6 +83,12 @@ limitations under the License.
             <version>${project.version}</version>
             <type>test-jar</type>
             <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <artifactId>reload4j</artifactId>
+                    <groupId>ch.qos.reload4j</groupId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.apache.flink</groupId>
@@ -332,6 +338,14 @@ limitations under the License.
                     <groupId>org.slf4j</groupId>
                     <artifactId>slf4j-log4j12</artifactId>
                 </exclusion>
+                <exclusion>
+                    <artifactId>reload4j</artifactId>
+                    <groupId>ch.qos.reload4j</groupId>
+                </exclusion>
+                <exclusion>
+                    <artifactId>slf4j-reload4j</artifactId>
+                    <groupId>org.slf4j</groupId>
+                </exclusion>
             </exclusions>
         </dependency>
 
@@ -352,6 +366,10 @@ limitations under the License.
                 <exclusion>
                     <artifactId>slf4j-log4j12</artifactId>
                     <groupId>org.slf4j</groupId>
+                </exclusion>
+                <exclusion>
+                    <artifactId>reload4j</artifactId>
+                    <groupId>ch.qos.reload4j</groupId>
                 </exclusion>
             </exclusions>
         </dependency>
@@ -375,6 +393,10 @@ limitations under the License.
                     <artifactId>slf4j-log4j12</artifactId>
                     <groupId>org.slf4j</groupId>
                 </exclusion>
+                <exclusion>
+                    <artifactId>reload4j</artifactId>
+                    <groupId>ch.qos.reload4j</groupId>
+                </exclusion>
             </exclusions>
         </dependency>
 
@@ -395,6 +417,14 @@ limitations under the License.
                 </exclusion>
                 <exclusion>
                     <artifactId>slf4j-log4j12</artifactId>
+                    <groupId>org.slf4j</groupId>
+                </exclusion>
+                <exclusion>
+                    <artifactId>reload4j</artifactId>
+                    <groupId>ch.qos.reload4j</groupId>
+                </exclusion>
+                <exclusion>
+                    <artifactId>slf4j-reload4j</artifactId>
                     <groupId>org.slf4j</groupId>
                 </exclusion>
             </exclusions>
@@ -444,7 +474,9 @@ limitations under the License.
                             <excludes>
                                 <exclude>**/MysqlE2eWithYarnApplicationITCase.java</exclude>
                             </excludes>
-                            <forkCount>1</forkCount>
+                            <forkCount>4</forkCount>
+                            <reuseForks>false</reuseForks>
+                            <parallel>classes</parallel>
                             <systemPropertyVariables>
                                 <moduleDir>${project.basedir}</moduleDir>
                             </systemPropertyVariables>

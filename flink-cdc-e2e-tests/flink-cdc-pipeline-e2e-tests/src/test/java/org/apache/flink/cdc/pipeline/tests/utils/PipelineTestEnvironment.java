@@ -45,7 +45,6 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.output.FrameConsumerResultCallback;
 import org.testcontainers.containers.output.OutputFrame;
-import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.containers.output.ToStringConsumer;
 import org.testcontainers.images.builder.Transferable;
 import org.testcontainers.junit.jupiter.Container;
@@ -114,8 +113,7 @@ public abstract class PipelineTestEnvironment extends TestLogger {
                             .withUsername("flinkuser")
                             .withPassword("flinkpw")
                             .withNetwork(NETWORK)
-                            .withNetworkAliases(INTER_CONTAINER_MYSQL_ALIAS)
-                            .withLogConsumer(new Slf4jLogConsumer(LOG));
+                            .withNetworkAliases(INTER_CONTAINER_MYSQL_ALIAS);
 
     // ------------------------------------------------------------------------------------------
     // Flink Variables
