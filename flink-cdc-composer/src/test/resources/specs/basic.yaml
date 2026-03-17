@@ -108,13 +108,14 @@
   expect: |-
     CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`string_` STRING}, primaryKeys=id_, options=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, From A to Z is Lie], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, From A to Z is Lie], after=[], op=DELETE, meta=()}
 - do: Filter by Expression
   projection: id_, string_
   filter: id_ + 1 <= 1
   primary-key: id_
   expect: |-
     CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`string_` STRING}, primaryKeys=id_, options=()}
-    DataChangeEvent{tableId=foo.bar.baz, before=[1, From A to Z is Lie], after=[-1, 天地玄黄宇宙洪荒], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[-1, 天地玄黄宇宙洪荒], op=INSERT, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[-1, 天地玄黄宇宙洪荒], after=[], op=DELETE, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null], op=INSERT, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[0, null], after=[], op=DELETE, meta=()}
@@ -126,6 +127,7 @@
   expect: |-
     CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`string_` STRING,`strlen_` INT}, primaryKeys=id_, options=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, From A to Z is Lie, 18], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, From A to Z is Lie, 18], after=[], op=DELETE, meta=()}
 - do: Filter by Calculation Column (With NULL)
   ignore: FLINK-38905
   projection: id_, string_, CHAR_LENGTH(string_) AS strlen_
@@ -134,6 +136,7 @@
   expect: |-
     CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`string_` STRING,`strlen_` INT}, primaryKeys=id_, options=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, From A to Z is Lie, 18], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, From A to Z is Lie, 18], after=[], op=DELETE, meta=()}
 - do: Invalid Projection Expr
   projection: id_, a_column_that_is_nowhere_to_be_found
   primary-key: id_

@@ -785,6 +785,91 @@ class PostTransformOperatorTest {
     }
 
     @Test
+    void testUpdateEventFilterOpTypeConversion() throws Exception {
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
+                        .addTransform(
+                                COLUMN_SQUARE_TABLE.identifier(),
+                                "col1, col2, col2 * col2 as square_col2",
+                                "col2 < 3 OR col2 > 5")
+                        .build();
+        RegularEventOperatorTestHarness<PostTransformOperator, Event>
+                transformFunctionEventEventOperatorTestHarness =
+                        RegularEventOperatorTestHarness.with(transform, 1);
+        transformFunctionEventEventOperatorTestHarness.open();
+        CreateTableEvent createTableEvent =
+                new CreateTableEvent(COLUMN_SQUARE_TABLE, COLUMN_SQUARE_SCHEMA);
+        BinaryRecordDataGenerator recordDataGenerator =
+                new BinaryRecordDataGenerator(((RowType) COLUMN_SQUARE_SCHEMA.toRowDataType()));
+
+        transform.processElement(new StreamRecord<>(createTableEvent));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(
+                        new StreamRecord<>(
+                                new CreateTableEvent(COLUMN_SQUARE_TABLE, COLUMN_SQUARE_SCHEMA)));
+
+        // Case 1: before=Y(col2=1), after=Y(col2=6) -> UPDATE
+        DataChangeEvent updateBothPass =
+                DataChangeEvent.updateEvent(
+                        COLUMN_SQUARE_TABLE,
+                        recordDataGenerator.generate(new Object[] {1, 1, null}),
+                        recordDataGenerator.generate(new Object[] {1, 6, null}));
+        transform.processElement(new StreamRecord<>(updateBothPass));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(
+                        new StreamRecord<>(
+                                DataChangeEvent.updateEvent(
+                                        COLUMN_SQUARE_TABLE,
+                                        recordDataGenerator.generate(new Object[] {1, 1, 1}),
+                                        recordDataGenerator.generate(new Object[] {1, 6, 36}))));
+
+        // Case 2: before=Y(col2=1), after=N(col2=4) -> DELETE(before only)
+        DataChangeEvent updateBeforeOnly =
+                DataChangeEvent.updateEvent(
+                        COLUMN_SQUARE_TABLE,
+                        recordDataGenerator.generate(new Object[] {2, 1, null}),
+                        recordDataGenerator.generate(new Object[] {2, 4, null}));
+        transform.processElement(new StreamRecord<>(updateBeforeOnly));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(
+                        new StreamRecord<>(
+                                DataChangeEvent.deleteEvent(
+                                        COLUMN_SQUARE_TABLE,
+                                        recordDataGenerator.generate(new Object[] {2, 1, 1}))));
+
+        // Case 3: before=N(col2=4), after=Y(col2=6) -> INSERT(after only)
+        DataChangeEvent updateAfterOnly =
+                DataChangeEvent.updateEvent(
+                        COLUMN_SQUARE_TABLE,
+                        recordDataGenerator.generate(new Object[] {3, 4, null}),
+                        recordDataGenerator.generate(new Object[] {3, 6, null}));
+        transform.processElement(new StreamRecord<>(updateAfterOnly));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(
+                        new StreamRecord<>(
+                                DataChangeEvent.insertEvent(
+                                        COLUMN_SQUARE_TABLE,
+                                        recordDataGenerator.generate(new Object[] {3, 6, 36}))));
+
+        // Case 4: before=N(col2=4), after=N(col2=5) -> drop
+        DataChangeEvent updateNonePass =
+                DataChangeEvent.updateEvent(
+                        COLUMN_SQUARE_TABLE,
+                        recordDataGenerator.generate(new Object[] {4, 4, null}),
+                        recordDataGenerator.generate(new Object[] {4, 5, null}));
+        transform.processElement(new StreamRecord<>(updateNonePass));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isNull();
+
+        transformFunctionEventEventOperatorTestHarness.close();
+    }
+
+    @Test
     void testTimestampTransform() throws Exception {
         PostTransformOperator transform =
                 PostTransformOperator.newBuilder()

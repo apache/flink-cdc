@@ -337,23 +337,6 @@ transform:
 ```
 小技巧：table-options 的格式是 `key1=value1,key2=value2`。
 
-## 分类映射
-多个转换规则可以定义为分类映射。
-只有第一个匹配的转换规则将应用。
-举个例子，我们可以定义一个转换规则如下：
-
-```yaml
-transform:
-  - source-table: mydb.web_order
-    projection: id, order_id
-    filter: UPPER(province) = 'SHANGHAI'
-    description: classification mapping example
-  - source-table: mydb.web_order
-    projection: order_id as id, id as order_id
-    filter: UPPER(province) = 'BEIJING'
-    description: classification mapping example
-```
-
 ## 用户自定义函数
 用户自定义函数（UDF）可以在转换规则中使用。
 

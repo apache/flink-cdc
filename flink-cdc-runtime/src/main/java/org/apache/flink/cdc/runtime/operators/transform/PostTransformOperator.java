@@ -289,16 +289,19 @@ public class PostTransformOperator extends AbstractStreamOperatorAdapter<Event>
                 getProjectionProcessor(tableId, effectiveTransformer);
         TransformFilterProcessor filterProcessor =
                 getFilterProcessor(tableId, effectiveTransformer);
-        RecordData beforeRow = null;
-        RecordData afterRow = null;
-        boolean filterPassed = true;
+
+        BinaryRecordData beforeRow = null;
+        BinaryRecordData afterRow = null;
+        boolean beforeFilterPassed = false;
+        boolean afterFilterPassed = false;
+
         if (event.before() != null) {
             context.opType = beforeOp;
             Tuple2<BinaryRecordData, Boolean> result =
                     transformRecord(
                             event.before(), info, projectionProcessor, filterProcessor, context);
             beforeRow = result.f0;
-            filterPassed = result.f1;
+            beforeFilterPassed = result.f1;
         }
         if (event.after() != null) {
             context.opType = afterOp;
@@ -306,23 +309,51 @@ public class PostTransformOperator extends AbstractStreamOperatorAdapter<Event>
                     transformRecord(
                             event.after(), info, projectionProcessor, filterProcessor, context);
             afterRow = result.f0;
-            filterPassed = result.f1;
+            afterFilterPassed = result.f1;
         }
-        if (filterPassed) {
-            DataChangeEvent finalEvent = DataChangeEvent.projectRecords(event, beforeRow, afterRow);
-            if (effectiveTransformer.getPostTransformConverter().isPresent()) {
-                return effectiveTransformer
-                        .getPostTransformConverter()
-                        .get()
-                        .convert(finalEvent)
-                        .map(Event.class::cast);
-            } else {
-                return Optional.of(finalEvent);
-            }
+        // For UPDATE events, before and after filter results may differ, requiring op type
+        // conversion:
+        //   before=Y, after=Y -> UPDATE;  before=Y, after=N -> DELETE;
+        //   before=N, after=Y -> INSERT;  before=N, after=N -> drop.
+        DataChangeEvent finalEvent;
+        switch (event.op()) {
+            case INSERT:
+            case REPLACE:
+                if (!afterFilterPassed) {
+                    return Optional.empty();
+                }
+                finalEvent = DataChangeEvent.projectRecords(event, beforeRow, afterRow);
+                break;
+            case DELETE:
+                if (!beforeFilterPassed) {
+                    return Optional.empty();
+                }
+                finalEvent = DataChangeEvent.projectRecords(event, beforeRow, afterRow);
+                break;
+            case UPDATE:
+                if (beforeFilterPassed && afterFilterPassed) {
+                    finalEvent = DataChangeEvent.projectRecords(event, beforeRow, afterRow);
+                } else if (beforeFilterPassed) {
+                    finalEvent = DataChangeEvent.deleteEvent(tableId, beforeRow, event.meta());
+                } else if (afterFilterPassed) {
+                    finalEvent = DataChangeEvent.insertEvent(tableId, afterRow, event.meta());
+                } else {
+                    return Optional.empty();
+                }
+                break;
+            default:
+                throw new UnsupportedOperationException(
+                        "Unsupported operation type: " + event.op());
         }
 
-        // Events with no matching filters satisfied won't be emitted to downstream.
-        return Optional.empty();
+        if (effectiveTransformer.getPostTransformConverter().isPresent()) {
+            return effectiveTransformer
+                    .getPostTransformConverter()
+                    .get()
+                    .convert(finalEvent)
+                    .map(Event.class::cast);
+        }
+        return Optional.of(finalEvent);
     }
 
     /**
