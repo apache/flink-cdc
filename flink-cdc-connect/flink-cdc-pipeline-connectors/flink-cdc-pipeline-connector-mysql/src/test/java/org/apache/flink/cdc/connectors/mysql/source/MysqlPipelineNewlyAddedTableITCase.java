@@ -32,7 +32,6 @@ import org.apache.flink.cdc.common.source.FlinkSourceProvider;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
-import org.apache.flink.cdc.common.utils.RestartStrategyUtils;
 import org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils;
 import org.apache.flink.cdc.connectors.mysql.factory.MySqlDataSourceFactory;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
@@ -52,6 +51,7 @@ import org.apache.flink.streaming.api.operators.collect.CollectResultIteratorAda
 import org.apache.flink.streaming.api.operators.collect.CollectSinkOperator;
 import org.apache.flink.streaming.api.operators.collect.CollectSinkOperatorFactory;
 import org.apache.flink.streaming.api.operators.collect.CollectStreamSink;
+import org.apache.flink.streaming.util.RestartStrategyUtils;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.util.ExceptionUtils;
 

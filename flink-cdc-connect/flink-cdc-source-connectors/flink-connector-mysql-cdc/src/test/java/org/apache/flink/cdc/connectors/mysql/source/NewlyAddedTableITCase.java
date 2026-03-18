@@ -19,7 +19,6 @@ package org.apache.flink.cdc.connectors.mysql.source;
 
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
-import org.apache.flink.cdc.common.utils.RestartStrategyUtils;
 import org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils;
 import org.apache.flink.cdc.connectors.mysql.table.MySqlReadableMetadata;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
@@ -38,6 +37,7 @@ import org.apache.flink.streaming.api.operators.collect.CollectResultIteratorAda
 import org.apache.flink.streaming.api.operators.collect.CollectSinkOperator;
 import org.apache.flink.streaming.api.operators.collect.CollectSinkOperatorFactory;
 import org.apache.flink.streaming.api.operators.collect.CollectStreamSink;
+import org.apache.flink.streaming.util.RestartStrategyUtils;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;

@@ -22,13 +22,13 @@ import org.apache.flink.api.connector.sink2.Sink;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.sink.FlinkSinkProvider;
-import org.apache.flink.cdc.common.utils.RestartStrategyUtils;
 import org.apache.flink.cdc.connectors.elasticsearch.config.ElasticsearchSinkOptions;
 import org.apache.flink.cdc.connectors.elasticsearch.sink.utils.ElasticsearchContainer;
 import org.apache.flink.cdc.connectors.elasticsearch.sink.utils.ElasticsearchTestUtils;
 import org.apache.flink.cdc.connectors.elasticsearch.v2.NetworkConfig;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.util.RestartStrategyUtils;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch.core.GetRequest;

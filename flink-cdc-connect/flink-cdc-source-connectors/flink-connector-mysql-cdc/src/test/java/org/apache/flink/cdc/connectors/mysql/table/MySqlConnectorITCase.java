@@ -19,7 +19,6 @@ package org.apache.flink.cdc.connectors.mysql.table;
 
 import org.apache.flink.api.common.time.Deadline;
 import org.apache.flink.api.java.tuple.Tuple2;
-import org.apache.flink.cdc.common.utils.RestartStrategyUtils;
 import org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils;
 import org.apache.flink.cdc.connectors.mysql.source.MySqlSourceTestBase;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
@@ -29,6 +28,7 @@ import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.core.execution.JobClient;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.util.RestartStrategyUtils;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.ValidationException;

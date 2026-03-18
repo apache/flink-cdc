@@ -24,7 +24,6 @@ import org.apache.flink.api.connector.sink2.Sink;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.sink.FlinkSinkProvider;
-import org.apache.flink.cdc.common.utils.RestartStrategyUtils;
 import org.apache.flink.cdc.connectors.elasticsearch.config.ElasticsearchSinkOptions;
 import org.apache.flink.cdc.connectors.elasticsearch.sink.utils.ElasticsearchContainer;
 import org.apache.flink.cdc.connectors.elasticsearch.sink.utils.ElasticsearchTestUtils;
@@ -37,6 +36,7 @@ import org.apache.flink.elasticsearch6.shaded.org.elasticsearch.client.RestClien
 import org.apache.flink.elasticsearch6.shaded.org.elasticsearch.client.RestHighLevelClient;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.util.RestartStrategyUtils;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

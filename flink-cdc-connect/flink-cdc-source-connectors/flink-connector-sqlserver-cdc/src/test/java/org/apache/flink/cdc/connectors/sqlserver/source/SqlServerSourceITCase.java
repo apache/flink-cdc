@@ -19,7 +19,6 @@ package org.apache.flink.cdc.connectors.sqlserver.source;
 
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
-import org.apache.flink.cdc.common.utils.RestartStrategyUtils;
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
 import org.apache.flink.cdc.connectors.base.source.utils.hooks.SnapshotPhaseHook;
 import org.apache.flink.cdc.connectors.base.source.utils.hooks.SnapshotPhaseHooks;
@@ -27,6 +26,7 @@ import org.apache.flink.cdc.connectors.sqlserver.source.config.SqlServerSourceCo
 import org.apache.flink.cdc.connectors.sqlserver.source.dialect.SqlServerDialect;
 import org.apache.flink.cdc.connectors.sqlserver.testutils.TestTable;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.util.RestartStrategyUtils;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.catalog.ResolvedSchema;

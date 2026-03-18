@@ -19,7 +19,6 @@ package org.apache.flink.cdc.connectors.oracle.source;
 
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
-import org.apache.flink.cdc.common.utils.RestartStrategyUtils;
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.connectors.base.source.utils.hooks.SnapshotPhaseHook;
@@ -30,6 +29,7 @@ import org.apache.flink.cdc.connectors.oracle.testutils.OracleTestUtils.Failover
 import org.apache.flink.cdc.connectors.oracle.testutils.OracleTestUtils.FailoverType;
 import org.apache.flink.cdc.connectors.oracle.testutils.TestTable;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.util.RestartStrategyUtils;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.catalog.ResolvedSchema;

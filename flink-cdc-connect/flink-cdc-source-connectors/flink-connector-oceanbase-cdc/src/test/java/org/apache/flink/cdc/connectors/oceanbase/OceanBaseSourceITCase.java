@@ -17,8 +17,8 @@
 
 package org.apache.flink.cdc.connectors.oceanbase;
 
-import org.apache.flink.cdc.common.utils.RestartStrategyUtils;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.util.RestartStrategyUtils;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;

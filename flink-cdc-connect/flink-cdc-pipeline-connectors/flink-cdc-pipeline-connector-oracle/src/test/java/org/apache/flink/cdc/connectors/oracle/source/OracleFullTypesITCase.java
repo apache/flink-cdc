@@ -33,11 +33,11 @@ import org.apache.flink.cdc.common.source.FlinkSourceProvider;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
-import org.apache.flink.cdc.common.utils.RestartStrategyUtils;
 import org.apache.flink.cdc.connectors.oracle.factory.OracleDataSourceFactory;
 import org.apache.flink.cdc.connectors.oracle.source.config.OracleSourceConfigFactory;
 import org.apache.flink.cdc.connectors.oracle.table.OracleReadableMetaData;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.util.RestartStrategyUtils;
 import org.apache.flink.util.CloseableIterator;
 
 import org.junit.jupiter.api.AfterAll;

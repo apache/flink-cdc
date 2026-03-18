@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.common.utils;
+package org.apache.flink.streaming.util;
 
 import org.apache.flink.annotation.Internal;
 import org.apache.flink.configuration.Configuration;
