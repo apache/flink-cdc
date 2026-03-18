@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.postgres.source.offset;
 
 import org.apache.flink.cdc.connectors.base.source.meta.offset.Offset;
 
+import io.debezium.connector.postgresql.PostgresOffsetContext;
 import io.debezium.connector.postgresql.SourceInfo;
 import io.debezium.connector.postgresql.connection.Lsn;
 import io.debezium.time.Conversions;
@@ -43,7 +44,10 @@ public class PostgresOffset extends Offset {
 
     // used by PostgresOffsetFactory
     PostgresOffset(Map<String, String> offset) {
-        this.offset = offset;
+        Map<String, String> filtered = new HashMap<>(offset);
+        filtered.remove(PostgresOffsetContext.LAST_COMPLETELY_PROCESSED_LSN_KEY); // lsn_proc
+        filtered.remove(PostgresOffsetContext.LAST_COMMIT_LSN_KEY);               // lsn_commit
+        this.offset = filtered;
     }
 
     PostgresOffset(Long lsn, Long txId, Instant lastCommitTs) {
