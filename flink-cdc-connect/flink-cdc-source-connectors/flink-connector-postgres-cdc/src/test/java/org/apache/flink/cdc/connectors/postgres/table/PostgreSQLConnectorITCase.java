@@ -34,7 +34,6 @@ import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.DisabledIfSystemProperty;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -56,7 +55,6 @@ import java.util.stream.Stream;
 import static org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT;
 
 /** Integration tests for PostgreSQL Table source. */
-@DisabledIfSystemProperty(named = "flink.profile", matches = "flink2")
 class PostgreSQLConnectorITCase extends PostgresTestBase {
 
     private final StreamExecutionEnvironment env =

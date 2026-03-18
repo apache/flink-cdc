@@ -38,6 +38,7 @@ limitations under the License.
             <id>flink1</id>
             <properties>
                 <paimon.flink.major.version>1.20</paimon.flink.major.version>
+                <iceberg.flink.major.version>1.20</iceberg.flink.major.version>
             </properties>
             <activation>
                 <activeByDefault>true</activeByDefault>
@@ -56,6 +57,7 @@ limitations under the License.
             <id>flink2</id>
             <properties>
                 <flink.version>${flink.2.x.version}</flink.version>
+                <iceberg.flink.major.version>2.0</iceberg.flink.major.version>
             </properties>
             <dependencies>
                 <dependency>

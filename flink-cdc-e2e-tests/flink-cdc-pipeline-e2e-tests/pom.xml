@@ -216,7 +216,7 @@ limitations under the License.
         </dependency>
         <dependency>
             <groupId>org.apache.iceberg</groupId>
-            <artifactId>iceberg-flink-runtime-${flink-major-1.20}</artifactId>
+            <artifactId>iceberg-flink-runtime-${iceberg.flink.major.version}</artifactId>
             <version>${iceberg.version}</version>
             <scope>test</scope>
         </dependency>

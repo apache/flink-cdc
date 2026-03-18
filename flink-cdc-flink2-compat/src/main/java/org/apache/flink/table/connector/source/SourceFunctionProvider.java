@@ -34,31 +34,36 @@ import java.util.Optional;
 public interface SourceFunctionProvider
         extends org.apache.flink.legacy.table.connector.source.SourceFunctionProvider {
 
-    static org.apache.flink.legacy.table.connector.source.SourceFunctionProvider of(
-            SourceFunction<RowData> sourceFunction, boolean isBounded) {
-        return of(sourceFunction, isBounded, (Integer) null);
+    static SourceFunctionProvider of(SourceFunction<RowData> sourceFunction, boolean isBounded) {
+        return of(sourceFunction, isBounded, null);
     }
 
-    static org.apache.flink.legacy.table.connector.source.SourceFunctionProvider of(
+    static SourceFunctionProvider of(
             final SourceFunction<RowData> sourceFunction,
             final boolean isBounded,
             @Nullable final Integer sourceParallelism) {
         return new SourceFunctionProvider() {
+            @Override
             public org.apache.flink.streaming.api.functions.source.legacy.SourceFunction<RowData>
                     createSourceFunction() {
-                return sourceFunction;
+                return (org.apache.flink.streaming.api.functions.source.legacy.SourceFunction<
+                                RowData>)
+                        sourceFunction;
             }
 
+            @Override
             public boolean isBounded() {
                 return isBounded;
             }
 
+            @Override
             public Optional<Integer> getParallelism() {
                 return Optional.ofNullable(sourceParallelism);
             }
         };
     }
 
+    @Override
     org.apache.flink.streaming.api.functions.source.legacy.SourceFunction<RowData>
             createSourceFunction();
 }
