@@ -17,8 +17,8 @@
 
 package org.apache.flink.cdc.connectors.postgres.table;
 
+import org.apache.flink.cdc.common.utils.RestartStrategyUtils;
 import org.apache.flink.cdc.connectors.postgres.PostgresTestBase;
-import org.apache.flink.cdc.connectors.utils.RestartStrategyUtils;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.StateRecoveryOptions;
 import org.apache.flink.core.execution.JobClient;

@@ -17,9 +17,9 @@
 
 package org.apache.flink.cdc.connectors.mongodb.source;
 
+import org.apache.flink.cdc.common.utils.RestartStrategyUtils;
 import org.apache.flink.cdc.connectors.mongodb.utils.MongoDBAssertUtils;
 import org.apache.flink.cdc.connectors.mongodb.utils.MongoDBTestUtils;
-import org.apache.flink.cdc.connectors.utils.RestartStrategyUtils;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.StateRecoveryOptions;
 import org.apache.flink.core.execution.JobClient;

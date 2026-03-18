@@ -27,10 +27,10 @@ import org.apache.flink.types.Row;
 
 import org.assertj.core.api.Assertions;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -38,20 +38,32 @@ import java.util.stream.Collectors;
 public class MongoDBTestUtils {
 
     public static void waitForSnapshotStarted(String sinkName) throws InterruptedException {
+        waitForSnapshotStarted(sinkName, Duration.ofMinutes(10));
+    }
+
+    public static void waitForSnapshotStarted(String sinkName, Duration timeout)
+            throws InterruptedException {
+        long deadline = System.nanoTime() + timeout.toNanos();
         while (sinkSize(sinkName) == 0) {
+            if (System.nanoTime() > deadline) {
+                Assertions.fail(
+                        "Wait for snapshot started timeout, raw results: \n"
+                                + String.join(
+                                        "\n",
+                                        TestValuesTableFactory.getRawResultsAsStrings(sinkName)));
+            }
             Thread.sleep(100);
         }
     }
 
     public static void waitForSinkSize(String sinkName, int expectedSize)
             throws InterruptedException {
-        waitForSinkSize(sinkName, expectedSize, 10, TimeUnit.MINUTES);
+        waitForSinkSize(sinkName, expectedSize, Duration.ofMinutes(10));
     }
 
-    public static void waitForSinkSize(
-            String sinkName, int expectedSize, long timeout, TimeUnit timeUnit)
+    public static void waitForSinkSize(String sinkName, int expectedSize, Duration timeout)
             throws InterruptedException {
-        long deadline = System.nanoTime() + timeUnit.toNanos(timeout);
+        long deadline = System.nanoTime() + timeout.toNanos();
         while (sinkSize(sinkName) < expectedSize) {
             if (System.nanoTime() > deadline) {
                 Assertions.fail(
@@ -76,13 +88,12 @@ public class MongoDBTestUtils {
      */
     public static void waitForSinkResult(String sinkName, List<String> expected)
             throws InterruptedException {
-        waitForSinkResult(sinkName, expected, 10, TimeUnit.MINUTES);
+        waitForSinkResult(sinkName, expected, Duration.ofMinutes(10));
     }
 
-    public static void waitForSinkResult(
-            String sinkName, List<String> expected, long timeout, TimeUnit timeUnit)
+    public static void waitForSinkResult(String sinkName, List<String> expected, Duration timeout)
             throws InterruptedException {
-        long deadline = System.nanoTime() + timeUnit.toNanos(timeout);
+        long deadline = System.nanoTime() + timeout.toNanos();
         while (true) {
             List<String> actual = TestValuesTableFactory.getResultsAsStrings(sinkName);
             if (actual.size() >= expected.size()

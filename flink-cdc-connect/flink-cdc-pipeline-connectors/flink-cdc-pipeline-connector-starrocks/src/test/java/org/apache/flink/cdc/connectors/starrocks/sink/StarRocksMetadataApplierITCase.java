@@ -38,6 +38,7 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
+import org.apache.flink.cdc.common.utils.RestartStrategyUtils;
 import org.apache.flink.cdc.composer.definition.SinkDef;
 import org.apache.flink.cdc.composer.flink.coordination.OperatorIDGenerator;
 import org.apache.flink.cdc.composer.flink.translator.DataSinkTranslator;
@@ -46,7 +47,6 @@ import org.apache.flink.cdc.composer.flink.translator.SchemaOperatorTranslator;
 import org.apache.flink.cdc.connectors.starrocks.sink.utils.StarRocksContainer;
 import org.apache.flink.cdc.connectors.starrocks.sink.utils.StarRocksSinkTestBase;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
-import org.apache.flink.configuration.RestartStrategyOptions;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
@@ -79,9 +79,7 @@ class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
     public static void before() {
         env.setParallelism(DEFAULT_PARALLELISM);
         env.enableCheckpointing(3000);
-        env.configure(
-                new org.apache.flink.configuration.Configuration()
-                        .set(RestartStrategyOptions.RESTART_STRATEGY, "none"));
+        RestartStrategyUtils.configureNoRestartStrategy(env);
     }
 
     @BeforeEach

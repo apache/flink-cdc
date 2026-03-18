@@ -45,6 +45,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -171,24 +172,34 @@ public abstract class PostgresTestBase extends AbstractTestBase {
     }
 
     protected void waitForSnapshotStarted(String sinkName) throws InterruptedException {
+        waitForSnapshotStarted(sinkName, Duration.ofMinutes(2));
+    }
+
+    protected void waitForSnapshotStarted(String sinkName, Duration timeout)
+            throws InterruptedException {
+        long start = System.currentTimeMillis();
         while (sinkSize(sinkName) == 0) {
+            if (System.currentTimeMillis() - start > timeout.toMillis()) {
+                throw new AssertionError(
+                        "Timeout waiting for snapshot to start. Sink: " + sinkName);
+            }
             sleep(300);
         }
     }
 
     protected void waitForSinkResult(String sinkName, List<String> expected)
             throws InterruptedException {
-        waitForSinkResult(sinkName, expected, 120000L); // default 2 minutes timeout
+        waitForSinkResult(sinkName, expected, Duration.ofMinutes(2));
     }
 
-    protected void waitForSinkResult(String sinkName, List<String> expected, long timeoutMillis)
+    protected void waitForSinkResult(String sinkName, List<String> expected, Duration timeout)
             throws InterruptedException {
         List<String> sortedExpected = expected.stream().sorted().collect(Collectors.toList());
         List<String> actual = TestValuesTableFactory.getResultsAsStrings(sinkName);
         List<String> sortedActual = actual.stream().sorted().collect(Collectors.toList());
         long start = System.currentTimeMillis();
         while (!sortedActual.equals(sortedExpected)) {
-            if (System.currentTimeMillis() - start > timeoutMillis) {
+            if (System.currentTimeMillis() - start > timeout.toMillis()) {
                 throw new AssertionError(
                         "Timeout waiting for sink result. Expected: "
                                 + sortedExpected
@@ -205,14 +216,14 @@ public abstract class PostgresTestBase extends AbstractTestBase {
     }
 
     protected void waitForSinkSize(String sinkName, int expectedSize) throws InterruptedException {
-        waitForSinkSize(sinkName, expectedSize, 120000L); // default 2 minutes timeout
+        waitForSinkSize(sinkName, expectedSize, Duration.ofMinutes(2));
     }
 
-    protected void waitForSinkSize(String sinkName, int expectedSize, long timeoutMillis)
+    protected void waitForSinkSize(String sinkName, int expectedSize, Duration timeout)
             throws InterruptedException {
         long start = System.currentTimeMillis();
         while (sinkSize(sinkName) < expectedSize) {
-            if (System.currentTimeMillis() - start > timeoutMillis) {
+            if (System.currentTimeMillis() - start > timeout.toMillis()) {
                 throw new AssertionError(
                         "Timeout waiting for sink size. Expected: "
                                 + expectedSize

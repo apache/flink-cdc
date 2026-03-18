@@ -70,7 +70,7 @@ jobs:
       java-versions: "[11]"
       flink-versions: "['2.2.0']"
       custom-maven-parameter: "-Pflink2"
-      modules: "['core_2.x']"
+      modules: "['core']"
   pipeline-ut:
     name: Pipeline Unit Tests
     uses: ./.github/workflows/flink_cdc_base.yml
@@ -84,7 +84,7 @@ jobs:
       java-versions: "[11]"
       flink-versions: "['2.2.0']"
       custom-maven-parameter: "-Pflink2"
-      modules: "['pipeline_connectors_2_x']"
+      modules: "['doris, elasticsearch, fluss, iceberg, kafka, maxcompute, mysql-pipeline, oceanbase-pipeline, paimon, postgres-pipeline, starrocks, oracle-pipeline']"
   source-ut:
     name: Source Unit Tests
     uses: ./.github/workflows/flink_cdc_base.yml
@@ -109,7 +109,7 @@ jobs:
     uses: ./.github/workflows/flink_cdc_base.yml
     with:
       java-versions: "[11]"
-      flink-versions: "['1.19.3', '1.20.3']"
+      flink-versions: "['1.20.3']"
       modules: "['pipeline_e2e']"
       parallelism: ${{ matrix.parallelism }}
   pipeline_e2e_2_x:
@@ -131,5 +131,5 @@ jobs:
     uses: ./.github/workflows/flink_cdc_base.yml
     with:
       java-versions: "[11]"
-      flink-versions: "['1.19.3', '1.20.3']"
+      flink-versions: "['1.20.3']"
       modules: "['source_e2e']"

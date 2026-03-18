@@ -36,6 +36,9 @@ limitations under the License.
     <profiles>
         <profile>
             <id>flink1</id>
+            <properties>
+                <paimon.flink.major.version>1.20</paimon.flink.major.version>
+            </properties>
             <activation>
                 <activeByDefault>true</activeByDefault>
             </activation>
@@ -53,7 +56,6 @@ limitations under the License.
             <id>flink2</id>
             <properties>
                 <flink.version>${flink.2.x.version}</flink.version>
-                <flink.major.version>2.1</flink.major.version>
             </properties>
             <dependencies>
                 <dependency>

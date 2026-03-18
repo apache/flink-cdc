@@ -114,6 +114,7 @@ limitations under the License.
         <maven.compiler.source>${source.java.version}</maven.compiler.source>
         <maven.compiler.target>${target.java.version}</maven.compiler.target>
         <flink.kafka.connector.version>3.3.0-1.20</flink.kafka.connector.version>
+        <paimon.flink.major.version>1.20</paimon.flink.major.version>
     </properties>
 
     <dependencyManagement>
@@ -853,6 +854,7 @@ limitations under the License.
             <id>flink2</id>
             <properties>
                 <flink.kafka.connector.version>4.0.1-2.0</flink.kafka.connector.version>
+                <paimon.flink.major.version>2.1</paimon.flink.major.version>
             </properties>
             <build>
                 <pluginManagement>

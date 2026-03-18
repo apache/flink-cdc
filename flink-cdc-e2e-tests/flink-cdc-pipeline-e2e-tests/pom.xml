@@ -773,7 +773,7 @@ limitations under the License.
                         </artifactItem>
                         <artifactItem>
                             <groupId>org.apache.paimon</groupId>
-                            <artifactId>paimon-flink-${flink.major.version}</artifactId>
+                            <artifactId>paimon-flink-2.1</artifactId>
                             <version>${paimon.version}</version>
                             <destFileName>paimon-sql-connector-2.2.0.jar</destFileName>
                             <type>jar</type>
@@ -823,13 +823,4 @@ limitations under the License.
             </plugin>
         </plugins>
     </build>
-
-    <profiles>
-        <profile>
-            <id>flink2</id>
-            <properties>
-                <flink.major.version>2.1</flink.major.version>
-            </properties>
-        </profile>
-    </profiles>
 </project>
