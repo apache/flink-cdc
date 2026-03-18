@@ -341,21 +341,19 @@ transform:
 Tips: The format of table-options is `key1=value1,key2=value2`.
 
 ## Classification mapping
-Multiple transform rules can be defined to classify input data rows and apply different processing.
-Only the first matched transform rule will apply.
+If a table hits ultiple transform rules, only the first matched transform rule will apply.
 For example, we may define a transform rule as follows:
 
 ```yaml
 transform:
   - source-table: mydb.web_order
     projection: id, order_id
-    filter: UPPER(province) = 'SHANGHAI'
-    description: classification mapping example
-  - source-table: mydb.web_order
-    projection: order_id as id, id as order_id
-    filter: UPPER(province) = 'BEIJING'
-    description: classification mapping example
+    filter: id > 1001
+  - source-table: mydb.\.*
+    projection: \*, 'fallback' AS FALLBACK
 ```
+
+Here, though `mydb.web_order` matches the second rule (`mydb.\.*`), it will not fall through the next rule as it has been handled in the first rule. 
 
 ## User-defined Functions
 

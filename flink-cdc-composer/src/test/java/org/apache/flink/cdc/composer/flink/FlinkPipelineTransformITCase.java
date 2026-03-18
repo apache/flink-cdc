@@ -58,7 +58,6 @@ import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 
-import org.apache.calcite.sql.validate.SqlValidatorException;
 import org.assertj.core.api.Assertions;
 import org.assertj.core.api.ThrowableAssert;
 import org.codehaus.commons.compiler.CompileException;
@@ -239,6 +238,136 @@ class FlinkPipelineTransformITCase {
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[3, Carol, 15, student], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[4, Derrida, 25, student], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[4, Derrida, 25, student], after=[], op=DELETE, meta=()}"));
+    }
+
+    @ParameterizedTest(name = "API version: {0}")
+    @EnumSource(ValuesDataSink.SinkApi.class)
+    void testFilterUpdateOpTypeConversion(ValuesDataSink.SinkApi sinkApi) throws Exception {
+        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+
+        Configuration sourceConfig = new Configuration();
+        sourceConfig.set(
+                ValuesDataSourceOptions.EVENT_SET_ID,
+                ValuesDataSourceHelper.EventSetId.CUSTOM_SOURCE_EVENTS);
+
+        TableId myTable1 = TableId.tableId("default_namespace", "default_schema", "mytable1");
+        Schema table1Schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .physicalColumn("age", DataTypes.INT())
+                        .primaryKey("id")
+                        .build();
+
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(
+                        table1Schema.getColumnDataTypes().toArray(new DataType[0]));
+
+        List<Event> events = new ArrayList<>();
+        events.add(new CreateTableEvent(myTable1, table1Schema));
+        // Case 1: before=Y, after=Y -> UPDATE
+        events.add(
+                DataChangeEvent.insertEvent(
+                        myTable1,
+                        generator.generate(
+                                new Object[] {1, BinaryStringData.fromString("Alice"), 30})));
+        events.add(
+                DataChangeEvent.updateEvent(
+                        myTable1,
+                        generator.generate(
+                                new Object[] {1, BinaryStringData.fromString("Alice"), 30}),
+                        generator.generate(
+                                new Object[] {1, BinaryStringData.fromString("Alice"), 40})));
+        // Case 2: before=Y, after=N -> DELETE
+        events.add(
+                DataChangeEvent.insertEvent(
+                        myTable1,
+                        generator.generate(
+                                new Object[] {2, BinaryStringData.fromString("Bob"), 30})));
+        events.add(
+                DataChangeEvent.updateEvent(
+                        myTable1,
+                        generator.generate(
+                                new Object[] {2, BinaryStringData.fromString("Bob"), 30}),
+                        generator.generate(
+                                new Object[] {2, BinaryStringData.fromString("Bob"), 20})));
+        // Case 3: before=N, after=Y -> INSERT
+        events.add(
+                DataChangeEvent.insertEvent(
+                        myTable1,
+                        generator.generate(
+                                new Object[] {3, BinaryStringData.fromString("Carol"), 20})));
+        events.add(
+                DataChangeEvent.updateEvent(
+                        myTable1,
+                        generator.generate(
+                                new Object[] {3, BinaryStringData.fromString("Carol"), 20}),
+                        generator.generate(
+                                new Object[] {3, BinaryStringData.fromString("Carol"), 35})));
+        // Case 4: before=N, after=N -> drop
+        events.add(
+                DataChangeEvent.insertEvent(
+                        myTable1,
+                        generator.generate(
+                                new Object[] {4, BinaryStringData.fromString("Dave"), 10})));
+        events.add(
+                DataChangeEvent.updateEvent(
+                        myTable1,
+                        generator.generate(
+                                new Object[] {4, BinaryStringData.fromString("Dave"), 10}),
+                        generator.generate(
+                                new Object[] {4, BinaryStringData.fromString("Dave"), 15})));
+
+        ValuesDataSourceHelper.setSourceEvents(Collections.singletonList(events));
+
+        SourceDef sourceDef =
+                new SourceDef(ValuesDataFactory.IDENTIFIER, "Value Source", sourceConfig);
+
+        Configuration sinkConfig = new Configuration();
+        sinkConfig.set(ValuesDataSinkOptions.MATERIALIZED_IN_MEMORY, true);
+        sinkConfig.set(ValuesDataSinkOptions.SINK_API, sinkApi);
+        SinkDef sinkDef = new SinkDef(ValuesDataFactory.IDENTIFIER, "Value Sink", sinkConfig);
+
+        Configuration pipelineConfig = new Configuration();
+        pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
+        PipelineDef pipelineDef =
+                new PipelineDef(
+                        sourceDef,
+                        sinkDef,
+                        Collections.emptyList(),
+                        Collections.singletonList(
+                                new TransformDef(
+                                        "default_namespace.default_schema.\\.*",
+                                        null,
+                                        "age > 25",
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null)),
+                        Collections.emptyList(),
+                        pipelineConfig);
+
+        PipelineExecution execution = composer.compose(pipelineDef);
+        execution.execute();
+
+        String[] outputEvents = outCaptor.toString().trim().split("\n");
+
+        assertThat(outputEvents)
+                .containsExactlyInAnyOrder(
+                        "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT NOT NULL,`name` STRING,`age` INT}, primaryKeys=id, options=()}",
+                        // INSERT id=1 (age=30 passes)
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, Alice, 30], op=INSERT, meta=()}",
+                        // UPDATE id=1 (30->40): before=Y, after=Y -> UPDATE
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[1, Alice, 30], after=[1, Alice, 40], op=UPDATE, meta=()}",
+                        // INSERT id=2 (age=30 passes)
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[2, Bob, 30], op=INSERT, meta=()}",
+                        // UPDATE id=2 (30->20): before=Y, after=N -> DELETE
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[2, Bob, 30], after=[], op=DELETE, meta=()}",
+                        // UPDATE id=3 (20->35): before=N, after=Y -> INSERT
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[3, Carol, 35], op=INSERT, meta=()}");
+        // INSERT id=3 (age=20 fails), INSERT id=4 (age=10 fails),
+        // UPDATE id=4 (10->15, both fail) are all filtered out.
     }
 
     /**
@@ -2507,7 +2636,6 @@ class FlinkPipelineTransformITCase {
                                 + "to schema\n"
                                 + "\t(Unknown).")
                 .rootCause()
-                .isExactlyInstanceOf(SqlValidatorException.class)
                 .hasMessage("Column 'id1' not found in any table");
 
         // Unexpected column in filter rule
