@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.mysql.source.config;
 
 import org.apache.flink.cdc.common.annotation.Internal;
+import org.apache.flink.cdc.common.route.TableIdRouter;
 import org.apache.flink.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory;
 import org.apache.flink.cdc.connectors.mysql.source.MySqlSource;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
@@ -398,7 +399,13 @@ public class MySqlSourceConfigFactory implements Serializable {
             props.setProperty("database.include.list", String.join(",", databaseList));
         }
         if (tableList != null) {
-            props.setProperty("table.include.list", String.join(",", tableList));
+            if (scanBinlogNewlyAddedTableEnabled) {
+                props.setProperty(
+                        "table.include.list",
+                        TableIdRouter.convertTableListToRegExpPattern(String.join(",", tableList)));
+            } else {
+                props.setProperty("table.include.list", String.join(",", tableList));
+            }
         }
         if (serverTimeZone != null) {
             props.setProperty("database.serverTimezone", serverTimeZone);
