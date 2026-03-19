@@ -106,6 +106,11 @@ Depending on the catalog type, you may need to add extra JARs manually and pass 
     </thead>
     <tbody>
       <tr>
+        <td>all</td>
+        <td><a href="https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-flink-runtime-1.20">org.apache.iceberg:iceberg-flink-runtime-1.20</a></td>
+        <td>Iceberg Flink runtime. Required for all catalog types when not pre-installed in the runtime environment (e.g., standalone Flink clusters).</td>
+      </tr>
+      <tr>
         <td>hadoop</td>
         <td><a href="https://mvnrepository.com/artifact/org.apache.flink/flink-shaded-hadoop-2-uber/2.8.3-10.0">org.apache.flink:flink-shaded-hadoop-2-uber:2.8.3-10.0</a></td>
         <td>Provides Hadoop filesystem dependencies.</td>
@@ -154,17 +159,17 @@ Pipeline Connector Options
     </tr>
     <tr>
       <td>catalog.properties.type</td>
-      <td>required</td>
+      <td>conditionally required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Metastore type of Iceberg catalog, supports <code>hadoop</code>, <code>hive</code>, and <code>glue</code>. Alternatively, you can use <code>catalog.properties.catalog-impl</code> to specify a custom catalog class directly.</td>
+      <td>Metastore type of Iceberg catalog, supports <code>hadoop</code>, <code>hive</code>, and <code>glue</code>. Either this option or <code>catalog.properties.catalog-impl</code> must be set.</td>
     </tr>
     <tr>
       <td>catalog.properties.catalog-impl</td>
-      <td>optional</td>
+      <td>conditionally required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Custom catalog implementation class. Use this instead of <code>catalog.properties.type</code> when you need a specific catalog class, e.g. <code>org.apache.iceberg.aws.glue.GlueCatalog</code>.</td>
+      <td>Custom catalog implementation class, e.g. <code>org.apache.iceberg.aws.glue.GlueCatalog</code>. Either this option or <code>catalog.properties.type</code> must be set.</td>
     </tr>
     <tr>
       <td>catalog.properties.warehouse</td>
