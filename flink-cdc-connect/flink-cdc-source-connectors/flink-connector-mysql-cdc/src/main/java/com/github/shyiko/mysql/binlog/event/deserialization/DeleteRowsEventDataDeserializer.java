@@ -15,6 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.github.shyiko.mysql.binlog.event.deserialization;
 
 import com.github.shyiko.mysql.binlog.event.DeleteRowsEventData;
@@ -32,7 +33,9 @@ import java.util.Map;
 /**
  * Copied from mysql-binlog-connector 0.27.2 to add a {@link TableIdFilter}.
  *
- * <p>Line 65-70: Use a {@link TableIdFilter} to skip the binlog deserialization of unwanted tables.
+ * <p>Line 52-56: Add a new constructor with {@link TableIdFilter} supplied.
+ *
+ * <p>Line 70-74: Use a {@link TableIdFilter} to skip the binlog deserialization of unwanted tables.
  */
 public class DeleteRowsEventDataDeserializer
         extends AbstractRowsEventDataDeserializer<DeleteRowsEventData> {
@@ -40,20 +43,21 @@ public class DeleteRowsEventDataDeserializer
     private boolean mayContainExtraInformation;
 
     /** the table id filter to skip further deserialization of unsubscribed table ids. */
-    private TableIdFilter tableIdFilter = TableIdFilter.all();
+    private final TableIdFilter tableIdFilter;
 
     public DeleteRowsEventDataDeserializer(Map<Long, TableMapEventData> tableMapEventByTableId) {
+        this(tableMapEventByTableId, TableIdFilter.all());
+    }
+
+    public DeleteRowsEventDataDeserializer(
+            Map<Long, TableMapEventData> tableMapEventByTableId, TableIdFilter tableIdFilter) {
         super(tableMapEventByTableId);
+        this.tableIdFilter = tableIdFilter;
     }
 
     public DeleteRowsEventDataDeserializer setMayContainExtraInformation(
             boolean mayContainExtraInformation) {
         this.mayContainExtraInformation = mayContainExtraInformation;
-        return this;
-    }
-
-    public DeleteRowsEventDataDeserializer setTableIdFilter(TableIdFilter tableIdFilter) {
-        this.tableIdFilter = tableIdFilter;
         return this;
     }
 

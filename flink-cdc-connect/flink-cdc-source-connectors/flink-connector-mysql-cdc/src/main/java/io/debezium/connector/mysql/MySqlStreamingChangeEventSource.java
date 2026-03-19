@@ -327,31 +327,25 @@ public class MySqlStreamingChangeEventSource
         eventDeserializer.setEventDataDeserializer(EventType.GTID, new GtidEventDataDeserializer());
         eventDeserializer.setEventDataDeserializer(
                 EventType.WRITE_ROWS,
-                new RowDeserializers.WriteRowsDeserializer(tableMapEventByTableId)
-                        .setTableIdFilter(tableIdFilter));
+                new RowDeserializers.WriteRowsDeserializer(tableMapEventByTableId, tableIdFilter));
         eventDeserializer.setEventDataDeserializer(
                 EventType.UPDATE_ROWS,
-                new RowDeserializers.UpdateRowsDeserializer(tableMapEventByTableId)
-                        .setTableIdFilter(tableIdFilter));
+                new RowDeserializers.UpdateRowsDeserializer(tableMapEventByTableId, tableIdFilter));
         eventDeserializer.setEventDataDeserializer(
                 EventType.DELETE_ROWS,
-                new RowDeserializers.DeleteRowsDeserializer(tableMapEventByTableId)
-                        .setTableIdFilter(tableIdFilter));
+                new RowDeserializers.DeleteRowsDeserializer(tableMapEventByTableId, tableIdFilter));
         eventDeserializer.setEventDataDeserializer(
                 EventType.EXT_WRITE_ROWS,
-                new RowDeserializers.WriteRowsDeserializer(tableMapEventByTableId)
-                        .setMayContainExtraInformation(true)
-                        .setTableIdFilter(tableIdFilter));
+                new RowDeserializers.WriteRowsDeserializer(tableMapEventByTableId, tableIdFilter)
+                        .setMayContainExtraInformation(true));
         eventDeserializer.setEventDataDeserializer(
                 EventType.EXT_UPDATE_ROWS,
-                new RowDeserializers.UpdateRowsDeserializer(tableMapEventByTableId)
-                        .setMayContainExtraInformation(true)
-                        .setTableIdFilter(tableIdFilter));
+                new RowDeserializers.UpdateRowsDeserializer(tableMapEventByTableId, tableIdFilter)
+                        .setMayContainExtraInformation(true));
         eventDeserializer.setEventDataDeserializer(
                 EventType.EXT_DELETE_ROWS,
-                new RowDeserializers.DeleteRowsDeserializer(tableMapEventByTableId)
-                        .setMayContainExtraInformation(true)
-                        .setTableIdFilter(tableIdFilter));
+                new RowDeserializers.DeleteRowsDeserializer(tableMapEventByTableId, tableIdFilter)
+                        .setMayContainExtraInformation(true));
         client.setEventDeserializer(eventDeserializer);
     }
 
