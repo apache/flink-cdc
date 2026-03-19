@@ -64,6 +64,8 @@ limitations under the License.
         <revision>3.6-SNAPSHOT</revision>
         <scala.binary.version>2.12</scala.binary.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!-- Classifier for distinguishing Flink 1.x and Flink 2.x builds -->
+        <flink.classifier></flink.classifier>
         <!-- Enforce single fork execution due to heavy mini cluster use in the tests -->
         <flink.forkCount>1</flink.forkCount>
         <flink.reuseForks>true</flink.reuseForks>
@@ -608,6 +610,7 @@ limitations under the License.
                             <shadeTestJar>false</shadeTestJar>
                             <shadedArtifactAttached>false</shadedArtifactAttached>
                             <createDependencyReducedPom>true</createDependencyReducedPom>
+                            <finalName>${project.artifactId}${flink.classifier}-${project.version}</finalName>
                             <filters combine.children="append">
                                 <filter>
                                     <artifact>*:*</artifact>
@@ -857,6 +860,7 @@ limitations under the License.
                 <flink.kafka.connector.version>4.0.1-2.0</flink.kafka.connector.version>
                 <paimon.flink.major.version>2.1</paimon.flink.major.version>
                 <iceberg.flink.major.version>2.0</iceberg.flink.major.version>
+                <flink.classifier>-flink2</flink.classifier>
             </properties>
             <build>
                 <pluginManagement>

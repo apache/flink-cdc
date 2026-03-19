@@ -22,14 +22,14 @@ limitations under the License.
     </formats>
 
     <includeBaseDirectory>true</includeBaseDirectory>
-    <baseDirectory>flink-cdc-${revision}</baseDirectory>
+    <baseDirectory>flink-cdc${flink.classifier}-${revision}</baseDirectory>
 
     <files>
         <!-- copy flink-cdc-dist uber jar -->
         <file>
-            <source>target/flink-cdc-dist-${revision}.jar</source>
+            <source>target/flink-cdc-dist${flink.classifier}-${revision}.jar</source>
             <outputDirectory>lib</outputDirectory>
-            <destName>flink-cdc-dist-${revision}.jar</destName>
+            <destName>flink-cdc-dist${flink.classifier}-${revision}.jar</destName>
             <fileMode>0644</fileMode>
         </file>
 
