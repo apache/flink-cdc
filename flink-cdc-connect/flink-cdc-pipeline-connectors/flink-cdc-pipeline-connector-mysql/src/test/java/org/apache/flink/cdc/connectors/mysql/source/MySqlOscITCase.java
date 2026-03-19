@@ -173,6 +173,30 @@ class MySqlOscITCase extends MySqlSourceTestBase {
         }
     }
 
+    private void insertRecordsPhase1ForAutoId(UniqueDatabase database, int count) throws Exception {
+        try (Connection connection = database.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            for (int i = 0; i < count; i++) {
+                statement.execute(
+                        String.format(
+                                "insert into customers_auto_id (name, address, phone_number) values ('%s', '%s', '%s');",
+                                "flink_" + i, "Address Line #" + i, 1000000000L + i));
+            }
+        }
+    }
+
+    private void insertRecordsPhase2ForAutoId(UniqueDatabase database, int count) throws Exception {
+        try (Connection connection = database.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            for (int i = 0; i < count; i++) {
+                statement.execute(
+                        String.format(
+                                "insert into customers_auto_id (name, address, phone_number, ext) values ('%s', '%s', '%s', %s);",
+                                "flink_ext_" + i, "Address Line Ext #" + i, 1000000000L + i, i));
+            }
+        }
+    }
+
     @Test
     void testGhOstSchemaMigration() throws Exception {
         String databaseName = customerDatabase.getDatabaseName();
@@ -276,6 +300,63 @@ class MySqlOscITCase extends MySqlSourceTestBase {
         try {
             TestCaseUtils.repeatedCheck(
                     () -> outCaptor.toString().split(System.lineSeparator()).length == 5023);
+        } catch (Exception e) {
+            LOG.error("Failed to verify results. Captured stdout: {}", outCaptor.toString(), e);
+        } finally {
+            yamlJob.interrupt();
+        }
+    }
+
+    @Test
+    void testPtOscSchemaMigrationWithAutoIncrementId() throws Exception {
+        String databaseName = customerDatabase.getDatabaseName();
+
+        LOG.info("Step 1: Start pipeline job for auto increment id table");
+
+        Thread yamlJob = runJob(databaseName, "customers_auto_id");
+        yamlJob.start();
+
+        LOG.info("Step 2: Insert initial records (Phase 1)");
+        insertRecordsPhase1ForAutoId(customerDatabase, 1000);
+
+        LOG.info("Step 3: Evolve schema with pt-osc - ADD COLUMN");
+
+        Thread thread =
+                new Thread(
+                        () -> {
+                            try {
+                                execInContainer(
+                                        PERCONA_TOOLKIT_CONTAINER,
+                                        "evolve schema",
+                                        "pt-online-schema-change",
+                                        "--user=" + TEST_USER,
+                                        "--host=" + INTER_CONTAINER_MYSQL_ALIAS,
+                                        "--password=" + TEST_PASSWORD,
+                                        "P=3306,t=customers_auto_id,D=" + databaseName,
+                                        "--alter",
+                                        "add column ext int first",
+                                        "--charset=utf8",
+                                        "--recursion-method=NONE", // Do not look for slave nodes
+                                        "--print",
+                                        "--execute");
+                            } catch (IOException | InterruptedException e) {
+                                throw new RuntimeException(e);
+                            }
+                        });
+
+        LOG.info("Insertion Phase 1 finishes");
+        thread.start();
+        insertRecordsPhase1ForAutoId(customerDatabase, 3000);
+        LOG.info("Insertion Phase 2 finishes");
+
+        thread.join();
+        insertRecordsPhase2ForAutoId(customerDatabase, 1000);
+        LOG.info("Insertion Phase 3 finishes");
+
+        // Initial 21 records + Phase1 1000 + Phase2 3000 + Phase3 1000 = 5021
+        try {
+            TestCaseUtils.repeatedCheck(
+                    () -> outCaptor.toString().split(System.lineSeparator()).length == 5021);
         } catch (Exception e) {
             LOG.error("Failed to verify results. Captured stdout: {}", outCaptor.toString(), e);
         } finally {
