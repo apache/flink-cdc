@@ -38,8 +38,8 @@ import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.assertj.core.api.Assertions;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.sql.SQLException;
@@ -64,18 +64,17 @@ class SnapshotSplitReaderTest extends MySqlSourceTestBase {
     private static BinaryLogClient binaryLogClient;
     private static MySqlConnection mySqlConnection;
 
-    @BeforeAll
-    public static void init() {
+    @BeforeEach
+    public void beforeEach() {
         customerDatabase.createAndInitialize();
-        customer3_0Database.createAndInitialize();
         MySqlSourceConfig sourceConfig =
                 getConfig(customerDatabase, new String[] {"customers"}, 10);
         binaryLogClient = DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
         mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig);
     }
 
-    @AfterAll
-    public static void afterClass() throws Exception {
+    @AfterEach
+    public void afterEach() throws Exception {
         if (mySqlConnection != null) {
             mySqlConnection.close();
         }
@@ -83,6 +82,7 @@ class SnapshotSplitReaderTest extends MySqlSourceTestBase {
         if (binaryLogClient != null) {
             binaryLogClient.disconnect();
         }
+        customerDatabase.dropDatabase();
     }
 
     @Test
@@ -113,6 +113,7 @@ class SnapshotSplitReaderTest extends MySqlSourceTestBase {
 
     @Test
     void testReadSingleSnapshotSplitWithDotName() throws Exception {
+        customer3_0Database.createAndInitialize();
         MySqlSourceConfig sourceConfig =
                 getConfig(customer3_0Database, new String[] {"customers3.0"}, 4);
         BinaryLogClient binaryLogClient =
@@ -146,6 +147,9 @@ class SnapshotSplitReaderTest extends MySqlSourceTestBase {
                 };
         List<String> actual =
                 readTableSnapshotSplits(mySqlSplits, statefulTaskContext, 1, dataType);
+        mySqlConnection.close();
+        binaryLogClient.disconnect();
+
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
     }
 
