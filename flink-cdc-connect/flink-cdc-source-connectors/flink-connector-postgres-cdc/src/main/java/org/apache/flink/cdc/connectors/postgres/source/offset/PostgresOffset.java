@@ -46,7 +46,7 @@ public class PostgresOffset extends Offset {
     PostgresOffset(Map<String, String> offset) {
         Map<String, String> filtered = new HashMap<>(offset);
         filtered.remove(PostgresOffsetContext.LAST_COMPLETELY_PROCESSED_LSN_KEY); // lsn_proc
-        filtered.remove(PostgresOffsetContext.LAST_COMMIT_LSN_KEY);               // lsn_commit
+        filtered.remove(PostgresOffsetContext.LAST_COMMIT_LSN_KEY); // lsn_commit
         this.offset = filtered;
     }
 
