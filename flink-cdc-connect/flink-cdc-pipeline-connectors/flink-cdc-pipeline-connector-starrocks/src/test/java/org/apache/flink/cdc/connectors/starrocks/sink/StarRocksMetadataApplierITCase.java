@@ -17,7 +17,6 @@
 
 package org.apache.flink.cdc.connectors.starrocks.sink;
 
-import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
@@ -46,6 +45,7 @@ import org.apache.flink.cdc.composer.flink.translator.SchemaOperatorTranslator;
 import org.apache.flink.cdc.connectors.starrocks.sink.utils.StarRocksContainer;
 import org.apache.flink.cdc.connectors.starrocks.sink.utils.StarRocksSinkTestBase;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
+import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.util.RestartStrategyUtils;
@@ -56,7 +56,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.DisabledIfSystemProperty;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -333,7 +332,6 @@ class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
     }
 
     @Test
-    @DisabledIfSystemProperty(named = "flink.profile", matches = "flink2")
     void testStarRocksAlterColumnType() throws Exception {
         TableId tableId =
                 TableId.tableId(
@@ -428,8 +426,7 @@ class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
     }
 
     private void runJobWithEvents(List<Event> events) throws Exception {
-        DataStream<Event> stream =
-                env.fromCollection(events, TypeInformation.of(Event.class)).setParallelism(1);
+        DataStream<Event> stream = env.fromData(events, new EventTypeInfo()).setParallelism(1);
 
         Configuration config =
                 new Configuration()
