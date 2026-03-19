@@ -45,7 +45,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static java.lang.Thread.sleep;
 import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER;
 import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER_PASSWORD;
 import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBTestUtils.waitForSinkResult;
@@ -212,18 +211,6 @@ class MongoDBConnectorITCase extends MongoDBSourceTestBase {
         Assertions.assertThat(actual).containsExactlyInAnyOrder(expected);
 
         result.getJobClient().get().cancel().get();
-    }
-
-    protected void waitForSinkResult(String sinkName, List<String> expected)
-            throws InterruptedException {
-        List<String> sortedExpected = expected.stream().sorted().collect(Collectors.toList());
-        List<String> actual = TestValuesTableFactory.getResultsAsStrings(sinkName);
-        List<String> sortedActual = actual.stream().sorted().collect(Collectors.toList());
-        while (!sortedActual.equals(sortedExpected)) {
-            sleep(1000);
-            actual = TestValuesTableFactory.getResultsAsStrings(sinkName);
-            sortedActual = actual.stream().sorted().collect(Collectors.toList());
-        }
     }
 
     @ParameterizedTest(name = "parallelismSnapshot: {0}")
