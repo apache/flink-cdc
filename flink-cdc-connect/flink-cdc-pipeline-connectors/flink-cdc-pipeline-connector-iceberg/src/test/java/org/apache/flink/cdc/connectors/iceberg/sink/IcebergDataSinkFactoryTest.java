@@ -122,7 +122,9 @@ public class IcebergDataSinkFactoryTest {
                         ImmutableMap.<String, String>builder()
                                 .put("catalog.properties.type", "glue")
                                 .put("catalog.properties.warehouse", "s3://my-bucket/warehouse")
-                                .put("catalog.properties.io-impl", "org.apache.iceberg.aws.s3.S3FileIO")
+                                .put(
+                                        "catalog.properties.io-impl",
+                                        "org.apache.iceberg.aws.s3.S3FileIO")
                                 .put("catalog.properties.client.region", "us-east-1")
                                 .put("catalog.properties.glue.skip-archive", "true")
                                 .build());
@@ -142,9 +144,13 @@ public class IcebergDataSinkFactoryTest {
         Configuration conf =
                 Configuration.fromMap(
                         ImmutableMap.<String, String>builder()
-                                .put("catalog.properties.catalog-impl", "org.apache.iceberg.aws.glue.GlueCatalog")
+                                .put(
+                                        "catalog.properties.catalog-impl",
+                                        "org.apache.iceberg.aws.glue.GlueCatalog")
                                 .put("catalog.properties.warehouse", "s3://my-bucket/warehouse")
-                                .put("catalog.properties.io-impl", "org.apache.iceberg.aws.s3.S3FileIO")
+                                .put(
+                                        "catalog.properties.io-impl",
+                                        "org.apache.iceberg.aws.s3.S3FileIO")
                                 .build());
         DataSink dataSink =
                 sinkFactory.createDataSink(
