@@ -48,7 +48,6 @@ import org.testcontainers.containers.Container;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.lifecycle.Startables;
-import org.testcontainers.utility.MountableFile;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -65,7 +64,7 @@ import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtil
 class MySqlOscITCase extends MySqlSourceTestBase {
     private static final MySqlContainer MYSQL8_CONTAINER = createMySqlContainer(MySqlVersion.V8_0);
 
-    private static final String PERCONA_TOOLKIT = "perconalab/percona-toolkit:3.5.7";
+    private static final String PERCONA_TOOLKIT = "perconalab/percona-toolkit:3.7.1";
 
     protected static final GenericContainer<?> PERCONA_TOOLKIT_CONTAINER =
             createPerconaToolkitContainer();
@@ -76,10 +75,10 @@ class MySqlOscITCase extends MySqlSourceTestBase {
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
 
-    private static final String GH_OST_RESOURCE_NAME =
+    private static final String GH_OST_DOWNLOAD_LINK =
             DockerClientFactory.instance().client().versionCmd().exec().getArch().equals("amd64")
-                    ? "ghost-cli/gh-ost-binary-linux-amd64-20231207144046.tar.gz"
-                    : "ghost-cli/gh-ost-binary-linux-arm64-20231207144046.tar.gz";
+                    ? "https://github.com/github/gh-ost/releases/download/v1.1.6/gh-ost-binary-linux-amd64-20231207144046.tar.gz"
+                    : "https://github.com/github/gh-ost/releases/download/v1.1.6/gh-ost-binary-linux-arm64-20231207144046.tar.gz";
 
     private final PrintStream standardOut = System.out;
     private final ByteArrayOutputStream outCaptor = new ByteArrayOutputStream();
@@ -128,8 +127,14 @@ class MySqlOscITCase extends MySqlSourceTestBase {
 
     private static void installGhOstCli(Container<?> container) {
         try {
-            container.copyFileToContainer(
-                    MountableFile.forClasspathResource(GH_OST_RESOURCE_NAME), "/tmp/gh-ost.tar.gz");
+            execInContainer(
+                    container,
+                    "download gh-ost tarball",
+                    "curl",
+                    "-L",
+                    "-o",
+                    "/tmp/gh-ost.tar.gz",
+                    GH_OST_DOWNLOAD_LINK);
             execInContainer(
                     container, "unzip binary", "tar", "-xzvf", "/tmp/gh-ost.tar.gz", "-C", "/bin");
         } catch (IOException | InterruptedException e) {

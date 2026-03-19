@@ -44,6 +44,7 @@ import java.io.IOException;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -578,20 +579,13 @@ public class RecordUtils {
                     return Optional.of(renamedFromTableName);
                 }
 
-                if (RDS_OGT_TEMP_TABLE_ID_PATTERN.matcher(renamedToTableName).matches()) {
-                    LOG.info(
-                            "Renamed to TableId name {} matches RDS temporary TableId pattern, yield {}.",
-                            renamedToTableName,
-                            renamedFromTableName);
-                    return Optional.of(renamedFromTableName);
-                }
-
                 LOG.info(
                         "Renamed to TableId {} does not match any RegEx pattern, skip it.",
                         renamedToTableName);
             }
             return Optional.empty();
         } catch (JsonProcessingException e) {
+            LOG.warn("Failed to parse schema change event {}", value, e);
             return Optional.empty();
         }
     }
@@ -599,8 +593,6 @@ public class RecordUtils {
     private static final Pattern OSC_TABLE_ID_PATTERN = Pattern.compile("^_(.*)_(gho|new)$");
 
     private static final Pattern OSC_TEMP_TABLE_ID_PATTERN = Pattern.compile("^_(.*)_(del|old)$");
-    private static final Pattern RDS_OGT_TEMP_TABLE_ID_PATTERN =
-            Pattern.compile("^tp_\\d*_del_(.*)$");
 
     /** This utility method peels out gh-ost/pt-osc mangled tableId to the original one. */
     public static TableId peelTableId(TableId tableId) {
