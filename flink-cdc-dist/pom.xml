@@ -117,7 +117,7 @@ limitations under the License.
                             <shadeTestJar>false</shadeTestJar>
                             <createDependencyReducedPom>false</createDependencyReducedPom>
                             <shadedArtifactAttached>false</shadedArtifactAttached>
-                            <finalName>${project.artifactId}${flink.classifier}-${revision}</finalName>
+                            <finalName>${project.artifactId}-${revision}</finalName>
                             <artifactSet>
                                 <includes>
                                     <include>*</include>
@@ -147,7 +147,7 @@ limitations under the License.
                             <tarLongFileMode>gnu</tarLongFileMode>
                             <appendAssemblyId>false</appendAssemblyId>
                             <attach>false</attach>
-                            <finalName>flink-cdc${flink.classifier}-${project.version}-bin</finalName>
+                            <finalName>flink-cdc-${project.version}-bin</finalName>
                             <descriptors>
                                 <descriptor>${basedir}/src/main/assembly/assembly.xml</descriptor>
                             </descriptors>
