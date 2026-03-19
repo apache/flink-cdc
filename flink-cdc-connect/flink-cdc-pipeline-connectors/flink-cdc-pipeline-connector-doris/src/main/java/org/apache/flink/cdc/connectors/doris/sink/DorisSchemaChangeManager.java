@@ -58,6 +58,7 @@ public class DorisSchemaChangeManager extends SchemaChangeManager {
     }
 
     private String quoted(String str) {
-        return "\"" + str + "\"";
+        String escaped = str.replace("\\", "\\\\");
+        return "\"" + escaped.replace("\"", "\\\"") + "\"";
     }
 }

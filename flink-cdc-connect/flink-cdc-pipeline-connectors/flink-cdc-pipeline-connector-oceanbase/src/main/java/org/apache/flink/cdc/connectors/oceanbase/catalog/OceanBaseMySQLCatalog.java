@@ -266,6 +266,20 @@ public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
                         quote(columnName),
                         oceanBaseColumn.getDataType());
 
+        // If comment is provided, we need to alter the column comment separately
+        // since MODIFY COLUMN doesn't support COMMENT in the same statement for OceanBase MySQL
+        if (comment != null && !comment.isEmpty()) {
+            String escapedComment = comment.replace("'", "''");
+            alterTypeSql =
+                    String.format(
+                            "ALTER TABLE %s.%s MODIFY COLUMN %s %s COMMENT '%s';",
+                            quote(databaseName),
+                            quote(tableName),
+                            quote(columnName),
+                            oceanBaseColumn.getDataType(),
+                            escapedComment);
+        }
+
         try {
             long startTimeMillis = System.currentTimeMillis();
             executeUpdateStatement(alterTypeSql);
@@ -391,9 +405,11 @@ public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
 
     @Override
     public void alterTable(String schemaName, String tableName, String comment) {
+        String escapedComment = comment == null ? "" : comment.replace("'", "''");
         String alterTableDDL =
                 String.format(
-                        "ALTER TABLE `%s`.`%s` SET COMMENT '%s'", schemaName, tableName, comment);
+                        "ALTER TABLE `%s`.`%s` SET COMMENT '%s'",
+                        schemaName, tableName, escapedComment);
         try {
             long startTimeMillis = System.currentTimeMillis();
             executeUpdateStatement(alterTableDDL);

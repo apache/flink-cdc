@@ -125,10 +125,9 @@ public class SchemaEvolutionUtils {
                         .append(string(addColumn.getAddColumn().getType()));
                 // Add comment if available
                 if (addColumn.getAddColumn().getComment() != null) {
-                    sqlBuilder
-                            .append(" comment '")
-                            .append(addColumn.getAddColumn().getComment())
-                            .append("'");
+                    String escapedComment =
+                            addColumn.getAddColumn().getComment().replace("'", "\\'");
+                    sqlBuilder.append(" comment '").append(escapedComment).append("'");
                 }
                 sqlBuilder.append(",");
             } else {
@@ -176,7 +175,8 @@ public class SchemaEvolutionUtils {
             if (comment == null) {
                 alterColumnSql += ";";
             } else {
-                alterColumnSql += " comment '" + comment + "';";
+                String escapedComment = comment.replace("'", "\\'");
+                alterColumnSql += " comment '" + escapedComment + "';";
             }
             Instance instance =
                     SQLTask.run(
@@ -258,11 +258,12 @@ public class SchemaEvolutionUtils {
     public static void alterTableComment(MaxComputeOptions options, TableId tableId, String comment)
             throws OdpsException {
         Odps odps = MaxComputeUtils.getOdps(options);
+        String escapedComment = comment == null ? "" : comment.replace("'", "\\'");
         String sql =
                 "alter table "
                         + getFullTableName(options, tableId)
                         + " set comment '"
-                        + comment
+                        + escapedComment
                         + "';";
         Instance instance =
                 SQLTask.run(

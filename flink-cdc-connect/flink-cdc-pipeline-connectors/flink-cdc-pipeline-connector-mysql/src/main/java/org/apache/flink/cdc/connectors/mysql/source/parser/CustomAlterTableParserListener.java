@@ -368,7 +368,7 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
                     typeMapping.put(oldColumnName, fromDbzColumn(column, tinyInt1isBit));
                     AlterColumnTypeEvent alterColumnTypeEvent =
                             new AlterColumnTypeEvent(currentTable, typeMapping);
-                    alterColumnTypeEvent.addColumnComment(column.name(), column.comment());
+                    alterColumnTypeEvent.addColumnComment(oldColumnName, column.comment());
                     changes.add(alterColumnTypeEvent);
 
                     if (newColumnName != null && !oldColumnName.equalsIgnoreCase(newColumnName)) {
@@ -421,15 +421,15 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
         parser.runIfNotNull(
                 () -> {
                     Column column = columnDefinitionListener.getColumn();
-                    Map<String, DataType> typeMapping = new HashMap<>();
-                    typeMapping.put(
+                    String columnName =
                             isTableIdCaseInsensitive
                                     ? column.name().toLowerCase(Locale.ROOT)
-                                    : column.name(),
-                            fromDbzColumn(column, tinyInt1isBit));
+                                    : column.name();
+                    Map<String, DataType> typeMapping = new HashMap<>();
+                    typeMapping.put(columnName, fromDbzColumn(column, tinyInt1isBit));
                     AlterColumnTypeEvent alterColumnTypeEvent =
                             new AlterColumnTypeEvent(currentTable, typeMapping);
-                    alterColumnTypeEvent.addColumnComment(column.name(), column.comment());
+                    alterColumnTypeEvent.addColumnComment(columnName, column.comment());
                     changes.add(alterColumnTypeEvent);
                     listeners.remove(columnDefinitionListener);
                 },
