@@ -135,9 +135,12 @@ public class StarRocksMetadataApplier implements MetadataApplier {
                     return null;
                 },
                 alterTableCommentEvent -> {
-                    // TODO Currently, column comments cannot be modified.
+                    // TODO Currently, table comments cannot be modified.
                     // See
                     // https://docs.starrocks.io/docs/sql-reference/sql-statements/table_bucket_part_index/ALTER_TABLE/#alter-table-comment-from-v31
+                    LOG.warn(
+                            "AlterTableCommentEvent is not supported by StarRocks connector yet. Event: {}",
+                            alterTableCommentEvent);
                     return null;
                 });
     }

@@ -35,7 +35,7 @@ public class AlterTableCommentEvent implements SchemaChangeEvent {
     private final String comment;
 
     public AlterTableCommentEvent(TableId tableId, String comment) {
-        Preconditions.checkArgument(comment != null, "comment should not be empty.");
+        Preconditions.checkArgument(comment != null, "comment should not be null.");
         this.tableId = tableId;
         this.comment = comment;
     }
