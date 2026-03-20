@@ -372,7 +372,7 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         String tableOptionsDelimiter =
                 Optional.ofNullable(transformNode.get(TRANSFORM_TABLE_OPTION_DELIMITER_KEY))
                         .map(JsonNode::asText)
-                        .orElse(null);
+                        .orElse(",");
         String description =
                 Optional.ofNullable(transformNode.get(TRANSFORM_DESCRIPTION_KEY))
                         .map(JsonNode::asText)
