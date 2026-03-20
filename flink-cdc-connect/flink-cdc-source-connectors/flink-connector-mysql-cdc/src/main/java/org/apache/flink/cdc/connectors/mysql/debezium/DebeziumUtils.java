@@ -275,11 +275,20 @@ public class DebeziumUtils {
     }
 
     static SSLMode sslModeFor(MySqlConnectorConfig.SecureConnectionMode mode) {
-        try {
-            return mode == null ? null : SSLMode.valueOf(mode.name());
-        } catch (IllegalArgumentException e) {
-            throw new FlinkRuntimeException(
-                    String.format("Invalid SecureConnectionMode provided: %s ", mode.name()), e);
+        switch (mode) {
+            case DISABLED:
+                return SSLMode.DISABLED;
+            case PREFERRED:
+                return SSLMode.PREFERRED;
+            case REQUIRED:
+                return SSLMode.REQUIRED;
+            case VERIFY_CA:
+                return SSLMode.VERIFY_CA;
+            case VERIFY_IDENTITY:
+                return SSLMode.VERIFY_IDENTITY;
+            default:
+                throw new FlinkRuntimeException(
+                        String.format("Invalid SecureConnectionMode provided: %s", mode.name()));
         }
     }
 

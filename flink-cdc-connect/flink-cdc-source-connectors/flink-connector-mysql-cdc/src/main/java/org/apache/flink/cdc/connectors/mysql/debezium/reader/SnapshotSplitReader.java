@@ -105,10 +105,19 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
 
     private static StatefulTaskContext createStatefulTaskContext(MySqlSourceConfig sourceConfig) {
         MySqlConnection connection = createMySqlConnection(sourceConfig);
-        return new StatefulTaskContext(
-                sourceConfig,
-                createBinaryClient(sourceConfig.getDbzConfiguration(), connection),
-                connection);
+        try {
+            return new StatefulTaskContext(
+                    sourceConfig,
+                    createBinaryClient(sourceConfig.getDbzConfiguration(), connection),
+                    connection);
+        } catch (Exception e) {
+            try {
+                connection.close();
+            } catch (Exception closeEx) {
+                e.addSuppressed(closeEx);
+            }
+            throw e;
+        }
     }
 
     public SnapshotSplitReader(
