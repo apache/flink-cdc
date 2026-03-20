@@ -638,7 +638,9 @@ public class PostgresPipelineITCase extends PostgresTestBase {
                         new EventTypeInfo());
 
         TypeSerializer<Event> serializer =
-                source.getTransformation().getOutputType().createSerializer(testEnv.getConfig());
+                source.getTransformation()
+                        .getOutputType()
+                        .createSerializer(testEnv.getConfig().getSerializerConfig());
         CheckpointedCollectResultBuffer<Event> resultBuffer =
                 new CheckpointedCollectResultBuffer<>(serializer);
         String accumulatorName = "dataStreamCollect_" + UUID.randomUUID();
