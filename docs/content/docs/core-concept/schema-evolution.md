@@ -88,6 +88,8 @@ This could be achieved by setting `include.schema.changes` and `exclude.schema.c
 
 > In Lenient mode, `TruncateTableEvent` and `DropTableEvent` will be ignored by default. In any other mode, no events will be ignored by default.
 
+> `CreateTableEvent` is the foundation for all subsequent schema change processing. When `include.schema.changes` is explicitly specified, `create.table` will be automatically added unless the user explicitly excludes it via `exclude.schema.changes`.
+
 Here's a full list of configurable schema change event types:
 
 | Event Type          | Description                  |
