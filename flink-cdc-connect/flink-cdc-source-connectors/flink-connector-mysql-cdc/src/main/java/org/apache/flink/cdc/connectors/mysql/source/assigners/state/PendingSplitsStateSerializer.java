@@ -35,6 +35,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -196,12 +197,12 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
             int splitVersion, DataInputDeserializer in) throws IOException {
         List<TableId> alreadyProcessedTables = readTableIds(in);
         List<MySqlSnapshotSplit> remainingSplits = readMySqlSnapshotSplits(splitVersion, in);
-        Map<String, MySqlSnapshotSplit> assignedSnapshotSplits =
+        LinkedHashMap<String, MySqlSnapshotSplit> assignedSnapshotSplits =
                 readAssignedSnapshotSplits(splitVersion, in);
 
         final List<MySqlSchemalessSnapshotSplit> remainingSchemalessSplits = new ArrayList<>();
-        final Map<String, MySqlSchemalessSnapshotSplit> assignedSchemalessSnapshotSplits =
-                new HashMap<>();
+        final LinkedHashMap<String, MySqlSchemalessSnapshotSplit> assignedSchemalessSnapshotSplits =
+                new LinkedHashMap<>();
         final Map<TableId, TableChanges.TableChange> tableSchemas = new HashMap<>();
         remainingSplits.forEach(
                 split -> {
@@ -267,8 +268,8 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
         List<TableId> remainingTableIds = readTableIds(in);
         boolean isTableIdCaseSensitive = in.readBoolean();
         final List<MySqlSchemalessSnapshotSplit> remainingSchemalessSplits = new ArrayList<>();
-        final Map<String, MySqlSchemalessSnapshotSplit> assignedSchemalessSnapshotSplits =
-                new HashMap<>();
+        final LinkedHashMap<String, MySqlSchemalessSnapshotSplit> assignedSchemalessSnapshotSplits =
+                new LinkedHashMap<>();
         final Map<TableId, TableChanges.TableChange> tableSchemas = new HashMap<>();
         remainingSplits.forEach(
                 split -> {
@@ -368,9 +369,9 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
         }
     }
 
-    private Map<String, MySqlSnapshotSplit> readAssignedSnapshotSplits(
+    private LinkedHashMap<String, MySqlSnapshotSplit> readAssignedSnapshotSplits(
             int splitVersion, DataInputDeserializer in) throws IOException {
-        Map<String, MySqlSnapshotSplit> assignedSplits = new HashMap<>();
+        LinkedHashMap<String, MySqlSnapshotSplit> assignedSplits = new LinkedHashMap<>();
         final int size = in.readInt();
         for (int i = 0; i < size; i++) {
             String splitId = in.readUTF();
