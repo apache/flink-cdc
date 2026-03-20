@@ -19,8 +19,8 @@ package org.apache.flink.cdc.connectors.hudi.sink.bucket;
 
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
+import org.apache.flink.cdc.runtime.operators.AbstractStreamOperatorAdapter;
 import org.apache.flink.cdc.runtime.operators.schema.regular.SchemaOperator;
-import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
@@ -31,7 +31,7 @@ import java.util.Map;
 import java.util.Set;
 
 /** Align {@link FlushEvent}s broadcasted by {@link BucketAssignOperator}. */
-public class FlushEventAlignmentOperator extends AbstractStreamOperator<BucketWrapper>
+public class FlushEventAlignmentOperator extends AbstractStreamOperatorAdapter<BucketWrapper>
         implements OneInputStreamOperator<BucketWrapper, BucketWrapper> {
 
     private transient int totalTasksNumber;

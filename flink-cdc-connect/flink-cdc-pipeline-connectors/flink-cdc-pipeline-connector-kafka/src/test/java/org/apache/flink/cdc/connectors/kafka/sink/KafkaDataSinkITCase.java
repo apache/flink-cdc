@@ -17,7 +17,6 @@
 
 package org.apache.flink.cdc.connectors.kafka.sink;
 
-import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.data.GenericArrayData;
@@ -45,6 +44,7 @@ import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.LocalStreamEnvironment;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.util.RestartStrategyUtils;
 import org.apache.flink.util.TestLogger;
 import org.apache.flink.util.jackson.JacksonMapperFactory;
 
@@ -248,7 +248,7 @@ class KafkaDataSinkITCase extends TestLogger {
     void testDebeziumJsonFormat() throws Exception {
         final StreamExecutionEnvironment env = new LocalStreamEnvironment();
         env.enableCheckpointing(1000L);
-        env.setRestartStrategy(RestartStrategies.noRestart());
+        RestartStrategyUtils.configureNoRestartStrategy(env);
         final DataStream<Event> source =
                 env.fromCollection(createSourceEvents(), new EventTypeInfo());
         Map<String, String> config = new HashMap<>();
@@ -306,7 +306,7 @@ class KafkaDataSinkITCase extends TestLogger {
     void testCanalJsonFormat() throws Exception {
         final StreamExecutionEnvironment env = new LocalStreamEnvironment();
         env.enableCheckpointing(1000L);
-        env.setRestartStrategy(RestartStrategies.noRestart());
+        RestartStrategyUtils.configureNoRestartStrategy(env);
         final DataStream<Event> source =
                 env.fromCollection(createSourceEvents(), new EventTypeInfo());
         Map<String, String> config = new HashMap<>();
@@ -377,7 +377,7 @@ class KafkaDataSinkITCase extends TestLogger {
     void testHashByKeyPartitionStrategyUsingJson() throws Exception {
         final StreamExecutionEnvironment env = new LocalStreamEnvironment();
         env.enableCheckpointing(1000L);
-        env.setRestartStrategy(RestartStrategies.noRestart());
+        RestartStrategyUtils.configureNoRestartStrategy(env);
         final DataStream<Event> source =
                 env.fromCollection(createSourceEvents(), new EventTypeInfo());
         Map<String, String> config = new HashMap<>();
@@ -474,7 +474,7 @@ class KafkaDataSinkITCase extends TestLogger {
     void testTopicAndHeaderOption() throws Exception {
         final StreamExecutionEnvironment env = new LocalStreamEnvironment();
         env.enableCheckpointing(1000L);
-        env.setRestartStrategy(RestartStrategies.noRestart());
+        RestartStrategyUtils.configureNoRestartStrategy(env);
         final DataStream<Event> source =
                 env.fromCollection(createSourceEvents(), new EventTypeInfo());
         Map<String, String> config = new HashMap<>();
@@ -569,7 +569,7 @@ class KafkaDataSinkITCase extends TestLogger {
     void testSinkTableMapping() throws Exception {
         final StreamExecutionEnvironment env = new LocalStreamEnvironment();
         env.enableCheckpointing(1000L);
-        env.setRestartStrategy(RestartStrategies.noRestart());
+        RestartStrategyUtils.configureNoRestartStrategy(env);
         final DataStream<Event> source = env.fromData(createSourceEvents(), new EventTypeInfo());
         Map<String, String> config = new HashMap<>();
         config.put(
@@ -723,7 +723,7 @@ class KafkaDataSinkITCase extends TestLogger {
             throws Exception {
         try (StreamExecutionEnvironment env = new LocalStreamEnvironment()) {
             env.enableCheckpointing(1000L);
-            env.setRestartStrategy(RestartStrategies.noRestart());
+            RestartStrategyUtils.configureNoRestartStrategy(env);
             final DataStream<Event> source = env.fromData(eventsToSerialize, new EventTypeInfo());
             Map<String, String> config = new HashMap<>();
             Properties properties = getKafkaClientConfiguration();

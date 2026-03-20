@@ -38,6 +38,7 @@ package org.apache.flink.cdc.connectors.maxcompute.sink;
 
 import org.apache.flink.api.connector.sink2.Sink;
 import org.apache.flink.api.connector.sink2.SinkWriter;
+import org.apache.flink.api.connector.sink2.WriterInitContext;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
@@ -76,7 +77,7 @@ import java.util.concurrent.Future;
 public class MaxComputeEventWriter implements SinkWriter<Event> {
     private static final Logger LOG = LoggerFactory.getLogger(MaxComputeEventWriter.class);
 
-    private final Sink.InitContext context;
+    private final int indexOfThisSubtask;
     private final MaxComputeOptions options;
     private final MaxComputeWriteOptions writeOptions;
     private final Map<String, MaxComputeWriter> writerMap;
@@ -86,7 +87,19 @@ public class MaxComputeEventWriter implements SinkWriter<Event> {
             MaxComputeOptions options,
             MaxComputeWriteOptions writeOptions,
             Sink.InitContext context) {
-        this.context = context;
+        this.indexOfThisSubtask = context.getTaskInfo().getIndexOfThisSubtask();
+        this.options = options;
+        this.writeOptions = writeOptions;
+
+        this.writerMap = new HashMap<>();
+        this.schemaCache = new HashMap<>();
+    }
+
+    public MaxComputeEventWriter(
+            MaxComputeOptions options,
+            MaxComputeWriteOptions writeOptions,
+            WriterInitContext context) {
+        this.indexOfThisSubtask = context.getTaskInfo().getIndexOfThisSubtask();
         this.options = options;
         this.writeOptions = writeOptions;
 
@@ -103,7 +116,7 @@ public class MaxComputeEventWriter implements SinkWriter<Event> {
             if (!writerMap.containsKey(sessionId)) {
                 LOG.info(
                         "Sink writer {} start to create session {}.",
-                        this.context.getSubtaskId(),
+                        indexOfThisSubtask,
                         sessionId);
                 SessionIdentifier sessionIdentifier =
                         SessionIdentifier.of(
@@ -150,7 +163,7 @@ public class MaxComputeEventWriter implements SinkWriter<Event> {
         Preconditions.checkNotNull(
                 operator,
                 "SessionManageOperator cannot be null, please setting 'pipeline.operator-chaining' to true to avoid this issue.");
-        LOG.info("Sink writer {} start to flush.", context.getSubtaskId());
+        LOG.info("Sink writer {} start to flush.", indexOfThisSubtask);
         List<Future<CoordinationResponse>> responces = new ArrayList<>(writerMap.size() + 1);
         writerMap.entrySet().stream()
                 .sorted(Map.Entry.comparingByKey())
@@ -161,7 +174,7 @@ public class MaxComputeEventWriter implements SinkWriter<Event> {
                                 Future<CoordinationResponse> future =
                                         operator.submitRequestToOperator(
                                                 new CommitSessionRequest(
-                                                        context.getSubtaskId(), entry.getKey()));
+                                                        indexOfThisSubtask, entry.getKey()));
                                 responces.add(future);
                             } catch (Exception e) {
                                 throw new RuntimeException(e);
@@ -170,7 +183,7 @@ public class MaxComputeEventWriter implements SinkWriter<Event> {
         writerMap.clear();
         Future<CoordinationResponse> future =
                 operator.submitRequestToOperator(
-                        new CommitSessionRequest(context.getSubtaskId(), Constant.END_OF_SESSION));
+                        new CommitSessionRequest(indexOfThisSubtask, Constant.END_OF_SESSION));
         responces.add(future);
         try {
             for (Future<CoordinationResponse> response : responces) {
@@ -184,7 +197,7 @@ public class MaxComputeEventWriter implements SinkWriter<Event> {
         } catch (ExecutionException e) {
             throw new IOException(e);
         }
-        LOG.info("Sink writer {} flush success.", context.getSubtaskId());
+        LOG.info("Sink writer {} flush success.", indexOfThisSubtask);
     }
 
     @Override

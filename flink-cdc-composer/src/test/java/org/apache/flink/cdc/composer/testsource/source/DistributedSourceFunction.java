@@ -143,7 +143,10 @@ public class DistributedSourceFunction extends RichParallelSourceFunction<Event>
     }
 
     @Override
-    public void run(SourceContext<Event> context) throws InterruptedException {
+    public void run(
+            org.apache.flink.streaming.api.functions.source.SourceFunction.SourceContext<Event>
+                    context)
+            throws InterruptedException {
         Schema initialSchema =
                 Schema.newBuilder()
                         .physicalColumn("id", DataTypes.STRING())
@@ -265,7 +268,10 @@ public class DistributedSourceFunction extends RichParallelSourceFunction<Event>
         return generator.generate(rowObjects);
     }
 
-    private void collect(SourceContext<Event> sourceContext, Event event) {
+    private void collect(
+            org.apache.flink.streaming.api.functions.source.SourceFunction.SourceContext<Event>
+                    sourceContext,
+            Event event) {
         LOG.info("{}> Emitting event {}", subTaskId, event);
         sourceContext.collect(event);
     }

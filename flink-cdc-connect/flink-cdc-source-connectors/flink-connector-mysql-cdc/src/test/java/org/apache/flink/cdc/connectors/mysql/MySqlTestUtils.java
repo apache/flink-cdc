@@ -30,11 +30,12 @@ import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.connectors.utils.TestSourceContext;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.cdc.debezium.DebeziumSourceFunction;
+import org.apache.flink.cdc.runtime.compat.MockStreamingRuntimeContextAdapter;
+import org.apache.flink.cdc.runtime.compat.OperatorStateStoreAdapter;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.execution.JobClient;
 import org.apache.flink.runtime.state.FunctionInitializationContext;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
-import org.apache.flink.streaming.util.MockStreamingRuntimeContext;
 import org.apache.flink.util.Collector;
 import org.apache.flink.util.Preconditions;
 import org.apache.flink.util.function.SupplierWithException;
@@ -89,7 +90,7 @@ public class MySqlTestUtils {
 
         // run setup procedure in operator life cycle
         source.setRuntimeContext(
-                new MockStreamingRuntimeContext(
+                MockStreamingRuntimeContextAdapter.create(
                         isCheckpointingEnabled, totalNumSubtasks, subtaskIndex));
         source.initializeState(
                 new MockFunctionInitializationContext(
@@ -211,7 +212,7 @@ public class MySqlTestUtils {
         }
     }
 
-    private static class MockOperatorStateStore implements OperatorStateStore {
+    private static class MockOperatorStateStore implements OperatorStateStoreAdapter {
 
         private final ListState<?> restoredOffsetListState;
         private final ListState<?> restoredHistoryListState;

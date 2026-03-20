@@ -47,6 +47,7 @@ import java.util.stream.Stream;
 
 import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER;
 import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER_PASSWORD;
+import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBTestUtils.waitForSinkResult;
 import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBTestUtils.waitForSinkSize;
 import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBTestUtils.waitForSnapshotStarted;
 
@@ -157,12 +158,25 @@ class MongoDBConnectorITCase extends MongoDBSourceTestBase {
                 Filters.eq("_id", new ObjectId("100000000000000000000111")),
                 Updates.set("weight", 5.17));
 
-        // Delay delete operations to avoid unstable tests.
-        waitForSinkSize("sink", 19);
+        // Wait a bit to ensure previous operations are processed before delete
+        Thread.sleep(3000);
 
         products.deleteOne(Filters.eq("_id", new ObjectId("100000000000000000000111")));
 
-        waitForSinkSize("sink", 20);
+        // Wait for the final aggregated result
+        // Note: We use waitForSinkResult instead of waitForSinkSize because Flink 2.x
+        // optimizations may reduce the number of intermediate changelog messages
+        String[] expected =
+                new String[] {
+                    "scooter,3.140",
+                    "car battery,8.100",
+                    "12-pack drill bits,0.800",
+                    "hammer,2.625",
+                    "rocks,5.100",
+                    "jacket,0.600",
+                    "spare tire,22.200"
+                };
+        waitForSinkResult("sink", Arrays.asList(expected));
 
         // The final database table looks like this:
         //
@@ -192,17 +206,6 @@ class MongoDBConnectorITCase extends MongoDBSourceTestBase {
         // | 110 | jacket             | new water resistent white wind breaker                  |
         // 0.5 |
         // +-----+--------------------+---------------------------------------------------------+--------+
-
-        String[] expected =
-                new String[] {
-                    "scooter,3.140",
-                    "car battery,8.100",
-                    "12-pack drill bits,0.800",
-                    "hammer,2.625",
-                    "rocks,5.100",
-                    "jacket,0.600",
-                    "spare tire,22.200"
-                };
 
         List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
         Assertions.assertThat(actual).containsExactlyInAnyOrder(expected);

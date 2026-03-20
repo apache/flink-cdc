@@ -39,6 +39,8 @@ import org.apache.flink.cdc.runtime.operators.sink.DataSinkWriterOperatorFactory
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.streaming.api.connector.sink2.CommittableMessage;
 import org.apache.flink.streaming.api.connector.sink2.CommittableMessageTypeInfo;
+import org.apache.flink.streaming.api.connector.sink2.SupportsPreCommitTopology;
+import org.apache.flink.streaming.api.connector.sink2.SupportsPreWriteTopology;
 import org.apache.flink.streaming.api.connector.sink2.WithPostCommitTopology;
 import org.apache.flink.streaming.api.connector.sink2.WithPreCommitTopology;
 import org.apache.flink.streaming.api.connector.sink2.WithPreWriteTopology;
@@ -128,6 +130,8 @@ public class DataSinkTranslator {
         // Pre-write topology
         if (sink instanceof WithPreWriteTopology) {
             stream = ((WithPreWriteTopology<Event>) sink).addPreWriteTopology(stream);
+        } else if (sink instanceof SupportsPreWriteTopology) {
+            stream = ((SupportsPreWriteTopology<Event>) sink).addPreWriteTopology(stream);
         }
 
         if (sink instanceof TwoPhaseCommittingSink) {
@@ -192,6 +196,8 @@ public class DataSinkTranslator {
         if (sink instanceof WithPreCommitTopology) {
             preCommitted =
                     ((WithPreCommitTopology<Event, CommT>) sink).addPreCommitTopology(written);
+        } else if (sink instanceof SupportsPreCommitTopology) {
+            preCommitted = ((SupportsPreCommitTopology) sink).addPreCommitTopology(written);
         }
 
         // TODO: Hard coding checkpoint

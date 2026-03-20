@@ -584,15 +584,15 @@ public class RowDataUtils {
             throw new IllegalStateException(
                     "Table schema has no primary keys - cannot create RowDataKeyGen");
         }
-        config.setString(FlinkOptions.RECORD_KEY_FIELD, String.join(",", primaryKeys));
+        config.set(FlinkOptions.RECORD_KEY_FIELD, String.join(",", primaryKeys));
 
         // Set partition path fields from partition keys
         List<String> partitionKeys = schema.partitionKeys();
         if (partitionKeys != null && !partitionKeys.isEmpty()) {
-            config.setString(FlinkOptions.PARTITION_PATH_FIELD, String.join(",", partitionKeys));
+            config.set(FlinkOptions.PARTITION_PATH_FIELD, String.join(",", partitionKeys));
         } else {
             // For unpartitioned tables, use empty string
-            config.setString(FlinkOptions.PARTITION_PATH_FIELD, "");
+            config.set(FlinkOptions.PARTITION_PATH_FIELD, "");
         }
 
         // Convert schema to RowType

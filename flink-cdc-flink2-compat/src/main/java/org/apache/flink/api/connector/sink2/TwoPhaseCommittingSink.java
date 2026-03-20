@@ -19,10 +19,30 @@ package org.apache.flink.api.connector.sink2;
 
 import org.apache.flink.annotation.Internal;
 
+import java.io.IOException;
+
 /**
  * Compatibility adapter for Flink 2.2. This class is part of the multi-version compatibility layer
  * that allows Flink CDC to work across different Flink versions.
  */
 @Internal
 public interface TwoPhaseCommittingSink<InputT, CommT>
-        extends Sink<InputT>, SupportsCommitter<CommT> {}
+        extends Sink<InputT>, SupportsCommitter<CommT> {
+
+    Committer<CommT> createCommitter() throws IOException;
+
+    @Override
+    default Committer<CommT> createCommitter(CommitterInitContext context) throws IOException {
+        return createCommitter();
+    }
+
+    /**
+     * Compatibility adapter for PrecommittingSinkWriter.
+     *
+     * <p>In Flink 1.x, this was an inner interface of TwoPhaseCommittingSink. In Flink 2.x, this
+     * concept is replaced by CommittingSinkWriter directly. This adapter provides backward
+     * compatibility.
+     */
+    @Internal
+    interface PrecommittingSinkWriter<InputT, CommT> extends CommittingSinkWriter<InputT, CommT> {}
+}

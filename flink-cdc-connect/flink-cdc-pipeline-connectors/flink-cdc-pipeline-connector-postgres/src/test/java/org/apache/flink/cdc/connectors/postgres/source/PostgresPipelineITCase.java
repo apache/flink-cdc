@@ -18,7 +18,6 @@
 package org.apache.flink.cdc.connectors.postgres.source;
 
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
-import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
@@ -41,16 +40,19 @@ import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConf
 import org.apache.flink.cdc.connectors.postgres.testutils.UniqueDatabase;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
+import org.apache.flink.configuration.StateRecoveryOptions;
 import org.apache.flink.core.execution.JobClient;
-import org.apache.flink.runtime.jobgraph.SavepointConfigOptions;
+import org.apache.flink.core.execution.SavepointFormatType;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.operators.collect.AbstractCollectResultBuffer;
 import org.apache.flink.streaming.api.operators.collect.CheckpointedCollectResultBuffer;
 import org.apache.flink.streaming.api.operators.collect.CollectResultIterator;
+import org.apache.flink.streaming.api.operators.collect.CollectResultIteratorAdapter;
 import org.apache.flink.streaming.api.operators.collect.CollectSinkOperator;
 import org.apache.flink.streaming.api.operators.collect.CollectSinkOperatorFactory;
 import org.apache.flink.streaming.api.operators.collect.CollectStreamSink;
+import org.apache.flink.streaming.util.RestartStrategyUtils;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.util.CloseableIterator;
 
@@ -83,8 +85,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT;
 
 /** Integration tests for Postgres source. */
-public class PostgresPipelineITCaseTest extends PostgresTestBase {
-    private static final Logger LOG = LoggerFactory.getLogger(PostgresPipelineITCaseTest.class);
+public class PostgresPipelineITCase extends PostgresTestBase {
+    private static final Logger LOG = LoggerFactory.getLogger(PostgresPipelineITCase.class);
 
     private final UniqueDatabase inventoryDatabase =
             new UniqueDatabase(
@@ -98,7 +100,7 @@ public class PostgresPipelineITCaseTest extends PostgresTestBase {
         TestValuesTableFactory.clearAllData();
         env.setParallelism(4);
         env.enableCheckpointing(2000);
-        env.setRestartStrategy(RestartStrategies.noRestart());
+        RestartStrategyUtils.configureNoRestartStrategy(env);
         slotName = getSlotName();
     }
 
@@ -196,7 +198,9 @@ public class PostgresPipelineITCaseTest extends PostgresTestBase {
                         new EventTypeInfo());
 
         TypeSerializer<Event> serializer =
-                source.getTransformation().getOutputType().createSerializer(env.getConfig());
+                source.getTransformation()
+                        .getOutputType()
+                        .createSerializer(env.getConfig().getSerializerConfig());
         CheckpointedCollectResultBuffer<Event> resultBuffer =
                 new CheckpointedCollectResultBuffer<>(serializer);
         String accumulatorName = "dataStreamCollect_" + UUID.randomUUID();
@@ -247,7 +251,7 @@ public class PostgresPipelineITCaseTest extends PostgresTestBase {
                 restoredSource
                         .getTransformation()
                         .getOutputType()
-                        .createSerializer(restoredEnv.getConfig());
+                        .createSerializer(restoredEnv.getConfig().getSerializerConfig());
         CheckpointedCollectResultBuffer<Event> restoredResultBuffer =
                 new CheckpointedCollectResultBuffer<>(restoredSerializer);
         String restoredAccumulatorName = "dataStreamCollect_" + UUID.randomUUID();
@@ -300,7 +304,9 @@ public class PostgresPipelineITCaseTest extends PostgresTestBase {
         final int maxRetries = 600;
         while (retryCount < maxRetries) {
             try {
-                return jobClient.stopWithSavepoint(true, savepointDirectory).get();
+                return jobClient
+                        .stopWithSavepoint(true, savepointDirectory, SavepointFormatType.DEFAULT)
+                        .get();
             } catch (Exception e) {
                 retryCount++;
                 LOG.error(
@@ -323,13 +329,13 @@ public class PostgresPipelineITCaseTest extends PostgresTestBase {
         org.apache.flink.configuration.Configuration configuration =
                 new org.apache.flink.configuration.Configuration();
         if (finishedSavePointPath != null) {
-            configuration.setString(SavepointConfigOptions.SAVEPOINT_PATH, finishedSavePointPath);
+            configuration.set(StateRecoveryOptions.SAVEPOINT_PATH, finishedSavePointPath);
         }
         StreamExecutionEnvironment env =
                 StreamExecutionEnvironment.getExecutionEnvironment(configuration);
         env.setParallelism(parallelism);
         env.enableCheckpointing(500L);
-        env.setRestartStrategy(RestartStrategies.noRestart());
+        RestartStrategyUtils.configureNoRestartStrategy(env);
         return env;
     }
 
@@ -342,13 +348,17 @@ public class PostgresPipelineITCaseTest extends PostgresTestBase {
             String accumulatorName) {
         CollectSinkOperatorFactory<T> sinkFactory =
                 new CollectSinkOperatorFactory<>(serializer, accumulatorName);
-        CollectSinkOperator<T> operator = (CollectSinkOperator<T>) sinkFactory.getOperator();
-        CollectResultIterator<T> iterator =
-                new CollectResultIterator<>(
-                        buffer, operator.getOperatorIdFuture(), accumulatorName, 0);
         CollectStreamSink<T> sink = new CollectStreamSink<>(source, sinkFactory);
-        sink.name("Data stream collect sink");
+        // Set both name and uid to the same value. The uid is used by Flink to generate
+        // OperatorID via StreamGraphHasherV2.generateUserSpecifiedHash(uid), and the same
+        // uid string must be passed to CollectResultIteratorAdapter for coordinator lookup.
+        String operatorUid = "Data stream collect sink";
+        sink.name(operatorUid).uid(operatorUid);
+        CollectSinkOperator<T> operator = (CollectSinkOperator<T>) sinkFactory.getOperator();
         env.addOperator(sink.getTransformation());
+        CollectResultIterator<T> iterator =
+                new CollectResultIteratorAdapter<>(
+                        buffer, operatorUid, operator, accumulatorName, 0);
         env.registerCollectIterator(iterator);
         return iterator;
     }
@@ -641,7 +651,7 @@ public class PostgresPipelineITCaseTest extends PostgresTestBase {
         StreamExecutionEnvironment testEnv = StreamExecutionEnvironment.getExecutionEnvironment();
         testEnv.setParallelism(1);
         testEnv.enableCheckpointing(1000);
-        testEnv.setRestartStrategy(RestartStrategies.noRestart());
+        RestartStrategyUtils.configureNoRestartStrategy(testEnv);
 
         FlinkSourceProvider sourceProvider =
                 (FlinkSourceProvider) dataSource.getEventSourceProvider();
@@ -654,7 +664,9 @@ public class PostgresPipelineITCaseTest extends PostgresTestBase {
                         new EventTypeInfo());
 
         TypeSerializer<Event> serializer =
-                source.getTransformation().getOutputType().createSerializer(testEnv.getConfig());
+                source.getTransformation()
+                        .getOutputType()
+                        .createSerializer(testEnv.getConfig().getSerializerConfig());
         CheckpointedCollectResultBuffer<Event> resultBuffer =
                 new CheckpointedCollectResultBuffer<>(serializer);
         String accumulatorName = "dataStreamCollect_" + UUID.randomUUID();

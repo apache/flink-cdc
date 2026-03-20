@@ -103,6 +103,7 @@ limitations under the License.
         <!-- Maven shade plugin prior to 3.2.0 could not correctly shade nested classes with JDK 8+. -->
         <maven.shade.plugin.version>3.6.0</maven.shade.plugin.version>
         <iceberg.version>1.10.1</iceberg.version>
+        <iceberg.flink.major.version>1.20</iceberg.flink.major.version>
         <hive.version>2.3.9</hive.version>
         <hadoop.version>3.3.4</hadoop.version>
         <java.version>11</java.version>
@@ -113,6 +114,8 @@ limitations under the License.
              and thus is changing back to java 1.6 on each maven re-import -->
         <maven.compiler.source>${source.java.version}</maven.compiler.source>
         <maven.compiler.target>${target.java.version}</maven.compiler.target>
+        <flink.kafka.connector.version>3.3.0-1.20</flink.kafka.connector.version>
+        <paimon.flink.major.version>1.20</paimon.flink.major.version>
     </properties>
 
     <dependencyManagement>
@@ -850,6 +853,11 @@ limitations under the License.
         </profile>
         <profile>
             <id>flink2</id>
+            <properties>
+                <flink.kafka.connector.version>4.0.1-2.0</flink.kafka.connector.version>
+                <paimon.flink.major.version>2.1</paimon.flink.major.version>
+                <iceberg.flink.major.version>2.0</iceberg.flink.major.version>
+            </properties>
             <build>
                 <pluginManagement>
                     <plugins>
@@ -869,6 +877,7 @@ limitations under the License.
                                                 <groupId>org.apache.flink</groupId>
                                                 <artifactId>flink-shaded-guava</artifactId>
                                                 <version>${flink.2.x.shaded.guava.version}</version>
+                                                <destFileName>flink-shaded-guava.jar</destFileName>
                                                 <outputDirectory>${project.build.directory}/flink2-extra-libs</outputDirectory>
                                             </artifactItem>
                                         </artifactItems>
@@ -880,8 +889,11 @@ limitations under the License.
                             <groupId>org.apache.maven.plugins</groupId>
                             <artifactId>maven-surefire-plugin</artifactId>
                             <configuration>
+                                <systemPropertyVariables>
+                                    <flink.profile>flink2</flink.profile>
+                                </systemPropertyVariables>
                                 <additionalClasspathElements>
-                                    <additionalClasspathElement>${project.build.directory}/flink2-extra-libs/flink-shaded-guava-${flink.2.x.shaded.guava.version}.jar</additionalClasspathElement>
+                                    <additionalClasspathElement>${project.build.directory}/flink2-extra-libs/flink-shaded-guava.jar</additionalClasspathElement>
                                 </additionalClasspathElements>
                             </configuration>
                         </plugin>

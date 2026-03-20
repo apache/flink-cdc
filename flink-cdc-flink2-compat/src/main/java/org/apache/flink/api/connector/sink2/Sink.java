@@ -38,13 +38,16 @@ import java.util.function.Consumer;
 @Internal
 public interface Sink<InputT> extends Serializable {
 
-    SinkWriter<InputT> createWriter(WriterInitContext var1) throws IOException;
+    default SinkWriter<InputT> createWriter(WriterInitContext writerInitContext)
+            throws IOException {
+        return createWriter(new InitContextAdapter(writerInitContext));
+    }
 
     /**
      * @deprecated
      */
     @Deprecated
-    SinkWriter<InputT> createWriter(InitContext var1) throws IOException;
+    SinkWriter<InputT> createWriter(InitContext initContext) throws IOException;
 
     /**
      * @deprecated
@@ -69,6 +72,14 @@ public interface Sink<InputT> extends Serializable {
         @Experimental
         default <MetaT> Optional<Consumer<MetaT>> metadataConsumer() {
             return Optional.empty();
+        }
+
+        default int getSubtaskId() {
+            return this.getTaskInfo().getIndexOfThisSubtask();
+        }
+
+        default int getNumberOfParallelSubtasks() {
+            return this.getTaskInfo().getNumberOfParallelSubtasks();
         }
     }
 }

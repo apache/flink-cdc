@@ -34,11 +34,11 @@ import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.connectors.paimon.sink.v2.OperatorIDGenerator;
 import org.apache.flink.cdc.connectors.paimon.sink.v2.PaimonWriterHelper;
 import org.apache.flink.cdc.connectors.paimon.sink.v2.TableSchemaInfo;
+import org.apache.flink.cdc.runtime.operators.AbstractStreamOperatorAdapter;
 import org.apache.flink.cdc.runtime.operators.schema.common.SchemaDerivator;
 import org.apache.flink.cdc.runtime.operators.sink.SchemaEvolutionClient;
 import org.apache.flink.runtime.jobgraph.tasks.TaskOperatorEventGateway;
 import org.apache.flink.streaming.api.graph.StreamConfig;
-import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.api.operators.Output;
@@ -66,7 +66,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /** Assign bucket for every given {@link DataChangeEvent}. */
-public class BucketAssignOperator extends AbstractStreamOperator<Event>
+public class BucketAssignOperator extends AbstractStreamOperatorAdapter<Event>
         implements OneInputStreamOperator<Event, Event> {
 
     protected static final Logger LOGGER = LoggerFactory.getLogger(BucketAssignOperator.class);

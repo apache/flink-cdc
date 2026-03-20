@@ -36,7 +36,7 @@ limitations under the License.
         <dependency>
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-connector-kafka</artifactId>
-            <version>3.3.0-${flink.major.version}</version>
+            <version>${flink.kafka.connector.version}</version>
         </dependency>
 
         <dependency>
@@ -159,5 +159,4 @@ limitations under the License.
             </plugin>
         </plugins>
     </build>
-
 </project>
