@@ -35,14 +35,60 @@ public class IcebergDataSinkOptions {
             key("catalog.properties.type")
                     .stringType()
                     .noDefaultValue()
-                    .withDescription("Type of iceberg catalog, supports `hadoop` and `hive`.");
+                    .withDescription(
+                            "Type of iceberg catalog, supports `hadoop`, `hive` and `glue`.");
+
+    public static final ConfigOption<String> CATALOG_IMPL =
+            key("catalog.properties.catalog-impl")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "Custom catalog implementation class. "
+                                    + "For AWS Glue catalog, use `org.apache.iceberg.aws.glue.GlueCatalog`.");
+
+    public static final ConfigOption<String> IO_IMPL =
+            key("catalog.properties.io-impl")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "Custom FileIO implementation class. "
+                                    + "For AWS S3, use `org.apache.iceberg.aws.s3.S3FileIO`.");
+
+    public static final ConfigOption<String> GLUE_ID =
+            key("catalog.properties.glue.id")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "The Glue catalog ID (AWS account ID). By default, the caller's AWS account ID is used.");
+
+    public static final ConfigOption<Boolean> GLUE_SKIP_ARCHIVE =
+            key("catalog.properties.glue.skip-archive")
+                    .booleanType()
+                    .defaultValue(true)
+                    .withDescription(
+                            "Whether to skip archiving older table versions in Glue. Default is true.");
+
+    public static final ConfigOption<Boolean> GLUE_SKIP_NAME_VALIDATION =
+            key("catalog.properties.glue.skip-name-validation")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Whether to skip name validation for Glue catalog. Default is false.");
+
+    public static final ConfigOption<String> CLIENT_REGION =
+            key("catalog.properties.client.region")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription("The AWS region for the Glue catalog client.");
 
     public static final ConfigOption<String> WAREHOUSE =
             key("catalog.properties.warehouse")
                     .stringType()
                     .noDefaultValue()
                     .withDescription(
-                            "The warehouse root path of catalog, only usable when catalog.properties.type is `hadoop`.");
+                            "The warehouse root path of the Iceberg catalog, used by all catalog types. "
+                                    + "For `hadoop` and `hive` catalogs, this is typically a local or distributed filesystem path (for example, `hdfs://namenode:8020/warehouse`). "
+                                    + "For `glue` catalog, this is typically an object storage path like `s3://my-bucket/warehouse`.");
 
     public static final ConfigOption<String> PARTITION_KEY =
             key("partition.key")
