@@ -40,22 +40,32 @@ import java.util.Properties;
 
 /**
  * Copied from Debezium project(1.9.8.final) to add custom jdbc properties in the jdbc url. The new
- * parameter {@code jdbcProperties} in the constructor of {@link MySqlConnectionConfiguration} will
- * be used to generate the jdbc url pattern, and may overwrite the default value.
+ * parameter {@link MySqlConnectionConfiguration#MySqlConnectionConfiguration(Configuration config,
+ * Properties jdbcProperties)} in the constructor of {@link MySqlConnectionConfiguration} will be
+ * used to generate the jdbc url pattern, and may overwrite the default value.
  *
- * <p>Line 75: Add field {@code urlPattern} in {@link MySqlConnection} and remove old pattern.
+ * <p>Add field {@link MySqlConnection#urlPattern} in {@link MySqlConnection} and remove old
+ * pattern.
  *
- * <p>Line 92: Init {@code urlPattern} using the url pattern from {@link
+ * <p>Added MySQL 8.4+ compatible probing fields {@link
+ * MySqlConnection#MYSQL_CLASSIC_SHOW_BINARY_LOG_STATEMENT}, {@link
+ * MySqlConnection#MYSQL_NEW_SHOW_BINARY_LOG_STATEMENT}, and {@link
+ * MySqlConnection#showBinaryLogStatement}.
+ *
+ * <p>Init {@link MySqlConnection#urlPattern} using the url pattern from {@link
  * MySqlConnectionConfiguration}.
  *
- * <p>Line 544: Generate the connection string by the new field {@code urlPattern}.
+ * <p>Generate the connection string by the new field {@link MySqlConnection#urlPattern}.
  *
- * <p>Line 569 ~ 574: Add new constant and field {@code urlPattern} to {@link
+ * <p>Add new constant and field {@link MySqlConnection#urlPattern} to {@link
  * MySqlConnectionConfiguration}.
  *
- * <p>Line 625: Init new field {@code urlPattern} in {@link MySqlConnectionConfiguration}.
+ * <p>Init new field {@link MySqlConnection#urlPattern} in {@link MySqlConnectionConfiguration}.
  *
- * <p>Line 715 ~ 741: Add some methods helping to generate the url pattern and add default values.
+ * <p>Add utility methods helping to generate the url pattern and add default values.
+ *
+ * <p>Added utility method {@link MySqlConnection#getShowBinaryLogStatement} and {@link
+ * MySqlConnection#probeShowBinaryLogStatement} for MySQL 8.4 compatibility.
  */
 public class MySqlConnection extends JdbcConnection {
 
@@ -74,9 +84,9 @@ public class MySqlConnection extends JdbcConnection {
 
     private final String urlPattern;
 
-    private static String MYSQL_CLASSIC_SHOW_BINARY_LOG_STATEMENT = "SHOW MASTER STATUS";
-    private static String MYSQL_NEW_SHOW_BINARY_LOG_STATEMENT = "SHOW BINARY LOG STATUS";
-    private String showBinaryLogStatement;
+    private static final String MYSQL_CLASSIC_SHOW_BINARY_LOG_STATEMENT = "SHOW MASTER STATUS";
+    private static final String MYSQL_NEW_SHOW_BINARY_LOG_STATEMENT = "SHOW BINARY LOG STATUS";
+    private final String showBinaryLogStatement;
 
     /**
      * Creates a new connection using the supplied configuration.
@@ -94,40 +104,7 @@ public class MySqlConnection extends JdbcConnection {
         this.connectionConfig = connectionConfig;
         this.mysqlFieldReader = fieldReader;
         this.urlPattern = connectionConfig.getUrlPattern();
-
-        probeShowBinaryLogStatement();
-    }
-
-    public String probeShowBinaryLogStatement() {
-        if (showBinaryLogStatement != null) {
-            return showBinaryLogStatement;
-        }
-        try {
-            LOGGER.info("Probing binary log statement.");
-            try {
-                // Attempt to query
-                query(MYSQL_NEW_SHOW_BINARY_LOG_STATEMENT, rs -> {});
-                showBinaryLogStatement = MYSQL_NEW_SHOW_BINARY_LOG_STATEMENT;
-            } catch (SQLException e) {
-                LOGGER.info(
-                        "Probing with {} failed, try {}. Caused by: {}",
-                        MYSQL_NEW_SHOW_BINARY_LOG_STATEMENT,
-                        MYSQL_CLASSIC_SHOW_BINARY_LOG_STATEMENT,
-                        e.getMessage());
-                query(MYSQL_CLASSIC_SHOW_BINARY_LOG_STATEMENT, rs -> {});
-                showBinaryLogStatement = MYSQL_CLASSIC_SHOW_BINARY_LOG_STATEMENT;
-            }
-            LOGGER.info(
-                    "Successfully found show binary log statement with `{}`.",
-                    showBinaryLogStatement);
-            return showBinaryLogStatement;
-        } catch (Exception e) {
-            LOGGER.warn(
-                    "Failed to probe binary log statement version. Fallback to `{}`. Caused by: {}.",
-                    MYSQL_CLASSIC_SHOW_BINARY_LOG_STATEMENT,
-                    e.getMessage());
-            return MYSQL_CLASSIC_SHOW_BINARY_LOG_STATEMENT;
-        }
+        this.showBinaryLogStatement = probeShowBinaryLogStatement();
     }
 
     /**
@@ -806,5 +783,28 @@ public class MySqlConnection extends JdbcConnection {
     @Override
     public String quotedTableIdString(TableId tableId) {
         return tableId.toQuotedString('`');
+    }
+
+    public String getShowBinaryLogStatement() {
+        return showBinaryLogStatement;
+    }
+
+    private String probeShowBinaryLogStatement() {
+        LOGGER.info("Probing binary log statement.");
+        try {
+            // Attempt to query
+            query(MYSQL_NEW_SHOW_BINARY_LOG_STATEMENT, rs -> {});
+            LOGGER.info(
+                    "Successfully found show binary log statement with `{}`.",
+                    MYSQL_NEW_SHOW_BINARY_LOG_STATEMENT);
+            return MYSQL_NEW_SHOW_BINARY_LOG_STATEMENT;
+        } catch (SQLException e) {
+            LOGGER.info(
+                    "Probing with {} failed, fallback to classic {}. Caused by: {}",
+                    MYSQL_NEW_SHOW_BINARY_LOG_STATEMENT,
+                    MYSQL_CLASSIC_SHOW_BINARY_LOG_STATEMENT,
+                    e.getMessage());
+            return MYSQL_CLASSIC_SHOW_BINARY_LOG_STATEMENT;
+        }
     }
 }

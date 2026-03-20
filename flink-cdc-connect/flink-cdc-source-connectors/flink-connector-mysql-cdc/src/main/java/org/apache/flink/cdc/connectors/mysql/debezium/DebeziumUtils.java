@@ -118,7 +118,7 @@ public class DebeziumUtils {
 
     /** Fetch current binlog offsets in MySql Server. */
     public static BinlogOffset currentBinlogOffset(MySqlConnection jdbc) {
-        String showBinaryLogStatement = jdbc.probeShowBinaryLogStatement();
+        String showBinaryLogStatement = jdbc.getShowBinaryLogStatement();
         try {
             return jdbc.queryAndMap(
                     showBinaryLogStatement,

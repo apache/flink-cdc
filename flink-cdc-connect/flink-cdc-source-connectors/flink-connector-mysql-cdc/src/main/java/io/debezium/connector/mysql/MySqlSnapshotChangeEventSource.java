@@ -335,7 +335,7 @@ public class MySqlSnapshotChangeEventSource
         final MySqlOffsetContext offsetContext = MySqlOffsetContext.initial(connectorConfig);
         ctx.offset = offsetContext;
         LOGGER.info("Read binlog position of MySQL primary server");
-        final String showMasterStmt = connection.probeShowBinaryLogStatement();
+        final String showMasterStmt = connection.getShowBinaryLogStatement();
         connection.query(
                 showMasterStmt,
                 rs -> {
