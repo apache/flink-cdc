@@ -64,8 +64,10 @@ public class SchemaMetadataTransform implements Serializable {
         if (!StringUtils.isNullOrWhitespaceOnly(tableOptionString)) {
             // Use custom delimiter if provided, otherwise default to comma for backward
             // compatibility.
+            // Note: We only check for null or empty string here, not whitespace-only,
+            // because whitespace characters like '\n', '\t' can be valid delimiters.
             String delimiter =
-                    StringUtils.isNullOrWhitespaceOnly(tableOptionsDelimiter)
+                    (tableOptionsDelimiter == null || tableOptionsDelimiter.isEmpty())
                             ? ","
                             : tableOptionsDelimiter;
             String[] tableOptions = tableOptionString.split(Pattern.quote(delimiter));

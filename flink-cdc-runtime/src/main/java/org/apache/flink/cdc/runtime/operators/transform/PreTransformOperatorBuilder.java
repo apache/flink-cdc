@@ -43,7 +43,7 @@ public class PreTransformOperatorBuilder {
                         "",
                         "",
                         "",
-                        "",
+                        ",",
                         null,
                         new SupportedMetadataColumn[0]));
         return this;
@@ -65,7 +65,7 @@ public class PreTransformOperatorBuilder {
                 primaryKey,
                 partitionKey,
                 tableOption,
-                null,
+                ",",
                 postTransformConverter,
                 supportedMetadataColumns);
     }

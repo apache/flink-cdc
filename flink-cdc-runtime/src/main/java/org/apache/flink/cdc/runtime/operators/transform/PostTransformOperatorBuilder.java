@@ -51,7 +51,7 @@ public class PostTransformOperatorBuilder {
                 primaryKey,
                 partitionKey,
                 tableOptions,
-                null,
+                ",",
                 postTransformConverter,
                 supportedMetadataColumns);
     }
@@ -90,7 +90,7 @@ public class PostTransformOperatorBuilder {
                         "",
                         "",
                         "",
-                        "",
+                        ",",
                         null,
                         new SupportedMetadataColumn[0]));
         return this;
