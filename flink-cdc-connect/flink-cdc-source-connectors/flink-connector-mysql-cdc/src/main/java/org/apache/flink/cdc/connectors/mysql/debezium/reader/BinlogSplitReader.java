@@ -27,6 +27,7 @@ import org.apache.flink.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplit;
 import org.apache.flink.cdc.connectors.mysql.source.split.SourceRecords;
 import org.apache.flink.cdc.connectors.mysql.source.utils.ChunkUtils;
+import org.apache.flink.cdc.connectors.mysql.source.utils.OnlineSchemaChangeUtils;
 import org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils;
 import org.apache.flink.cdc.connectors.mysql.source.utils.SplitKeyUtils;
 import org.apache.flink.cdc.connectors.mysql.table.StartupMode;
@@ -196,7 +197,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
                     }
 
                     Optional<String> finishedTables =
-                            RecordUtils.parseOnLineSchemaRenameEvent(event.getRecord());
+                            OnlineSchemaChangeUtils.parseOnLineSchemaRenameEvent(event.getRecord());
                     if (finishedTables.isPresent()) {
                         TableId tableId = RecordUtils.getTableId(event.getRecord());
                         String finishedTableId = tableId.catalog() + "." + finishedTables.get();
@@ -257,11 +258,11 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
     }
 
     private Optional<SourceRecord> parseOnLineSchemaChangeEvent(SourceRecord sourceRecord) {
-        if (RecordUtils.isOnLineSchemaChangeEvent(sourceRecord)) {
+        if (OnlineSchemaChangeUtils.isOnLineSchemaChangeEvent(sourceRecord)) {
             // This is a gh-ost initialized schema change event and should be emitted if the
             // peeled tableId matches the predicate.
             TableId originalTableId = RecordUtils.getTableId(sourceRecord);
-            TableId peeledTableId = RecordUtils.peelTableId(originalTableId);
+            TableId peeledTableId = OnlineSchemaChangeUtils.peelTableId(originalTableId);
             if (capturedTableFilter.test(peeledTableId)) {
                 return Optional.of(
                         RecordUtils.setTableId(sourceRecord, originalTableId, peeledTableId));
