@@ -15,17 +15,21 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.connectors.mysql.table;
+package org.apache.flink.cdc.connectors.mysql.source;
 
-import org.apache.flink.cdc.connectors.mysql.MySqlValidatorTest;
+import org.apache.flink.api.common.eventtime.WatermarkStrategy;
+import org.apache.flink.cdc.common.event.DataChangeEvent;
+import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.source.FlinkSourceProvider;
+import org.apache.flink.cdc.connectors.mysql.factory.MySqlDataSourceFactory;
+import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
+import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
 import org.apache.flink.cdc.connectors.mysql.testutils.MySqlContainer;
 import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
+import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.table.api.EnvironmentSettings;
-import org.apache.flink.table.api.TableResult;
-import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
-import org.apache.flink.types.Row;
+import org.apache.flink.streaming.util.RestartStrategyUtils;
 import org.apache.flink.util.CloseableIterator;
 
 import org.junit.jupiter.api.AfterEach;
@@ -47,25 +51,27 @@ import java.nio.file.StandardOpenOption;
 import java.sql.Connection;
 import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
-import java.util.Random;
 import java.util.stream.Stream;
 
-import static org.apache.flink.cdc.connectors.mysql.source.MySqlSourceTestBase.assertEqualsInAnyOrder;
-import static org.apache.flink.cdc.connectors.mysql.source.MySqlSourceTestBase.assertEqualsInOrder;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.TEST_PASSWORD;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.TEST_USER;
+import static org.assertj.core.api.Assertions.assertThat;
 
-/** Integration tests to check mysql-cdc works well with different MySQL server version. */
+/**
+ * Integration tests to check MySQL pipeline connector works well with different MySQL server
+ * versions.
+ */
 @ParameterizedClass
 @EnumSource(
         value = MySqlVersion.class,
         names = {"V5_7", "V8_0", "V8_4"})
-class MySqlCompatibilityITCase {
+class MySqlPipelineCompatibilityITCase {
 
-    private static final Logger LOG = LoggerFactory.getLogger(MySqlCompatibilityITCase.class);
+    private static final Logger LOG =
+            LoggerFactory.getLogger(MySqlPipelineCompatibilityITCase.class);
 
     private static Path tempFolder;
     private static File resourceFolder;
@@ -76,11 +82,8 @@ class MySqlCompatibilityITCase {
 
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
-    private final StreamTableEnvironment tEnv =
-            StreamTableEnvironment.create(
-                    env, EnvironmentSettings.newInstance().inStreamingMode().build());
 
-    MySqlCompatibilityITCase(MySqlVersion version) {
+    MySqlPipelineCompatibilityITCase(MySqlVersion version) {
         this.version = version;
         this.mySqlContainer =
                 (MySqlContainer)
@@ -91,7 +94,8 @@ class MySqlCompatibilityITCase {
                                 .withUsername("flinkuser")
                                 .withPassword("flinkpw")
                                 .withLogConsumer(new Slf4jLogConsumer(LOG));
-        this.testDatabase = new UniqueDatabase(mySqlContainer, "inventory", "mysqluser", "mysqlpw");
+        this.testDatabase =
+                new UniqueDatabase(mySqlContainer, "inventory", TEST_USER, TEST_PASSWORD);
     }
 
     @BeforeEach
@@ -101,7 +105,7 @@ class MySqlCompatibilityITCase {
             resourceFolder =
                     Paths.get(
                                     Objects.requireNonNull(
-                                                    MySqlValidatorTest.class
+                                                    MySqlPipelineCompatibilityITCase.class
                                                             .getClassLoader()
                                                             .getResource("."))
                                             .toURI())
@@ -111,6 +115,7 @@ class MySqlCompatibilityITCase {
 
         env.setParallelism(4);
         env.enableCheckpointing(200);
+        RestartStrategyUtils.configureNoRestartStrategy(env);
 
         LOG.info("Starting container for MySQL {}...", version.getVersion());
         Startables.deepStart(Stream.of(mySqlContainer)).join();
@@ -134,104 +139,93 @@ class MySqlCompatibilityITCase {
     }
 
     @Test
-    void testMySqlVersionCompatibility() throws Exception {
-        String sourceDDL =
-                String.format(
-                        "CREATE TABLE products ("
-                                + " `id` INT NOT NULL,"
-                                + " name STRING,"
-                                + " description STRING,"
-                                + " weight DECIMAL(10,3),"
-                                + " primary key (`id`) not enforced"
-                                + ") WITH ("
-                                + " 'connector' = 'mysql-cdc',"
-                                + " 'hostname' = '%s',"
-                                + " 'port' = '%s',"
-                                + " 'username' = '%s',"
-                                + " 'password' = '%s',"
-                                + " 'database-name' = '%s',"
-                                + " 'table-name' = '%s',"
-                                + " 'server-time-zone' = 'UTC',"
-                                + " 'server-id' = '%s'"
-                                + ")",
-                        mySqlContainer.getHost(),
-                        mySqlContainer.getDatabasePort(),
-                        testDatabase.getUsername(),
-                        testDatabase.getPassword(),
-                        testDatabase.getDatabaseName(),
-                        "products",
-                        getServerId());
-        tEnv.executeSql(sourceDDL);
+    void testSnapshotRead() throws Exception {
+        MySqlSourceConfigFactory configFactory =
+                new MySqlSourceConfigFactory()
+                        .hostname(mySqlContainer.getHost())
+                        .port(mySqlContainer.getDatabasePort())
+                        .username(TEST_USER)
+                        .password(TEST_PASSWORD)
+                        .databaseList(testDatabase.getDatabaseName())
+                        .tableList(testDatabase.getDatabaseName() + ".products")
+                        .startupOptions(StartupOptions.initial())
+                        .serverId(getServerId(env.getParallelism()))
+                        .serverTimeZone("UTC");
 
-        TableResult result =
-                tEnv.executeSql("SELECT `id`, name, description, weight FROM products");
+        FlinkSourceProvider sourceProvider =
+                (FlinkSourceProvider) new MySqlDataSource(configFactory).getEventSourceProvider();
+        CloseableIterator<Event> events =
+                env.fromSource(
+                                sourceProvider.getSource(),
+                                WatermarkStrategy.noWatermarks(),
+                                MySqlDataSourceFactory.IDENTIFIER,
+                                new EventTypeInfo())
+                        .executeAndCollect();
 
-        CloseableIterator<Row> iterator = result.collect();
+        List<Event> snapshotEvents = fetchEvents(events, 9);
 
-        String[] expectedSnapshot =
-                new String[] {
-                    "+I[101, scooter, Small 2-wheel scooter, 3.140]",
-                    "+I[102, car battery, 12V car battery, 8.100]",
-                    "+I[103, 12-pack drill bits, 12-pack of drill bits with sizes ranging from #40 to #3, 0.800]",
-                    "+I[104, hammer, 12oz carpenter's hammer, 0.750]",
-                    "+I[105, hammer, 14oz carpenter's hammer, 0.875]",
-                    "+I[106, hammer, 16oz carpenter's hammer, 1.000]",
-                    "+I[107, rocks, box of assorted rocks, 5.300]",
-                    "+I[108, jacket, water resistent black wind breaker, 0.100]",
-                    "+I[109, spare tire, 24 inch spare tire, 22.200]"
-                };
-        assertEqualsInAnyOrder(
-                Arrays.asList(expectedSnapshot), fetchRows(iterator, expectedSnapshot.length));
+        assertThat(snapshotEvents).hasSize(9);
+        assertThat(snapshotEvents.stream().filter(e -> e instanceof DataChangeEvent)).hasSize(9);
+
+        events.close();
+    }
+
+    @Test
+    void testBinlogRead() throws Exception {
+        MySqlSourceConfigFactory configFactory =
+                new MySqlSourceConfigFactory()
+                        .hostname(mySqlContainer.getHost())
+                        .port(mySqlContainer.getDatabasePort())
+                        .username(TEST_USER)
+                        .password(TEST_PASSWORD)
+                        .databaseList(testDatabase.getDatabaseName())
+                        .tableList(testDatabase.getDatabaseName() + ".products")
+                        .startupOptions(StartupOptions.initial())
+                        .serverId(getServerId(env.getParallelism()))
+                        .serverTimeZone("UTC");
+
+        FlinkSourceProvider sourceProvider =
+                (FlinkSourceProvider) new MySqlDataSource(configFactory).getEventSourceProvider();
+        CloseableIterator<Event> events =
+                env.fromSource(
+                                sourceProvider.getSource(),
+                                WatermarkStrategy.noWatermarks(),
+                                MySqlDataSourceFactory.IDENTIFIER,
+                                new EventTypeInfo())
+                        .executeAndCollect();
+
+        fetchEvents(events, 9);
 
         try (Connection connection = testDatabase.getJdbcConnection();
                 Statement statement = connection.createStatement()) {
             statement.execute(
-                    "UPDATE products SET description='18oz carpenter hammer' WHERE id=106;");
-            statement.execute("UPDATE products SET weight='5.1' WHERE id=107;");
-            statement.execute(
-                    "INSERT INTO products VALUES (default,'jacket','water resistent white wind breaker',0.2);"); // 110
-            statement.execute(
-                    "INSERT INTO products VALUES (default,'scooter','Big 2-wheel scooter ',5.18);");
-            statement.execute(
-                    "UPDATE products SET description='new water resistent white wind breaker', weight='0.5' WHERE id=110;");
-            statement.execute("UPDATE products SET weight='5.17' WHERE id=111;");
-            statement.execute("DELETE FROM products WHERE id=111;");
+                    String.format(
+                            "INSERT INTO `%s`.`products` VALUES (default,'test_product','desc',1.0);",
+                            testDatabase.getDatabaseName()));
         }
 
-        String[] expectedBinlog =
-                new String[] {
-                    "-U[106, hammer, 16oz carpenter's hammer, 1.000]",
-                    "+U[106, hammer, 18oz carpenter hammer, 1.000]",
-                    "-U[107, rocks, box of assorted rocks, 5.300]",
-                    "+U[107, rocks, box of assorted rocks, 5.100]",
-                    "+I[110, jacket, water resistent white wind breaker, 0.200]",
-                    "+I[111, scooter, Big 2-wheel scooter , 5.180]",
-                    "-U[110, jacket, water resistent white wind breaker, 0.200]",
-                    "+U[110, jacket, new water resistent white wind breaker, 0.500]",
-                    "-U[111, scooter, Big 2-wheel scooter , 5.180]",
-                    "+U[111, scooter, Big 2-wheel scooter , 5.170]",
-                    "-D[111, scooter, Big 2-wheel scooter , 5.170]"
-                };
+        List<Event> binlogEvents = fetchEvents(events, 1);
+        assertThat(binlogEvents).hasSize(1);
+        assertThat(binlogEvents.get(0)).isInstanceOf(DataChangeEvent.class);
 
-        assertEqualsInOrder(
-                Arrays.asList(expectedBinlog), fetchRows(iterator, expectedBinlog.length));
-        result.getJobClient().get().cancel().get();
+        events.close();
     }
 
-    private String getServerId() {
-        final Random random = new Random();
-        int serverId = random.nextInt(100) + 5400;
-        return serverId + "-" + (serverId + env.getParallelism());
+    private String getServerId(int parallelism) {
+        int serverId = (int) (Math.random() * 100) + 5400;
+        return serverId + "-" + (serverId + parallelism);
     }
 
-    private static List<String> fetchRows(Iterator<Row> iter, int size) {
-        List<String> rows = new ArrayList<>(size);
-        while (size > 0 && iter.hasNext()) {
-            Row row = iter.next();
-            rows.add(row.toString());
-            size--;
+    private List<Event> fetchEvents(CloseableIterator<Event> iterator, int count) {
+        List<Event> events = new ArrayList<>();
+        while (count > 0 && iterator.hasNext()) {
+            Event event = iterator.next();
+            if (event instanceof DataChangeEvent) {
+                events.add(event);
+                count--;
+            }
         }
-        return rows;
+        return events;
     }
 
     private String buildCustomMySqlConfig(MySqlVersion version) {
@@ -240,7 +234,7 @@ class MySqlCompatibilityITCase {
                 resourceFolder =
                         Paths.get(
                                         Objects.requireNonNull(
-                                                        MySqlValidatorTest.class
+                                                        MySqlPipelineCompatibilityITCase.class
                                                                 .getClassLoader()
                                                                 .getResource("."))
                                                 .toURI())
