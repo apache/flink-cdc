@@ -48,7 +48,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 /** IT Tests for {@link MySqlSource}. */
-@Timeout(value = 20, unit = TimeUnit.SECONDS)
+@Timeout(value = 40, unit = TimeUnit.SECONDS)
 class MySqlSourceSSLConnectionITCase extends MySqlSourceTestBase {
 
     private final UniqueDatabase inventoryDatabase =

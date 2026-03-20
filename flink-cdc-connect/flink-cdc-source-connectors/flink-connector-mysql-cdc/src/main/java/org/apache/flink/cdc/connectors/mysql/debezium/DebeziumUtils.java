@@ -120,10 +120,7 @@ public class DebeziumUtils {
                         connectorConfig.port(),
                         connectorConfig.username(),
                         connectorConfig.password());
-        SSLMode sslMode = sslModeFor(connectorConfig.sslMode());
-        if (sslMode != null) {
-            client.setSSLMode(sslMode);
-        }
+        client.setSSLMode(sslModeFor(connectorConfig.sslMode()));
         if (connectorConfig.sslModeEnabled()) {
             SSLSocketFactory sslSocketFactory =
                     getBinlogSslSocketFactory(connectorConfig, connection);
@@ -405,6 +402,12 @@ public class DebeziumUtils {
             return BinlogOffset.ofBinlogFilePosition(binlogName, 0);
         } catch (Exception e) {
             throw new FlinkRuntimeException(e);
+        } finally {
+            try {
+                client.disconnect();
+            } catch (Exception e) {
+                LOG.warn("Failed to disconnect BinaryLogClient", e);
+            }
         }
     }
 
