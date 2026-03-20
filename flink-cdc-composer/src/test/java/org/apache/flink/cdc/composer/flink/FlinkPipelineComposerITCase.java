@@ -1352,7 +1352,11 @@ class FlinkPipelineComposerITCase {
                                 "DataChangeEvent{tableId={}_everything_merged, before=[], after=[104, Zen, 19, 2020-01-01T14:28:57.123456789Z], op=INSERT, meta=()}",
                                 "DataChangeEvent{tableId={}_everything_merged, before=[], after=[105, Zen, 19, 2020-01-01T04:28:57-05:00], op=INSERT, meta=()}",
                                 "DataChangeEvent{tableId={}_everything_merged, before=[], after=[106, Zen, 19, 2020-01-01T04:28:57.123456789-05:00], op=INSERT, meta=()}")
-                        .map(s -> s.replace("{}", "default_namespace.default_schema.default"))
+                        .map(
+                                s ->
+                                        s.replace(
+                                                "tableId={}",
+                                                "tableId=default_namespace.default_schema.default"))
                         .toArray(String[]::new);
 
         assertThat(outputEvents).containsExactlyInAnyOrder(expected);
@@ -1435,8 +1439,8 @@ class FlinkPipelineComposerITCase {
                         .map(
                                 s ->
                                         s.replace(
-                                                "{}",
-                                                "default_namespace.default_schema.default_everything_merged"))
+                                                "tableId={}",
+                                                "tableId=default_namespace.default_schema.default_everything_merged"))
                         .toArray(String[]::new);
 
         assertThat(outputEvents).containsExactlyInAnyOrder(expected);
