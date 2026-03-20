@@ -21,7 +21,6 @@
 ## Variables with defaults (if not overwritten by environment)
 ##
 MVN=${MVN:-mvn}
-CUSTOM_OPTIONS=${CUSTOM_OPTIONS:-}
 
 # fail immediately
 set -o errexit
@@ -29,7 +28,7 @@ set -o nounset
 
 CURR_DIR=`pwd`
 BASE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
-PROJECT_ROOT="${BASE_DIR}/../../"
+PROJECT_ROOT="${BASE_DIR}/../"
 
 # Sanity check to ensure that resolved paths are valid; a LICENSE file should always exist in project root
 if [ ! -f ${PROJECT_ROOT}/LICENSE ]; then
@@ -55,39 +54,30 @@ function set_pom_version {
 
 cd ${PROJECT_ROOT}
 
-# Build Maven options
-MVN_OPTIONS="-Papache-release -DskipTests -DretryFailedDeploymentCount=10"
-
-# If FLINK_VERSION is set, pass it to Maven
-if [ -n "${FLINK_VERSION:-}" ]; then
-    echo "Using Flink version: ${FLINK_VERSION}"
-
-    # Extract and set flink.major.version (e.g., "1.20" from "1.20.3")
-    flink_major_version=$(echo "${FLINK_VERSION}" | cut -d. -f1,2)
-    MVN_OPTIONS="${MVN_OPTIONS} -Dflink.major.version=${flink_major_version}"
-
-    # Update project version: base_version-FLINK_VERSION
-    current_version=$(get_pom_version)
-    echo "Current version: ${current_version}"
-
-    # Skip if version already ends with FLINK_VERSION
-    if [[ "${current_version}" == *"-${FLINK_VERSION}" ]]; then
-        echo "Version already ends with -${FLINK_VERSION}, skipping version update"
-    else
-        base_version=${current_version%-SNAPSHOT}
-        new_version="${base_version}-${FLINK_VERSION}"
-        echo "Updating version to: ${new_version}"
-        set_pom_version "${new_version}"
-    fi
-
-    # Add -Pflink2 profile if FLINK_VERSION starts with "2"
-    if [[ "${FLINK_VERSION}" == 2* ]]; then
-        echo "Enabling flink2 profile"
-        MVN_OPTIONS="${MVN_OPTIONS} -Pflink2"
-    fi
+# Check if FLINK_VERSION is set
+if [ -z "${FLINK_VERSION:-}" ]; then
+    echo "Error: FLINK_VERSION environment variable is not set."
+    echo "Usage: FLINK_VERSION=1.20 $0"
+    exit 1
 fi
 
-echo "Deploying to repository.apache.org"
-${MVN} clean deploy ${MVN_OPTIONS} ${CUSTOM_OPTIONS}
+echo "FLINK_VERSION: ${FLINK_VERSION}"
+
+# Get current version
+current_version=$(get_pom_version)
+echo "Current version: ${current_version}"
+
+# Extract base version (remove -SNAPSHOT suffix if present)
+base_version=${current_version%-SNAPSHOT}
+echo "Base version: ${base_version}"
+
+# Build new version: base_version-FLINK_VERSION
+new_version="${base_version}-${FLINK_VERSION}"
+echo "New version: ${new_version}"
+
+# Set new version
+set_pom_version "${new_version}"
+
+echo "Version updated successfully: ${current_version} -> ${new_version}"
 
 cd ${CURR_DIR}
