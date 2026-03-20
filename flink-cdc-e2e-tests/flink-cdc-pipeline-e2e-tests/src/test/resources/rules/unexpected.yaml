@@ -48,7 +48,7 @@ steps:
               sink: uuid
     error: |
       Unexpected key `mapping` in YAML transform block.
-      Allowed keys in this context are: [source-table, projection, filter, primary-keys, partition-keys, table-options, description, converter-after-transform]
+      Allowed keys in this context are: [source-table, projection, filter, primary-keys, partition-keys, table-options, table-options.delimiter, description, converter-after-transform]
       Note: option mapping: [{"source":"userUuid","sink":"uuid"}] is unexpected. It was silently ignored in previous versions, and probably should be removed.
   # Unexpected route block keys
   - type: submit

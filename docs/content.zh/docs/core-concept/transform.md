@@ -31,16 +31,17 @@ under the License.
 # 参数
 为了定义一个 transform 规则，可以使用以下参数：
 
-| 参数                        | 含义                                                     | 是否必填     |
-|---------------------------|--------------------------------------------------------|----------|
-| source-table              | 源表 ID，支持正则表达式                                         | 必填       |
-| projection                | 投影规则，支持类似 SQL 中 SELECT 子句的语法                           | 可选       |
-| filter                    | 过滤规则，支持类似 SQL 中 WHERE 子句的语法                            | 可选       |
-| primary-keys              | 目标表主键，以逗号分隔                                            | 可选       |
-| partition-keys            | 目标表分区键，以逗号分隔                                           | 可选       |
-| table-options             | 用于配置自动建表时的建表语句                                         | 可选       |
-| converter-after-transform | 用于在 transform 处理后添加转换器来修改 DataChangeEvent                | 可选       |
-| description               | Transform 规则描述                                         | 可选       |
+| 参数                        | 含义                                        | 是否必填 |
+|---------------------------|-------------------------------------------|------|
+| source-table              | 源表 ID，支持正则表达式                             | 必填   |
+| projection                | 投影规则，支持类似 SQL 中 SELECT 子句的语法              | 可选   |
+| filter                    | 过滤规则，支持类似 SQL 中 WHERE 子句的语法               | 可选   |
+| primary-keys              | 目标表主键，以逗号分隔                               | 可选   |
+| partition-keys            | 目标表分区键，以逗号分隔                              | 可选   |
+| table-options             | 用于配置自动建表时的建表语句                            | 可选   |
+| table-options.delimiter   | 多个表属性的分隔符, 默认值为 `,`       | 可选   |
+| converter-after-transform | 用于在 transform 处理后添加转换器来修改 DataChangeEvent | 可选   |
+| description               | Transform 规则描述                            | 可选   |
 
 多个 transform 规则可以声明在一个 pipeline YAML 文件中。
 
@@ -335,7 +336,13 @@ transform:
     table-options: comment=web order
     description: auto creating table options example
 ```
-小技巧：table-options 的格式是 `key1=value1,key2=value2`。
+小技巧：table-options 的格式是 `key1=value1,key2=value2`；如果 value 中包含逗号或其他特殊字符，可以使用 `table-options.delimiter` 指定自定义分隔符（如 `;`、`|`、`$` 等）：
+```yaml
+transform:
+  - source-table: mydb.web_order
+    table-options: sequence.field=gxsj,jjsj;file-index.bloom-filter.columns=jjdbh
+    table-options.delimiter: ";"
+```
 
 ## 分类映射
 在一张表同时被多个转换规则命中时，
@@ -467,8 +474,8 @@ transform:
 
 ## Embedding AI 模型
 
-Embedding AI 模型可以在 transform 规则中使用。
-为了使用 Embedding AI 模型，你需要下载内置模型的 jar，然后在 `flink-cdc.sh` 命令中添加 `--jar {$BUILT_IN_MODEL_PATH}`。
+内置 AI 模型可以在 transform 规则中使用。
+为了使用内置 AI 模型，你需要下载内置模型的 jar ，然后在 `flink-cdc.sh` 命令中添加 `--jar {$BUILT_IN_MODEL_PATH}`。
 
 如何定义一个 Embedding AI 模型：
 
