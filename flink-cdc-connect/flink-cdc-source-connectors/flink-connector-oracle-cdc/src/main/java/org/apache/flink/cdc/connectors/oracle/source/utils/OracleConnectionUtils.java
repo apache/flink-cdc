@@ -17,11 +17,11 @@
 
 package org.apache.flink.cdc.connectors.oracle.source.utils;
 
+import org.apache.flink.cdc.connectors.oracle.connection.OracleSourceConnection;
 import org.apache.flink.cdc.connectors.oracle.source.meta.offset.RedoLogOffset;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import io.debezium.config.Configuration;
-import io.debezium.connector.oracle.OracleConnection;
 import io.debezium.connector.oracle.Scn;
 import io.debezium.jdbc.JdbcConfiguration;
 import io.debezium.jdbc.JdbcConnection;
@@ -49,15 +49,16 @@ public class OracleConnectionUtils {
     /** show current scn sql in oracle. */
     private static final String SHOW_CURRENT_SCN = "SELECT CURRENT_SCN FROM V$DATABASE";
 
-    /** Creates a new {@link OracleConnection}, but not open the connection. */
-    public static OracleConnection createOracleConnection(Configuration configuration) {
+    /** Creates a new {@link OracleSourceConnection}, but not open the connection. */
+    public static OracleSourceConnection createOracleConnection(Configuration configuration) {
         return createOracleConnection(JdbcConfiguration.adapt(configuration));
     }
 
-    /** Creates a new {@link OracleConnection}, but not open the connection. */
-    public static OracleConnection createOracleConnection(JdbcConfiguration dbzConfiguration) {
+    /** Creates a new {@link OracleSourceConnection}, but not open the connection. */
+    public static OracleSourceConnection createOracleConnection(
+            JdbcConfiguration dbzConfiguration) {
         Configuration configuration = dbzConfiguration.subset(DATABASE_CONFIG_PREFIX, true);
-        return new OracleConnection(
+        return new OracleSourceConnection(
                 configuration.isEmpty() ? dbzConfiguration : JdbcConfiguration.adapt(configuration),
                 OracleConnectionUtils.class::getClassLoader);
     }

@@ -28,11 +28,12 @@ import org.apache.flink.cdc.connectors.utils.TestSourceContext;
 import org.apache.flink.cdc.connectors.vitess.config.TabletType;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.cdc.debezium.DebeziumSourceFunction;
+import org.apache.flink.cdc.runtime.compat.MockStreamingRuntimeContextAdapter;
+import org.apache.flink.cdc.runtime.compat.OperatorStateStoreAdapter;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.testutils.CheckedThread;
 import org.apache.flink.runtime.state.FunctionInitializationContext;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
-import org.apache.flink.streaming.util.MockStreamingRuntimeContext;
 import org.apache.flink.util.Collector;
 
 import org.apache.kafka.connect.source.SourceRecord;
@@ -201,7 +202,7 @@ class VitessSourceTest extends VitessTestBase {
 
         // run setup procedure in operator life cycle
         source.setRuntimeContext(
-                new MockStreamingRuntimeContext(
+                MockStreamingRuntimeContextAdapter.create(
                         isCheckpointingEnabled, totalNumSubtasks, subtaskIndex));
         source.initializeState(
                 new MockFunctionInitializationContext(
@@ -226,7 +227,7 @@ class VitessSourceTest extends VitessTestBase {
         }
     }
 
-    private static class MockOperatorStateStore implements OperatorStateStore {
+    private static class MockOperatorStateStore implements OperatorStateStoreAdapter {
 
         private final ListState<?> restoredOffsetListState;
         private final ListState<?> restoredHistoryListState;

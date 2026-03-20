@@ -264,4 +264,13 @@ public class PostgresDataSourceOptions {
                             .defaultValue(false)
                             .withDescription(
                                     "Whether to assign the unbounded chunks first during snapshot reading phase. This might help reduce the risk of the TaskManager experiencing an out-of-memory (OOM) error when taking a snapshot of the largest unbounded chunk.  Defaults to false.");
+
+    public static final ConfigOption<Boolean> TABLE_ID_INCLUDE_DATABASE =
+            ConfigOptions.key("table-id.include-database")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Whether to include database in the generated Table ID. "
+                                    + "If set to true, the Table ID will be in the format (database, schema, table). "
+                                    + "If set to false, the Table ID will be in the format (schema, table). Defaults to false.");
 }

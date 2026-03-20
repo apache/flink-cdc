@@ -91,12 +91,16 @@ public class Lsn implements Comparable<Lsn> {
         return Lsn.valueOf(value);
     }
 
-    /** @return Long represent position in the write-ahead log stream */
+    /**
+     * @return Long represent position in the write-ahead log stream
+     */
     public long asLong() {
         return value;
     }
 
-    /** @return PostgreSQL JDBC driver representation of position in the write-ahead log stream */
+    /**
+     * @return PostgreSQL JDBC driver representation of position in the write-ahead log stream
+     */
     public LogSequenceNumber asLogSequenceNumber() {
         return LogSequenceNumber.valueOf(value);
     }

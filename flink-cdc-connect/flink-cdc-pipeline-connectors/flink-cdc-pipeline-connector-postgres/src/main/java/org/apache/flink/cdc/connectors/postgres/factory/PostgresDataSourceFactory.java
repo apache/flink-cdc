@@ -80,6 +80,7 @@ import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSource
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.TABLES;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.TABLES_EXCLUDE;
+import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.TABLE_ID_INCLUDE_DATABASE;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.USERNAME;
 import static org.apache.flink.cdc.debezium.table.DebeziumOptions.DEBEZIUM_OPTIONS_PREFIX;
 import static org.apache.flink.cdc.debezium.table.DebeziumOptions.getDebeziumProperties;
@@ -129,6 +130,7 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
         int connectionPoolSize = config.get(CONNECTION_POOL_SIZE);
         boolean skipSnapshotBackfill = config.get(SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP);
         int lsnCommitCheckpointsDelay = config.get(SCAN_LSN_COMMIT_CHECKPOINTS_DELAY);
+        boolean tableIdIncludeDatabase = config.get(TABLE_ID_INCLUDE_DATABASE);
 
         validateIntegerOption(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE, splitSize, 1);
         validateIntegerOption(CHUNK_META_GROUP_SIZE, splitMetaGroupSize, 1);
@@ -169,6 +171,7 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
                         .skipSnapshotBackfill(skipSnapshotBackfill)
                         .lsnCommitCheckpointsDelay(lsnCommitCheckpointsDelay)
                         .assignUnboundedChunkFirst(isAssignUnboundedChunkFirst)
+                        .includeDatabaseInTableId(tableIdIncludeDatabase)
                         .getConfigFactory();
 
         List<TableId> tableIds = PostgresSchemaUtils.listTables(configFactory.create(0), null);
@@ -197,6 +200,7 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
         String metadataList = config.get(METADATA_LIST);
         List<PostgreSQLReadableMetadata> readableMetadataList = listReadableMetadata(metadataList);
 
+        // Create a custom PostgresDataSource that passes the includeDatabaseInTableId flag
         return new PostgresDataSource(configFactory, readableMetadataList);
     }
 
@@ -257,6 +261,7 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
         options.add(SCAN_LSN_COMMIT_CHECKPOINTS_DELAY);
         options.add(METADATA_LIST);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED);
+        options.add(TABLE_ID_INCLUDE_DATABASE);
         return options;
     }
 
@@ -305,11 +310,12 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
             default:
                 throw new ValidationException(
                         String.format(
-                                "Invalid value for option '%s'. Supported values are [%s, %s, %s], but was: %s",
+                                "Invalid value for option '%s'. Supported values are [%s, %s, %s, %s], but was: %s",
                                 SourceOptions.SCAN_STARTUP_MODE.key(),
                                 SCAN_STARTUP_MODE_VALUE_INITIAL,
                                 SCAN_STARTUP_MODE_VALUE_SNAPSHOT,
                                 SCAN_STARTUP_MODE_VALUE_LATEST,
+                                SCAN_STARTUP_MODE_VALUE_COMMITTED_OFFSET,
                                 modeString));
         }
     }
@@ -398,12 +404,14 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
     private boolean isValidPostgresDbName(String dbName) {
         // PostgreSQL database name conventions:
         // 1. Length does not exceed 63 characters
-        // 2. Can contain letters, numbers, underscores, and dollar signs
-        // 3. Cannot start with a dollar sign
+        // 2. Can contain letters, numbers, underscores, dollar signs, and hyphens
+        // 3. Must start with a letter, underscore, or dollar sign (cannot start with a hyphen)
+        // Note: While SQL identifiers have strict rules, database names created
+        // via createdb command can contain hyphens (e.g., createdb foo-bar)
         if (dbName == null || dbName.length() > 63) {
             return false;
         }
-        if (!dbName.matches("[a-zA-Z_$][a-zA-Z0-9_$]*")) {
+        if (!dbName.matches("[a-zA-Z_$][a-zA-Z0-9_$-]*")) {
             return false;
         }
         return true;

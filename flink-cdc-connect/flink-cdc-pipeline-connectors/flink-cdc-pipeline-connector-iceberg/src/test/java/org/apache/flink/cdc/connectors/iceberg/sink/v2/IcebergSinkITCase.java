@@ -17,7 +17,6 @@
 
 package org.apache.flink.cdc.connectors.iceberg.sink.v2;
 
-import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.connector.sink2.Sink;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
@@ -34,6 +33,7 @@ import org.apache.flink.cdc.connectors.iceberg.sink.v2.compaction.CompactionOpti
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.util.RestartStrategyUtils;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.iceberg.CatalogUtil;
@@ -80,7 +80,7 @@ public class IcebergSinkITCase {
         env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.setParallelism(DEFAULT_PARALLELISM);
         env.enableCheckpointing(1000);
-        env.setRestartStrategy(RestartStrategies.noRestart());
+        RestartStrategyUtils.configureNoRestartStrategy(env);
         String warehouse =
                 new File(temporaryFolder.toFile(), UUID.randomUUID().toString()).toString();
         catalogOptions.put("type", "hadoop");
@@ -100,7 +100,12 @@ public class IcebergSinkITCase {
         DataStream<Event> stream = env.fromData(events, TypeInformation.of(Event.class));
 
         Sink<Event> icebergSink =
-                new IcebergSink(catalogOptions, null, null, CompactionOptions.builder().build());
+                new IcebergSink(
+                        catalogOptions,
+                        null,
+                        null,
+                        CompactionOptions.builder().build(),
+                        "FlinkCDC");
         String[] expected = new String[] {"21, 1.732, Disenchanted", "17, 6.28, Doris Day"};
         stream.sinkTo(icebergSink);
         env.execute("Values to Iceberg Sink");

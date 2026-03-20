@@ -287,12 +287,17 @@ public class PostgresScanFetchTask extends AbstractScanFetchTask {
                             .filter(field -> table.columnWithName(field).typeName().equals("uuid"))
                             .collect(Collectors.toList());
 
+            List<String> columnNames =
+                    table.columns().stream()
+                            .map(column -> jdbcConnection.quotedColumnIdString(column.name()))
+                            .collect(Collectors.toList());
             final String selectSql =
                     PostgresQueryUtils.buildSplitScanQuery(
                             snapshotSplit.getTableId(),
                             snapshotSplit.getSplitKeyType(),
                             snapshotSplit.getSplitStart() == null,
                             snapshotSplit.getSplitEnd() == null,
+                            columnNames,
                             uuidFields);
             LOG.debug(
                     "For split '{}' of table {} using select statement: '{}'",

@@ -326,3 +326,34 @@ CREATE TABLE default_value_test (
 INSERT INTO default_value_test
 VALUES (1,'user1','Shanghai',123567),
        (2,'user2','Shanghai',123567);
+
+-- table has auto increment primary key for pt-osc testing
+CREATE TABLE customers_auto_id (
+  id INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(255) NOT NULL DEFAULT 'flink',
+  address VARCHAR(1024),
+  phone_number VARCHAR(512)
+);
+
+INSERT INTO customers_auto_id
+VALUES (default, 'user_1', 'Shanghai', '123567891234'),
+       (default, 'user_2', 'Shanghai', '123567891234'),
+       (default, 'user_3', 'Shanghai', '123567891234'),
+       (default, 'user_4', 'Shanghai', '123567891234'),
+       (default, 'user_5', 'Shanghai', '123567891234'),
+       (default, 'user_6', 'Shanghai', '123567891234'),
+       (default, 'user_7', 'Shanghai', '123567891234'),
+       (default, 'user_8', 'Shanghai', '123567891234'),
+       (default, 'user_9', 'Shanghai', '123567891234'),
+       (default, 'user_10', 'Shanghai', '123567891234'),
+       (default, 'user_11', 'Shanghai', '123567891234'),
+       (default, 'user_12', 'Shanghai', '123567891234'),
+       (default, 'user_13', 'Shanghai', '123567891234'),
+       (default, 'user_14', 'Shanghai', '123567891234'),
+       (default, 'user_15', 'Shanghai', '123567891234'),
+       (default, 'user_16', 'Shanghai', '123567891234'),
+       (default, 'user_17', 'Shanghai', '123567891234'),
+       (default, 'user_18', 'Shanghai', '123567891234'),
+       (default, 'user_19', 'Shanghai', '123567891234'),
+       (default, 'user_20', 'Shanghai', '123567891234'),
+       (default, 'user_21', 'Shanghai', '123567891234');

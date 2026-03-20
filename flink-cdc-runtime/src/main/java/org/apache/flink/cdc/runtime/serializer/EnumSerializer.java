@@ -20,6 +20,7 @@ package org.apache.flink.cdc.runtime.serializer;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.common.typeutils.TypeSerializerSchemaCompatibility;
 import org.apache.flink.api.common.typeutils.TypeSerializerSnapshot;
+import org.apache.flink.api.common.typeutils.TypeSerializerSnapshotAdapter;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataOutputView;
@@ -176,7 +177,7 @@ public final class EnumSerializer<T extends Enum<T>> extends TypeSerializer<T> {
 
     /** {@link TypeSerializerSnapshot} for {@link EnumSerializer}. */
     public static final class EnumSerializerSnapshot<T extends Enum<T>>
-            implements TypeSerializerSnapshot<T> {
+            implements TypeSerializerSnapshotAdapter<T> {
         private static final int CURRENT_VERSION = 3;
 
         private T[] previousEnums;

@@ -32,14 +32,13 @@ import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
 import org.apache.flink.cdc.common.exceptions.UnsupportedSchemaChangeEventException;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
-import org.apache.flink.cdc.common.types.utils.DataTypeUtils;
+import org.apache.flink.cdc.connectors.paimon.sink.utils.TypeUtils;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.Sets;
 
 import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.catalog.Identifier;
 import org.apache.paimon.flink.FlinkCatalogFactory;
-import org.apache.paimon.flink.LogicalTypeConversion;
 import org.apache.paimon.options.Options;
 import org.apache.paimon.schema.SchemaChange;
 import org.apache.paimon.table.Table;
@@ -173,9 +172,7 @@ public class PaimonMetadataApplier implements MetadataApplier {
                             (column) ->
                                     builder.column(
                                             column.getName(),
-                                            LogicalTypeConversion.toDataType(
-                                                    DataTypeUtils.toFlinkDataType(column.getType())
-                                                            .getLogicalType()),
+                                            TypeUtils.toPaimonDataType(column.getType()),
                                             column.getComment()));
             List<String> partitionKeys = new ArrayList<>();
             List<String> primaryKeys = schema.primaryKeys();

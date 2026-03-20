@@ -20,6 +20,7 @@ package org.apache.flink.cdc.runtime.serializer.data;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.common.typeutils.TypeSerializerSchemaCompatibility;
 import org.apache.flink.api.common.typeutils.TypeSerializerSnapshot;
+import org.apache.flink.api.common.typeutils.TypeSerializerSnapshotAdapter;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.ZonedTimestampData;
 import org.apache.flink.cdc.runtime.serializer.StringSerializer;
@@ -146,7 +147,7 @@ public class ZonedTimestampDataSerializer extends TypeSerializer<ZonedTimestampD
 
     /** {@link TypeSerializerSnapshot} for {@link ZonedTimestampDataSerializer}. */
     public static final class ZonedTimestampDataSerializerSnapshot
-            implements TypeSerializerSnapshot<ZonedTimestampData> {
+            implements TypeSerializerSnapshotAdapter<ZonedTimestampData> {
 
         private static final int CURRENT_VERSION = 1;
 

@@ -23,15 +23,16 @@ import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.pipeline.RouteMode;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.route.RouteRule;
+import org.apache.flink.cdc.common.route.TableIdRouter;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
+import org.apache.flink.cdc.runtime.operators.AbstractStreamOperatorAdapter;
 import org.apache.flink.cdc.runtime.operators.schema.common.SchemaDerivator;
 import org.apache.flink.cdc.runtime.operators.schema.common.SchemaManager;
-import org.apache.flink.cdc.runtime.operators.schema.common.TableIdRouter;
 import org.apache.flink.streaming.api.graph.StreamConfig;
-import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.api.operators.Output;
@@ -49,7 +50,7 @@ import java.util.stream.Collectors;
 
 /** The operator will apply create table event and router mapper in batch mode. */
 @Internal
-public class BatchSchemaOperator extends AbstractStreamOperator<Event>
+public class BatchSchemaOperator extends AbstractStreamOperatorAdapter<Event>
         implements OneInputStreamOperator<Event, Event>, Serializable {
 
     private static final long serialVersionUID = 1L;
@@ -58,6 +59,7 @@ public class BatchSchemaOperator extends AbstractStreamOperator<Event>
     // Final fields that are set in constructor
     private final String timezone;
     private final List<RouteRule> routingRules;
+    private final RouteMode routeMode;
 
     // Transient fields that are set during open()
     private transient volatile Map<TableId, Schema> originalSchemaMap;
@@ -69,10 +71,14 @@ public class BatchSchemaOperator extends AbstractStreamOperator<Event>
     private boolean alreadyMergedCreateTableTables = false;
 
     public BatchSchemaOperator(
-            List<RouteRule> routingRules, MetadataApplier metadataApplier, String timezone) {
+            List<RouteRule> routingRules,
+            RouteMode routeMode,
+            MetadataApplier metadataApplier,
+            String timezone) {
         this.chainingStrategy = ChainingStrategy.ALWAYS;
         this.timezone = timezone;
         this.routingRules = routingRules;
+        this.routeMode = routeMode;
         this.metadataApplier = metadataApplier;
     }
 
@@ -89,7 +95,7 @@ public class BatchSchemaOperator extends AbstractStreamOperator<Event>
         super.open();
         this.originalSchemaMap = new HashMap<>();
         this.evolvedSchemaMap = new HashMap<>();
-        this.router = new TableIdRouter(routingRules);
+        this.router = new TableIdRouter(routingRules, routeMode);
         this.derivator = new SchemaDerivator();
         this.schemaManager = new SchemaManager(SchemaChangeBehavior.IGNORE);
     }

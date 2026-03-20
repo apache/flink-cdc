@@ -104,6 +104,7 @@ class SchemaMergingUtilsTest {
     private static final DataType ROW = DataTypes.ROW(INT, STRING);
     private static final DataType ARRAY = DataTypes.ARRAY(STRING);
     private static final DataType MAP = DataTypes.MAP(INT, STRING);
+    private static final DataType VARIANT = DataTypes.VARIANT();
 
     private static final List<DataType> ALL_TYPES =
             Arrays.asList(
@@ -130,7 +131,8 @@ class SchemaMergingUtilsTest {
                     // Complex types
                     ROW,
                     ARRAY,
-                    MAP);
+                    MAP,
+                    VARIANT);
 
     private static final Map<DataType, Object> DUMMY_OBJECTS =
             ImmutableMap.of(
@@ -966,35 +968,35 @@ class SchemaMergingUtilsTest {
                 Arrays.asList(
                         STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING,
                         STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING,
-                        STRING));
+                        STRING, STRING));
 
         assertTypeMergingVector(
                 CHAR,
                 Arrays.asList(
                         STRING, CHAR, STRING, STRING, STRING, STRING, STRING, STRING, STRING,
                         STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING,
-                        STRING));
+                        STRING, STRING));
 
         assertTypeMergingVector(
                 VARCHAR,
                 Arrays.asList(
                         STRING, STRING, VARCHAR, STRING, STRING, STRING, STRING, STRING, STRING,
                         STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING,
-                        STRING));
+                        STRING, STRING));
 
         assertTypeMergingVector(
                 BINARY,
                 Arrays.asList(
                         STRING, STRING, STRING, BINARY, STRING, STRING, STRING, STRING, STRING,
                         STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING,
-                        STRING));
+                        STRING, STRING));
 
         assertTypeMergingVector(
                 VARBINARY,
                 Arrays.asList(
                         STRING, STRING, STRING, STRING, VARBINARY, STRING, STRING, STRING, STRING,
                         STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING,
-                        STRING));
+                        STRING, STRING));
 
         // 8-bit TINYINT could fit into FLOAT (24 sig bits) or DOUBLE (53 sig bits)
         assertTypeMergingVector(
@@ -1002,7 +1004,7 @@ class SchemaMergingUtilsTest {
                 Arrays.asList(
                         STRING, STRING, STRING, STRING, STRING, TINYINT, SMALLINT, INT, BIGINT,
                         DECIMAL, FLOAT, DOUBLE, STRING, STRING, STRING, STRING, STRING, STRING,
-                        STRING));
+                        STRING, STRING));
 
         // 16-bit SMALLINT could fit into FLOAT (24 sig bits) or DOUBLE (53 sig bits)
         assertTypeMergingVector(
@@ -1010,42 +1012,43 @@ class SchemaMergingUtilsTest {
                 Arrays.asList(
                         STRING, STRING, STRING, STRING, STRING, SMALLINT, SMALLINT, INT, BIGINT,
                         DECIMAL, FLOAT, DOUBLE, STRING, STRING, STRING, STRING, STRING, STRING,
-                        STRING));
+                        STRING, STRING));
 
         // 32-bit INT could fit into DOUBLE (53 sig bits)
         assertTypeMergingVector(
                 INT,
                 Arrays.asList(
                         STRING, STRING, STRING, STRING, STRING, INT, INT, INT, BIGINT, DECIMAL,
-                        DOUBLE, DOUBLE, STRING, STRING, STRING, STRING, STRING, STRING, STRING));
+                        DOUBLE, DOUBLE, STRING, STRING, STRING, STRING, STRING, STRING, STRING,
+                        STRING));
 
         assertTypeMergingVector(
                 BIGINT,
                 Arrays.asList(
                         STRING, STRING, STRING, STRING, STRING, BIGINT, BIGINT, BIGINT, BIGINT,
                         DECIMAL, DOUBLE, DOUBLE, STRING, STRING, STRING, STRING, STRING, STRING,
-                        STRING));
+                        STRING, STRING));
 
         assertTypeMergingVector(
                 DECIMAL,
                 Arrays.asList(
                         STRING, STRING, STRING, STRING, STRING, DECIMAL, DECIMAL, DECIMAL, DECIMAL,
                         DECIMAL, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING,
-                        STRING));
+                        STRING, STRING));
 
         assertTypeMergingVector(
                 FLOAT,
                 Arrays.asList(
                         STRING, STRING, STRING, STRING, STRING, FLOAT, FLOAT, DOUBLE, DOUBLE,
                         STRING, FLOAT, DOUBLE, STRING, STRING, STRING, STRING, STRING, STRING,
-                        STRING));
+                        STRING, STRING));
 
         assertTypeMergingVector(
                 DOUBLE,
                 Arrays.asList(
                         STRING, STRING, STRING, STRING, STRING, DOUBLE, DOUBLE, DOUBLE, DOUBLE,
                         STRING, DOUBLE, DOUBLE, STRING, STRING, STRING, STRING, STRING, STRING,
-                        STRING));
+                        STRING, STRING));
 
         assertTypeMergingVector(
                 TIMESTAMP,
@@ -1065,6 +1068,7 @@ class SchemaMergingUtilsTest {
                         TIMESTAMP,
                         TIMESTAMP_LTZ,
                         TIMESTAMP_TZ,
+                        STRING,
                         STRING,
                         STRING,
                         STRING,
@@ -1091,6 +1095,7 @@ class SchemaMergingUtilsTest {
                         STRING,
                         STRING,
                         STRING,
+                        STRING,
                         STRING));
 
         assertTypeMergingVector(
@@ -1114,6 +1119,7 @@ class SchemaMergingUtilsTest {
                         STRING,
                         STRING,
                         STRING,
+                        STRING,
                         STRING));
 
         assertTypeMergingVector(
@@ -1121,13 +1127,13 @@ class SchemaMergingUtilsTest {
                 Arrays.asList(
                         STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING,
                         STRING, STRING, STRING, STRING, STRING, STRING, TIME, STRING, STRING,
-                        STRING));
+                        STRING, STRING));
 
         assertTypeMergingVector(
                 ROW,
                 Arrays.asList(
                         STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING,
-                        STRING, STRING, STRING, STRING, STRING, STRING, STRING, ROW, STRING,
+                        STRING, STRING, STRING, STRING, STRING, STRING, STRING, ROW, STRING, STRING,
                         STRING));
 
         assertTypeMergingVector(
@@ -1135,14 +1141,21 @@ class SchemaMergingUtilsTest {
                 Arrays.asList(
                         STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING,
                         STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, ARRAY,
-                        STRING));
+                        STRING, STRING));
 
         assertTypeMergingVector(
                 MAP,
                 Arrays.asList(
                         STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING,
+                        STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, MAP,
+                        STRING));
+
+        assertTypeMergingVector(
+                VARIANT,
+                Arrays.asList(
                         STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING,
-                        MAP));
+                        STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING,
+                        STRING, VARIANT));
     }
 
     private static void assertTypeMergingVector(DataType incomingType, List<DataType> resultTypes) {

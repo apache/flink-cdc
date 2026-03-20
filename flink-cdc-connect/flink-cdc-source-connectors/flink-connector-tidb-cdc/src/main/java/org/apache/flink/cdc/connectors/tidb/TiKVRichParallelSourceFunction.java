@@ -32,6 +32,7 @@ import org.apache.flink.runtime.state.FunctionInitializationContext;
 import org.apache.flink.runtime.state.FunctionSnapshotContext;
 import org.apache.flink.streaming.api.checkpoint.CheckpointedFunction;
 import org.apache.flink.streaming.api.functions.source.RichParallelSourceFunction;
+import org.apache.flink.streaming.api.functions.source.SourceFunction;
 import org.apache.flink.util.Collector;
 import org.apache.flink.util.Preconditions;
 
@@ -85,7 +86,7 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
 
     private transient Coprocessor.KeyRange keyRange = null;
     private transient CDCClient cdcClient = null;
-    private transient SourceContext<T> sourceContext = null;
+    private transient SourceFunction.SourceContext<T> sourceContext = null;
     private transient volatile long resolvedTs = -1L;
     private transient TreeMap<RowKeyWithTs, Cdcpb.Event.Row> prewrites = null;
     private transient TreeMap<RowKeyWithTs, Cdcpb.Event.Row> commits = null;
@@ -129,8 +130,8 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
         keyRange =
                 TableKeyRangeUtils.getTableKeyRange(
                         tableId,
-                        getRuntimeContext().getNumberOfParallelSubtasks(),
-                        getRuntimeContext().getIndexOfThisSubtask());
+                        getRuntimeContext().getTaskInfo().getNumberOfParallelSubtasks(),
+                        getRuntimeContext().getTaskInfo().getIndexOfThisSubtask());
         cdcClient = new CDCClient(session, keyRange);
         prewrites = new TreeMap<>();
         commits = new TreeMap<>();
@@ -147,7 +148,7 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
                 new ThreadFactoryBuilder()
                         .setNameFormat(
                                 "tidb-source-function-"
-                                        + getRuntimeContext().getIndexOfThisSubtask())
+                                        + getRuntimeContext().getTaskInfo().getIndexOfThisSubtask())
                         .build();
         executorService = Executors.newSingleThreadExecutor(threadFactory);
         final MetricGroup metricGroup = getRuntimeContext().getMetricGroup();
@@ -156,7 +157,7 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
     }
 
     @Override
-    public void run(final SourceContext<T> ctx) throws Exception {
+    public void run(final SourceFunction.SourceContext<T> ctx) throws Exception {
         sourceContext = ctx;
         outputCollector.context = sourceContext;
 
@@ -388,7 +389,7 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
 
     private static class OutputCollector<T> implements Collector<T> {
 
-        private SourceContext<T> context;
+        private SourceFunction.SourceContext<T> context;
 
         @Override
         public void collect(T record) {

@@ -136,7 +136,7 @@ Pipeline Connector Options
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Partition keys for each partitioned table. Allow setting multiple primary keys for multiTables. Tables are separated by ';', and partition keys are separated by ','. For example, we can set <code>partition.key</code> of two tables using 'testdb.table1:id1,id2;testdb.table2:name'.</td>
+      <td>Partition keys for each partitioned table. Allow setting multiple primary keys for multiTables. Tables are separated by ';', and partition keys are separated by ','. For example, we can set <code>partition.key</code> of two tables using 'testdb.table1:id1,id2;testdb.table2:name'. For partition transforms, we can set <code>partition.key</code> using 'testdb.table1:truncate[10](id);testdb.table2:hour(create_time);testdb.table3:day(create_time);testdb.table4:month(create_time);testdb.table5:year(create_time);testdb.table6:bucket[10](create_time)'.</td>
     </tr>
     <tr>
       <td>catalog.properties.*</td>

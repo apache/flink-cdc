@@ -58,7 +58,6 @@ import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 
-import org.apache.calcite.sql.validate.SqlValidatorException;
 import org.assertj.core.api.Assertions;
 import org.assertj.core.api.ThrowableAssert;
 import org.codehaus.commons.compiler.CompileException;
@@ -241,6 +240,136 @@ class FlinkPipelineTransformITCase {
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[4, Derrida, 25, student], after=[], op=DELETE, meta=()}"));
     }
 
+    @ParameterizedTest(name = "API version: {0}")
+    @EnumSource(ValuesDataSink.SinkApi.class)
+    void testFilterUpdateOpTypeConversion(ValuesDataSink.SinkApi sinkApi) throws Exception {
+        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+
+        Configuration sourceConfig = new Configuration();
+        sourceConfig.set(
+                ValuesDataSourceOptions.EVENT_SET_ID,
+                ValuesDataSourceHelper.EventSetId.CUSTOM_SOURCE_EVENTS);
+
+        TableId myTable1 = TableId.tableId("default_namespace", "default_schema", "mytable1");
+        Schema table1Schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .physicalColumn("age", DataTypes.INT())
+                        .primaryKey("id")
+                        .build();
+
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(
+                        table1Schema.getColumnDataTypes().toArray(new DataType[0]));
+
+        List<Event> events = new ArrayList<>();
+        events.add(new CreateTableEvent(myTable1, table1Schema));
+        // Case 1: before=Y, after=Y -> UPDATE
+        events.add(
+                DataChangeEvent.insertEvent(
+                        myTable1,
+                        generator.generate(
+                                new Object[] {1, BinaryStringData.fromString("Alice"), 30})));
+        events.add(
+                DataChangeEvent.updateEvent(
+                        myTable1,
+                        generator.generate(
+                                new Object[] {1, BinaryStringData.fromString("Alice"), 30}),
+                        generator.generate(
+                                new Object[] {1, BinaryStringData.fromString("Alice"), 40})));
+        // Case 2: before=Y, after=N -> DELETE
+        events.add(
+                DataChangeEvent.insertEvent(
+                        myTable1,
+                        generator.generate(
+                                new Object[] {2, BinaryStringData.fromString("Bob"), 30})));
+        events.add(
+                DataChangeEvent.updateEvent(
+                        myTable1,
+                        generator.generate(
+                                new Object[] {2, BinaryStringData.fromString("Bob"), 30}),
+                        generator.generate(
+                                new Object[] {2, BinaryStringData.fromString("Bob"), 20})));
+        // Case 3: before=N, after=Y -> INSERT
+        events.add(
+                DataChangeEvent.insertEvent(
+                        myTable1,
+                        generator.generate(
+                                new Object[] {3, BinaryStringData.fromString("Carol"), 20})));
+        events.add(
+                DataChangeEvent.updateEvent(
+                        myTable1,
+                        generator.generate(
+                                new Object[] {3, BinaryStringData.fromString("Carol"), 20}),
+                        generator.generate(
+                                new Object[] {3, BinaryStringData.fromString("Carol"), 35})));
+        // Case 4: before=N, after=N -> drop
+        events.add(
+                DataChangeEvent.insertEvent(
+                        myTable1,
+                        generator.generate(
+                                new Object[] {4, BinaryStringData.fromString("Dave"), 10})));
+        events.add(
+                DataChangeEvent.updateEvent(
+                        myTable1,
+                        generator.generate(
+                                new Object[] {4, BinaryStringData.fromString("Dave"), 10}),
+                        generator.generate(
+                                new Object[] {4, BinaryStringData.fromString("Dave"), 15})));
+
+        ValuesDataSourceHelper.setSourceEvents(Collections.singletonList(events));
+
+        SourceDef sourceDef =
+                new SourceDef(ValuesDataFactory.IDENTIFIER, "Value Source", sourceConfig);
+
+        Configuration sinkConfig = new Configuration();
+        sinkConfig.set(ValuesDataSinkOptions.MATERIALIZED_IN_MEMORY, true);
+        sinkConfig.set(ValuesDataSinkOptions.SINK_API, sinkApi);
+        SinkDef sinkDef = new SinkDef(ValuesDataFactory.IDENTIFIER, "Value Sink", sinkConfig);
+
+        Configuration pipelineConfig = new Configuration();
+        pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
+        PipelineDef pipelineDef =
+                new PipelineDef(
+                        sourceDef,
+                        sinkDef,
+                        Collections.emptyList(),
+                        Collections.singletonList(
+                                new TransformDef(
+                                        "default_namespace.default_schema.\\.*",
+                                        null,
+                                        "age > 25",
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null)),
+                        Collections.emptyList(),
+                        pipelineConfig);
+
+        PipelineExecution execution = composer.compose(pipelineDef);
+        execution.execute();
+
+        String[] outputEvents = outCaptor.toString().trim().split("\n");
+
+        assertThat(outputEvents)
+                .containsExactlyInAnyOrder(
+                        "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT NOT NULL,`name` STRING,`age` INT}, primaryKeys=id, options=()}",
+                        // INSERT id=1 (age=30 passes)
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, Alice, 30], op=INSERT, meta=()}",
+                        // UPDATE id=1 (30->40): before=Y, after=Y -> UPDATE
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[1, Alice, 30], after=[1, Alice, 40], op=UPDATE, meta=()}",
+                        // INSERT id=2 (age=30 passes)
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[2, Bob, 30], op=INSERT, meta=()}",
+                        // UPDATE id=2 (30->20): before=Y, after=N -> DELETE
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[2, Bob, 30], after=[], op=DELETE, meta=()}",
+                        // UPDATE id=3 (20->35): before=N, after=Y -> INSERT
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[3, Carol, 35], op=INSERT, meta=()}");
+        // INSERT id=3 (age=20 fails), INSERT id=4 (age=10 fails),
+        // UPDATE id=4 (10->15, both fail) are all filtered out.
+    }
+
     /**
      * This tests if transform rule could be used to classify source records based on filtering
      * rules.
@@ -253,17 +382,8 @@ class FlinkPipelineTransformITCase {
                 Arrays.asList(
                         new TransformDef(
                                 "default_namespace.default_schema.\\.*",
-                                "*, 'YOUNG' AS category",
-                                "age < 20",
+                                "*, CASE WHEN age < 20 THEN 'YOUNG' WHEN age >= 20 THEN 'OLD' END AS category",
                                 null,
-                                null,
-                                null,
-                                null,
-                                null),
-                        new TransformDef(
-                                "default_namespace.default_schema.\\.*",
-                                "*, 'OLD' AS category",
-                                "age >= 20",
                                 null,
                                 null,
                                 null,
@@ -288,17 +408,8 @@ class FlinkPipelineTransformITCase {
                 Arrays.asList(
                         new TransformDef(
                                 "default_namespace.default_schema.\\.*",
-                                "id,age,'Juvenile' AS roleName",
-                                "age < 18",
+                                "id,age, CASE WHEN age < 18 THEN 'Juvenile' WHEN age >= 18 THEN name END AS roleName",
                                 null,
-                                null,
-                                null,
-                                null,
-                                null),
-                        new TransformDef(
-                                "default_namespace.default_schema.\\.*",
-                                "id,age,name AS roleName",
-                                "age >= 18",
                                 null,
                                 null,
                                 null,
@@ -317,42 +428,7 @@ class FlinkPipelineTransformITCase {
 
     @ParameterizedTest
     @EnumSource
-    void testMultiTransformWithAsterisk(ValuesDataSink.SinkApi sinkApi) throws Exception {
-        runGenericTransformTest(
-                sinkApi,
-                Arrays.asList(
-                        new TransformDef(
-                                "default_namespace.default_schema.mytable2",
-                                "*,'Juvenile' AS roleName",
-                                "age < 18",
-                                null,
-                                null,
-                                null,
-                                null,
-                                null),
-                        new TransformDef(
-                                "default_namespace.default_schema.mytable2",
-                                "id,name,age,description,name AS roleName",
-                                "age >= 18",
-                                null,
-                                null,
-                                null,
-                                null,
-                                null)),
-                Arrays.asList(
-                        "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT,`name` STRING,`age` INT}, primaryKeys=id, options=()}",
-                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, Alice, 18], op=INSERT, meta=()}",
-                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[2, Bob, 20], op=INSERT, meta=()}",
-                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[2, Bob, 20], after=[2, Bob, 30], op=UPDATE, meta=()}",
-                        "CreateTableEvent{tableId=default_namespace.default_schema.mytable2, schema=columns={`id` BIGINT NOT NULL,`name` VARCHAR(255),`age` TINYINT,`description` STRING,`roleName` STRING}, primaryKeys=id, options=()}",
-                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[3, Carol, 15, student, Juvenile], op=INSERT, meta=()}",
-                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[4, Derrida, 25, student, Derrida], op=INSERT, meta=()}",
-                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[4, Derrida, 25, student, Derrida], after=[], op=DELETE, meta=()}"));
-    }
-
-    @ParameterizedTest
-    @EnumSource
-    void testMultiTransformMissingProjection(ValuesDataSink.SinkApi sinkApi) throws Exception {
+    void testMissingProjection(ValuesDataSink.SinkApi sinkApi) throws Exception {
         runGenericTransformTest(
                 sinkApi,
                 Arrays.asList(
@@ -364,170 +440,14 @@ class FlinkPipelineTransformITCase {
                                 null,
                                 null,
                                 null,
-                                null),
-                        new TransformDef(
-                                "default_namespace.default_schema.mytable2",
-                                "id,UPPER(name) AS name,age,description",
-                                "age >= 18",
-                                null,
-                                null,
-                                null,
-                                null,
                                 null)),
                 Arrays.asList(
                         "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT,`name` STRING,`age` INT}, primaryKeys=id, options=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, Alice, 18], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[2, Bob, 20], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[2, Bob, 20], after=[2, Bob, 30], op=UPDATE, meta=()}",
-                        "CreateTableEvent{tableId=default_namespace.default_schema.mytable2, schema=columns={`id` BIGINT NOT NULL,`name` STRING,`age` TINYINT,`description` STRING}, primaryKeys=id, options=()}",
-                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[3, Carol, 15, student], op=INSERT, meta=()}",
-                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[4, DERRIDA, 25, student], op=INSERT, meta=()}",
-                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[4, DERRIDA, 25, student], after=[], op=DELETE, meta=()}"));
-    }
-
-    @ParameterizedTest
-    @EnumSource
-    @Disabled("to be fixed in FLINK-37132")
-    void testMultiTransformSchemaColumnsCompatibilityWithNullProjection(
-            ValuesDataSink.SinkApi sinkApi) {
-        TransformDef nullProjection =
-                new TransformDef(
-                        "default_namespace.default_schema.mytable2",
-                        null,
-                        "age < 18",
-                        null,
-                        null,
-                        null,
-                        null,
-                        null);
-
-        assertThatThrownBy(
-                        () ->
-                                runGenericTransformTest(
-                                        sinkApi,
-                                        Arrays.asList(
-                                                nullProjection,
-                                                new TransformDef(
-                                                        "default_namespace.default_schema.mytable2",
-                                                        // reference part column
-                                                        "id,UPPER(name) AS name",
-                                                        "age >= 18",
-                                                        null,
-                                                        null,
-                                                        null,
-                                                        null,
-                                                        null)),
-                                        Collections.emptyList()))
-                .rootCause()
-                .isExactlyInstanceOf(IllegalStateException.class)
-                .hasMessage(
-                        "Unable to merge schema columns={`id` BIGINT,`name` VARCHAR(255),`age` TINYINT,`description` STRING}, primaryKeys=id, options=() "
-                                + "and columns={`id` BIGINT,`name` STRING}, primaryKeys=id, options=() with different column counts.");
-    }
-
-    @ParameterizedTest
-    @EnumSource
-    @Disabled("to be fixed in FLINK-37132")
-    void testMultiTransformSchemaColumnsCompatibilityWithEmptyProjection(
-            ValuesDataSink.SinkApi sinkApi) {
-        TransformDef emptyProjection =
-                new TransformDef(
-                        "default_namespace.default_schema.mytable2",
-                        "",
-                        "age < 18",
-                        null,
-                        null,
-                        null,
-                        null,
-                        null);
-
-        assertThatThrownBy(
-                        () ->
-                                runGenericTransformTest(
-                                        sinkApi,
-                                        Arrays.asList(
-                                                emptyProjection,
-                                                new TransformDef(
-                                                        "default_namespace.default_schema.mytable2",
-                                                        // reference part column
-                                                        "id,UPPER(name) AS name",
-                                                        "age >= 18",
-                                                        null,
-                                                        null,
-                                                        null,
-                                                        null,
-                                                        null)),
-                                        Collections.emptyList()))
-                .rootCause()
-                .isExactlyInstanceOf(IllegalStateException.class)
-                .hasMessage(
-                        "Unable to merge schema columns={`id` BIGINT,`name` VARCHAR(255),`age` TINYINT,`description` STRING}, primaryKeys=id, options=() "
-                                + "and columns={`id` BIGINT,`name` STRING}, primaryKeys=id, options=() with different column counts.");
-    }
-
-    @ParameterizedTest
-    @EnumSource
-    void testMultiTransformWithNullEmptyAsteriskProjections(ValuesDataSink.SinkApi sinkApi)
-            throws Exception {
-        TransformDef nullProjection =
-                new TransformDef(
-                        "default_namespace.default_schema.mytable2",
-                        null,
-                        "age < 18",
-                        null,
-                        null,
-                        null,
-                        null,
-                        null);
-
-        TransformDef emptyProjection =
-                new TransformDef(
-                        "default_namespace.default_schema.mytable2",
-                        "",
-                        "age < 18",
-                        null,
-                        null,
-                        null,
-                        null,
-                        null);
-
-        TransformDef asteriskProjection =
-                new TransformDef(
-                        "default_namespace.default_schema.mytable2",
-                        "*",
-                        "age < 18",
-                        null,
-                        null,
-                        null,
-                        null,
-                        null);
-
-        runGenericTransformTest(
-                sinkApi,
-                Arrays.asList(
-                        // Setting projection as null, '', or * should be equivalent
-                        nullProjection,
-                        emptyProjection,
-                        asteriskProjection,
-                        new TransformDef(
-                                "default_namespace.default_schema.mytable2",
-                                // reference all column
-                                "id,UPPER(name) AS name,age,description",
-                                "age >= 18",
-                                null,
-                                null,
-                                null,
-                                null,
-                                null)),
-                Arrays.asList(
-                        "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT,`name` STRING,`age` INT}, primaryKeys=id, options=()}",
-                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, Alice, 18], op=INSERT, meta=()}",
-                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[2, Bob, 20], op=INSERT, meta=()}",
-                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[2, Bob, 20], after=[2, Bob, 30], op=UPDATE, meta=()}",
-                        "CreateTableEvent{tableId=default_namespace.default_schema.mytable2, schema=columns={`id` BIGINT NOT NULL,`name` STRING,`age` TINYINT,`description` STRING}, primaryKeys=id, options=()}",
-                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[3, Carol, 15, student], op=INSERT, meta=()}",
-                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[4, DERRIDA, 25, student], op=INSERT, meta=()}",
-                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[4, DERRIDA, 25, student], after=[], op=DELETE, meta=()}"));
+                        "CreateTableEvent{tableId=default_namespace.default_schema.mytable2, schema=columns={`id` BIGINT NOT NULL,`name` VARCHAR(255),`age` TINYINT,`description` STRING}, primaryKeys=id, options=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[3, Carol, 15, student], op=INSERT, meta=()}"));
     }
 
     /** This tests if transform generates metadata info correctly. */
@@ -577,11 +497,11 @@ class FlinkPipelineTransformITCase {
                                 "A Transform Block without projection or filter",
                                 null)),
                 Arrays.asList(
-                        "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT,`name` STRING,`age` INT}, primaryKeys=id;name, partitionKeys=id, options=({bucket=17, replication_num=1})}",
+                        "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT NOT NULL,`name` STRING NOT NULL,`age` INT}, primaryKeys=id;name, partitionKeys=id, options=({bucket=17, replication_num=1})}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, Alice, 18], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[2, Bob, 20], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[2, Bob, 20], after=[2, Bob, 30], op=UPDATE, meta=()}",
-                        "CreateTableEvent{tableId=default_namespace.default_schema.mytable2, schema=columns={`id` BIGINT,`name` VARCHAR(255),`age` TINYINT,`description` STRING}, primaryKeys=id;name, partitionKeys=id, options=({bucket=17, replication_num=1})}",
+                        "CreateTableEvent{tableId=default_namespace.default_schema.mytable2, schema=columns={`id` BIGINT NOT NULL,`name` VARCHAR(255) NOT NULL,`age` TINYINT,`description` STRING}, primaryKeys=id;name, partitionKeys=id, options=({bucket=17, replication_num=1})}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[3, Carol, 15, student], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[4, Derrida, 25, student], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[4, Derrida, 25, student], after=[], op=DELETE, meta=()}"));
@@ -1137,37 +1057,102 @@ class FlinkPipelineTransformITCase {
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[3, null, null, null, null, null, null], op=INSERT, meta=()}");
     }
 
-    @ParameterizedTest
-    @EnumSource
-    void testTransformMergingIncompatibleRules(ValuesDataSink.SinkApi apiVersion) {
-        Assertions.assertThatThrownBy(
-                        () ->
-                                runGenericTransformTest(
-                                        apiVersion,
-                                        Arrays.asList(
-                                                new TransformDef(
-                                                        "\\.*.\\.*.mytable1",
-                                                        "*, 'rule_1_matched' AS rule_1_matched",
-                                                        "id > 0",
-                                                        null,
-                                                        "id",
-                                                        null,
-                                                        null,
-                                                        null),
-                                                new TransformDef(
-                                                        "\\.*.\\.*.\\.*",
-                                                        "*, 'rule_fallback' AS rule_fallback",
-                                                        null,
-                                                        null,
-                                                        "id",
-                                                        null,
-                                                        null,
-                                                        null)),
-                                        Collections.emptyList()))
-                .rootCause()
-                .isExactlyInstanceOf(IllegalArgumentException.class)
-                .hasMessage(
-                        "Trying to merge transformed schemas [columns={`id` INT,`name` STRING,`age` INT,`rule_1_matched` STRING}, primaryKeys=id, partitionKeys=id, options=(), columns={`id` INT,`name` STRING,`age` INT,`rule_fallback` STRING}, primaryKeys=id, partitionKeys=id, options=()], but got more than one column name views: [[id, name, age, rule_1_matched], [id, name, age, rule_fallback]]");
+    /** This tests if transform variant functions works as expected. */
+    @Test
+    void testTransformWithVariantFunctions() throws Exception {
+        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+
+        // Setup value source
+        Configuration sourceConfig = new Configuration();
+        sourceConfig.set(
+                ValuesDataSourceOptions.EVENT_SET_ID,
+                ValuesDataSourceHelper.EventSetId.CUSTOM_SOURCE_EVENTS);
+
+        TableId myTable = TableId.tableId("default_namespace", "default_schema", "mytable1");
+        Schema tableSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT().notNull())
+                        .physicalColumn("message", DataTypes.STRING())
+                        .physicalColumn("duplicatedMessage", DataTypes.STRING())
+                        .physicalColumn("invalidMessage", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(
+                        tableSchema.getColumnDataTypes().toArray(new DataType[0]));
+        List<Event> events =
+                Arrays.asList(
+                        new CreateTableEvent(myTable, tableSchema),
+                        DataChangeEvent.insertEvent(
+                                myTable,
+                                generator.generate(
+                                        new Object[] {
+                                            1,
+                                            BinaryStringData.fromString(
+                                                    "{\"name\":\"Bob\",\"age\":30,\"is_active\":true,\"email\":\"zhangsan@example.com\",\"hobbies\":[\"reading\",\"coding\",\"traveling\"],\"address\":{\"street\":\"MainSt\",\"city\":\"Beijing\",\"zip\":\"100000\"}}"),
+                                            BinaryStringData.fromString(
+                                                    "{\"name\":\"Bob\",\"name\":\"Bob\",\"age\":30,\"is_active\":true,\"email\":\"zhangsan@example.com\",\"hobbies\":[\"reading\",\"coding\",\"traveling\"],\"address\":{\"street\":\"MainSt\",\"city\":\"Beijing\",\"zip\":\"100000\"}}"),
+                                            BinaryStringData.fromString("invalidJson"),
+                                        })),
+                        DataChangeEvent.insertEvent(
+                                myTable,
+                                generator.generate(
+                                        new Object[] {
+                                            2,
+                                            BinaryStringData.fromString(
+                                                    "{\"name\":\"Mark\",\"age\":40,\"is_active\":true,\"email\":\"lisi@example.com\",\"hobbies\":[\"reading\",\"coding\",\"traveling\"],\"address\":{\"street\":\"MainSt\",\"city\":\"Beijing\",\"zip\":\"100000\"}}"),
+                                            BinaryStringData.fromString(
+                                                    "{\"name\":\"Mark\",\"name\":\"Mark\",\"age\":40,\"is_active\":true,\"email\":\"lisi@example.com\",\"hobbies\":[\"reading\",\"coding\",\"traveling\"],\"address\":{\"street\":\"MainSt\",\"city\":\"Beijing\",\"zip\":\"100000\"}}"),
+                                            BinaryStringData.fromString("invalidJson"),
+                                        })),
+                        DataChangeEvent.insertEvent(
+                                myTable, generator.generate(new Object[] {3, null, null, null})));
+
+        ValuesDataSourceHelper.setSourceEvents(Collections.singletonList(events));
+
+        SourceDef sourceDef =
+                new SourceDef(ValuesDataFactory.IDENTIFIER, "Value Source", sourceConfig);
+
+        // Setup value sink
+        Configuration sinkConfig = new Configuration();
+        sinkConfig.set(ValuesDataSinkOptions.MATERIALIZED_IN_MEMORY, true);
+        SinkDef sinkDef = new SinkDef(ValuesDataFactory.IDENTIFIER, "Value Sink", sinkConfig);
+
+        // Setup pipeline
+        Configuration pipelineConfig = new Configuration();
+        pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
+        PipelineDef pipelineDef =
+                new PipelineDef(
+                        sourceDef,
+                        sinkDef,
+                        Collections.emptyList(),
+                        Collections.singletonList(
+                                new TransformDef(
+                                        "default_namespace.default_schema.\\.*",
+                                        "id, parse_json(message) as variantVal, parse_json(duplicatedMessage, true) as duplicatedVariantVal, try_parse_json(message) as variantVal2, try_parse_json(duplicatedMessage, true) as duplicatedVariantVal2, try_parse_json(invalidMessage) as invalidVariantVal",
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null)),
+                        Collections.emptyList(),
+                        pipelineConfig);
+
+        // Execute the pipeline
+        PipelineExecution execution = composer.compose(pipelineDef);
+        execution.execute();
+
+        // Check the order and content of all received events
+        String[] outputEvents = outCaptor.toString().trim().split("\n");
+
+        Assertions.assertThat(outputEvents)
+                .containsExactly(
+                        "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT NOT NULL,`variantVal` VARIANT,`duplicatedVariantVal` VARIANT,`variantVal2` VARIANT,`duplicatedVariantVal2` VARIANT,`invalidVariantVal` VARIANT}, primaryKeys=id, options=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, {\"address\":{\"city\":\"Beijing\",\"street\":\"MainSt\",\"zip\":\"100000\"},\"age\":30,\"email\":\"zhangsan@example.com\",\"hobbies\":[\"reading\",\"coding\",\"traveling\"],\"is_active\":true,\"name\":\"Bob\"}, {\"address\":{\"city\":\"Beijing\",\"street\":\"MainSt\",\"zip\":\"100000\"},\"age\":30,\"email\":\"zhangsan@example.com\",\"hobbies\":[\"reading\",\"coding\",\"traveling\"],\"is_active\":true,\"name\":\"Bob\"}, {\"address\":{\"city\":\"Beijing\",\"street\":\"MainSt\",\"zip\":\"100000\"},\"age\":30,\"email\":\"zhangsan@example.com\",\"hobbies\":[\"reading\",\"coding\",\"traveling\"],\"is_active\":true,\"name\":\"Bob\"}, {\"address\":{\"city\":\"Beijing\",\"street\":\"MainSt\",\"zip\":\"100000\"},\"age\":30,\"email\":\"zhangsan@example.com\",\"hobbies\":[\"reading\",\"coding\",\"traveling\"],\"is_active\":true,\"name\":\"Bob\"}, null], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[2, {\"address\":{\"city\":\"Beijing\",\"street\":\"MainSt\",\"zip\":\"100000\"},\"age\":40,\"email\":\"lisi@example.com\",\"hobbies\":[\"reading\",\"coding\",\"traveling\"],\"is_active\":true,\"name\":\"Mark\"}, {\"address\":{\"city\":\"Beijing\",\"street\":\"MainSt\",\"zip\":\"100000\"},\"age\":40,\"email\":\"lisi@example.com\",\"hobbies\":[\"reading\",\"coding\",\"traveling\"],\"is_active\":true,\"name\":\"Mark\"}, {\"address\":{\"city\":\"Beijing\",\"street\":\"MainSt\",\"zip\":\"100000\"},\"age\":40,\"email\":\"lisi@example.com\",\"hobbies\":[\"reading\",\"coding\",\"traveling\"],\"is_active\":true,\"name\":\"Mark\"}, {\"address\":{\"city\":\"Beijing\",\"street\":\"MainSt\",\"zip\":\"100000\"},\"age\":40,\"email\":\"lisi@example.com\",\"hobbies\":[\"reading\",\"coding\",\"traveling\"],\"is_active\":true,\"name\":\"Mark\"}, null], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[3, null, null, null, null, null], op=INSERT, meta=()}");
     }
 
     @ParameterizedTest
@@ -1197,6 +1182,40 @@ class FlinkPipelineTransformITCase {
                 Arrays.asList(
                         "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT NOT NULL,`name` STRING,`age` INT,`rule_1_matched` STRING}, primaryKeys=id, partitionKeys=id, options=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, Alice, 18, rule_1_matched], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[2, Bob, 20, rule_1_matched], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[2, Bob, 20, rule_1_matched], after=[2, Bob, 30, rule_1_matched], op=UPDATE, meta=()}",
+                        "CreateTableEvent{tableId=default_namespace.default_schema.mytable2, schema=columns={`id` BIGINT NOT NULL,`name` VARCHAR(255),`age` TINYINT,`description` STRING,`rule_fallback` STRING}, primaryKeys=id, partitionKeys=id, options=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[3, Carol, 15, student, rule_fallback], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[4, Derrida, 25, student, rule_fallback], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[4, Derrida, 25, student, rule_fallback], after=[], op=DELETE, meta=()}"));
+    }
+
+    @ParameterizedTest
+    @EnumSource
+    void testTransformFilterWithFallbackRules(ValuesDataSink.SinkApi apiVersion) throws Exception {
+        runGenericTransformTest(
+                apiVersion,
+                Arrays.asList(
+                        new TransformDef(
+                                "\\.*.\\.*.mytable1",
+                                "*, 'rule_1_matched' AS rule_1_matched",
+                                "id > 1",
+                                null,
+                                "id",
+                                null,
+                                null,
+                                null),
+                        new TransformDef(
+                                "\\.*.\\.*.\\.*",
+                                "*, 'rule_fallback' AS rule_fallback",
+                                null,
+                                null,
+                                "id",
+                                null,
+                                null,
+                                null)),
+                Arrays.asList(
+                        "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT NOT NULL,`name` STRING,`age` INT,`rule_1_matched` STRING}, primaryKeys=id, partitionKeys=id, options=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[2, Bob, 20, rule_1_matched], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[2, Bob, 20, rule_1_matched], after=[2, Bob, 30, rule_1_matched], op=UPDATE, meta=()}",
                         "CreateTableEvent{tableId=default_namespace.default_schema.mytable2, schema=columns={`id` BIGINT NOT NULL,`name` VARCHAR(255),`age` TINYINT,`description` STRING,`rule_fallback` STRING}, primaryKeys=id, partitionKeys=id, options=()}",
@@ -2032,7 +2051,7 @@ class FlinkPipelineTransformITCase {
         assertThat(outputEvents)
                 .containsExactly(
                         // Initial stage
-                        "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT,`name` STRING,`age` INT}, primaryKeys=name, partitionKeys=id;name, options=()}",
+                        "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT,`name` STRING NOT NULL,`age` INT}, primaryKeys=name, partitionKeys=id;name, options=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, Alice, 21], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[2, Barcarolle, 22], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[3, Cecily, 23], op=INSERT, meta=()}",
@@ -2048,7 +2067,7 @@ class FlinkPipelineTransformITCase {
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[3rd, 6, Fiona, 26, 3], after=[], op=DELETE, meta=()}",
 
                         // Alter column type stage
-                        "AlterColumnTypeEvent{tableId=default_namespace.default_schema.mytable1, typeMapping={gender=INT, name=VARCHAR(17), age=DOUBLE}, oldTypeMapping={gender=TINYINT, name=STRING, age=INT}}",
+                        "AlterColumnTypeEvent{tableId=default_namespace.default_schema.mytable1, typeMapping={gender=INT, name=VARCHAR(17), age=DOUBLE}, oldTypeMapping={gender=TINYINT, name=STRING NOT NULL, age=INT}}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[4th, 7, Gem, 19.0, -1], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[5th, 8, Helen, 18.0, -2], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[5th, 8, Helen, 18.0, -2], after=[5th, 8, Harry, 18.0, -3], op=UPDATE, meta=()}",
@@ -2617,7 +2636,6 @@ class FlinkPipelineTransformITCase {
                                 + "to schema\n"
                                 + "\t(Unknown).")
                 .rootCause()
-                .isExactlyInstanceOf(SqlValidatorException.class)
                 .hasMessage("Column 'id1' not found in any table");
 
         // Unexpected column in filter rule
@@ -2638,10 +2656,9 @@ class FlinkPipelineTransformITCase {
                 .cause()
                 .isExactlyInstanceOf(FlinkRuntimeException.class)
                 .hasMessage(
-                        "Failed to compile expression TransformExpressionKey{expression='import static org.apache.flink.cdc.runtime.functions.SystemFunctionUtils.*;greaterThan($0, 0)', argumentNames=[__time_zone__, __epoch_time__], argumentClasses=[class java.lang.String, class java.lang.Long], returnClass=class java.lang.Boolean, columnNameMap={id1=$0}}")
+                        "Failed to compile expression TransformExpressionKey{originalExpression='id1 > 0', compiledExpression='greaterThan($0, 0)', argumentNames=[__time_zone__, __epoch_time__], argumentClasses=[class java.lang.String, class java.lang.Long], returnClass=class java.lang.Boolean, columnNameMap={id1=$0}}")
                 .cause()
-                .hasMessageContaining(
-                        "Expression: import static org.apache.flink.cdc.runtime.functions.SystemFunctionUtils.*;greaterThan($0, 0)")
+                .hasMessageContaining("Compiled expression: greaterThan($0, 0)")
                 .hasMessageContaining("Column name map: {$0 -> id1}")
                 .rootCause()
                 .isExactlyInstanceOf(CompileException.class)
@@ -2684,7 +2701,7 @@ class FlinkPipelineTransformITCase {
                 .cause()
                 .isExactlyInstanceOf(RuntimeException.class)
                 .hasMessageContaining(
-                        "Failed to evaluate projection expression `castToInteger($0) + 1` for column `new_name` in table `default_namespace.default_schema.mytable1`")
+                        "Failed to evaluate projection expression `CAST(`TB`.`name` AS INTEGER) + 1` for column `new_name` in table `default_namespace.default_schema.mytable1`")
                 .hasMessageContaining("Column name map: {$0 -> name}");
 
         // Unsupported operations in filter rule
@@ -2705,8 +2722,10 @@ class FlinkPipelineTransformITCase {
                 .cause()
                 .isExactlyInstanceOf(RuntimeException.class)
                 .hasMessageContaining(
-                        "Failed to evaluate filtering expression `greaterThan($0 + 1, 0)` for table `default_namespace.default_schema.mytable1`")
-                .hasMessageContaining("Column name map: {$0 -> name}")
+                        "Failed to evaluate filtering expression for table `default_namespace.default_schema.mytable1`.\n"
+                                + "\tOriginal expression: name + 1 > 0\n"
+                                + "\tCompiled expression: greaterThan($0 + 1, 0)\n"
+                                + "\tColumn name map: {$0 -> name}")
                 .rootCause()
                 .isExactlyInstanceOf(RuntimeException.class)
                 .hasMessage(
@@ -2995,6 +3014,32 @@ class FlinkPipelineTransformITCase {
                         "CreateTableEvent{tableId=default_namespace.default_schema.my_table, schema=columns={`id` INT NOT NULL,`date_0` DATE,`time_0` TIME(0),`time_3` TIME(3),`time_6` TIME(6),`time_9` TIME(9),`date_0_str` STRING,`time_0_str` STRING,`time_3_str` STRING,`time_6_str` STRING,`time_9_str` STRING}, primaryKeys=id, options=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.my_table, before=[], after=[1, 1999-12-31, 21:48:25, 21:48:25.123, 21:48:25.123, 21:48:25.123, 1999-12-31, 21:48:25, 21:48:25.123, 21:48:25.123, 21:48:25.123], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.my_table, before=[], after=[2, null, null, null, null, null, null, null, null, null, null], op=INSERT, meta=()}");
+    }
+
+    @ParameterizedTest
+    @EnumSource
+    void testPostTransformConvertersWoProjection(ValuesDataSink.SinkApi sinkApi) throws Exception {
+        runGenericTransformTest(
+                sinkApi,
+                Collections.singletonList(
+                        new TransformDef(
+                                "default_namespace.default_schema.\\.*",
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                "SOFT_DELETE")),
+                Arrays.asList(
+                        "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT NOT NULL,`name` STRING,`age` INT}, primaryKeys=id, options=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, Alice, 18], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[2, Bob, 20], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[2, Bob, 20], after=[2, Bob, 30], op=UPDATE, meta=()}",
+                        "CreateTableEvent{tableId=default_namespace.default_schema.mytable2, schema=columns={`id` BIGINT NOT NULL,`name` VARCHAR(255),`age` TINYINT,`description` STRING}, primaryKeys=id, options=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[3, Carol, 15, student], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[4, Derrida, 25, student], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[4, Derrida, 25, student], op=INSERT, meta=()}"));
     }
 
     private List<Event> generateFloorCeilAndRoundEvents(TableId tableId) {

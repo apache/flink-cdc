@@ -24,6 +24,7 @@ import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.common.source.EventSourceProvider;
 import org.apache.flink.cdc.common.source.FlinkSourceProvider;
 import org.apache.flink.cdc.common.source.MetadataAccessor;
+import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.connectors.base.config.SourceConfig;
 import org.apache.flink.cdc.connectors.base.source.jdbc.JdbcIncrementalSource;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceRecords;
@@ -65,8 +66,14 @@ public class PostgresDataSource implements DataSource {
 
     @Override
     public EventSourceProvider getEventSourceProvider() {
+        String databaseName = postgresSourceConfig.getDatabaseList().get(0);
+        boolean includeDatabaseInTableId = postgresSourceConfig.isIncludeDatabaseInTableId();
         DebeziumEventDeserializationSchema deserializer =
-                new PostgresEventDeserializer(DebeziumChangelogMode.ALL, readableMetadataList);
+                new PostgresEventDeserializer(
+                        DebeziumChangelogMode.ALL,
+                        readableMetadataList,
+                        includeDatabaseInTableId,
+                        databaseName);
 
         PostgresOffsetFactory postgresOffsetFactory = new PostgresOffsetFactory();
         PostgresDialect postgresDialect = new PostgresDialect(postgresSourceConfig);
@@ -90,6 +97,23 @@ public class PostgresDataSource implements DataSource {
     @VisibleForTesting
     public PostgresSourceConfig getPostgresSourceConfig() {
         return postgresSourceConfig;
+    }
+
+    @Override
+    public SupportedMetadataColumn[] supportedMetadataColumns() {
+        return new SupportedMetadataColumn[] {
+            new OpTsMetadataColumn(),
+            new TableNameMetadataColumn(),
+            new DatabaseNameMetadataColumn(),
+            new SchemaNameMetadataColumn()
+        };
+    }
+
+    @Override
+    public boolean isParallelMetadataSource() {
+        // During incremental stage, PostgreSQL never emits schema change events on different
+        // partitions (since it has one WAL stream only.)
+        return false;
     }
 
     /** The {@link JdbcIncrementalSource} implementation for Postgres. */

@@ -16,84 +16,161 @@
 # Pull Request Labeler Github Action Configuration: https://github.com/marketplace/actions/labeler
 
 build:
-  - .github/**/*
-  - .idea/**/*
-  - tools/**/*
-  - .gitignore
-  - azure-pipelines.yml
-  - pom.xml
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/**/*'
+          - '.idea/**/*'
+          - 'tools/**/*'
+          - '.gitignore'
+          - 'azure-pipelines.yml'
+          - 'pom.xml'
+
 docs:
-  - docs/**/*
-  - README.md
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'docs/**/*'
+          - 'README.md'
+
 cli:
-  - flink-cdc-cli/**/*
+  - changed-files:
+      - any-glob-to-any-file: 'flink-cdc-cli/**/*'
+
 common:
-  - flink-cdc-common/**/*
+  - changed-files:
+      - any-glob-to-any-file: 'flink-cdc-common/**/*'
+
 composer:
-  - flink-cdc-composer/**/*
+  - changed-files:
+      - any-glob-to-any-file: 'flink-cdc-composer/**/*'
+
 dist:
-  - flink-cdc-dist/**/*
+  - changed-files:
+      - any-glob-to-any-file: 'flink-cdc-dist/**/*'
+
 runtime:
-  - flink-cdc-runtime/**/*
+  - changed-files:
+      - any-glob-to-any-file: 'flink-cdc-runtime/**/*'
+
 e2e-tests:
-  - flink-cdc-e2e-tests/**/*
+  - changed-files:
+      - any-glob-to-any-file: 'flink-cdc-e2e-tests/**/*'
+
 migration-tests:
-  - flink-cdc-migration-tests/**/*
+  - changed-files:
+      - any-glob-to-any-file: 'flink-cdc-migration-tests/**/*'
+
 add-ons:
-  - flink-cdc-pipeline-model/**/*
-  - flink-cdc-pipeline-udf-examples/**/*
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'flink-cdc-pipeline-model/**/*'
+          - 'flink-cdc-pipeline-udf-examples/**/*'
+
 base:
-  - flink-cdc-connect/flink-cdc-source-connectors/flink-cdc-base/**/*
+  - changed-files:
+      - any-glob-to-any-file: 'flink-cdc-connect/flink-cdc-source-connectors/flink-cdc-base/**/*'
+
 debezium:
-  - flink-cdc-connect/flink-cdc-source-connectors/flink-connector-debezium/**/*
+  - changed-files:
+      - any-glob-to-any-file: 'flink-cdc-connect/flink-cdc-source-connectors/flink-connector-debezium/**/*'
+
 connector-test-util:
-  - flink-cdc-connect/flink-cdc-source-connectors/flink-connector-test-util/**/*
+  - changed-files:
+      - any-glob-to-any-file: 'flink-cdc-connect/flink-cdc-source-connectors/flink-connector-test-util/**/*'
+
 db2-cdc-connector:
-  - flink-cdc-connect/flink-cdc-source-connectors/flink-connector-db2-cdc/**/*
-  - flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-db2-cdc/**/*
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'flink-cdc-connect/flink-cdc-source-connectors/flink-connector-db2-cdc/**/*'
+          - 'flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-db2-cdc/**/*'
+
 mongodb-cdc-connector:
-  - flink-cdc-connect/flink-cdc-source-connectors/flink-connector-mongodb-cdc/**/*
-  - flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-mongodb-cdc/**/*
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'flink-cdc-connect/flink-cdc-source-connectors/flink-connector-mongodb-cdc/**/*'
+          - 'flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-mongodb-cdc/**/*'
+
 mysql-cdc-connector:
-  - flink-cdc-connect/flink-cdc-source-connectors/flink-connector-mysql-cdc/**/*
-  - flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-mysql-cdc/**/*
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'flink-cdc-connect/flink-cdc-source-connectors/flink-connector-mysql-cdc/**/*'
+          - 'flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-mysql-cdc/**/*'
+
 oceanbase-cdc-connector:
-  - flink-cdc-connect/flink-cdc-source-connectors/flink-connector-oceanbase-cdc/**/*
-  - flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-oceanbase-cdc/**/*
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'flink-cdc-connect/flink-cdc-source-connectors/flink-connector-oceanbase-cdc/**/*'
+          - 'flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-oceanbase-cdc/**/*'
+
 oracle-cdc-connector:
-  - flink-cdc-connect/flink-cdc-source-connectors/flink-connector-oracle-cdc/**/*
-  - flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-oracle-cdc/**/*
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'flink-cdc-connect/flink-cdc-source-connectors/flink-connector-oracle-cdc/**/*'
+          - 'flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-oracle-cdc/**/*'
+
 postgres-cdc-connector:
-  - flink-cdc-connect/flink-cdc-source-connectors/flink-connector-postgres-cdc/**/*
-  - flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-postgres-cdc/**/*
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'flink-cdc-connect/flink-cdc-source-connectors/flink-connector-postgres-cdc/**/*'
+          - 'flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-postgres-cdc/**/*'
+
 sqlserver-cdc-connector:
-  - flink-cdc-connect/flink-cdc-source-connectors/flink-connector-sqlserver-cdc/**/*
-  - flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-sqlserver-cdc/**/*
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'flink-cdc-connect/flink-cdc-source-connectors/flink-connector-sqlserver-cdc/**/*'
+          - 'flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-sqlserver-cdc/**/*'
+
 tidb-cdc-connector:
-  - flink-cdc-connect/flink-cdc-source-connectors/flink-connector-tidb-cdc/**/*
-  - flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-tidb-cdc/**/*
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'flink-cdc-connect/flink-cdc-source-connectors/flink-connector-tidb-cdc/**/*'
+          - 'flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-tidb-cdc/**/*'
+
 vitess-cdc-connector:
-  - flink-cdc-connect/flink-cdc-source-connectors/flink-connector-vitess-cdc/**/*
-  - flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-vitess-cdc/**/*
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'flink-cdc-connect/flink-cdc-source-connectors/flink-connector-vitess-cdc/**/*'
+          - 'flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-vitess-cdc/**/*'
+
 values-pipeline-connector:
-  - flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-values/**/*
+  - changed-files:
+      - any-glob-to-any-file: 'flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-values/**/*'
+
 mysql-pipeline-connector:
-  - flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-mysql/**/*
+  - changed-files:
+      - any-glob-to-any-file: 'flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-mysql/**/*'
+
 paimon-pipeline-connector:
-  - flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-paimon/**/*
+  - changed-files:
+      - any-glob-to-any-file: 'flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-paimon/**/*'
+
 kafka-pipeline-connector:
-  - flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-kafka/**/*
+  - changed-files:
+      - any-glob-to-any-file: 'flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-kafka/**/*'
+
 doris-pipeline-connector:
-  - flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-doris/**/*
+  - changed-files:
+      - any-glob-to-any-file: 'flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-doris/**/*'
+
 starrocks-pipeline-connector:
-  - flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-starrocks/**/*
+  - changed-files:
+      - any-glob-to-any-file: 'flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-starrocks/**/*'
+
 elasticsearch-pipeline-connector:
-  - flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-elasticsearch/**/*
+  - changed-files:
+      - any-glob-to-any-file: 'flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-elasticsearch/**/*'
+
 oceanbase-pipeline-connector:
-  - flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-oceanbase/**/*
+  - changed-files:
+      - any-glob-to-any-file: 'flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-oceanbase/**/*'
+
 maxcompute-pipeline-connector:
-  - flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-maxcompute/**/*
+  - changed-files:
+      - any-glob-to-any-file: 'flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-maxcompute/**/*'
+
 iceberg-pipeline-connector:
-  - flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-iceberg/**/*
+  - changed-files:
+      - any-glob-to-any-file: 'flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-iceberg/**/*'
+
 postgres-pipeline-connector:
-  - flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-postgres/**/*
+  - changed-files:
+      - any-glob-to-any-file: 'flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-postgres/**/*'

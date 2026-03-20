@@ -31,6 +31,7 @@ import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
+import org.apache.flink.cdc.common.pipeline.RouteMode;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
@@ -52,12 +53,13 @@ import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
 import org.apache.flink.test.junit5.MiniClusterExtension;
 
+import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
-import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -420,78 +422,6 @@ class FlinkPipelineComposerITCase {
                         "DropColumnEvent{tableId=default_namespace.default_schema.table1, droppedColumnNames=[newCol2]}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[1, 1, 10, -D, 4], after=[], op=DELETE, meta=({op_ts=4})}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[2, , 20, -U, 5], after=[2, x, 20, +U, 5], op=UPDATE, meta=({op_ts=5})}");
-    }
-
-    @ParameterizedTest
-    @EnumSource
-    void testTransformTwice(ValuesDataSink.SinkApi sinkApi) throws Exception {
-        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
-
-        // Setup value source
-        Configuration sourceConfig = new Configuration();
-        sourceConfig.set(
-                ValuesDataSourceOptions.EVENT_SET_ID,
-                ValuesDataSourceHelper.EventSetId.TRANSFORM_TABLE);
-        SourceDef sourceDef =
-                new SourceDef(ValuesDataFactory.IDENTIFIER, "Value Source", sourceConfig);
-
-        // Setup value sink
-        Configuration sinkConfig = new Configuration();
-        sinkConfig.set(ValuesDataSinkOptions.MATERIALIZED_IN_MEMORY, true);
-        sinkConfig.set(ValuesDataSinkOptions.SINK_API, sinkApi);
-        SinkDef sinkDef = new SinkDef(ValuesDataFactory.IDENTIFIER, "Value Sink", sinkConfig);
-
-        // Setup transform
-        TransformDef transformDef1 =
-                new TransformDef(
-                        "default_namespace.default_schema.table1",
-                        "*,concat(col1,'1') as col12",
-                        "col1 = '1' OR col1 = '999'",
-                        "col1",
-                        "col12",
-                        "key1=value1",
-                        "",
-                        null);
-        TransformDef transformDef2 =
-                new TransformDef(
-                        "default_namespace.default_schema.table1",
-                        "*,concat(col1,'2') as col12",
-                        "col1 = '2'",
-                        null,
-                        null,
-                        null,
-                        "",
-                        null);
-        // Setup pipeline
-        Configuration pipelineConfig = new Configuration();
-        pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
-        pipelineConfig.set(
-                PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
-        PipelineDef pipelineDef =
-                new PipelineDef(
-                        sourceDef,
-                        sinkDef,
-                        Collections.emptyList(),
-                        new ArrayList<>(Arrays.asList(transformDef1, transformDef2)),
-                        Collections.emptyList(),
-                        pipelineConfig);
-
-        // Execute the pipeline
-        PipelineExecution execution = composer.compose(pipelineDef);
-        execution.execute();
-
-        // Check the order and content of all received events
-        String[] outputEvents = outCaptor.toString().trim().split("\n");
-        assertThat(outputEvents)
-                .containsExactly(
-                        "CreateTableEvent{tableId=default_namespace.default_schema.table1, schema=columns={`col1` STRING NOT NULL,`col2` STRING,`col12` STRING}, primaryKeys=col1, partitionKeys=col12, options=({key1=value1})}",
-                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[1, 1, 11], op=INSERT, meta=({op_ts=1})}",
-                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[2, 2, 22], op=INSERT, meta=({op_ts=2})}",
-                        "AddColumnEvent{tableId=default_namespace.default_schema.table1, addedColumns=[ColumnWithPosition{column=`col3` STRING, position=AFTER, existedColumnName=col2}]}",
-                        "RenameColumnEvent{tableId=default_namespace.default_schema.table1, nameMapping={col2=newCol2, col3=newCol3}}",
-                        "DropColumnEvent{tableId=default_namespace.default_schema.table1, droppedColumnNames=[newCol2]}",
-                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[1, 1, 11], after=[], op=DELETE, meta=({op_ts=4})}",
-                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[2, , 22], after=[2, x, 22], op=UPDATE, meta=({op_ts=5})}");
     }
 
     @ParameterizedTest
@@ -1657,6 +1587,146 @@ class FlinkPipelineComposerITCase {
         }
 
         return events;
+    }
+
+    @ParameterizedTest
+    @EnumSource
+    void testRouteModeFirstMatch(ValuesDataSink.SinkApi sinkApi) throws Exception {
+        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+
+        // Setup value source
+        Configuration sourceConfig = new Configuration();
+        sourceConfig.set(
+                ValuesDataSourceOptions.EVENT_SET_ID,
+                ValuesDataSourceHelper.EventSetId.SINGLE_SPLIT_MULTI_TABLES);
+        SourceDef sourceDef =
+                new SourceDef(ValuesDataFactory.IDENTIFIER, "Value Source", sourceConfig);
+
+        // Setup value sink
+        Configuration sinkConfig = new Configuration();
+        sinkConfig.set(ValuesDataSinkOptions.MATERIALIZED_IN_MEMORY, true);
+        sinkConfig.set(ValuesDataSinkOptions.SINK_API, sinkApi);
+        SinkDef sinkDef = new SinkDef(ValuesDataFactory.IDENTIFIER, "Value Sink", sinkConfig);
+
+        TableId routedTable1 = TableId.tableId("default_namespace", "default_schema", "routed1");
+        TableId routedTable2 = TableId.tableId("default_namespace", "default_schema", "routed2");
+        TableId routedAll = TableId.tableId("default_namespace", "default_schema", "routed_all");
+        List<RouteDef> routeDef =
+                Arrays.asList(
+                        new RouteDef(TABLE_1.toString(), routedTable1.toString(), null, null),
+                        new RouteDef(TABLE_2.toString(), routedTable2.toString(), null, null),
+                        new RouteDef(
+                                "default_namespace.default_schema.table\\.*",
+                                routedAll.toString(),
+                                null,
+                                null));
+
+        // Setup pipeline with first-match route mode
+        Configuration pipelineConfig = new Configuration();
+        pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
+        pipelineConfig.set(
+                PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
+        pipelineConfig.set(PipelineOptions.PIPELINE_ROUTE_MODE, RouteMode.FIRST_MATCH);
+        PipelineDef pipelineDef =
+                new PipelineDef(
+                        sourceDef,
+                        sinkDef,
+                        routeDef,
+                        Collections.emptyList(),
+                        Collections.emptyList(),
+                        pipelineConfig);
+
+        // Execute the pipeline
+        PipelineExecution execution = composer.compose(pipelineDef);
+        execution.execute();
+
+        // Check result in ValuesDatabase
+        // With first-match mode, tables should only be routed to their first matching route
+        List<String> routed1Results = ValuesDatabase.getResults(routedTable1);
+        assertThat(routed1Results)
+                .contains(
+                        "default_namespace.default_schema.routed1:col1=2;newCol3=x",
+                        "default_namespace.default_schema.routed1:col1=3;newCol3=");
+        List<String> routed2Results = ValuesDatabase.getResults(routedTable2);
+        assertThat(routed2Results)
+                .contains(
+                        "default_namespace.default_schema.routed2:col1=1;col2=1",
+                        "default_namespace.default_schema.routed2:col1=2;col2=2",
+                        "default_namespace.default_schema.routed2:col1=3;col2=3");
+
+        List<String> allResults = ValuesDatabase.getAllResults();
+        assertThat(allResults).noneMatch(result -> result.startsWith(routedAll.toString()));
+    }
+
+    @ParameterizedTest
+    @EnumSource
+    void testRouteModeAllMatch(ValuesDataSink.SinkApi sinkApi) throws Exception {
+        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+
+        // Setup value source
+        Configuration sourceConfig = new Configuration();
+        sourceConfig.set(
+                ValuesDataSourceOptions.EVENT_SET_ID,
+                ValuesDataSourceHelper.EventSetId.SINGLE_SPLIT_MULTI_TABLES);
+        SourceDef sourceDef =
+                new SourceDef(ValuesDataFactory.IDENTIFIER, "Value Source", sourceConfig);
+
+        // Setup value sink
+        Configuration sinkConfig = new Configuration();
+        sinkConfig.set(ValuesDataSinkOptions.MATERIALIZED_IN_MEMORY, true);
+        sinkConfig.set(ValuesDataSinkOptions.SINK_API, sinkApi);
+        SinkDef sinkDef = new SinkDef(ValuesDataFactory.IDENTIFIER, "Value Sink", sinkConfig);
+
+        TableId routedTable1 = TableId.tableId("default_namespace", "default_schema", "routed1");
+        TableId routedTable2 = TableId.tableId("default_namespace", "default_schema", "routed2");
+        TableId routedAll = TableId.tableId("default_namespace", "default_schema", "routed_all");
+        List<RouteDef> routeDef =
+                Arrays.asList(
+                        new RouteDef(TABLE_1.toString(), routedTable1.toString(), null, null),
+                        new RouteDef(TABLE_2.toString(), routedTable2.toString(), null, null),
+                        new RouteDef(
+                                "default_namespace.default_schema.table\\.*",
+                                routedAll.toString(),
+                                null,
+                                null));
+
+        // Setup pipeline with all-match route mode
+        Configuration pipelineConfig = new Configuration();
+        pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
+        pipelineConfig.set(
+                PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
+        pipelineConfig.set(PipelineOptions.PIPELINE_ROUTE_MODE, RouteMode.ALL_MATCH);
+        PipelineDef pipelineDef =
+                new PipelineDef(
+                        sourceDef,
+                        sinkDef,
+                        routeDef,
+                        Collections.emptyList(),
+                        Collections.emptyList(),
+                        pipelineConfig);
+
+        // Execute the pipeline
+        PipelineExecution execution = composer.compose(pipelineDef);
+        execution.execute();
+
+        // Check result in ValuesDatabase
+        // With all-match mode, tables should be routed to all matching routes
+        List<String> routed1Results = ValuesDatabase.getResults(routedTable1);
+        assertThat(routed1Results)
+                .contains(
+                        "default_namespace.default_schema.routed1:col1=2;newCol3=x",
+                        "default_namespace.default_schema.routed1:col1=3;newCol3=");
+        List<String> routed2Results = ValuesDatabase.getResults(routedTable2);
+        assertThat(routed2Results)
+                .contains(
+                        "default_namespace.default_schema.routed2:col1=1;col2=1",
+                        "default_namespace.default_schema.routed2:col1=2;col2=2",
+                        "default_namespace.default_schema.routed2:col1=3;col2=3");
+
+        List<String> routedAllResults = ValuesDatabase.getResults(routedAll);
+        assertThat(routedAllResults).isNotEmpty();
+        assertThat(routedAllResults.stream().filter(s -> s.contains("routed_all")).count())
+                .isGreaterThan(0);
     }
 
     BinaryRecordData generate(Schema schema, Object... fields) {

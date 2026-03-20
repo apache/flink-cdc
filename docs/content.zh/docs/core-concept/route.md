@@ -39,6 +39,29 @@ under the License.
 
 一个 Route 模块可以包含一个或多个 source-table/sink-table 规则。
 
+# 路由模式
+默认情况下，所有匹配的路由规则都会被应用到表上。你可以在 pipeline 配置中通过 `route-mode` 选项来改变这一行为：
+
+| 值            | 描述                                              |
+|--------------|-------------------------------------------------|
+| `ALL_MATCH`  | 应用所有匹配的路由规则到表上。这是默认模式。                          |
+| `FIRST_MATCH`| 只应用第一个匹配的路由规则，并停止后续规则的计算。                       |
+
+例如，使用 `FIRST_MATCH` 模式：
+
+```yaml
+pipeline:
+  name: Sync MySQL Database to Doris
+  parallelism: 2
+  route-mode: FIRST_MATCH
+```
+
+{{< hint info >}}
+
+当使用 `FIRST_MATCH` 模式时，路由规则会按照定义的顺序进行计算。第一个匹配源表的规则会被应用，后续的规则将被跳过。
+
+{{< /hint >}}
+
 # 示例
 ## 路由一个 Data Source 表到一个 Data Sink 表
 如果同步一个 `mydb` 数据库中的 `web_order` 表到一个相同库的 `ods_web_order` 表，我们可以使用下面的 yaml 文件来定义这个路由：
@@ -86,3 +109,24 @@ route:
 ```
 
 然后，`source_db` 库下所有的表都会被同步到 `sink_db` 库下。
+
+## 高级：基于正则捕获组的替换规则
+
+您可以在 `source-table` 字段中定义正则表达式的捕获组：
+
+```yaml
+route:
+  - source-table: db_(\.*).(\.*)_tbl
+    sink-table: sink_db_$1.sink_table_$2
+```
+
+这里我们创建了两个捕获组，分别用来匹配数据库名 `db_` 之后的后缀和表名 `_tbl` 之前的前缀。
+
+以上游表 `db_foo.bar_tbl` 为例，我们将会从中提取出 `(foo, bar)` 作为捕获组，并且将其依次绑定到 `$1` 和 `$2` 变量中。
+因此，这张表将被路由到 `sink_db_foo.sink_table_bar` 下游表中。
+
+{{< hint info >}}
+
+注意：基于正则捕获组的替换规则无法与 `replace-symbol` 选项搭配使用。
+
+{{< /hint >}}

@@ -28,6 +28,10 @@ public class StoppableChangeEventSourceContext
 
     private volatile boolean isRunning = true;
 
+    public void startChangeEventSource() {
+        isRunning = true;
+    }
+
     public void stopChangeEventSource() {
         isRunning = false;
     }

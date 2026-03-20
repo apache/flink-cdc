@@ -38,8 +38,8 @@ import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.assertj.core.api.Assertions;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.sql.SQLException;
@@ -64,10 +64,9 @@ class SnapshotSplitReaderTest extends MySqlSourceTestBase {
     private static BinaryLogClient binaryLogClient;
     private static MySqlConnection mySqlConnection;
 
-    @BeforeAll
-    public static void init() {
+    @BeforeEach
+    public void beforeEach() {
         customerDatabase.createAndInitialize();
-        customer3_0Database.createAndInitialize();
         MySqlSourceConfig sourceConfig =
                 getConfig(customerDatabase, new String[] {"customers"}, 10);
         mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig);
@@ -76,8 +75,8 @@ class SnapshotSplitReaderTest extends MySqlSourceTestBase {
                         sourceConfig.getDbzConfiguration(), mySqlConnection);
     }
 
-    @AfterAll
-    public static void afterClass() throws Exception {
+    @AfterEach
+    public void afterEach() throws Exception {
         if (mySqlConnection != null) {
             mySqlConnection.close();
         }
@@ -85,6 +84,7 @@ class SnapshotSplitReaderTest extends MySqlSourceTestBase {
         if (binaryLogClient != null) {
             binaryLogClient.disconnect();
         }
+        customerDatabase.dropDatabase();
     }
 
     @Test
@@ -115,6 +115,7 @@ class SnapshotSplitReaderTest extends MySqlSourceTestBase {
 
     @Test
     void testReadSingleSnapshotSplitWithDotName() throws Exception {
+        customer3_0Database.createAndInitialize();
         MySqlSourceConfig sourceConfig =
                 getConfig(customer3_0Database, new String[] {"customers3.0"}, 4);
         MySqlConnection mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig);
@@ -149,6 +150,9 @@ class SnapshotSplitReaderTest extends MySqlSourceTestBase {
                 };
         List<String> actual =
                 readTableSnapshotSplits(mySqlSplits, statefulTaskContext, 1, dataType);
+        mySqlConnection.close();
+        binaryLogClient.disconnect();
+
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
     }
 
@@ -565,6 +569,65 @@ class SnapshotSplitReaderTest extends MySqlSourceTestBase {
         List<String> actual =
                 readTableSnapshotSplits(
                         mySqlSplits, statefulTaskContext, 1, dataType, snapshotHooks);
+        assertEqualsInAnyOrder(Arrays.asList(expected), actual);
+    }
+
+    @Test
+    void testMultipleSplitsWithBackfill() throws Exception {
+        String tableName = "customers_even_dist";
+        String tableId = customerDatabase.getDatabaseName() + "." + tableName;
+        MySqlSourceConfig sourceConfig = getConfig(customerDatabase, new String[] {tableName}, 4);
+        StatefulTaskContext statefulTaskContext =
+                new StatefulTaskContext(sourceConfig, binaryLogClient, mySqlConnection);
+
+        // Hook to make highWatermark > lowWatermark, enforcing backfill phase
+        SnapshotPhaseHooks snapshotHooks = new SnapshotPhaseHooks();
+        snapshotHooks.setPreHighWatermarkAction(
+                (mySqlConnection, split) -> {
+                    if (split.splitId().equals(tableId + ":0")) {
+                        mySqlConnection.execute(
+                                "UPDATE " + tableId + " SET address = 'Beijing' WHERE id = 103");
+                        mySqlConnection.commit();
+                    } else if (split.splitId().equals(tableId + ":1")) {
+                        mySqlConnection.execute(
+                                "UPDATE " + tableId + " SET address = 'Beijing' WHERE id = 106");
+                        mySqlConnection.commit();
+                    } else if (split.splitId().equals(tableId + ":2")) {
+                        mySqlConnection.execute(
+                                "UPDATE " + tableId + " SET address = 'Beijing' WHERE id = 109");
+                        mySqlConnection.commit();
+                    }
+                });
+
+        final DataType dataType =
+                DataTypes.ROW(
+                        DataTypes.FIELD("id", DataTypes.BIGINT()),
+                        DataTypes.FIELD("name", DataTypes.STRING()),
+                        DataTypes.FIELD("address", DataTypes.STRING()),
+                        DataTypes.FIELD("phone_number", DataTypes.STRING()));
+        List<MySqlSplit> mySqlSplits = getMySqlSplits(sourceConfig);
+
+        String[] expected =
+                new String[] {
+                    "+I[101, user_1, Shanghai, 123567891234]",
+                    "+I[102, user_2, Shanghai, 123567891234]",
+                    "+I[103, user_3, Beijing, 123567891234]",
+                    "+I[104, user_4, Shanghai, 123567891234]",
+                    "+I[105, user_5, Shanghai, 123567891234]",
+                    "+I[106, user_6, Beijing, 123567891234]",
+                    "+I[107, user_7, Shanghai, 123567891234]",
+                    "+I[108, user_8, Shanghai, 123567891234]",
+                    "+I[109, user_9, Beijing, 123567891234]",
+                    "+I[110, user_10, Shanghai, 123567891234]"
+                };
+
+        List<String> actual =
+                readTableSnapshotSplits(
+                        mySqlSplits,
+                        statefulTaskContext,
+                        mySqlSplits.size(),
+                        dataType,
+                        snapshotHooks);
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
     }
 

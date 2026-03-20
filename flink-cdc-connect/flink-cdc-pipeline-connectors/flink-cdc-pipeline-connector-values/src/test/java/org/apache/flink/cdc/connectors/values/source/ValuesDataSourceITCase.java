@@ -18,7 +18,6 @@
 package org.apache.flink.cdc.connectors.values.source;
 
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
-import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
@@ -40,6 +39,7 @@ import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -49,6 +49,7 @@ import java.util.List;
  * different enumeration situations of {@link
  * org.apache.flink.cdc.connectors.values.source.ValuesDataSourceHelper}.
  */
+@Timeout(value = 60, unit = java.util.concurrent.TimeUnit.SECONDS)
 class ValuesDataSourceITCase {
 
     @BeforeEach
@@ -68,7 +69,6 @@ class ValuesDataSourceITCase {
     private void executeDataStreamJob(ValuesDataSourceHelper.EventSetId type) throws Exception {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.enableCheckpointing(3000);
-        env.setRestartStrategy(RestartStrategies.noRestart());
         FlinkSourceProvider sourceProvider =
                 (FlinkSourceProvider) new ValuesDataSource(type).getEventSourceProvider();
         CloseableIterator<Event> events =

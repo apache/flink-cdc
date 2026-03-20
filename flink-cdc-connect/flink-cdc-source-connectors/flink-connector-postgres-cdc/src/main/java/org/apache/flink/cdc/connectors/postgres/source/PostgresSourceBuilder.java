@@ -305,6 +305,12 @@ public class PostgresSourceBuilder<T> {
         return this;
     }
 
+    /** Whether to include database in the generated Table ID. */
+    public PostgresSourceBuilder<T> includeDatabaseInTableId(boolean includeDatabaseInTableId) {
+        this.configFactory.setIncludeDatabaseInTableId(includeDatabaseInTableId);
+        return this;
+    }
+
     /**
      * Build the {@link PostgresIncrementalSource}.
      *

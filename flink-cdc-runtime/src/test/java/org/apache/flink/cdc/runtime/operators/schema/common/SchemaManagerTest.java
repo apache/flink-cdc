@@ -27,8 +27,9 @@ import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataTypes;
 
+import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
+
 import org.junit.jupiter.api.Test;
-import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 
 import java.util.Arrays;
 import java.util.List;

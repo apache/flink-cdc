@@ -43,7 +43,6 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Objects;
 import java.util.Random;
 import java.util.stream.Stream;
 
@@ -65,16 +64,7 @@ class MongoE2eITCase extends FlinkContainerTestEnvironment {
 
     private MongoClient mongoClient;
 
-    public static String getMongoVersion() {
-        String specifiedMongoVersion = System.getProperty("specifiedMongoVersion");
-        if (Objects.isNull(specifiedMongoVersion)) {
-            throw new IllegalArgumentException(
-                    "No MongoDB version specified to run this test. Please use -DspecifiedMongoVersion to pass one.");
-        }
-        return specifiedMongoVersion;
-    }
-
-    void setup(String mongoVersion, boolean parallelismSnapshot, boolean scanFullChangelog) {
+    void setup(String mongoVersion, boolean scanFullChangelog) {
         container =
                 new MongoDBContainer("mongo:" + mongoVersion)
                         .withSharding()
@@ -123,7 +113,7 @@ class MongoE2eITCase extends FlinkContainerTestEnvironment {
     })
     void testMongoDbCDC(String mongoVersion, boolean parallelismSnapshot, boolean scanFullChangelog)
             throws Exception {
-        setup(mongoVersion, parallelismSnapshot, scanFullChangelog);
+        setup(mongoVersion, scanFullChangelog);
         String dbName =
                 container.executeCommandFileInDatabase(
                         "mongo_inventory",

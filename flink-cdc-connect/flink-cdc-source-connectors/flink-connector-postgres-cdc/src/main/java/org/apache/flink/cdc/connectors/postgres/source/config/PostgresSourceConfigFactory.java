@@ -54,6 +54,9 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
 
     private boolean includePartitionedTables;
 
+    private boolean includeDatabaseInTableId =
+            PostgresSourceOptions.TABLE_ID_INCLUDE_DATABASE.defaultValue();
+
     /** Creates a new {@link PostgresSourceConfig} for the given subtask {@code subtaskId}. */
     @Override
     public PostgresSourceConfig create(int subtaskId) {
@@ -136,7 +139,8 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
                 scanNewlyAddedTableEnabled,
                 lsnCommitCheckpointsDelay,
                 assignUnboundedChunkFirst,
-                includePartitionedTables);
+                includePartitionedTables,
+                includeDatabaseInTableId);
     }
 
     /**
@@ -188,5 +192,10 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
     /** Enable include partitioned table. */
     public void setIncludePartitionedTables(boolean includePartitionedTables) {
         this.includePartitionedTables = includePartitionedTables;
+    }
+
+    /** Set whether to include database in the generated Table ID. */
+    public void setIncludeDatabaseInTableId(boolean includeDatabaseInTableId) {
+        this.includeDatabaseInTableId = includeDatabaseInTableId;
     }
 }

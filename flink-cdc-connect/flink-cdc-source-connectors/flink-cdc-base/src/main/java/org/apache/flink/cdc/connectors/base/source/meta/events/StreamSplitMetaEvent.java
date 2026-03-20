@@ -38,6 +38,7 @@ public class StreamSplitMetaEvent implements SourceEvent {
 
     /** The metadata of stream split is divided to multiple groups. */
     private final int metaGroupId;
+
     /**
      * The serialized metadata of stream split, it's serialized/deserialized by {@link
      * FinishedSnapshotSplitInfo#serialize()} and {@link

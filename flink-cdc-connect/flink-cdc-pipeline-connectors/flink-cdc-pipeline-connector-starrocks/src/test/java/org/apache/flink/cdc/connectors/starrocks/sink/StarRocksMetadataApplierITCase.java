@@ -17,8 +17,6 @@
 
 package org.apache.flink.cdc.connectors.starrocks.sink;
 
-import org.apache.flink.api.common.restartstrategy.RestartStrategies;
-import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
@@ -47,15 +45,16 @@ import org.apache.flink.cdc.composer.flink.translator.SchemaOperatorTranslator;
 import org.apache.flink.cdc.connectors.starrocks.sink.utils.StarRocksContainer;
 import org.apache.flink.cdc.connectors.starrocks.sink.utils.StarRocksSinkTestBase;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
+import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.util.RestartStrategyUtils;
 
 import com.mysql.jdbc.exceptions.jdbc4.MySQLSyntaxErrorException;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -79,7 +78,7 @@ class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
     public static void before() {
         env.setParallelism(DEFAULT_PARALLELISM);
         env.enableCheckpointing(3000);
-        env.setRestartStrategy(RestartStrategies.noRestart());
+        RestartStrategyUtils.configureNoRestartStrategy(env);
     }
 
     @BeforeEach
@@ -163,7 +162,7 @@ class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
                 Schema.newBuilder()
                         .column(new PhysicalColumn("id", DataTypes.INT().notNull(), null))
                         .column(new PhysicalColumn("number", DataTypes.DOUBLE(), null))
-                        .column(new PhysicalColumn("name", DataTypes.VARCHAR(17), null))
+                        .column(new PhysicalColumn("name", DataTypes.VARCHAR(17).notNull(), null))
                         .primaryKey("id")
                         .build();
 
@@ -198,11 +197,11 @@ class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
         Schema schema =
                 Schema.newBuilder()
                         .column(new PhysicalColumn("id", DataTypes.INT().notNull(), "ID"))
-                        // StarRocks sink doesn't support BINARY and BYTES type yet.
-                        // .column(new PhysicalColumn("binary", DataTypes.BINARY(17), "Binary"))
-                        // .column(new PhysicalColumn("varbinary", DataTypes.VARBINARY(17), "Var
-                        // Binary"))
-                        // .column(new PhysicalColumn("bytes", DataTypes.BYTES(), "Bytes"))
+                        .column(new PhysicalColumn("binary", DataTypes.BINARY(17), "Binary"))
+                        .column(
+                                new PhysicalColumn(
+                                        "varbinary", DataTypes.VARBINARY(17), "Var Binary"))
+                        .column(new PhysicalColumn("bytes", DataTypes.BYTES(), "Bytes"))
                         .column(new PhysicalColumn("boolean", DataTypes.BOOLEAN(), "Boolean"))
                         .column(new PhysicalColumn("int", DataTypes.INT(), "Int"))
                         .column(new PhysicalColumn("tinyint", DataTypes.TINYINT(), "Tiny Int"))
@@ -214,10 +213,10 @@ class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
                         .column(new PhysicalColumn("string", DataTypes.STRING(), "String"))
                         .column(new PhysicalColumn("decimal", DataTypes.DECIMAL(17, 7), "Decimal"))
                         .column(new PhysicalColumn("date", DataTypes.DATE(), "Date"))
-                        // StarRocks sink doesn't support TIME type yet.
-                        // .column(new PhysicalColumn("time", DataTypes.TIME(), "Time"))
-                        // .column(new PhysicalColumn("time_3", DataTypes.TIME(3), "Time With
-                        // Precision"))
+                        .column(new PhysicalColumn("time", DataTypes.TIME(), "Time"))
+                        .column(
+                                new PhysicalColumn(
+                                        "time_3", DataTypes.TIME(3), "Time With Precision"))
                         .column(new PhysicalColumn("timestamp", DataTypes.TIMESTAMP(), "Timestamp"))
                         .column(
                                 new PhysicalColumn(
@@ -246,6 +245,9 @@ class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
         List<String> expected =
                 Arrays.asList(
                         "id | int | NO | true | null",
+                        "binary | varbinary | YES | false | null",
+                        "varbinary | varbinary | YES | false | null",
+                        "bytes | varbinary | YES | false | null",
                         "boolean | boolean | YES | false | null",
                         "int | int | YES | false | null",
                         "tinyint | tinyint | YES | false | null",
@@ -257,6 +259,9 @@ class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
                         "string | varchar(1048576) | YES | false | null",
                         "decimal | decimal(17,7) | YES | false | null",
                         "date | date | YES | false | null",
+                        // TIME type mapped to VARCHAR since StarRocks doesn't support TIME type
+                        "time | varchar(8) | YES | false | null",
+                        "time_3 | varchar(12) | YES | false | null",
                         "timestamp | datetime | YES | false | null",
                         "timestamp_3 | datetime | YES | false | null",
                         "timestampltz | datetime | YES | false | null",
@@ -307,7 +312,6 @@ class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
     }
 
     @Test
-    @Disabled("Rename column is not supported currently.")
     void testStarRocksRenameColumn() throws Exception {
         TableId tableId =
                 TableId.tableId(
@@ -328,7 +332,6 @@ class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
     }
 
     @Test
-    @Disabled("Alter column type is not supported currently.")
     void testStarRocksAlterColumnType() throws Exception {
         TableId tableId =
                 TableId.tableId(
@@ -336,7 +339,7 @@ class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
                         StarRocksContainer.STARROCKS_TABLE_NAME);
 
         runJobWithEvents(generateAlterColumnTypeEvents(tableId));
-
+        waitAlterDone(tableId, 60000L);
         List<String> actual = inspectTableSchema(tableId);
 
         List<String> expected =
@@ -349,7 +352,6 @@ class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
     }
 
     @Test
-    @Disabled("Alter column type is not supported currently.")
     void testStarRocksNarrowingAlterColumnType() throws Exception {
         Assertions.assertThatThrownBy(
                 () -> {
@@ -424,8 +426,7 @@ class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
     }
 
     private void runJobWithEvents(List<Event> events) throws Exception {
-        DataStream<Event> stream =
-                env.fromCollection(events, TypeInformation.of(Event.class)).setParallelism(1);
+        DataStream<Event> stream = env.fromData(events, new EventTypeInfo()).setParallelism(1);
 
         Configuration config =
                 new Configuration()

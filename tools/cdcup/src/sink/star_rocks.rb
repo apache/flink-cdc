@@ -24,7 +24,7 @@ class StarRocks
 
     def prepend_to_docker_compose_yaml(docker_compose_yaml)
       docker_compose_yaml['services']['starrocks'] = {
-        'image' => 'starrocks/allin1-ubuntu:3.2.6',
+        'image' => 'starrocks/allin1-ubuntu:3.5.10',
         'hostname' => 'starrocks',
         'ports' => %w[8080 9030],
         'volumes' => ["#{CDC_DATA_VOLUME}:/data"]

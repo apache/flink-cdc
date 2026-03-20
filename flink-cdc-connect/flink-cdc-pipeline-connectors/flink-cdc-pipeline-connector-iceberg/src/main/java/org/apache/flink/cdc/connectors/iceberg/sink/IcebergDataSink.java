@@ -47,25 +47,30 @@ public class IcebergDataSink implements DataSink, Serializable {
 
     public final CompactionOptions compactionOptions;
 
+    public final String jobIdPrefix;
+
     public IcebergDataSink(
             Map<String, String> catalogOptions,
             Map<String, String> tableOptions,
             Map<TableId, List<String>> partitionMaps,
             ZoneId zoneId,
             String schemaOperatorUid,
-            CompactionOptions compactionOptions) {
+            CompactionOptions compactionOptions,
+            String jobIdPrefix) {
         this.catalogOptions = catalogOptions;
         this.tableOptions = tableOptions;
         this.partitionMaps = partitionMaps;
         this.zoneId = zoneId;
         this.schemaOperatorUid = schemaOperatorUid;
         this.compactionOptions = compactionOptions;
+        this.jobIdPrefix = jobIdPrefix;
     }
 
     @Override
     public EventSinkProvider getEventSinkProvider() {
         IcebergSink icebergEventSink =
-                new IcebergSink(catalogOptions, tableOptions, zoneId, compactionOptions);
+                new IcebergSink(
+                        catalogOptions, tableOptions, zoneId, compactionOptions, jobIdPrefix);
         return FlinkSinkProvider.of(icebergEventSink);
     }
 

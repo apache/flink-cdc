@@ -23,6 +23,7 @@ import org.apache.flink.api.connector.sink2.SinkWriter;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
+import org.apache.flink.cdc.runtime.operators.AbstractStreamOperatorAdapter;
 import org.apache.flink.cdc.runtime.operators.sink.exception.SinkWrapperException;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContext;
@@ -33,6 +34,7 @@ import org.apache.flink.streaming.api.operators.BoundedOneInput;
 import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.api.operators.Output;
+import org.apache.flink.streaming.api.operators.StreamOperatorParameters;
 import org.apache.flink.streaming.api.watermark.Watermark;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.tasks.ProcessingTimeService;
@@ -41,6 +43,7 @@ import org.apache.flink.streaming.runtime.watermarkstatus.WatermarkStatus;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 
 /**
  * An operator that processes records to be written into a {@link Sink} in batch mode.
@@ -53,7 +56,7 @@ import java.lang.reflect.Field;
  */
 @Internal
 public class BatchDataSinkWriterOperator<CommT>
-        extends AbstractStreamOperator<CommittableMessage<CommT>>
+        extends AbstractStreamOperatorAdapter<CommittableMessage<CommT>>
         implements OneInputStreamOperator<Event, CommittableMessage<CommT>>, BoundedOneInput {
 
     private final Sink<Event> sink;
@@ -88,8 +91,7 @@ public class BatchDataSinkWriterOperator<CommT>
             Output<StreamRecord<CommittableMessage<CommT>>> output) {
         super.setup(containingTask, config, output);
         flinkWriterOperator = createFlinkWriterOperator();
-        this.<AbstractStreamOperator<CommittableMessage<CommT>>>getFlinkWriterOperator()
-                .setup(containingTask, config, output);
+        invokeSetup(flinkWriterOperator, containingTask, config, output);
     }
 
     @Override
@@ -161,19 +163,56 @@ public class BatchDataSinkWriterOperator<CommT>
 
     // -------------------------- Reflection helper functions --------------------------
 
-    private Object createFlinkWriterOperator() {
+    private void invokeSetup(
+            Object operator,
+            StreamTask<?, ?> containingTask,
+            StreamConfig config,
+            Output<?> output) {
         try {
-            Class<?> flinkWriterClass =
+            Method setupMethod =
+                    AbstractStreamOperator.class.getDeclaredMethod(
+                            "setup", StreamTask.class, StreamConfig.class, Output.class);
+            setupMethod.setAccessible(true);
+            setupMethod.invoke(operator, containingTask, config, output);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to invoke setup on flinkWriterOperator", e);
+        }
+    }
+
+    private Object createFlinkWriterOperator() {
+        Class<?> flinkWriterClass;
+        try {
+            flinkWriterClass =
                     getRuntimeContext()
                             .getUserCodeClassLoader()
                             .loadClass(
                                     "org.apache.flink.streaming.runtime.operators.sink.SinkWriterOperator");
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException("Failed to load SinkWriterOperator class", e);
+        }
+
+        try {
             Constructor<?> constructor =
                     flinkWriterClass.getDeclaredConstructor(
                             Sink.class, ProcessingTimeService.class, MailboxExecutor.class);
             constructor.setAccessible(true);
             return constructor.newInstance(sink, processingTimeService, mailboxExecutor);
+        } catch (NoSuchMethodException e) {
+            // Constructor with 3 parameters not found, try the 4-parameter version
+            try {
+                Constructor<?> constructor =
+                        flinkWriterClass.getDeclaredConstructor(
+                                StreamOperatorParameters.class,
+                                Sink.class,
+                                ProcessingTimeService.class,
+                                MailboxExecutor.class);
+                constructor.setAccessible(true);
+                return constructor.newInstance(null, sink, processingTimeService, mailboxExecutor);
+            } catch (Exception ex) {
+                throw new RuntimeException("Failed to create SinkWriterOperator in Flink", ex);
+            }
         } catch (Exception e) {
+            // Other exceptions (e.g., InvocationTargetException) indicate real failures
             throw new RuntimeException("Failed to create SinkWriterOperator in Flink", e);
         }
     }

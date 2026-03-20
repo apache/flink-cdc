@@ -25,7 +25,8 @@ public enum MySqlVersion {
     V8_0_17("8.0.17"),
     V8_0_18("8.0.18"),
     V8_0_19("8.0.19"),
-    V8_0("8.0");
+    V8_0("8.0"),
+    V8_4("8.4");
 
     private String version;
 

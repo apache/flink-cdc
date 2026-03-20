@@ -87,6 +87,8 @@ public class InternalSerializers {
             case MAP:
                 MapType mapType = (MapType) type;
                 return new MapDataSerializer(mapType.getKeyType(), mapType.getValueType());
+            case VARIANT:
+                return VariantSerializer.INSTANCE;
             default:
                 throw new UnsupportedOperationException(
                         "Unsupported type '" + type + "' to get internal serializer");

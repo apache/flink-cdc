@@ -17,8 +17,6 @@
 
 package org.apache.flink.cdc.composer.definition;
 
-import org.apache.flink.cdc.common.utils.StringUtils;
-
 import java.util.Objects;
 
 /**
@@ -78,16 +76,8 @@ public class TransformDef {
         return projection;
     }
 
-    public boolean isValidProjection() {
-        return !StringUtils.isNullOrWhitespaceOnly(projection);
-    }
-
     public String getFilter() {
         return filter;
-    }
-
-    public boolean isValidFilter() {
-        return !StringUtils.isNullOrWhitespaceOnly(filter);
     }
 
     public String getDescription() {

@@ -23,12 +23,15 @@ import org.apache.flink.cdc.connectors.base.config.SourceConfig;
 import org.apache.flink.cdc.connectors.base.dialect.DataSourceDialect;
 import org.apache.flink.cdc.connectors.base.source.meta.events.LatestFinishedSplitsNumberEvent;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SnapshotSplit;
+import org.apache.flink.cdc.connectors.base.source.meta.split.SnapshotSplitState;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitSerializer;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitState;
 import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
+import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplitState;
 import org.apache.flink.cdc.connectors.base.source.reader.IncrementalSourceReaderContext;
 import org.apache.flink.cdc.connectors.base.source.reader.IncrementalSourceReaderWithCommit;
+import org.apache.flink.cdc.connectors.base.source.reader.IncrementalSourceRecordEmitter;
 import org.apache.flink.cdc.connectors.postgres.source.PostgresDialect;
 import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfig;
 import org.apache.flink.cdc.connectors.postgres.source.events.OffsetCommitAckEvent;
@@ -92,6 +95,18 @@ public class PostgresSourceReader extends IncrementalSourceReaderWithCommit {
             context.sendSourceEventToCoordinator(new OffsetCommitAckEvent());
         } else {
             super.handleSourceEvents(sourceEvent);
+        }
+    }
+
+    @Override
+    protected SourceSplitState initializedState(SourceSplitBase split) {
+        if (recordEmitter instanceof IncrementalSourceRecordEmitter) {
+            ((IncrementalSourceRecordEmitter) recordEmitter).applySplit(split);
+        }
+        if (split.isSnapshotSplit()) {
+            return new SnapshotSplitState(split.asSnapshotSplit());
+        } else {
+            return new StreamSplitState(split.asStreamSplit());
         }
     }
 

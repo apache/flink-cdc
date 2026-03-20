@@ -96,8 +96,10 @@ class PaimonMetadataApplierTest {
     @ParameterizedTest
     @ValueSource(strings = {"filesystem", "hive"})
     void testApplySchemaChange(String metastore)
-            throws Catalog.TableNotExistException, Catalog.DatabaseNotEmptyException,
-                    Catalog.DatabaseNotExistException, SchemaEvolveException {
+            throws Catalog.TableNotExistException,
+                    Catalog.DatabaseNotEmptyException,
+                    Catalog.DatabaseNotExistException,
+                    SchemaEvolveException {
         initialize(metastore);
         MetadataApplier metadataApplier = new PaimonMetadataApplier(catalogOptions);
         CreateTableEvent createTableEvent =
@@ -187,6 +189,26 @@ class PaimonMetadataApplierTest {
         Assertions.assertThat(catalog.getTable(Identifier.fromString("test.table1")).rowType())
                 .isEqualTo(tableSchema);
 
+        // Add column with variant type.
+        addedColumns = new ArrayList<>();
+        addedColumns.add(
+                new AddColumnEvent.ColumnWithPosition(
+                        Column.physicalColumn(
+                                "variantCol",
+                                org.apache.flink.cdc.common.types.DataTypes.VARIANT(),
+                                null)));
+        addColumnEvent = new AddColumnEvent(TableId.parse("test.table1"), addedColumns);
+        metadataApplier.applySchemaChange(addColumnEvent);
+        tableSchema =
+                new RowType(
+                        Arrays.asList(
+                                new DataField(0, "col1", DataTypes.STRING().notNull()),
+                                new DataField(
+                                        2, "newcol3", DataTypes.STRING(), null, "col3DefValue"),
+                                new DataField(3, "variantCol", DataTypes.VARIANT(), null, null)));
+        Assertions.assertThat(catalog.getTable(Identifier.fromString("test.table1")).rowType())
+                .isEqualTo(tableSchema);
+
         // Create table with partition column.
         createTableEvent =
                 new CreateTableEvent(
@@ -246,8 +268,10 @@ class PaimonMetadataApplierTest {
     @ParameterizedTest
     @ValueSource(strings = {"filesystem", "hive"})
     public void testCreateTableWithoutPrimaryKey(String metastore)
-            throws Catalog.TableNotExistException, Catalog.DatabaseNotEmptyException,
-                    Catalog.DatabaseNotExistException, SchemaEvolveException {
+            throws Catalog.TableNotExistException,
+                    Catalog.DatabaseNotEmptyException,
+                    Catalog.DatabaseNotExistException,
+                    SchemaEvolveException {
         initialize(metastore);
         Map<String, String> tableOptions = new HashMap<>();
         tableOptions.put("bucket", "-1");
@@ -289,8 +313,10 @@ class PaimonMetadataApplierTest {
     @ParameterizedTest
     @ValueSource(strings = {"filesystem", "hive"})
     void testCreateTableWithOptions(String metastore)
-            throws Catalog.TableNotExistException, Catalog.DatabaseNotEmptyException,
-                    Catalog.DatabaseNotExistException, SchemaEvolveException {
+            throws Catalog.TableNotExistException,
+                    Catalog.DatabaseNotEmptyException,
+                    Catalog.DatabaseNotExistException,
+                    SchemaEvolveException {
         initialize(metastore);
         Map<String, String> tableOptions = new HashMap<>();
         tableOptions.put("bucket", "-1");
@@ -335,8 +361,10 @@ class PaimonMetadataApplierTest {
     @ParameterizedTest
     @ValueSource(strings = {"filesystem", "hive"})
     void testCreateTableWithAllDataTypes(String metastore)
-            throws Catalog.TableNotExistException, Catalog.DatabaseNotEmptyException,
-                    Catalog.DatabaseNotExistException, SchemaEvolveException {
+            throws Catalog.TableNotExistException,
+                    Catalog.DatabaseNotEmptyException,
+                    Catalog.DatabaseNotExistException,
+                    SchemaEvolveException {
         initialize(metastore);
         MetadataApplier metadataApplier = new PaimonMetadataApplier(catalogOptions);
         CreateTableEvent createTableEvent =
@@ -404,6 +432,9 @@ class PaimonMetadataApplierTest {
                                         "timestamp_ltz_with_precision",
                                         org.apache.flink.cdc.common.types.DataTypes.TIMESTAMP_LTZ(
                                                 3))
+                                .physicalColumn(
+                                        "variant",
+                                        org.apache.flink.cdc.common.types.DataTypes.VARIANT())
                                 .primaryKey("col1")
                                 .build());
         metadataApplier.applySchemaChange(createTableEvent);
@@ -437,7 +468,8 @@ class PaimonMetadataApplierTest {
                                 new DataField(
                                         20,
                                         "timestamp_ltz_with_precision",
-                                        DataTypes.TIMESTAMP_WITH_LOCAL_TIME_ZONE(3))));
+                                        DataTypes.TIMESTAMP_WITH_LOCAL_TIME_ZONE(3)),
+                                new DataField(21, "variant", DataTypes.VARIANT())));
         Assertions.assertThat(catalog.getTable(Identifier.fromString("test.table1")).rowType())
                 .isEqualTo(tableSchema);
     }
@@ -445,8 +477,10 @@ class PaimonMetadataApplierTest {
     @ParameterizedTest
     @ValueSource(strings = {"filesystem", "hive"})
     void testAddColumnWithPosition(String metastore)
-            throws Catalog.DatabaseNotEmptyException, Catalog.DatabaseNotExistException,
-                    Catalog.TableNotExistException, SchemaEvolveException {
+            throws Catalog.DatabaseNotEmptyException,
+                    Catalog.DatabaseNotExistException,
+                    Catalog.TableNotExistException,
+                    SchemaEvolveException {
         initialize(metastore);
         MetadataApplier metadataApplier = new PaimonMetadataApplier(catalogOptions);
 
@@ -536,8 +570,10 @@ class PaimonMetadataApplierTest {
     @ParameterizedTest
     @ValueSource(strings = {"filesystem", "hive"})
     public void testCreateTableWithComment(String metastore)
-            throws Catalog.TableNotExistException, Catalog.DatabaseNotEmptyException,
-                    Catalog.DatabaseNotExistException, SchemaEvolveException {
+            throws Catalog.TableNotExistException,
+                    Catalog.DatabaseNotEmptyException,
+                    Catalog.DatabaseNotExistException,
+                    SchemaEvolveException {
         initialize(metastore);
         Map<String, String> tableOptions = new HashMap<>();
         tableOptions.put("bucket", "-1");
@@ -585,8 +621,10 @@ class PaimonMetadataApplierTest {
 
     @Test
     public void testMysqlDefaultTimestampValueConversionInAddColumn()
-            throws SchemaEvolveException, Catalog.TableNotExistException,
-                    Catalog.DatabaseNotEmptyException, Catalog.DatabaseNotExistException {
+            throws SchemaEvolveException,
+                    Catalog.TableNotExistException,
+                    Catalog.DatabaseNotEmptyException,
+                    Catalog.DatabaseNotExistException {
         initialize("filesystem");
         Map<String, String> tableOptions = new HashMap<>();
         tableOptions.put("bucket", "-1");

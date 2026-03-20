@@ -136,8 +136,8 @@ public class StarRocksDataSinkOptions {
 
     /**
      * The prefix for properties used for creating a table. You can refer to StarRocks documentation
-     * for the DDL.
-     * https://docs.starrocks.io/docs/table_design/table_types/primary_key_table/#create-a-table
+     * for the DDL. <a
+     * href="https://docs.starrocks.io/docs/table_design/table_types/primary_key_table/#create-primary-key-table">create-primary-key-table</a>
      */
     public static final String TABLE_CREATE_PROPERTIES_PREFIX = "table.create.properties.";
 

@@ -17,9 +17,9 @@
 
 package org.apache.flink.cdc.connectors.paimon.sink.v2;
 
+import org.apache.flink.api.connector.sink2.CommittingSinkWriter;
 import org.apache.flink.api.connector.sink2.Sink;
 import org.apache.flink.api.connector.sink2.StatefulSinkWriter;
-import org.apache.flink.api.connector.sink2.TwoPhaseCommittingSink;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.runtime.io.disk.iomanager.IOManager;
@@ -53,7 +53,7 @@ import java.util.stream.Collectors;
 
 /** A {@link Sink} to write {@link DataChangeEvent} to Paimon storage. */
 public class PaimonWriter<InputT>
-        implements TwoPhaseCommittingSink.PrecommittingSinkWriter<InputT, MultiTableCommittable>,
+        implements CommittingSinkWriter<InputT, MultiTableCommittable>,
                 StatefulSinkWriter<InputT, PaimonWriterState> {
 
     private static final Logger LOG = LoggerFactory.getLogger(PaimonWriter.class);
@@ -109,16 +109,17 @@ public class PaimonWriter<InputT>
     public Collection<MultiTableCommittable> prepareCommit() {
         long startTime = System.currentTimeMillis();
         List<MultiTableCommittable> committables =
-                writes.entrySet()
-                        .parallelStream()
+                writes.entrySet().parallelStream()
                         .flatMap(
                                 entry -> {
                                     try {
                                         // here we set it to lastCheckpointId+1 to
                                         // avoid prepareCommit the same checkpointId with the first
                                         // round.
-                                        return entry.getValue()
-                                                .prepareCommit(false, lastCheckpointId + 1).stream()
+                                        return entry
+                                                .getValue()
+                                                .prepareCommit(false, lastCheckpointId + 1)
+                                                .stream()
                                                 .map(
                                                         committable ->
                                                                 MultiTableCommittable
@@ -222,6 +223,9 @@ public class PaimonWriter<InputT>
         }
         if (compactExecutor != null) {
             compactExecutor.shutdownNow();
+        }
+        if (ioManager != null) {
+            ioManager.close();
         }
     }
 

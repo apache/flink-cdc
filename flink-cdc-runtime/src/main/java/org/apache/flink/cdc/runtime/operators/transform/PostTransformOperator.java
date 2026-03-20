@@ -20,6 +20,7 @@ package org.apache.flink.cdc.runtime.operators.transform;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.cdc.common.converter.JavaObjectConverter;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
 import org.apache.flink.cdc.common.event.ChangeEvent;
@@ -31,17 +32,19 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.udf.UserDefinedFunctionContext;
-import org.apache.flink.cdc.common.utils.SchemaMergingUtils;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
+import org.apache.flink.cdc.runtime.operators.AbstractStreamOperatorAdapter;
 import org.apache.flink.cdc.runtime.operators.transform.converter.PostTransformConverters;
 import org.apache.flink.cdc.runtime.operators.transform.exceptions.TransformException;
 import org.apache.flink.cdc.runtime.parser.TransformParser;
+import org.apache.flink.cdc.runtime.typeutils.BinaryInternalObjectConverter;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
-import org.apache.flink.cdc.runtime.typeutils.DataTypeConverter;
-import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 
+import org.apache.flink.shaded.guava31.com.google.common.cache.CacheBuilder;
+import org.apache.flink.shaded.guava31.com.google.common.cache.CacheLoader;
+import org.apache.flink.shaded.guava31.com.google.common.cache.LoadingCache;
 import org.apache.flink.shaded.guava31.com.google.common.collect.HashBasedTable;
 import org.apache.flink.shaded.guava31.com.google.common.collect.Table;
 
@@ -55,7 +58,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static org.apache.flink.cdc.common.utils.Preconditions.checkNotNull;
 
@@ -63,7 +65,7 @@ import static org.apache.flink.cdc.common.utils.Preconditions.checkNotNull;
  * A data process function that performs column filtering, calculated column evaluation & final
  * projection.
  */
-public class PostTransformOperator extends AbstractStreamOperator<Event>
+public class PostTransformOperator extends AbstractStreamOperatorAdapter<Event>
         implements OneInputStreamOperator<Event, Event>, Serializable {
 
     private static final long serialVersionUID = 1L;
@@ -86,6 +88,8 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
     private transient Table<TableId, PostTransformer, TransformProjectionProcessor>
             projectionProcessors;
     private transient Table<TableId, PostTransformer, TransformFilterProcessor> filterProcessors;
+
+    private transient LoadingCache<TableId, Optional<PostTransformer>> transformersCache;
 
     public static PostTransformOperatorBuilder newBuilder() {
         return new PostTransformOperatorBuilder();
@@ -115,6 +119,16 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
         initializeUdf();
 
         this.transformers = createTransformers();
+        this.transformersCache =
+                CacheBuilder.newBuilder()
+                        .maximumSize(1024)
+                        .build(
+                                new CacheLoader<>() {
+                                    @Override
+                                    public Optional<PostTransformer> load(TableId tableId) {
+                                        return getEffectiveTransformer(tableId);
+                                    }
+                                });
     }
 
     @Override
@@ -161,26 +175,26 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
 
         ChangeEvent changeEvent = (ChangeEvent) event;
         TableId tableId = changeEvent.tableId();
-        List<PostTransformer> transformers = getEffectiveTransformers(tableId);
+        Optional<PostTransformer> transformer = transformersCache.getUnchecked(tableId);
 
         // Short-circuit if there's no effective transformers.
-        if (transformers.isEmpty()) {
+        if (transformer.isEmpty()) {
             output.collect(element);
             return;
         }
 
         if (event instanceof CreateTableEvent) {
-            processCreateTableEvent((CreateTableEvent) event, transformers)
+            processCreateTableEvent((CreateTableEvent) event, transformer.get())
                     .map(StreamRecord::new)
                     .ifPresent(output::collect);
             invalidateCache(tableId);
         } else if (event instanceof SchemaChangeEvent) {
-            processSchemaChangeEvent((SchemaChangeEvent) event, transformers)
+            processSchemaChangeEvent((SchemaChangeEvent) event, transformer.get())
                     .map(StreamRecord::new)
                     .ifPresent(output::collect);
             invalidateCache(tableId);
         } else if (event instanceof DataChangeEvent) {
-            processDataChangeEvent((DataChangeEvent) event, transformers)
+            processDataChangeEvent((DataChangeEvent) event, transformer.get())
                     .map(StreamRecord::new)
                     .ifPresent(output::collect);
         } else {
@@ -196,18 +210,12 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
      * Apply effective transform rules to {@link CreateTableEvent}s based on effective transformers.
      */
     private Optional<Event> processCreateTableEvent(
-            CreateTableEvent event, List<PostTransformer> effectiveTransformers) {
+            CreateTableEvent event, PostTransformer effectiveTransformer) {
         TableId tableId = event.tableId();
         Schema preSchema = event.getSchema();
 
-        // Apply transform rules and verify we can get a deterministic post schema
-        List<Schema> schemas =
-                effectiveTransformers.stream()
-                        .map(trans -> transformSchema(preSchema, trans))
-                        .collect(Collectors.toList());
-
         Schema postSchema =
-                SchemaUtils.ensurePkNonNull(SchemaMergingUtils.strictlyMergeSchemas(schemas));
+                SchemaUtils.ensurePkNonNull(transformSchema(preSchema, effectiveTransformer));
 
         // Update transform info map
         postTransformInfoMap.put(
@@ -215,11 +223,10 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
 
         // Update "if-table-has-been–wildcard–matched" map
         boolean wildcardMatched =
-                effectiveTransformers.stream()
-                        .map(PostTransformer::getProjection)
-                        .flatMap(this::optionalToStream)
-                        .map(TransformProjection::getProjection)
-                        .anyMatch(TransformParser::hasAsterisk);
+                effectiveTransformer.getProjection().isPresent()
+                        && TransformParser.hasAsterisk(
+                                effectiveTransformer.getProjection().get().getProjection());
+
         hasAsteriskMap.put(tableId, wildcardMatched);
         projectedColumnsMap.put(
                 tableId,
@@ -235,7 +242,7 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
      * transformers and existing {@link PostTransformChangeInfo}.
      */
     private Optional<Event> processSchemaChangeEvent(
-            SchemaChangeEvent event, List<PostTransformer> effectiveTransformers) {
+            SchemaChangeEvent event, PostTransformer effectiveTransformer) {
         TableId tableId = event.tableId();
         PostTransformChangeInfo info = checkNotNull(postTransformInfoMap.get(tableId));
 
@@ -243,14 +250,8 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
         Schema prevPreSchema = info.getPreTransformedSchema();
         Schema nextPreSchema = SchemaUtils.applySchemaChangeEvent(prevPreSchema, event);
 
-        // Apply transform rules and verify we can get a deterministic post schema
-        List<Schema> schemas =
-                effectiveTransformers.stream()
-                        .map(trans -> transformSchema(nextPreSchema, trans))
-                        .collect(Collectors.toList());
-
         Schema nextPostSchema =
-                SchemaUtils.ensurePkNonNull(SchemaMergingUtils.strictlyMergeSchemas(schemas));
+                SchemaUtils.ensurePkNonNull(transformSchema(nextPreSchema, effectiveTransformer));
 
         // Update transform info map
         postTransformInfoMap.put(
@@ -273,7 +274,7 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
 
     /** Apply projection rules to given {@link DataChangeEvent}. */
     private Optional<Event> processDataChangeEvent(
-            DataChangeEvent event, List<PostTransformer> effectiveTransformers) {
+            DataChangeEvent event, PostTransformer effectiveTransformer) {
         TableId tableId = event.tableId();
         PostTransformChangeInfo info = checkNotNull(postTransformInfoMap.get(tableId));
 
@@ -284,55 +285,75 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
 
         String beforeOp = event.opTypeString(false);
         String afterOp = event.opTypeString(true);
+        TransformProjectionProcessor projectionProcessor =
+                getProjectionProcessor(tableId, effectiveTransformer);
+        TransformFilterProcessor filterProcessor =
+                getFilterProcessor(tableId, effectiveTransformer);
 
-        for (PostTransformer transformer : effectiveTransformers) {
-            TransformProjectionProcessor projectionProcessor =
-                    getProjectionProcessor(tableId, transformer);
-            TransformFilterProcessor filterProcessor = getFilterProcessor(tableId, transformer);
+        BinaryRecordData beforeRow = null;
+        BinaryRecordData afterRow = null;
+        boolean beforeFilterPassed = false;
+        boolean afterFilterPassed = false;
 
-            RecordData beforeRow = null;
-            RecordData afterRow = null;
-            boolean filterPassed = true;
-
-            if (event.before() != null) {
-                context.opType = beforeOp;
-                Tuple2<BinaryRecordData, Boolean> result =
-                        transformRecord(
-                                event.before(),
-                                info,
-                                projectionProcessor,
-                                filterProcessor,
-                                context);
-                beforeRow = result.f0;
-                filterPassed = result.f1;
-            }
-
-            if (event.after() != null) {
-                context.opType = afterOp;
-                Tuple2<BinaryRecordData, Boolean> result =
-                        transformRecord(
-                                event.after(), info, projectionProcessor, filterProcessor, context);
-                afterRow = result.f0;
-                filterPassed = result.f1;
-            }
-
-            if (filterPassed) {
-                DataChangeEvent finalEvent =
-                        DataChangeEvent.projectRecords(event, beforeRow, afterRow);
-                if (transformer.getPostTransformConverter().isPresent()) {
-                    return transformer
-                            .getPostTransformConverter()
-                            .get()
-                            .convert(finalEvent)
-                            .map(Event.class::cast);
-                } else {
-                    return Optional.of(finalEvent);
+        if (event.before() != null) {
+            context.opType = beforeOp;
+            Tuple2<BinaryRecordData, Boolean> result =
+                    transformRecord(
+                            event.before(), info, projectionProcessor, filterProcessor, context);
+            beforeRow = result.f0;
+            beforeFilterPassed = result.f1;
+        }
+        if (event.after() != null) {
+            context.opType = afterOp;
+            Tuple2<BinaryRecordData, Boolean> result =
+                    transformRecord(
+                            event.after(), info, projectionProcessor, filterProcessor, context);
+            afterRow = result.f0;
+            afterFilterPassed = result.f1;
+        }
+        // For UPDATE events, before and after filter results may differ, requiring op type
+        // conversion:
+        //   before=Y, after=Y -> UPDATE;  before=Y, after=N -> DELETE;
+        //   before=N, after=Y -> INSERT;  before=N, after=N -> drop.
+        DataChangeEvent finalEvent;
+        switch (event.op()) {
+            case INSERT:
+            case REPLACE:
+                if (!afterFilterPassed) {
+                    return Optional.empty();
                 }
-            }
+                finalEvent = DataChangeEvent.projectRecords(event, beforeRow, afterRow);
+                break;
+            case DELETE:
+                if (!beforeFilterPassed) {
+                    return Optional.empty();
+                }
+                finalEvent = DataChangeEvent.projectRecords(event, beforeRow, afterRow);
+                break;
+            case UPDATE:
+                if (beforeFilterPassed && afterFilterPassed) {
+                    finalEvent = DataChangeEvent.projectRecords(event, beforeRow, afterRow);
+                } else if (beforeFilterPassed) {
+                    finalEvent = DataChangeEvent.deleteEvent(tableId, beforeRow, event.meta());
+                } else if (afterFilterPassed) {
+                    finalEvent = DataChangeEvent.insertEvent(tableId, afterRow, event.meta());
+                } else {
+                    return Optional.empty();
+                }
+                break;
+            default:
+                throw new UnsupportedOperationException(
+                        "Unsupported operation type: " + event.op());
         }
 
-        // Events with no matching filters satisfied won't be emitted to downstream.
-        return Optional.empty();
+        if (effectiveTransformer.getPostTransformConverter().isPresent()) {
+            return effectiveTransformer
+                    .getPostTransformConverter()
+                    .get()
+                    .convert(finalEvent)
+                    .map(Event.class::cast);
+        }
+        return Optional.of(finalEvent);
     }
 
     /**
@@ -369,7 +390,7 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
         Object[] preRow = new Object[preFieldGetters.length];
         for (int i = 0; i < preFieldGetters.length; i++) {
             preRow[i] =
-                    DataTypeConverter.convertToOriginal(
+                    JavaObjectConverter.convertToJava(
                             preFieldGetters[i].getFieldOrNull(recordData),
                             preSchema.getColumnDataTypes().get(i));
         }
@@ -386,7 +407,8 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
         Object[] postRowBinary = new Object[postSchema.getColumnCount()];
         for (int i = 0; i < postRow.length; i++) {
             postRowBinary[i] =
-                    DataTypeConverter.convert(postRow[i], postSchema.getColumnDataTypes().get(i));
+                    BinaryInternalObjectConverter.convertToInternal(
+                            postRow[i], postSchema.getColumnDataTypes().get(i));
         }
         return Tuple2.of(postGenerator.generate(postRowBinary), filterPassed);
     }
@@ -395,22 +417,14 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
     // Convenience methods for coping with transient fields.
     // -------------------
 
-    /** Obtain effective transformers based on given {@link TableId}. */
-    private List<PostTransformer> getEffectiveTransformers(TableId tableId) {
-        List<PostTransformer> effectiveTransformers = new ArrayList<>();
+    /** Obtain effective transformer based on given {@link TableId}. */
+    private Optional<PostTransformer> getEffectiveTransformer(TableId tableId) {
         for (PostTransformer transformer : transformers) {
             if (transformer.getSelectors().isMatch(tableId)) {
-                effectiveTransformers.add(transformer);
-
-                // Transform module works with "First-match" rule. If we have met an uncondition
-                // transform rule (without any filtering expression), then any following transform
-                // rule will not be effective.
-                if (!transformer.getFilter().isPresent()) {
-                    break;
-                }
+                return Optional.of(transformer);
             }
         }
-        return effectiveTransformers;
+        return Optional.empty();
     }
 
     /**
@@ -485,7 +499,7 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
                     new PostTransformer(
                             selectors,
                             TransformProjection.of(projection).orElse(null),
-                            TransformFilter.of(filterExpression, udfDescriptors).orElse(null),
+                            TransformFilter.of(filterExpression).orElse(null),
                             PostTransformConverters.of(rule.getPostTransformConverter())
                                     .orElse(null),
                             rule.getSupportedMetadataColumns());
@@ -543,11 +557,5 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
         }
         udfDescriptors.clear();
         udfFunctionInstances.clear();
-    }
-
-    /** Backport of {@code Optional#stream} before Java 11. */
-    @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
-    private <T> Stream<T> optionalToStream(Optional<T> optional) {
-        return optional.map(Stream::of).orElseGet(Stream::empty);
     }
 }

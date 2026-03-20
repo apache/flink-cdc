@@ -23,6 +23,8 @@ import org.apache.flink.cdc.connectors.mysql.source.MySqlSource;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
 import org.apache.flink.table.catalog.ObjectPath;
 
+import io.debezium.config.CommonConnectorConfig;
+
 import java.io.Serializable;
 import java.time.Duration;
 import java.time.ZoneId;
@@ -63,6 +65,8 @@ public class MySqlSourceConfigFactory implements Serializable {
     private double distributionFactorLower =
             MySqlSourceOptions.CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue();
     private boolean includeSchemaChanges = false;
+    private boolean includeHeartbeatEvents = false;
+    private boolean includeTransactionMetadataEvents = false;
     private boolean scanNewlyAddedTableEnabled = false;
     private boolean closeIdleReaders = false;
     private Properties jdbcProperties;
@@ -235,6 +239,19 @@ public class MySqlSourceConfigFactory implements Serializable {
         return this;
     }
 
+    /** Whether the {@link MySqlSource} should output the heartbeat events or not. */
+    public MySqlSourceConfigFactory includeHeartbeatEvents(boolean includeHeartbeatEvents) {
+        this.includeHeartbeatEvents = includeHeartbeatEvents;
+        return this;
+    }
+
+    /** Whether the {@link MySqlSource} should output the transaction metadata events or not. */
+    public MySqlSourceConfigFactory includeTransactionMetadataEvents(
+            boolean includeTransactionMetadataEvents) {
+        this.includeTransactionMetadataEvents = includeTransactionMetadataEvents;
+        return this;
+    }
+
     /** Whether the {@link MySqlSource} should scan the newly added tables or not. */
     public MySqlSourceConfigFactory scanNewlyAddedTableEnabled(boolean scanNewlyAddedTableEnabled) {
         this.scanNewlyAddedTableEnabled = scanNewlyAddedTableEnabled;
@@ -359,6 +376,10 @@ public class MySqlSourceConfigFactory implements Serializable {
         // Note: the includeSchemaChanges parameter is used to control emitting the schema record,
         // only DataStream API program need to emit the schema record, the Table API need not
         props.setProperty("include.schema.changes", String.valueOf(true));
+        // enable transaction metadata if includeTransactionMetadataEvents is true
+        props.setProperty(
+                CommonConnectorConfig.PROVIDE_TRANSACTION_METADATA.name(),
+                String.valueOf(includeTransactionMetadataEvents));
         // disable the offset flush totally
         props.setProperty("offset.flush.interval.ms", String.valueOf(Long.MAX_VALUE));
         // disable tombstones
@@ -412,6 +433,8 @@ public class MySqlSourceConfigFactory implements Serializable {
                 distributionFactorUpper,
                 distributionFactorLower,
                 includeSchemaChanges,
+                includeHeartbeatEvents,
+                includeTransactionMetadataEvents,
                 scanNewlyAddedTableEnabled,
                 closeIdleReaders,
                 props,

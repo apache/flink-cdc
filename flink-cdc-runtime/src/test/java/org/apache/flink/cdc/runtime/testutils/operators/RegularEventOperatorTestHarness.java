@@ -24,8 +24,10 @@ import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.SchemaChangeEventTypeFamily;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
+import org.apache.flink.cdc.common.pipeline.RouteMode;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.runtime.operators.AbstractStreamOperatorAdapter;
 import org.apache.flink.cdc.runtime.operators.schema.common.CoordinationResponseUtils;
 import org.apache.flink.cdc.runtime.operators.schema.common.event.FlushSuccessEvent;
 import org.apache.flink.cdc.runtime.operators.schema.common.event.GetEvolvedSchemaRequest;
@@ -40,6 +42,7 @@ import org.apache.flink.cdc.runtime.operators.sink.SchemaEvolutionClient;
 import org.apache.flink.cdc.runtime.testutils.schema.CollectingMetadataApplier;
 import org.apache.flink.cdc.runtime.testutils.schema.TestingSchemaRegistryGateway;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.runtime.event.WatermarkEvent;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.jobgraph.tasks.TaskOperatorEventGateway;
 import org.apache.flink.runtime.operators.testutils.DummyEnvironment;
@@ -82,7 +85,8 @@ import static org.apache.flink.cdc.runtime.operators.schema.common.CoordinationR
  * @param <OP> Type of the operator
  * @param <E> Type of the event emitted by the operator
  */
-public class RegularEventOperatorTestHarness<OP extends AbstractStreamOperator<E>, E extends Event>
+public class RegularEventOperatorTestHarness<
+                OP extends AbstractStreamOperatorAdapter<E>, E extends Event>
         implements AutoCloseable {
     private static final Logger LOG =
             LoggerFactory.getLogger(RegularEventOperatorTestHarness.class);
@@ -121,12 +125,13 @@ public class RegularEventOperatorTestHarness<OP extends AbstractStreamOperator<E
                         new CollectingMetadataApplier(
                                 schemaEvolveDuration, enabledEventTypes, errorsOnEventTypes),
                         new ArrayList<>(),
+                        RouteMode.ALL_MATCH,
                         behavior,
                         rpcTimeout);
         schemaRegistryGateway = new TestingSchemaRegistryGateway(schemaRegistry);
     }
 
-    public static <OP extends AbstractStreamOperator<E>, E extends Event>
+    public static <OP extends AbstractStreamOperatorAdapter<E>, E extends Event>
             RegularEventOperatorTestHarness<OP, E> with(OP operator, int numOutputs) {
         return new RegularEventOperatorTestHarness<>(
                 operator,
@@ -138,7 +143,7 @@ public class RegularEventOperatorTestHarness<OP extends AbstractStreamOperator<E
                 Collections.emptySet());
     }
 
-    public static <OP extends AbstractStreamOperator<E>, E extends Event>
+    public static <OP extends AbstractStreamOperatorAdapter<E>, E extends Event>
             RegularEventOperatorTestHarness<OP, E> withDuration(
                     OP operator, int numOutputs, Duration evolveDuration) {
         return new RegularEventOperatorTestHarness<>(
@@ -151,7 +156,7 @@ public class RegularEventOperatorTestHarness<OP extends AbstractStreamOperator<E
                 Collections.emptySet());
     }
 
-    public static <OP extends AbstractStreamOperator<E>, E extends Event>
+    public static <OP extends AbstractStreamOperatorAdapter<E>, E extends Event>
             RegularEventOperatorTestHarness<OP, E> withDurationAndBehavior(
                     OP operator,
                     int numOutputs,
@@ -167,7 +172,7 @@ public class RegularEventOperatorTestHarness<OP extends AbstractStreamOperator<E
                 Collections.emptySet());
     }
 
-    public static <OP extends AbstractStreamOperator<E>, E extends Event>
+    public static <OP extends AbstractStreamOperatorAdapter<E>, E extends Event>
             RegularEventOperatorTestHarness<OP, E> withDurationAndFineGrainedBehavior(
                     OP operator,
                     int numOutputs,
@@ -184,7 +189,7 @@ public class RegularEventOperatorTestHarness<OP extends AbstractStreamOperator<E
                 Collections.emptySet());
     }
 
-    public static <OP extends AbstractStreamOperator<E>, E extends Event>
+    public static <OP extends AbstractStreamOperatorAdapter<E>, E extends Event>
             RegularEventOperatorTestHarness<OP, E> withDurationAndFineGrainedBehaviorWithError(
                     OP operator,
                     int numOutputs,
@@ -324,6 +329,10 @@ public class RegularEventOperatorTestHarness<OP extends AbstractStreamOperator<E
 
         @Override
         public void emitWatermark(Watermark mark) {
+            throw new UnsupportedOperationException();
+        }
+
+        public void emitWatermark(WatermarkEvent mark) {
             throw new UnsupportedOperationException();
         }
 

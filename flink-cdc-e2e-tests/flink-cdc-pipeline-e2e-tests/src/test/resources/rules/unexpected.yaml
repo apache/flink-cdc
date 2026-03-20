@@ -79,5 +79,5 @@ steps:
             language: clojure
     error: |
       Unexpected key `language` in YAML UDF block.
-      Allowed keys in this context are: [name, classpath]
+      Allowed keys in this context are: [name, classpath, options]
       Note: option language: "clojure" is unexpected. It was silently ignored in previous versions, and probably should be removed.

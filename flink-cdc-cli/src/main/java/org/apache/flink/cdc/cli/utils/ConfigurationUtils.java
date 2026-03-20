@@ -67,12 +67,16 @@ public class ConfigurationUtils {
 
     public static Class<?> getClaimModeClass() {
         try {
-            return Class.forName("org.apache.flink.core.execution.RestoreMode");
-        } catch (ClassNotFoundException ignored) {
+            return Class.forName("org.apache.flink.core.execution.RecoveryClaimMode");
+        } catch (ClassNotFoundException classNotFoundException) {
             try {
-                return Class.forName("org.apache.flink.runtime.jobgraph.RestoreMode");
-            } catch (ClassNotFoundException e) {
-                throw new RuntimeException(e);
+                return Class.forName("org.apache.flink.core.execution.RestoreMode");
+            } catch (ClassNotFoundException ignored) {
+                try {
+                    return Class.forName("org.apache.flink.runtime.jobgraph.RestoreMode");
+                } catch (ClassNotFoundException e) {
+                    throw new RuntimeException(e);
+                }
             }
         }
     }
