@@ -498,7 +498,7 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
 
     @Override
     public void exitTableOptionComment(MySqlParser.TableOptionCommentContext ctx) {
-        if (currentTable != null && !parser.skipComments() && tableEditor.hasComment()) {
+        if (currentTable != null && !parser.skipComments()) {
             changes.add(
                     new AlterTableCommentEvent(
                             currentTable,

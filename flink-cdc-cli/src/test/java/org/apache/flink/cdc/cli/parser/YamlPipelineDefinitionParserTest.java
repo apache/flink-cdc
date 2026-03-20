@@ -45,6 +45,7 @@ import java.util.Set;
 
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.ADD_COLUMN;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.ALTER_COLUMN_TYPE;
+import static org.apache.flink.cdc.common.event.SchemaChangeEventType.ALTER_TABLE_COMMENT;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.CREATE_TABLE;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.DROP_COLUMN;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.DROP_TABLE;
@@ -222,6 +223,7 @@ class YamlPipelineDefinitionParserTest {
                 null,
                 null,
                 ImmutableSet.of(
+                        ALTER_TABLE_COMMENT,
                         ADD_COLUMN,
                         ALTER_COLUMN_TYPE,
                         CREATE_TABLE,
@@ -234,6 +236,7 @@ class YamlPipelineDefinitionParserTest {
                 null,
                 null,
                 ImmutableSet.of(
+                        ALTER_TABLE_COMMENT,
                         ADD_COLUMN,
                         ALTER_COLUMN_TYPE,
                         CREATE_TABLE,
@@ -246,6 +249,7 @@ class YamlPipelineDefinitionParserTest {
                 "[column, table]",
                 "[drop]",
                 ImmutableSet.of(
+                        ALTER_TABLE_COMMENT,
                         ADD_COLUMN,
                         ALTER_COLUMN_TYPE,
                         CREATE_TABLE,
@@ -256,12 +260,18 @@ class YamlPipelineDefinitionParserTest {
                 null,
                 null,
                 ImmutableSet.of(
-                        ADD_COLUMN, ALTER_COLUMN_TYPE, CREATE_TABLE, DROP_COLUMN, RENAME_COLUMN));
+                        ALTER_TABLE_COMMENT,
+                        ADD_COLUMN,
+                        ALTER_COLUMN_TYPE,
+                        CREATE_TABLE,
+                        DROP_COLUMN,
+                        RENAME_COLUMN));
         testSchemaEvolutionTypesParsing(
                 "lenient",
                 null,
                 "[]",
                 ImmutableSet.of(
+                        ALTER_TABLE_COMMENT,
                         ADD_COLUMN,
                         ALTER_COLUMN_TYPE,
                         CREATE_TABLE,
@@ -594,6 +604,7 @@ class YamlPipelineDefinitionParserTest {
                                             .put("bootstrap-servers", "localhost:9092")
                                             .build()),
                             ImmutableSet.of(
+                                    ALTER_TABLE_COMMENT,
                                     DROP_COLUMN,
                                     ALTER_COLUMN_TYPE,
                                     ADD_COLUMN,
@@ -620,6 +631,7 @@ class YamlPipelineDefinitionParserTest {
                             null,
                             new Configuration(),
                             ImmutableSet.of(
+                                    ALTER_TABLE_COMMENT,
                                     DROP_COLUMN,
                                     ALTER_COLUMN_TYPE,
                                     ADD_COLUMN,
@@ -706,6 +718,7 @@ class YamlPipelineDefinitionParserTest {
                             null,
                             new Configuration(),
                             ImmutableSet.of(
+                                    ALTER_TABLE_COMMENT,
                                     DROP_COLUMN,
                                     ALTER_COLUMN_TYPE,
                                     ADD_COLUMN,
@@ -742,6 +755,7 @@ class YamlPipelineDefinitionParserTest {
                             null,
                             new Configuration(),
                             ImmutableSet.of(
+                                    ALTER_TABLE_COMMENT,
                                     DROP_COLUMN,
                                     ALTER_COLUMN_TYPE,
                                     ADD_COLUMN,
@@ -797,6 +811,7 @@ class YamlPipelineDefinitionParserTest {
                                             .put("password", "")
                                             .build()),
                             ImmutableSet.of(
+                                    ALTER_TABLE_COMMENT,
                                     DROP_COLUMN,
                                     ALTER_COLUMN_TYPE,
                                     ADD_COLUMN,
