@@ -815,8 +815,10 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
         // Preparations
         customerDatabase.createAndInitialize();
         MySqlSourceConfig connectionConfig = getConfig(new String[] {"customers"});
-        binaryLogClient = DebeziumUtils.createBinaryClient(connectionConfig.getDbzConfiguration());
         mySqlConnection = DebeziumUtils.createMySqlConnection(connectionConfig);
+        binaryLogClient =
+                DebeziumUtils.createBinaryClient(
+                        connectionConfig.getDbzConfiguration(), mySqlConnection);
         DataType dataType =
                 DataTypes.ROW(
                         DataTypes.FIELD("id", DataTypes.BIGINT()),
