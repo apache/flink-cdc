@@ -126,7 +126,11 @@ class MySqlPipelineCompatibilityITCase {
 
     @AfterEach
     void tearDown() {
-        testDatabase.dropDatabase();
+        try {
+            testDatabase.dropDatabase();
+        } catch (IllegalStateException e) {
+            LOG.warn("Failed to drop test database during teardown.", e);
+        }
         if (mySqlContainer != null) {
             LOG.info("Stopping container for MySQL {}...", version.getVersion());
             mySqlContainer.stop();
