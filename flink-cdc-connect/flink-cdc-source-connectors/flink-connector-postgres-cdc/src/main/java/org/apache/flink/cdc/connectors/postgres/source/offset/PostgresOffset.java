@@ -45,8 +45,30 @@ public class PostgresOffset extends Offset {
     // used by PostgresOffsetFactory
     PostgresOffset(Map<String, String> offset) {
         Map<String, String> filtered = new HashMap<>(offset);
-        filtered.remove(PostgresOffsetContext.LAST_COMPLETELY_PROCESSED_LSN_KEY); // lsn_proc
-        filtered.remove(PostgresOffsetContext.LAST_COMMIT_LSN_KEY); // lsn_commit
+        // When lsn == lsn_proc, WalPositionLocator is constructed with
+        // (lastCommitStoredLsn=Y, lastEventStoredLsn=Y). In pgoutput non-streaming mode,
+        // BEGIN and DML of the first new transaction after recovery share the same
+        // data_start as the previous COMMIT LSN (Y). WalPositionLocator puts Y into
+        // lsnSeen but sets startStreamingLsn to the new COMMIT LSN (Z), causing those
+        // DML records to be silently dropped in the actual streaming phase
+        // (Y in lsnSeen, Y != Z -> filtered).
+        //
+        // Fix: when lsn == lsn_proc, remove lsn_proc and lsn_commit so that
+        // WalPositionLocator is constructed with lastCommitStoredLsn=null, which
+        // triggers the fast path: startStreamingLsn=firstLsnReceived=Y, switch-off
+        // happens immediately and all messages pass through.
+        //
+        // This is fixed upstream in Debezium via DBZ-6204 (adding Operation.COMMIT to
+        // the lastProcessedMessageType check in WalPositionLocator.resumeFromLsn):
+        // https://github.com/debezium/debezium/commit/3b5740f1a836c8b438888f2458ebb1554320bac7
+        // This workaround can be removed once Debezium is upgraded to a version that
+        // includes DBZ-6204.
+        String lsnVal = filtered.get(SourceInfo.LSN_KEY);
+        String lsnProc = filtered.get(PostgresOffsetContext.LAST_COMPLETELY_PROCESSED_LSN_KEY);
+        if (lsnVal != null && lsnVal.equals(lsnProc)) {
+            filtered.remove(PostgresOffsetContext.LAST_COMPLETELY_PROCESSED_LSN_KEY);
+            filtered.remove(PostgresOffsetContext.LAST_COMMIT_LSN_KEY);
+        }
         this.offset = filtered;
     }
 
