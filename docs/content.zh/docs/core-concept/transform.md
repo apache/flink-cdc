@@ -474,8 +474,8 @@ transform:
 
 ## Embedding AI 模型
 
-内置AI模型可以在transform规则中使用。
-为了使用内置AI模型，你需要下载内置模型的jar，然后在flink-cdc.sh命令中添加`--jar {$BUILT_IN_MODEL_PATH}`。
+内置 AI 模型可以在 transform 规则中使用。
+为了使用内置 AI 模型，你需要下载内置模型的 jar ，然后在 `flink-cdc.sh` 命令中添加 `--jar {$BUILT_IN_MODEL_PATH}`。
 
 如何定义一个 Embedding AI 模型：
 
