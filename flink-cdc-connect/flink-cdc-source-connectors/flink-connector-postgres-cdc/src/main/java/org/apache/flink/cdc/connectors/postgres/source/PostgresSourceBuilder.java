@@ -21,6 +21,7 @@ import org.apache.flink.api.connector.source.SourceReaderContext;
 import org.apache.flink.api.connector.source.SplitEnumeratorContext;
 import org.apache.flink.cdc.common.annotation.Experimental;
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
+import org.apache.flink.cdc.connectors.base.config.SourceConfig;
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.connectors.base.source.assigner.HybridSplitAssigner;
 import org.apache.flink.cdc.connectors.base.source.assigner.SplitAssigner;
@@ -31,6 +32,7 @@ import org.apache.flink.cdc.connectors.base.source.assigner.state.StreamPendingS
 import org.apache.flink.cdc.connectors.base.source.jdbc.JdbcIncrementalSource;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceRecords;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
+import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitState;
 import org.apache.flink.cdc.connectors.base.source.metrics.SourceReaderMetrics;
 import org.apache.flink.cdc.connectors.base.source.reader.IncrementalSourceReaderContext;
 import org.apache.flink.cdc.connectors.base.source.reader.IncrementalSourceSplitReader;
@@ -39,7 +41,9 @@ import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConf
 import org.apache.flink.cdc.connectors.postgres.source.enumerator.PostgresSourceEnumerator;
 import org.apache.flink.cdc.connectors.postgres.source.offset.PostgresOffsetFactory;
 import org.apache.flink.cdc.connectors.postgres.source.reader.PostgresSourceReader;
+import org.apache.flink.cdc.connectors.postgres.source.reader.PostgresSourceRecordEmitter;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
+import org.apache.flink.connector.base.source.reader.RecordEmitter;
 import org.apache.flink.connector.base.source.reader.RecordsWithSplitIds;
 import org.apache.flink.connector.base.source.reader.synchronization.FutureCompletingBlockingQueue;
 import org.apache.flink.util.FlinkRuntimeException;
@@ -311,6 +315,12 @@ public class PostgresSourceBuilder<T> {
         return this;
     }
 
+    /** Whether to infer schema change event on relation message. */
+    public PostgresSourceBuilder<T> includeSchemaChanges(boolean includeSchemaChanges) {
+        this.configFactory.includeSchemaChanges(includeSchemaChanges);
+        return this;
+    }
+
     /**
      * Build the {@link PostgresIncrementalSource}.
      *
@@ -443,6 +453,16 @@ public class PostgresSourceBuilder<T> {
                     sourceConfig,
                     sourceSplitSerializer,
                     dataSourceDialect);
+        }
+
+        @Override
+        protected RecordEmitter<SourceRecords, T, SourceSplitState> createRecordEmitter(
+                SourceConfig sourceConfig, SourceReaderMetrics sourceReaderMetrics) {
+            return new PostgresSourceRecordEmitter<>(
+                    deserializationSchema,
+                    sourceReaderMetrics,
+                    sourceConfig.isIncludeSchemaChanges(),
+                    offsetFactory);
         }
 
         public static <T> PostgresSourceBuilder<T> builder() {

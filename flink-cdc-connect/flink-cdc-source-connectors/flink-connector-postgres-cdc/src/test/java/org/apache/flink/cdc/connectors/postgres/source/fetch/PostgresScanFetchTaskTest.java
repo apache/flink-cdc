@@ -247,7 +247,8 @@ class PostgresScanFetchTaskTest extends PostgresTestBase {
     void testSnapshotFetchSize() throws Exception {
         customDatabase.createAndInitialize();
         PostgresSourceConfigFactory sourceConfigFactory =
-                getMockPostgresSourceConfigFactory(customDatabase, schemaName, tableName, 10, true);
+                getMockPostgresSourceConfigFactory(
+                        customDatabase, schemaName, tableName, null, 10, true);
         Properties properties = new Properties();
         properties.setProperty("snapshot.fetch.size", "2");
         sourceConfigFactory.debeziumProperties(properties);
@@ -291,7 +292,7 @@ class PostgresScanFetchTaskTest extends PostgresTestBase {
             throws Exception {
         PostgresSourceConfigFactory sourceConfigFactory =
                 getMockPostgresSourceConfigFactory(
-                        customDatabase, schemaName, tableName, 10, skipSnapshotBackfill);
+                        customDatabase, schemaName, tableName, null, 10, skipSnapshotBackfill);
         PostgresSourceConfig sourceConfig = sourceConfigFactory.create(0);
         PostgresDialect postgresDialect = new PostgresDialect(sourceConfigFactory.create(0));
         SnapshotPhaseHooks hooks = new SnapshotPhaseHooks();

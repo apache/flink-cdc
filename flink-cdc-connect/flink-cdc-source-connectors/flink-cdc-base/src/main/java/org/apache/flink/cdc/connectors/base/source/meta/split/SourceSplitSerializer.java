@@ -247,7 +247,8 @@ public abstract class SourceSplitSerializer
                     throw new IOException("Unknown version: " + version);
             }
             Document document = documentReader.read(tableChangeStr);
-            TableChange tableChange = FlinkJsonTableChangeSerializer.fromDocument(document, true);
+            TableChange tableChange =
+                    FlinkJsonTableChangeSerializer.fromDocument(document, useCatalogBeforeSchema);
             tableSchemas.put(tableId, tableChange);
         }
         return tableSchemas;

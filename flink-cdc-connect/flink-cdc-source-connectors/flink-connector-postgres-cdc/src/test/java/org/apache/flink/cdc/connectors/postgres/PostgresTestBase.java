@@ -38,6 +38,8 @@ import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.lifecycle.Startables;
 import org.testcontainers.utility.DockerImageName;
 
+import javax.annotation.Nullable;
+
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -248,13 +250,14 @@ public abstract class PostgresTestBase extends AbstractTestBase {
     protected PostgresSourceConfigFactory getMockPostgresSourceConfigFactory(
             UniqueDatabase database, String schemaName, String tableName, int splitSize) {
         return getMockPostgresSourceConfigFactory(
-                database, schemaName, tableName, splitSize, false);
+                database, schemaName, tableName, null, splitSize, false);
     }
 
     protected PostgresSourceConfigFactory getMockPostgresSourceConfigFactory(
             UniqueDatabase database,
             String schemaName,
             String tableName,
+            @Nullable String slotName,
             int splitSize,
             boolean skipSnapshotBackfill) {
 
@@ -270,6 +273,10 @@ public abstract class PostgresTestBase extends AbstractTestBase {
         postgresSourceConfigFactory.skipSnapshotBackfill(skipSnapshotBackfill);
         postgresSourceConfigFactory.setLsnCommitCheckpointsDelay(1);
         postgresSourceConfigFactory.decodingPluginName("pgoutput");
+        if (slotName != null) {
+            postgresSourceConfigFactory.slotName(slotName);
+        }
+
         return postgresSourceConfigFactory;
     }
 
