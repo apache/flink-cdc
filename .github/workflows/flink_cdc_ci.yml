@@ -133,3 +133,11 @@ jobs:
       java-versions: "[11]"
       flink-versions: "['1.20.3']"
       modules: "['source_e2e']"
+  source_e2e_2_x:
+    name: Source E2E Tests 2.x
+    uses: ./.github/workflows/flink_cdc_base.yml
+    with:
+      java-versions: "[11]"
+      flink-versions: "['2.2.0']"
+      custom-maven-parameter: "-Pflink2"
+      modules: "['source_e2e']"

@@ -35,6 +35,8 @@ import java.util.Collection;
 public interface StatefulSink<InputT, WriterStateT>
         extends Sink<InputT>, SupportsWriterState<InputT, WriterStateT> {
 
+    SinkWriter<InputT> createWriter(InitContext initContext) throws IOException;
+
     @Override
     default SinkWriter<InputT> createWriter(WriterInitContext writerInitContext)
             throws IOException {

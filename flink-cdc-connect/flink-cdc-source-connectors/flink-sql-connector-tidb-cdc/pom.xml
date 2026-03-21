@@ -54,6 +54,7 @@ limitations under the License.
                                 <includes>
                                     <include>org.apache.flink:flink-connector-debezium</include>
                                     <include>org.apache.flink:flink-connector-tidb-cdc</include>
+                                    <include>org.apache.flink:flink-cdc-flink*-compat</include>
                                     <include>org.tikv:tikv-client-java</include>
                                     <include>com.google.protobuf:*</include>
                                     <include>io.grpc:*</include>
