@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.mysql.source.parser;
 
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
+import org.apache.flink.cdc.common.event.AlterTableCommentEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.DropTableEvent;
@@ -37,6 +38,7 @@ import io.debezium.relational.ColumnEditor;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableEditor;
 import io.debezium.relational.TableId;
+import io.debezium.relational.ddl.AbstractDdlParser;
 import org.antlr.v4.runtime.tree.ParseTreeListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -364,7 +366,10 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
                     Map<String, DataType> typeMapping = new HashMap<>();
 
                     typeMapping.put(oldColumnName, fromDbzColumn(column, tinyInt1isBit));
-                    changes.add(new AlterColumnTypeEvent(currentTable, typeMapping));
+                    AlterColumnTypeEvent alterColumnTypeEvent =
+                            new AlterColumnTypeEvent(currentTable, typeMapping);
+                    alterColumnTypeEvent.addColumnComment(oldColumnName, column.comment());
+                    changes.add(alterColumnTypeEvent);
 
                     if (newColumnName != null && !oldColumnName.equalsIgnoreCase(newColumnName)) {
                         Map<String, String> renameMap = new HashMap<>();
@@ -416,13 +421,16 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
         parser.runIfNotNull(
                 () -> {
                     Column column = columnDefinitionListener.getColumn();
-                    Map<String, DataType> typeMapping = new HashMap<>();
-                    typeMapping.put(
+                    String columnName =
                             isTableIdCaseInsensitive
                                     ? column.name().toLowerCase(Locale.ROOT)
-                                    : column.name(),
-                            fromDbzColumn(column, tinyInt1isBit));
-                    changes.add(new AlterColumnTypeEvent(currentTable, typeMapping));
+                                    : column.name();
+                    Map<String, DataType> typeMapping = new HashMap<>();
+                    typeMapping.put(columnName, fromDbzColumn(column, tinyInt1isBit));
+                    AlterColumnTypeEvent alterColumnTypeEvent =
+                            new AlterColumnTypeEvent(currentTable, typeMapping);
+                    alterColumnTypeEvent.addColumnComment(columnName, column.comment());
+                    changes.add(alterColumnTypeEvent);
                     listeners.remove(columnDefinitionListener);
                 },
                 columnDefinitionListener);
@@ -479,12 +487,24 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
                     () -> {
                         if (ctx.COMMENT() != null) {
                             tableEditor.setComment(
-                                    parser.withoutQuotes(ctx.STRING_LITERAL().getText()));
+                                    AbstractDdlParser.withoutQuotes(
+                                            ctx.STRING_LITERAL().getText()));
                         }
                     },
                     tableEditor);
         }
         super.enterTableOptionComment(ctx);
+    }
+
+    @Override
+    public void exitTableOptionComment(MySqlParser.TableOptionCommentContext ctx) {
+        if (currentTable != null && !parser.skipComments()) {
+            changes.add(
+                    new AlterTableCommentEvent(
+                            currentTable,
+                            AbstractDdlParser.withoutQuotes(ctx.STRING_LITERAL().getText())));
+        }
+        super.exitTableOptionComment(ctx);
     }
 
     private org.apache.flink.cdc.common.schema.Column toCdcColumn(Column dbzColumn) {
