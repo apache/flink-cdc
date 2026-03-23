@@ -354,10 +354,6 @@ public class PaimonMetadataApplier implements MetadataApplier {
     private void applyTruncateTable(TruncateTableEvent event) throws SchemaEvolveException {
         try {
             Table table = catalog.getTable(tableIdToIdentifier(event));
-            if (table.options().get("deletion-vectors.enabled").equals("true")) {
-                throw new UnsupportedSchemaChangeEventException(
-                        event, "Unable to truncate a table with deletion vectors enabled.", null);
-            }
             try (BatchTableCommit batchTableCommit = table.newBatchWriteBuilder().newCommit()) {
                 batchTableCommit.truncateTable();
             }
