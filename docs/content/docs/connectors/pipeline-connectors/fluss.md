@@ -31,6 +31,7 @@ The Fluss Pipeline connector can be used as the *Data Sink* of the pipeline, and
 ## What can the connector do?
 * Create table automatically if not exist
 * Data synchronization
+* Schema change synchronization (lenient mode)
 
 How to create Pipeline
 ----------------
@@ -61,6 +62,7 @@ sink:
 pipeline:
   name: MySQL to Fluss Pipeline
   parallelism: 2
+  schema.change.behavior: LENIENT
 ```
 
 Pipeline Connector Options
@@ -142,7 +144,13 @@ Pipeline Connector Options
   * The number of buckets is controlled by `bucket.num`
   * The distribution keys are controlled by option `bucket.key`. For primary key table and a bucket key is not specified, the bucket key will be used as primary key(excluding the partition key). For log table has no primary key and the bucket key is not specified, the data will be distributed to each bucket randomly. 
 
-* Not support schema change synchronization.If you want to ignore schema change, use `schema.change.behavior: IGNORE`.
+* Supports schema change synchronization in `lenient` mode with `schema.change.behavior: lenient`. The following schema change events are supported:
+  * **Add column** — new columns are appended to the Fluss table.
+  * **Drop column** — supported, columns are removed from the Fluss table.
+  * **Rename non-nullable column** — since Fluss does not support renaming non-nullable columns directly, this is translated into an add-new-column + alter-old-column-type-to-nullable sequence.
+  * **Alter column type** — not supported by Fluss. If the upstream source emits an alter-column-type event, it will be ignored in lenient mode.
+
+  To enable schema change synchronization, configure the pipeline with `schema.change.behavior: lenient`. If you want to ignore all schema changes, use `schema.change.behavior: IGNORE`.
 
 * For data synchronization, the pipeline connector uses [Fluss Java Client](https://fluss.apache.org/docs/apis/java-client/)
   to write data to Fluss.

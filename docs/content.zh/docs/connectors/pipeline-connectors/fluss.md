@@ -30,6 +30,7 @@ Fluss Pipeline 连接器可用作 Pipeline 的 *Data Sink*，将数据写入 [Fl
 ## What can the connector do?
 * 自动创建不存在的表 
 * 数据同步
+* Schema 变更同步（lenient 模式）
 
 How to create Pipeline
 ----------------
@@ -60,6 +61,7 @@ sink:
 pipeline:
   name: MySQL to Fluss Pipeline
   parallelism: 2
+  schema.change.behavior: LENIENT
 ```
 
 Pipeline Connector Options
@@ -140,7 +142,13 @@ Pipeline Connector Options
   * 桶数量由 `bucket.num` 选项控制
   * 数据分布由 `bucket.key` 选项控制。对于主键表，若未指定分桶键，则分桶键默认为主键（不含分区键）；对于无主键的日志表，若未指定分桶键，则数据将随机分配到各个桶中。 
 
-* 不支持 schema 变更同步。如果需要忽略 schema 变更，可使用 `schema.change.behavior: IGNORE`。
+* 支持在 `lenient` 模式下进行 Schema 变更同步，通过 `schema.change.behavior: lenient` 配置。支持以下 Schema 变更事件：
+  * **新增列** — 新列会追加到 Fluss 表中。
+  * **删除列** — 支持，列会从 Fluss 表中删除。
+  * **重命名非空列** — 由于 Fluss 不支持直接重命名非空列，此操作会被转换为新增列 + 将旧列类型修改为可空的序列。
+  * **修改列类型** — Fluss 不支持。如果上游源发送了修改列类型事件，在 lenient 模式下会被忽略。
+
+  要启用 Schema 变更同步，请在 pipeline 中配置 `schema.change.behavior: lenient`。如果想要忽略所有 Schema 变更，使用 `schema.change.behavior: IGNORE`。
 
 * 关于数据同步， Pipeline 连接器使用 [Fluss Java Client](https://fluss.apache.org/docs/apis/java-client/) 向 Fluss 写入数据.
 
