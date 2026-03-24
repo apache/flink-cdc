@@ -55,7 +55,7 @@ Flink CDC 提供了可用于 YAML 作业的 Pipeline Source 和 Sink 连接器�
 | <font color="DarkCyan">3.3.x</font> |                        <font color="MediumVioletRed">1.19.\*</font>, <font color="MediumVioletRed">1.20.\*</font>                        |      Mysql      | StarRocks,Doris,Paimon,Kafka,ElasticSearch,OceanBase,MaxCompute |                                   |
 | <font color="DarkCyan">3.4.x</font> |                        <font color="MediumVioletRed">1.19.\*</font>, <font color="MediumVioletRed">1.20.\*</font>                        |   Mysql   | StarRocks,Doris,Paimon,Kafka,ElasticSearch,OceanBase,MaxCompute,Iceberg |                                   |
 | <font color="DarkCyan">3.5.x</font> |                        <font color="MediumVioletRed">1.19.\*</font>, <font color="MediumVioletRed">1.20.\*</font>                        | Mysql, Postgres | StarRocks,Doris,Paimon,Kafka,ElasticSearch,OceanBase,MaxCompute,Iceberg,Fluss |                                   |
-| <font color="DarkCyan">3.6.x</font> |                        <font color="MediumVioletRed">1.19.\*</font>, <font color="MediumVioletRed">1.20.\*</font>                        | Mysql, Postgres | StarRocks,Doris,Paimon,Kafka,ElasticSearch,OceanBase,MaxCompute,Iceberg,Fluss |                                   |
+| <font color="DarkCyan">3.6.x</font> |                        <font color="MediumVioletRed">1.20.\*</font>, <font color="MediumVioletRed">2.2.\*</font>                        | Mysql, Postgres | StarRocks,Doris,Paimon,Kafka,ElasticSearch,OceanBase,MaxCompute,Iceberg,Fluss,Oracle,Hudi | Hudi 仅支持 Flink 1.20.* |
 
 
 ## Develop Your Own Connector
