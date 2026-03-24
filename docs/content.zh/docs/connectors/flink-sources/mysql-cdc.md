@@ -30,9 +30,9 @@ MySQL CDC 连接器允许从 MySQL 数据库读取快照数据和增量数据。
 
 ## 支持的数据库
 
-| Connector | Database                                                                                                                                                                                                                                                                                                                                                                                               | Driver              |
-|-----------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------|
-| mysql-cdc | <li> [MySQL](https://dev.mysql.com/doc): 5.6, 5.7, 8.0.x <li> [RDS MySQL](https://www.aliyun.com/product/rds/mysql): 5.6, 5.7, 8.0.x <li> [PolarDB MySQL](https://www.aliyun.com/product/polardb): 5.6, 5.7, 8.0.x <li> [Aurora MySQL](https://aws.amazon.com/cn/rds/aurora): 5.6, 5.7, 8.0.x <li> [MariaDB](https://mariadb.org): 10.x <li> [PolarDB X](https://github.com/ApsaraDB/galaxysql): 2.0.1 | JDBC Driver: 8.0.27 |
+| Connector | Database                                                                                                                                                                                                                                                                                                                                                                                                | Driver              |
+|-----------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------|
+| mysql-cdc | <li> [MySQL](https://dev.mysql.com/doc): 5.7, 8.0.x, 8.4+ <li> [RDS MySQL](https://www.aliyun.com/product/rds/mysql): 5.6, 5.7, 8.0.x <li> [PolarDB MySQL](https://www.aliyun.com/product/polardb): 5.6, 5.7, 8.0.x <li> [Aurora MySQL](https://aws.amazon.com/cn/rds/aurora): 5.6, 5.7, 8.0.x <li> [MariaDB](https://mariadb.org): 10.x <li> [PolarDB X](https://github.com/ApsaraDB/galaxysql): 2.0.1 | JDBC Driver: 8.0.27 |
 
 依赖
 ------------
@@ -120,6 +120,16 @@ mysql> FLUSH PRIVILEGES;
 当为大型数据库创建初始一致快照时，你建立的连接可能会在读取表时碰到超时问题。你可以通过在 MySQL 侧配置 interactive_timeout 和 wait_timeout 来缓解此类问题。
 - `interactive_timeout`: 服务器在关闭交互连接之前等待活动的秒数。 更多信息请参考 [MySQL documentations](https://dev.mysql.com/doc/refman/8.0/en/server-system-variables.html#sysvar_interactive_timeout).
 - `wait_timeout`: 服务器在关闭非交互连接之前等待活动的秒数。 更多信息请参考 [MySQL documentations](https://dev.mysql.com/doc/refman/8.0/en/server-system-variables.html#sysvar_wait_timeout).
+
+
+### MySQL 8.4+ 兼容性
+
+MySQL 8.4 引入了一些影响 CDC 连接器的重大变更：
+
+- `SHOW MASTER STATUS` 已被弃用，替换为 `SHOW BINARY LOG STATUS`
+- 错误消息术语从 `slave/master` 变更为 `replica/source`
+
+MySQL CDC 连接器会自动探测 MySQL 服务器版本，并根据服务器版本使用相应的 SQL 语句。这确保了与 MySQL 8.4+ 及更早版本的兼容性，无需额外配置。
 
 
 如何创建 MySQL CDC 表
