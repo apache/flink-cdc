@@ -586,6 +586,21 @@ class SnapshotSplitReaderTest extends MySqlSourceTestBase {
                                 "UPDATE " + tableId + " SET address = 'Beijing' WHERE id = 103");
                         mySqlConnection.commit();
                     } else if (split.splitId().equals(tableId + ":1")) {
+                        // To verify that FLINK-39315 is fixed, generate sufficient binlog events,
+                        // so that the MySqlBinlogSplitReadTask runs long enough to exercise the
+                        // context-running checks in binlog reading backfill phase.
+                        for (int i = 0; i < 1000; i++) {
+                            mySqlConnection.execute(
+                                    "UPDATE "
+                                            + tableId
+                                            + " SET address = 'Beijing' WHERE id = 106");
+                            mySqlConnection.commit();
+                            mySqlConnection.execute(
+                                    "UPDATE "
+                                            + tableId
+                                            + " SET address = 'Shanghai' WHERE id = 106");
+                            mySqlConnection.commit();
+                        }
                         mySqlConnection.execute(
                                 "UPDATE " + tableId + " SET address = 'Beijing' WHERE id = 106");
                         mySqlConnection.commit();
