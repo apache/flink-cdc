@@ -135,7 +135,7 @@ public class PostgresPipelineRecordEmitter<T> extends PostgresSourceRecordEmitte
             maybeSendCreateTableEventFromCache(tableId, output);
         } else if (isDataChangeRecord(element)) {
             handleDataChangeRecord(element, output);
-        } else if (isSchemaChangeEvent(element) && sourceConfig.isSchemaChangeEnabled()) {
+        } else if (isSchemaChangeEvent(element) && sourceConfig.isIncludeSchemaChanges()) {
             handleSchemaChangeRecord(element, output, splitState);
         }
         super.processElement(element, output, splitState);

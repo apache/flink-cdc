@@ -116,12 +116,14 @@ public class PostgresE2eITCase extends PipelineTestEnvironment {
                                 + "  scan.startup.mode: initial\n"
                                 + "  server-time-zone: UTC\n"
                                 + "  connect.timeout: 120s\n"
+                                + "  schema-change.enabled: true\n"
                                 + "\n"
                                 + "sink:\n"
                                 + "  type: values\n"
                                 + "\n"
                                 + "pipeline:\n"
-                                + "  parallelism: %d",
+                                + "  parallelism: %d\n"
+                                + "  schema.change.behavior: evolve",
                         INTER_CONTAINER_POSTGRES_ALIAS,
                         5432,
                         POSTGRES_TEST_USER,
@@ -172,5 +174,47 @@ public class PostgresE2eITCase extends PipelineTestEnvironment {
             LOG.error("Update table for CDC failed.", e);
             throw new RuntimeException(e);
         }
+
+        LOG.info("Begin schema change stage.");
+
+        try (Connection conn =
+                        getJdbcConnection(
+                                POSTGRES_CONTAINER, postgresInventoryDatabase.getDatabaseName());
+                Statement stat = conn.createStatement()) {
+            // Test ADD COLUMN
+            stat.execute("ALTER TABLE inventory.products ADD COLUMN category VARCHAR(255);");
+            stat.execute(
+                    "INSERT INTO inventory.products VALUES (default, 'widget', 'A small widget', 1.5, 'tools');");
+
+            // Test DROP COLUMN
+            stat.execute("ALTER TABLE inventory.products DROP COLUMN weight;");
+            stat.execute(
+                    "INSERT INTO inventory.products VALUES (default, 'gadget', 'A useful gadget', 'electronics');");
+
+            // Test RENAME COLUMN
+            stat.execute(
+                    "ALTER TABLE inventory.products RENAME COLUMN category TO product_category;");
+            stat.execute(
+                    "INSERT INTO inventory.products VALUES (default, 'gizmo', 'A fancy gizmo', 'gadgets');");
+        } catch (Exception e) {
+            LOG.error("Schema change test failed.", e);
+            throw new RuntimeException(e);
+        }
+
+        // Validate schema change events and corresponding data
+        waitUntilSpecificEvent(
+                "AddColumnEvent{tableId=inventory.products, addedColumns=[ColumnWithPosition{column=`category` VARCHAR(255), position=LAST, existedColumnName=null}]}");
+        waitUntilSpecificEvent(
+                "DataChangeEvent{tableId=inventory.products, before=[], after=[110, widget, A small widget, 1.5, tools], op=INSERT, meta=()}");
+
+        waitUntilSpecificEvent(
+                "DropColumnEvent{tableId=inventory.products, droppedColumnNames=[weight]}");
+        waitUntilSpecificEvent(
+                "DataChangeEvent{tableId=inventory.products, before=[], after=[111, gadget, A useful gadget, electronics], op=INSERT, meta=()}");
+
+        waitUntilSpecificEvent(
+                "RenameColumnEvent{tableId=inventory.products, nameMapping={category=product_category}}");
+        waitUntilSpecificEvent(
+                "DataChangeEvent{tableId=inventory.products, before=[], after=[112, gizmo, A fancy gizmo, gadgets], op=INSERT, meta=()}");
     }
 }

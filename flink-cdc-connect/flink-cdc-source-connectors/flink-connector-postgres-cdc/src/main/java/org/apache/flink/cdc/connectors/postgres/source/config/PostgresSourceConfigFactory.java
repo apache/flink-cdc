@@ -57,8 +57,6 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
     private boolean includeDatabaseInTableId =
             PostgresSourceOptions.TABLE_ID_INCLUDE_DATABASE.defaultValue();
 
-    private boolean schemaChangeEnabled = false;
-
     /** Creates a new {@link PostgresSourceConfig} for the given subtask {@code subtaskId}. */
     @Override
     public PostgresSourceConfig create(int subtaskId) {
@@ -142,8 +140,7 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
                 lsnCommitCheckpointsDelay,
                 assignUnboundedChunkFirst,
                 includePartitionedTables,
-                includeDatabaseInTableId,
-                schemaChangeEnabled);
+                includeDatabaseInTableId);
     }
 
     /**
@@ -200,10 +197,5 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
     /** Set whether to include database in the generated Table ID. */
     public void setIncludeDatabaseInTableId(boolean includeDatabaseInTableId) {
         this.includeDatabaseInTableId = includeDatabaseInTableId;
-    }
-
-    /** Set whether to infer schema change event on relation message. */
-    public void enableSchemaChange(boolean schemaChangeEnabled) {
-        this.schemaChangeEnabled = schemaChangeEnabled;
     }
 }

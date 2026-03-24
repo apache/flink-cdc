@@ -40,7 +40,6 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
     private final int lsnCommitCheckpointsDelay;
     private final boolean includePartitionedTables;
     private final boolean includeDatabaseInTableId;
-    private final boolean schemaChangeEnabled;
 
     public PostgresSourceConfig(
             int subtaskId,
@@ -72,8 +71,7 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
             int lsnCommitCheckpointsDelay,
             boolean assignUnboundedChunkFirst,
             boolean includePartitionedTables,
-            boolean includeDatabaseInTableId,
-            boolean schemaChangeEnabled) {
+            boolean includeDatabaseInTableId) {
         super(
                 startupOptions,
                 databaseList,
@@ -105,7 +103,6 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
         this.lsnCommitCheckpointsDelay = lsnCommitCheckpointsDelay;
         this.includePartitionedTables = includePartitionedTables;
         this.includeDatabaseInTableId = includeDatabaseInTableId;
-        this.schemaChangeEnabled = schemaChangeEnabled;
     }
 
     /**
@@ -158,10 +155,5 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
     /** Returns whether to include database in the generated Table ID. */
     public boolean isIncludeDatabaseInTableId() {
         return includeDatabaseInTableId;
-    }
-
-    /** Returns whether to infer column types via JDBC TypeRegistry on schema change events. */
-    public boolean isSchemaChangeEnabled() {
-        return schemaChangeEnabled;
     }
 }

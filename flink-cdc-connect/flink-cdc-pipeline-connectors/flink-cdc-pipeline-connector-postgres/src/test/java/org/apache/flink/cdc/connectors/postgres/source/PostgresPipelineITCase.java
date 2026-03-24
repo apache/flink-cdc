@@ -620,7 +620,7 @@ public class PostgresPipelineITCase extends PostgresTestBase {
         configFactory.database(inventoryDatabase.getDatabaseName());
         configFactory.slotName(slotName);
         configFactory.decodingPluginName("pgoutput");
-        configFactory.enableSchemaChange(true);
+        configFactory.includeSchemaChanges(true);
 
         FlinkSourceProvider sourceProvider =
                 (FlinkSourceProvider)
