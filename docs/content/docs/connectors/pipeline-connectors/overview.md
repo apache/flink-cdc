@@ -51,17 +51,18 @@ definition.
 
 
 ## Supported Flink Versions
-The following table shows the version mapping between Flink<sup>®</sup> CDC Pipeline Connectors and Flink<sup>®</sup>
 
-|    Flink<sup>®</sup> CDC Version    |                                                        Flink<sup>®</sup> Version                                                         | Pipeline Source |                          Pipeline Sink                          |                   Notes                   |
-|:-----------------------------------:|:----------------------------------------------------------------------------------------------------------------------------------------:|:---------------:|:---------------------------------------------------------------:|:-----------------------------------------:|
-| <font color="DarkCyan">3.0.x</font> |                        <font color="MediumVioletRed">1.17.\*</font>, <font color="MediumVioletRed">1.18.\*</font>                        |      Mysql      |                         StarRocks,Doris                         |                                           |
-| <font color="DarkCyan">3.1.x</font> | <font color="MediumVioletRed">1.17.\*</font>, <font color="MediumVioletRed">1.18.\*</font>, <font color="MediumVioletRed">1.19.\*</font> |      Mysql      |                  StarRocks,Doris,Paimon,Kafka                   | only flink-cdc 3.1.1 support flink 1.19.* |
-| <font color="DarkCyan">3.2.x</font> | <font color="MediumVioletRed">1.17.\*</font>, <font color="MediumVioletRed">1.18.\*</font>, <font color="MediumVioletRed">1.19.\*</font> |      Mysql      |           StarRocks,Doris,Paimon,Kafka,ElasticSearch            |                                           |
-| <font color="DarkCyan">3.3.x</font> |                        <font color="MediumVioletRed">1.19.\*</font>, <font color="MediumVioletRed">1.20.\*</font>                        |      Mysql      | StarRocks,Doris,Paimon,Kafka,ElasticSearch,OceanBase,MaxCompute |                                           |
-| <font color="DarkCyan">3.4.x</font> |                        <font color="MediumVioletRed">1.19.\*</font>, <font color="MediumVioletRed">1.20.\*</font>                        |   Mysql   | StarRocks,Doris,Paimon,Kafka,ElasticSearch,OceanBase,MaxCompute,Iceberg |                                           |
-| <font color="DarkCyan">3.5.x</font> |                        <font color="MediumVioletRed">1.19.\*</font>, <font color="MediumVioletRed">1.20.\*</font>                        | Mysql, Postgres | StarRocks,Doris,Paimon,Kafka,ElasticSearch,OceanBase,MaxCompute,Iceberg,Fluss |                                           |
-| <font color="DarkCyan">3.6.x</font> |                        <font color="MediumVioletRed">1.20.\*</font>, <font color="MediumVioletRed">2.2.\*</font>                        | Mysql, Postgres | StarRocks,Doris,Paimon,Kafka,ElasticSearch,OceanBase,MaxCompute,Iceberg,Fluss,Oracle,Hudi | Hudi only supports Flink 1.20.* |
+The following table shows the version mapping between Flink CDC Pipeline Connectors and Flink:
+
+| Flink CDC Version |       Flink Version       |      Pipeline Source      |                                        Pipeline Sink                                        |                  Notes                   |
+|:-----------------:|:-------------------------:|:-------------------------:|:-------------------------------------------------------------------------------------------:|:----------------------------------------:|
+|     **3.0.x**     |     1.17.\*, 1.18.\*      |           MySQL           |                                      StarRocks, Doris                                       |                                          |
+|     **3.1.x**     | 1.17.\*, 1.18.\*, 1.19.\* |           MySQL           |                               StarRocks, Doris, Paimon, Kafka                               | Only flink-cdc 3.1.1 supports Flink 1.19 |
+|     **3.2.x**     | 1.17.\*, 1.18.\*, 1.19.\* |           MySQL           |                       StarRocks, Doris, Paimon, Kafka, Elasticsearch                        |                                          |
+|     **3.3.x**     |     1.19.\*, 1.20.\*      |           MySQL           |            StarRocks, Doris, Paimon, Kafka, Elasticsearch, OceanBase, MaxCompute            |                                          |
+|     **3.4.x**     |     1.19.\*, 1.20.\*      |           MySQL           |       StarRocks, Doris, Paimon, Kafka, Elasticsearch, OceanBase, MaxCompute, Iceberg        |                                          |
+|     **3.5.x**     |     1.19.\*, 1.20.\*      |     MySQL, PostgreSQL     |    StarRocks, Doris, Paimon, Kafka, Elasticsearch, OceanBase, MaxCompute, Iceberg, Fluss    |                                          |
+|     **3.6.x**     |      1.20.\*, 2.2.\*      | MySQL, PostgreSQL, Oracle | StarRocks, Doris, Paimon, Kafka, Elasticsearch, OceanBase, MaxCompute, Iceberg, Fluss, Hudi |                                          |
 
 
 ## Develop Your Own Connector
