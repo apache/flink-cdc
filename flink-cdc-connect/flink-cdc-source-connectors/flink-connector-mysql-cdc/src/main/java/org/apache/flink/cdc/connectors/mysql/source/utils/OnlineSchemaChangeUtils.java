@@ -110,7 +110,8 @@ public class OnlineSchemaChangeUtils {
         Struct value = (Struct) record.value();
         try {
             String ddl =
-                    OBJECT_MAPPER.readTree(value.getString(HISTORY_RECORD_FIELD))
+                    OBJECT_MAPPER
+                            .readTree(value.getString(HISTORY_RECORD_FIELD))
                             .get(HistoryRecord.Fields.DDL_STATEMENTS)
                             .asText()
                             .toLowerCase();
@@ -140,7 +141,8 @@ public class OnlineSchemaChangeUtils {
 
         try {
             String ddl =
-                    OBJECT_MAPPER.readTree(value.getString(HISTORY_RECORD_FIELD))
+                    OBJECT_MAPPER
+                            .readTree(value.getString(HISTORY_RECORD_FIELD))
                             .get(HistoryRecord.Fields.DDL_STATEMENTS)
                             .asText()
                             .toLowerCase();
