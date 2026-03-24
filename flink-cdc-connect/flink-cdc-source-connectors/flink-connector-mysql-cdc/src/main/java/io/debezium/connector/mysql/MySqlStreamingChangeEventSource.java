@@ -1106,23 +1106,30 @@ public class MySqlStreamingChangeEventSource
                     (event) -> handleRowsQuery(effectiveOffsetContext, event));
         }
 
-        BinaryLogClient.EventListener listener;
+        BinaryLogClient.EventListener eventListener;
         if (connectorConfig.bufferSizeForStreamingChangeEventSource() == 0) {
-            listener = (event) -> handleEvent(partition, effectiveOffsetContext, event);
+            eventListener = (event) -> handleEvent(partition, effectiveOffsetContext, event);
         } else {
             EventBuffer buffer =
                     new EventBuffer(
                             connectorConfig.bufferSizeForStreamingChangeEventSource(),
                             this,
                             context);
-            listener = (event) -> buffer.add(partition, effectiveOffsetContext, event);
+            eventListener = (event) -> buffer.add(partition, effectiveOffsetContext, event);
         }
-        client.registerEventListener(listener);
 
-        client.registerLifecycleListener(new ReaderThreadLifecycleListener(effectiveOffsetContext));
-        client.registerEventListener((event) -> onEvent(effectiveOffsetContext, event));
-        if (LOGGER.isDebugEnabled()) {
-            client.registerEventListener((event) -> logEvent(effectiveOffsetContext, event));
+        ReaderThreadLifecycleListener lifecycleListener =
+                new ReaderThreadLifecycleListener(effectiveOffsetContext);
+        BinaryLogClient.EventListener metricsEventListener =
+                (event) -> onEvent(effectiveOffsetContext, event);
+        BinaryLogClient.EventListener logEventListener =
+                LOGGER.isDebugEnabled() ? (event) -> logEvent(effectiveOffsetContext, event) : null;
+
+        client.registerEventListener(eventListener);
+        client.registerLifecycleListener(lifecycleListener);
+        client.registerEventListener(metricsEventListener);
+        if (logEventListener != null) {
+            client.registerEventListener(logEventListener);
         }
 
         final boolean isGtidModeEnabled = connection.isGtidModeEnabled();
@@ -1179,6 +1186,7 @@ public class MySqlStreamingChangeEventSource
         // Only when we reach the first BEGIN event will we start to skip events ...
         skipEvent = false;
 
+        Throwable executionError = null;
         try {
             // Start the log reader, which starts background threads ...
             if (context.isRunning()) {
@@ -1263,6 +1271,13 @@ public class MySqlStreamingChangeEventSource
                 client.disconnect();
             } catch (Exception e) {
                 LOGGER.info("Exception while stopping binary log client", e);
+            }
+
+            client.unregisterEventListener(eventListener);
+            client.unregisterEventListener(metricsEventListener);
+            client.unregisterLifecycleListener(lifecycleListener);
+            if (logEventListener != null) {
+                client.unregisterEventListener(logEventListener);
             }
         }
     }
