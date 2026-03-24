@@ -45,7 +45,6 @@ import org.apache.flink.cdc.common.event.SchemaChangeEventTypeFamily;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
-import org.apache.flink.cdc.common.exceptions.UnsupportedSchemaChangeEventException;
 import org.apache.flink.cdc.common.factories.DataSinkFactory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
@@ -489,18 +488,8 @@ public class PaimonSinkITCase {
                         Row.ofKind(RowKind.INSERT, "6", "6"));
 
         TruncateTableEvent truncateTableEvent = new TruncateTableEvent(table1);
-        if (enableDeleteVector) {
-            Assertions.assertThatThrownBy(
-                            () -> metadataApplier.applySchemaChange(truncateTableEvent))
-                    .isExactlyInstanceOf(SchemaEvolveException.class)
-                    .cause()
-                    .isExactlyInstanceOf(UnsupportedSchemaChangeEventException.class)
-                    .extracting("exceptionMessage")
-                    .isEqualTo("Unable to truncate a table with deletion vectors enabled.");
-        } else {
-            metadataApplier.applySchemaChange(truncateTableEvent);
-            Assertions.assertThat(fetchResults(table1)).isEmpty();
-        }
+        metadataApplier.applySchemaChange(truncateTableEvent);
+        Assertions.assertThat(fetchResults(table1)).isEmpty();
 
         DropTableEvent dropTableEvent = new DropTableEvent(table1);
         metadataApplier.applySchemaChange(dropTableEvent);
