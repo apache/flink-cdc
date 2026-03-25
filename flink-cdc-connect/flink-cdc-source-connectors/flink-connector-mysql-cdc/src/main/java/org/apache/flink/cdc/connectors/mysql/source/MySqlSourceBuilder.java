@@ -224,7 +224,6 @@ public class MySqlSourceBuilder<T> {
         return this;
     }
 
-
     /** Specifies the startup options. */
     public MySqlSourceBuilder<T> startupOptions(StartupOptions startupOptions) {
         this.configFactory.startupOptions(startupOptions);

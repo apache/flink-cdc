@@ -353,7 +353,8 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
             }
         }
 
-        // Case 3: Use still need to capture new sharding table if user disable scan new added table,
+        // Case 3: Use still need to capture new sharding table if user disable scan new added
+        // table,
         // The history records for all new added tables(including sharding table and normal table)
         // will be capture after restore from a savepoint if user enable scan new added table
         if (!statefulTaskContext.getSourceConfig().isScanNewlyAddedTableEnabled()) {
