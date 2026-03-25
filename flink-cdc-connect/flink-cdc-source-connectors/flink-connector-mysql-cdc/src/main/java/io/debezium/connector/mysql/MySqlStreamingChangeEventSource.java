@@ -87,18 +87,20 @@ import static io.debezium.util.Strings.isNullOrEmpty;
  * Copied from Debezium project(1.9.8.Final) to fix
  * https://github.com/ververica/flink-cdc-connectors/issues/1944.
  *
- * <p>Line 1432-1443 : Adjust GTID merging logic to support recovering from job which previously
+ * <p>Line 1449-1461 : Adjust GTID merging logic to support recovering from job which previously
  * specifying starting offset on start. Uses {@link GtidUtils#fixOldChannelsGtidSet} for shared
  * EARLIEST/LATEST logic.
  *
- * <p>Line 1444-1452 : Fix LATEST mode GTID merging to avoid replaying pre-checkpoint transactions
+ * <p>Line 1463-1469 : Fix LATEST mode GTID merging to avoid replaying pre-checkpoint transactions
  * when checkpoint GTID has non-contiguous ranges. Delegates to {@link
  * GtidUtils#computeLatestModeGtidSet}. See FLINK-39149.
  *
- * <p>Line 1490 : Add more error details for some exceptions.
+ * <p>Line 1507 : Add more error details for some exceptions.
  *
- * <p>Line 951-963 : Use iterator instead of index-based loop to avoid O(n²) complexity when
+ * <p>Line 954-966 : Use iterator instead of index-based loop to avoid O(n²) complexity when
  * processing LinkedList rows in handleChange method. See FLINK-38846.
+ *
+ * <p>Line 1271-1277 : Unregister listeners to avoid client reuse interference. See FLINK-39315.
  */
 public class MySqlStreamingChangeEventSource
         implements StreamingChangeEventSource<MySqlPartition, MySqlOffsetContext> {
