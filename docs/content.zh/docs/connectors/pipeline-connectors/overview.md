@@ -52,13 +52,13 @@ Flink CDC 提供了可用于 YAML 作业的 Pipeline Source 和 Sink 连接器�
 
 | Flink CDC 版本 |         Flink 版本          |      Pipeline Source      |                                        Pipeline Sink                                        |               备注                |
 |:------------:|:-------------------------:|:-------------------------:|:-------------------------------------------------------------------------------------------:|:-------------------------------:|
-|  **3.0.x**   |     1.17.\*, 1.18.\*      |           MySQL           |                                      StarRocks, Doris                                       |                                 |
-|  **3.1.x**   | 1.17.\*, 1.18.\*, 1.19.\* |           MySQL           |                               StarRocks, Doris, Paimon, Kafka                               | 仅 Flink CDC 3.1.1 支持 Flink 1.19 |
-|  **3.2.x**   | 1.17.\*, 1.18.\*, 1.19.\* |           MySQL           |                       StarRocks, Doris, Paimon, Kafka, Elasticsearch                        |                                 |
-|  **3.3.x**   |     1.19.\*, 1.20.\*      |           MySQL           |            StarRocks, Doris, Paimon, Kafka, Elasticsearch, OceanBase, MaxCompute            |                                 |
-|  **3.4.x**   |     1.19.\*, 1.20.\*      |           MySQL           |       StarRocks, Doris, Paimon, Kafka, Elasticsearch, OceanBase, MaxCompute, Iceberg        |                                 |
-|  **3.5.x**   |     1.19.\*, 1.20.\*      |     MySQL, PostgreSQL     |    StarRocks, Doris, Paimon, Kafka, Elasticsearch, OceanBase, MaxCompute, Iceberg, Fluss    |                                 |
 |  **3.6.x**   |      1.20.\*, 2.2.\*      | MySQL, PostgreSQL, Oracle | StarRocks, Doris, Paimon, Kafka, Elasticsearch, OceanBase, MaxCompute, Iceberg, Fluss, Hudi |                                 |
+|  **3.5.x**   |     1.19.\*, 1.20.\*      |     MySQL, PostgreSQL     |    StarRocks, Doris, Paimon, Kafka, Elasticsearch, OceanBase, MaxCompute, Iceberg, Fluss    |                                 |
+|  **3.4.x**   |     1.19.\*, 1.20.\*      |           MySQL           |       StarRocks, Doris, Paimon, Kafka, Elasticsearch, OceanBase, MaxCompute, Iceberg        |                                 |
+|  **3.3.x**   |     1.19.\*, 1.20.\*      |           MySQL           |            StarRocks, Doris, Paimon, Kafka, Elasticsearch, OceanBase, MaxCompute            |                                 |
+|  **3.2.x**   | 1.17.\*, 1.18.\*, 1.19.\* |           MySQL           |                       StarRocks, Doris, Paimon, Kafka, Elasticsearch                        |                                 |
+|  **3.1.x**   | 1.17.\*, 1.18.\*, 1.19.\* |           MySQL           |                               StarRocks, Doris, Paimon, Kafka                               | 仅 Flink CDC 3.1.1 支持 Flink 1.19 |
+|  **3.0.x**   |     1.17.\*, 1.18.\*      |           MySQL           |                                      StarRocks, Doris                                       |                                 |
 
 
 ## Develop Your Own Connector
