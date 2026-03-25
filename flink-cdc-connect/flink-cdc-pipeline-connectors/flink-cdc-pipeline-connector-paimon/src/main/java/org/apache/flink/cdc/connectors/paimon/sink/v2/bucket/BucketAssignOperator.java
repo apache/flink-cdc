@@ -337,6 +337,9 @@ public class BucketAssignOperator extends AbstractStreamOperatorAdapter<Event>
         Integer numAssigners = table.coreOptions().dynamicBucketInitialBuckets();
         Integer maxBucketsNum = table.coreOptions().dynamicBucketMaxBuckets();
         LOGGER.debug("Successfully get table info {}", table);
+        int minAssigners = MathUtils.min(numAssigners, totalTasksNumber);
+        int assignId = minAssigners == 1 ? 0 : currentTaskNumber;
+        int numChannels = minAssigners == 1 ? 1 : totalTasksNumber;
         return new Tuple4<>(
                 table.bucketMode(),
                 table.createRowKeyExtractor(),
@@ -344,9 +347,9 @@ public class BucketAssignOperator extends AbstractStreamOperatorAdapter<Event>
                         table.snapshotManager(),
                         commitUser,
                         table.store().newIndexFileHandler(),
-                        totalTasksNumber,
-                        MathUtils.min(numAssigners, totalTasksNumber),
-                        currentTaskNumber,
+                        numChannels,
+                        minAssigners,
+                        assignId,
                         targetRowNum,
                         maxBucketsNum),
                 new RowPartitionKeyExtractor(table.schema()));
