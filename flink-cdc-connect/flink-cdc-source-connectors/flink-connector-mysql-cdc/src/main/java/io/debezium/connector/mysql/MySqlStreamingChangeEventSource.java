@@ -1204,7 +1204,6 @@ public class MySqlStreamingChangeEventSource
         // Only when we reach the first BEGIN event will we start to skip events ...
         skipEvent = false;
 
-        Throwable executionError = null;
         try {
             // Start the log reader, which starts background threads ...
             if (context.isRunning()) {
@@ -1284,18 +1283,19 @@ public class MySqlStreamingChangeEventSource
             while (context.isRunning()) {
                 Thread.sleep(100);
             }
-        } finally {
-            try {
-                client.disconnect();
-            } catch (Exception e) {
-                LOGGER.info("Exception while stopping binary log client", e);
-            }
 
+            // Unregister listeners to avoid client reuse interference (FLINK-39315)
             client.unregisterEventListener(eventListener);
             client.unregisterEventListener(metricsEventListener);
             client.unregisterLifecycleListener(lifecycleListener);
             if (logEventListener != null) {
                 client.unregisterEventListener(logEventListener);
+            }
+        } finally {
+            try {
+                client.disconnect();
+            } catch (Exception e) {
+                LOGGER.info("Exception while stopping binary log client", e);
             }
         }
     }
