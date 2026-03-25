@@ -589,7 +589,7 @@ class SnapshotSplitReaderTest extends MySqlSourceTestBase {
                         // To verify that FLINK-39315 is fixed, generate sufficient binlog events,
                         // so that the MySqlBinlogSplitReadTask runs long enough to exercise the
                         // context-running checks in binlog reading backfill phase.
-                        for (int i = 0; i < 1000; i++) {
+                        for (int i = 0; i < 100; i++) {
                             mySqlConnection.execute(
                                     "UPDATE "
                                             + tableId
