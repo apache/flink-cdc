@@ -115,7 +115,7 @@ This guide provides a simple `pom.xml` example for packaging DataStream job JARs
         <!-- Checked the dependencies of the Flink project and below is a feasible reference. -->
         <dependency>
             <groupId>org.apache.flink</groupId>
-            <artifactId>flink-sql-connector-mysql-cdc</artifactId>
+            <artifactId>flink-connector-mysql-cdc</artifactId>
             <version>${flink.cdc.version}</version>
         </dependency>
         <dependency>
