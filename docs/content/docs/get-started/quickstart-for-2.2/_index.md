@@ -1,5 +1,5 @@
 ---
-title: "Quickstart"
+title: "Quickstart for 2.2"
 bookCollapseSection: true
 weight: 2
 ---
