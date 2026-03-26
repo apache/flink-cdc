@@ -56,30 +56,28 @@ Make sure you have the correct JDK version installed before running Flink CDC. Y
 
 Flink CDC provides a rich ecosystem of connectors to interact with various external systems:
 
-| Connector | Type |
-|-----------|------|
-| MySQL | [Source Connector]({{< ref "docs/connectors/flink-sources/mysql-cdc" >}}) / [Pipeline Source Connector]({{< ref "docs/connectors/pipeline-connectors/mysql" >}}) |
-| Oracle | [Source Connector]({{< ref "docs/connectors/flink-sources/oracle-cdc" >}}) / [Pipeline Source Connector]({{< ref "docs/connectors/pipeline-connectors/oracle" >}}) |
-| PostgreSQL | [Source Connector]({{< ref "docs/connectors/flink-sources/postgres-cdc" >}}) / [Pipeline Source Connector]({{< ref "docs/connectors/pipeline-connectors/postgres" >}}) |
-| Db2 | [Source Connector]({{< ref "docs/connectors/flink-sources/db2-cdc" >}}) |
-| MongoDB | [Source Connector]({{< ref "docs/connectors/flink-sources/mongodb-cdc" >}}) |
-| SQL Server | [Source Connector]({{< ref "docs/connectors/flink-sources/sqlserver-cdc" >}}) |
-| TiDB | [Source Connector]({{< ref "docs/connectors/flink-sources/tidb-cdc" >}}) |
-| Vitess | [Source Connector]({{< ref "docs/connectors/flink-sources/vitess-cdc" >}}) |
-| Apache Doris | [Pipeline Sink Connector]({{< ref "docs/connectors/pipeline-connectors/doris" >}}) |
-| Elasticsearch | [Pipeline Sink Connector]({{< ref "docs/connectors/pipeline-connectors/elasticsearch" >}}) |
-| Fluss | [Pipeline Sink Connector]({{< ref "docs/connectors/pipeline-connectors/fluss" >}}) |
-| Hudi | [Pipeline Sink Connector]({{< ref "docs/connectors/pipeline-connectors/hudi" >}}) |
-| Iceberg | [Pipeline Sink Connector]({{< ref "docs/connectors/pipeline-connectors/iceberg" >}}) |
-| Kafka | [Pipeline Sink Connector]({{< ref "docs/connectors/pipeline-connectors/kafka" >}}) |
-| MaxCompute | [Pipeline Sink Connector]({{< ref "docs/connectors/pipeline-connectors/maxcompute" >}}) |
-| OceanBase | [Pipeline Sink Connector]({{< ref "docs/connectors/pipeline-connectors/oceanbase" >}}) |
-| Paimon | [Pipeline Sink Connector]({{< ref "docs/connectors/pipeline-connectors/paimon" >}}) |
-| StarRocks | [Pipeline Sink Connector]({{< ref "docs/connectors/pipeline-connectors/starrocks" >}}) |
+| Connector     | Type                                                                                                                                                                   |
+|---------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| MySQL         | [Source Connector]({{< ref "docs/connectors/flink-sources/mysql-cdc" >}}) / [Pipeline Source Connector]({{< ref "docs/connectors/pipeline-connectors/mysql" >}})       |
+| Oracle        | [Source Connector]({{< ref "docs/connectors/flink-sources/oracle-cdc" >}}) / [Pipeline Source Connector]({{< ref "docs/connectors/pipeline-connectors/oracle" >}})     |
+| PostgreSQL    | [Source Connector]({{< ref "docs/connectors/flink-sources/postgres-cdc" >}}) / [Pipeline Source Connector]({{< ref "docs/connectors/pipeline-connectors/postgres" >}}) |
+| Db2           | [Source Connector]({{< ref "docs/connectors/flink-sources/db2-cdc" >}})                                                                                                |
+| MongoDB       | [Source Connector]({{< ref "docs/connectors/flink-sources/mongodb-cdc" >}})                                                                                            |
+| SQL Server    | [Source Connector]({{< ref "docs/connectors/flink-sources/sqlserver-cdc" >}})                                                                                          |
+| TiDB          | [Source Connector]({{< ref "docs/connectors/flink-sources/tidb-cdc" >}})                                                                                               |
+| Vitess        | [Source Connector]({{< ref "docs/connectors/flink-sources/vitess-cdc" >}})                                                                                             |
+| Apache Doris  | [Pipeline Sink Connector]({{< ref "docs/connectors/pipeline-connectors/doris" >}})                                                                                     |
+| Elasticsearch | [Pipeline Sink Connector]({{< ref "docs/connectors/pipeline-connectors/elasticsearch" >}})                                                                             |
+| Fluss         | [Pipeline Sink Connector]({{< ref "docs/connectors/pipeline-connectors/fluss" >}})                                                                                     |
+| Hudi          | [Pipeline Sink Connector]({{< ref "docs/connectors/pipeline-connectors/hudi" >}})                                                                                      |
+| Iceberg       | [Pipeline Sink Connector]({{< ref "docs/connectors/pipeline-connectors/iceberg" >}})                                                                                   |
+| Kafka         | [Pipeline Sink Connector]({{< ref "docs/connectors/pipeline-connectors/kafka" >}})                                                                                     |
+| MaxCompute    | [Pipeline Sink Connector]({{< ref "docs/connectors/pipeline-connectors/maxcompute" >}})                                                                                |
+| OceanBase     | [Pipeline Sink Connector]({{< ref "docs/connectors/pipeline-connectors/oceanbase" >}})                                                                                 |
+| Paimon        | [Pipeline Sink Connector]({{< ref "docs/connectors/pipeline-connectors/paimon" >}})                                                                                    |
+| StarRocks     | [Pipeline Sink Connector]({{< ref "docs/connectors/pipeline-connectors/starrocks" >}})                                                                                 |
 
-{{< hint info >}}
-For detailed information about each connector including supported versions, features, and configuration options, please refer to the [Connectors]({{< ref "docs/connectors" >}}) section.
-{{< /hint >}}
+For connector download links, please visit the [Flink Source Connectors]({{< ref "docs/connectors/flink-sources/overview#supported-connectors" >}}) and [Pipeline Connectors]({{< ref "docs/connectors/pipeline-connectors/overview#supported-connectors" >}}) pages.
 
 ## How to Use Flink CDC
 
