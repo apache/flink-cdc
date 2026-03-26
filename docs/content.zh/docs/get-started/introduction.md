@@ -37,6 +37,46 @@ Flink CDC 深度集成并由 Apache Flink 驱动，提供以下核心功能：
 * ✅ 整库同步
 * ✅具备表结构变更自动同步的能力（Schema Evolution），
 
+## 环境要求
+
+Flink CDC 有以下环境要求：
+
+* **JDK**：JDK 11 或更高版本（Flink CDC 从 3.6.0 版本开始基于 JDK 11 构建）
+* **Apache Flink**：Flink 1.20.x 或 Flink 2.2.x
+
+{{< hint info >}}
+在运行 Flink CDC 之前，请确保已安装正确的 JDK 版本。您可以使用 `java -version` 命令验证 Java 版本。
+{{< /hint >}}
+
+## 支持的连接器
+
+Flink CDC 提供了丰富的连接器生态系统，用于与各种外部系统进行交互：
+
+| 连接器 | 类型 |
+|-----------|------|
+| MySQL | [Source Connector]({{< ref "docs/connectors/flink-sources/mysql-cdc" >}}) / [Pipeline Source Connector]({{< ref "docs/connectors/pipeline-connectors/mysql" >}}) |
+| Oracle | [Source Connector]({{< ref "docs/connectors/flink-sources/oracle-cdc" >}}) / [Pipeline Source Connector]({{< ref "docs/connectors/pipeline-connectors/oracle" >}}) |
+| PostgreSQL | [Source Connector]({{< ref "docs/connectors/flink-sources/postgres-cdc" >}}) / [Pipeline Source Connector]({{< ref "docs/connectors/pipeline-connectors/postgres" >}}) |
+| Db2 | [Source Connector]({{< ref "docs/connectors/flink-sources/db2-cdc" >}}) |
+| MongoDB | [Source Connector]({{< ref "docs/connectors/flink-sources/mongodb-cdc" >}}) |
+| SQL Server | [Source Connector]({{< ref "docs/connectors/flink-sources/sqlserver-cdc" >}}) |
+| TiDB | [Source Connector]({{< ref "docs/connectors/flink-sources/tidb-cdc" >}}) |
+| Vitess | [Source Connector]({{< ref "docs/connectors/flink-sources/vitess-cdc" >}}) |
+| Apache Doris | [Pipeline Sink Connector]({{< ref "docs/connectors/pipeline-connectors/doris" >}}) |
+| Elasticsearch | [Pipeline Sink Connector]({{< ref "docs/connectors/pipeline-connectors/elasticsearch" >}}) |
+| Fluss | [Pipeline Sink Connector]({{< ref "docs/connectors/pipeline-connectors/fluss" >}}) |
+| Hudi | [Pipeline Sink Connector]({{< ref "docs/connectors/pipeline-connectors/hudi" >}}) |
+| Iceberg | [Pipeline Sink Connector]({{< ref "docs/connectors/pipeline-connectors/iceberg" >}}) |
+| Kafka | [Pipeline Sink Connector]({{< ref "docs/connectors/pipeline-connectors/kafka" >}}) |
+| MaxCompute | [Pipeline Sink Connector]({{< ref "docs/connectors/pipeline-connectors/maxcompute" >}}) |
+| OceanBase | [Pipeline Sink Connector]({{< ref "docs/connectors/pipeline-connectors/oceanbase" >}}) |
+| Paimon | [Pipeline Sink Connector]({{< ref "docs/connectors/pipeline-connectors/paimon" >}}) |
+| StarRocks | [Pipeline Sink Connector]({{< ref "docs/connectors/pipeline-connectors/starrocks" >}}) |
+
+{{< hint info >}}
+有关每个连接器的详细信息，包括支持的版本、功能和配置选项，请参考[连接器]({{< ref "docs/connectors" >}})部分。
+{{< /hint >}}
+
 ## 如何使用 Flink CDC
 
 Flink CDC 提供了基于 `YAML` 格式的用户 API，更适合于数据集成场景。以下是一个 `YAML` 文件的示例，它定义了一个数据管道(Pipeline)，该Pipeline从 MySQL 捕获实时变更，并将它们同步到 Apache Doris：
@@ -77,8 +117,10 @@ pipeline:
 
 查看快速入门指南，了解如何建立一个 Flink CDC Pipeline：
 
-- [MySQL to Apache Doris]({{< ref "docs/get-started/quickstart/mysql-to-doris" >}})
-- [MySQL to StarRocks]({{< ref "docs/get-started/quickstart/mysql-to-starrocks" >}})
+| 示例 | 版本 |
+|---------|---------|
+| MySQL to Apache Doris | [1.20.x]({{< ref "docs/get-started/quickstart-for-1.20/mysql-to-doris" >}}) / [2.2.x]({{< ref "docs/get-started/quickstart-for-2.2/mysql-to-doris" >}}) |
+| MySQL to StarRocks | [1.20.x]({{< ref "docs/get-started/quickstart-for-1.20/mysql-to-starrocks" >}}) / [2.2.x]({{< ref "docs/get-started/quickstart-for-2.2/mysql-to-starrocks" >}}) |
 
 ### 理解核心概念
 
