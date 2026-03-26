@@ -71,6 +71,7 @@ public class TiDBValueConverters extends JdbcValueConverters {
     }
 
     private static final Logger LOGGER = LoggerFactory.getLogger(TiDBValueConverters.class);
+
     /** Used to parse values of TIME columns. Format: 000:00:00.000000. */
     private static final Pattern TIME_FIELD_PATTERN =
             Pattern.compile("(\\-?[0-9]*):([0-9]*):([0-9]*)(\\.([0-9]*))?");
