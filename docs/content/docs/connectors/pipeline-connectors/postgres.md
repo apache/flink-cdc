@@ -28,7 +28,6 @@ under the License.
 
 Postgres connector allows reading snapshot data and incremental data from Postgres database and provides end-to-end full-database data synchronization capabilities.
 This document describes how to setup the Postgres connector.
-Note: Since the Postgres WAL log cannot parse table structure change records, Postgres CDC Pipeline Source does not support synchronizing table structure changes currently.
 
 ## Example
 
@@ -46,6 +45,7 @@ source:
    tables: adb.\.*.\.*
    decoding.plugin.name:  pgoutput
    slot.name: pgtest
+   schema-change.enabled: true
 
 sink:
   type: fluss
@@ -60,6 +60,7 @@ sink:
 pipeline:
    name: Postgres to Fluss Pipeline
    parallelism: 4
+   schema.change.behavior: lenient
 ```
 
 ## Connector Options
@@ -271,6 +272,17 @@ pipeline:
         Whether to include database in the generated Table ID.<br>
         If set to true, the Table ID will be in the format (database, schema, table).<br>
         If set to false, the Table ID will be in the format (schema, table).<br>
+        Defaults to false.
+      </td>
+    </tr>
+    <tr>
+      <td>schema-change.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        Whether to enable schema change inference for the Postgres source. When enabled, the connector infers schema change events (add column, drop column, rename column, alter column type) by comparing pgoutput Relation messages against the cached schema.<br>
+        Requires <code>decoding.plugin.name</code> to be set to <code>pgoutput</code>.<br>
         Defaults to false.
       </td>
     </tr>
