@@ -244,6 +244,21 @@ Data Type Mapping
       <td>BYTES</td>
       <td></td>
     </tr>
+    <tr>
+      <td>ARRAY</td>
+      <td>ARRAY</td>
+      <td>元素类型递归映射。</td>
+    </tr>
+    <tr>
+      <td>MAP</td>
+      <td>MAP</td>
+      <td>键和值类型递归映射。</td>
+    </tr>
+    <tr>
+      <td>ROW</td>
+      <td>ROW</td>
+      <td>字段类型递归映射。</td>
+    </tr>
     </tbody>
 </table>
 </div>

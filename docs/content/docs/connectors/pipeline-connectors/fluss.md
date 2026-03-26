@@ -247,6 +247,21 @@ Data Type Mapping
       <td>BYTES</td>
       <td></td>
     </tr>
+    <tr>
+      <td>ARRAY</td>
+      <td>ARRAY</td>
+      <td>Element type is mapped recursively.</td>
+    </tr>
+    <tr>
+      <td>MAP</td>
+      <td>MAP</td>
+      <td>Key and value types are mapped recursively.</td>
+    </tr>
+    <tr>
+      <td>ROW</td>
+      <td>ROW</td>
+      <td>Field types are mapped recursively.</td>
+    </tr>
     </tbody>
 </table>
 </div>

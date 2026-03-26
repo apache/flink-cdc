@@ -41,7 +41,7 @@ source:
    username: admin
    password: pass
    # 需要确保所有的表来自同一个database
-   tables: adb.\.*\.\.*
+   tables: adb.\.*.\.*
    decoding.plugin.name:  pgoutput
    slot.name: pgtest
    schema-change.enabled: true

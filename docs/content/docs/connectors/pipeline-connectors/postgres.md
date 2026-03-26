@@ -42,7 +42,7 @@ source:
    username: admin
    password: pass
    # make sure all the tables share same database.
-   tables: adb.\.*\.\.*
+   tables: adb.\.*.\.*
    decoding.plugin.name:  pgoutput
    slot.name: pgtest
    schema-change.enabled: true
