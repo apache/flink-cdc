@@ -61,7 +61,7 @@ You need a Linux or macOS computer with Docker installed before starting.
 
 After the cluster gets started, you can access the Flink Web UI at [http://localhost:8081/](http://localhost:8081/).
 
-{{< img src="/fig/mysql-Kafka-tutorial/flink-ui.png" alt="Flink UI" >}}
+{{< img src="/fig/mysql-Kafka-tutorial/flink-ui-flink22.png" alt="Flink UI" >}}
 
 Run `start-cluster.sh` multiple times to start more TaskManagers if necessary.  
 
@@ -230,7 +230,7 @@ You need to build your own SNAPSHOT versions based on master or release branches
 
     A job named `Sync MySQL Database to Kafka` could be seen running in the Flink Web UI.
 
-    {{< img src="/fig/mysql-Kafka-tutorial/mysql-to-Kafka.png" alt="MySQL-to-Kafka" >}}
+    {{< img src="/fig/mysql-Kafka-tutorial/mysql-to-Kafka-flink22.png" alt="MySQL-to-Kafka" >}}
 
     We can subscribe the sink kafka topic to monitor messages sent to Kafka with this command:  
 

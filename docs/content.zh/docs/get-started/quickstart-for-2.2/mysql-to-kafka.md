@@ -59,7 +59,7 @@ under the License.
 
 启动成功后，即可在 [http://localhost:8081/](http://localhost:8081/) 访问到 Flink Web UI，如下所示：
 
-{{< img src="/fig/mysql-Kafka-tutorial/flink-ui.png" alt="Flink UI" >}}
+{{< img src="/fig/mysql-Kafka-tutorial/flink-ui-flink22.png" alt="Flink UI" >}}
 
 多次执行 `start-cluster.sh` 可以拉起多个 TaskManager。
 
@@ -230,7 +230,7 @@ under the License.
 
     在 Flink Web UI，可以看到一个名为 `Sync MySQL Database to Kafka` 的任务正在运行。
 
-    {{< img src="/fig/mysql-Kafka-tutorial/mysql-to-Kafka.png" alt="MySQL-to-Kafka" >}}
+    {{< img src="/fig/mysql-Kafka-tutorial/mysql-to-Kafka-flink22.png" alt="MySQL-to-Kafka" >}}
 
     您可以通过 Kafka 提供的命令行工具查看 Topic 中的消息，像这样：
 

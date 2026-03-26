@@ -56,7 +56,7 @@ under the License.
 
 启动成功的话，可以在 [http://localhost:8081/](http://localhost:8081/)访问到 Flink Web UI，如下所示：
 
-{{< img src="/fig/mysql-doris-tutorial/flink-ui.png" alt="Flink UI" >}}
+{{< img src="/fig/mysql-doris-tutorial/flink-ui-flink22.png" alt="Flink UI" >}}
 
 多次执行 `start-cluster.sh` 可以拉起多个 TaskManager。
 
@@ -240,11 +240,11 @@ sink 添加 `table.create.properties.replication_num` 参数是由于 Docker 镜
    Job ID: ae30f4580f1918bebf16752d4963dc54
    Job Description: Sync MySQL Database to Doris
    ```
-在 Flink Web UI，可以看到一个名为 `Sync MySQL Database to Doris` 的任务正在运行。 
+在 Flink Web UI，可以看到一个名为 `Sync MySQL Database to Doris` 的任务正在运行。
 
-{{< img src="/fig/mysql-doris-tutorial/mysql-to-doris.png" alt="MySQL-to-Doris" >}}
+{{< img src="/fig/mysql-doris-tutorial/mysql-to-doris-flink22.png" alt="MySQL-to-Doris" >}}
 
-打开 Doris 的 Web UI，可以看到数据表已经被创建出来，数据能成功写入。 
+打开 Doris 的 Web UI，可以看到数据表已经被创建出来，数据能成功写入。
 
 {{< img src="/fig/mysql-doris-tutorial/doris-display-data.png" alt="Doris display data" >}}
 

@@ -58,7 +58,7 @@ Prepare a Linux or MacOS computer with Docker installed.
 
 If successfully started, you can access the Flink Web UI at [http://localhost:8081/](http://localhost:8081/), as shown below.
 
-{{< img src="/fig/mysql-doris-tutorial/flink-ui.png" alt="Flink UI" >}}
+{{< img src="/fig/mysql-doris-tutorial/flink-ui-flink22.png" alt="Flink UI" >}}
 
 Executing `start-cluster.sh` multiple times can start multiple `TaskManager`s.
 
@@ -242,11 +242,11 @@ After successful submission, the return information is as follows：
    Job ID: ae30f4580f1918bebf16752d4963dc54
    Job Description: Sync MySQL Database to Doris
    ```
- We can find a job  named `Sync MySQL Database to Doris` is running through Flink Web UI.   
+ We can find a job  named `Sync MySQL Database to Doris` is running through Flink Web UI.
 
-{{< img src="/fig/mysql-doris-tutorial/mysql-to-doris.png" alt="MySQL-to-Doris" >}}
+{{< img src="/fig/mysql-doris-tutorial/mysql-to-doris-flink22.png" alt="MySQL-to-Doris" >}}
 
-We can find that tables are created and inserted through Doris Web UI.   
+We can find that tables are created and inserted through Doris Web UI.
 
 {{< img src="/fig/mysql-doris-tutorial/doris-display-data.png" alt="Doris display data" >}}
 

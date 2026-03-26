@@ -58,7 +58,7 @@ Prepare a Linux or MacOS computer with Docker installed.
 
 If successfully started, you can access the Flink Web UI at [http://localhost:8081/](http://localhost:8081/), as shown below.
 
-{{< img src="/fig/mysql-starrocks-tutorial/flink-ui.png" alt="Flink UI" >}}
+{{< img src="/fig/mysql-starrocks-tutorial/flink-ui-flink22.png" alt="Flink UI" >}}
 
 Executing `start-cluster.sh` multiple times can start multiple `TaskManager`s.
 
@@ -211,7 +211,7 @@ After successful submission, the return information is as follows：
 
 We can find a job  named `Sync MySQL Database to StarRocks` is running through Flink Web UI.
 
-{{< img src="/fig/mysql-starrocks-tutorial/mysql-to-starrocks.png" alt="MySQL-to-StarRocks" >}}
+{{< img src="/fig/mysql-starrocks-tutorial/mysql-to-starrocks-flink22.png" alt="MySQL-to-StarRocks" >}}
 
 Connect to jdbc through database connection tools such as Dbeaver using `mysql://127.0.0.1:9030`. You can view the data written to three tables in StarRocks.
 

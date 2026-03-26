@@ -56,7 +56,7 @@ under the License.
 
 启动成功的话，可以在 [http://localhost:8081/](http://localhost:8081/) 访问到 Flink Web UI，如下所示：
 
-{{< img src="/fig/mysql-starrocks-tutorial/flink-ui.png" alt="Flink UI" >}}
+{{< img src="/fig/mysql-starrocks-tutorial/flink-ui-flink22.png" alt="Flink UI" >}}
 
 多次执行 start-cluster.sh 可以拉起多个 TaskManager。
 
@@ -208,7 +208,7 @@ under the License.
 
 在 Flink Web UI，可以看到一个名为 `Sync MySQL Database to StarRocks` 的任务正在运行。
 
-{{< img src="/fig/mysql-starrocks-tutorial/mysql-to-starrocks.png" alt="MySQL-to-StarRocks" >}}
+{{< img src="/fig/mysql-starrocks-tutorial/mysql-to-starrocks-flink22.png" alt="MySQL-to-StarRocks" >}}
 
 通过数据库连接工具例如 Dbeaver 等连接到 jdbc:mysql://127.0.0.1:9030， 可以查看 StarRocks 中写入了三张表的数据。
 
