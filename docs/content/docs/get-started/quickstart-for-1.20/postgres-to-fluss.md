@@ -2,8 +2,6 @@
 title: "Postgres to Fluss"
 weight: 5
 type: docs
-aliases:
-- /get-started/quickstart/postgres-to-fluss
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one

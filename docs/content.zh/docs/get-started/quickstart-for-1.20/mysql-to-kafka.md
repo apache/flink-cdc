@@ -2,8 +2,6 @@
 title: "MySQL 同步到 Kafka"
 weight: 4
 type: docs
-aliases:
-- /try-flink-cdc/pipeline-connectors/mysql-Kafka-pipeline-tutorial.html
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
