@@ -146,9 +146,9 @@ Pipeline Connector Options
 
 * Supports schema change synchronization in `lenient` mode with `schema.change.behavior: lenient`. The following schema change events are supported:
   * **Add column** — new columns are appended to the Fluss table.
-  * **Drop column** — supported, columns are removed from the Fluss table.
-  * **Rename non-nullable column** — since Fluss does not support renaming non-nullable columns directly, this is translated into an add-new-column + alter-old-column-type-to-nullable sequence.
-  * **Alter column type** — not supported by Fluss. If the upstream source emits an alter-column-type event, it will be ignored in lenient mode.
+  * **Drop column** — the column is not physically removed in lenient mode. The drop operation is ignored, and subsequent writes will set the column value to null.
+  * **Rename column** — in lenient mode, this is translated into an add-new-column + alter-old-column-type-to-nullable sequence.
+  * **Alter column type** — not supported. 
 
   To enable schema change synchronization, configure the pipeline with `schema.change.behavior: lenient`. If you want to ignore all schema changes, use `schema.change.behavior: IGNORE`.
 

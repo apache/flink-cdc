@@ -144,9 +144,9 @@ Pipeline Connector Options
 
 * 支持在 `lenient` 模式下进行 Schema 变更同步，通过 `schema.change.behavior: lenient` 配置。支持以下 Schema 变更事件：
   * **新增列** — 新列会追加到 Fluss 表中。
-  * **删除列** — 支持，列会从 Fluss 表中删除。
-  * **重命名非空列** — 由于 Fluss 不支持直接重命名非空列，此操作会被转换为新增列 + 将旧列类型修改为可空的序列。
-  * **修改列类型** — Fluss 不支持。如果上游源发送了修改列类型事件，在 lenient 模式下会被忽略。
+  * **删除列** — 在 lenient 模式下不会真正删除列，而是忽略该删除操作，后续写入时将该列的值设为 null。
+  * **重命名列** — 在 lenient 模式下，此操作会被转换为新增列 + 将旧列类型修改为可空的序列。
+  * **修改列类型** — 不支持。
 
   要启用 Schema 变更同步，请在 pipeline 中配置 `schema.change.behavior: lenient`。如果想要忽略所有 Schema 变更，使用 `schema.change.behavior: IGNORE`。
 
