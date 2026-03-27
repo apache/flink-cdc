@@ -28,9 +28,7 @@ limitations under the License.
     <artifactId>flink-cdc-pipeline-e2e-tests</artifactId>
 
     <properties>
-        <flink-1.19>1.19.3</flink-1.19>
         <flink-1.20>1.20.3</flink-1.20>
-        <flink-major-1.19>1.19</flink-major-1.19>
         <flink-major-1.20>1.20</flink-major-1.20>
         <mysql.driver.version>8.0.27</mysql.driver.version>
         <starrocks.connector.version>1.2.14_flink-${flink-major-1.20}</starrocks.connector.version>
@@ -682,15 +680,6 @@ limitations under the License.
                         </artifactItem>
                         <artifactItem>
                             <groupId>org.apache.fluss</groupId>
-                            <artifactId>fluss-flink-${flink-major-1.19}</artifactId>
-                            <version>${fluss.version}</version>
-                            <destFileName>fluss-flink-${flink-1.19}.jar</destFileName>
-                            <type>jar</type>
-                            <outputDirectory>${project.build.directory}/dependencies
-                            </outputDirectory>
-                        </artifactItem>
-                        <artifactItem>
-                            <groupId>org.apache.fluss</groupId>
                             <artifactId>fluss-flink-2.2</artifactId>
                             <version>${fluss.version}</version>
                             <destFileName>fluss-flink-2.2.0.jar</destFileName>
@@ -763,9 +752,9 @@ limitations under the License.
                         </artifactItem>
                         <artifactItem>
                             <groupId>org.apache.paimon</groupId>
-                            <artifactId>paimon-flink-${flink-major-1.19}</artifactId>
+                            <artifactId>paimon-flink-${flink-major-1.20}</artifactId>
                             <version>${paimon.version}</version>
-                            <destFileName>paimon-sql-connector-${flink-1.19}.jar</destFileName>
+                            <destFileName>paimon-sql-connector-${flink-1.20}.jar</destFileName>
                             <type>jar</type>
                             <outputDirectory>${project.build.directory}/dependencies
                             </outputDirectory>
@@ -784,15 +773,6 @@ limitations under the License.
                             <artifactId>hive-exec</artifactId>
                             <version>${hive.version}</version>
                             <destFileName>hive-exec.jar</destFileName>
-                            <type>jar</type>
-                            <outputDirectory>${project.build.directory}/dependencies
-                            </outputDirectory>
-                        </artifactItem>
-                        <artifactItem>
-                            <groupId>org.apache.paimon</groupId>
-                            <artifactId>paimon-flink-${flink-major-1.20}</artifactId>
-                            <version>${paimon.version}</version>
-                            <destFileName>paimon-sql-connector-${flink-1.20}.jar</destFileName>
                             <type>jar</type>
                             <outputDirectory>${project.build.directory}/dependencies
                             </outputDirectory>
