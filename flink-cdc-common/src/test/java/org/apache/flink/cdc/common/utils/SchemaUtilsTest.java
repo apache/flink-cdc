@@ -120,6 +120,46 @@ class SchemaUtilsTest {
                                 .physicalColumn("col3", DataTypes.STRING())
                                 .build());
 
+        // wrong add column in before type
+        final Schema finalSchema = schema;
+        Assertions.assertThatThrownBy(
+                        () ->
+                                SchemaUtils.applySchemaChangeEvent(
+                                        finalSchema,
+                                        new AddColumnEvent(
+                                                tableId,
+                                                List.of(
+                                                        new AddColumnEvent.ColumnWithPosition(
+                                                                Column.physicalColumn(
+                                                                        "col6", DataTypes.STRING()),
+                                                                AddColumnEvent.ColumnPosition
+                                                                        .BEFORE,
+                                                                "col10")))))
+                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .hasMessage(
+                        String.format(
+                                "BEFORE type AddColumnEvent error: Table %s's column %s is not existed",
+                                tableId, "col10"));
+
+        // wrong add column in after type
+        Assertions.assertThatThrownBy(
+                        () ->
+                                SchemaUtils.applySchemaChangeEvent(
+                                        finalSchema,
+                                        new AddColumnEvent(
+                                                tableId,
+                                                List.of(
+                                                        new AddColumnEvent.ColumnWithPosition(
+                                                                Column.physicalColumn(
+                                                                        "col6", DataTypes.STRING()),
+                                                                AddColumnEvent.ColumnPosition.AFTER,
+                                                                "col10")))))
+                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .hasMessage(
+                        String.format(
+                                "AFTER type AddColumnEvent error: Table %s's column %s is not existed",
+                                tableId, "col10"));
+
         // drop columns
         DropColumnEvent dropColumnEvent =
                 new DropColumnEvent(tableId, Arrays.asList("col3", "col5"));
