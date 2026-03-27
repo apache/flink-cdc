@@ -2,8 +2,6 @@
 title: "MySQL 同步到 Doris"
 weight: 1
 type: docs
-aliases:
-- /get-started/quickstart/mysql-to-doris
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
