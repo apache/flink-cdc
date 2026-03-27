@@ -34,13 +34,13 @@ under the License.
 准备一台已经安装了 Docker 的 Linux 或者 macOS 电脑。
 
 ### 准备 Flink Standalone 集群
-1. 下载 [Flink 1.20.3](https://archive.apache.org/dist/flink/flink-1.20.3/flink-1.20.3-bin-scala_2.12.tgz)，解压后得到 flink-1.20.3 目录。
-   使用下面的命令跳转至 Flink 目录下，并且设置 `FLINK_HOME` 为 flink-1.20.3 所在目录。
+1. 下载 [Flink 2.2.0](https://archive.apache.org/dist/flink/flink-2.2.0/flink-2.2.0-bin-scala_2.12.tgz)，解压后得到 flink-2.2.0 目录。
+   使用下面的命令跳转至 Flink 目录下，并且设置 `FLINK_HOME` 为 flink-2.2.0 所在目录。
 
     ```shell
-    tar -zxvf flink-1.20.3-bin-scala_2.12.tgz
-    exprot FLINK_HOME=$(pwd)/flink-1.20.3
-    cd flink-1.20.3
+    tar -zxvf flink-2.2.0-bin-scala_2.12.tgz
+    export FLINK_HOME=$(pwd)/flink-2.2.0
+    cd flink-2.2.0
     ```
 
 2. 在 `conf/config.yaml` 配置文件追加下列参数开启检查点，每隔 3 秒进行一次 checkpoint。
@@ -59,7 +59,7 @@ under the License.
 
 启动成功后，即可在 [http://localhost:8081/](http://localhost:8081/) 访问到 Flink Web UI，如下所示：
 
-{{< img src="/fig/mysql-Kafka-tutorial/flink-ui.png" alt="Flink UI" >}}
+{{< img src="/fig/mysql-Kafka-tutorial/flink-ui-flink22.png" alt="Flink UI" >}}
 
 多次执行 `start-cluster.sh` 可以拉起多个 TaskManager。
 
@@ -176,8 +176,8 @@ under the License.
 
 2. 下载下面列出的 connector 包，并且移动到 lib 目录下；
    **请注意，您需要将 jar 移动到 Flink CDC Home 的 lib 目录，而非 Flink Home 的 lib 目录下。**
-   - [MySQL pipeline connector {{< param Version >}}](https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-mysql/{{< param Version >}}/flink-cdc-pipeline-connector-mysql-{{< param Version >}}.jar)
-   - [Kafka pipeline connector {{< param Version >}}](https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-kafka/{{< param Version >}}/flink-cdc-pipeline-connector-kafka-{{< param Version >}}.jar)
+   - [MySQL pipeline connector {{< param Version >}}](https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-mysql/{{< param Version >}}/flink-cdc-pipeline-connector-mysql-{{< param Version >}}-2.2.jar)
+   - [Kafka pipeline connector {{< param Version >}}](https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-kafka/{{< param Version >}}/flink-cdc-pipeline-connector-kafka-{{< param Version >}}-2.2.jar)
 
    您还需要将下面的 Driver 包放在 Flink `lib` 目录下，或通过 `--jar` 参数将其传入 Flink CDC CLI，因为 CDC Connectors 不再包含这些 Drivers：
    - [MySQL Connector Java](https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar)
@@ -230,7 +230,7 @@ under the License.
 
     在 Flink Web UI，可以看到一个名为 `Sync MySQL Database to Kafka` 的任务正在运行。
 
-    {{< img src="/fig/mysql-Kafka-tutorial/mysql-to-Kafka.png" alt="MySQL-to-Kafka" >}}
+    {{< img src="/fig/mysql-Kafka-tutorial/mysql-to-Kafka-flink22.png" alt="MySQL-to-Kafka" >}}
 
     您可以通过 Kafka 提供的命令行工具查看 Topic 中的消息，像这样：
 
@@ -623,7 +623,7 @@ pipeline:
 docker compose down
 ```
 
-在 Flink 所在目录 `flink-1.20.3` 下执行如下命令停止 Flink 集群：
+在 `FLINK_HOME` 目录下执行如下命令停止 Flink 集群：
 
 ```shell
 ./bin/stop-cluster.sh

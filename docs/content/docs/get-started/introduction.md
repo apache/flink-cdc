@@ -41,6 +41,44 @@ Deeply integrated with and powered by Apache Flink, Flink CDC provides:
 * ✅ Synchronization of entire databases
 * ✅ Schema evolution capability
 
+## Requirements
+
+Flink CDC has the following requirements:
+
+* **JDK**: JDK 11 or later (Flink CDC is built on JDK 11 since 3.6.0)
+* **Apache Flink**: Flink 1.20.x or Flink 2.2.x
+
+{{< hint info >}}
+Make sure you have the correct JDK version installed before running Flink CDC. You can verify your Java version with `java -version`.
+{{< /hint >}}
+
+## Supported Connectors
+
+Flink CDC provides a rich ecosystem of connectors to interact with various external systems:
+
+| Connector     | Type                                                                                                                                                                   |
+|---------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| MySQL         | [Source Connector]({{< ref "docs/connectors/flink-sources/mysql-cdc" >}}) / [Pipeline Source Connector]({{< ref "docs/connectors/pipeline-connectors/mysql" >}})       |
+| Oracle        | [Source Connector]({{< ref "docs/connectors/flink-sources/oracle-cdc" >}}) / [Pipeline Source Connector]({{< ref "docs/connectors/pipeline-connectors/oracle" >}})     |
+| PostgreSQL    | [Source Connector]({{< ref "docs/connectors/flink-sources/postgres-cdc" >}}) / [Pipeline Source Connector]({{< ref "docs/connectors/pipeline-connectors/postgres" >}}) |
+| Db2           | [Source Connector]({{< ref "docs/connectors/flink-sources/db2-cdc" >}})                                                                                                |
+| MongoDB       | [Source Connector]({{< ref "docs/connectors/flink-sources/mongodb-cdc" >}})                                                                                            |
+| SQL Server    | [Source Connector]({{< ref "docs/connectors/flink-sources/sqlserver-cdc" >}})                                                                                          |
+| TiDB          | [Source Connector]({{< ref "docs/connectors/flink-sources/tidb-cdc" >}})                                                                                               |
+| Vitess        | [Source Connector]({{< ref "docs/connectors/flink-sources/vitess-cdc" >}})                                                                                             |
+| Apache Doris  | [Pipeline Sink Connector]({{< ref "docs/connectors/pipeline-connectors/doris" >}})                                                                                     |
+| Elasticsearch | [Pipeline Sink Connector]({{< ref "docs/connectors/pipeline-connectors/elasticsearch" >}})                                                                             |
+| Fluss         | [Pipeline Sink Connector]({{< ref "docs/connectors/pipeline-connectors/fluss" >}})                                                                                     |
+| Hudi          | [Pipeline Sink Connector]({{< ref "docs/connectors/pipeline-connectors/hudi" >}})                                                                                      |
+| Iceberg       | [Pipeline Sink Connector]({{< ref "docs/connectors/pipeline-connectors/iceberg" >}})                                                                                   |
+| Kafka         | [Pipeline Sink Connector]({{< ref "docs/connectors/pipeline-connectors/kafka" >}})                                                                                     |
+| MaxCompute    | [Pipeline Sink Connector]({{< ref "docs/connectors/pipeline-connectors/maxcompute" >}})                                                                                |
+| OceanBase     | [Pipeline Sink Connector]({{< ref "docs/connectors/pipeline-connectors/oceanbase" >}})                                                                                 |
+| Paimon        | [Pipeline Sink Connector]({{< ref "docs/connectors/pipeline-connectors/paimon" >}})                                                                                    |
+| StarRocks     | [Pipeline Sink Connector]({{< ref "docs/connectors/pipeline-connectors/starrocks" >}})                                                                                 |
+
+For connector download links, please visit the [Flink Source Connectors]({{< ref "docs/connectors/flink-sources/overview#supported-connectors" >}}) and [Pipeline Connectors]({{< ref "docs/connectors/pipeline-connectors/overview#supported-connectors" >}}) pages.
+
 ## How to Use Flink CDC
 
 Flink CDC provides an YAML-formatted user API that more suitable for data
@@ -85,8 +123,11 @@ pipeline:
 
 Check out the quickstart guide to learn how to establish a Flink CDC pipeline:
 
-- [MySQL to Apache Doris]({{< ref "docs/get-started/quickstart/mysql-to-doris" >}})
-- [MySQL to StarRocks]({{< ref "docs/get-started/quickstart/mysql-to-starrocks" >}})
+| Example | Version |
+|---------|---------|
+| MySQL to Apache Doris | [1.20.x]({{< ref "docs/get-started/quickstart-for-1.20/mysql-to-doris" >}}) / [2.2.x]({{< ref "docs/get-started/quickstart-for-2.2/mysql-to-doris" >}}) |
+| MySQL to StarRocks | [1.20.x]({{< ref "docs/get-started/quickstart-for-1.20/mysql-to-starrocks" >}}) / [2.2.x]({{< ref "docs/get-started/quickstart-for-2.2/mysql-to-starrocks" >}}) |
+| MySQL to Kafka | [1.20.x]({{< ref "docs/get-started/quickstart-for-1.20/mysql-to-kafka" >}}) / [2.2.x]({{< ref "docs/get-started/quickstart-for-2.2/mysql-to-kafka" >}}) |
 
 ### Understand Core Concepts
 

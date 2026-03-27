@@ -2,8 +2,6 @@
 title: "MySQL to StarRocks"
 weight: 2
 type: docs
-aliases:
-- /try-flink-cdc/pipeline-connectors/mysql-starrocks-pipeline-tutorial.html
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one

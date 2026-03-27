@@ -36,13 +36,13 @@ without a single line of Java/Scala code or IDE installation.
 You need a Linux or macOS computer with Docker installed before starting.
 
 ### Prepare Flink Standalone cluster
-1. Download [Flink 1.20.3](https://archive.apache.org/dist/flink/flink-1.20.3/flink-1.20.3-bin-scala_2.12.tgz), unzip it and enter `flink-1.20.3` directory.
-   Use the following command to navigate to the Flink directory and set `FLINK_HOME` to the directory where flink-1.20.3 is located.
+1. Download [Flink 2.2.0](https://archive.apache.org/dist/flink/flink-2.2.0/flink-2.2.0-bin-scala_2.12.tgz), unzip it and enter `flink-2.2.0` directory.
+   Use the following command to navigate to the Flink directory and set `FLINK_HOME` to the directory where flink-2.2.0 is located.
 
    ```shell
-   tar -zxvf flink-1.20.3-bin-scala_2.12.tgz
-   exprot FLINK_HOME=$(pwd)/flink-1.20.3
-   cd flink-1.20.3
+   tar -zxvf flink-2.2.0-bin-scala_2.12.tgz
+   export FLINK_HOME=$(pwd)/flink-2.2.0
+   cd flink-2.2.0
    ```
 
 2. Enable checkpointing by appending the following parameters to the `conf/config.yaml` configuration file to perform a checkpoint every 3 seconds.
@@ -61,7 +61,7 @@ You need a Linux or macOS computer with Docker installed before starting.
 
 After the cluster gets started, you can access the Flink Web UI at [http://localhost:8081/](http://localhost:8081/).
 
-{{< img src="/fig/mysql-Kafka-tutorial/flink-ui.png" alt="Flink UI" >}}
+{{< img src="/fig/mysql-Kafka-tutorial/flink-ui-flink22.png" alt="Flink UI" >}}
 
 Run `start-cluster.sh` multiple times to start more TaskManagers if necessary.  
 
@@ -174,14 +174,14 @@ Run `docker ps` to check whether these containers are running properly.
 **Please note that the following download links are available only for stable releases.
 You need to build your own SNAPSHOT versions based on master or release branches by yourself.**
 
-1. Download the binary compressed packages listed below and extract them to the directory `flink cdc-{{< param Version >}}'`:
+1. Download the binary compressed packages listed below and extract them to the directory `flink-cdc-{{< param Version >}}`:
    [flink-cdc-{{< param Version >}}-bin.tar.gz](https://www.apache.org/dyn/closer.lua/flink/flink-cdc-{{< param Version >}}/flink-cdc-{{< param Version >}}-bin.tar.gz)
-   flink-cdc-{{< param Version >}} directory will contain four directory: `bin`, `lib`, `log`, and `conf`.
+   `flink-cdc-{{< param Version >}}` directory will contain four directories: `bin`, `lib`, `log`, and `conf`.
 
 2. Download the connector package listed below and move it to the `lib` directory:
    **Please note that you need to move the jar to the lib directory of Flink CDC Home, not to the lib directory of Flink Home.**
-   - [MySQL pipeline connector {{< param Version >}}](https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-mysql/{{< param Version >}}/flink-cdc-pipeline-connector-mysql-{{< param Version >}}.jar)
-   - [Kafka pipeline connector {{< param Version >}}](https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-kafka/{{< param Version >}}/flink-cdc-pipeline-connector-kafka-{{< param Version >}}.jar)
+   - [MySQL pipeline connector {{< param Version >}}](https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-mysql/{{< param Version >}}/flink-cdc-pipeline-connector-mysql-{{< param Version >}}-2.2.jar)
+   - [Kafka pipeline connector {{< param Version >}}](https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-kafka/{{< param Version >}}/flink-cdc-pipeline-connector-kafka-{{< param Version >}}-2.2.jar)
 
    You also need to place MySQL connector into Flink `lib` folder or pass it with `--jar` argument, since they're no longer packaged with CDC connectors:
    - [MySQL Connector Java](https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar)
@@ -230,7 +230,7 @@ You need to build your own SNAPSHOT versions based on master or release branches
 
     A job named `Sync MySQL Database to Kafka` could be seen running in the Flink Web UI.
 
-    {{< img src="/fig/mysql-Kafka-tutorial/mysql-to-Kafka.png" alt="MySQL-to-Kafka" >}}
+    {{< img src="/fig/mysql-Kafka-tutorial/mysql-to-Kafka-flink22.png" alt="MySQL-to-Kafka" >}}
 
     We can subscribe the sink kafka topic to monitor messages sent to Kafka with this command:  
 
