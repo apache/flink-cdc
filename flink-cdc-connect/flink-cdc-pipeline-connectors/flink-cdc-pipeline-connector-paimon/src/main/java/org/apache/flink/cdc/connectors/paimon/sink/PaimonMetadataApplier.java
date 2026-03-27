@@ -120,40 +120,16 @@ public class PaimonMetadataApplier implements MetadataApplier {
         if (catalog == null) {
             catalog = FlinkCatalogFactory.createPaimonCatalog(catalogOptions);
         }
-        SchemaChangeEventVisitor.visit(
+        SchemaChangeEventVisitor.voidVisit(
                 schemaChangeEvent,
-                addColumnEvent -> {
-                    applyAddColumn(addColumnEvent);
-                    return null;
-                },
-                alterColumnTypeEvent -> {
-                    applyAlterColumnType(alterColumnTypeEvent);
-                    return null;
-                },
-                createTableEvent -> {
-                    applyCreateTable(createTableEvent);
-                    return null;
-                },
-                dropColumnEvent -> {
-                    applyDropColumn(dropColumnEvent);
-                    return null;
-                },
-                dropTableEvent -> {
-                    applyDropTable(dropTableEvent);
-                    return null;
-                },
-                renameColumnEvent -> {
-                    applyRenameColumn(renameColumnEvent);
-                    return null;
-                },
-                truncateTableEvent -> {
-                    applyTruncateTable(truncateTableEvent);
-                    return null;
-                },
-                alterTableCommentEvent -> {
-                    applyAlterTableComment(alterTableCommentEvent);
-                    return null;
-                });
+                this::applyAddColumn,
+                this::applyAlterColumnType,
+                this::applyCreateTable,
+                this::applyDropColumn,
+                this::applyDropTable,
+                this::applyRenameColumn,
+                this::applyTruncateTable,
+                this::applyAlterTableComment);
     }
 
     @Override
