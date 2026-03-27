@@ -88,21 +88,21 @@ import static io.debezium.util.Strings.isNullOrEmpty;
  * Copied from Debezium project(1.9.8.Final) to fix
  * https://github.com/ververica/flink-cdc-connectors/issues/1944.
  *
- * <p>Line 1432-1443 : Adjust GTID merging logic to support recovering from job which previously
+ * <p>Line 1454-1466 : Adjust GTID merging logic to support recovering from job which previously
  * specifying starting offset on start. Uses {@link GtidUtils#fixOldChannelsGtidSet} for shared
  * EARLIEST/LATEST logic.
  *
- * <p>Line 1444-1452 : Fix LATEST mode GTID merging to avoid replaying pre-checkpoint transactions
+ * <p>Line 1467-1475 : Fix LATEST mode GTID merging to avoid replaying pre-checkpoint transactions
  * when checkpoint GTID has non-contiguous ranges. Delegates to {@link
  * GtidUtils#computeLatestModeGtidSet}. See FLINK-39149.
  *
- * <p>Line 1490 : Add more error details for some exceptions.
+ * <p>Line 1526 : Add more error details for some exceptions.
  *
- * <p>Line 951-963 : Use iterator instead of index-based loop to avoid O(n²) complexity when
+ * <p>Line 965-977 : Use iterator instead of index-based loop to avoid O(n²) complexity when
  * processing LinkedList rows in handleChange method. See FLINK-38846.
  *
- * <p>Line 317, 1358-1366 : Use a {@link TableIdFilter} to skip binlog deserialization of unmatched
- * tables.
+ * <p>Line 324-330, 1366-1373 : Use a {@link TableIdFilter} to skip binlog deserialization of
+ * unmatched tables.
  */
 public class MySqlStreamingChangeEventSource
         implements StreamingChangeEventSource<MySqlPartition, MySqlOffsetContext> {
@@ -207,7 +207,8 @@ public class MySqlStreamingChangeEventSource
             ErrorHandler errorHandler,
             Clock clock,
             MySqlTaskContext taskContext,
-            MySqlStreamingChangeEventSourceMetrics metrics) {
+            MySqlStreamingChangeEventSourceMetrics metrics,
+            boolean skipBinlogDeserializationOfUnsubscribedTables) {
 
         this.taskContext = taskContext;
         this.connectorConfig = connectorConfig;
@@ -320,7 +321,13 @@ public class MySqlStreamingChangeEventSource
                     }
                 };
 
-        final TableIdFilter tableIdFilter = getTableIdDeserializationFilter();
+        LOGGER.info(
+                "Skip binlog deserialization for unsubscribed tables: {}",
+                skipBinlogDeserializationOfUnsubscribedTables);
+        final TableIdFilter tableIdFilter =
+                skipBinlogDeserializationOfUnsubscribedTables
+                        ? getTableIdDeserializationFilter()
+                        : TableIdFilter.all();
 
         // Add our custom deserializers ...
         eventDeserializer.setEventDataDeserializer(EventType.STOP, new StopEventDataDeserializer());

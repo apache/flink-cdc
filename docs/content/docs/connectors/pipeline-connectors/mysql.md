@@ -294,6 +294,17 @@ pipeline:
       </td>
     </tr>
     <tr>
+      <td>scan.binlog.skip-unsubscribed-tables.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        During incremental reading, whether to skip deserialization of incremental data (binlog) for unsubscribed tables.<br>
+        It is recommended to enable this option when only a subset of tables are subscribed. It can avoid parsing incremental events of unsubscribed tables and improve performance.<br>
+        This is an experimental feature and is disabled by default.
+      </td>
+    </tr>
+    <tr>
       <td>scan.parse.online.schema.changes.enabled</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>
