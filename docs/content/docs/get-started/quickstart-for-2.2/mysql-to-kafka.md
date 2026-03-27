@@ -41,7 +41,7 @@ You need a Linux or macOS computer with Docker installed before starting.
 
    ```shell
    tar -zxvf flink-2.2.0-bin-scala_2.12.tgz
-   exprot FLINK_HOME=$(pwd)/flink-2.2.0
+   export FLINK_HOME=$(pwd)/flink-2.2.0
    cd flink-2.2.0
    ```
 
@@ -174,14 +174,14 @@ Run `docker ps` to check whether these containers are running properly.
 **Please note that the following download links are available only for stable releases.
 You need to build your own SNAPSHOT versions based on master or release branches by yourself.**
 
-1. Download the binary compressed packages listed below and extract them to the directory `flink cdc-{{< param Version >}}'`:
+1. Download the binary compressed packages listed below and extract them to the directory `flink-cdc-{{< param Version >}}`:
    [flink-cdc-{{< param Version >}}-bin.tar.gz](https://www.apache.org/dyn/closer.lua/flink/flink-cdc-{{< param Version >}}/flink-cdc-{{< param Version >}}-bin.tar.gz)
-   flink-cdc-{{< param Version >}} directory will contain four directory: `bin`, `lib`, `log`, and `conf`.
+   `flink-cdc-{{< param Version >}}` directory will contain four directories: `bin`, `lib`, `log`, and `conf`.
 
 2. Download the connector package listed below and move it to the `lib` directory:
    **Please note that you need to move the jar to the lib directory of Flink CDC Home, not to the lib directory of Flink Home.**
-   - [MySQL pipeline connector {{< param Version >}}](https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-mysql/{{< param Version >}}/flink-cdc-pipeline-connector-mysql-{{< param Version >}}.jar)
-   - [Kafka pipeline connector {{< param Version >}}](https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-kafka/{{< param Version >}}/flink-cdc-pipeline-connector-kafka-{{< param Version >}}.jar)
+   - [MySQL pipeline connector {{< param Version >}}](https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-mysql/{{< param Version >}}/flink-cdc-pipeline-connector-mysql-{{< param Version >}}-2.2.jar)
+   - [Kafka pipeline connector {{< param Version >}}](https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-kafka/{{< param Version >}}/flink-cdc-pipeline-connector-kafka-{{< param Version >}}-2.2.jar)
 
    You also need to place MySQL connector into Flink `lib` folder or pass it with `--jar` argument, since they're no longer packaged with CDC connectors:
    - [MySQL Connector Java](https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar)

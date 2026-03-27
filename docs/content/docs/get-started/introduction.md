@@ -45,7 +45,7 @@ Deeply integrated with and powered by Apache Flink, Flink CDC provides:
 
 Flink CDC has the following requirements:
 
-* **JDK**: JDK 11 or later (Flink CDC is built on JDK 11 after 3.6.0)
+* **JDK**: JDK 11 or later (Flink CDC is built on JDK 11 since 3.6.0)
 * **Apache Flink**: Flink 1.20.x or Flink 2.2.x
 
 {{< hint info >}}

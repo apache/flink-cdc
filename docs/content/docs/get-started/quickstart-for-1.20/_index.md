@@ -1,5 +1,5 @@
 ---
-title: "Quickstart for 1.20"
+title: "Quickstart for Flink 1.20"
 bookCollapseSection: true
 weight: 2
 ---

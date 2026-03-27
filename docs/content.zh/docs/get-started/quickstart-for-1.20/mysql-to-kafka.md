@@ -37,7 +37,7 @@ under the License.
 
     ```shell
     tar -zxvf flink-1.20.3-bin-scala_2.12.tgz
-    exprot FLINK_HOME=$(pwd)/flink-1.20.3
+    export FLINK_HOME=$(pwd)/flink-1.20.3
     cd flink-1.20.3
     ```
 

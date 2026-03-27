@@ -201,11 +201,11 @@ This command automatically starts all the containers defined in the Docker Compo
    [flink-cdc-{{< param Version >}}-bin.tar.gz](https://www.apache.org/dyn/closer.lua/flink/flink-cdc-{{< param Version >}}/flink-cdc-{{< param Version >}}-bin.tar.gz)
    flink-cdc-{{< param Version >}} directory will contain four directories: `bin`, `lib`, `log`, and `conf`.
 
-2. Download the connector packages listed below and move them to the `lib` directory    
+2. Download the connector packages listed below and move them to the `lib` directory
    **Download links are available only for stable releases, SNAPSHOT dependencies need to be built based on master or release branches by yourself.**
    **Please note that you need to move the jar to the lib directory of Flink CDC Home, not to the lib directory of Flink Home.**
-    - [Postgres pipeline connector {{< param Version >}}](https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-postgres/{{< param Version >}}/flink-cdc-pipeline-connector-postgres-{{< param Version >}}.jar)
-    - [Fluss pipeline connector {{< param Version >}}](https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-fluss/{{< param Version >}}/flink-cdc-pipeline-connector-fluss-{{< param Version >}}.jar)
+    - [Postgres pipeline connector {{< param Version >}}](https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-postgres/{{< param Version >}}/flink-cdc-pipeline-connector-postgres-{{< param Version >}}-2.2.jar)
+    - [Fluss pipeline connector {{< param Version >}}](https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-fluss/{{< param Version >}}/flink-cdc-pipeline-connector-fluss-{{< param Version >}}-2.2.jar)
 
 3. Write task configuration yaml file.
    Here is an example file for synchronizing the entire database `postgres-to-fluss.yaml`：
