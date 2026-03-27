@@ -33,11 +33,11 @@ under the License.
 准备一台已经安装了 Docker 的 Linux 或者 MacOS 电脑。
 
 ### 准备 Flink Standalone 集群
-1. 下载 [Flink 1.20.3](https://archive.apache.org/dist/flink/flink-1.20.3/flink-1.20.3-bin-scala_2.12.tgz) ，解压后得到 flink-1.20.3 目录。
-   使用下面的命令跳转至 Flink 目录下，并且设置 FLINK_HOME 为 flink-1.20.3 所在目录。
+1. 下载 [Flink 2.2.0](https://archive.apache.org/dist/flink/flink-2.2.0/flink-2.2.0-bin-scala_2.12.tgz) ，解压后得到 flink-2.2.0 目录。
+   使用下面的命令跳转至 Flink 目录下，并且设置 FLINK_HOME 为 flink-2.2.0 所在目录。
 
    ```shell
-   cd flink-1.20.3
+   cd flink-2.2.0
    ```
 
 2. 通过在 conf/config.yaml 配置文件追加下列参数开启 checkpoint，每隔 3 秒做一次 checkpoint。
@@ -56,7 +56,7 @@ under the License.
 
 启动成功的话，可以在 [http://localhost:8081/](http://localhost:8081/) 访问到 Flink Web UI，如下所示：
 
-{{< img src="/fig/mysql-starrocks-tutorial/flink-ui.png" alt="Flink UI" >}}
+{{< img src="/fig/mysql-starrocks-tutorial/flink-ui-flink22.png" alt="Flink UI" >}}
 
 多次执行 start-cluster.sh 可以拉起多个 TaskManager。
 
@@ -150,8 +150,8 @@ under the License.
 2. 下载下面列出的 connector 包，并且移动到 lib 目录下；
    **下载链接只对已发布的版本有效, SNAPSHOT 版本需要本地基于 master 或 release- 分支编译。**
    **请注意，您需要将 jar 移动到 Flink CDC Home 的 lib 目录，而非 Flink Home 的 lib 目录下。**
-   - [MySQL pipeline connector {{< param Version >}}](https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-mysql/{{< param Version >}}/flink-cdc-pipeline-connector-mysql-{{< param Version >}}.jar)
-   - [StarRocks pipeline connector {{< param Version >}}](https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-starrocks/{{< param Version >}}/flink-cdc-pipeline-connector-starrocks-{{< param Version >}}.jar)
+   - [MySQL pipeline connector {{< param Version >}}](https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-mysql/{{< param Version >}}/flink-cdc-pipeline-connector-mysql-{{< param Version >}}-2.2.jar)
+   - [StarRocks pipeline connector {{< param Version >}}](https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-starrocks/{{< param Version >}}/flink-cdc-pipeline-connector-starrocks-{{< param Version >}}-2.2.jar)
 
    您还需要将下面的 Driver 包放在 Flink `lib` 目录下，或通过 `--jar` 参数将其传入 Flink CDC CLI，因为 CDC Connectors 不再包含这些 Drivers：
    - [MySQL Connector Java](https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar)
@@ -208,7 +208,7 @@ under the License.
 
 在 Flink Web UI，可以看到一个名为 `Sync MySQL Database to StarRocks` 的任务正在运行。
 
-{{< img src="/fig/mysql-starrocks-tutorial/mysql-to-starrocks.png" alt="MySQL-to-StarRocks" >}}
+{{< img src="/fig/mysql-starrocks-tutorial/mysql-to-starrocks-flink22.png" alt="MySQL-to-StarRocks" >}}
 
 通过数据库连接工具例如 Dbeaver 等连接到 jdbc:mysql://127.0.0.1:9030， 可以查看 StarRocks 中写入了三张表的数据。
 
@@ -308,7 +308,7 @@ Flink CDC 提供了将源表的表结构/数据路由到其他表名的配置，
    docker-compose down
    ```
 
-在 Flink 所在目录 `flink-1.20.3` 下执行如下命令停止 Flink 集群：
+在 Flink 所在目录 `flink-2.2.0` 下执行如下命令停止 Flink 集群：
 
    ```shell
    ./bin/stop-cluster.sh

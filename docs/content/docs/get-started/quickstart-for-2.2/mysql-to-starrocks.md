@@ -1,9 +1,9 @@
 ---
-title: "MySQL to Doris"
-weight: 1
+title: "MySQL to StarRocks"
+weight: 2
 type: docs
 aliases:
-- /get-started/quickstart/mysql-to-doris
+- /try-flink-cdc/pipeline-connectors/mysql-starrocks-pipeline-tutorial.html
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -24,9 +24,9 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-# Streaming ELT from MySQL to Doris
+# Streaming ELT from MySQL to StarRocks
 
-This tutorial is to show how to quickly build a Streaming ELT job from MySQL to Doris using Flink CDC, including the
+This tutorial is to show how to quickly build a Streaming ELT job from MySQL to StarRocks using Flink CDC, including the
 feature of sync all table of one database, schema change evolution and sync sharding tables into one table.  
 All exercises in this tutorial are performed in the Flink CDC CLI, and the entire process uses standard SQL syntax,
 without a single line of Java/Scala code or IDE installation.
@@ -35,11 +35,11 @@ without a single line of Java/Scala code or IDE installation.
 Prepare a Linux or MacOS computer with Docker installed.
 
 ### Prepare Flink Standalone cluster
-1. Download [Flink 1.20.3](https://archive.apache.org/dist/flink/flink-1.20.3/flink-1.20.3-bin-scala_2.12.tgz) ，unzip and get flink-1.20.3 directory.
-   Use the following command to navigate to the Flink directory and set FLINK_HOME to the directory where flink-1.20.3 is located.
+1. Download [Flink 2.2.0](https://archive.apache.org/dist/flink/flink-2.2.0/flink-2.2.0-bin-scala_2.12.tgz) ，unzip and get flink-2.2.0 directory.
+   Use the following command to navigate to the Flink directory and set FLINK_HOME to the directory where flink-2.2.0 is located.
 
    ```shell
-   cd flink-1.20.3
+   cd flink-2.2.0
    ```
 
 2. Enable checkpointing by appending the following parameters to the conf/config.yaml configuration file to perform a checkpoint every 3 seconds.
@@ -58,57 +58,35 @@ Prepare a Linux or MacOS computer with Docker installed.
 
 If successfully started, you can access the Flink Web UI at [http://localhost:8081/](http://localhost:8081/), as shown below.
 
-{{< img src="/fig/mysql-doris-tutorial/flink-ui.png" alt="Flink UI" >}}
+{{< img src="/fig/mysql-starrocks-tutorial/flink-ui-flink22.png" alt="Flink UI" >}}
 
 Executing `start-cluster.sh` multiple times can start multiple `TaskManager`s.
 
 ### Prepare docker compose
 The following tutorial will prepare the required components using `docker-compose`.
-
-1. Host Machine Configuration  
-Since `Doris` requires memory mapping support for operation, execute the following command on the host machine:
-
-   ```shell
-   sysctl -w vm.max_map_count=2000000
-   ```
-Due to the different ways of implementing containers internally on MacOS, it may not be possible to directly modify the value of max_map_count on the host during deployment. You need to create the following containers first:
-
-   ```shell
-   docker run -it --privileged --pid=host --name=change_count debian nsenter -t 1 -m -u -n -i sh
-   ```
-
-The container was created successfully executing the following command:
-   ```shell
-   sysctl -w vm.max_map_count=2000000
-   ```
-
-Then `exit` exits and creates the Doris Docker cluster.
-
-2. Start docker compose
-   Create a `docker-compose.yml` file using the content provided below:
+Create a `docker-compose.yml` file using the content provided below:
 
    ```yaml
    version: '2.1'
    services:
-     doris:
-       image: yagagagaga/doris-standalone
-       ports:
-         - "8030:8030"
-         - "8040:8040"
-         - "9030:9030"
-     mysql:
-       image: debezium/example-mysql:1.1
-       ports:
-         - "3306:3306"
-       environment:
-         - MYSQL_ROOT_PASSWORD=123456
-         - MYSQL_USER=mysqluser
-         - MYSQL_PASSWORD=mysqlpw
+      StarRocks:
+         image: starrocks/allin1-ubuntu:3.5.10
+         ports:
+            - "8080:8080"
+            - "9030:9030"
+      MySQL:
+         image: debezium/example-mysql:1.1
+         ports:
+            - "3306:3306"
+         environment:
+            - MYSQL_ROOT_PASSWORD=123456
+            - MYSQL_USER=mysqluser
+            - MYSQL_PASSWORD=mysqlpw
    ```
 
 The Docker Compose should include the following services (containers):
-- MySQL: include a database named `app_db` 
-- Doris: to store tables from MySQL
+- MySQL: include a database named `app_db`
+- StarRocks: to store tables from MySQL
 
 To start all containers, run the following command in the directory that contains the `docker-compose.yml` file.
 
@@ -116,12 +94,12 @@ To start all containers, run the following command in the directory that contain
    docker-compose up -d
    ```
 
-This command automatically starts all the containers defined in the Docker Compose configuration in a detached mode. Run docker ps to check whether these containers are running properly. You can also visit [http://localhost:8030/](http://localhost:8030/) to check whether Doris is running.
+This command automatically starts all the containers defined in the Docker Compose configuration in a detached mode. Run docker ps to check whether these containers are running properly. You can also visit [http://localhost:8030/](http://localhost:8030/) to check whether StarRocks is running.
 #### Prepare records for MySQL
 1. Enter MySQL container
 
    ```shell
-   docker-compose exec mysql mysql -uroot -p123456
+   docker-compose exec MySQL mysql -uroot -p123456
    ```
 
 2. create `app_db` database and `orders`,`products`,`shipments` tables, then insert records
@@ -167,42 +145,26 @@ This command automatically starts all the containers defined in the Docker Compo
    INSERT INTO `products` (`id`, `product`) VALUES (3, 'Peanut');
     ```
 
-#### Create database in Doris
-`Doris` connector currently does not support automatic database creation and needs to first create a database corresponding to the write table.
-1. Enter Doris Web UI。  
-   [http://localhost:8030/](http://localhost:8030/)  
-   The default username is `root`, and the default password is empty.
-
-   {{< img src="/fig/mysql-doris-tutorial/doris-ui.png" alt="Doris UI" >}}
-
-2. Create `app_db` database through Web UI.
-
-    ```sql
-   create database app_db;
-    ```
-
-   {{< img src="/fig/mysql-doris-tutorial/doris-create-table.png" alt="Doris create table" >}}
-
 ## Submit job with Flink CDC CLI
-1. Download the binary compressed packages listed below and extract them to the directory `flink cdc-{{< param Version >}}'`：    
+1. Download the binary compressed packages listed below and extract them to the directory `flink-cdc-{{< param Version >}}`：
    [flink-cdc-{{< param Version >}}-bin.tar.gz](https://www.apache.org/dyn/closer.lua/flink/flink-cdc-{{< param Version >}}/flink-cdc-{{< param Version >}}-bin.tar.gz)
-   flink-cdc-{{< param Version >}} directory will contain four directory: `bin`, `lib`, `log`, and `conf`.
+   `flink-cdc-{{< param Version >}}` directory will contain four directories: `bin`, `lib`, `log`, and `conf`.
 
-2. Download the connector package listed below and move it to the `lib` directory  
+2. Download the connector package listed below and move it to the `lib` directory
    **Download links are available only for stable releases, SNAPSHOT dependencies need to be built based on master or release branches by yourself.**
    **Please note that you need to move the jar to the lib directory of Flink CDC Home, not to the lib directory of Flink Home.**
-    - [MySQL pipeline connector {{< param Version >}}](https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-mysql/{{< param Version >}}/flink-cdc-pipeline-connector-mysql-{{< param Version >}}.jar)
-    - [Apache Doris pipeline connector {{< param Version >}}](https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-doris/{{< param Version >}}/flink-cdc-pipeline-connector-doris-{{< param Version >}}.jar)
+   - [MySQL pipeline connector {{< param Version >}}](https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-mysql/{{< param Version >}}/flink-cdc-pipeline-connector-mysql-{{< param Version >}}-2.2.jar)
+   - [StarRocks pipeline connector {{< param Version >}}](https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-starrocks/{{< param Version >}}/flink-cdc-pipeline-connector-starrocks-{{< param Version >}}-2.2.jar)
 
-     You also need to place MySQL connector into Flink `lib` folder or pass it with `--jar` argument, since they're no longer packaged with CDC connectors:
-    - [MySQL Connector Java](https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar)
+   You also need to place MySQL connector into Flink `lib` folder or pass it with `--jar` argument, since they're no longer packaged with CDC connectors:
+   - [MySQL Connector Java](https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar)
 
-3. Write task configuration yaml file 
-  Here is an example file for synchronizing the entire database `mysql-to-doris.yaml`：
+3. Write task configuration yaml file.
+   Here is an example file for synchronizing the entire database `mysql-to-starrocks.yaml`：
 
    ```yaml
    ################################################################################
-   # Description: Sync MySQL all tables to Doris
+   # Description: Sync MySQL all tables to StarRocks
    ################################################################################
    source:
      type: mysql
@@ -215,40 +177,45 @@ This command automatically starts all the containers defined in the Docker Compo
      server-time-zone: UTC
    
    sink:
-     type: doris
-     fenodes: 127.0.0.1:8030
+     type: starrocks
+     name: StarRocks Sink
+     jdbc-url: jdbc:mysql://127.0.0.1:9030
+     load-url: 127.0.0.1:8080
      username: root
      password: ""
-     table.create.properties.light_schema_change: true
      table.create.properties.replication_num: 1
    
    pipeline:
-     name: Sync MySQL Database to Doris
+     name: Sync MySQL Database to StarRocks
      parallelism: 2
    
    ```
-   
+
 Notice that:  
-`tables: app_db.\.*` in source synchronize all tables in `app_db` through Regular Matching.   
-`table.create.properties.replication_num` in sink is because there is only one Doris BE node in the Docker image.
+* `tables: app_db.\.*` in source synchronize all tables in `app_db` through Regular Matching.   
+* `table.create.properties.replication_num` in sink is because there is only one StarRocks BE node in the Docker image.
 
 4. Finally, submit job to Flink Standalone cluster using Cli.
+
    ```shell
-   bash bin/flink-cdc.sh mysql-to-doris.yaml
+   bash bin/flink-cdc.sh mysql-to-starrocks.yaml
    ```
+   
 After successful submission, the return information is as follows：
+
    ```shell
    Pipeline has been submitted to cluster.
-   Job ID: ae30f4580f1918bebf16752d4963dc54
-   Job Description: Sync MySQL Database to Doris
+   Job ID: 02a31c92f0e7bc9a1f4c0051980088a0
+   Job Description: Sync MySQL Database to StarRocks
    ```
- We can find a job  named `Sync MySQL Database to Doris` is running through Flink Web UI.   
 
-{{< img src="/fig/mysql-doris-tutorial/mysql-to-doris.png" alt="MySQL-to-Doris" >}}
+We can find a job  named `Sync MySQL Database to StarRocks` is running through Flink Web UI.
 
-We can find that tables are created and inserted through Doris Web UI.   
+{{< img src="/fig/mysql-starrocks-tutorial/mysql-to-starrocks-flink22.png" alt="MySQL-to-StarRocks" >}}
 
-{{< img src="/fig/mysql-doris-tutorial/doris-display-data.png" alt="Doris display data" >}}
+Connect to jdbc through database connection tools such as Dbeaver using `mysql://127.0.0.1:9030`. You can view the data written to three tables in StarRocks.
+
+{{< img src="/fig/mysql-starrocks-tutorial/starrocks-display-data.png" alt="StarRocks-display-data" >}}
 
 ### Synchronize Schema and Data changes
 Enter MySQL container
@@ -257,20 +224,20 @@ Enter MySQL container
  docker-compose exec mysql mysql -uroot -p123456
  ```
 
-Then, modify schema and record in MySQL, and the tables of Doris will change the same in real time：
-1. insert one record in `orders` from MySQL:   
+Then, modify schema and record in MySQL, and the tables of StarRocks will change the same in real time：
+1. insert one record in `orders` from MySQL:
 
    ```sql
    INSERT INTO app_db.orders (id, price) VALUES (3, 100.00);
    ```
 
-2. add one column in `orders` from MySQL:   
+2. add one column in `orders` from MySQL:
 
    ```sql
    ALTER TABLE app_db.orders ADD amount varchar(100) NULL;
    ```   
 
-3. update one record in `orders` from MySQL:   
+3. update one record in `orders` from MySQL:
 
    ```sql
    UPDATE app_db.orders SET price=100.00, amount=100.00 WHERE id=1;
@@ -281,11 +248,11 @@ Then, modify schema and record in MySQL, and the tables of Doris will change the
    DELETE FROM app_db.orders WHERE id=2;
    ```
 
-Refresh the Doris Web UI every time you execute a step, and you can see that the `orders` table displayed in Doris will be updated in real-time, like the following：
+Refresh the Dbeaver every time you execute a step, and you can see that the `orders` table displayed in StarRocks will be updated in real-time, like the following：
 
-{{< img src="/fig/mysql-doris-tutorial/doris-display-result.png" alt="Doris display result" >}}
+{{< img src="/fig/mysql-starrocks-tutorial/starrocks-display-result.png" alt="StarRocks-display-result" >}}
 
-Similarly, by modifying the 'shipments' and' products' tables, you can also see the results of synchronized changes in real-time in Doris.
+Similarly, by modifying the `shipments` and `products` tables, you can also see the results of synchronized changes in real-time in StarRocks.
 
 ### Route the changes
 Flink CDC provides the configuration to route the table structure/data of the source table to other table names.   
@@ -293,7 +260,7 @@ With this ability, we can achieve functions such as table name, database name re
 Here is an example file for using `route` feature:
    ```yaml
    ################################################################################
-   # Description: Sync MySQL all tables to Doris
+   # Description: Sync MySQL all tables to StarRocks
    ################################################################################
    source:
       type: mysql
@@ -306,12 +273,11 @@ Here is an example file for using `route` feature:
       server-time-zone: UTC
 
    sink:
-      type: doris
-      fenodes: 127.0.0.1:8030
-      benodes: 127.0.0.1:8040
+      type: starrocks
+      jdbc-url: jdbc:mysql://127.0.0.1:9030
+      load-url: 127.0.0.1:8030
       username: root
       password: ""
-      table.create.properties.light_schema_change: true
       table.create.properties.replication_num: 1
 
    route:
@@ -323,7 +289,7 @@ Here is an example file for using `route` feature:
         sink-table: ods_db.ods_products
 
    pipeline:
-      name: Sync MySQL Database to Doris
+      name: Sync MySQL Database to StarRocks
       parallelism: 2
    ```
 
@@ -345,7 +311,8 @@ After finishing the tutorial, run the following command to stop all containers i
    ```shell
    docker-compose down
    ```
-Run the following command to stop the Flink cluster in the directory of Flink `flink-1.20.3`:
+
+Run the following command to stop the Flink cluster in the directory of Flink `flink-2.2.0`:
 
    ```shell
    ./bin/stop-cluster.sh

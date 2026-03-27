@@ -17,6 +17,8 @@
 
 package org.apache.flink.cdc.connectors.oracle.source.parser;
 
+import org.apache.flink.cdc.connectors.oracle.utils.OracleSchemaUtils;
+
 import io.debezium.ddl.parser.oracle.generated.PlSqlParser;
 import io.debezium.ddl.parser.oracle.generated.PlSqlParserBaseListener;
 
@@ -76,21 +78,6 @@ public class BaseParserListener extends PlSqlParserBaseListener {
      * @return parsed table or column name from the supplied name argument
      */
     private static String getTableOrColumnName(String name) {
-        return removeQuotes(name, true);
-    }
-
-    /**
-     * Removes leading and trailing double quote characters from the provided string.
-     *
-     * @param text value to have double quotes removed
-     * @param upperCaseIfNotQuoted control if returned string is upper-cased if not quoted
-     * @return string that has had quotes removed
-     */
-    @SuppressWarnings("SameParameterValue")
-    private static String removeQuotes(String text, boolean upperCaseIfNotQuoted) {
-        if (text != null && text.length() > 2 && text.startsWith("\"") && text.endsWith("\"")) {
-            return text.substring(1, text.length() - 1);
-        }
-        return upperCaseIfNotQuoted ? text.toUpperCase() : text;
+        return OracleSchemaUtils.removeQuotes(name);
     }
 }

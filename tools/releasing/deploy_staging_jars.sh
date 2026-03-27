@@ -51,6 +51,12 @@ function set_pom_version {
   ${MVN} org.codehaus.mojo:versions-maven-plugin:2.8.1:set -DnewVersion=${new_version} -DgenerateBackupPoms=false --quiet
 }
 
+function set_revision_property {
+  new_revision=$1
+
+  ${MVN} org.codehaus.mojo:versions-maven-plugin:2.8.1:set-property -Dproperty=revision -DnewVersion=${new_revision} -DgenerateBackupPoms=false --quiet
+}
+
 ###########################
 
 cd ${PROJECT_ROOT}
@@ -66,18 +72,23 @@ if [ -n "${FLINK_VERSION:-}" ]; then
     flink_major_version=$(echo "${FLINK_VERSION}" | cut -d. -f1,2)
     MVN_OPTIONS="${MVN_OPTIONS} -Dflink.major.version=${flink_major_version}"
 
-    # Update project version: base_version-FLINK_VERSION
+    # Update project version: RELEASE_VERSION-FLINK_VERSION
     current_version=$(get_pom_version)
     echo "Current version: ${current_version}"
 
-    # Skip if version already ends with FLINK_VERSION
-    if [[ "${current_version}" == *"-${FLINK_VERSION}" ]]; then
-        echo "Version already ends with -${FLINK_VERSION}, skipping version update"
+    if [ -z "${RELEASE_VERSION:-}" ]; then
+        echo "ERROR: RELEASE_VERSION environment variable is required"
+        exit 1
+    fi
+    new_version="${RELEASE_VERSION}-${FLINK_VERSION}"
+
+    # Skip if version already matches RELEASE_VERSION-FLINK_VERSION
+    if [[ "${current_version}" == "${new_version}" ]]; then
+        echo "Version already is ${new_version}, skipping version update"
     else
-        base_version=${current_version%-SNAPSHOT}
-        new_version="${base_version}-${FLINK_VERSION}"
         echo "Updating version to: ${new_version}"
         set_pom_version "${new_version}"
+        set_revision_property "${new_version}"
     fi
 
     # Add -Pflink2 profile if FLINK_VERSION starts with "2"
