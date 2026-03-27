@@ -411,7 +411,7 @@ class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                                     new String[] {tableWithoutPrimaryKey});
                         })
                 .hasStackTraceContaining(
-                        "To use incremental snapshot, 'scan.incremental.snapshot.chunk.key-column' must be set when the table doesn't have primary keys.");
+                        "has no primary key. To use incremental snapshot, please set 'scan.incremental.snapshot.chunk.key-column' for this table.");
     }
 
     @Test
