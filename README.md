@@ -126,15 +126,27 @@ All artifacts use group ID `org.apache.flink`. See the [DataStream API packaging
 
 ## Flink Version Compatibility
 
-| Flink CDC Version | Flink Version             | Notes                             |
-|-------------------|---------------------------|-----------------------------------|
-| 3.6.x             | 1.20.\*, 2.2.\*           |                                   |
-| 3.5.x             | 1.19.\*, 1.20.\*          |                                   |
-| 3.4.x             | 1.19.\*, 1.20.\*          |                                   |
-| 3.3.x             | 1.19.\*, 1.20.\*          |                                   |
-| 3.2.x             | 1.17.\*, 1.18.\*, 1.19.\* |                                   |
-| 3.1.x             | 1.17.\*, 1.18.\*, 1.19.\* | Only 3.1.1 supports Flink 1.19.\* |
-| 3.0.x             | 1.17.\*, 1.18.\*          |                                   |
+| Flink CDC | Supported Flink Versions     | Notes                                                           |
+|-----------|------------------------------|-----------------------------------------------------------------|
+| 3.6       | 1.20, 2.2                    |                                                                 |
+| 3.5       | 1.19, 1.20                   |                                                                 |
+| 3.4       | 1.19, 1.20                   |                                                                 |
+| 3.3       | 1.19, 1.20                   |                                                                 |
+| 3.2       | 1.17, 1.18, 1.19             |                                                                 |
+| 3.1       | 1.16, 1.17, 1.18, 1.19       | Only Flink CDC 3.1.1 supports Flink 1.19                        |
+| 3.0       | 1.14, 1.15, 1.16, 1.17, 1.18 | Pipeline API requires Flink 1.17 and above                      |
+| 2.4       | 1.13, 1.14, 1.15, 1.16, 1.17 | Flink CDC 1.x and 2.x does not support Pipeline API, same below |
+| 2.3       | 1.13, 1.14, 1.15, 1.16       |                                                                 |
+| 2.2       | 1.13, 1.14                   |                                                                 |
+| 2.1       | 1.13                         |                                                                 |
+| 2.0       | 1.13                         |                                                                 |
+| 1.4       | 1.13                         |                                                                 |
+| 1.3       | 1.12                         |                                                                 |
+| 1.2       | 1.12                         |                                                                 |
+| 1.1       | 1.11                         |                                                                 |
+| 1.0       | 1.11                         |                                                                 |
+
+See the [Pipeline connector overview](https://nightlies.apache.org/flink/flink-cdc-docs-stable/docs/connectors/pipeline-connectors/overview/) and [source connector overview](https://nightlies.apache.org/flink/flink-cdc-docs-stable/docs/connectors/flink-sources/overview/) for details.
 
 ## Join the Community
 
