@@ -39,6 +39,9 @@ public class IcebergDataSink implements DataSink, Serializable {
     // options for creating Iceberg table.
     private final Map<String, String> tableOptions;
 
+    // options for Hadoop configuration.
+    private final Map<String, String> hadoopConfOptions;
+
     private final Map<TableId, List<String>> partitionMaps;
 
     private final ZoneId zoneId;
@@ -56,7 +59,8 @@ public class IcebergDataSink implements DataSink, Serializable {
             ZoneId zoneId,
             String schemaOperatorUid,
             CompactionOptions compactionOptions,
-            String jobIdPrefix) {
+            String jobIdPrefix,
+            Map<String, String> hadoopConfOptions) {
         this.catalogOptions = catalogOptions;
         this.tableOptions = tableOptions;
         this.partitionMaps = partitionMaps;
@@ -64,18 +68,25 @@ public class IcebergDataSink implements DataSink, Serializable {
         this.schemaOperatorUid = schemaOperatorUid;
         this.compactionOptions = compactionOptions;
         this.jobIdPrefix = jobIdPrefix;
+        this.hadoopConfOptions = hadoopConfOptions;
     }
 
     @Override
     public EventSinkProvider getEventSinkProvider() {
         IcebergSink icebergEventSink =
                 new IcebergSink(
-                        catalogOptions, tableOptions, zoneId, compactionOptions, jobIdPrefix);
+                        catalogOptions,
+                        tableOptions,
+                        zoneId,
+                        compactionOptions,
+                        jobIdPrefix,
+                        hadoopConfOptions);
         return FlinkSinkProvider.of(icebergEventSink);
     }
 
     @Override
     public MetadataApplier getMetadataApplier() {
-        return new IcebergMetadataApplier(catalogOptions, tableOptions, partitionMaps);
+        return new IcebergMetadataApplier(
+                catalogOptions, tableOptions, partitionMaps, hadoopConfOptions);
     }
 }

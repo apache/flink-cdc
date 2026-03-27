@@ -241,6 +241,13 @@ Pipeline 连接器选项
       <td>String</td>
       <td>透传 Iceberg 表选项到管道，详见 <a href="https://iceberg.apache.org/docs/nightly/configuration/#write-properties">Iceberg 表配置</a>。</td>
     </tr>
+    <tr>
+      <td>hadoop.conf.*</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>传递 Hadoop <code>Configuration</code> 参数（用于 Iceberg 的 catalog/table 相关操作）。前缀 <code>hadoop.conf.</code> 会被剥离。例如 <code>hadoop.conf.fs.s3a.endpoint</code>。</td>
+    </tr>
     </tbody>
 </table>    
 </div>

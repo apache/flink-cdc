@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.iceberg.sink.v2;
 
 import org.apache.flink.api.connector.sink2.Committer;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.connectors.iceberg.sink.utils.HadoopConfUtils;
 import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.metrics.groups.SinkCommitterMetricGroup;
 
@@ -67,15 +68,19 @@ public class IcebergCommitter implements Committer<WriteResultWrapper> {
 
     private final Map<TableId, TableMetric> tableIdMetricMap;
 
-    public IcebergCommitter(Map<String, String> catalogOptions) {
-        this(catalogOptions, null);
+    public IcebergCommitter(
+            Map<String, String> catalogOptions, Map<String, String> hadoopConfOptions) {
+        this(catalogOptions, null, hadoopConfOptions);
     }
 
     public IcebergCommitter(
-            Map<String, String> catalogOptions, SinkCommitterMetricGroup metricGroup) {
+            Map<String, String> catalogOptions,
+            SinkCommitterMetricGroup metricGroup,
+            Map<String, String> hadoopConfOptions) {
+        Configuration configuration = HadoopConfUtils.createConfiguration(hadoopConfOptions);
         this.catalog =
                 CatalogUtil.buildIcebergCatalog(
-                        this.getClass().getSimpleName(), catalogOptions, new Configuration());
+                        this.getClass().getSimpleName(), catalogOptions, configuration);
         this.metricGroup = metricGroup;
         this.tableIdMetricMap = new HashMap<>();
     }

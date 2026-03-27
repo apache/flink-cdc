@@ -94,6 +94,31 @@ public class IcebergDataSinkFactoryTest {
     }
 
     @Test
+    void testHadoopConfOptionsAreAllowed() {
+        DataSinkFactory sinkFactory =
+                FactoryDiscoveryUtils.getFactoryByIdentifier("iceberg", DataSinkFactory.class);
+        Assertions.assertThat(sinkFactory).isInstanceOf(IcebergDataSinkFactory.class);
+
+        Configuration conf =
+                Configuration.fromMap(
+                        ImmutableMap.<String, String>builder()
+                                .put(
+                                        "hadoop.conf.hive.metastore.kerberos.keytab.file",
+                                        "/etc/security/keytabs/hive.service.keytab")
+                                .put(
+                                        "hadoop.conf.hive.metastore.kerberos.principal",
+                                        "hive/_HOST@EXAMPLE.COM")
+                                .put("hadoop.conf.hive.metastore.sasl.enabled", "true")
+                                .build());
+
+        DataSink dataSink =
+                sinkFactory.createDataSink(
+                        new FactoryHelper.DefaultContext(
+                                conf, conf, Thread.currentThread().getContextClassLoader()));
+        Assertions.assertThat(dataSink).isInstanceOf(IcebergDataSink.class);
+    }
+
+    @Test
     void testPrefixRequireOption() {
         DataSinkFactory sinkFactory =
                 FactoryDiscoveryUtils.getFactoryByIdentifier("iceberg", DataSinkFactory.class);

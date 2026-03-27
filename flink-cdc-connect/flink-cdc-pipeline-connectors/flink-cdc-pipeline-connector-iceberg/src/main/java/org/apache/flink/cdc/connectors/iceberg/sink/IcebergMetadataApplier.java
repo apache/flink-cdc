@@ -32,6 +32,7 @@ import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.PhysicalColumn;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.common.types.utils.DataTypeUtils;
+import org.apache.flink.cdc.connectors.iceberg.sink.utils.HadoopConfUtils;
 import org.apache.flink.cdc.connectors.iceberg.sink.utils.IcebergTypeUtils;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.Sets;
@@ -92,19 +93,30 @@ public class IcebergMetadataApplier implements MetadataApplier {
 
     private final Map<TableId, List<String>> partitionMaps;
 
+    private final Map<String, String> hadoopConfOptions;
+
     private Set<SchemaChangeEventType> enabledSchemaEvolutionTypes;
 
     public IcebergMetadataApplier(Map<String, String> catalogOptions) {
-        this(catalogOptions, new HashMap<>(), new HashMap<>());
+        this(catalogOptions, new HashMap<>(), new HashMap<>(), null);
     }
 
     public IcebergMetadataApplier(
             Map<String, String> catalogOptions,
             Map<String, String> tableOptions,
             Map<TableId, List<String>> partitionMaps) {
+        this(catalogOptions, tableOptions, partitionMaps, null);
+    }
+
+    public IcebergMetadataApplier(
+            Map<String, String> catalogOptions,
+            Map<String, String> tableOptions,
+            Map<TableId, List<String>> partitionMaps,
+            Map<String, String> hadoopConfOptions) {
         this.catalogOptions = catalogOptions;
         this.tableOptions = tableOptions;
         this.partitionMaps = partitionMaps;
+        this.hadoopConfOptions = hadoopConfOptions;
         this.enabledSchemaEvolutionTypes = getSupportedSchemaEvolutionTypes();
     }
 
@@ -112,9 +124,10 @@ public class IcebergMetadataApplier implements MetadataApplier {
     public void applySchemaChange(SchemaChangeEvent schemaChangeEvent)
             throws SchemaEvolveException {
         if (catalog == null) {
+            Configuration configuration = HadoopConfUtils.createConfiguration(hadoopConfOptions);
             catalog =
                     CatalogUtil.buildIcebergCatalog(
-                            this.getClass().getSimpleName(), catalogOptions, new Configuration());
+                            this.getClass().getSimpleName(), catalogOptions, configuration);
         }
         SchemaChangeEventVisitor.visit(
                 schemaChangeEvent,
