@@ -50,6 +50,8 @@ public class OnlineSchemaChangeUtils {
      * Pattern matching gh-ost shadow table ({@code _<name>_gho}) and pt-osc new table ({@code
      * _<name>_new}), which carry the actual ALTER DDL during an online schema change.
      */
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
     private static final Pattern OSC_TABLE_ID_PATTERN = Pattern.compile("^_(.*)_(gho|new)$");
 
     /**
@@ -106,10 +108,10 @@ public class OnlineSchemaChangeUtils {
             return false;
         }
         Struct value = (Struct) record.value();
-        ObjectMapper mapper = new ObjectMapper();
         try {
             String ddl =
-                    mapper.readTree(value.getString(HISTORY_RECORD_FIELD))
+                    OBJECT_MAPPER
+                            .readTree(value.getString(HISTORY_RECORD_FIELD))
                             .get(HistoryRecord.Fields.DDL_STATEMENTS)
                             .asText()
                             .toLowerCase();
@@ -136,11 +138,11 @@ public class OnlineSchemaChangeUtils {
             return Optional.empty();
         }
         Struct value = (Struct) record.value();
-        ObjectMapper mapper = new ObjectMapper();
 
         try {
             String ddl =
-                    mapper.readTree(value.getString(HISTORY_RECORD_FIELD))
+                    OBJECT_MAPPER
+                            .readTree(value.getString(HISTORY_RECORD_FIELD))
                             .get(HistoryRecord.Fields.DDL_STATEMENTS)
                             .asText()
                             .toLowerCase();
