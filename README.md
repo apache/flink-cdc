@@ -41,7 +41,7 @@ source:
   port: 3306
   username: root
   password: 123456
-  tables: app_db\.\.*
+  tables: app_db.\.*
 
 sink:
   type: doris
