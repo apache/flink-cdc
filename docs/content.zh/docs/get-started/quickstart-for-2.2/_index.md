@@ -1,5 +1,5 @@
 ---
-title: "在Flink 2.2上快速开始"
+title: "在 Flink 2.2 上快速开始"
 bookCollapseSection: true
 weight: 2
 ---
