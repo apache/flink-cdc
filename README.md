@@ -20,7 +20,7 @@
 </p>
 
 
-Flink CDC is a distributed data integration tool for real time data and batch data, built on top of Apache Flink. It prioritizes efficient end-to-end data integration and offers enhanced functionalities such as full database synchronization, sharding table synchronization, schema evolution and data transformation.
+Flink CDC is a distributed data integration tool for real-time data and batch data, built on top of Apache Flink. It prioritizes efficient end-to-end data integration and offers enhanced functionalities such as full database synchronization, sharding table synchronization, schema evolution and data transformation.
 
 ![Flink CDC framework design](docs/static/fig/architecture.png)
 
