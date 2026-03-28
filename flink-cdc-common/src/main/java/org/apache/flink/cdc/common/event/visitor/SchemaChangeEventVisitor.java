@@ -99,41 +99,23 @@ public class SchemaChangeEventVisitor {
             VoidVisitorHandler<TruncateTableEvent, E> truncateTableEventVisitor,
             VoidVisitorHandler<AlterTableCommentEvent, E> alterTableCommentEventHandler)
             throws E {
-        if (event instanceof AddColumnEvent) {
-            if (addColumnVisitor != null) {
-                addColumnVisitor.visit((AddColumnEvent) event);
-            }
-        } else if (event instanceof AlterColumnTypeEvent) {
-            if (alterColumnTypeEventVisitor != null) {
-                alterColumnTypeEventVisitor.visit((AlterColumnTypeEvent) event);
-            }
-        } else if (event instanceof CreateTableEvent) {
-            if (createTableEventVisitor != null) {
-                createTableEventVisitor.visit((CreateTableEvent) event);
-            }
-        } else if (event instanceof DropColumnEvent) {
-            if (dropColumnEventVisitor != null) {
-                dropColumnEventVisitor.visit((DropColumnEvent) event);
-            }
-        } else if (event instanceof DropTableEvent) {
-            if (dropTableEventVisitor != null) {
-                dropTableEventVisitor.visit((DropTableEvent) event);
-            }
-        } else if (event instanceof RenameColumnEvent) {
-            if (renameColumnEventVisitor != null) {
-                renameColumnEventVisitor.visit((RenameColumnEvent) event);
-            }
-        } else if (event instanceof TruncateTableEvent) {
-            if (truncateTableEventVisitor != null) {
-                truncateTableEventVisitor.visit((TruncateTableEvent) event);
-            }
-        } else if (event instanceof AlterTableCommentEvent) {
-            if (alterTableCommentEventHandler != null) {
-                alterTableCommentEventHandler.visit((AlterTableCommentEvent) event);
-            }
-        } else {
-            throw new IllegalArgumentException(
-                    "Unknown schema change event type " + event.getType());
-        }
+        visit(
+                event,
+                wrapVoidVisitor(addColumnVisitor),
+                wrapVoidVisitor(alterColumnTypeEventVisitor),
+                wrapVoidVisitor(createTableEventVisitor),
+                wrapVoidVisitor(dropColumnEventVisitor),
+                wrapVoidVisitor(dropTableEventVisitor),
+                wrapVoidVisitor(renameColumnEventVisitor),
+                wrapVoidVisitor(truncateTableEventVisitor),
+                wrapVoidVisitor(alterTableCommentEventHandler));
+    }
+
+    private static <EVT extends SchemaChangeEvent, E extends Throwable>
+            VisitorHandler<EVT, Void, E> wrapVoidVisitor(VoidVisitorHandler<EVT, E> handler) {
+        return event -> {
+            handler.visit(event);
+            return null;
+        };
     }
 }
