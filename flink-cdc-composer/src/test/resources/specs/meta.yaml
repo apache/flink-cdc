@@ -47,15 +47,3 @@
     DataChangeEvent{tableId=foo.bar.baz, before=[], after=[-D, -1, false, -2, -3, -4, -5, -7.7, -88.88, -9876543210, -987654321098765432.10, 爱丽丝, 疯帽子, 天地玄黄宇宙洪荒, 5LiA5LqM5LiJ5Zub5LqU, 5YWt5LiD5YWr5Lmd5Y2B, 5ZC+6Lyp44Gv54yr44Gn44GC44KL, 1970-01-09T08:57:36.789723456, 1970-01-10T15:49:27.891834561, 1970-01-11T22:41:18.912945612, 1970-01-09T08:57:36.789723456+08:00, 1970-01-10T15:49:27.891834561+01:00, 1970-01-11T22:41:18.912945612-04:00, 1970-01-09T08:57:36.789723456, 1970-01-10T15:49:27.891834561, 1970-01-11T22:41:18.912945612, 2001-01-01, 12:34:45, 23:45:07, 02:30:05, [2, 3, 5, 7, 11, 13, 17, 19], [二, san, 五, qi, 十一], {1 -> yi, 2 -> er, 3 -> san}, {二 -> [E, R], 三 -> [S, A, N], 一 -> [Y, I]}, {name: STRING -> Derrida, length: INT -> 7}, [{"k":1},"hello",{"k":2}]], op=INSERT, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[], after=[+I, 0, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null], op=INSERT, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[], after=[-D, 0, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null], op=INSERT, meta=()}
-- do: Downcase Post Converter
-  ignore: FLINK-38887
-  projection: id_, 'UPCASE' AS UPCASE, 'downcase' AS downcase, 'MiXeD cAsE' AS MiXeD_cAsE
-  primary-key: id_
-  converters: FIELD_NAME_LOWER_CASE
-  expect: |-
-    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`upcase` STRING,`downcase` STRING,`mixed_case` STRING}, primaryKeys=id_, options=()}
-    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, UPCASE, downcase, MiXeD cAsE], op=INSERT, meta=()}
-    DataChangeEvent{tableId=foo.bar.baz, before=[1, UPCASE, downcase, MiXeD cAsE], after=[-1, UPCASE, downcase, MiXeD cAsE], op=UPDATE, meta=()}
-    DataChangeEvent{tableId=foo.bar.baz, before=[-1, UPCASE, downcase, MiXeD cAsE], after=[], op=DELETE, meta=()}
-    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, UPCASE, downcase, MiXeD cAsE], op=INSERT, meta=()}
-    DataChangeEvent{tableId=foo.bar.baz, before=[0, UPCASE, downcase, MiXeD cAsE], after=[], op=DELETE, meta=()}

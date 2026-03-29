@@ -24,6 +24,7 @@ MODULES_PIPELINE_CONNECTORS = [
     "flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-kafka",
     "flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-maxcompute",
     "flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-mysql",
+    "flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-oracle",
     "flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-oceanbase",
     "flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-maxcompute",
     "flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-postgres",
@@ -55,6 +56,10 @@ MODULES_POSTGRES_PIPELINE = [
 MODULES_ORACLE = [
     "flink-cdc-connect/flink-cdc-source-connectors/flink-connector-oracle-cdc",
     "flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-oracle-cdc"
+]
+
+MODULES_ORACLE_PIPELINE = [
+    "flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-oracle"
 ]
 
 MODULES_MONGODB = [
@@ -143,6 +148,7 @@ ALL_MODULES = set(
     MODULES_POSTGRES_SOURCE +
     MODULES_POSTGRES_PIPELINE +
     MODULES_ORACLE +
+    MODULES_ORACLE_PIPELINE +
     MODULES_MONGODB +
     MODULES_SQLSERVER +
     MODULES_TIDB +
@@ -167,7 +173,7 @@ test_modules = set()
 compile_modules = set()
 
 for module in INPUT_MODULES.split(', '):
-    module_list = set(globals()['MODULES_' + module.upper().replace('-', '_')])
+    module_list = set(globals()['MODULES_' + module.upper().replace('-', '_').replace('.', '_')])
     test_modules |= module_list
     if module == 'source_e2e' or module == 'pipeline_e2e':
         compile_modules |= ALL_MODULES

@@ -29,6 +29,7 @@ limitations under the License.
     <properties>
         <doris.connector.version>25.1.0</doris.connector.version>
         <mysql.connector.version>8.0.26</mysql.connector.version>
+        <doris.flink.major.version>1.20</doris.flink.major.version>
     </properties>
 
     <dependencies>
@@ -48,7 +49,7 @@ limitations under the License.
 
         <dependency>
             <groupId>org.apache.doris</groupId>
-            <artifactId>flink-doris-connector-${flink.major.version}</artifactId>
+            <artifactId>flink-doris-connector-${doris.flink.major.version}</artifactId>
             <version>${doris.connector.version}</version>
         </dependency>
 
@@ -77,12 +78,24 @@ limitations under the License.
             <artifactId>flink-test-utils-junit</artifactId>
             <version>${flink.version}</version>
             <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.testcontainers</groupId>
+                    <artifactId>testcontainers</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-test-utils</artifactId>
             <version>${flink.version}</version>
             <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.testcontainers</groupId>
+                    <artifactId>testcontainers</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>

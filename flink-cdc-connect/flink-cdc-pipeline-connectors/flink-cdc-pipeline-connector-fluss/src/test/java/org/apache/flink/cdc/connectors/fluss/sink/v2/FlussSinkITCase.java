@@ -17,9 +17,11 @@
 
 package org.apache.flink.cdc.connectors.fluss.sink.v2;
 
-import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.cdc.common.data.DecimalData;
+import org.apache.flink.cdc.common.data.GenericArrayData;
+import org.apache.flink.cdc.common.data.GenericMapData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
+import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
@@ -31,6 +33,7 @@ import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.connectors.fluss.sink.FlussEventSerializationSchema;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
+import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
@@ -40,7 +43,9 @@ import org.apache.flink.test.util.AbstractTestBase;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 
-import com.alibaba.fluss.server.testutils.FlussClusterExtension;
+import org.apache.fluss.client.Connection;
+import org.apache.fluss.client.ConnectionFactory;
+import org.apache.fluss.server.testutils.FlussClusterExtension;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -56,9 +61,9 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-import static com.alibaba.fluss.config.ConfigOptions.BOOTSTRAP_SERVERS;
-import static com.alibaba.fluss.flink.source.testutils.FlinkRowAssertionsUtils.assertResultsIgnoreOrder;
-import static com.alibaba.fluss.server.testutils.FlussClusterExtension.BUILTIN_DATABASE;
+import static org.apache.fluss.config.ConfigOptions.BOOTSTRAP_SERVERS;
+import static org.apache.fluss.flink.source.testutils.FlinkRowAssertionsUtils.assertResultsIgnoreOrder;
+import static org.apache.fluss.server.testutils.FlussClusterExtension.BUILTIN_DATABASE;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Integration tests for FlussSink. */
@@ -74,7 +79,9 @@ public class FlussSinkITCase extends AbstractTestBase {
     protected TableEnvironment tBatchEnv;
 
     @BeforeEach
-    void before() {
+    void before() throws Exception {
+        waitForFlussClusterReady();
+
         // open a catalog so that we can get table from the catalog
         String bootstrapServers = FLUSS_CLUSTER_EXTENSION.getBootstrapServers();
 
@@ -92,6 +99,27 @@ public class FlussSinkITCase extends AbstractTestBase {
         // create database
         tBatchEnv.executeSql("create database " + DEFAULT_DB);
         tBatchEnv.useDatabase(DEFAULT_DB);
+    }
+
+    private void waitForFlussClusterReady() throws Exception {
+        int maxRetries = 30;
+        int retryIntervalMs = 1000;
+        Exception lastException = null;
+
+        for (int i = 0; i < maxRetries; i++) {
+            try (Connection connection =
+                    ConnectionFactory.createConnection(FLUSS_CLUSTER_EXTENSION.getClientConfig())) {
+                // Connection successful, cluster is ready
+                return;
+            } catch (Exception e) {
+                lastException = e;
+                Thread.sleep(retryIntervalMs);
+            }
+        }
+
+        throw new IllegalStateException(
+                "Failed to connect to Fluss cluster after " + maxRetries + " attempts",
+                lastException);
     }
 
     @AfterEach
@@ -122,7 +150,10 @@ public class FlussSinkITCase extends AbstractTestBase {
                                         + "    date_type DATE,\n"
                                         + "    time_type TIME,\n"
                                         + "    timestamp_type TIMESTAMP,\n"
-                                        + "    timestamp_ltz_type TIMESTAMP_LTZ(8)\n"
+                                        + "    timestamp_ltz_type TIMESTAMP_LTZ(8),\n"
+                                        + "    array_type ARRAY<INT>,\n"
+                                        + "    map_type MAP<STRING, INT>,\n"
+                                        + "    row_type ROW< f0 INT, f1 STRING >\n"
                                         + (primaryKeyTable
                                                 ? " ,PRIMARY KEY (int_type) NOT ENFORCED \n"
                                                 : "")
@@ -146,7 +177,10 @@ public class FlussSinkITCase extends AbstractTestBase {
                     "date_type",
                     "time_type",
                     "timestamp_type",
-                    "timestamp_ltz_type"
+                    "timestamp_ltz_type",
+                    "array_type",
+                    "map_type",
+                    "row_type"
                 };
         String[] pkFieldNames = primaryKeyTable ? new String[] {"int_type"} : new String[0];
 
@@ -166,8 +200,19 @@ public class FlussSinkITCase extends AbstractTestBase {
                     DataTypes.DATE(),
                     DataTypes.TIME(),
                     DataTypes.TIMESTAMP(),
-                    DataTypes.TIMESTAMP_LTZ(8)
+                    DataTypes.TIMESTAMP_LTZ(8),
+                    DataTypes.ARRAY(DataTypes.INT()),
+                    DataTypes.MAP(DataTypes.STRING(), DataTypes.INT()),
+                    DataTypes.ROW(
+                            DataTypes.FIELD("f0", DataTypes.INT()),
+                            DataTypes.FIELD("f1", DataTypes.STRING()))
                 };
+
+        // Currently, AbstractBinaryWriter.writeRecord only support BinaryRecordData but not
+        // GenericRecordData
+        RecordData nestedRowData =
+                new BinaryRecordDataGenerator(new DataType[] {DataTypes.INT(), DataTypes.STRING()})
+                        .generate(new Object[] {1, BinaryStringData.fromString("hello")});
 
         Object[][] insertedValues =
                 new Object[][] {
@@ -191,22 +236,26 @@ public class FlussSinkITCase extends AbstractTestBase {
                         LocalZonedTimestampData.fromInstant(
                                 LocalDateTime.of(2023, 11, 11, 11, 11, 11, 11)
                                         .atZone(ZoneId.of("GMT+05:00"))
-                                        .toInstant())
+                                        .toInstant()),
+                        new GenericArrayData(new Object[] {1, 2, 3}),
+                        new GenericMapData(
+                                Collections.singletonMap(BinaryStringData.fromString("key"), 123)),
+                        nestedRowData
                     },
                     new Object[] {
                         null, null, null, null, null, null, null, 0, null, null, null, null, null,
-                        null, null
+                        null, null, null, null, null
                     }
                 };
         // default timezone is asian/shanghai
         List<String> expectedRows =
                 Arrays.asList(
                         String.format(
-                                "+I[a, test character, test text, false, 8119.21, 1, 32767, 32768, 652482, 20.2007, 8.58965, 2023-11-12, 08:30:15, %s, 2023-11-11T06:11:11.000000011Z]",
+                                "+I[a, test character, test text, false, 8119.21, 1, 32767, 32768, 652482, 20.2007, 8.58965, 2023-11-12, 08:30:15, %s, 2023-11-11T06:11:11.000000011Z, [1, 2, 3], {key=123}, +I[1, hello]]",
                                 primaryKeyTable
                                         ? "2023-11-11T11:11:11.000000011"
                                         : "2023-11-11T11:11:11"),
-                        "+I[null, null, null, null, null, null, null, 0, null, null, null, null, null, null, null]");
+                        "+I[null, null, null, null, null, null, null, 0, null, null, null, null, null, null, null, null, null, null]");
 
         testInsertSingleTable(
                 tableId,
@@ -551,8 +600,7 @@ public class FlussSinkITCase extends AbstractTestBase {
                 StreamExecutionEnvironment.getExecutionEnvironment();
         environment.setParallelism(1);
 
-        DataStreamSource<Event> source =
-                environment.fromData(events, TypeInformation.of(Event.class));
+        DataStreamSource<Event> source = environment.fromData(events, new EventTypeInfo());
 
         FlussEventSerializationSchema flussRecordSerializer = new FlussEventSerializationSchema();
         FlussSink<Event> flussSink =

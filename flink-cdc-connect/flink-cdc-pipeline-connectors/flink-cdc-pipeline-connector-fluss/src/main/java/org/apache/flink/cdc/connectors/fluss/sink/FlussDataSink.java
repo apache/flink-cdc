@@ -25,7 +25,7 @@ import org.apache.flink.cdc.common.sink.FlinkSinkProvider;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.connectors.fluss.sink.v2.FlussSink;
 
-import com.alibaba.fluss.config.Configuration;
+import org.apache.fluss.config.Configuration;
 
 import java.util.List;
 import java.util.Map;

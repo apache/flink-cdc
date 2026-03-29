@@ -60,6 +60,7 @@ public class CompactionOperatorTest {
 
     @Test
     public void testCompationOperator() throws IOException, InterruptedException {
+        long checkpointId = 0;
         Map<String, String> catalogOptions = new HashMap<>();
         String warehouse =
                 new File(temporaryFolder.toFile(), UUID.randomUUID().toString()).toString();
@@ -69,8 +70,17 @@ public class CompactionOperatorTest {
         Catalog catalog =
                 CatalogUtil.buildIcebergCatalog(
                         "cdc-iceberg-catalog", catalogOptions, new Configuration());
+        String jobId = UUID.randomUUID().toString();
+        String operatorId = UUID.randomUUID().toString();
         IcebergWriter icebergWriter =
-                new IcebergWriter(catalogOptions, 1, 1, ZoneId.systemDefault());
+                new IcebergWriter(
+                        catalogOptions,
+                        1,
+                        1,
+                        ZoneId.systemDefault(),
+                        checkpointId,
+                        jobId,
+                        operatorId);
         IcebergMetadataApplier icebergMetadataApplier = new IcebergMetadataApplier(catalogOptions);
         TableId tableId = TableId.parse("test.iceberg_table");
 
@@ -155,7 +165,10 @@ public class CompactionOperatorTest {
         compactionOperator.processElement(
                 new StreamRecord<>(
                         new CommittableWithLineage<>(
-                                new WriteResultWrapper(null, tableId), 0L, 0)));
+                                new WriteResultWrapper(
+                                        null, tableId, checkpointId, jobId, operatorId),
+                                0L,
+                                0)));
         Map<String, String> summary =
                 catalog.loadTable(TableIdentifier.parse(tableId.identifier()))
                         .currentSnapshot()

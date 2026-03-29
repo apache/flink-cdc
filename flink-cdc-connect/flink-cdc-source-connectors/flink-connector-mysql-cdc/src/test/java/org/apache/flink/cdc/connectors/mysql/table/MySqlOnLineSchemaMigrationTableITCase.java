@@ -78,7 +78,7 @@ class MySqlOnLineSchemaMigrationTableITCase extends MySqlSourceTestBase {
     private static final String TEST_USER = "mysqluser";
     private static final String TEST_PASSWORD = "mysqlpw";
 
-    private static final String PERCONA_TOOLKIT = "perconalab/percona-toolkit:3.5.7";
+    private static final String PERCONA_TOOLKIT = "perconalab/percona-toolkit:3.7.1";
 
     protected static final GenericContainer<?> PERCONA_TOOLKIT_CONTAINER =
             createPerconaToolkitContainer();
@@ -177,7 +177,8 @@ class MySqlOnLineSchemaMigrationTableITCase extends MySqlSourceTestBase {
                                 + " 'table-name' = '%s',"
                                 + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'server-time-zone' = 'UTC',"
-                                + " 'server-id' = '%s'"
+                                + " 'server-id' = '%s',"
+                                + " 'scan.parse.online.schema.changes.enabled' = 'true'"
                                 + ")",
                         MYSQL8_CONTAINER.getHost(),
                         MYSQL8_CONTAINER.getDatabasePort(),
@@ -346,7 +347,8 @@ class MySqlOnLineSchemaMigrationTableITCase extends MySqlSourceTestBase {
                                 + " 'table-name' = '%s',"
                                 + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'server-time-zone' = 'UTC',"
-                                + " 'server-id' = '%s'"
+                                + " 'server-id' = '%s',"
+                                + " 'scan.parse.online.schema.changes.enabled' = 'true'"
                                 + ")",
                         MYSQL8_CONTAINER.getHost(),
                         MYSQL8_CONTAINER.getDatabasePort(),

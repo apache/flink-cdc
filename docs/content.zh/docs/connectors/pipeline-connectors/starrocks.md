@@ -128,15 +128,15 @@ pipeline:
       <td>sink.connect.timeout-ms</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">30000</td>
-      <td>String</td>
+      <td>Integer</td>
       <td>与 FE 建立 HTTP 连接的超时时间。取值范围：[100, 60000]。</td>
     </tr>
     <tr>
       <td>sink.wait-for-continue.timeout-ms</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">30000</td>
-      <td>String</td>
-      <td>等待 FE HTTP 100-continue 应答的超时时间。取值范围：[3000, 60000]。</td>
+      <td>Integer</td>
+      <td>等待 FE HTTP 100-continue 应答的超时时间。取值范围：[3000, 600000]。</td>
     </tr>
     <tr>
       <td>sink.buffer-flush.max-bytes</td>
@@ -173,6 +173,13 @@ pipeline:
       <td style="word-wrap: break-word;">true</td>
       <td>Boolean</td>
       <td>at-least-once 下是否使用 transaction stream load。</td>
+    </tr>
+    <tr>
+      <td>sink.metric.histogram-window-size</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">100</td>
+      <td>Integer</td>
+      <td>直方图指标的窗口大小。</td>
     </tr>
     <tr>
       <td>sink.properties.*</td>
@@ -233,7 +240,7 @@ pipeline:
     自动设置分桶数量</a>。对于 StarRocks 2.5 之前的版本必须设置，否则无法自动创建表。
 
 * 对于表结构变更同步
-  * 只支持增删列
+  * 支持创建/删除/清空表，增加/删除/重命名列，修改列类型
   * 新增列只能添加到最后一列
   * 如果使用 StarRocks 3.2 及之后版本，并且通过连接器来自动建表, 可以通过配置 `table.create.properties.fast_schema_evolution` 为 `true`
     来加速 StarRocks 执行变更。
@@ -298,6 +305,11 @@ pipeline:
       <td></td>
     </tr>
     <tr>
+      <td>TIME</td>
+      <td>VARCHAR</td>
+      <td>StarRocks 不支持 TIME 类型，因此映射为 VARCHAR。TIME(p) 值以字符串形式存储：当 p = 0 时格式为 "HH:mm:ss"，当 p > 0 时格式为 "HH:mm:ss.&lt;p 位小数&gt;"（例如 p = 3 时为 "HH:mm:ss.SSS"）。</td>
+    </tr>
+    <tr>
       <td>TIMESTAMP</td>
       <td>DATETIME</td>
       <td></td>
@@ -324,6 +336,21 @@ pipeline:
       <td>VARCHAR(n * 3)</td>
       <td>CDC 中长度表示字符数，而 StarRocks 中长度表示字节数。根据 UTF-8 编码，一个中文字符占用三个字节，因此 CDC 中的长度对应到 StarRocks
           中为 n * 3。</td>
+    </tr>
+    <tr>
+      <td>BINARY(n)</td>
+      <td>VARBINARY(min(n,1048576))</td>
+      <td>长度上限为 1048576。</td>
+    </tr>
+    <tr>
+      <td>VARBINARY(n)</td>
+      <td>VARBINARY(min(n,1048576))</td>
+      <td>长度上限为 1048576。</td>
+    </tr>
+    <tr>
+      <td>BYTES</td>
+      <td>VARBINARY(1048576)</td>
+      <td>BYTES 映射为最大长度为 1048576 的 VARBINARY。</td>
     </tr>
     </tbody>
 </table>

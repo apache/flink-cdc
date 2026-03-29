@@ -39,7 +39,7 @@ limitations under the License.
         <!-- paimon dependency -->
         <dependency>
             <groupId>org.apache.paimon</groupId>
-            <artifactId>paimon-flink-${flink.major.version}</artifactId>
+            <artifactId>paimon-flink-${paimon.flink.major.version}</artifactId>
             <version>${paimon.version}</version>
         </dependency>
 

@@ -87,10 +87,18 @@ import static io.debezium.util.Strings.isNullOrEmpty;
  * Copied from Debezium project(1.9.8.Final) to fix
  * https://github.com/ververica/flink-cdc-connectors/issues/1944.
  *
- * <p>Line 1427-1433 : Adjust GTID merging logic to support recovering from job which previously
- * specifying starting offset on start.
+ * <p>Line 1432-1443 : Adjust GTID merging logic to support recovering from job which previously
+ * specifying starting offset on start. Uses {@link GtidUtils#fixOldChannelsGtidSet} for shared
+ * EARLIEST/LATEST logic.
  *
- * <p>Line 1485 : Add more error details for some exceptions.
+ * <p>Line 1444-1452 : Fix LATEST mode GTID merging to avoid replaying pre-checkpoint transactions
+ * when checkpoint GTID has non-contiguous ranges. Delegates to {@link
+ * GtidUtils#computeLatestModeGtidSet}. See FLINK-39149.
+ *
+ * <p>Line 1490 : Add more error details for some exceptions.
+ *
+ * <p>Line 951-963 : Use iterator instead of index-based loop to avoid O(n²) complexity when
+ * processing LinkedList rows in handleChange method. See FLINK-38846.
  */
 public class MySqlStreamingChangeEventSource
         implements StreamingChangeEventSource<MySqlPartition, MySqlOffsetContext> {
@@ -941,11 +949,18 @@ public class MySqlStreamingChangeEventSource
             int count = 0;
             int numRows = rows.size();
             if (startingRowNumber < numRows) {
-                for (int row = startingRowNumber; row != numRows; ++row) {
-                    offsetContext.setRowNumber(row, numRows);
-                    offsetContext.event(tableId, eventTimestamp);
-                    changeEmitter.emit(tableId, rows.get(row));
-                    count++;
+                // Use iterator to avoid O(n²) complexity when rows is a LinkedList
+                // (mysql-binlog-connector-java uses LinkedList in WriteRowsEventDataDeserializer
+                // and DeleteRowsEventDataDeserializer)
+                int rowIndex = 0;
+                for (U rowData : rows) {
+                    if (rowIndex >= startingRowNumber) {
+                        offsetContext.setRowNumber(rowIndex, numRows);
+                        offsetContext.event(tableId, eventTimestamp);
+                        changeEmitter.emit(tableId, rowData);
+                        count++;
+                    }
+                    rowIndex++;
                 }
                 if (LOGGER.isDebugEnabled()) {
                     if (startingRowNumber != 0) {
@@ -1406,7 +1421,6 @@ public class MySqlStreamingChangeEventSource
         GtidSet mergedGtidSet;
 
         if (connectorConfig.gtidNewChannelPosition() == GtidNewChannelPosition.EARLIEST) {
-            final GtidSet knownGtidSet = filteredGtidSet;
             LOGGER.info("Using first available positions for new GTID channels");
             final GtidSet relevantAvailableServerGtidSet =
                     (gtidSourceFilter != null)
@@ -1426,14 +1440,16 @@ public class MySqlStreamingChangeEventSource
             // recorded offset in the checkpoint, and the available GTID for other MySQL instances
             // should be completed.
             mergedGtidSet =
-                    GtidUtils.fixRestoredGtidSet(
-                            GtidUtils.mergeGtidSetInto(
-                                    relevantAvailableServerGtidSet.retainAll(
-                                            uuid -> knownGtidSet.forServerWithId(uuid) != null),
-                                    purgedServerGtid),
-                            filteredGtidSet);
+                    GtidUtils.fixOldChannelsGtidSet(
+                            relevantAvailableServerGtidSet, purgedServerGtid, filteredGtidSet);
         } else {
-            mergedGtidSet = availableServerGtidSet.with(filteredGtidSet);
+            LOGGER.info("Using latest positions for new GTID channels");
+            mergedGtidSet =
+                    GtidUtils.computeLatestModeGtidSet(
+                            availableServerGtidSet,
+                            purgedServerGtid,
+                            filteredGtidSet,
+                            gtidSourceFilter);
         }
 
         LOGGER.info("Final merged GTID set to use when connecting to MySQL: {}", mergedGtidSet);

@@ -131,7 +131,6 @@ public class ProjectionColumnProcessor {
         List<Class<?>> paramTypes = new ArrayList<>();
 
         List<Column> columns = tableInfo.getPreTransformedSchema().getColumns();
-        String scriptExpression = projectionColumn.getScriptExpression();
         Map<String, String> columnNameMap = projectionColumn.getColumnNameMap();
         LinkedHashSet<String> originalColumnNames =
                 new LinkedHashSet<>(projectionColumn.getOriginalColumnNames());
@@ -171,7 +170,7 @@ public class ProjectionColumnProcessor {
 
         return TransformExpressionKey.of(
                 projectionColumn.getExpression(),
-                JaninoCompiler.loadSystemFunction(scriptExpression),
+                projectionColumn.getScriptExpression(),
                 argumentNames,
                 paramTypes,
                 JavaClassConverter.toJavaClass(projectionColumn.getDataType()),

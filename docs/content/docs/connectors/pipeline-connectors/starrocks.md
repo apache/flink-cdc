@@ -128,14 +128,14 @@ pipeline:
       <td>sink.connect.timeout-ms</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">30000</td>
-      <td>String</td>
+      <td>Integer</td>
       <td>The timeout for establishing HTTP connection. Valid values: 100 to 60000.</td>
     </tr>
     <tr>
       <td>sink.wait-for-continue.timeout-ms</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">30000</td>
-      <td>String</td>
+      <td>Integer</td>
       <td>Timeout in millisecond to wait for 100-continue response from FE http server.
             Valid values: 3000 to 600000.</td>
     </tr>
@@ -176,6 +176,13 @@ pipeline:
       <td style="word-wrap: break-word;">true</td>
       <td>Boolean</td>
       <td>Whether to use transaction stream load for at-least-once when it's available.</td>
+    </tr>
+    <tr>
+      <td>sink.metric.histogram-window-size</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">100</td>
+      <td>Integer</td>
+      <td>Window size of histogram metrics.</td>
     </tr>
     <tr>
       <td>sink.properties.*</td>
@@ -241,7 +248,7 @@ pipeline:
     otherwise you must set the option.
 
 * For schema change synchronization
-  * only supports add/drop columns
+  * supports create/drop/truncate table, add/drop/rename columns and alter column types
   * the new column will always be added to the last position
   * if your StarRocks version is 3.2 or later, and using the connector to create table automatically,
     you can set `table.create.properties.fast_schema_evolution` to `true` to speed up the schema change.
@@ -307,6 +314,11 @@ pipeline:
       <td></td>
     </tr>
     <tr>
+      <td>TIME</td>
+      <td>VARCHAR</td>
+      <td>StarRocks does not support TIME type, so it is mapped to VARCHAR. TIME values are stored as strings in format "HH:mm:ss" when the precision p = 0, or "HH:mm:ss.&lt;p digits&gt;" when p &gt; 0 (for example, p = 3 uses "HH:mm:ss.SSS").</td>
+    </tr>
+    <tr>
       <td>TIMESTAMP</td>
       <td>DATETIME</td>
       <td></td>
@@ -335,6 +347,21 @@ pipeline:
       <td>VARCHAR(n * 3)</td>
       <td>CDC defines the length by characters, and StarRocks defines it by bytes. According to UTF-8, one Chinese 
         character is equal to three bytes, so the length for StarRocks is n * 3.</td>
+    </tr>
+    <tr>
+      <td>BINARY(n)</td>
+      <td>VARBINARY(min(n,1048576))</td>
+      <td>The length is capped to 1048576.</td>
+    </tr>
+    <tr>
+      <td>VARBINARY(n)</td>
+      <td>VARBINARY(min(n,1048576))</td>
+      <td>The length is capped to 1048576.</td>
+    </tr>
+    <tr>
+      <td>BYTES</td>
+      <td>VARBINARY(1048576)</td>
+      <td>BYTES is mapped to VARBINARY with max length 1048576.</td>
     </tr>
     </tbody>
 </table>

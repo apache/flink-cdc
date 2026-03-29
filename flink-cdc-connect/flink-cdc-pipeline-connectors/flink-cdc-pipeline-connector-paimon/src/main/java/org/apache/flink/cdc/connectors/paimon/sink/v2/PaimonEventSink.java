@@ -24,7 +24,7 @@ import org.apache.flink.cdc.connectors.paimon.sink.v2.bucket.BucketWrapperChange
 import org.apache.flink.cdc.connectors.paimon.sink.v2.bucket.BucketWrapperEventTypeInfo;
 import org.apache.flink.cdc.connectors.paimon.sink.v2.bucket.FlushEventAlignmentOperator;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
-import org.apache.flink.streaming.api.connector.sink2.WithPreWriteTopology;
+import org.apache.flink.streaming.api.connector.sink2.SupportsPreWriteTopology;
 import org.apache.flink.streaming.api.datastream.DataStream;
 
 import org.apache.paimon.flink.sink.MultiTableCommittable;
@@ -35,7 +35,7 @@ import org.apache.paimon.table.sink.CommitMessageSerializer;
 import java.time.ZoneId;
 
 /** A {@link PaimonSink} to process {@link Event}. */
-public class PaimonEventSink extends PaimonSink<Event> implements WithPreWriteTopology<Event> {
+public class PaimonEventSink extends PaimonSink<Event> implements SupportsPreWriteTopology<Event> {
 
     public final String schemaOperatorUid;
 
@@ -69,6 +69,7 @@ public class PaimonEventSink extends PaimonSink<Event> implements WithPreWriteTo
                             if (event instanceof BucketWrapperChangeEvent) {
                                 // Add hash of tableId to avoid data skew.
                                 return ((BucketWrapperChangeEvent) event).getBucket()
+                                        + ((BucketWrapperChangeEvent) event).getPartition()
                                         + ((BucketWrapperChangeEvent) event).tableId().hashCode();
                             } else {
                                 return ((BucketWrapper) event).getBucket();
@@ -82,7 +83,7 @@ public class PaimonEventSink extends PaimonSink<Event> implements WithPreWriteTo
     }
 
     @Override
-    public SimpleVersionedSerializer<MultiTableCommittable> getCommittableSerializer() {
+    public SimpleVersionedSerializer<MultiTableCommittable> getWriteResultSerializer() {
         CommitMessageSerializer fileSerializer = new CommitMessageSerializer();
         return new MultiTableCommittableSerializer(fileSerializer);
     }

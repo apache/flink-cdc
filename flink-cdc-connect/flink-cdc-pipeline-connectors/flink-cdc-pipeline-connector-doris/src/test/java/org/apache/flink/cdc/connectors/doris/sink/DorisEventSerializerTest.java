@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.doris.sink;
 
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.data.DateData;
+import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
@@ -41,6 +42,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.Map;
@@ -66,6 +68,38 @@ public class DorisEventSerializerTest {
                     .build();
     private static final BinaryRecordDataGenerator RECORD_DATA_GENERATOR =
             new BinaryRecordDataGenerator(((RowType) SCHEMA.toRowDataType()));
+
+    @Test
+    public void testDataChangeEventWithTimeDataType() throws IOException {
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id_", DataTypes.BIGINT().notNull())
+                        .physicalColumn("time_0_", DataTypes.TIME(0))
+                        .physicalColumn("time_3_", DataTypes.TIME(3))
+                        .primaryKey("id_")
+                        .build();
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(((RowType) schema.toRowDataType()));
+        CreateTableEvent createTableEvent = new CreateTableEvent(TABLE_ID, schema);
+        DataChangeEvent dataChangeEvent =
+                DataChangeEvent.insertEvent(
+                        TABLE_ID,
+                        generator.generate(
+                                new Object[] {
+                                    1L,
+                                    TimeData.fromLocalTime(LocalTime.of(19, 43, 17)),
+                                    TimeData.fromLocalTime(LocalTime.of(21, 45, 3, 123000000)),
+                                }));
+
+        dorisEventSerializer = new DorisEventSerializer(ZoneId.of("UTC"), new Configuration());
+        dorisEventSerializer.serialize(createTableEvent);
+        DorisRecord dorisRecord = dorisEventSerializer.serialize(dataChangeEvent);
+        JsonNode jsonNode = objectMapper.readTree(dorisRecord.getRow());
+
+        Assertions.assertThat(jsonNode.get("id_").asLong()).isEqualTo(1L);
+        Assertions.assertThat(jsonNode.get("time_0_").asText()).isEqualTo("19:43:17");
+        Assertions.assertThat(jsonNode.get("time_3_").asText()).isEqualTo("21:45:03.123");
+    }
 
     @Test
     public void testDataChangeEventWithDateTimePartitionColumn() throws IOException {

@@ -21,6 +21,7 @@ import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.SchemaChangeEventTypeFamily;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
+import org.apache.flink.cdc.common.utils.ChangeEventUtils;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.common.utils.StringUtils;
 import org.apache.flink.cdc.composer.definition.ModelDef;
@@ -92,6 +93,7 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     private static final String UDF_KEY = "user-defined-function";
     private static final String UDF_FUNCTION_NAME_KEY = "name";
     private static final String UDF_CLASSPATH_KEY = "classpath";
+    private static final String UDF_OPTIONS_KEY = "options";
 
     // Model related keys
     private static final String MODEL_NAME_KEY = "model-name";
@@ -103,6 +105,8 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     public static final String TRANSFORM_PARTITION_KEY_KEY = "partition-keys";
 
     public static final String TRANSFORM_TABLE_OPTION_KEY = "table-options";
+
+    public static final String TRANSFORM_TABLE_OPTION_DELIMITER_KEY = "table-options.delimiter";
 
     private final ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
 
@@ -226,6 +230,19 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
             Arrays.stream(SchemaChangeEventTypeFamily.ALL)
                     .map(SchemaChangeEventType::getTag)
                     .forEach(includedSETypes::add);
+        } else {
+            // CreateTableEvent is always required as the foundation for all subsequent processing.
+            // Automatically add it if not explicitly excluded by user.
+            // Use resolveSchemaEvolutionTag to properly handle both exact tags and family tags.
+            boolean createTableExplicitlyExcluded =
+                    excludedSETypes.stream()
+                            .flatMap(
+                                    tag -> ChangeEventUtils.resolveSchemaEvolutionTag(tag).stream())
+                            .anyMatch(type -> type == SchemaChangeEventType.CREATE_TABLE);
+            if (!createTableExplicitlyExcluded
+                    && !includedSETypes.contains(SchemaChangeEventType.CREATE_TABLE.getTag())) {
+                includedSETypes.add(SchemaChangeEventType.CREATE_TABLE.getTag());
+            }
         }
 
         if (excludedFieldNotPresent && SchemaChangeBehavior.LENIENT.equals(schemaChangeBehavior)) {
@@ -295,7 +312,7 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                 "UDF",
                 udfNode,
                 Arrays.asList(UDF_FUNCTION_NAME_KEY, UDF_CLASSPATH_KEY),
-                Collections.emptyList());
+                Collections.singletonList(UDF_OPTIONS_KEY));
 
         String functionName =
                 checkNotNull(
@@ -310,7 +327,15 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                                 UDF_CLASSPATH_KEY)
                         .asText();
 
-        return new UdfDef(functionName, classpath);
+        Map<String, String> options =
+                Optional.ofNullable(udfNode.get(UDF_OPTIONS_KEY))
+                        .map(
+                                node ->
+                                        mapper.convertValue(
+                                                node, new TypeReference<Map<String, String>>() {}))
+                        .orElse(null);
+
+        return new UdfDef(functionName, classpath, options);
     }
 
     private TransformDef toTransformDef(JsonNode transformNode) {
@@ -324,6 +349,7 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                         TRANSFORM_PRIMARY_KEY_KEY,
                         TRANSFORM_PARTITION_KEY_KEY,
                         TRANSFORM_TABLE_OPTION_KEY,
+                        TRANSFORM_TABLE_OPTION_DELIMITER_KEY,
                         TRANSFORM_DESCRIPTION_KEY,
                         TRANSFORM_CONVERTER_AFTER_TRANSFORM_KEY));
 
@@ -357,6 +383,10 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                 Optional.ofNullable(transformNode.get(TRANSFORM_TABLE_OPTION_KEY))
                         .map(JsonNode::asText)
                         .orElse(null);
+        String tableOptionsDelimiter =
+                Optional.ofNullable(transformNode.get(TRANSFORM_TABLE_OPTION_DELIMITER_KEY))
+                        .map(JsonNode::asText)
+                        .orElse(",");
         String description =
                 Optional.ofNullable(transformNode.get(TRANSFORM_DESCRIPTION_KEY))
                         .map(JsonNode::asText)
@@ -373,6 +403,7 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                 primaryKeys,
                 partitionKeys,
                 tableOptions,
+                tableOptionsDelimiter,
                 description,
                 postTransformConverter);
     }

@@ -192,7 +192,7 @@ public class NestedSerializersSnapshotDelegate {
         TypeSerializer<E> typedSerializer = (TypeSerializer<E>) serializer;
         TypeSerializerSnapshot<E> typedSnapshot = (TypeSerializerSnapshot<E>) snapshot;
 
-        return typedSnapshot.resolveSchemaCompatibility(typedSerializer);
+        return typedSnapshot.resolveSchemaCompatibility(typedSerializer.snapshotConfiguration());
     }
 
     private static TypeSerializer<?>[] snapshotsToRestoreSerializers(

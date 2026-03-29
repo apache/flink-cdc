@@ -106,6 +106,8 @@ public class IcebergDataSinkFactory implements DataSinkFactory {
                 }
             }
         }
+        String jobIdPrefix =
+                context.getFactoryConfiguration().get(IcebergDataSinkOptions.JOB_ID_PREFIX);
 
         return new IcebergDataSink(
                 catalogOptions,
@@ -113,7 +115,8 @@ public class IcebergDataSinkFactory implements DataSinkFactory {
                 partitionMaps,
                 zoneId,
                 schemaOperatorUid,
-                compactionOptions);
+                compactionOptions,
+                jobIdPrefix);
     }
 
     private CompactionOptions getCompactionStrategy(Configuration configuration) {
@@ -139,11 +142,18 @@ public class IcebergDataSinkFactory implements DataSinkFactory {
     public Set<ConfigOption<?>> optionalOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
         options.add(IcebergDataSinkOptions.TYPE);
+        options.add(IcebergDataSinkOptions.CATALOG_IMPL);
+        options.add(IcebergDataSinkOptions.IO_IMPL);
+        options.add(IcebergDataSinkOptions.GLUE_ID);
+        options.add(IcebergDataSinkOptions.GLUE_SKIP_ARCHIVE);
+        options.add(IcebergDataSinkOptions.GLUE_SKIP_NAME_VALIDATION);
+        options.add(IcebergDataSinkOptions.CLIENT_REGION);
         options.add(IcebergDataSinkOptions.WAREHOUSE);
         options.add(IcebergDataSinkOptions.PARTITION_KEY);
         options.add(IcebergDataSinkOptions.SINK_COMPACTION_ENABLED);
         options.add(IcebergDataSinkOptions.SINK_COMPACTION_COMMIT_INTERVAL);
         options.add(IcebergDataSinkOptions.SINK_COMPACTION_PARALLELISM);
+        options.add(IcebergDataSinkOptions.JOB_ID_PREFIX);
         return options;
     }
 }

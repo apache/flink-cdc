@@ -340,4 +340,101 @@ class DebeziumJsonSerializationSchemaTest {
         assertThat(rowNode.has("f1")).isTrue();
         assertThat(rowNode.has("f2")).isTrue();
     }
+
+    @Test
+    void testSerializeWithSchemaComplexTypes() throws Exception {
+        ObjectMapper mapper =
+                JacksonMapperFactory.createObjectMapper()
+                        .configure(JsonGenerator.Feature.WRITE_BIGDECIMAL_AS_PLAIN, false);
+        Map<String, String> properties = new HashMap<>();
+        properties.put("include-schema.enabled", "true");
+        Configuration configuration = Configuration.fromMap(properties);
+        SerializationSchema<Event> serializationSchema =
+                ChangeLogJsonFormatFactory.createSerializationSchema(
+                        configuration, JsonSerializationType.DEBEZIUM_JSON, ZoneId.systemDefault());
+        serializationSchema.open(new MockInitializationContext());
+
+        // create table with complex types
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("arr", DataTypes.ARRAY(DataTypes.STRING()))
+                        .physicalColumn("map", DataTypes.MAP(DataTypes.STRING(), DataTypes.INT()))
+                        .physicalColumn(
+                                "row",
+                                DataTypes.ROW(
+                                        DataTypes.FIELD("f1", DataTypes.STRING()),
+                                        DataTypes.FIELD("f2", DataTypes.INT())))
+                        .primaryKey("id")
+                        .build();
+
+        RowType rowType =
+                RowType.of(
+                        DataTypes.INT(),
+                        DataTypes.ARRAY(DataTypes.STRING()),
+                        DataTypes.MAP(DataTypes.STRING(), DataTypes.INT()),
+                        DataTypes.ROW(
+                                DataTypes.FIELD("f1", DataTypes.STRING()),
+                                DataTypes.FIELD("f2", DataTypes.INT())));
+
+        CreateTableEvent createTableEvent = new CreateTableEvent(TABLE_1, schema);
+        assertThat(serializationSchema.serialize(createTableEvent)).isNull();
+
+        BinaryRecordDataGenerator generator = new BinaryRecordDataGenerator(rowType);
+
+        // Create test data with complex types
+        org.apache.flink.cdc.common.data.GenericArrayData arrayData =
+                new org.apache.flink.cdc.common.data.GenericArrayData(
+                        new Object[] {
+                            BinaryStringData.fromString("item1"),
+                            BinaryStringData.fromString("item2")
+                        });
+
+        Map<Object, Object> mapValues = new HashMap<>();
+        mapValues.put(BinaryStringData.fromString("key1"), 100);
+        mapValues.put(BinaryStringData.fromString("key2"), 200);
+        org.apache.flink.cdc.common.data.GenericMapData mapData =
+                new org.apache.flink.cdc.common.data.GenericMapData(mapValues);
+
+        BinaryRecordDataGenerator nestedRowGenerator =
+                new BinaryRecordDataGenerator(RowType.of(DataTypes.STRING(), DataTypes.INT()));
+        org.apache.flink.cdc.common.data.RecordData nestedRow =
+                nestedRowGenerator.generate(
+                        new Object[] {BinaryStringData.fromString("nested"), 42});
+
+        // insert event with complex types
+        DataChangeEvent insertEvent =
+                DataChangeEvent.insertEvent(
+                        TABLE_1,
+                        generator.generate(new Object[] {1, arrayData, mapData, nestedRow}));
+
+        byte[] serialized = serializationSchema.serialize(insertEvent);
+        JsonNode actual = mapper.readTree(serialized);
+
+        JsonNode expected =
+                mapper.readTree(
+                        "{\"schema\":{\"type\":\"struct\",\"fields\":["
+                                + "{\"type\":\"struct\",\"fields\":["
+                                + "{\"type\":\"int32\",\"optional\":true,\"field\":\"id\"},"
+                                + "{\"type\":\"array\",\"items\":{\"type\":\"string\",\"optional\":false},\"optional\":true,\"field\":\"arr\"},"
+                                + "{\"type\":\"map\",\"keys\":{\"type\":\"string\",\"optional\":false},\"values\":{\"type\":\"int32\",\"optional\":false},\"optional\":true,\"field\":\"map\"},"
+                                + "{\"type\":\"struct\",\"fields\":["
+                                + "{\"type\":\"string\",\"optional\":false,\"field\":\"f1\"},"
+                                + "{\"type\":\"int32\",\"optional\":false,\"field\":\"f2\"}"
+                                + "],\"optional\":true,\"field\":\"row\"}"
+                                + "],\"optional\":true,\"field\":\"before\"},"
+                                + "{\"type\":\"struct\",\"fields\":["
+                                + "{\"type\":\"int32\",\"optional\":true,\"field\":\"id\"},"
+                                + "{\"type\":\"array\",\"items\":{\"type\":\"string\",\"optional\":false},\"optional\":true,\"field\":\"arr\"},"
+                                + "{\"type\":\"map\",\"keys\":{\"type\":\"string\",\"optional\":false},\"values\":{\"type\":\"int32\",\"optional\":false},\"optional\":true,\"field\":\"map\"},"
+                                + "{\"type\":\"struct\",\"fields\":["
+                                + "{\"type\":\"string\",\"optional\":false,\"field\":\"f1\"},"
+                                + "{\"type\":\"int32\",\"optional\":false,\"field\":\"f2\"}"
+                                + "],\"optional\":true,\"field\":\"row\"}"
+                                + "],\"optional\":true,\"field\":\"after\"}"
+                                + "],\"optional\":false},"
+                                + "\"payload\":{\"before\":null,\"after\":{\"id\":1,\"arr\":[\"item1\",\"item2\"],\"map\":{\"key1\":100,\"key2\":200},\"row\":{\"f1\":\"nested\",\"f2\":42}},\"op\":\"c\",\"source\":{\"db\":\"default_schema\",\"table\":\"table1\"}}}");
+
+        assertThat(actual).isEqualTo(expected);
+    }
 }

@@ -74,6 +74,7 @@ import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSource
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.SCAN_LSN_COMMIT_CHECKPOINTS_DELAY;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.SCAN_STARTUP_MODE;
+import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.SCHEMA_CHANGE_ENABLED;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.SERVER_TIME_ZONE;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.SLOT_NAME;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND;
@@ -131,6 +132,7 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
         boolean skipSnapshotBackfill = config.get(SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP);
         int lsnCommitCheckpointsDelay = config.get(SCAN_LSN_COMMIT_CHECKPOINTS_DELAY);
         boolean tableIdIncludeDatabase = config.get(TABLE_ID_INCLUDE_DATABASE);
+        boolean includeSchemaChanges = config.get(SCHEMA_CHANGE_ENABLED);
 
         validateIntegerOption(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE, splitSize, 1);
         validateIntegerOption(CHUNK_META_GROUP_SIZE, splitMetaGroupSize, 1);
@@ -172,6 +174,7 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
                         .lsnCommitCheckpointsDelay(lsnCommitCheckpointsDelay)
                         .assignUnboundedChunkFirst(isAssignUnboundedChunkFirst)
                         .includeDatabaseInTableId(tableIdIncludeDatabase)
+                        .includeSchemaChanges(includeSchemaChanges)
                         .getConfigFactory();
 
         List<TableId> tableIds = PostgresSchemaUtils.listTables(configFactory.create(0), null);
@@ -262,6 +265,7 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
         options.add(METADATA_LIST);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED);
         options.add(TABLE_ID_INCLUDE_DATABASE);
+        options.add(SCHEMA_CHANGE_ENABLED);
         return options;
     }
 
@@ -404,12 +408,14 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
     private boolean isValidPostgresDbName(String dbName) {
         // PostgreSQL database name conventions:
         // 1. Length does not exceed 63 characters
-        // 2. Can contain letters, numbers, underscores, and dollar signs
-        // 3. Cannot start with a dollar sign
+        // 2. Can contain letters, numbers, underscores, dollar signs, and hyphens
+        // 3. Must start with a letter, underscore, or dollar sign (cannot start with a hyphen)
+        // Note: While SQL identifiers have strict rules, database names created
+        // via createdb command can contain hyphens (e.g., createdb foo-bar)
         if (dbName == null || dbName.length() > 63) {
             return false;
         }
-        if (!dbName.matches("[a-zA-Z_$][a-zA-Z0-9_$]*")) {
+        if (!dbName.matches("[a-zA-Z_$][a-zA-Z0-9_$-]*")) {
             return false;
         }
         return true;

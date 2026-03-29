@@ -166,7 +166,6 @@
     DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, true, false, true, false], op=INSERT, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[0, null, true, false, true, false], after=[], op=DELETE, meta=()}
 - do: Between Op
-  ignore: FLINK-38906
   projection: |-
     id_
     tinyint_ BETWEEN CAST(1 AS TINYINT) AND CAST(3 AS TINYINT) AS comp_1
@@ -189,7 +188,6 @@
     DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, false, false, false, false, false, false, false, false, false, false, false], op=INSERT, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[0, false, false, false, false, false, false, false, false, false, false, false], after=[], op=DELETE, meta=()}
 - do: Not Between Op
-  ignore: FLINK-38906
   projection: |-
     id_
     tinyint_ NOT BETWEEN CAST(1 AS TINYINT) AND CAST(3 AS TINYINT) AS comp_1
@@ -238,7 +236,6 @@
   projection: id_, char_ NOT LIKE 'A.*' AS comp_1, varchar_ NOT LIKE '.*rro' AS comp_2, string_ NOT LIKE 'From [A-Z] to [A-Z] is Lie' AS comp_3
   primary-key: id_
 - do: In Op
-  ignore: FLINK-38906
   projection: |-
     id_
     tinyint_ IN (CAST(2 AS TINYINT)) AS comp_1
@@ -261,7 +258,6 @@
     DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, false, false, false, false, false, false, false, false, false, false, false], op=INSERT, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[0, false, false, false, false, false, false, false, false, false, false, false], after=[], op=DELETE, meta=()}
 - do: Not In Op
-  ignore: FLINK-38906
   projection: |-
     id_
     tinyint_ NOT IN (CAST(2 AS TINYINT)) AS comp_1

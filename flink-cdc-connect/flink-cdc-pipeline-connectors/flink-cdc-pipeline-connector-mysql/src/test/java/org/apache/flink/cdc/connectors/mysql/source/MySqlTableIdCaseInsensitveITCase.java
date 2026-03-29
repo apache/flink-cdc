@@ -18,7 +18,6 @@
 package org.apache.flink.cdc.connectors.mysql.source;
 
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
-import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
@@ -38,13 +37,15 @@ import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.util.RestartStrategyUtils;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.util.CloseableIterator;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.testcontainers.lifecycle.Startables;
 
 import java.sql.Connection;
@@ -93,11 +94,13 @@ class MySqlTableIdCaseInsensitveITCase extends MySqlSourceTestBase {
         TestValuesTableFactory.clearAllData();
         env.setParallelism(4);
         env.enableCheckpointing(2000);
-        env.setRestartStrategy(RestartStrategies.noRestart());
+        RestartStrategyUtils.configureNoRestartStrategy(env);
     }
 
-    @Test
-    public void testParseAlterStatementWhenTableNameAndColumnIsUpper() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {"products", "uppercase_products"})
+    public void testParseAlterStatementWhenTableNameAndColumnIsUpper(String tableName)
+            throws Exception {
         env.setParallelism(1);
         inventoryDatabase.createAndInitialize();
         MySqlSourceConfigFactory configFactory =
@@ -107,7 +110,7 @@ class MySqlTableIdCaseInsensitveITCase extends MySqlSourceTestBase {
                         .username(TEST_USER)
                         .password(TEST_PASSWORD)
                         .databaseList(inventoryDatabase.getDatabaseName())
-                        .tableList(inventoryDatabase.getDatabaseName() + "\\.products")
+                        .tableList(inventoryDatabase.getDatabaseName() + "\\." + tableName)
                         .startupOptions(StartupOptions.latest())
                         .serverId(getServerId(env.getParallelism()))
                         .serverTimeZone("UTC")
@@ -124,17 +127,17 @@ class MySqlTableIdCaseInsensitveITCase extends MySqlSourceTestBase {
                         .executeAndCollect();
         Thread.sleep(5_000);
 
-        TableId tableId = TableId.tableId(inventoryDatabase.getDatabaseName(), "products");
+        TableId tableId = TableId.tableId(inventoryDatabase.getDatabaseName(), tableName);
         List<Event> expected = new ArrayList<>();
         expected.add(getProductsCreateTableEvent(tableId));
         try (Connection connection = inventoryDatabase.getJdbcConnection();
                 Statement statement = connection.createStatement()) {
-            expected.addAll(executeAlterAndProvideExpected(tableId, statement));
+            expected.addAll(executeAlterAndProvideExpected(tableId, statement, tableName));
 
             statement.execute(
                     String.format(
-                            "ALTER TABLE `%s`.`PRODUCTS` ADD `cols1` VARCHAR(45);",
-                            inventoryDatabase.getDatabaseName()));
+                            "ALTER TABLE `%s`.`%s` ADD `COLS1` VARCHAR(45);",
+                            inventoryDatabase.getDatabaseName(), tableName));
             expected.add(
                     new AddColumnEvent(
                             tableId,
@@ -143,6 +146,42 @@ class MySqlTableIdCaseInsensitveITCase extends MySqlSourceTestBase {
                                             Column.physicalColumn(
                                                     "cols1", DataTypes.VARCHAR(45))))));
         }
+        List<Event> actual = fetchResults(events, expected.size());
+        assertThat(actual).isEqualTo(expected);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"products", "uppercase_products"})
+    public void testSnapshotModeWhenTableNameAndColumnIsUpper(String tableName) throws Exception {
+        env.setParallelism(1);
+        inventoryDatabase.createAndInitialize();
+        MySqlSourceConfigFactory configFactory =
+                new MySqlSourceConfigFactory()
+                        .hostname(MYSQL8_CONTAINER.getHost())
+                        .port(MYSQL8_CONTAINER.getDatabasePort())
+                        .username(TEST_USER)
+                        .password(TEST_PASSWORD)
+                        .databaseList(inventoryDatabase.getDatabaseName())
+                        .tableList(inventoryDatabase.getDatabaseName() + "\\." + tableName)
+                        .startupOptions(StartupOptions.snapshot())
+                        .serverId(getServerId(env.getParallelism()))
+                        .serverTimeZone("UTC")
+                        .includeSchemaChanges(SCHEMA_CHANGE_ENABLED.defaultValue());
+
+        FlinkSourceProvider sourceProvider =
+                (FlinkSourceProvider) new MySqlDataSource(configFactory).getEventSourceProvider();
+        CloseableIterator<Event> events =
+                env.fromSource(
+                                sourceProvider.getSource(),
+                                WatermarkStrategy.noWatermarks(),
+                                MySqlDataSourceFactory.IDENTIFIER,
+                                new EventTypeInfo())
+                        .executeAndCollect();
+        Thread.sleep(5_000);
+
+        TableId tableId = TableId.tableId(inventoryDatabase.getDatabaseName(), tableName);
+        List<Event> expected = new ArrayList<>();
+        expected.add(getProductsCreateTableEvent(tableId));
         List<Event> actual = fetchResults(events, expected.size());
         assertThat(actual).isEqualTo(expected);
     }
@@ -172,13 +211,13 @@ class MySqlTableIdCaseInsensitveITCase extends MySqlSourceTestBase {
      * );
      * </pre>
      */
-    private List<Event> executeAlterAndProvideExpected(TableId tableId, Statement statement)
-            throws SQLException {
+    private List<Event> executeAlterAndProvideExpected(
+            TableId tableId, Statement statement, String tableName) throws SQLException {
         List<Event> expected = new ArrayList<>();
         statement.execute(
                 String.format(
-                        "ALTER TABLE `%s`.`products` CHANGE COLUMN `DESCRIPTION` `DESC` VARCHAR(255) NULL DEFAULT NULL;",
-                        inventoryDatabase.getDatabaseName()));
+                        "ALTER TABLE `%s`.`%s` CHANGE COLUMN `DESCRIPTION` `DESC` VARCHAR(255) NULL DEFAULT NULL;",
+                        inventoryDatabase.getDatabaseName(), tableName));
         expected.add(
                 new AlterColumnTypeEvent(
                         tableId, Collections.singletonMap("description", DataTypes.VARCHAR(255))));
@@ -187,8 +226,8 @@ class MySqlTableIdCaseInsensitveITCase extends MySqlSourceTestBase {
 
         statement.execute(
                 String.format(
-                        "ALTER TABLE `%s`.`products` CHANGE COLUMN `desc` `desc2` VARCHAR(400) NULL DEFAULT NULL;",
-                        inventoryDatabase.getDatabaseName()));
+                        "ALTER TABLE `%s`.`%s` CHANGE COLUMN `desc` `desc2` VARCHAR(400) NULL DEFAULT NULL;",
+                        inventoryDatabase.getDatabaseName(), tableName));
         expected.add(
                 new AlterColumnTypeEvent(
                         tableId, Collections.singletonMap("desc", DataTypes.VARCHAR(400))));
@@ -196,8 +235,8 @@ class MySqlTableIdCaseInsensitveITCase extends MySqlSourceTestBase {
 
         statement.execute(
                 String.format(
-                        "ALTER TABLE `%s`.`products` ADD COLUMN `DESC1` VARCHAR(45) NULL AFTER `weight`;",
-                        inventoryDatabase.getDatabaseName()));
+                        "ALTER TABLE `%s`.`%s` ADD COLUMN `DESC1` VARCHAR(45) NULL AFTER `weight`;",
+                        inventoryDatabase.getDatabaseName(), tableName));
         expected.add(
                 new AddColumnEvent(
                         tableId,
@@ -209,8 +248,8 @@ class MySqlTableIdCaseInsensitveITCase extends MySqlSourceTestBase {
 
         statement.execute(
                 String.format(
-                        "ALTER TABLE `%s`.`products` ADD COLUMN `col1` VARCHAR(45) NULL AFTER `weight`, ADD COLUMN `COL2` VARCHAR(55) NULL AFTER `desc1`;",
-                        inventoryDatabase.getDatabaseName()));
+                        "ALTER TABLE `%s`.`%s` ADD COLUMN `col1` VARCHAR(45) NULL AFTER `weight`, ADD COLUMN `COL2` VARCHAR(55) NULL AFTER `desc1`;",
+                        inventoryDatabase.getDatabaseName(), tableName));
         expected.add(
                 new AddColumnEvent(
                         tableId,
@@ -230,8 +269,8 @@ class MySqlTableIdCaseInsensitveITCase extends MySqlSourceTestBase {
 
         statement.execute(
                 String.format(
-                        "ALTER TABLE `%s`.`products` DROP COLUMN `desc2`, CHANGE COLUMN `desc1` `desc1` VARCHAR(65) NULL DEFAULT NULL;",
-                        inventoryDatabase.getDatabaseName()));
+                        "ALTER TABLE `%s`.`%s` DROP COLUMN `desc2`, CHANGE COLUMN `desc1` `desc1` VARCHAR(65) NULL DEFAULT NULL;",
+                        inventoryDatabase.getDatabaseName(), tableName));
         expected.add(new DropColumnEvent(tableId, Collections.singletonList("desc2")));
         expected.add(
                 new AlterColumnTypeEvent(
@@ -240,22 +279,22 @@ class MySqlTableIdCaseInsensitveITCase extends MySqlSourceTestBase {
         // Only available in mysql 8.0
         statement.execute(
                 String.format(
-                        "ALTER TABLE `%s`.`products` RENAME COLUMN `desc1` TO `desc3`;",
-                        inventoryDatabase.getDatabaseName()));
+                        "ALTER TABLE `%s`.`%s` RENAME COLUMN `desc1` TO `desc3`;",
+                        inventoryDatabase.getDatabaseName(), tableName));
         expected.add(new RenameColumnEvent(tableId, Collections.singletonMap("desc1", "desc3")));
 
         statement.execute(
                 String.format(
-                        "ALTER TABLE `%s`.`products` MODIFY COLUMN `DESC3` VARCHAR(255) NULL DEFAULT NULL;",
-                        inventoryDatabase.getDatabaseName()));
+                        "ALTER TABLE `%s`.`%s` MODIFY COLUMN `DESC3` VARCHAR(255) NULL DEFAULT NULL;",
+                        inventoryDatabase.getDatabaseName(), tableName));
         expected.add(
                 new AlterColumnTypeEvent(
                         tableId, Collections.singletonMap("desc3", DataTypes.VARCHAR(255))));
 
         statement.execute(
                 String.format(
-                        "ALTER TABLE `%s`.`products` DROP COLUMN `desc3`;",
-                        inventoryDatabase.getDatabaseName()));
+                        "ALTER TABLE `%s`.`%s` DROP COLUMN `desc3`;",
+                        inventoryDatabase.getDatabaseName(), tableName));
         expected.add(new DropColumnEvent(tableId, Collections.singletonList("desc3")));
 
         // Should not catch SchemaChangeEvent of tables other than `products`

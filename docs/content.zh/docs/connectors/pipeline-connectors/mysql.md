@@ -144,6 +144,13 @@ pipeline:
       <td>是否发送模式更改事件，下游 sink 可以响应模式变更事件实现表结构同步，默认为true。</td>
     </tr>
     <tr>
+      <td>server-time-zone</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>数据库服务器中的会话时区。若未设置，则使用 ZoneId.systemDefault() 来确定服务器时区。</td>
+    </tr>
+    <tr>
       <td>server-id</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
@@ -240,7 +247,7 @@ pipeline:
     <tr>
       <td>jdbc.properties.*</td>
       <td>optional</td>
-      <td style="word-wrap: break-word;">20</td>
+      <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>传递自定义 JDBC URL 属性的选项。用户可以传递自定义属性，如 'jdbc.properties.useSSL' = 'false'.</td>
     </tr>
@@ -337,7 +344,7 @@ pipeline:
     <tr>
       <td>metadata.list</td>
       <td>optional</td>
-      <td style="word-wrap: break-word;">false</td>
+      <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>
         可额外读取的SourceRecord中元数据的列表，后续可直接使用在transform模块，英文逗号 `,` 分割。目前可用值包含：op_ts。

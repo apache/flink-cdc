@@ -57,11 +57,13 @@ public class IcebergDataSinkFactoryTest {
         Configuration conf = Configuration.fromMap(ImmutableMap.<String, String>builder().build());
         conf.set(IcebergDataSinkOptions.WAREHOUSE, "/tmp/warehouse");
         conf.set(IcebergDataSinkOptions.SINK_COMPACTION_PARALLELISM, 4);
+        conf.set(IcebergDataSinkOptions.JOB_ID_PREFIX, "FlinkCDC");
         DataSink dataSink =
                 sinkFactory.createDataSink(
                         new FactoryHelper.DefaultContext(
                                 conf, conf, Thread.currentThread().getContextClassLoader()));
         Assertions.assertThat(dataSink).isInstanceOf(IcebergDataSink.class);
+        Assertions.assertThat(((IcebergDataSink) dataSink).jobIdPrefix).isEqualTo("FlinkCDC");
     }
 
     @Test
@@ -101,6 +103,54 @@ public class IcebergDataSinkFactoryTest {
                 Configuration.fromMap(
                         ImmutableMap.<String, String>builder()
                                 .put("catalog.properties.type", "hadoop")
+                                .build());
+        DataSink dataSink =
+                sinkFactory.createDataSink(
+                        new FactoryHelper.DefaultContext(
+                                conf, conf, Thread.currentThread().getContextClassLoader()));
+        Assertions.assertThat(dataSink).isInstanceOf(IcebergDataSink.class);
+    }
+
+    @Test
+    void testCreateGlueCatalogDataSink() {
+        DataSinkFactory sinkFactory =
+                FactoryDiscoveryUtils.getFactoryByIdentifier("iceberg", DataSinkFactory.class);
+        Assertions.assertThat(sinkFactory).isInstanceOf(IcebergDataSinkFactory.class);
+
+        Configuration conf =
+                Configuration.fromMap(
+                        ImmutableMap.<String, String>builder()
+                                .put("catalog.properties.type", "glue")
+                                .put("catalog.properties.warehouse", "s3://my-bucket/warehouse")
+                                .put(
+                                        "catalog.properties.io-impl",
+                                        "org.apache.iceberg.aws.s3.S3FileIO")
+                                .put("catalog.properties.client.region", "us-east-1")
+                                .put("catalog.properties.glue.skip-archive", "true")
+                                .build());
+        DataSink dataSink =
+                sinkFactory.createDataSink(
+                        new FactoryHelper.DefaultContext(
+                                conf, conf, Thread.currentThread().getContextClassLoader()));
+        Assertions.assertThat(dataSink).isInstanceOf(IcebergDataSink.class);
+    }
+
+    @Test
+    void testCreateGlueCatalogWithCatalogImpl() {
+        DataSinkFactory sinkFactory =
+                FactoryDiscoveryUtils.getFactoryByIdentifier("iceberg", DataSinkFactory.class);
+        Assertions.assertThat(sinkFactory).isInstanceOf(IcebergDataSinkFactory.class);
+
+        Configuration conf =
+                Configuration.fromMap(
+                        ImmutableMap.<String, String>builder()
+                                .put(
+                                        "catalog.properties.catalog-impl",
+                                        "org.apache.iceberg.aws.glue.GlueCatalog")
+                                .put("catalog.properties.warehouse", "s3://my-bucket/warehouse")
+                                .put(
+                                        "catalog.properties.io-impl",
+                                        "org.apache.iceberg.aws.s3.S3FileIO")
                                 .build());
         DataSink dataSink =
                 sinkFactory.createDataSink(
