@@ -138,8 +138,8 @@ class SchemaUtilsTest {
                 .isExactlyInstanceOf(IllegalArgumentException.class)
                 .hasMessage(
                         String.format(
-                                "BEFORE type AddColumnEvent error: Table %s's column %s is not existed",
-                                tableId, "col10"));
+                                "BEFORE type AddColumnEvent error: Column %s does not exist in table %s",
+                                "col10", tableId));
 
         // wrong add column in after type
         Assertions.assertThatThrownBy(
@@ -157,8 +157,8 @@ class SchemaUtilsTest {
                 .isExactlyInstanceOf(IllegalArgumentException.class)
                 .hasMessage(
                         String.format(
-                                "AFTER type AddColumnEvent error: Table %s's column %s is not existed",
-                                tableId, "col10"));
+                                "AFTER type AddColumnEvent error: Column %s does not exist in table %s",
+                                "col10", tableId));
 
         // drop columns
         DropColumnEvent dropColumnEvent =
