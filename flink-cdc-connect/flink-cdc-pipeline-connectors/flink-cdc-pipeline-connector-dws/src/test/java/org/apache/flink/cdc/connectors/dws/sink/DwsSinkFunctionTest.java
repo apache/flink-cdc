@@ -71,6 +71,7 @@ class DwsSinkFunctionTest {
                         1,
                         Duration.ofSeconds(1),
                         true,
+                        true,
                         null,
                         delegate);
 
@@ -103,6 +104,7 @@ class DwsSinkFunctionTest {
                         1,
                         Duration.ofSeconds(1),
                         true,
+                        true,
                         null,
                         delegate);
 
@@ -128,6 +130,7 @@ class DwsSinkFunctionTest {
                         "public",
                         1,
                         Duration.ofSeconds(1),
+                        true,
                         true,
                         null,
                         delegate);
@@ -179,6 +182,34 @@ class DwsSinkFunctionTest {
     }
 
     @Test
+    void testCreateDwsConfigPreservesNativeWriteTuningOptions() {
+        DwsConfig nativeConfig =
+                DwsConfig.builder()
+                        .with(DwsClientConfigs.WRITE_THREAD_SIZE, 6)
+                        .with(DwsClientConfigs.WRITE_USE_COPY_BATCH_SIZE, 2048)
+                        .with(DwsClientConfigs.WRITE_FORCE_FLUSH_BATCH_SIZE, 4096)
+                        .build();
+
+        DwsSinkFunction sinkFunction =
+                new DwsSinkFunction(
+                        minimalConnectionOptions(nativeConfig),
+                        ZoneId.of("UTC"),
+                        false,
+                        "public",
+                        128,
+                        Duration.ofSeconds(5),
+                        true,
+                        true,
+                        WriteMode.AUTO,
+                        new ForwardingSinkFunction());
+
+        DwsConfig dwsConfig = sinkFunction.createDwsConfig();
+        assertThat(dwsConfig.get(DwsClientConfigs.WRITE_THREAD_SIZE)).isEqualTo(6);
+        assertThat(dwsConfig.get(DwsClientConfigs.WRITE_USE_COPY_BATCH_SIZE)).isEqualTo(2048);
+        assertThat(dwsConfig.get(DwsClientConfigs.WRITE_FORCE_FLUSH_BATCH_SIZE)).isEqualTo(4096);
+    }
+
+    @Test
     void testCreateDwsConfigUsesCopyMergeWriteModeByDefaultForCaseInsensitive() throws Exception {
         DwsSinkFunction sinkFunction = createSinkFunction(false, "public", true, null);
 
@@ -198,6 +229,28 @@ class DwsSinkFunctionTest {
                 createSinkFunction(false, "public", true, WriteMode.UPDATE_AUTO);
 
         assertThat(readField(sinkFunction, "writeMode")).isEqualTo(WriteMode.UPDATE_AUTO);
+    }
+
+    @Test
+    void testCreateDwsConfigPreservesRetryConfiguration() {
+        DwsConfig nativeConfig =
+                DwsConfig.builder().with(DwsClientConfigs.RETRY_MAX_TIMES, 9).build();
+
+        DwsSinkFunction sinkFunction =
+                new DwsSinkFunction(
+                        minimalConnectionOptions(nativeConfig),
+                        ZoneId.of("UTC"),
+                        false,
+                        "public",
+                        128,
+                        Duration.ofSeconds(5),
+                        true,
+                        false,
+                        WriteMode.AUTO,
+                        new ForwardingSinkFunction());
+
+        DwsConfig dwsConfig = sinkFunction.createDwsConfig();
+        assertThat(dwsConfig.get(DwsClientConfigs.RETRY_MAX_TIMES)).isEqualTo(9);
     }
 
     private static final class TrackingSinkFunction extends RichSinkFunction<Event>
@@ -322,10 +375,15 @@ class DwsSinkFunctionTest {
     }
 
     private static DwsConnectionOptions minimalConnectionOptions() {
+        return minimalConnectionOptions(null);
+    }
+
+    private static DwsConnectionOptions minimalConnectionOptions(DwsConfig config) {
         return DwsConnectionOptions.builder()
                 .withUrl("jdbc:gaussdb://localhost:8000/test")
                 .withUsername("user")
                 .withPassword("password")
+                .withConfig(config)
                 .build();
     }
 
@@ -342,6 +400,7 @@ class DwsSinkFunctionTest {
                 128,
                 Duration.ofSeconds(5),
                 enableAutoFlush,
+                true,
                 writeMode,
                 new ForwardingSinkFunction());
     }

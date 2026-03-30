@@ -38,6 +38,7 @@ import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 
 import com.huaweicloud.dws.client.DwsClient;
 import com.huaweicloud.dws.client.DwsConfig;
+import com.huaweicloud.dws.client.config.DwsClientConfigs;
 import com.huaweicloud.dws.client.exception.DwsClientException;
 import com.huaweicloud.dws.client.exception.ExceptionCode;
 import com.huaweicloud.dws.client.model.WriteMode;
@@ -71,6 +72,7 @@ public class DwsSinkFunction extends RichSinkFunction<Event>
     private final int autoFlushBatchSize;
     private final long autoFlushMaxIntervalMs;
     private final boolean enableAutoFlush;
+    private final boolean enableDelete;
     private final WriteMode writeMode;
     private final Map<TableId, TableInfo> tableInfoCache = new HashMap<>();
     private final SinkFunction<Event> sinkFunction;
@@ -83,6 +85,7 @@ public class DwsSinkFunction extends RichSinkFunction<Event>
             int autoFlushBatchSize,
             Duration autoFlushMaxInterval,
             boolean enableAutoFlush,
+            boolean enableDelete,
             WriteMode writeMode) {
         this(
                 connectorOptions,
@@ -92,6 +95,7 @@ public class DwsSinkFunction extends RichSinkFunction<Event>
                 autoFlushBatchSize,
                 autoFlushMaxInterval,
                 enableAutoFlush,
+                enableDelete,
                 writeMode,
                 null);
     }
@@ -104,6 +108,7 @@ public class DwsSinkFunction extends RichSinkFunction<Event>
             int autoFlushBatchSize,
             Duration autoFlushMaxInterval,
             boolean enableAutoFlush,
+            boolean enableDelete,
             WriteMode writeMode,
             SinkFunction<Event> sinkFunction) {
         this.options = connectorOptions;
@@ -113,6 +118,7 @@ public class DwsSinkFunction extends RichSinkFunction<Event>
         this.autoFlushBatchSize = autoFlushBatchSize;
         this.autoFlushMaxIntervalMs = autoFlushMaxInterval.toMillis();
         this.enableAutoFlush = enableAutoFlush;
+        this.enableDelete = enableDelete;
         this.writeMode = resolveWriteMode(writeMode, caseSensitive);
         this.sinkFunction = sinkFunction == null ? createDwsSinkFunction() : sinkFunction;
     }
@@ -219,9 +225,17 @@ public class DwsSinkFunction extends RichSinkFunction<Event>
                 };
 
         LOG.info(
-                "Created GaussDB DWS sink with write mode {} and case-sensitive={}",
+                "Created GaussDB DWS sink with write mode {}, case-sensitive={}, enableDelete={}, autoFlushEnabled={}, autoFlushBatchSize={}, autoFlushIntervalMs={}, nativeWriteThreadSize={}, nativeUseCopySize={}, nativeForceFlushSize={}, nativeRetryMaxTimes={}",
                 writeMode,
-                caseSensitive);
+                caseSensitive,
+                enableDelete,
+                enableAutoFlush,
+                dwsConfig.get(DwsClientConfigs.WRITE_AUTO_FLUSH_BATCH_SIZE),
+                dwsConfig.get(DwsClientConfigs.WRITE_AUTO_FLUSH_MAX_INTERVAL).toMillis(),
+                dwsConfig.get(DwsClientConfigs.WRITE_THREAD_SIZE),
+                dwsConfig.get(DwsClientConfigs.WRITE_USE_COPY_BATCH_SIZE),
+                dwsConfig.get(DwsClientConfigs.WRITE_FORCE_FLUSH_BATCH_SIZE),
+                dwsConfig.get(DwsClientConfigs.RETRY_MAX_TIMES));
         return DwsSink.sink(dwsConfig, context, invokeFunction);
     }
 
@@ -235,7 +249,12 @@ public class DwsSinkFunction extends RichSinkFunction<Event>
                 writeRecord(event.after(), event, client.write(tableName), DwsConstants.UPSERT);
                 break;
             case DELETE:
-                writeRecord(event.before(), event, client.delete(tableName), "DELETE");
+                if (enableDelete) {
+                    writeRecord(event.before(), event, client.delete(tableName), "DELETE");
+                } else {
+                    LOG.debug(
+                            "Skip DELETE for {} because sink.enable-delete=false", event.tableId());
+                }
                 break;
             default:
                 LOG.warn("Unsupported operation {} for {}", event.op(), event.tableId());

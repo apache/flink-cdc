@@ -91,7 +91,12 @@ class DwsDataSinkFactoryTest {
         factoryConfiguration.set(DwsDataSinkOptions.ENABLE_AUTO_FLUSH, false);
         factoryConfiguration.set(DwsDataSinkOptions.ENABLE_DN_PARTITION, true);
         factoryConfiguration.set(DwsDataSinkOptions.DISTRIBUTION_KEY, "id");
+        factoryConfiguration.set(DwsDataSinkOptions.SINK_ENABLE_DELETE, false);
+        factoryConfiguration.set(DwsDataSinkOptions.SINK_MAX_RETRIES, 9);
         factoryConfiguration.set(DwsDataSinkOptions.WRITE_MODE, "auto");
+        factoryConfiguration.set(DwsDataSinkOptions.DWS_CLIENT_WRITE_THREAD_SIZE, 8);
+        factoryConfiguration.set(DwsDataSinkOptions.DWS_CLIENT_WRITE_USE_COPY_SIZE, 5000);
+        factoryConfiguration.set(DwsDataSinkOptions.DWS_CLIENT_WRITE_FORCE_FLUSH_SIZE, 6000);
 
         Configuration pipelineConfiguration = new Configuration();
         pipelineConfiguration.set(PipelineOptions.PIPELINE_LOCAL_TIME_ZONE, "Asia/Shanghai");
@@ -104,6 +109,7 @@ class DwsDataSinkFactoryTest {
         Assertions.assertThat(readField(dataSink, "zoneId")).isEqualTo(ZoneId.of("UTC"));
         Assertions.assertThat(readField(dataSink, "defaultSchema")).isEqualTo("ods");
         Assertions.assertThat(readField(dataSink, "enableAutoFlush")).isEqualTo(false);
+        Assertions.assertThat(readField(dataSink, "enableDelete")).isEqualTo(false);
         Assertions.assertThat(readField(dataSink, "writeMode")).isEqualTo(WriteMode.AUTO);
         Assertions.assertThat(readField(metadataApplier, "defaultSchema")).isEqualTo("ods");
         Assertions.assertThat(readField(metadataApplier, "enableDnPartition")).isEqualTo(true);
@@ -114,6 +120,20 @@ class DwsDataSinkFactoryTest {
         Assertions.assertThat(
                         connectorOptions.getConfig().get(DwsClientConfigs.WRITE_PARTITION_POLICY))
                 .isEqualTo(PartitionPolicy.DN);
+        Assertions.assertThat(connectorOptions.getConfig().get(DwsClientConfigs.WRITE_THREAD_SIZE))
+                .isEqualTo(8);
+        Assertions.assertThat(
+                        connectorOptions
+                                .getConfig()
+                                .get(DwsClientConfigs.WRITE_USE_COPY_BATCH_SIZE))
+                .isEqualTo(5000);
+        Assertions.assertThat(
+                        connectorOptions
+                                .getConfig()
+                                .get(DwsClientConfigs.WRITE_FORCE_FLUSH_BATCH_SIZE))
+                .isEqualTo(6000);
+        Assertions.assertThat(connectorOptions.getConfig().get(DwsClientConfigs.RETRY_MAX_TIMES))
+                .isEqualTo(9);
     }
 
     @Test
