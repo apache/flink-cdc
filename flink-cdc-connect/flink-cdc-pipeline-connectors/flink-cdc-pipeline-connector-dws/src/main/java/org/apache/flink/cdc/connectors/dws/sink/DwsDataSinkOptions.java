@@ -207,75 +207,42 @@ public final class DwsDataSinkOptions {
                     .defaultValue(false)
                     .withDescription("Whether Huawei DN partitioning is enabled.");
 
+    public static final ConfigOption<Integer> DWS_CLIENT_WRITE_THREAD_SIZE =
+            ConfigOptions.key("dws.client.write.thread-size")
+                    .intType()
+                    .defaultValue(3)
+                    .withDescription(
+                            "Native DWS client write worker thread count used by the built-in execution pool.");
+
+    public static final ConfigOption<Integer> DWS_CLIENT_WRITE_USE_COPY_SIZE =
+            ConfigOptions.key("dws.client.write.use-copy-size")
+                    .intType()
+                    .defaultValue(1000)
+                    .withDescription(
+                            "COPY mode switch threshold used by the native DWS client when batching writes.");
+
+    public static final ConfigOption<Integer> DWS_CLIENT_WRITE_FORCE_FLUSH_SIZE =
+            ConfigOptions.key("dws.client.write.force-flush-size")
+                    .intType()
+                    .defaultValue(40000)
+                    .withDescription(
+                            "Force flush threshold used by the native DWS client. This is typically larger than auto-batch-flush-size.");
+
     public static final ConfigOption<String> DISTRIBUTION_KEY =
             ConfigOptions.key("distribution-key")
                     .stringType()
                     .noDefaultValue()
                     .withDescription("Distribution key used for DN partitioning.");
 
-    public static final ConfigOption<Integer> SINK_BUFFER_FLUSH_MAX_ROWS =
-            ConfigOptions.key("sink.buffer-flush.max-rows")
-                    .intType()
-                    .defaultValue(5_000)
-                    .withDescription("Maximum buffered rows before flushing.");
-
-    public static final ConfigOption<Integer> SINK_BUFFER_FLUSH_MAX_SIZE =
-            ConfigOptions.key("sink.buffer-flush.max-size")
-                    .intType()
-                    .defaultValue(5 * 1024 * 1024)
-                    .withDescription("Maximum buffered bytes before flushing.");
-
-    public static final ConfigOption<Duration> SINK_BUFFER_FLUSH_INTERVAL =
-            ConfigOptions.key("sink.buffer-flush.interval")
-                    .durationType()
-                    .defaultValue(Duration.ofSeconds(3))
-                    .withDescription("Maximum time to buffer data before flushing.");
-
     public static final ConfigOption<Integer> SINK_MAX_RETRIES =
             ConfigOptions.key("sink.max-retries")
                     .intType()
                     .defaultValue(3)
-                    .withDescription("Maximum number of retries after a write failure.");
+                    .withDescription("Maximum number of retries used by the native DWS client.");
 
     public static final ConfigOption<Boolean> SINK_ENABLE_DELETE =
             ConfigOptions.key("sink.enable-delete")
                     .booleanType()
                     .defaultValue(true)
                     .withDescription("Whether DELETE events are forwarded to the sink.");
-
-    public static final ConfigOption<Boolean> SINK_ENABLE_UPSERT =
-            ConfigOptions.key("sink.enable-upsert")
-                    .booleanType()
-                    .defaultValue(true)
-                    .withDescription("Whether INSERT and UPDATE events use upsert semantics.");
-
-    public static final ConfigOption<Integer> CONNECTION_POOL_MAX_SIZE =
-            ConfigOptions.key("connection.pool.max-size")
-                    .intType()
-                    .defaultValue(20)
-                    .withDescription("Maximum number of connections in the pool.");
-
-    public static final ConfigOption<Integer> CONNECTION_POOL_MIN_SIZE =
-            ConfigOptions.key("connection.pool.min-size")
-                    .intType()
-                    .defaultValue(1)
-                    .withDescription("Minimum number of connections kept in the pool.");
-
-    public static final ConfigOption<Duration> CONNECTION_MAX_LIFETIME =
-            ConfigOptions.key("connection.max-lifetime")
-                    .durationType()
-                    .defaultValue(Duration.ofMinutes(30))
-                    .withDescription("Maximum lifetime of a pooled connection.");
-
-    public static final ConfigOption<Boolean> SINK_ENABLE_TABLE_CREATE =
-            ConfigOptions.key("sink.enable.table-create")
-                    .booleanType()
-                    .defaultValue(false)
-                    .withDescription("Whether missing target tables may be created automatically.");
-
-    public static final ConfigOption<String> TABLE_CREATE_PROPERTIES =
-            ConfigOptions.key("table.create.properties")
-                    .stringType()
-                    .defaultValue("")
-                    .withDescription("Additional properties appended to CREATE TABLE statements.");
 }

@@ -43,11 +43,8 @@ import static org.apache.flink.cdc.connectors.dws.sink.DwsDataSinkOptions.AUTO_B
 import static org.apache.flink.cdc.connectors.dws.sink.DwsDataSinkOptions.AUTO_FLUSH_MAX_INTERVAL;
 import static org.apache.flink.cdc.connectors.dws.sink.DwsDataSinkOptions.CASE_SENSITIVE;
 import static org.apache.flink.cdc.connectors.dws.sink.DwsDataSinkOptions.CONNECTION_MAX_IDLE_MS;
-import static org.apache.flink.cdc.connectors.dws.sink.DwsDataSinkOptions.CONNECTION_MAX_LIFETIME;
 import static org.apache.flink.cdc.connectors.dws.sink.DwsDataSinkOptions.CONNECTION_MAX_USE_COUNT;
 import static org.apache.flink.cdc.connectors.dws.sink.DwsDataSinkOptions.CONNECTION_MAX_USE_TIME_SECONDS;
-import static org.apache.flink.cdc.connectors.dws.sink.DwsDataSinkOptions.CONNECTION_POOL_MAX_SIZE;
-import static org.apache.flink.cdc.connectors.dws.sink.DwsDataSinkOptions.CONNECTION_POOL_MIN_SIZE;
 import static org.apache.flink.cdc.connectors.dws.sink.DwsDataSinkOptions.CONNECTION_POOL_MONITOR_PERIOD;
 import static org.apache.flink.cdc.connectors.dws.sink.DwsDataSinkOptions.CONNECTION_POOL_NAME;
 import static org.apache.flink.cdc.connectors.dws.sink.DwsDataSinkOptions.CONNECTION_POOL_SIZE;
@@ -58,6 +55,9 @@ import static org.apache.flink.cdc.connectors.dws.sink.DwsDataSinkOptions.CONNEC
 import static org.apache.flink.cdc.connectors.dws.sink.DwsDataSinkOptions.DATABASE;
 import static org.apache.flink.cdc.connectors.dws.sink.DwsDataSinkOptions.DISTRIBUTION_KEY;
 import static org.apache.flink.cdc.connectors.dws.sink.DwsDataSinkOptions.DRIVER;
+import static org.apache.flink.cdc.connectors.dws.sink.DwsDataSinkOptions.DWS_CLIENT_WRITE_FORCE_FLUSH_SIZE;
+import static org.apache.flink.cdc.connectors.dws.sink.DwsDataSinkOptions.DWS_CLIENT_WRITE_THREAD_SIZE;
+import static org.apache.flink.cdc.connectors.dws.sink.DwsDataSinkOptions.DWS_CLIENT_WRITE_USE_COPY_SIZE;
 import static org.apache.flink.cdc.connectors.dws.sink.DwsDataSinkOptions.ENABLE_AUTO_FLUSH;
 import static org.apache.flink.cdc.connectors.dws.sink.DwsDataSinkOptions.ENABLE_DN_PARTITION;
 import static org.apache.flink.cdc.connectors.dws.sink.DwsDataSinkOptions.LOG_SWITCH;
@@ -65,15 +65,9 @@ import static org.apache.flink.cdc.connectors.dws.sink.DwsDataSinkOptions.NEED_C
 import static org.apache.flink.cdc.connectors.dws.sink.DwsDataSinkOptions.PASSWORD;
 import static org.apache.flink.cdc.connectors.dws.sink.DwsDataSinkOptions.PIPELINE_LOCAL_TIME_ZONE;
 import static org.apache.flink.cdc.connectors.dws.sink.DwsDataSinkOptions.SCHEMA;
-import static org.apache.flink.cdc.connectors.dws.sink.DwsDataSinkOptions.SINK_BUFFER_FLUSH_INTERVAL;
-import static org.apache.flink.cdc.connectors.dws.sink.DwsDataSinkOptions.SINK_BUFFER_FLUSH_MAX_ROWS;
-import static org.apache.flink.cdc.connectors.dws.sink.DwsDataSinkOptions.SINK_BUFFER_FLUSH_MAX_SIZE;
 import static org.apache.flink.cdc.connectors.dws.sink.DwsDataSinkOptions.SINK_ENABLE_DELETE;
-import static org.apache.flink.cdc.connectors.dws.sink.DwsDataSinkOptions.SINK_ENABLE_TABLE_CREATE;
-import static org.apache.flink.cdc.connectors.dws.sink.DwsDataSinkOptions.SINK_ENABLE_UPSERT;
 import static org.apache.flink.cdc.connectors.dws.sink.DwsDataSinkOptions.SINK_MAX_RETRIES;
 import static org.apache.flink.cdc.connectors.dws.sink.DwsDataSinkOptions.SINK_PARALLELISM;
-import static org.apache.flink.cdc.connectors.dws.sink.DwsDataSinkOptions.TABLE_CREATE_PROPERTIES;
 import static org.apache.flink.cdc.connectors.dws.sink.DwsDataSinkOptions.TABLE_NAME;
 import static org.apache.flink.cdc.connectors.dws.sink.DwsDataSinkOptions.URL;
 import static org.apache.flink.cdc.connectors.dws.sink.DwsDataSinkOptions.USERNAME;
@@ -101,6 +95,7 @@ public class DwsDataSinkFactory implements DataSinkFactory {
                 config.get(AUTO_BATCH_FLUSH_SIZE),
                 autoFlushMaxInterval,
                 config.get(ENABLE_AUTO_FLUSH),
+                config.get(SINK_ENABLE_DELETE),
                 parseWriteMode(config.get(WRITE_MODE)),
                 config.get(ENABLE_DN_PARTITION),
                 config.getOptional(DISTRIBUTION_KEY).orElse(null));
@@ -134,18 +129,12 @@ public class DwsDataSinkFactory implements DataSinkFactory {
         optionalOptions.add(SCHEMA);
         optionalOptions.add(ENABLE_AUTO_FLUSH);
         optionalOptions.add(ENABLE_DN_PARTITION);
+        optionalOptions.add(DWS_CLIENT_WRITE_THREAD_SIZE);
+        optionalOptions.add(DWS_CLIENT_WRITE_USE_COPY_SIZE);
+        optionalOptions.add(DWS_CLIENT_WRITE_FORCE_FLUSH_SIZE);
         optionalOptions.add(DISTRIBUTION_KEY);
-        optionalOptions.add(SINK_BUFFER_FLUSH_MAX_ROWS);
-        optionalOptions.add(SINK_BUFFER_FLUSH_MAX_SIZE);
-        optionalOptions.add(SINK_BUFFER_FLUSH_INTERVAL);
         optionalOptions.add(SINK_MAX_RETRIES);
         optionalOptions.add(SINK_ENABLE_DELETE);
-        optionalOptions.add(SINK_ENABLE_UPSERT);
-        optionalOptions.add(CONNECTION_POOL_MAX_SIZE);
-        optionalOptions.add(CONNECTION_POOL_MIN_SIZE);
-        optionalOptions.add(CONNECTION_MAX_LIFETIME);
-        optionalOptions.add(SINK_ENABLE_TABLE_CREATE);
-        optionalOptions.add(TABLE_CREATE_PROPERTIES);
         optionalOptions.add(CONNECTION_MAX_USE_TIME_SECONDS);
         optionalOptions.add(CONNECTION_MAX_IDLE_MS);
         optionalOptions.add(CONNECTION_TIME_OUT);
@@ -170,6 +159,16 @@ public class DwsDataSinkFactory implements DataSinkFactory {
                                 config.get(ENABLE_DN_PARTITION)
                                         ? PartitionPolicy.DN
                                         : PartitionPolicy.DYNAMIC)
+                        .with(
+                                DwsClientConfigs.WRITE_THREAD_SIZE,
+                                config.get(DWS_CLIENT_WRITE_THREAD_SIZE))
+                        .with(
+                                DwsClientConfigs.WRITE_USE_COPY_BATCH_SIZE,
+                                config.get(DWS_CLIENT_WRITE_USE_COPY_SIZE))
+                        .with(
+                                DwsClientConfigs.WRITE_FORCE_FLUSH_BATCH_SIZE,
+                                config.get(DWS_CLIENT_WRITE_FORCE_FLUSH_SIZE))
+                        .with(DwsClientConfigs.RETRY_MAX_TIMES, config.get(SINK_MAX_RETRIES))
                         .build();
 
         DwsConnectionOptions.Builder builder =

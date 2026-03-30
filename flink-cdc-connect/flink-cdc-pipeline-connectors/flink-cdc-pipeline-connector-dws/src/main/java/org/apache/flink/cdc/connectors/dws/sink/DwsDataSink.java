@@ -39,6 +39,7 @@ public class DwsDataSink implements DataSink, Serializable {
     private final int autoFlushBatchSize;
     private final Duration autoFlushMaxInterval;
     private final boolean enableAutoFlush;
+    private final boolean enableDelete;
     private final WriteMode writeMode;
     private final boolean enableDnPartition;
     private final String distributionKey;
@@ -51,6 +52,7 @@ public class DwsDataSink implements DataSink, Serializable {
             int autoFlushBatchSize,
             Duration autoFlushMaxInterval,
             boolean enableAutoFlush,
+            boolean enableDelete,
             WriteMode writeMode,
             boolean enableDnPartition,
             String distributionKey) {
@@ -61,6 +63,7 @@ public class DwsDataSink implements DataSink, Serializable {
         this.autoFlushBatchSize = autoFlushBatchSize;
         this.autoFlushMaxInterval = autoFlushMaxInterval;
         this.enableAutoFlush = enableAutoFlush;
+        this.enableDelete = enableDelete;
         this.writeMode = writeMode;
         this.enableDnPartition = enableDnPartition;
         this.distributionKey = distributionKey;
@@ -77,6 +80,7 @@ public class DwsDataSink implements DataSink, Serializable {
                         autoFlushBatchSize,
                         autoFlushMaxInterval,
                         enableAutoFlush,
+                        enableDelete,
                         writeMode));
     }
 
