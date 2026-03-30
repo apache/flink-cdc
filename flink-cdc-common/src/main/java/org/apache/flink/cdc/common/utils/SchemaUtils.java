@@ -138,9 +138,8 @@ public class SchemaUtils {
                         Preconditions.checkNotNull(
                                 columnWithPosition.getExistedColumnName(),
                                 "existedColumnName could not be null in BEFORE type AddColumnEvent");
-                        List<String> columnNames =
-                                columns.stream().map(Column::getName).collect(Collectors.toList());
-                        int index = columnNames.indexOf(columnWithPosition.getExistedColumnName());
+                        int index =
+                                findColumnIndex(columns, columnWithPosition.getExistedColumnName());
                         if (index < 0) {
                             throw new IllegalArgumentException(
                                     String.format(
@@ -156,9 +155,8 @@ public class SchemaUtils {
                         Preconditions.checkNotNull(
                                 columnWithPosition.getExistedColumnName(),
                                 "existedColumnName could not be null in AFTER type AddColumnEvent");
-                        List<String> columnNames =
-                                columns.stream().map(Column::getName).collect(Collectors.toList());
-                        int index = columnNames.indexOf(columnWithPosition.getExistedColumnName());
+                        int index =
+                                findColumnIndex(columns, columnWithPosition.getExistedColumnName());
                         if (index < 0) {
                             throw new IllegalArgumentException(
                                     String.format(
@@ -172,6 +170,20 @@ public class SchemaUtils {
             }
         }
         return oldSchema.copy(columns);
+    }
+
+    private static int findColumnIndex(List<Column> columns, String existedColumnName) {
+        for (int i = 0; i < columns.size(); i++) {
+            if (columns.get(i).getName().equals(existedColumnName)) {
+                return i;
+            }
+        }
+        for (int i = 0; i < columns.size(); i++) {
+            if (columns.get(i).getName().equalsIgnoreCase(existedColumnName)) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     private static Schema applyDropColumnEvent(DropColumnEvent event, Schema oldSchema) {
