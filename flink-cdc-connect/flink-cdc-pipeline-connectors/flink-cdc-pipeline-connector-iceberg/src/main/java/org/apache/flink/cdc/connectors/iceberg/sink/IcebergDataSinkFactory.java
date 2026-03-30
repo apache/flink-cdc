@@ -64,7 +64,7 @@ public class IcebergDataSinkFactory implements DataSinkFactory {
 
         Map<String, String> catalogOptions = new HashMap<>();
         Map<String, String> tableOptions = new HashMap<>();
-        Map<String, String> hadoopConfOptions = new HashMap<>();
+        Map<String, String> hadoopConfOptions = extractHadoopConfOptions(allOptions);
         allOptions.forEach(
                 (key, value) -> {
                     if (key.startsWith(PREFIX_TABLE_PROPERTIES)) {
@@ -74,8 +74,6 @@ public class IcebergDataSinkFactory implements DataSinkFactory {
                                 key.substring(
                                         IcebergDataSinkOptions.PREFIX_CATALOG_PROPERTIES.length()),
                                 value);
-                    } else if (key.startsWith(PREFIX_HADOOP_CONF)) {
-                        hadoopConfOptions.put(key.substring(PREFIX_HADOOP_CONF.length()), value);
                     }
                 });
         catalogOptions.putAll(FIXED_CATALOG_OPTIONS);
@@ -123,6 +121,17 @@ public class IcebergDataSinkFactory implements DataSinkFactory {
                 compactionOptions,
                 jobIdPrefix,
                 hadoopConfOptions);
+    }
+
+    static Map<String, String> extractHadoopConfOptions(Map<String, String> allOptions) {
+        Map<String, String> hadoopConfOptions = new HashMap<>();
+        allOptions.forEach(
+                (key, value) -> {
+                    if (key.startsWith(PREFIX_HADOOP_CONF)) {
+                        hadoopConfOptions.put(key.substring(PREFIX_HADOOP_CONF.length()), value);
+                    }
+                });
+        return hadoopConfOptions;
     }
 
     private CompactionOptions getCompactionStrategy(Configuration configuration) {

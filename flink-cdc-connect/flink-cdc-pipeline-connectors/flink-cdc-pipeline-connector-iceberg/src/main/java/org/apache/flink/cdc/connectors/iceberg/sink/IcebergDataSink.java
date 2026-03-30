@@ -89,4 +89,8 @@ public class IcebergDataSink implements DataSink, Serializable {
         return new IcebergMetadataApplier(
                 catalogOptions, tableOptions, partitionMaps, hadoopConfOptions);
     }
+
+    public Map<String, String> getHadoopConfOptions() {
+        return hadoopConfOptions;
+    }
 }
