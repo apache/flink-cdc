@@ -53,17 +53,35 @@ public class ProjectionColumn implements Serializable {
     private final List<String> originalColumnNames;
     private final Map<String, String> columnNameMap;
 
+    /**
+     * When true, this projection has provable 1:1 lineage from a single upstream physical column
+     * (plain forward, simple rename, or key-preserving CAST in a future parser revision). Used for
+     * primary/partition key remapping with {@code column-name-case}.
+     */
+    private final boolean provablePhysicalKeyLineage;
+
     public ProjectionColumn(
             Column column,
             String expression,
             String scriptExpression,
             List<String> originalColumnNames,
             Map<String, String> columnNameMap) {
+        this(column, expression, scriptExpression, originalColumnNames, columnNameMap, false);
+    }
+
+    public ProjectionColumn(
+            Column column,
+            String expression,
+            String scriptExpression,
+            List<String> originalColumnNames,
+            Map<String, String> columnNameMap,
+            boolean provablePhysicalKeyLineage) {
         this.column = column;
         this.expression = expression;
         this.scriptExpression = scriptExpression;
         this.originalColumnNames = originalColumnNames;
         this.columnNameMap = columnNameMap;
+        this.provablePhysicalKeyLineage = provablePhysicalKeyLineage;
     }
 
     public ProjectionColumn copy() {
@@ -72,7 +90,8 @@ public class ProjectionColumn implements Serializable {
                 expression,
                 scriptExpression,
                 new ArrayList<>(originalColumnNames),
-                new HashMap<>(columnNameMap));
+                new HashMap<>(columnNameMap),
+                provablePhysicalKeyLineage);
     }
 
     public Column getColumn() {
@@ -112,6 +131,15 @@ public class ProjectionColumn implements Serializable {
     }
 
     /**
+     * Plain forward, simple identifier rename, or key-preserving single-column CAST (when marked by
+     * the parser). Excludes arbitrary expressions and metadata columns built as calculated
+     * projections.
+     */
+    public boolean isSimpleColumnRenameOrForward() {
+        return provablePhysicalKeyLineage;
+    }
+
+    /**
      * This projection is created with a plain column name. <br>
      * Just like column {@code id} in {@code id, name AS new_name, age + 1 AS new_age}. <br>
      * Comments and default expressions will be intact.
@@ -120,7 +148,12 @@ public class ProjectionColumn implements Serializable {
         String name = column.getName();
         Map<String, String> columnNameMap = Collections.singletonMap(name, mappedColumnName);
         return new ProjectionColumn(
-                column, name, mappedColumnName, Collections.singletonList(name), columnNameMap);
+                column,
+                name,
+                mappedColumnName,
+                Collections.singletonList(name),
+                columnNameMap,
+                true);
     }
 
     /**
@@ -138,7 +171,8 @@ public class ProjectionColumn implements Serializable {
                 originalName,
                 mappedColumnName,
                 Collections.singletonList(originalName),
-                columnNameMap);
+                columnNameMap,
+                true);
     }
 
     /**
@@ -158,7 +192,8 @@ public class ProjectionColumn implements Serializable {
                 expression,
                 scriptExpression,
                 originalColumnNames,
-                columnNameMap);
+                columnNameMap,
+                false);
     }
 
     @Override

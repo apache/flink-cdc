@@ -17,12 +17,15 @@
 
 package org.apache.flink.cdc.runtime.operators.transform;
 
+import org.apache.flink.cdc.common.pipeline.SchemaColumnCaseFormat;
 import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.runtime.operators.transform.converter.PostTransformConverter;
 
 import javax.annotation.Nullable;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 /** Post-Transformation rule used by {@link PostTransformOperator}. */
@@ -34,17 +37,43 @@ public class PostTransformer {
     private final @Nullable PostTransformConverter postTransformConverter;
     private final SupportedMetadataColumn[] supportedMetadataColumns;
 
+    /**
+     * When non-empty, overrides automatic primary-key name remapping after projection (YAML {@code
+     * primary-keys}). Names refer to <b>post-projection</b> columns.
+     */
+    private final List<String> explicitPrimaryKeys;
+
+    /**
+     * When non-empty, overrides automatic partition-key name remapping (YAML {@code
+     * partition-keys}). Names refer to <b>post-projection</b> columns.
+     */
+    private final List<String> explicitPartitionKeys;
+
+    private final SchemaColumnCaseFormat schemaColumnCaseFormat;
+
     public PostTransformer(
             Selectors selectors,
             @Nullable TransformProjection projection,
             @Nullable TransformFilter filter,
             @Nullable PostTransformConverter postTransformConverter,
-            SupportedMetadataColumn[] supportedMetadataColumns) {
+            SupportedMetadataColumn[] supportedMetadataColumns,
+            List<String> explicitPrimaryKeys,
+            List<String> explicitPartitionKeys,
+            SchemaColumnCaseFormat schemaColumnCaseFormat) {
         this.selectors = selectors;
         this.projection = projection;
         this.filter = filter;
         this.postTransformConverter = postTransformConverter;
         this.supportedMetadataColumns = supportedMetadataColumns;
+        this.explicitPrimaryKeys =
+                explicitPrimaryKeys == null
+                        ? Collections.emptyList()
+                        : Collections.unmodifiableList(explicitPrimaryKeys);
+        this.explicitPartitionKeys =
+                explicitPartitionKeys == null
+                        ? Collections.emptyList()
+                        : Collections.unmodifiableList(explicitPartitionKeys);
+        this.schemaColumnCaseFormat = schemaColumnCaseFormat;
     }
 
     public Selectors getSelectors() {
@@ -65,5 +94,17 @@ public class PostTransformer {
 
     public SupportedMetadataColumn[] getSupportedMetadataColumns() {
         return supportedMetadataColumns;
+    }
+
+    public List<String> getExplicitPrimaryKeys() {
+        return explicitPrimaryKeys;
+    }
+
+    public List<String> getExplicitPartitionKeys() {
+        return explicitPartitionKeys;
+    }
+
+    public SchemaColumnCaseFormat getSchemaColumnCaseFormat() {
+        return schemaColumnCaseFormat;
     }
 }

@@ -29,6 +29,8 @@ import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.pipeline.SchemaColumnCaseFormat;
+import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.udf.UserDefinedFunctionContext;
@@ -52,10 +54,13 @@ import javax.annotation.Nullable;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -215,7 +220,8 @@ public class PostTransformOperator extends AbstractStreamOperatorAdapter<Event>
         Schema preSchema = event.getSchema();
 
         Schema postSchema =
-                SchemaUtils.ensurePkNonNull(transformSchema(preSchema, effectiveTransformer));
+                SchemaUtils.ensurePkNonNull(
+                        transformSchema(preSchema, effectiveTransformer, tableId));
 
         // Update transform info map
         postTransformInfoMap.put(
@@ -251,7 +257,8 @@ public class PostTransformOperator extends AbstractStreamOperatorAdapter<Event>
         Schema nextPreSchema = SchemaUtils.applySchemaChangeEvent(prevPreSchema, event);
 
         Schema nextPostSchema =
-                SchemaUtils.ensurePkNonNull(transformSchema(nextPreSchema, effectiveTransformer));
+                SchemaUtils.ensurePkNonNull(
+                        transformSchema(nextPreSchema, effectiveTransformer, tableId));
 
         // Update transform info map
         postTransformInfoMap.put(
@@ -358,8 +365,12 @@ public class PostTransformOperator extends AbstractStreamOperatorAdapter<Event>
 
     /**
      * Generates transformed version of schema based on upstream schema and effective transformer.
+     *
+     * <p>Primary/partition keys follow explicit YAML keys when set; otherwise provable 1:1 lineage
+     * and {@link SchemaColumnCaseFormat} apply for post-projection names.
      */
-    private Schema transformSchema(Schema preSchema, PostTransformer transformer) {
+    private Schema transformSchema(Schema preSchema, PostTransformer transformer, TableId tableId) {
+        SchemaColumnCaseFormat caseFormat = transformer.getSchemaColumnCaseFormat();
         List<ProjectionColumn> projectionColumns =
                 TransformParser.generateProjectionColumns(
                         transformer
@@ -369,10 +380,51 @@ public class PostTransformOperator extends AbstractStreamOperatorAdapter<Event>
                         preSchema.getColumns(),
                         udfDescriptors,
                         transformer.getSupportedMetadataColumns());
-        return preSchema.copy(
-                projectionColumns.stream()
-                        .map(ProjectionColumn::getColumn)
-                        .collect(Collectors.toList()));
+
+        List<Column> newColumns =
+                SchemaColumnCaseFormatter.applyCaseFormatToColumns(projectionColumns, caseFormat);
+
+        Set<String> projectedColumnNames =
+                newColumns.stream().map(Column::getName).collect(Collectors.toSet());
+        Map<String, String> lineageMap =
+                SchemaColumnCaseFormatter.buildProvableLineageMap(projectionColumns, caseFormat);
+
+        List<String> newPrimaryKeys =
+                SchemaColumnCaseFormatter.resolveProjectedKeys(
+                        preSchema.primaryKeys(),
+                        transformer.getExplicitPrimaryKeys(),
+                        lineageMap,
+                        projectedColumnNames,
+                        tableId,
+                        "primary",
+                        caseFormat);
+        List<String> newPartitionKeys =
+                SchemaColumnCaseFormatter.resolveProjectedKeys(
+                        preSchema.partitionKeys(),
+                        transformer.getExplicitPartitionKeys(),
+                        lineageMap,
+                        projectedColumnNames,
+                        tableId,
+                        "partition",
+                        caseFormat);
+
+        return Schema.newBuilder()
+                .setColumns(newColumns)
+                .primaryKey(newPrimaryKeys)
+                .partitionKey(newPartitionKeys)
+                .options(preSchema.options())
+                .comment(preSchema.comment())
+                .build();
+    }
+
+    private static List<String> parseCommaSeparatedKeys(@Nullable String csv) {
+        if (csv == null || csv.trim().isEmpty()) {
+            return Collections.emptyList();
+        }
+        return Arrays.stream(csv.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.toList());
     }
 
     /** Projects given {@link RecordData} based on given processor. */
@@ -502,7 +554,10 @@ public class PostTransformOperator extends AbstractStreamOperatorAdapter<Event>
                             TransformFilter.of(filterExpression).orElse(null),
                             PostTransformConverters.of(rule.getPostTransformConverter())
                                     .orElse(null),
-                            rule.getSupportedMetadataColumns());
+                            rule.getSupportedMetadataColumns(),
+                            parseCommaSeparatedKeys(rule.getPrimaryKey()),
+                            parseCommaSeparatedKeys(rule.getPartitionKey()),
+                            rule.getSchemaColumnCaseFormat());
             list.add(apply);
         }
         return list;
