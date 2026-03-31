@@ -26,6 +26,7 @@ import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOptions;
 import org.apache.flink.cdc.connectors.mysql.source.connection.JdbcConnectionPools;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
+import org.apache.flink.cdc.connectors.mysql.source.reader.MySqlSourceReader;
 import org.apache.flink.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSchemalessSnapshotSplit;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
@@ -73,7 +74,21 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
 
     private final List<TableId> alreadyProcessedTables;
     private final List<MySqlSchemalessSnapshotSplit> remainingSplits;
-    private final Map<String, MySqlSchemalessSnapshotSplit> assignedSplits;
+
+    /**
+     * The splits that have been assigned to a reader. Once a split is finished, it remains in this
+     * map. An entry added to {@link #splitFinishedOffsets} indicates that the split has been
+     * finished. If reading the split fails, it is removed from this map.
+     *
+     * <p>{@link MySqlSourceReader} relies on the order of elements within the map:
+     *
+     * <ol>
+     *   <li>It must correspond to the order of assignment of the splits to readers.
+     *   <li>The order must be retained across job restarts.
+     * </ol>
+     */
+    private final LinkedHashMap<String, MySqlSchemalessSnapshotSplit> assignedSplits;
+
     private final Map<TableId, TableChanges.TableChange> tableSchemas;
     private final Map<String, BinlogOffset> splitFinishedOffsets;
     private final MySqlSourceConfig sourceConfig;
@@ -141,7 +156,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
             int currentParallelism,
             List<TableId> alreadyProcessedTables,
             List<MySqlSchemalessSnapshotSplit> remainingSplits,
-            Map<String, MySqlSchemalessSnapshotSplit> assignedSplits,
+            LinkedHashMap<String, MySqlSchemalessSnapshotSplit> assignedSplits,
             Map<TableId, TableChanges.TableChange> tableSchemas,
             Map<String, BinlogOffset> splitFinishedOffsets,
             AssignerStatus assignerStatus,
@@ -154,17 +169,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
         this.currentParallelism = currentParallelism;
         this.alreadyProcessedTables = alreadyProcessedTables;
         this.remainingSplits = new CopyOnWriteArrayList<>(remainingSplits);
-        // When job restore from savepoint, sort the existing tables and newly added tables
-        // to let enumerator only send newly added tables' BinlogSplitMetaEvent
-        this.assignedSplits =
-                assignedSplits.entrySet().stream()
-                        .sorted(Entry.comparingByKey())
-                        .collect(
-                                Collectors.toMap(
-                                        Entry::getKey,
-                                        Entry::getValue,
-                                        (o, o2) -> o,
-                                        LinkedHashMap::new));
+        this.assignedSplits = assignedSplits;
         this.tableSchemas = tableSchemas;
         this.splitFinishedOffsets = splitFinishedOffsets;
         this.assignerStatus = assignerStatus;
@@ -224,8 +229,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     private void captureNewlyAddedTables() {
         // Don't scan newly added table in snapshot mode.
         if (sourceConfig.isScanNewlyAddedTableEnabled()
-                && !sourceConfig.getStartupOptions().isSnapshotOnly()
-                && AssignerStatus.isAssigningFinished(assignerStatus)) {
+                && !sourceConfig.getStartupOptions().isSnapshotOnly()) {
             // check whether we got newly added tables
             try (JdbcConnection jdbc = DebeziumUtils.openSnapshotJdbcConnection(sourceConfig)) {
                 final List<TableId> currentCapturedTables =
@@ -248,6 +252,10 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                 List<TableId> newlyAddedTables = currentCapturedTables;
 
                 // case 1: there are old tables to remove from state
+                // Table removal must happen regardless of assigner status. When a table
+                // is excluded after splits have been assigned but before they are finished,
+                // we must remove those splits to prevent the assigner from waiting indefinitely
+                // for splits that will never be reported as finished.
                 if (!tablesToRemove.isEmpty()) {
 
                     // remove unassigned tables/splits if it does not satisfy new table filter
@@ -267,6 +275,11 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                     LOG.info("Enumerator remove tables after restart: {}", tablesToRemove);
                     remainingTables.removeAll(tablesToRemove);
                     alreadyProcessedTables.removeIf(tableId -> tablesToRemove.contains(tableId));
+                }
+
+                // Adding new tables should only happen when assigning is finished.
+                if (!AssignerStatus.isAssigningFinished(assignerStatus)) {
+                    return;
                 }
 
                 // case 2: there are new tables to add
@@ -390,11 +403,12 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                 new ArrayList<>(assignedSplits.values());
         List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos = new ArrayList<>();
         for (MySqlSchemalessSnapshotSplit split : assignedSnapshotSplit) {
-            BinlogOffset binlogOffset = splitFinishedOffsets.get(split.splitId());
+            String splitId = split.splitId();
+            BinlogOffset binlogOffset = splitFinishedOffsets.get(splitId);
             finishedSnapshotSplitInfos.add(
                     new FinishedSnapshotSplitInfo(
                             split.getTableId(),
-                            split.splitId(),
+                            splitId,
                             split.getSplitStart(),
                             split.getSplitEnd(),
                             binlogOffset));

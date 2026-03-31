@@ -67,6 +67,13 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
     public static final DateTimeFormatter DATE_TIME_FORMATTER =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSSSSS");
 
+    /** Format TIME type data without precision. */
+    public static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss");
+
+    /** Format TIME type data with millisecond precision. */
+    public static final DateTimeFormatter TIME_WITH_MILLISECOND_FORMATTER =
+            DateTimeFormatter.ofPattern("HH:mm:ss.SSS");
+
     /** ZoneId from pipeline config to support timestamp with local time zone. */
     public final ZoneId pipelineZoneId;
 

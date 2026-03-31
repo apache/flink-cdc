@@ -28,7 +28,6 @@ under the License.
 
 Postgres connector allows reading snapshot data and incremental data from Postgres database and provides end-to-end full-database data synchronization capabilities.
 This document describes how to setup the Postgres connector.
-Note: Since the Postgres WAL log cannot parse table structure change records, Postgres CDC Pipeline Source does not support synchronizing table structure changes currently.
 
 ## Example
 
@@ -46,6 +45,7 @@ source:
    tables: adb.\.*.\.*
    decoding.plugin.name:  pgoutput
    slot.name: pgtest
+   schema-change.enabled: true
 
 sink:
   type: fluss
@@ -60,6 +60,7 @@ sink:
 pipeline:
    name: Postgres to Fluss Pipeline
    parallelism: 4
+   schema.change.behavior: lenient
 ```
 
 ## Connector Options
@@ -245,10 +246,10 @@ pipeline:
     <tr>
       <td>metadata.list</td>
       <td>optional</td>
-      <td style="word-wrap: break-word;">false</td>
+      <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>
-        List of readable metadata from SourceRecord to be passed to downstream and could be used in transform module, split by `,`. Available readable metadata are: op_ts.
+        List of readable metadata from SourceRecord to be passed to downstream and could be used in transform module, split by `,`. Available readable metadata are: op_ts, table_name, database_name, schema_name. See <a href="#supported-metadata-columns">Supported Metadata Columns</a> for more details.
       </td>
     </tr>
     <tr>
@@ -271,6 +272,17 @@ pipeline:
         Whether to include database in the generated Table ID.<br>
         If set to true, the Table ID will be in the format (database, schema, table).<br>
         If set to false, the Table ID will be in the format (schema, table).<br>
+        Defaults to false.
+      </td>
+    </tr>
+    <tr>
+      <td>schema-change.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        Whether to enable schema change inference for the Postgres source. When enabled, the connector infers schema change events (add column, drop column, rename column, alter column type) by comparing pgoutput Relation messages against the cached schema.<br>
+        Requires <code>decoding.plugin.name</code> to be set to <code>pgoutput</code>.<br>
         Defaults to false.
       </td>
     </tr>
@@ -310,6 +322,78 @@ Metrics can help understand the progress of assignments, and the following are t
 
 Notice:
 1. The group name is `namespace.schema.table`, where `namespace` is the actual database name, `schema` is the actual schema name, and `table` is the actual table name.
+
+## Supported Metadata Columns
+
+PostgreSQL CDC connector supports reading metadata columns from source records. These metadata columns can be used in transform operations or passed to downstream sinks.
+
+**Note:** Some metadata information is also available through Transform expressions (e.g., `__namespace_name__`, `__schema_name__`, `__table_name__`). The key differences are:
+- **`op_ts`**: Only available via `metadata.list` - provides the actual operation timestamp from the database.
+- **`table_name`, `database_name`, `schema_name`**: Can be obtained via either `metadata.list` or Transform expressions. Using `metadata.list` allows you to pass these values directly to downstream sinks without writing transform rules, which is simpler for basic use cases.
+
+To enable metadata columns, configure the `metadata.list` option with a comma-separated list of metadata column names:
+
+```yaml
+source:
+  type: postgres
+  # ... other configurations
+  metadata.list: op_ts,table_name,database_name,schema_name
+```
+
+The following metadata columns are supported:
+
+<div class="wy-table-responsive">
+<table class="colwidths-auto docutils">
+    <thead>
+      <tr>
+        <th class="text-left" style="width: 20%">Metadata Column</th>
+        <th class="text-left" style="width: 15%">Data Type</th>
+        <th class="text-left" style="width: 65%">Description</th>
+      </tr>
+    </thead>
+    <tbody>
+    <tr>
+      <td>op_ts</td>
+      <td>BIGINT NOT NULL</td>
+      <td>The timestamp (in milliseconds since epoch) when the change event occurred in the database. For snapshot records, this value is 0.</td>
+    </tr>
+    <tr>
+      <td>table_name</td>
+      <td>STRING NOT NULL</td>
+      <td>The name of the table that contains the changed row. Alternative: use <code>__table_name__</code> in Transform expressions.</td>
+    </tr>
+    <tr>
+      <td>database_name</td>
+      <td>STRING NOT NULL</td>
+      <td>The name of the database that contains the changed row. Alternative: use <code>__namespace_name__</code> in Transform expressions.</td>
+    </tr>
+    <tr>
+      <td>schema_name</td>
+      <td>STRING NOT NULL</td>
+      <td>The name of the schema that contains the changed row. This is specific to PostgreSQL. Alternative: use <code>__schema_name__</code> in Transform expressions.</td>
+    </tr>
+    </tbody>
+</table>
+</div>
+
+**Example Usage:**
+
+```yaml
+source:
+  type: postgres
+  hostname: localhost
+  port: 5432
+  username: postgres
+  password: postgres
+  tables: mydb.public.orders
+  slot.name: flink_slot
+  metadata.list: op_ts,table_name,schema_name
+
+transform:
+  - source-table: mydb.public.orders
+    projection: order_id, customer_id, op_ts, table_name, schema_name
+    description: Include metadata columns in output
+```
 
 ## Data Type Mapping
 

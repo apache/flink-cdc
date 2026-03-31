@@ -104,35 +104,22 @@ public class StarRocksMetadataApplier implements MetadataApplier {
             catalog.open();
         }
 
-        SchemaChangeEventVisitor.visit(
+        SchemaChangeEventVisitor.voidVisit(
                 schemaChangeEvent,
-                addColumnEvent -> {
-                    applyAddColumn(addColumnEvent);
-                    return null;
-                },
-                alterColumnTypeEvent -> {
-                    applyAlterColumnType(alterColumnTypeEvent);
-                    return null;
-                },
-                createTableEvent -> {
-                    applyCreateTable(createTableEvent);
-                    return null;
-                },
-                dropColumnEvent -> {
-                    applyDropColumn(dropColumnEvent);
-                    return null;
-                },
-                dropTableEvent -> {
-                    applyDropTable(dropTableEvent);
-                    return null;
-                },
-                renameColumnEvent -> {
-                    applyRenameColumn(renameColumnEvent);
-                    return null;
-                },
-                truncateTableEvent -> {
-                    applyTruncateTable(truncateTableEvent);
-                    return null;
+                this::applyAddColumn,
+                this::applyAlterColumnType,
+                this::applyCreateTable,
+                this::applyDropColumn,
+                this::applyDropTable,
+                this::applyRenameColumn,
+                this::applyTruncateTable,
+                alterTableCommentEvent -> {
+                    // TODO Currently, table comments cannot be modified.
+                    // See
+                    // https://docs.starrocks.io/docs/sql-reference/sql-statements/table_bucket_part_index/ALTER_TABLE/#alter-table-comment-from-v31
+                    LOG.warn(
+                            "AlterTableCommentEvent is not supported by StarRocks connector yet. Event: {}",
+                            alterTableCommentEvent);
                 });
     }
 

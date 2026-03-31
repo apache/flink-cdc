@@ -19,11 +19,11 @@ package org.apache.flink.cdc.connectors.iceberg.sink.v2.compaction;
 
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.connectors.iceberg.sink.v2.WriteResultWrapper;
+import org.apache.flink.cdc.runtime.operators.AbstractStreamOperatorAdapter;
 import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.connector.sink2.CommittableMessage;
 import org.apache.flink.streaming.api.connector.sink2.CommittableWithLineage;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.util.concurrent.ExecutorThreadFactory;
@@ -46,7 +46,7 @@ import java.util.concurrent.Executors;
 
 /** An Operator to trigger file compaction conditionally. */
 public class CompactionOperator
-        extends AbstractStreamOperator<CommittableMessage<WriteResultWrapper>>
+        extends AbstractStreamOperatorAdapter<CommittableMessage<WriteResultWrapper>>
         implements OneInputStreamOperator<
                 CommittableMessage<WriteResultWrapper>, CommittableMessage<WriteResultWrapper>> {
     protected static final Logger LOGGER = LoggerFactory.getLogger(CompactionOperator.class);

@@ -39,6 +39,7 @@ To describe a transform rule, the following parameters can be used:
 | primary-keys              | Sink table primary keys, separated by commas                                      | optional          |
 | partition-keys            | Sink table partition keys, separated by commas                                    | optional          |
 | table-options             | used to the configure table creation statement when automatically creating tables | optional          |
+| table-options.delimiter   | delimiter for table-options key-value pairs, default is `,`                       | optional          |
 | converter-after-transform | used to add a converter to change DataChangeEvent after transform                 | optional          |
 | description               | Transform rule description                                                        | optional          |
 
@@ -339,23 +340,28 @@ transform:
     description: auto creating table options example
 ```
 Tips: The format of table-options is `key1=value1,key2=value2`.
+If option values contain commas or other special characters, you can specify a custom delimiter using `table-options.delimiter` (such as `;`, `|`, `$`, etc.):
+```yaml
+transform:
+  - source-table: mydb.web_order
+    table-options: sequence.field=gxsj,jjsj;file-index.bloom-filter.columns=jjdbh
+    table-options.delimiter: ";"
+```
 
 ## Classification mapping
-Multiple transform rules can be defined to classify input data rows and apply different processing.
-Only the first matched transform rule will apply.
+If a table hits ultiple transform rules, only the first matched transform rule will apply.
 For example, we may define a transform rule as follows:
 
 ```yaml
 transform:
   - source-table: mydb.web_order
     projection: id, order_id
-    filter: UPPER(province) = 'SHANGHAI'
-    description: classification mapping example
-  - source-table: mydb.web_order
-    projection: order_id as id, id as order_id
-    filter: UPPER(province) = 'BEIJING'
-    description: classification mapping example
+    filter: id > 1001
+  - source-table: mydb.\.*
+    projection: \*, 'fallback' AS FALLBACK
 ```
+
+Here, though `mydb.web_order` matches the second rule (`mydb.\.*`), it will not fall through the next rule as it has been handled in the first rule. 
 
 ## User-defined Functions
 
@@ -416,6 +422,51 @@ pipeline:
 ```
 
 Notice that given classpath must be fully-qualified, and corresponding `jar` files must be included in Flink `/lib` folder, or be passed with `flink-cdc.sh --jar` option.
+
+### UDF Options
+
+You can pass extra options to UDFs by adding an `options` block. These options will be available in the `open` method through `UserDefinedFunctionContext.configuration()`:
+
+```yaml
+pipeline:
+  user-defined-function:
+    - name: query_redis
+      classpath: com.example.flink.cdc.udf.RedisQueryFunction
+      options:
+        hostname: localhost
+        port: "6379"
+        cache.enabled: "true"
+```
+
+And in your UDF implementation, you can access these options by defining `ConfigOption` instances:
+
+```java
+import org.apache.flink.cdc.common.configuration.ConfigOption;
+import org.apache.flink.cdc.common.configuration.ConfigOptions;
+
+public class RedisQueryFunction implements UserDefinedFunction {
+    private static final ConfigOption<String> HOSTNAME =
+        ConfigOptions.key("hostname").stringType().noDefaultValue();
+    private static final ConfigOption<Integer> PORT =
+        ConfigOptions.key("port").intType().defaultValue(6379);
+
+    private String hostname;
+    private int port;
+    
+    @Override
+    public void open(UserDefinedFunctionContext context) throws Exception {
+        hostname = context.configuration().get(HOSTNAME);
+        port = context.configuration().get(PORT);
+        // Initialize your connection here...
+    }
+    
+    public Object eval(String key) {
+        // Query Redis using hostname and port...
+    }
+}
+```
+
+The `options` field is optional. If not specified, an empty configuration will be passed to the UDF.
 
 After being correctly registered, UDFs could be used in both `projection` and `filter` expressions, just like built-in functions:
 

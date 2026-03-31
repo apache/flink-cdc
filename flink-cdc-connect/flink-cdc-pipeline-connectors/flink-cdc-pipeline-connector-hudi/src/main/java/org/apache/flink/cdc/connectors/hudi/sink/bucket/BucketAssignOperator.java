@@ -27,11 +27,11 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.connectors.hudi.sink.util.RowDataUtils;
 import org.apache.flink.cdc.connectors.hudi.sink.v2.OperatorIDGenerator;
+import org.apache.flink.cdc.runtime.operators.AbstractStreamOperatorAdapter;
 import org.apache.flink.cdc.runtime.operators.sink.SchemaEvolutionClient;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.jobgraph.tasks.TaskOperatorEventGateway;
 import org.apache.flink.streaming.api.graph.StreamConfig;
-import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.api.operators.Output;
@@ -65,7 +65,7 @@ import java.util.Optional;
  *   <li>Wraps events in BucketWrapper for downstream partitioning
  * </ul>
  */
-public class BucketAssignOperator extends AbstractStreamOperator<BucketWrapper>
+public class BucketAssignOperator extends AbstractStreamOperatorAdapter<BucketWrapper>
         implements OneInputStreamOperator<Event, BucketWrapper> {
 
     private static final Logger LOG = LoggerFactory.getLogger(BucketAssignOperator.class);
@@ -91,7 +91,7 @@ public class BucketAssignOperator extends AbstractStreamOperator<BucketWrapper>
     private final Map<TableId, List<RecordData.FieldGetter>> fieldGetterCache = new HashMap<>();
 
     public BucketAssignOperator(Configuration conf, String schemaOperatorUid) {
-        this.numBuckets = conf.getInteger(FlinkOptions.BUCKET_INDEX_NUM_BUCKETS);
+        this.numBuckets = conf.get(FlinkOptions.BUCKET_INDEX_NUM_BUCKETS);
         this.schemaOperatorUid = schemaOperatorUid;
         this.chainingStrategy = ChainingStrategy.ALWAYS;
     }

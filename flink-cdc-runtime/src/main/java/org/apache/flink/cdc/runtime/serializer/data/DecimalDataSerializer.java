@@ -20,6 +20,7 @@ package org.apache.flink.cdc.runtime.serializer.data;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.common.typeutils.TypeSerializerSchemaCompatibility;
 import org.apache.flink.api.common.typeutils.TypeSerializerSnapshot;
+import org.apache.flink.api.common.typeutils.TypeSerializerSnapshotAdapter;
 import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataOutputView;
@@ -138,7 +139,7 @@ public final class DecimalDataSerializer extends TypeSerializer<DecimalData> {
 
     /** {@link TypeSerializerSnapshot} for {@link DecimalDataSerializer}. */
     public static final class DecimalSerializerSnapshot
-            implements TypeSerializerSnapshot<DecimalData> {
+            implements TypeSerializerSnapshotAdapter<DecimalData> {
 
         private static final int CURRENT_VERSION = 3;
 

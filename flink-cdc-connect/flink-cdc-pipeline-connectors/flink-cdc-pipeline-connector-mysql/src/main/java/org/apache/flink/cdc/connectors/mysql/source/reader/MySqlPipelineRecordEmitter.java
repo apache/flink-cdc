@@ -55,9 +55,11 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils.openJdbcConnection;
 import static org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils.getTableId;
@@ -80,6 +82,7 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
     // Used when startup mode is snapshot
     private boolean shouldEmitAllCreateTableEventsInSnapshotMode = true;
     private boolean isBounded = false;
+    private final boolean isTableIdCaseInsensitive;
 
     private final DebeziumDeserializationSchema<Event> debeziumDeserializationSchema;
 
@@ -88,7 +91,8 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
     public MySqlPipelineRecordEmitter(
             DebeziumDeserializationSchema<Event> debeziumDeserializationSchema,
             MySqlSourceReaderMetrics sourceReaderMetrics,
-            MySqlSourceConfig sourceConfig) {
+            MySqlSourceConfig sourceConfig,
+            boolean isTableIdCaseInsensitive) {
         super(
                 debeziumDeserializationSchema,
                 sourceReaderMetrics,
@@ -102,6 +106,7 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
                 ((DebeziumEventDeserializationSchema) debeziumDeserializationSchema)
                         .getCreateTableEventCache();
         this.isBounded = StartupOptions.snapshot().equals(sourceConfig.getStartupOptions());
+        this.isTableIdCaseInsensitive = isTableIdCaseInsensitive;
     }
 
     @Override
@@ -261,7 +266,10 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
         for (int i = 0; i < columns.size(); i++) {
             Column column = columns.get(i);
 
-            String colName = column.name();
+            String colName =
+                    this.isTableIdCaseInsensitive
+                            ? column.name().toLowerCase(Locale.ROOT)
+                            : column.name();
             DataType dataType =
                     MySqlTypeUtils.fromDbzColumn(column, sourceConfig.isTreatTinyInt1AsBoolean());
             if (!column.isOptional()) {
@@ -277,6 +285,12 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
 
         List<String> primaryKey = table.primaryKeyColumnNames();
         if (Objects.nonNull(primaryKey) && !primaryKey.isEmpty()) {
+            if (this.isTableIdCaseInsensitive) {
+                primaryKey =
+                        primaryKey.stream()
+                                .map(key -> key.toLowerCase(Locale.ROOT))
+                                .collect(Collectors.toList());
+            }
             tableBuilder.primaryKey(primaryKey);
         }
         return tableBuilder.build();

@@ -669,4 +669,58 @@ class PaimonMetadataApplierTest {
 
         Assertions.assertThat(table).isNotNull();
     }
+
+    /** Microsecond variant: '0000-00-00 00:00:00.000000'. */
+    private static final String INVALID_DATETIME_WITH_MICROS = "0000-00-00 00:00:00.000000";
+
+    @Test
+    public void testMysqlDefaultTimestampValueWithMicrosInAddColumn()
+            throws SchemaEvolveException,
+                    Catalog.TableNotExistException,
+                    Catalog.DatabaseNotEmptyException,
+                    Catalog.DatabaseNotExistException {
+        initialize("filesystem");
+        Map<String, String> tableOptions = new HashMap<>();
+        tableOptions.put("bucket", "-1");
+        MetadataApplier metadataApplier =
+                new PaimonMetadataApplier(catalogOptions, tableOptions, new HashMap<>());
+
+        CreateTableEvent createTableEvent =
+                new CreateTableEvent(
+                        TableId.parse("test.timestamp_micros_test"),
+                        org.apache.flink.cdc.common.schema.Schema.newBuilder()
+                                .physicalColumn(
+                                        "id",
+                                        org.apache.flink.cdc.common.types.DataTypes.INT().notNull())
+                                .physicalColumn(
+                                        "name",
+                                        org.apache.flink.cdc.common.types.DataTypes.STRING())
+                                .primaryKey("id")
+                                .build());
+        metadataApplier.applySchemaChange(createTableEvent);
+
+        List<AddColumnEvent.ColumnWithPosition> addedColumns = new ArrayList<>();
+        addedColumns.add(
+                AddColumnEvent.last(
+                        Column.physicalColumn(
+                                "created_time",
+                                org.apache.flink.cdc.common.types.DataTypes.TIMESTAMP(6),
+                                null,
+                                INVALID_DATETIME_WITH_MICROS)));
+        addedColumns.add(
+                AddColumnEvent.last(
+                        Column.physicalColumn(
+                                "updated_time",
+                                org.apache.flink.cdc.common.types.DataTypes.TIMESTAMP_LTZ(6),
+                                null,
+                                INVALID_DATETIME_WITH_MICROS)));
+
+        AddColumnEvent addColumnEvent =
+                new AddColumnEvent(TableId.parse("test.timestamp_micros_test"), addedColumns);
+        metadataApplier.applySchemaChange(addColumnEvent);
+
+        Table table = catalog.getTable(Identifier.fromString("test.timestamp_micros_test"));
+
+        Assertions.assertThat(table).isNotNull();
+    }
 }

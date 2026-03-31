@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.paimon.sink.v2.bucket;
 
 import org.apache.flink.api.common.ExecutionConfig;
+import org.apache.flink.api.common.serialization.SerializerConfig;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.cdc.common.event.Event;
@@ -58,8 +59,12 @@ public class BucketWrapperEventTypeInfo extends TypeInformation<Event> {
         return false;
     }
 
-    @Override
     public TypeSerializer<Event> createSerializer(ExecutionConfig config) {
+        return BucketWrapperEventSerializer.INSTANCE;
+    }
+
+    @Override
+    public TypeSerializer<Event> createSerializer(SerializerConfig config) {
         return BucketWrapperEventSerializer.INSTANCE;
     }
 

@@ -33,6 +33,8 @@ limitations under the License.
     <packaging>pom</packaging>
 
     <modules>
+        <module>flink-cdc-flink1-compat</module>
+        <module>flink-cdc-flink2-compat</module>
         <module>flink-cdc-cli</module>
         <module>flink-cdc-common</module>
         <module>flink-cdc-composer</module>
@@ -59,7 +61,7 @@ limitations under the License.
     </scm>
 
     <properties>
-        <revision>3.6-SNAPSHOT</revision>
+        <revision>3.7-SNAPSHOT</revision>
         <scala.binary.version>2.12</scala.binary.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <!-- Enforce single fork execution due to heavy mini cluster use in the tests -->
@@ -67,13 +69,18 @@ limitations under the License.
         <flink.reuseForks>true</flink.reuseForks>
 
         <!-- dependencies versions -->
-        <flink.version>1.20.3</flink.version>
+        <flink.1.x.version>1.20.3</flink.1.x.version>
+        <flink.2.x.version>2.2.0</flink.2.x.version>
+        <flink.version>${flink.1.x.version}</flink.version>
         <flink.major.version>1.20</flink.major.version>
+        <flink.1.x.shaded.guava.version>31.1-jre-17.0</flink.1.x.shaded.guava.version>
+        <flink.2.x.shaded.guava.version>33.4.0-jre-20.0</flink.2.x.shaded.guava.version>
+        <shaded.guava.version>${flink.1.x.shaded.guava.version}</shaded.guava.version>
         <flink.shaded.version>17.0</flink.shaded.version>
         <debezium.version>1.9.8.Final</debezium.version>
         <tikv.version>3.2.0</tikv.version>
         <geometry.version>2.2.0</geometry.version>
-        <testcontainers.version>1.18.3</testcontainers.version>
+        <testcontainers.version>1.21.4</testcontainers.version>
         <hamcrest.version>1.3</hamcrest.version>
         <version.awaitility>4.2.0</version.awaitility>
         <slf4j.version>1.7.36</slf4j.version>
@@ -82,7 +89,7 @@ limitations under the License.
         <commons-lang3.version>3.12.0</commons-lang3.version>
         <json-path.version>2.7.0</json-path.version>
         <jackson.version>2.13.2</jackson.version>
-        <junit.version>5.10.1</junit.version>
+        <junit.version>5.13.1</junit.version>
         <assertj.version>3.24.2</assertj.version>
         <markBundledAsOptional>true</markBundledAsOptional>
         <flatten-maven-plugin.version>1.5.0</flatten-maven-plugin.version>
@@ -96,6 +103,7 @@ limitations under the License.
         <!-- Maven shade plugin prior to 3.2.0 could not correctly shade nested classes with JDK 8+. -->
         <maven.shade.plugin.version>3.6.0</maven.shade.plugin.version>
         <iceberg.version>1.10.1</iceberg.version>
+        <iceberg.flink.major.version>1.20</iceberg.flink.major.version>
         <hive.version>2.3.9</hive.version>
         <hadoop.version>3.3.4</hadoop.version>
         <java.version>11</java.version>
@@ -106,6 +114,8 @@ limitations under the License.
              and thus is changing back to java 1.6 on each maven re-import -->
         <maven.compiler.source>${source.java.version}</maven.compiler.source>
         <maven.compiler.target>${target.java.version}</maven.compiler.target>
+        <flink.kafka.connector.version>3.3.0-1.20</flink.kafka.connector.version>
+        <paimon.flink.major.version>1.20</paimon.flink.major.version>
     </properties>
 
     <dependencyManagement>
@@ -289,7 +299,7 @@ limitations under the License.
         <dependency>
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-shaded-guava</artifactId>
-            <version>31.1-jre-${flink.shaded.version}</version>
+            <version>${shaded.guava.version}</version>
         </dependency>
 
         <dependency>
@@ -359,7 +369,6 @@ limitations under the License.
             <groupId>commons-codec</groupId>
             <artifactId>commons-codec</artifactId>
             <version>1.15</version>
-            <scope>test</scope>
         </dependency>
     </dependencies>
 
@@ -840,6 +849,56 @@ limitations under the License.
                         </configuration>
                     </plugin>
                 </plugins>
+            </build>
+        </profile>
+        <profile>
+            <id>flink2</id>
+            <properties>
+                <flink.kafka.connector.version>4.0.1-2.0</flink.kafka.connector.version>
+                <paimon.flink.major.version>2.1</paimon.flink.major.version>
+                <iceberg.flink.major.version>2.0</iceberg.flink.major.version>
+            </properties>
+            <build>
+                <pluginManagement>
+                    <plugins>
+                        <plugin>
+                            <groupId>org.apache.maven.plugins</groupId>
+                            <artifactId>maven-dependency-plugin</artifactId>
+                            <executions>
+                                <execution>
+                                    <id>copy-flink2-guava</id>
+                                    <phase>process-test-resources</phase>
+                                    <goals>
+                                        <goal>copy</goal>
+                                    </goals>
+                                    <configuration>
+                                        <artifactItems>
+                                            <artifactItem>
+                                                <groupId>org.apache.flink</groupId>
+                                                <artifactId>flink-shaded-guava</artifactId>
+                                                <version>${flink.2.x.shaded.guava.version}</version>
+                                                <destFileName>flink-shaded-guava.jar</destFileName>
+                                                <outputDirectory>${project.build.directory}/flink2-extra-libs</outputDirectory>
+                                            </artifactItem>
+                                        </artifactItems>
+                                    </configuration>
+                                </execution>
+                            </executions>
+                        </plugin>
+                        <plugin>
+                            <groupId>org.apache.maven.plugins</groupId>
+                            <artifactId>maven-surefire-plugin</artifactId>
+                            <configuration>
+                                <systemPropertyVariables>
+                                    <flink.profile>flink2</flink.profile>
+                                </systemPropertyVariables>
+                                <additionalClasspathElements>
+                                    <additionalClasspathElement>${project.build.directory}/flink2-extra-libs/flink-shaded-guava.jar</additionalClasspathElement>
+                                </additionalClasspathElements>
+                            </configuration>
+                        </plugin>
+                    </plugins>
+                </pluginManagement>
             </build>
         </profile>
         <profile>

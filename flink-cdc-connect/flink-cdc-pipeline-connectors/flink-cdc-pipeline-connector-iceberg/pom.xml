@@ -33,8 +33,14 @@ limitations under the License.
     <dependencies>
         <dependency>
             <groupId>org.apache.iceberg</groupId>
-            <artifactId>iceberg-flink-runtime-1.20</artifactId>
+            <artifactId>iceberg-flink-runtime-${iceberg.flink.major.version}</artifactId>
             <version>${iceberg.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.iceberg</groupId>
+            <artifactId>iceberg-aws</artifactId>
+            <version>${iceberg.version}</version>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.flink</groupId>
@@ -56,6 +62,10 @@ limitations under the License.
                     <artifactId>junit-vintage-engine</artifactId>
                     <groupId>org.junit.vintage</groupId>
                 </exclusion>
+                <exclusion>
+                    <groupId>org.testcontainers</groupId>
+                    <artifactId>testcontainers</artifactId>
+                </exclusion>
             </exclusions>
         </dependency>
 
@@ -76,6 +86,12 @@ limitations under the License.
             <artifactId>flink-test-utils-junit</artifactId>
             <version>${flink.version}</version>
             <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.testcontainers</groupId>
+                    <artifactId>testcontainers</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <!-- hadoop dependency -->

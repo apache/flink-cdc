@@ -70,8 +70,8 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
     private transient Tables tables;
     private transient CustomMySqlAntlrDdlParser customParser;
 
-    private List<MySqlReadableMetadata> readableMetadataList;
-    private boolean isTableIdCaseInsensitive;
+    private final List<MySqlReadableMetadata> readableMetadataList;
+    private final boolean isTableIdCaseInsensitive;
 
     public MySqlEventDeserializer(
             DebeziumChangelogMode changelogMode,
@@ -85,7 +85,6 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
                 includeSchemaChanges,
                 tinyInt1isBit,
                 isTableIdCaseInsensitive);
-        this.isTableIdCaseInsensitive = isTableIdCaseInsensitive;
     }
 
     public MySqlEventDeserializer(

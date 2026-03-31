@@ -67,7 +67,10 @@ public class ChunkUtils {
         String chunkKeyColumn = findChunkKeyColumn(table.id(), chunkKeyColumns);
         if (primaryKeys.isEmpty() && chunkKeyColumn == null) {
             throw new ValidationException(
-                    "To use incremental snapshot, 'scan.incremental.snapshot.chunk.key-column' must be set when the table doesn't have primary keys.");
+                    String.format(
+                            "Table '%s' has no primary key. To use incremental snapshot, "
+                                    + "please set 'scan.incremental.snapshot.chunk.key-column' for this table.",
+                            table.id()));
         }
 
         List<Column> searchColumns = table.columns();

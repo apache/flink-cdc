@@ -16,26 +16,38 @@
 # This workflow will triage pull requests and apply a label based on the
 # paths that are modified in the pull request.
 #
-# To use this workflow, you will need to set up a .github/label.yml
+# To use this workflow, you will need to set up a .github/labeler.yml
 # file with configuration.  For more information, see:
 # https://github.com/actions/labeler
 
 name: Labeler
+
 on:
-  pull_request:
-    branches:
-      - master
-      - release-*
+  workflow_run:
+    workflows: [Labeler-Trigger]
+    types: [requested]
+
+permissions:
+  checks: write
+  contents: read
+  pull-requests: write
 
 jobs:
   label:
-
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
-
     steps:
+      - name: "Checkout ${{ github.ref }} ( ${{ github.sha }} )"
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          submodules: recursive
+      - name: "Get information about the original trigger of the run"
+        uses: ./.github/actions/get-workflow-origin
+        id: source-run-info
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          sourceRunId: ${{ github.event.workflow_run.id }}
       - uses: actions/labeler@v6
         with:
           repo-token: "${{ secrets.GITHUB_TOKEN }}"
+          pr-number: ${{ steps.source-run-info.outputs.pullRequestNumber }}

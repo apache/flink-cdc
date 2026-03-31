@@ -152,11 +152,7 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
         return new PostgresConnectorConfig(getDbzConfiguration());
     }
 
-    /**
-     * Returns whether to include database in the generated Table ID.
-     *
-     * @return whether to include database in the generated Table ID
-     */
+    /** Returns whether to include database in the generated Table ID. */
     public boolean isIncludeDatabaseInTableId() {
         return includeDatabaseInTableId;
     }

@@ -173,7 +173,7 @@ test_modules = set()
 compile_modules = set()
 
 for module in INPUT_MODULES.split(', '):
-    module_list = set(globals()['MODULES_' + module.upper().replace('-', '_')])
+    module_list = set(globals()['MODULES_' + module.upper().replace('-', '_').replace('.', '_')])
     test_modules |= module_list
     if module == 'source_e2e' or module == 'pipeline_e2e':
         compile_modules |= ALL_MODULES

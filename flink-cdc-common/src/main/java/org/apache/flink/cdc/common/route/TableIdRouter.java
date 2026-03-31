@@ -20,6 +20,7 @@ package org.apache.flink.cdc.common.route;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.cdc.common.annotation.PublicEvolving;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.pipeline.RouteMode;
 import org.apache.flink.cdc.common.schema.Selectors;
 
 import org.apache.flink.shaded.guava31.com.google.common.cache.CacheBuilder;
@@ -34,7 +35,10 @@ import javax.annotation.Nonnull;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -53,6 +57,7 @@ public class TableIdRouter {
 
     private final List<Tuple3<Pattern, String, String>> routes;
     private final LoadingCache<TableId, List<TableId>> routingCache;
+    private final RouteMode routeMode;
 
     private static final String DOT_PLACEHOLDER = "_dot_placeholder_";
 
@@ -106,6 +111,11 @@ public class TableIdRouter {
     }
 
     public TableIdRouter(List<RouteRule> routingRules) {
+        this(routingRules, RouteMode.ALL_MATCH);
+    }
+
+    public TableIdRouter(List<RouteRule> routingRules, RouteMode routeMode) {
+        this.routeMode = routeMode;
         this.routes = new ArrayList<>();
         for (RouteRule rule : routingRules) {
             try {
@@ -139,11 +149,19 @@ public class TableIdRouter {
     }
 
     private List<TableId> calculateRoute(TableId sourceTableId) {
-        List<TableId> routedTableIds =
-                routes.stream()
-                        .filter(route -> matches(route.f0, sourceTableId))
-                        .map(route -> resolveReplacement(sourceTableId, route))
-                        .collect(Collectors.toList());
+        List<TableId> routedTableIds = new ArrayList<>();
+
+        for (Tuple3<Pattern, String, String> route : routes) {
+            if (matches(route.f0, sourceTableId)) {
+                routedTableIds.add(resolveReplacement(sourceTableId, route));
+
+                // If match mode is FIRST_MATCH, stop after the first match
+                if (routeMode == RouteMode.FIRST_MATCH) {
+                    break;
+                }
+            }
+        }
+
         if (routedTableIds.isEmpty()) {
             routedTableIds.add(sourceTableId);
         }
@@ -177,13 +195,36 @@ public class TableIdRouter {
         if (routes.isEmpty()) {
             return new ArrayList<>();
         }
-        return routes.stream()
-                .map(
-                        route ->
-                                tableIdSet.stream()
-                                        .filter(tableId -> matches(route.f0, tableId))
-                                        .collect(Collectors.toSet()))
-                .collect(Collectors.toList());
+
+        if (routeMode == RouteMode.ALL_MATCH) {
+            return routes.stream()
+                    .map(
+                            route ->
+                                    tableIdSet.stream()
+                                            .filter(tableId -> matches(route.f0, tableId))
+                                            .collect(Collectors.toSet()))
+                    .collect(Collectors.toList());
+        } else if (routeMode == RouteMode.FIRST_MATCH) {
+            Map<TableId, Integer> matchingTableIds = new HashMap<>();
+            for (TableId tableId : tableIdSet) {
+                for (int i = 0; i < routes.size(); i++) {
+                    if (routes.get(i).f0.matcher(tableId.toString()).matches()) {
+                        matchingTableIds.put(tableId, i);
+                        break;
+                    }
+                }
+            }
+            List<Set<TableId>> routeGroups = new ArrayList<>(routes.size());
+            for (int i = 0; i < routes.size(); i++) {
+                routeGroups.add(new HashSet<>());
+            }
+            for (Map.Entry<TableId, Integer> entry : matchingTableIds.entrySet()) {
+                routeGroups.get(entry.getValue()).add(entry.getKey());
+            }
+            return routeGroups;
+        } else {
+            throw new IllegalArgumentException("Unexpected route mode: " + routeMode);
+        }
     }
 
     private static boolean matches(Pattern pattern, TableId tableId) {
