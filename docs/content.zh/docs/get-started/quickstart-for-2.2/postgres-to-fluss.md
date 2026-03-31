@@ -202,8 +202,8 @@ under the License.
 2. 下载下面列出的 connector 包，并且移动到 `lib` 目录下；
    **下载链接只对已发布的版本有效, SNAPSHOT 版本需要本地基于 master 或 release- 分支编译。**
    **请注意，您需要将 jar 移动到 Flink CDC Home 的 lib 目录，而非 Flink Home 的 lib 目录下。**
-   - [Postgres pipeline connector {{< param Version >}}](https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-postgres/{{< param Version >}}/flink-cdc-pipeline-connector-postgres-{{< param Version >}}-2.2.jar)
-   - [Fluss pipeline connector {{< param Version >}}](https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-fluss/{{< param Version >}}/flink-cdc-pipeline-connector-fluss-{{< param Version >}}-2.2.jar)
+   - [flink-cdc-pipeline-connector-postgres](https://mvnrepository.com/artifact/org.apache.flink/flink-cdc-pipeline-connector-postgres)
+   - [flink-cdc-pipeline-connector-fluss](https://mvnrepository.com/artifact/org.apache.flink/flink-cdc-pipeline-connector-fluss)
 
 3. 编写任务配置 yaml 文件。
    下面给出了一个整库同步的示例文件 `postgres-to-fluss.yaml`：

@@ -52,7 +52,7 @@ MySQL CDC 连接器允许从 MySQL 数据库读取快照数据和增量数据。
 
 ### SQL Client JAR
 
-下载 [flink-sql-connector-mysql-cdc-{{< param Version >}}.jar](https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-mysql-cdc/{{< param Version >}}/flink-sql-connector-mysql-cdc-{{< param Version >}}.jar) 到 `<FLINK_HOME>/lib/` 目录下。
+下载 [flink-sql-connector-mysql-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-mysql-cdc) 到 `<FLINK_HOME>/lib/` 目录下。
 
 **注意:** 参考 [flink-sql-connector-mysql-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-mysql-cdc) 当前已发布的所有版本都可以在 Maven 中央仓库获取。
 
