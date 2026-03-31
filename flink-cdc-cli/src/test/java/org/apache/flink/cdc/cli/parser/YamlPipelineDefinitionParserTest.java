@@ -20,6 +20,7 @@ package org.apache.flink.cdc.cli.parser;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
+import org.apache.flink.cdc.common.pipeline.SchemaColumnCaseFormat;
 import org.apache.flink.cdc.composer.definition.ModelDef;
 import org.apache.flink.cdc.composer.definition.PipelineDef;
 import org.apache.flink.cdc.composer.definition.RouteDef;
@@ -51,6 +52,7 @@ import static org.apache.flink.cdc.common.event.SchemaChangeEventType.DROP_COLUM
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.DROP_TABLE;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.RENAME_COLUMN;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.TRUNCATE_TABLE;
+import static org.apache.flink.cdc.common.pipeline.PipelineOptions.PIPELINE_COLUMN_NAME_CASE;
 import static org.apache.flink.cdc.common.pipeline.PipelineOptions.PIPELINE_LOCAL_TIME_ZONE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
@@ -842,4 +844,123 @@ class YamlPipelineDefinitionParserTest {
                                     .put("parallelism", "2")
                                     .put("route-mode", "FIRST_MATCH")
                                     .build()));
+
+    @Test
+    void testShorthandSchemaColumnCaseFormat() throws Exception {
+        String yaml =
+                "source:\n"
+                        + "  type: mysql\n"
+                        + "sink:\n"
+                        + "  type: kafka\n"
+                        + "pipeline:\n"
+                        + "  column-name-case: lower\n";
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+        PipelineDef def = parser.parse(yaml, new Configuration());
+        assertThat(def.getConfig().get(PIPELINE_COLUMN_NAME_CASE))
+                .isEqualTo(SchemaColumnCaseFormat.LOWER);
+    }
+
+    @Test
+    void testTransformColumnCaseFormat() throws Exception {
+        String yaml =
+                "source:\n"
+                        + "  type: mysql\n"
+                        + "sink:\n"
+                        + "  type: kafka\n"
+                        + "transform:\n"
+                        + "  - source-table: db.t\n"
+                        + "    projection: a, b\n"
+                        + "    column-name-case: LOWER\n";
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+        PipelineDef def = parser.parse(yaml, new Configuration());
+        assertThat(def.getTransforms()).hasSize(1);
+        assertThat(def.getTransforms().get(0).getColumnCaseFormat())
+                .isEqualTo(SchemaColumnCaseFormat.LOWER);
+    }
+
+    @Test
+    void testTransformWithOnlyColumnCaseFormatRegistersPostRule() throws Exception {
+        String yaml =
+                "source:\n"
+                        + "  type: mysql\n"
+                        + "sink:\n"
+                        + "  type: kafka\n"
+                        + "transform:\n"
+                        + "  - source-table: db.t\n"
+                        + "    column-name-case: UPPER\n";
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+        PipelineDef def = parser.parse(yaml, new Configuration());
+
+        assertThat(def.getTransforms()).hasSize(1);
+        assertThat(def.getTransforms().get(0).getColumnCaseFormat())
+                .isEqualTo(SchemaColumnCaseFormat.UPPER);
+        assertThat(def.getTransforms().get(0).registersPostTransformRule()).isTrue();
+    }
+
+    @Test
+    void testMysqlTUserRouteWithUpperCasePipelineAndWildcardTransform() throws Exception {
+        String yaml =
+                "source:\n"
+                        + "  type: mysql\n"
+                        + "  name: source_mysql\n"
+                        + "sink:\n"
+                        + "  type: doris\n"
+                        + "  name: sink_doris\n"
+                        + "route:\n"
+                        + "  - source-table: (saas_pw_00).t_user\n"
+                        + "    sink-table: ods_saas_pw.$2\n"
+                        + "transform:\n"
+                        + "  - source-table: (saas_pw_00).t_user\n"
+                        + "    projection: '*'\n"
+                        + "pipeline:\n"
+                        + "  name: mysql_2_selectdb_saas_pw_ts\n"
+                        + "  column-name-case: UPPER\n";
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+        PipelineDef def = parser.parse(yaml, new Configuration());
+
+        assertThat(def.getConfig().get(PIPELINE_COLUMN_NAME_CASE))
+                .isEqualTo(SchemaColumnCaseFormat.UPPER);
+        assertThat(def.getConfig().get(PipelineOptions.PIPELINE_NAME))
+                .isEqualTo("mysql_2_selectdb_saas_pw_ts");
+        assertThat(def.getTransforms()).hasSize(1);
+        assertThat(def.getTransforms().get(0).getSourceTable()).isEqualTo("(saas_pw_00).t_user");
+        assertThat(def.getTransforms().get(0).getProjection()).isEqualTo("*");
+        assertThat(def.getTransforms().get(0).getColumnCaseFormat()).isNull();
+        assertThat(def.getRoute()).hasSize(1);
+        assertThat(def.getRoute().get(0).getSourceTable()).isEqualTo("(saas_pw_00).t_user");
+        assertThat(def.getRoute().get(0).getSinkTable()).isEqualTo("ods_saas_pw.$2");
+    }
+
+    @Test
+    void testPipelineSchemaColumnCaseFormatWithoutTransformSection() throws Exception {
+        String yaml =
+                "source:\n"
+                        + "  type: mysql\n"
+                        + "sink:\n"
+                        + "  type: doris\n"
+                        + "pipeline:\n"
+                        + "  column-name-case: UPPER\n";
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+        PipelineDef def = parser.parse(yaml, new Configuration());
+
+        assertThat(def.getTransforms()).isEmpty();
+        assertThat(def.getConfig().get(PIPELINE_COLUMN_NAME_CASE))
+                .isEqualTo(SchemaColumnCaseFormat.UPPER);
+    }
+
+    @Test
+    void testTransformWithOnlyPrimaryKeysDoesNotRegisterPostRule() throws Exception {
+        String yaml =
+                "source:\n"
+                        + "  type: mysql\n"
+                        + "sink:\n"
+                        + "  type: kafka\n"
+                        + "transform:\n"
+                        + "  - source-table: db.t\n"
+                        + "    primary-keys: id\n";
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+        PipelineDef def = parser.parse(yaml, new Configuration());
+        assertThat(def.getTransforms()).hasSize(1);
+        assertThat(def.getTransforms().get(0).registersPostTransformRule()).isFalse();
+    }
 }

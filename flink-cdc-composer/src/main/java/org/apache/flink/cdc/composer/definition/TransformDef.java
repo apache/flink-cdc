@@ -17,6 +17,11 @@
 
 package org.apache.flink.cdc.composer.definition;
 
+import org.apache.flink.cdc.common.pipeline.SchemaColumnCaseFormat;
+import org.apache.flink.cdc.common.utils.StringUtils;
+
+import javax.annotation.Nullable;
+
 import java.util.Objects;
 
 /**
@@ -39,7 +44,16 @@ import java.util.Objects;
  *   <li>tableOptionsDelimiter: a string for delimiter of table options, default is `,`. Optional
  *       for the definition.
  *   <li>description: description for the transformation. Optional for the definition.
+ *   <li>column-name-case (YAML): optional per-transform override for pipeline {@code
+ *       column-name-case} (AS_IS, UPPER, LOWER). Same key as pipeline shorthand. When set, it
+ *       applies to this rule's post-transform schema only.
  * </ul>
+ *
+ * <p><b>Post-transform registration:</b> A rule is registered on the post-transform operator only
+ * if {@link #registersPostTransformRule()} is true (non-empty projection/filter or per-transform
+ * {@code column-name-case}). Fields such as {@code primary-keys}, {@code partition-keys}, or {@code
+ * converter-after-transform} are interpreted in the post-transform phase and have no effect unless
+ * a projection/filter or {@code column-name-case} is also set.
  */
 public class TransformDef {
     private final String sourceTable;
@@ -52,6 +66,9 @@ public class TransformDef {
     private final String tableOptionsDelimiter;
     private final String postTransformConverter;
 
+    /** When non-null, overrides pipeline {@code column-name-case} for this transform. */
+    private final @Nullable SchemaColumnCaseFormat columnCaseFormat;
+
     public TransformDef(
             String sourceTable,
             String projection,
@@ -62,6 +79,30 @@ public class TransformDef {
             String tableOptionsDelimiter,
             String description,
             String postTransformConverter) {
+        this(
+                sourceTable,
+                projection,
+                filter,
+                primaryKeys,
+                partitionKeys,
+                tableOptions,
+                tableOptionsDelimiter,
+                description,
+                postTransformConverter,
+                null);
+    }
+
+    public TransformDef(
+            String sourceTable,
+            String projection,
+            String filter,
+            String primaryKeys,
+            String partitionKeys,
+            String tableOptions,
+            String tableOptionsDelimiter,
+            String description,
+            String postTransformConverter,
+            @Nullable SchemaColumnCaseFormat columnCaseFormat) {
         this.sourceTable = sourceTable;
         this.projection = projection;
         this.filter = filter;
@@ -71,6 +112,7 @@ public class TransformDef {
         this.tableOptionsDelimiter = tableOptionsDelimiter;
         this.description = description;
         this.postTransformConverter = postTransformConverter;
+        this.columnCaseFormat = columnCaseFormat;
     }
 
     public TransformDef(
@@ -91,7 +133,8 @@ public class TransformDef {
                 tableOptions,
                 ",",
                 description,
-                postTransformConverter);
+                postTransformConverter,
+                null);
     }
 
     public String getSourceTable() {
@@ -102,8 +145,25 @@ public class TransformDef {
         return projection;
     }
 
+    public boolean isValidProjection() {
+        return !StringUtils.isNullOrWhitespaceOnly(projection);
+    }
+
     public String getFilter() {
         return filter;
+    }
+
+    public boolean isValidFilter() {
+        return !StringUtils.isNullOrWhitespaceOnly(filter);
+    }
+
+    /**
+     * Returns true if this transform has a non-empty projection or filter, so it is registered on
+     * the post-transform operator. Otherwise post-only settings (e.g. {@code primary-keys} in YAML)
+     * do not take effect for that phase.
+     */
+    public boolean registersPostTransformRule() {
+        return isValidProjection() || isValidFilter() || columnCaseFormat != null;
     }
 
     public String getDescription() {
@@ -130,6 +190,11 @@ public class TransformDef {
         return postTransformConverter;
     }
 
+    @Nullable
+    public SchemaColumnCaseFormat getColumnCaseFormat() {
+        return columnCaseFormat;
+    }
+
     @Override
     public String toString() {
         return "TransformDef{"
@@ -148,6 +213,8 @@ public class TransformDef {
                 + ", postTransformConverter='"
                 + postTransformConverter
                 + '\''
+                + ", columnCaseFormat="
+                + columnCaseFormat
                 + '}';
     }
 
@@ -168,7 +235,8 @@ public class TransformDef {
                 && Objects.equals(partitionKeys, that.partitionKeys)
                 && Objects.equals(tableOptions, that.tableOptions)
                 && Objects.equals(tableOptionsDelimiter, that.tableOptionsDelimiter)
-                && Objects.equals(postTransformConverter, that.postTransformConverter);
+                && Objects.equals(postTransformConverter, that.postTransformConverter)
+                && columnCaseFormat == that.columnCaseFormat;
     }
 
     @Override
@@ -182,6 +250,7 @@ public class TransformDef {
                 partitionKeys,
                 tableOptions,
                 tableOptionsDelimiter,
-                postTransformConverter);
+                postTransformConverter,
+                columnCaseFormat);
     }
 }
