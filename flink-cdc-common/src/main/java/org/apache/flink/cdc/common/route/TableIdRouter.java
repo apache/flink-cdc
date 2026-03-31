@@ -59,7 +59,17 @@ public class TableIdRouter {
     private final LoadingCache<TableId, List<TableId>> routingCache;
     private final RouteMode routeMode;
 
-    private static final String DOT_PLACEHOLDER = "_dot_placeholder_";
+    /**
+     * Placeholder for regex dots during CDC-style → standard RegExp conversion. Uses a Unicode
+     * sentinel so it cannot collide with legitimate table name characters (unlike a string like
+     * {@code _dot_placeholder_}).
+     */
+    private static final String DOT_PLACEHOLDER = "\u0000_CDC_DOT_\u0000";
+
+    /**
+     * Detects regex group references like {@code $1}, {@code $2}, … {@code $99} in sink patterns.
+     */
+    private static final Pattern GROUP_REF_PATTERN = Pattern.compile("\\$\\d");
 
     /**
      * Currently, The supported regular syntax is not exactly the same in {@link Selectors}.
@@ -76,13 +86,13 @@ public class TableIdRouter {
      * literally instead of the meta-character.
      */
     public static String convertTableListToRegExpPattern(String tables) {
-        LOG.info("Rewriting CDC style table capture list: {}", tables);
+        LOG.debug("Rewriting CDC style table capture list: {}", tables);
 
         // In CDC-style table matching, table names could be separated by `,` character.
         // Convert it to `|` as it's standard RegEx syntax.
         tables =
                 Arrays.stream(tables.split(",")).map(String::trim).collect(Collectors.joining("|"));
-        LOG.info("Expression after replacing comma with vert separator: {}", tables);
+        LOG.debug("Expression after replacing comma with vert separator: {}", tables);
 
         // Essentially, we're just trying to swap escaped `\\.` and unescaped `.`.
         // In our table matching syntax, `\\.` means RegEx token matcher and `.` means database &
@@ -93,19 +103,19 @@ public class TableIdRouter {
         // Step 1: escape the dot with a backslash, but keep it as a placeholder (like `$`).
         // For example, `db\.*.tbl\.*` => `db$*.tbl$*`
         String unescapedTables = tables.replace("\\.", DOT_PLACEHOLDER);
-        LOG.info("Expression after un-escaping dots as RegEx meta-character: {}", unescapedTables);
+        LOG.debug("Expression after un-escaping dots as RegEx meta-character: {}", unescapedTables);
 
         // Step 2: replace all remaining dots (`.`) to quoted version (`\.`), as a separator between
         // database and table names.
         // For example, `db$*.tbl$*` => `db$*\.tbl$*`
         String unescapedTablesWithDbTblSeparator = unescapedTables.replace(".", "\\.");
-        LOG.info("Re-escaping dots as TableId delimiter: {}", unescapedTablesWithDbTblSeparator);
+        LOG.debug("Re-escaping dots as TableId delimiter: {}", unescapedTablesWithDbTblSeparator);
 
         // Step 3: restore placeholder to normal RegEx matcher (`.`)
         // For example, `db$*\.tbl$*` => `db.*\.tbl.*`
         String standardRegExpTableCaptureList =
                 unescapedTablesWithDbTblSeparator.replace(DOT_PLACEHOLDER, ".");
-        LOG.info("Final standard RegExp table capture list: {}", standardRegExpTableCaptureList);
+        LOG.debug("Final standard RegExp table capture list: {}", standardRegExpTableCaptureList);
 
         return standardRegExpTableCaptureList;
     }
@@ -172,13 +182,30 @@ public class TableIdRouter {
             TableId originalTable, Tuple3<Pattern, String, String> route) {
         if (route.f2 != null) {
             return TableId.parse(route.f1.replace(route.f2, originalTable.getTableName()));
+        } else if (!containsGroupReference(route.f1)) {
+            // No capture group references ($1, $2, ...) in sink table: return literally. Avoids
+            // appendReplacement interpreting $ and \ in sink names (e.g. price$market).
+            return TableId.parse(route.f1);
         } else {
             Matcher matcher = route.f0.matcher(originalTable.toString());
-            if (matcher.find()) {
-                return TableId.parse(matcher.replaceAll(route.f1));
+            if (matcher.matches()) {
+                // Do NOT use matcher.replaceAll(): it resets the matcher and uses find(), which
+                // does partial matching and breaks alternation order (e.g. saas_pw|saas_pw_00).
+                StringBuffer sb = new StringBuffer();
+                matcher.appendReplacement(sb, route.f1);
+                matcher.appendTail(sb);
+                return TableId.parse(sb.toString());
             }
+            LOG.warn(
+                    "Source table {} does not match pattern {} in replacement resolution.",
+                    originalTable,
+                    route.f0.pattern());
+            return TableId.parse(route.f1);
         }
-        return TableId.parse(route.f1);
+    }
+
+    private static boolean containsGroupReference(String sinkTable) {
+        return GROUP_REF_PATTERN.matcher(sinkTable).find();
     }
 
     /**
