@@ -146,6 +146,39 @@ class DorisMetadataApplierITCase extends DorisSinkTestBase {
                                                 null)))));
     }
 
+    private List<Event> generateAddColumnEventsWithPosition(TableId tableId) {
+        Schema schema =
+                Schema.newBuilder()
+                        .column(new PhysicalColumn("id", DataTypes.INT().notNull(), null))
+                        .column(new PhysicalColumn("number", DataTypes.DOUBLE(), null))
+                        .column(new PhysicalColumn("name", DataTypes.VARCHAR(17), null))
+                        .primaryKey("id")
+                        .build();
+
+        return Arrays.asList(
+                new CreateTableEvent(tableId, schema),
+                new AddColumnEvent(
+                        tableId,
+                        Collections.singletonList(
+                                AddColumnEvent.first(
+                                        new PhysicalColumn(
+                                                "extra_first", DataTypes.STRING(), null)))),
+                new AddColumnEvent(
+                        tableId,
+                        Collections.singletonList(
+                                AddColumnEvent.after(
+                                        new PhysicalColumn(
+                                                "extra_after_id", DataTypes.BIGINT(), null),
+                                        "id"))),
+                new AddColumnEvent(
+                        tableId,
+                        Collections.singletonList(
+                                AddColumnEvent.before(
+                                        new PhysicalColumn(
+                                                "extra_before_name", DataTypes.BOOLEAN(), null),
+                                        "name"))));
+    }
+
     private List<Event> generateDropColumnEvents(TableId tableId) {
         Schema schema =
                 Schema.newBuilder()
@@ -349,6 +382,29 @@ class DorisMetadataApplierITCase extends DorisSinkTestBase {
                         "extra_date | DATE | Yes | false | null",
                         "extra_bool | BOOLEAN | Yes | false | null",
                         "extra_decimal | DECIMAL(17, 0) | Yes | false | null");
+
+        assertEqualsInOrder(expected, actual);
+    }
+
+    @ParameterizedTest(name = "batchMode: {0}")
+    @ValueSource(booleans = {true, false})
+    void testDorisAddColumnWithPosition(boolean batchMode) throws Exception {
+        TableId tableId =
+                TableId.tableId(
+                        DorisContainer.DORIS_DATABASE_NAME, DorisContainer.DORIS_TABLE_NAME);
+
+        runJobWithEvents(generateAddColumnEventsWithPosition(tableId), batchMode);
+
+        List<String> actual = inspectTableSchema(tableId);
+
+        List<String> expected =
+                Arrays.asList(
+                        "extra_first | TEXT | Yes | false | null",
+                        "id | INT | Yes | true | null",
+                        "extra_after_id | BIGINT | Yes | false | null",
+                        "number | DOUBLE | Yes | false | null",
+                        "extra_before_name | BOOLEAN | Yes | false | null",
+                        "name | VARCHAR(51) | Yes | false | null");
 
         assertEqualsInOrder(expected, actual);
     }
