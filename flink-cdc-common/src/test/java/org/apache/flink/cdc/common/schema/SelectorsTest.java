@@ -18,10 +18,17 @@
 package org.apache.flink.cdc.common.schema;
 
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.pipeline.PipelineOptions;
+import org.apache.flink.cdc.common.utils.Predicates;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
+
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Test for {@link org.apache.flink.cdc.common.schema.Selectors}. */
 class SelectorsTest {
@@ -130,6 +137,88 @@ class SelectorsTest {
 
         selectors = new Selectors.SelectorsBuilder().includeTables("sc1.\\.*").build();
         assertAllowed(selectors, null, "sc1", "sc1");
+    }
+
+    @Test
+    void testSchemaColumnCaseFormatDefaultTableInclusionsMatchAllIdShapes() {
+        Selectors selectors =
+                new Selectors.SelectorsBuilder()
+                        .includeTables(
+                                PipelineOptions.PIPELINE_COLUMN_NAME_CASE_DEFAULT_TABLE_INCLUSIONS)
+                        .build();
+
+        assertAllowed(selectors, null, null, "topic_only");
+        assertAllowed(selectors, null, "saas_pw_00", "t_user");
+        assertAllowed(selectors, "ns", "schema", "tbl");
+    }
+
+    /**
+     * Deep validation of {@link
+     * PipelineOptions#PIPELINE_COLUMN_NAME_CASE_DEFAULT_TABLE_INCLUSIONS}.
+     *
+     * <p>{@link Selectors.SelectorsBuilder#includeTables(String)} first splits on comma (with
+     * escape rules), then splits each entry on <b>unescaped</b> {@code .}. Therefore a naive {@code
+     * .*} as the one-part entry is invalid: the leading {@code .} is a segment separator, the
+     * remainder is {@code *}, which is not a legal Java regex. Using {@code [\s\S]*} avoids any
+     * unescaped dot while still matching any string (including newlines).
+     */
+    @Test
+    void testPipelineSchemaColumnCaseFormatDefaultInclusionsCompileAndMatch() {
+        String inclusions = PipelineOptions.PIPELINE_COLUMN_NAME_CASE_DEFAULT_TABLE_INCLUSIONS;
+
+        String[] commaParts = Predicates.RegExSplitterByComma.split(inclusions);
+        assertThat(commaParts).as("three comma-separated table patterns").hasSize(3);
+        assertThat(commaParts[0]).isEqualTo("[\\s\\S]*");
+        assertThat(commaParts[1]).isEqualTo("[\\s\\S]*.[\\s\\S]*");
+        assertThat(commaParts[2]).isEqualTo("[\\s\\S]*.[\\s\\S]*.[\\s\\S]*");
+
+        assertThatCode(
+                        () -> {
+                            for (String part : commaParts) {
+                                String[] dotParts = Predicates.RegExSplitterByDot.split(part);
+                                for (String seg : dotParts) {
+                                    Pattern.compile(seg, Pattern.CASE_INSENSITIVE);
+                                }
+                            }
+                        })
+                .as("every segment must compile as a regex (CASE_INSENSITIVE like Selectors)")
+                .doesNotThrowAnyException();
+
+        assertThatThrownBy(() -> new Selectors.SelectorsBuilder().includeTables(".*").build())
+                .isInstanceOf(PatternSyntaxException.class)
+                .hasMessageContaining("Dangling meta character '*'");
+
+        Selectors selectors = new Selectors.SelectorsBuilder().includeTables(inclusions).build();
+
+        // --- 1-part: namespace & schema absent (e.g. Kafka topic) ---
+        assertAllowed(selectors, null, null, "topic_only");
+        assertAllowed(selectors, null, null, "events.v1.orders");
+        assertAllowed(selectors, null, null, "topic-with-dashes");
+        assertAllowed(selectors, null, null, "T_中文表名");
+
+        // --- 2-part: schema + table (e.g. MySQL database.table) ---
+        assertAllowed(selectors, null, "saas_pw_00", "t_user");
+        assertAllowed(selectors, null, "db", "t");
+        assertAllowed(selectors, null, "my_schema", "tbl_01");
+
+        // --- 3-part: namespace + schema + table (e.g. Oracle) ---
+        assertAllowed(selectors, "ns", "schema", "tbl");
+        assertAllowed(selectors, "ORCL", "HR", "EMPLOYEES");
+
+        // 3-part must not be forced through the 2-part selector only: still matches via 3rd arm
+        assertAllowed(selectors, "catalog", "db", "table");
+    }
+
+    @Test
+    void testDotSplittingDoesNotBreakTwoAndThreePartDefaultPatterns() {
+        String inclusions = PipelineOptions.PIPELINE_COLUMN_NAME_CASE_DEFAULT_TABLE_INCLUSIONS;
+        String[] commaParts = Predicates.RegExSplitterByComma.split(inclusions);
+
+        String[] twoPartDots = Predicates.RegExSplitterByDot.split(commaParts[1]);
+        assertThat(twoPartDots).containsExactly("[\\s\\S]*", "[\\s\\S]*");
+
+        String[] threePartDots = Predicates.RegExSplitterByDot.split(commaParts[2]);
+        assertThat(threePartDots).containsExactly("[\\s\\S]*", "[\\s\\S]*", "[\\s\\S]*");
     }
 
     protected void assertAllowed(

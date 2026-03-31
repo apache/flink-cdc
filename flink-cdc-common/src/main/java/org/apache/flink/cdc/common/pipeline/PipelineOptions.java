@@ -136,5 +136,38 @@ public class PipelineOptions {
                     .withDescription(
                             "The timeout time for SchemaOperator to wait downstream SchemaChangeEvent applying finished, the default value is 3 minutes.");
 
+    /**
+     * Normalizes physical column names in the post-transform projection schema (simple forwards and
+     * {@code *} expansion). Explicit projection aliases are never rewritten. Per-transform {@code
+     * column-name-case} overrides this when set.
+     */
+    public static final ConfigOption<SchemaColumnCaseFormat> PIPELINE_COLUMN_NAME_CASE =
+            ConfigOptions.key("column-name-case")
+                    .enumType(SchemaColumnCaseFormat.class)
+                    .defaultValue(SchemaColumnCaseFormat.AS_IS)
+                    .withDescription(
+                            Description.builder()
+                                    .text(
+                                            "Case format for post-projection column names: AS_IS, UPPER, or LOWER (Locale.ROOT). ")
+                                    .linebreak()
+                                    .text(
+                                            "When set to UPPER or LOWER and the pipeline has no transform block (or no transform with a post projection or filter), an implicit post-transform rule is added so all tables still receive this formatting.")
+                                    .build());
+
+    /**
+     * When {@link #PIPELINE_COLUMN_NAME_CASE} is not {@link SchemaColumnCaseFormat#AS_IS} and the
+     * pipeline YAML has no {@code transform} entries (or none with a post projection / filter), the
+     * composer installs an implicit post-transform rule with this table inclusion pattern so case
+     * formatting applies to every {@link org.apache.flink.cdc.common.event.TableId} shape:
+     * single-part, two-part (e.g. MySQL database.table), and three-part.
+     *
+     * <p>Patterns use {@code [\s\S]*} (not {@code .*}) for match-all segments because {@link
+     * org.apache.flink.cdc.common.schema.Selectors} splits each comma-separated entry on
+     * <b>unescaped</b> {@code .}; a literal {@code .*} would split into an empty segment and {@code
+     * *}, which is not a valid regular expression.
+     */
+    public static final String PIPELINE_COLUMN_NAME_CASE_DEFAULT_TABLE_INCLUSIONS =
+            "[\\s\\S]*,[\\s\\S]*.[\\s\\S]*,[\\s\\S]*.[\\s\\S]*.[\\s\\S]*";
+
     private PipelineOptions() {}
 }
