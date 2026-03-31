@@ -204,7 +204,7 @@ public class MySqlSource<T>
         final MySqlSplitAssigner splitAssigner;
         // In snapshot-only startup option, only split snapshots.
         if (sourceConfig.getStartupOptions().isSnapshotOnly()) {
-            try (JdbcConnection jdbc = DebeziumUtils.openJdbcConnection(sourceConfig)) {
+            try (JdbcConnection jdbc = DebeziumUtils.openSnapshotJdbcConnection(sourceConfig)) {
                 boolean isTableIdCaseSensitive = DebeziumUtils.isTableIdCaseSensitive(jdbc);
                 splitAssigner =
                         new MySqlSnapshotSplitAssigner(
@@ -218,7 +218,7 @@ public class MySqlSource<T>
                         "Failed to discover captured tables for enumerator", e);
             }
         } else if (!sourceConfig.getStartupOptions().isStreamOnly()) {
-            try (JdbcConnection jdbc = DebeziumUtils.openJdbcConnection(sourceConfig)) {
+            try (JdbcConnection jdbc = DebeziumUtils.openSnapshotJdbcConnection(sourceConfig)) {
                 boolean isTableIdCaseSensitive = DebeziumUtils.isTableIdCaseSensitive(jdbc);
                 splitAssigner =
                         new MySqlHybridSplitAssigner(

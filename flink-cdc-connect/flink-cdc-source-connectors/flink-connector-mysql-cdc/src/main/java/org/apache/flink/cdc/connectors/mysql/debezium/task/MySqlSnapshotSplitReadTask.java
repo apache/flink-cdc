@@ -73,7 +73,8 @@ public class MySqlSnapshotSplitReadTask
 
     private final MySqlSourceConfig sourceConfig;
     private final MySqlDatabaseSchema databaseSchema;
-    private final MySqlConnection jdbcConnection;
+    private final MySqlConnection primaryConnection;
+    private final MySqlConnection snapshotConnection;
     private final EventDispatcherImpl<TableId> dispatcher;
     private final Clock clock;
     private final MySqlSnapshotSplit snapshotSplit;
@@ -84,6 +85,45 @@ public class MySqlSnapshotSplitReadTask
     private final SnapshotPhaseHooks hooks;
     private final boolean isBackfillSkipped;
 
+    /**
+     * Creates a new MySqlSnapshotSplitReadTask with separate writer and reader connections.
+     *
+     * @param primaryConnection Connection to the primary writer instance (used for binlog position)
+     * @param snapshotConnection Connection to the snapshot instance (used for snapshot data queries)
+     */
+    public MySqlSnapshotSplitReadTask(
+            MySqlSourceConfig sourceConfig,
+            MySqlConnectorConfig connectorConfig,
+            SnapshotChangeEventSourceMetrics<MySqlPartition> snapshotChangeEventSourceMetrics,
+            MySqlDatabaseSchema databaseSchema,
+            MySqlConnection primaryConnection,
+            MySqlConnection snapshotConnection,
+            EventDispatcherImpl<TableId> dispatcher,
+            TopicSelector<TableId> topicSelector,
+            EventDispatcher.SnapshotReceiver<MySqlPartition> snapshotReceiver,
+            Clock clock,
+            MySqlSnapshotSplit snapshotSplit,
+            SnapshotPhaseHooks hooks,
+            boolean isBackfillSkipped) {
+        super(connectorConfig, snapshotChangeEventSourceMetrics);
+        this.sourceConfig = sourceConfig;
+        this.databaseSchema = databaseSchema;
+        this.primaryConnection = primaryConnection;
+        this.snapshotConnection = snapshotConnection;
+        this.dispatcher = dispatcher;
+        this.clock = clock;
+        this.snapshotSplit = snapshotSplit;
+        this.topicSelector = topicSelector;
+        this.snapshotReceiver = snapshotReceiver;
+        this.snapshotChangeEventSourceMetrics = snapshotChangeEventSourceMetrics;
+        this.hooks = hooks;
+        this.isBackfillSkipped = isBackfillSkipped;
+    }
+
+    /**
+     * Legacy constructor for backward compatibility. Uses same connection for both writer and
+     * snapshot operations.
+     */
     public MySqlSnapshotSplitReadTask(
             MySqlSourceConfig sourceConfig,
             MySqlConnectorConfig connectorConfig,
@@ -97,18 +137,20 @@ public class MySqlSnapshotSplitReadTask
             MySqlSnapshotSplit snapshotSplit,
             SnapshotPhaseHooks hooks,
             boolean isBackfillSkipped) {
-        super(connectorConfig, snapshotChangeEventSourceMetrics);
-        this.sourceConfig = sourceConfig;
-        this.databaseSchema = databaseSchema;
-        this.jdbcConnection = jdbcConnection;
-        this.dispatcher = dispatcher;
-        this.clock = clock;
-        this.snapshotSplit = snapshotSplit;
-        this.topicSelector = topicSelector;
-        this.snapshotReceiver = snapshotReceiver;
-        this.snapshotChangeEventSourceMetrics = snapshotChangeEventSourceMetrics;
-        this.hooks = hooks;
-        this.isBackfillSkipped = isBackfillSkipped;
+        this(
+                sourceConfig,
+                connectorConfig,
+                snapshotChangeEventSourceMetrics,
+                databaseSchema,
+                jdbcConnection,
+                jdbcConnection,
+                dispatcher,
+                topicSelector,
+                snapshotReceiver,
+                clock,
+                snapshotSplit,
+                hooks,
+                isBackfillSkipped);
     }
 
     @Override
@@ -151,9 +193,10 @@ public class MySqlSnapshotSplitReadTask
                         dispatcher.getQueue());
 
         if (hooks.getPreLowWatermarkAction() != null) {
-            hooks.getPreLowWatermarkAction().accept(jdbcConnection, snapshotSplit);
+            hooks.getPreLowWatermarkAction().accept(primaryConnection, snapshotSplit);
         }
-        final BinlogOffset lowWatermark = DebeziumUtils.currentBinlogOffset(jdbcConnection);
+        // Use writer connection for binlog position (low watermark)
+        final BinlogOffset lowWatermark = DebeziumUtils.currentBinlogOffset(primaryConnection);
         LOG.info(
                 "Snapshot step 1 - Determining low watermark {} for split {}",
                 lowWatermark,
@@ -164,14 +207,14 @@ public class MySqlSnapshotSplitReadTask
                 snapshotSplit, lowWatermark, SignalEventDispatcher.WatermarkKind.LOW);
 
         if (hooks.getPostLowWatermarkAction() != null) {
-            hooks.getPostLowWatermarkAction().accept(jdbcConnection, snapshotSplit);
+            hooks.getPostLowWatermarkAction().accept(primaryConnection, snapshotSplit);
         }
 
         LOG.info("Snapshot step 2 - Snapshotting data");
         createDataEvents(ctx, snapshotSplit.getTableId());
 
         if (hooks.getPreHighWatermarkAction() != null) {
-            hooks.getPreHighWatermarkAction().accept(jdbcConnection, snapshotSplit);
+            hooks.getPreHighWatermarkAction().accept(primaryConnection, snapshotSplit);
         }
 
         BinlogOffset highWatermark;
@@ -185,8 +228,8 @@ public class MySqlSnapshotSplitReadTask
             // phase.
             highWatermark = lowWatermark;
         } else {
-            // Get the current binlog offset as HW
-            highWatermark = DebeziumUtils.currentBinlogOffset(jdbcConnection);
+            // Use writer connection for binlog position (high watermark)
+            highWatermark = DebeziumUtils.currentBinlogOffset(primaryConnection);
         }
 
         LOG.info(
@@ -199,7 +242,7 @@ public class MySqlSnapshotSplitReadTask
                 .setHighWatermark(highWatermark);
 
         if (hooks.getPostHighWatermarkAction() != null) {
-            hooks.getPostHighWatermarkAction().accept(jdbcConnection, snapshotSplit);
+            hooks.getPostHighWatermarkAction().accept(primaryConnection, snapshotSplit);
         }
         return SnapshotResult.completed(ctx.offset);
     }
@@ -254,9 +297,14 @@ public class MySqlSnapshotSplitReadTask
                 table.id(),
                 selectSql);
 
+        LOG.debug(
+                "Executing snapshot query for split '{}' of table {} via host {}",
+                snapshotSplit.splitId(),
+                table.id(),
+                snapshotConnection.connectionConfig().hostname());
         try (PreparedStatement selectStatement =
                         StatementUtils.readTableSplitDataStatement(
-                                jdbcConnection,
+                                snapshotConnection,
                                 selectSql,
                                 snapshotSplit.getSplitStart() == null,
                                 snapshotSplit.getSplitEnd() == null,
@@ -337,7 +385,7 @@ public class MySqlSnapshotSplitReadTask
             return readTimestampField(rs, fieldNo, actualColumn, actualTable);
         }
         // JDBC's rs.GetObject() will return a Boolean for all TINYINT(1) columns.
-        // TINYINT columns are reprtoed as SMALLINT by JDBC driver
+        // TINYINT columns are reported as SMALLINT by JDBC driver
         else if (actualColumn.jdbcType() == Types.TINYINT
                 || actualColumn.jdbcType() == Types.SMALLINT) {
             // It seems that rs.wasNull() returns false when default value is set and NULL is
