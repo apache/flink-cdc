@@ -23,6 +23,7 @@ import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.converter.JavaObjectConverter;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
+import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.ChangeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
@@ -33,6 +34,7 @@ import org.apache.flink.cdc.common.pipeline.SchemaColumnCaseFormat;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.schema.Selectors;
+import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.udf.UserDefinedFunctionContext;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.runtime.operators.AbstractStreamOperatorAdapter;
@@ -57,6 +59,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -272,6 +276,13 @@ public class PostTransformOperator extends AbstractStreamOperatorAdapter<Event>
             // See comments in PreTransformOperator#cacheChangeSchema method.
             return SchemaUtils.transformSchemaChangeEvent(true, columnNamesBeforeChange, event)
                     .map(Event.class::cast);
+        } else if (event instanceof AlterColumnTypeEvent) {
+            return rewriteAlterColumnTypeEvent(
+                            (AlterColumnTypeEvent) event,
+                            nextPreSchema,
+                            nextPostSchema,
+                            effectiveTransformer)
+                    .map(Event.class::cast);
         } else {
             return SchemaUtils.transformSchemaChangeEvent(
                             false, projectedColumnsMap.get(tableId), event)
@@ -425,6 +436,55 @@ public class PostTransformOperator extends AbstractStreamOperatorAdapter<Event>
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
                 .collect(Collectors.toList());
+    }
+
+    private Optional<AlterColumnTypeEvent> rewriteAlterColumnTypeEvent(
+            AlterColumnTypeEvent event,
+            Schema nextPreSchema,
+            Schema nextPostSchema,
+            PostTransformer transformer) {
+        Map<String, String> lineageMap = buildProvableLineageMap(nextPreSchema, transformer);
+        Set<String> postColumnNames = new HashSet<>(nextPostSchema.getColumnNames());
+        Map<String, DataType> rewrittenTypeMapping = new LinkedHashMap<>();
+        Map<String, DataType> rewrittenOldTypeMapping = new LinkedHashMap<>();
+
+        for (Map.Entry<String, DataType> entry : event.getTypeMapping().entrySet()) {
+            String postColumnName = lineageMap.get(entry.getKey());
+            if (postColumnName == null || !postColumnNames.contains(postColumnName)) {
+                continue;
+            }
+            rewrittenTypeMapping.put(postColumnName, entry.getValue());
+            if (event.hasPreSchema() && event.getOldTypeMapping().containsKey(entry.getKey())) {
+                rewrittenOldTypeMapping.put(
+                        postColumnName, event.getOldTypeMapping().get(entry.getKey()));
+            }
+        }
+
+        if (rewrittenTypeMapping.isEmpty()) {
+            return Optional.empty();
+        }
+
+        if (event.hasPreSchema() && !rewrittenOldTypeMapping.isEmpty()) {
+            return Optional.of(
+                    new AlterColumnTypeEvent(
+                            event.tableId(), rewrittenTypeMapping, rewrittenOldTypeMapping));
+        }
+        return Optional.of(new AlterColumnTypeEvent(event.tableId(), rewrittenTypeMapping));
+    }
+
+    private Map<String, String> buildProvableLineageMap(
+            Schema preSchema, PostTransformer transformer) {
+        List<ProjectionColumn> projectionColumns =
+                TransformParser.generateProjectionColumns(
+                        transformer
+                                .getProjection()
+                                .map(TransformProjection::getProjection)
+                                .orElse("*"),
+                        preSchema.getColumns(),
+                        udfDescriptors,
+                        transformer.getSupportedMetadataColumns());
+        return SchemaColumnCaseFormatter.buildProvableLineageMap(
+                projectionColumns, transformer.getSchemaColumnCaseFormat());
     }
 
     /** Projects given {@link RecordData} based on given processor. */

@@ -21,6 +21,8 @@ import org.apache.flink.api.common.io.ParseException;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.common.types.DataType;
+import org.apache.flink.cdc.common.types.DataTypeChecks;
+import org.apache.flink.cdc.common.types.DataTypeRoot;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.runtime.operators.transform.ProjectionColumn;
 import org.apache.flink.cdc.runtime.operators.transform.UserDefinedFunctionDescriptor;
@@ -341,11 +343,23 @@ public class TransformParser {
                 } else {
                     List<String> originalColumnNames = parseColumnNameList(exprNode);
                     Map<String, String> columnNameMap = generateColumnNameMap(originalColumnNames);
+                    DataType projectedDataType =
+                            preserveSinglePhysicalCastNullability(
+                                    exprNode,
+                                    CalciteDataTypeConverter.convertCalciteRelDataTypeToDataType(
+                                            relDataType),
+                                    originalColumnMap,
+                                    supportedMetadataColumns);
+                    boolean provableKeyLineage =
+                            isKeyPreservingCastOfSinglePhysicalColumn(
+                                    exprNode,
+                                    projectedDataType,
+                                    originalColumnMap,
+                                    supportedMetadataColumns);
                     projectionColumn =
                             ProjectionColumn.ofCalculated(
                                     columnName,
-                                    CalciteDataTypeConverter.convertCalciteRelDataTypeToDataType(
-                                            relDataType),
+                                    projectedDataType,
                                     exprNode.toString(),
                                     JaninoCompiler.translateSqlNodeToJaninoExpression(
                                             JaninoCompiler.Context.of(
@@ -355,7 +369,8 @@ public class TransformParser {
                                                     supportedMetadataColumns),
                                             exprNode),
                                     originalColumnNames,
-                                    columnNameMap);
+                                    columnNameMap,
+                                    provableKeyLineage);
                 }
             }
             // ... or an existing column's name identifier.
@@ -423,6 +438,210 @@ public class TransformParser {
         } else {
             return ProjectionColumn.ofAliased(
                     column, projectedColumnName, MAPPED_SINGLE_COLUMN_NAME);
+        }
+    }
+
+    /**
+     * Only key-preserving {@code CAST(physical_column AS type)} has safe 1:1 lineage for
+     * primary/partition key remapping. Nested or non-identifier casts (for example {@code CAST(a +
+     * b AS BIGINT)}) are excluded, and lossy casts (for example {@code CAST(ts AS DATE)} or {@code
+     * CAST(id AS DOUBLE)}) are rejected even if they reference a single physical column.
+     */
+    private static boolean isKeyPreservingCastOfSinglePhysicalColumn(
+            SqlNode exprNode,
+            DataType targetType,
+            Map<String, Column> originalColumnMap,
+            SupportedMetadataColumn[] supportedMetadataColumns) {
+        Column sourceColumn =
+                resolveSinglePhysicalColumnCastSource(
+                        exprNode, originalColumnMap, supportedMetadataColumns);
+        return sourceColumn != null && isKeyPreservingCast(sourceColumn.getType(), targetType);
+    }
+
+    /**
+     * Preserves {@code NOT NULL} only for provable {@code CAST(single physical column AS type)}
+     * cases where our runtime cast implementation is guaranteed to never turn a non-null source
+     * value into null.
+     *
+     * <p>This is intentionally narrower than Calcite's expression nullability inference because
+     * Janino delegates CAST execution to {@code SystemFunctionUtils.castToXxx(...)} helpers, and
+     * several of those helpers return {@code null} for invalid non-null inputs (for example string
+     * to integer, or precision-overflowing decimal casts). For consistency with actual runtime
+     * behavior, we keep those casts nullable in the projected schema.
+     */
+    private static DataType preserveSinglePhysicalCastNullability(
+            SqlNode exprNode,
+            DataType targetType,
+            Map<String, Column> originalColumnMap,
+            SupportedMetadataColumn[] supportedMetadataColumns) {
+        Column sourceColumn =
+                resolveSinglePhysicalColumnCastSource(
+                        exprNode, originalColumnMap, supportedMetadataColumns);
+        if (sourceColumn == null || sourceColumn.getType().isNullable()) {
+            return targetType;
+        }
+        return isGuaranteedNonNullCast(sourceColumn.getType(), targetType)
+                ? targetType.notNull()
+                : targetType;
+    }
+
+    @Nullable
+    private static Column resolveSinglePhysicalColumnCastSource(
+            SqlNode exprNode,
+            Map<String, Column> originalColumnMap,
+            SupportedMetadataColumn[] supportedMetadataColumns) {
+        if (!(exprNode instanceof SqlBasicCall)) {
+            return null;
+        }
+        SqlBasicCall call = (SqlBasicCall) exprNode;
+        if (!SqlKind.CAST.equals(call.getOperator().getKind())) {
+            return null;
+        }
+        List<SqlNode> operands = call.getOperandList();
+        if (operands.isEmpty()) {
+            return null;
+        }
+        SqlNode castValue = operands.get(0);
+        if (!(castValue instanceof SqlIdentifier)) {
+            return null;
+        }
+        SqlIdentifier id = (SqlIdentifier) castValue;
+        String originalName = id.names.get(id.names.size() - 1);
+        if (isMetadataColumn(originalName, supportedMetadataColumns)) {
+            return null;
+        }
+        return originalColumnMap.get(originalName);
+    }
+
+    private static boolean isGuaranteedNonNullCast(DataType sourceType, DataType targetType) {
+        switch (targetType.getTypeRoot()) {
+            case BOOLEAN:
+            case CHAR:
+            case VARCHAR:
+                return true;
+            case TINYINT:
+            case SMALLINT:
+            case INTEGER:
+            case BIGINT:
+                return isGuaranteedNonNullNumericCastInput(sourceType);
+            case FLOAT:
+            case DOUBLE:
+                return isGuaranteedNonNullApproximateNumericCastInput(sourceType);
+            case DECIMAL:
+                return isGuaranteedNonNullDecimalCast(sourceType, targetType);
+            case TIMESTAMP_WITHOUT_TIME_ZONE:
+                return sourceType.isAnyOf(
+                        DataTypeRoot.TIMESTAMP_WITHOUT_TIME_ZONE,
+                        DataTypeRoot.TIMESTAMP_WITH_LOCAL_TIME_ZONE,
+                        DataTypeRoot.TIMESTAMP_WITH_TIME_ZONE);
+            default:
+                return false;
+        }
+    }
+
+    private static boolean isGuaranteedNonNullNumericCastInput(DataType sourceType) {
+        return sourceType.isAnyOf(
+                DataTypeRoot.BOOLEAN,
+                DataTypeRoot.TINYINT,
+                DataTypeRoot.SMALLINT,
+                DataTypeRoot.INTEGER,
+                DataTypeRoot.BIGINT,
+                DataTypeRoot.DECIMAL,
+                DataTypeRoot.FLOAT,
+                DataTypeRoot.DOUBLE);
+    }
+
+    private static boolean isGuaranteedNonNullApproximateNumericCastInput(DataType sourceType) {
+        return sourceType.isAnyOf(
+                DataTypeRoot.BOOLEAN,
+                DataTypeRoot.TINYINT,
+                DataTypeRoot.SMALLINT,
+                DataTypeRoot.INTEGER,
+                DataTypeRoot.BIGINT,
+                DataTypeRoot.DECIMAL,
+                DataTypeRoot.FLOAT,
+                DataTypeRoot.DOUBLE);
+    }
+
+    private static boolean isGuaranteedNonNullDecimalCast(
+            DataType sourceType, DataType targetType) {
+        if (sourceType.is(DataTypeRoot.BOOLEAN)) {
+            return true;
+        }
+        return isInjectiveExactNumericCast(sourceType, targetType);
+    }
+
+    private static boolean isKeyPreservingCast(DataType sourceType, DataType targetType) {
+        if (isInjectiveExactNumericCast(sourceType, targetType)) {
+            return true;
+        }
+        if (sourceType.getTypeRoot() != targetType.getTypeRoot()) {
+            return false;
+        }
+        switch (sourceType.getTypeRoot()) {
+            case BOOLEAN:
+            case DATE:
+                return true;
+            case CHAR:
+            case BINARY:
+                return DataTypeChecks.getLength(sourceType) == DataTypeChecks.getLength(targetType);
+            case VARCHAR:
+            case VARBINARY:
+                return DataTypeChecks.getLength(targetType) >= DataTypeChecks.getLength(sourceType);
+            case TIME_WITHOUT_TIME_ZONE:
+            case TIMESTAMP_WITHOUT_TIME_ZONE:
+            case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
+            case TIMESTAMP_WITH_TIME_ZONE:
+                return DataTypeChecks.getPrecision(targetType)
+                        >= DataTypeChecks.getPrecision(sourceType);
+            default:
+                return false;
+        }
+    }
+
+    private static boolean isInjectiveExactNumericCast(DataType sourceType, DataType targetType) {
+        if (!isExactNumericType(sourceType) || !isExactNumericType(targetType)) {
+            return false;
+        }
+        return getExactNumericIntegerDigits(targetType) >= getExactNumericIntegerDigits(sourceType)
+                && getExactNumericScale(targetType) >= getExactNumericScale(sourceType);
+    }
+
+    private static boolean isExactNumericType(DataType dataType) {
+        return dataType.isAnyOf(
+                DataTypeRoot.TINYINT,
+                DataTypeRoot.SMALLINT,
+                DataTypeRoot.INTEGER,
+                DataTypeRoot.BIGINT,
+                DataTypeRoot.DECIMAL);
+    }
+
+    private static int getExactNumericIntegerDigits(DataType dataType) {
+        if (dataType.is(DataTypeRoot.DECIMAL)) {
+            return DataTypeChecks.getPrecision(dataType) - DataTypeChecks.getScale(dataType);
+        }
+        return getIntegerDigits(dataType.getTypeRoot());
+    }
+
+    private static int getExactNumericScale(DataType dataType) {
+        if (dataType.is(DataTypeRoot.DECIMAL)) {
+            return DataTypeChecks.getScale(dataType);
+        }
+        return 0;
+    }
+
+    private static int getIntegerDigits(DataTypeRoot typeRoot) {
+        switch (typeRoot) {
+            case TINYINT:
+                return 3;
+            case SMALLINT:
+                return 5;
+            case INTEGER:
+                return 10;
+            case BIGINT:
+                return 19;
+            default:
+                throw new IllegalArgumentException("Unsupported integer type root: " + typeRoot);
         }
     }
 

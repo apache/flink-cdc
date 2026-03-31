@@ -187,13 +187,36 @@ public class ProjectionColumn implements Serializable {
             String scriptExpression,
             List<String> originalColumnNames,
             Map<String, String> columnNameMap) {
+        return ofCalculated(
+                columnName,
+                dataType,
+                expression,
+                scriptExpression,
+                originalColumnNames,
+                columnNameMap,
+                false);
+    }
+
+    /**
+     * Same as {@link #ofCalculated(String, DataType, String, String, List, Map)} but allows marking
+     * key-preserving {@code CAST(single physical column)} projections as having provable key
+     * lineage.
+     */
+    public static ProjectionColumn ofCalculated(
+            String columnName,
+            DataType dataType,
+            String expression,
+            String scriptExpression,
+            List<String> originalColumnNames,
+            Map<String, String> columnNameMap,
+            boolean provablePhysicalKeyLineage) {
         return new ProjectionColumn(
                 Column.physicalColumn(columnName, dataType),
                 expression,
                 scriptExpression,
                 originalColumnNames,
                 columnNameMap,
-                false);
+                provablePhysicalKeyLineage);
     }
 
     @Override
