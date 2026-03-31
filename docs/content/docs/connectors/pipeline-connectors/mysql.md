@@ -164,6 +164,24 @@ pipeline:
       <td>The chunk size (number of rows) of table snapshot, captured tables are split into multiple chunks when read the snapshot of table.</td>
     </tr>
     <tr>
+      <td>scan.snapshot.hostname</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>Optional IP address or hostname of a MySQL read replica to use for snapshot and metadata
+          queries (table discovery, chunk splitting). When set, all snapshot data reads and metadata
+          operations are routed to this instance, reducing load on the primary writer. Binlog
+          position tracking and changelog streaming always use the primary writer instance.
+          <br/><br/>
+          <strong>⚠ WARNING: At-least-once semantics only.</strong> When this option is set, exactly-once
+          guarantees cannot be maintained because the binlog positions recorded during snapshot
+          scanning originate from the primary writer while the data is read from the replica, and
+          storage replication lag (even in the millisecond range, as with Aurora/RDS) means the
+          two positions may not be perfectly consistent. Duplicate records are possible during
+          recovery. See <a href="#read-replica-snapshot">Read Replica Snapshot</a> for details.
+      </td>
+    </tr>
+    <tr>
       <td>scan.snapshot.fetch.size</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">1024</td>
@@ -396,6 +414,47 @@ source:
   scan.startup.specific-offset.gtid-set: 24DA167-...    # GTID set under specific offset startup mode
   scan.startup.timestamp-millis: 1667232000000          # Timestamp under timestamp startup mode
   # ...
+```
+
+## Read Replica Snapshot
+
+The `scan.snapshot.hostname` option allows routing snapshot data reads and metadata queries
+(table discovery, chunk splitting) to a MySQL read replica, while all binlog operations remain
+on the primary writer instance.
+
+This is particularly useful in AWS Aurora/RDS deployments where the primary writer handles
+high-throughput transactional workloads and you want to avoid the additional I/O pressure of
+a full-table snapshot scan.
+
+### How it works
+
+During the snapshot phase, Flink CDC performs the following sequence for each chunk:
+
+1. **Record low watermark** — queries `SHOW MASTER STATUS` on the **primary writer** to capture the current binlog position.
+2. **Scan chunk data** — executes `SELECT` queries on the **snapshot instance** (`scan.snapshot.hostname`).
+3. **Record high watermark** — queries `SHOW MASTER STATUS` on the **primary writer** again.
+4. **Backfill** — replays changelog events from the primary between low and high watermark to catch up any changes that occurred during the scan.
+
+Metadata operations (table discovery, `SELECT MIN/MAX` for chunk splitting) also run on the snapshot instance.
+
+### At-least-once semantics
+
+> **⚠ Warning:** When `scan.snapshot.hostname` is configured, exactly-once delivery cannot be guaranteed.
+
+The low/high watermark binlog positions are recorded from the primary writer, while the data is read from the replica. Even with storage-level replication (as used by Aurora), replication lag — even at the millisecond scale — means there is no strict guarantee that the replica's data at the moment of scanning corresponds exactly to the primary's binlog position recorded as the watermark. As a result, some events may be delivered more than once after a job restart or failover.
+
+This is a known and accepted trade-off: **reduced load on the primary writer at the cost of at-least-once semantics** during the snapshot phase.
+
+### Example
+
+```yaml
+source:
+  type: mysql
+  hostname: writer.cluster.us-east-1.rds.amazonaws.com
+  scan.snapshot.hostname: reader.cluster-ro.us-east-1.rds.amazonaws.com
+  username: flink
+  password: secret
+  tables: mydb.orders
 ```
 
 ## Available Source metrics
