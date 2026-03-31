@@ -24,6 +24,7 @@ import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.pipeline.RuntimeExecutionMode;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
+import org.apache.flink.cdc.common.pipeline.SchemaColumnCaseFormat;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.composer.PipelineComposer;
@@ -190,6 +191,8 @@ public class FlinkPipelineComposer implements PipelineComposer {
                         dataSource.supportedMetadataColumns());
 
         // PreTransform ---> PostTransform
+        SchemaColumnCaseFormat pipelineColumnNameCase =
+                pipelineDefConfig.get(PipelineOptions.PIPELINE_COLUMN_NAME_CASE);
         stream =
                 transformTranslator.translatePostTransform(
                         stream,
@@ -198,6 +201,7 @@ public class FlinkPipelineComposer implements PipelineComposer {
                         pipelineDef.getUdfs(),
                         pipelineDef.getModels(),
                         dataSource.supportedMetadataColumns(),
+                        pipelineColumnNameCase,
                         operatorUidGenerator);
 
         if (isParallelMetadataSource) {

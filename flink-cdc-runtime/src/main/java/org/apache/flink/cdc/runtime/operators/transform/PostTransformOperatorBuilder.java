@@ -19,6 +19,7 @@ package org.apache.flink.cdc.runtime.operators.transform;
 
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
+import org.apache.flink.cdc.common.pipeline.SchemaColumnCaseFormat;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 
 import javax.annotation.Nullable;
@@ -66,6 +67,30 @@ public class PostTransformOperatorBuilder {
             String tableOptionsDelimiter,
             String postTransformConverter,
             SupportedMetadataColumn[] supportedMetadataColumns) {
+        return addTransform(
+                tableInclusions,
+                projection,
+                filter,
+                primaryKey,
+                partitionKey,
+                tableOptions,
+                tableOptionsDelimiter,
+                postTransformConverter,
+                supportedMetadataColumns,
+                SchemaColumnCaseFormat.AS_IS);
+    }
+
+    public PostTransformOperatorBuilder addTransform(
+            String tableInclusions,
+            @Nullable String projection,
+            @Nullable String filter,
+            String primaryKey,
+            String partitionKey,
+            String tableOptions,
+            String tableOptionsDelimiter,
+            String postTransformConverter,
+            SupportedMetadataColumn[] supportedMetadataColumns,
+            SchemaColumnCaseFormat schemaColumnCaseFormat) {
         transformRules.add(
                 new TransformRule(
                         tableInclusions,
@@ -76,7 +101,8 @@ public class PostTransformOperatorBuilder {
                         tableOptions,
                         tableOptionsDelimiter,
                         postTransformConverter,
-                        supportedMetadataColumns));
+                        supportedMetadataColumns,
+                        schemaColumnCaseFormat));
         return this;
     }
 

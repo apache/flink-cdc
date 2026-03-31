@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.runtime.operators.transform;
 
+import org.apache.flink.cdc.common.pipeline.SchemaColumnCaseFormat;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.common.utils.StringUtils;
 
@@ -26,7 +27,7 @@ import java.io.Serializable;
 
 /** A rule defining pre-transformations where filtered rows and irrelevant columns are removed. */
 public class TransformRule implements Serializable {
-    private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 2L;
 
     private final String tableInclusions;
     private final @Nullable String projection;
@@ -37,6 +38,7 @@ public class TransformRule implements Serializable {
     private final String tableOptionsDelimiter;
     private final @Nullable String postTransformConverter;
     private final SupportedMetadataColumn[] supportedMetadataColumns;
+    private final SchemaColumnCaseFormat schemaColumnCaseFormat;
 
     public TransformRule(
             String tableInclusions,
@@ -48,6 +50,30 @@ public class TransformRule implements Serializable {
             String tableOptionsDelimiter,
             @Nullable String postTransformConverter,
             SupportedMetadataColumn[] supportedMetadataColumns) {
+        this(
+                tableInclusions,
+                projection,
+                filter,
+                primaryKey,
+                partitionKey,
+                tableOption,
+                tableOptionsDelimiter,
+                postTransformConverter,
+                supportedMetadataColumns,
+                SchemaColumnCaseFormat.AS_IS);
+    }
+
+    public TransformRule(
+            String tableInclusions,
+            @Nullable String projection,
+            @Nullable String filter,
+            String primaryKey,
+            String partitionKey,
+            String tableOption,
+            String tableOptionsDelimiter,
+            @Nullable String postTransformConverter,
+            SupportedMetadataColumn[] supportedMetadataColumns,
+            SchemaColumnCaseFormat schemaColumnCaseFormat) {
         this.tableInclusions = tableInclusions;
         this.projection = StringUtils.isNullOrWhitespaceOnly(projection) ? "*" : projection;
         this.filter = filter;
@@ -57,6 +83,10 @@ public class TransformRule implements Serializable {
         this.tableOptionsDelimiter = tableOptionsDelimiter;
         this.postTransformConverter = postTransformConverter;
         this.supportedMetadataColumns = supportedMetadataColumns;
+        this.schemaColumnCaseFormat =
+                schemaColumnCaseFormat == null
+                        ? SchemaColumnCaseFormat.AS_IS
+                        : schemaColumnCaseFormat;
     }
 
     public String getTableInclusions() {
@@ -96,5 +126,9 @@ public class TransformRule implements Serializable {
 
     public SupportedMetadataColumn[] getSupportedMetadataColumns() {
         return supportedMetadataColumns;
+    }
+
+    public SchemaColumnCaseFormat getSchemaColumnCaseFormat() {
+        return schemaColumnCaseFormat;
     }
 }
