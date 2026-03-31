@@ -106,8 +106,6 @@ In order to set up the OceanBase CDC connector, the following table provides dep
 
 ### SQL Client JAR
 
-```Download link is available only for stable releases.```
-
 Download [flink-sql-connector-oceanbase-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-oceanbase-cdc) and put it under `<FLINK_HOME>/lib/`.
 
 **Note:** Refer to [flink-sql-connector-oceanbase-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-oceanbase-cdc), more released versions will be available in the Maven central warehouse.

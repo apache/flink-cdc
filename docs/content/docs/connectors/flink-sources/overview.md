@@ -81,15 +81,15 @@ The following table shows the current features of the connector:
 
 | Connector                                                                             | No-lock Read | Parallel Read | Exactly-once Read | Incremental Snapshot Read |
 |---------------------------------------------------------------------------------------|--------------|---------------|-------------------|---------------------------|
-| [mongodb-cdc]({{< ref "docs/connectors/flink-sources/mongodb-cdc" >}})     | ✅            | ✅             | [mongodb-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-mongodb-cdc) | ✅                         |
-| [mysql-cdc]({{< ref "docs/connectors/flink-sources/mysql-cdc" >}})         | ✅            | ✅             | [mysql-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-mysql-cdc) | ✅                         |
-| [oracle-cdc]({{< ref "docs/connectors/flink-sources/oracle-cdc" >}})       | ✅            | ✅             | [oracle-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-oracle-cdc) | ✅                         |
-| [postgres-cdc]({{< ref "docs/connectors/flink-sources/postgres-cdc" >}})   | ✅            | ✅             | [postgres-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-postgres-cdc) | ✅                         |
-| [sqlserver-cdc]({{< ref "docs/connectors/flink-sources/sqlserver-cdc" >}}) | ✅            | ✅             | [sqlserver-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-sqlserver-cdc) | ✅                         |
-| [oceanbase-cdc]({{< ref "docs/connectors/flink-sources/oceanbase-cdc" >}}) | ❌            | ❌             | [oceanbase-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-oceanbase-cdc) | ❌                         |
-| [tidb-cdc]({{< ref "docs/connectors/flink-sources/tidb-cdc" >}})           | ✅            | ❌             | [tidb-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-tidb-cdc) | ❌                         |
-| [db2-cdc]({{< ref "docs/connectors/flink-sources/db2-cdc" >}})             | ✅            | ✅             | [db2-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-db2-cdc) | ✅                         |
-| [vitess-cdc]({{< ref "docs/connectors/flink-sources/vitess-cdc" >}})       | ✅            | ❌             | [vitess-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-vitess-cdc) | ❌                         |
+| [mongodb-cdc]({{< ref "docs/connectors/flink-sources/mongodb-cdc" >}})     | ✅            | ✅             | ✅ | ✅                         |
+| [mysql-cdc]({{< ref "docs/connectors/flink-sources/mysql-cdc" >}})         | ✅            | ✅             | ✅ | ✅                         |
+| [oracle-cdc]({{< ref "docs/connectors/flink-sources/oracle-cdc" >}})       | ✅            | ✅             | ✅ | ✅                         |
+| [postgres-cdc]({{< ref "docs/connectors/flink-sources/postgres-cdc" >}})   | ✅            | ✅             | ✅ | ✅                         |
+| [sqlserver-cdc]({{< ref "docs/connectors/flink-sources/sqlserver-cdc" >}}) | ✅            | ✅             | ✅ | ✅                         |
+| [oceanbase-cdc]({{< ref "docs/connectors/flink-sources/oceanbase-cdc" >}}) | ❌            | ❌             | ❌ | ❌                         |
+| [tidb-cdc]({{< ref "docs/connectors/flink-sources/tidb-cdc" >}})           | ✅            | ❌             | ❌ | ❌                         |
+| [db2-cdc]({{< ref "docs/connectors/flink-sources/db2-cdc" >}})             | ✅            | ✅             | ✅ | ✅                         |
+| [vitess-cdc]({{< ref "docs/connectors/flink-sources/vitess-cdc" >}})       | ✅            | ❌             | ❌ | ❌                         |
 
 ## Usage for Table/SQL API
 
