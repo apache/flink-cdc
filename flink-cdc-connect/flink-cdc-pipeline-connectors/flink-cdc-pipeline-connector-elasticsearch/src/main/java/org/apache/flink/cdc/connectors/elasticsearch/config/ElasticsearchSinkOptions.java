@@ -99,42 +99,58 @@ public class ElasticsearchSinkOptions implements Serializable {
         this.shardingSeparator = shardingSeparator;
     }
 
-    /** @return the maximum batch size */
+    /**
+     * @return the maximum batch size
+     */
     public int getMaxBatchSize() {
         return maxBatchSize;
     }
 
-    /** @return the maximum number of in-flight requests */
+    /**
+     * @return the maximum number of in-flight requests
+     */
     public int getMaxInFlightRequests() {
         return maxInFlightRequests;
     }
 
-    /** @return the maximum number of buffered requests */
+    /**
+     * @return the maximum number of buffered requests
+     */
     public int getMaxBufferedRequests() {
         return maxBufferedRequests;
     }
 
-    /** @return the maximum batch size in bytes */
+    /**
+     * @return the maximum batch size in bytes
+     */
     public long getMaxBatchSizeInBytes() {
         return maxBatchSizeInBytes;
     }
 
-    /** @return the maximum time in buffer in milliseconds */
+    /**
+     * @return the maximum time in buffer in milliseconds
+     */
     public long getMaxTimeInBufferMS() {
         return maxTimeInBufferMS;
     }
 
-    /** @return the maximum record size in bytes */
+    /**
+     * @return the maximum record size in bytes
+     */
     public long getMaxRecordSizeInBytes() {
         return maxRecordSizeInBytes;
     }
 
-    /** @return the network configuration */
+    /**
+     * @return the network configuration
+     */
     public NetworkConfig getNetworkConfig() {
         return networkConfig;
     }
 
-    /** @return the list of Elasticsearch hosts */
+    /**
+     * @return the list of Elasticsearch hosts
+     */
     public List<HttpHost> getHosts() {
         return networkConfig.getHosts();
     }

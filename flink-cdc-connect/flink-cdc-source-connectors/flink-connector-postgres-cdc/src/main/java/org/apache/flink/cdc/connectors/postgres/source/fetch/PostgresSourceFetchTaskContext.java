@@ -132,9 +132,8 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                                     .edit()
                                     .with(
                                             "table.include.list",
-                                            ((SnapshotSplit) sourceSplitBase)
-                                                    .getTableId()
-                                                    .toString())
+                                            getTableList(
+                                                    ((SnapshotSplit) sourceSplitBase).getTableId()))
                                     .with(
                                             SLOT_NAME.name(),
                                             ((PostgresSourceConfig) sourceConfig)
@@ -151,13 +150,13 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                 // when backfilled split, only current table schema should be scan
                 builder.with(
                         "table.include.list",
-                        sourceSplitBase
-                                .asStreamSplit()
-                                .getTableSchemas()
-                                .keySet()
-                                .iterator()
-                                .next()
-                                .toString());
+                        getTableList(
+                                sourceSplitBase
+                                        .asStreamSplit()
+                                        .getTableSchemas()
+                                        .keySet()
+                                        .iterator()
+                                        .next()));
             }
 
             dbzConfig =
@@ -384,5 +383,12 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
         return sourceSplitBase.isStreamSplit()
                 && !StreamSplit.STREAM_SPLIT_ID.equalsIgnoreCase(
                         sourceSplitBase.asStreamSplit().splitId());
+    }
+
+    private String getTableList(TableId tableId) {
+        if (tableId.schema() == null || tableId.schema().isEmpty()) {
+            return tableId.table();
+        }
+        return tableId.schema() + "." + tableId.table();
     }
 }

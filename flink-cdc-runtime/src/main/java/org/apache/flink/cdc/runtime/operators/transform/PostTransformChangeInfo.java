@@ -20,9 +20,9 @@ package org.apache.flink.cdc.runtime.operators.transform;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
-import org.apache.flink.cdc.runtime.typeutils.DataTypeConverter;
 
 import javax.annotation.Nullable;
 
@@ -57,8 +57,7 @@ public class PostTransformChangeInfo {
                 SchemaUtils.createFieldGetters(postTransformedSchema.getColumns());
 
         BinaryRecordDataGenerator postTransformedRecordDataGenerator =
-                new BinaryRecordDataGenerator(
-                        DataTypeConverter.toRowType(postTransformedSchema.getColumns()));
+                new BinaryRecordDataGenerator((RowType) postTransformedSchema.toRowDataType());
 
         return new PostTransformChangeInfo(
                 tableId,

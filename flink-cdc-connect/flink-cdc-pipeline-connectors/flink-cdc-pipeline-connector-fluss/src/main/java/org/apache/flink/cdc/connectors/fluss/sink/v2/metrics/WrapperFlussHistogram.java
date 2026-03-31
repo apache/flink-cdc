@@ -45,10 +45,7 @@ public class WrapperFlussHistogram implements Histogram {
 
     @Override
     public HistogramStatistics getStatistics() {
-
-        flussHistogram.getStatistics();
-
-        return null;
+        return new FlinkHistogramStatistics(flussHistogram.getStatistics());
     }
 
     private static class FlinkHistogramStatistics extends HistogramStatistics {

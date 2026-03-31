@@ -24,7 +24,9 @@ public class ParsingException extends RuntimeException {
 
     private final Position position;
 
-    /** @param position the position of the error; never null */
+    /**
+     * @param position the position of the error; never null
+     */
     public ParsingException(Position position) {
         super();
         this.position = position;

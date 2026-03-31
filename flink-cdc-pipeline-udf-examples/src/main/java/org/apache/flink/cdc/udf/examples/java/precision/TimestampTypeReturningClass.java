@@ -22,6 +22,8 @@ import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.udf.UserDefinedFunction;
 
+import java.time.LocalDateTime;
+
 /** This is an example UDF class for testing purposes only. */
 public class TimestampTypeReturningClass implements UserDefinedFunction {
     @Override
@@ -29,7 +31,7 @@ public class TimestampTypeReturningClass implements UserDefinedFunction {
         return DataTypes.TIMESTAMP(2);
     }
 
-    public TimestampData eval() {
-        return TimestampData.fromMillis(24 * 60 * 60 * 1000);
+    public LocalDateTime eval() {
+        return TimestampData.fromMillis(24 * 60 * 60 * 1000).toLocalDateTime();
     }
 }

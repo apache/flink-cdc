@@ -73,6 +73,8 @@ public class RecordUtils {
             "io.debezium.connector.mysql.SchemaChangeKey";
     public static final String SCHEMA_HEARTBEAT_EVENT_KEY_NAME =
             "io.debezium.connector.common.Heartbeat";
+    public static final String SCHEMA_TRANSACTION_METADATA_EVENT_KEY_NAME =
+            "io.debezium.connector.common.TransactionMetadataKey";
     private static final DocumentReader DOCUMENT_READER = DocumentReader.defaultReader();
 
     /** Converts a {@link ResultSet} row to an array of Objects. */
@@ -337,6 +339,18 @@ public class RecordUtils {
         Schema valueSchema = record.valueSchema();
         return valueSchema != null
                 && SCHEMA_HEARTBEAT_EVENT_KEY_NAME.equalsIgnoreCase(valueSchema.name());
+    }
+
+    /**
+     * Check whether the given source record is a transaction metadata event (BEGIN or END).
+     *
+     * <p>Transaction events are emitted by Debezium to mark transaction boundaries when
+     * provide.transaction.metadata is enabled.
+     */
+    public static boolean isTransactionMetadataEvent(SourceRecord record) {
+        Schema keySchema = record.keySchema();
+        return keySchema != null
+                && SCHEMA_TRANSACTION_METADATA_EVENT_KEY_NAME.equalsIgnoreCase(keySchema.name());
     }
 
     /**

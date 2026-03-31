@@ -53,6 +53,7 @@ import java.util.stream.Stream;
 public class Db2TableSource implements ScanTableSource, SupportsReadingMetadata {
 
     private final ResolvedSchema physicalSchema;
+
     /** Data type that describes the final output of the source. */
     protected DataType producedDataType;
 

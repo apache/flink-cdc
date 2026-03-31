@@ -17,10 +17,10 @@
 
 package org.apache.flink.cdc.runtime.operators.transform;
 
+import org.apache.flink.cdc.common.converter.JavaClassConverter;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.runtime.parser.JaninoCompiler;
-import org.apache.flink.cdc.runtime.typeutils.DataTypeConverter;
 
 import org.codehaus.janino.ExpressionEvaluator;
 
@@ -89,10 +89,12 @@ public class ProjectionColumnProcessor {
             throw new RuntimeException(
                     String.format(
                             "Failed to evaluate projection expression `%s` for column `%s` in table `%s`.\n"
+                                    + "\tCompiled expression: %s\n"
                                     + "\tColumn name map: {%s}",
-                            projectionColumn.getScriptExpression(),
+                            projectionColumn.getExpression(),
                             projectionColumn.getColumnName(),
                             tableInfo.getName(),
+                            projectionColumn.getScriptExpression(),
                             projectionColumn.getColumnNameMapAsString()),
                     e);
         }
@@ -129,7 +131,6 @@ public class ProjectionColumnProcessor {
         List<Class<?>> paramTypes = new ArrayList<>();
 
         List<Column> columns = tableInfo.getPreTransformedSchema().getColumns();
-        String scriptExpression = projectionColumn.getScriptExpression();
         Map<String, String> columnNameMap = projectionColumn.getColumnNameMap();
         LinkedHashSet<String> originalColumnNames =
                 new LinkedHashSet<>(projectionColumn.getOriginalColumnNames());
@@ -137,7 +138,7 @@ public class ProjectionColumnProcessor {
             for (Column column : columns) {
                 if (column.getName().equals(originalColumnName)) {
                     argumentNames.add(columnNameMap.get(originalColumnName));
-                    paramTypes.add(DataTypeConverter.convertOriginalClass(column.getType()));
+                    paramTypes.add(JavaClassConverter.toJavaClass(column.getType()));
                     break;
                 }
             }
@@ -168,10 +169,11 @@ public class ProjectionColumnProcessor {
         paramTypes.add(Long.class);
 
         return TransformExpressionKey.of(
-                JaninoCompiler.loadSystemFunction(scriptExpression),
+                projectionColumn.getExpression(),
+                projectionColumn.getScriptExpression(),
                 argumentNames,
                 paramTypes,
-                DataTypeConverter.convertOriginalClass(projectionColumn.getDataType()),
+                JavaClassConverter.toJavaClass(projectionColumn.getDataType()),
                 columnNameMap);
     }
 }

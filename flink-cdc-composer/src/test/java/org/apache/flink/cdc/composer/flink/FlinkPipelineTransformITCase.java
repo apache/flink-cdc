@@ -1137,6 +1137,104 @@ class FlinkPipelineTransformITCase {
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[3, null, null, null, null, null, null], op=INSERT, meta=()}");
     }
 
+    /** This tests if transform variant functions works as expected. */
+    @Test
+    void testTransformWithVariantFunctions() throws Exception {
+        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+
+        // Setup value source
+        Configuration sourceConfig = new Configuration();
+        sourceConfig.set(
+                ValuesDataSourceOptions.EVENT_SET_ID,
+                ValuesDataSourceHelper.EventSetId.CUSTOM_SOURCE_EVENTS);
+
+        TableId myTable = TableId.tableId("default_namespace", "default_schema", "mytable1");
+        Schema tableSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT().notNull())
+                        .physicalColumn("message", DataTypes.STRING())
+                        .physicalColumn("duplicatedMessage", DataTypes.STRING())
+                        .physicalColumn("invalidMessage", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(
+                        tableSchema.getColumnDataTypes().toArray(new DataType[0]));
+        List<Event> events =
+                Arrays.asList(
+                        new CreateTableEvent(myTable, tableSchema),
+                        DataChangeEvent.insertEvent(
+                                myTable,
+                                generator.generate(
+                                        new Object[] {
+                                            1,
+                                            BinaryStringData.fromString(
+                                                    "{\"name\":\"Bob\",\"age\":30,\"is_active\":true,\"email\":\"zhangsan@example.com\",\"hobbies\":[\"reading\",\"coding\",\"traveling\"],\"address\":{\"street\":\"MainSt\",\"city\":\"Beijing\",\"zip\":\"100000\"}}"),
+                                            BinaryStringData.fromString(
+                                                    "{\"name\":\"Bob\",\"name\":\"Bob\",\"age\":30,\"is_active\":true,\"email\":\"zhangsan@example.com\",\"hobbies\":[\"reading\",\"coding\",\"traveling\"],\"address\":{\"street\":\"MainSt\",\"city\":\"Beijing\",\"zip\":\"100000\"}}"),
+                                            BinaryStringData.fromString("invalidJson"),
+                                        })),
+                        DataChangeEvent.insertEvent(
+                                myTable,
+                                generator.generate(
+                                        new Object[] {
+                                            2,
+                                            BinaryStringData.fromString(
+                                                    "{\"name\":\"Mark\",\"age\":40,\"is_active\":true,\"email\":\"lisi@example.com\",\"hobbies\":[\"reading\",\"coding\",\"traveling\"],\"address\":{\"street\":\"MainSt\",\"city\":\"Beijing\",\"zip\":\"100000\"}}"),
+                                            BinaryStringData.fromString(
+                                                    "{\"name\":\"Mark\",\"name\":\"Mark\",\"age\":40,\"is_active\":true,\"email\":\"lisi@example.com\",\"hobbies\":[\"reading\",\"coding\",\"traveling\"],\"address\":{\"street\":\"MainSt\",\"city\":\"Beijing\",\"zip\":\"100000\"}}"),
+                                            BinaryStringData.fromString("invalidJson"),
+                                        })),
+                        DataChangeEvent.insertEvent(
+                                myTable, generator.generate(new Object[] {3, null, null, null})));
+
+        ValuesDataSourceHelper.setSourceEvents(Collections.singletonList(events));
+
+        SourceDef sourceDef =
+                new SourceDef(ValuesDataFactory.IDENTIFIER, "Value Source", sourceConfig);
+
+        // Setup value sink
+        Configuration sinkConfig = new Configuration();
+        sinkConfig.set(ValuesDataSinkOptions.MATERIALIZED_IN_MEMORY, true);
+        SinkDef sinkDef = new SinkDef(ValuesDataFactory.IDENTIFIER, "Value Sink", sinkConfig);
+
+        // Setup pipeline
+        Configuration pipelineConfig = new Configuration();
+        pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
+        PipelineDef pipelineDef =
+                new PipelineDef(
+                        sourceDef,
+                        sinkDef,
+                        Collections.emptyList(),
+                        Collections.singletonList(
+                                new TransformDef(
+                                        "default_namespace.default_schema.\\.*",
+                                        "id, parse_json(message) as variantVal, parse_json(duplicatedMessage, true) as duplicatedVariantVal, try_parse_json(message) as variantVal2, try_parse_json(duplicatedMessage, true) as duplicatedVariantVal2, try_parse_json(invalidMessage) as invalidVariantVal",
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null)),
+                        Collections.emptyList(),
+                        pipelineConfig);
+
+        // Execute the pipeline
+        PipelineExecution execution = composer.compose(pipelineDef);
+        execution.execute();
+
+        // Check the order and content of all received events
+        String[] outputEvents = outCaptor.toString().trim().split("\n");
+
+        Assertions.assertThat(outputEvents)
+                .containsExactly(
+                        "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT NOT NULL,`variantVal` VARIANT,`duplicatedVariantVal` VARIANT,`variantVal2` VARIANT,`duplicatedVariantVal2` VARIANT,`invalidVariantVal` VARIANT}, primaryKeys=id, options=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, {\"address\":{\"city\":\"Beijing\",\"street\":\"MainSt\",\"zip\":\"100000\"},\"age\":30,\"email\":\"zhangsan@example.com\",\"hobbies\":[\"reading\",\"coding\",\"traveling\"],\"is_active\":true,\"name\":\"Bob\"}, {\"address\":{\"city\":\"Beijing\",\"street\":\"MainSt\",\"zip\":\"100000\"},\"age\":30,\"email\":\"zhangsan@example.com\",\"hobbies\":[\"reading\",\"coding\",\"traveling\"],\"is_active\":true,\"name\":\"Bob\"}, {\"address\":{\"city\":\"Beijing\",\"street\":\"MainSt\",\"zip\":\"100000\"},\"age\":30,\"email\":\"zhangsan@example.com\",\"hobbies\":[\"reading\",\"coding\",\"traveling\"],\"is_active\":true,\"name\":\"Bob\"}, {\"address\":{\"city\":\"Beijing\",\"street\":\"MainSt\",\"zip\":\"100000\"},\"age\":30,\"email\":\"zhangsan@example.com\",\"hobbies\":[\"reading\",\"coding\",\"traveling\"],\"is_active\":true,\"name\":\"Bob\"}, null], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[2, {\"address\":{\"city\":\"Beijing\",\"street\":\"MainSt\",\"zip\":\"100000\"},\"age\":40,\"email\":\"lisi@example.com\",\"hobbies\":[\"reading\",\"coding\",\"traveling\"],\"is_active\":true,\"name\":\"Mark\"}, {\"address\":{\"city\":\"Beijing\",\"street\":\"MainSt\",\"zip\":\"100000\"},\"age\":40,\"email\":\"lisi@example.com\",\"hobbies\":[\"reading\",\"coding\",\"traveling\"],\"is_active\":true,\"name\":\"Mark\"}, {\"address\":{\"city\":\"Beijing\",\"street\":\"MainSt\",\"zip\":\"100000\"},\"age\":40,\"email\":\"lisi@example.com\",\"hobbies\":[\"reading\",\"coding\",\"traveling\"],\"is_active\":true,\"name\":\"Mark\"}, {\"address\":{\"city\":\"Beijing\",\"street\":\"MainSt\",\"zip\":\"100000\"},\"age\":40,\"email\":\"lisi@example.com\",\"hobbies\":[\"reading\",\"coding\",\"traveling\"],\"is_active\":true,\"name\":\"Mark\"}, null], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[3, null, null, null, null, null], op=INSERT, meta=()}");
+    }
+
     @ParameterizedTest
     @EnumSource
     void testTransformMergingIncompatibleRules(ValuesDataSink.SinkApi apiVersion) {
@@ -2638,10 +2736,9 @@ class FlinkPipelineTransformITCase {
                 .cause()
                 .isExactlyInstanceOf(FlinkRuntimeException.class)
                 .hasMessage(
-                        "Failed to compile expression TransformExpressionKey{expression='import static org.apache.flink.cdc.runtime.functions.SystemFunctionUtils.*;greaterThan($0, 0)', argumentNames=[__time_zone__, __epoch_time__], argumentClasses=[class java.lang.String, class java.lang.Long], returnClass=class java.lang.Boolean, columnNameMap={id1=$0}}")
+                        "Failed to compile expression TransformExpressionKey{originalExpression='id1 > 0', compiledExpression='greaterThan($0, 0)', argumentNames=[__time_zone__, __epoch_time__], argumentClasses=[class java.lang.String, class java.lang.Long], returnClass=class java.lang.Boolean, columnNameMap={id1=$0}}")
                 .cause()
-                .hasMessageContaining(
-                        "Expression: import static org.apache.flink.cdc.runtime.functions.SystemFunctionUtils.*;greaterThan($0, 0)")
+                .hasMessageContaining("Compiled expression: greaterThan($0, 0)")
                 .hasMessageContaining("Column name map: {$0 -> id1}")
                 .rootCause()
                 .isExactlyInstanceOf(CompileException.class)
@@ -2684,7 +2781,7 @@ class FlinkPipelineTransformITCase {
                 .cause()
                 .isExactlyInstanceOf(RuntimeException.class)
                 .hasMessageContaining(
-                        "Failed to evaluate projection expression `castToInteger($0) + 1` for column `new_name` in table `default_namespace.default_schema.mytable1`")
+                        "Failed to evaluate projection expression `CAST(`TB`.`name` AS INTEGER) + 1` for column `new_name` in table `default_namespace.default_schema.mytable1`")
                 .hasMessageContaining("Column name map: {$0 -> name}");
 
         // Unsupported operations in filter rule
@@ -2705,8 +2802,10 @@ class FlinkPipelineTransformITCase {
                 .cause()
                 .isExactlyInstanceOf(RuntimeException.class)
                 .hasMessageContaining(
-                        "Failed to evaluate filtering expression `greaterThan($0 + 1, 0)` for table `default_namespace.default_schema.mytable1`")
-                .hasMessageContaining("Column name map: {$0 -> name}")
+                        "Failed to evaluate filtering expression for table `default_namespace.default_schema.mytable1`.\n"
+                                + "\tOriginal expression: name + 1 > 0\n"
+                                + "\tCompiled expression: greaterThan($0 + 1, 0)\n"
+                                + "\tColumn name map: {$0 -> name}")
                 .rootCause()
                 .isExactlyInstanceOf(RuntimeException.class)
                 .hasMessage(

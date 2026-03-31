@@ -146,6 +146,14 @@ class ElasticsearchDataSinkITCaseTest {
         verifyInsertedDataWithNewColumn(tableId, "3", 3, 3.0, "value3", true);
     }
 
+    @Test
+    void testElasticsearchSinkWithOnlySchemaChangeEvents() throws Exception {
+        TableId tableId = TableId.tableId("default", "schema", "schema_only_table");
+        List<Event> events = ElasticsearchTestUtils.createTestEventsWithOnlySchemaChange(tableId);
+
+        runJobWithEvents(events);
+    }
+
     private static ElasticsearchContainer createElasticsearchContainer() {
         ElasticsearchContainer esContainer = new ElasticsearchContainer(ELASTICSEARCH_VERSION);
         esContainer.withLogConsumer(new Slf4jLogConsumer(LOG));

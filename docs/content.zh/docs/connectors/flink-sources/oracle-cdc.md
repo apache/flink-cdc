@@ -558,6 +558,67 @@ _Note: the mechanism of `scan.startup.mode` option relying on Debezium's `snapsh
 
 The Oracle CDC source can't work in parallel reading, because there is only one task can receive change events.
 
+### 动态加表
+
+**注意:** 该功能从 Flink CDC 3.1.0 版本开始支持。
+
+动态加表功能使你可以为正在运行的作业添加新表进行监控。新添加的表将首先读取其快照数据,然后自动读取其 redo log。
+
+想象一下这个场景:一开始,Flink 作业监控表 `[product, user, address]`,但几天后,我们希望这个作业还可以监控表 `[order, custom]`,这些表包含历史数据,我们需要作业仍然可以复用作业的已有状态。动态加表功能可以优雅地解决此问题。
+
+以下操作显示了如何启用此功能来解决上述场景。使用现有的 Oracle CDC Source 作业,如下:
+
+```java
+    JdbcIncrementalSource<String> oracleSource = new OracleSourceBuilder()
+        .hostname("yourHostname")
+        .port(1521)
+        .databaseList("ORCLCDB") // 设置捕获的数据库
+        .schemaList("INVENTORY") // 设置捕获的 schema
+        .tableList("INVENTORY.PRODUCT", "INVENTORY.USER", "INVENTORY.ADDRESS") // 设置捕获的表
+        .username("yourUsername")
+        .password("yourPassword")
+        .scanNewlyAddedTableEnabled(true) // 启用扫描新添加的表功能
+        .deserializer(new JsonDebeziumDeserializationSchema()) // 将 SourceRecord 转换为 JSON 字符串
+        .build();
+   // 你的业务代码
+```
+
+如果我们想添加新表 `[INVENTORY.ORDER, INVENTORY.CUSTOM]` 到现有的 Flink 作业,只需更新作业的 `tableList()` 将新增表 `[INVENTORY.ORDER, INVENTORY.CUSTOM]` 加入并从已有的 savepoint 恢复作业。
+
+_Step 1_: 使用 savepoint 停止现有的 Flink 作业。
+```shell
+$ ./bin/flink stop $Existing_Flink_JOB_ID
+```
+```shell
+Suspending job "cca7bc1061d61cf15238e92312c2fc20" with a savepoint.
+Savepoint completed. Path: file:/tmp/flink-savepoints/savepoint-cca7bc-bb1e257f0dab
+```
+_Step 2_: 更新现有 Flink 作业的表列表选项。
+1. 更新 `tableList()` 参数。
+2. 编译更新后的作业,示例如下:
+```java
+    JdbcIncrementalSource<String> oracleSource = new OracleSourceBuilder()
+        .hostname("yourHostname")
+        .port(1521)
+        .databaseList("ORCLCDB")
+        .schemaList("INVENTORY")
+        .tableList("INVENTORY.PRODUCT", "INVENTORY.USER", "INVENTORY.ADDRESS", "INVENTORY.ORDER", "INVENTORY.CUSTOM") // 设置捕获的表 [PRODUCT, USER, ADDRESS, ORDER, CUSTOM]
+        .username("yourUsername")
+        .password("yourPassword")
+        .scanNewlyAddedTableEnabled(true)
+        .deserializer(new JsonDebeziumDeserializationSchema()) // 将 SourceRecord 转换为 JSON 字符串
+        .build();
+   // 你的业务代码
+```
+_Step 3_: 从 savepoint 还原更新后的 Flink 作业。
+```shell
+$ ./bin/flink run \
+      --detached \
+      --from-savepoint /tmp/flink-savepoints/savepoint-cca7bc-bb1e257f0dab \
+      ./FlinkCDCExample.jar
+```
+**注意:** 请参考文档 [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.17/docs/deployment/cli/#command-line-interface) 了解更多详细信息。
+
 ### DataStream Source
 
 The Oracle CDC connector can also be a DataStream source. There are two modes for the DataStream source:

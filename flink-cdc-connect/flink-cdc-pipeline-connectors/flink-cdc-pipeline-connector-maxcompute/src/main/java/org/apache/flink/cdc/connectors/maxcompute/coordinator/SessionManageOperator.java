@@ -94,6 +94,7 @@ public class SessionManageOperator extends AbstractStreamOperator<Event>
 
     private transient Future<CoordinationResponse> snapshotFlushSuccess;
     private transient int indexOfThisSubtask;
+
     /**
      * trigger endOfInput is ahead of prepareSnapshotPreBarrier, so we need this flag to handle when
      * endOfInput, send WaitForSuccessRequest in advance.

@@ -17,7 +17,6 @@
 
 package org.apache.flink.cdc.udf.examples.java.precision;
 
-import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.udf.UserDefinedFunction;
@@ -31,7 +30,7 @@ public class DecimalTypeReturningClass implements UserDefinedFunction {
         return DataTypes.DECIMAL(10, 3);
     }
 
-    public DecimalData eval() {
-        return DecimalData.fromBigDecimal(new BigDecimal("12.315"), 10, 3);
+    public BigDecimal eval() {
+        return new BigDecimal("12.315");
     }
 }

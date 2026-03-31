@@ -51,7 +51,8 @@ public class IcebergDataSinkOptions {
                     .withDescription(
                             "Partition keys for each partitioned table, allow setting multiple primary keys for multiTables. "
                                     + "Tables are separated by ';', and partition keys are separated by ','. "
-                                    + "For example, we can set partition.key of two tables by 'testdb.table1:id1,id2;testdb.table2:name'.");
+                                    + "For example, we can set partition.key of two tables by 'testdb.table1:id1,id2;testdb.table2:name'."
+                                    + "For partition transforms,  we can set partition.key by 'testdb.table1:truncate[10](id);testdb.table2:hour(create_time);testdb.table3:day(create_time);testdb.table4:month(create_time);testdb.table5:year(create_time);testdb.table6:bucket[10](create_time)'.");
 
     @Experimental
     public static final ConfigOption<Boolean> SINK_COMPACTION_ENABLED =
@@ -77,4 +78,12 @@ public class IcebergDataSinkOptions {
                     .defaultValue(-1)
                     .withDescription(
                             "The parallelism for file compaction, default value is -1, which means that compaction parallelism is equal to sink writer parallelism.");
+
+    @Experimental
+    public static final ConfigOption<String> JOB_ID_PREFIX =
+            key("job.id.prefix")
+                    .stringType()
+                    .defaultValue("cdc")
+                    .withDescription(
+                            "The prefix of job id, which is used to distinguish different jobs.");
 }

@@ -117,6 +117,10 @@ public class TypeConvertUtils {
         if (!type.isNullable() || notNull) {
             columnBuilder.notNull();
         }
+        // Set column comment if available
+        if (flinkColumn.getComment() != null) {
+            columnBuilder.withComment(flinkColumn.getComment());
+        }
         return columnBuilder.build();
     }
 

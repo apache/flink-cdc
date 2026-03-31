@@ -54,6 +54,7 @@ public class DataSinkFunctionOperator extends StreamSink<Event> {
 
     private SchemaEvolutionClient schemaEvolutionClient;
     private final OperatorID schemaOperatorID;
+
     /** A set of {@link TableId} that already processed {@link CreateTableEvent}. */
     private final Set<TableId> processedTableIds;
 

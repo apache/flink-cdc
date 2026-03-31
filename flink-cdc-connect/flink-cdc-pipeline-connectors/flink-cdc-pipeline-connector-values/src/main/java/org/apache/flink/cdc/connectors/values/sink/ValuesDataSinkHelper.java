@@ -21,18 +21,19 @@ import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
-
-import org.apache.flink.shaded.guava31.com.google.common.io.BaseEncoding;
+import org.apache.flink.cdc.common.types.DataType;
+import org.apache.flink.cdc.common.utils.Preconditions;
+import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataExtractor;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /** A helper class for {@link ValuesDataSink} to process {@link Event}. */
 public class ValuesDataSinkHelper {
 
     /** convert Event to String for {@link ValuesDataSink} to display detail message. */
-    public static String convertEventToStr(Event event, List<RecordData.FieldGetter> fieldGetters) {
+    public static String convertEventToStr(
+            Event event, List<DataType> dataTypes, List<RecordData.FieldGetter> fieldGetters) {
         if (event instanceof SchemaChangeEvent) {
             return event.toString();
         } else if (event instanceof DataChangeEvent) {
@@ -42,9 +43,9 @@ public class ValuesDataSinkHelper {
                             + "tableId="
                             + dataChangeEvent.tableId()
                             + ", before="
-                            + getFields(fieldGetters, dataChangeEvent.before())
+                            + getFields(dataTypes, fieldGetters, dataChangeEvent.before())
                             + ", after="
-                            + getFields(fieldGetters, dataChangeEvent.after())
+                            + getFields(dataTypes, fieldGetters, dataChangeEvent.after())
                             + ", op="
                             + dataChangeEvent.op()
                             + ", meta="
@@ -56,7 +57,11 @@ public class ValuesDataSinkHelper {
     }
 
     private static List<Object> getFields(
-            List<RecordData.FieldGetter> fieldGetters, RecordData recordData) {
+            List<DataType> dataTypes,
+            List<RecordData.FieldGetter> fieldGetters,
+            RecordData recordData) {
+        Preconditions.checkArgument(dataTypes.size() == fieldGetters.size());
+
         List<Object> fields = new ArrayList<>(fieldGetters.size());
         if (recordData == null) {
             return fields;
@@ -64,18 +69,13 @@ public class ValuesDataSinkHelper {
         for (RecordData.FieldGetter fieldGetter : fieldGetters) {
             fields.add(fieldGetter.getFieldOrNull(recordData));
         }
-        return fields.stream()
-                .map(
-                        o -> {
-                            if (o == null) {
-                                return "null";
-                            }
-                            if (o instanceof byte[]) {
-                                return BaseEncoding.base64().encode((byte[]) o);
-                            } else {
-                                return o.toString();
-                            }
-                        })
-                .collect(Collectors.toList());
+
+        List<Object> humanReadableObjects = new ArrayList<>(fields.size());
+        for (int i = 0; i < fields.size(); i++) {
+            humanReadableObjects.add(
+                    BinaryRecordDataExtractor.extractRecord(fields.get(i), dataTypes.get(i)));
+        }
+
+        return humanReadableObjects;
     }
 }

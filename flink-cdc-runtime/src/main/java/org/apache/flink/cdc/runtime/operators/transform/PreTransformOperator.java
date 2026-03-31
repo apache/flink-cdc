@@ -116,7 +116,7 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
                     new PreTransformer(
                             selectors,
                             TransformProjection.of(projection).orElse(null),
-                            TransformFilter.of(filter, udfDescriptors).orElse(null)));
+                            TransformFilter.of(filter).orElse(null)));
             schemaMetadataTransformers.add(
                     new Tuple2<>(
                             selectors,

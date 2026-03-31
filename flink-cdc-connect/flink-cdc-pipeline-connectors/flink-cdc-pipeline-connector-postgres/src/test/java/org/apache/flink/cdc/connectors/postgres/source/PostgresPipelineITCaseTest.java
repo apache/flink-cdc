@@ -20,6 +20,7 @@ package org.apache.flink.cdc.connectors.postgres.source;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
+import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
@@ -57,7 +58,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,6 +69,7 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -74,6 +77,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT;
@@ -101,6 +105,14 @@ public class PostgresPipelineITCaseTest extends PostgresTestBase {
     @AfterEach
     public void after() throws SQLException {
         inventoryDatabase.removeSlot(slotName);
+    }
+
+    static Stream<Arguments> provideParameters() {
+        return Stream.of(
+                Arguments.of(true, true),
+                Arguments.of(false, false),
+                Arguments.of(true, false),
+                Arguments.of(false, true));
     }
 
     @Test
@@ -341,9 +353,10 @@ public class PostgresPipelineITCaseTest extends PostgresTestBase {
         return iterator;
     }
 
-    @ParameterizedTest(name = "unboundedChunkFirst: {0}")
-    @ValueSource(booleans = {true, false})
-    public void testInitialStartupModeWithOpts(boolean unboundedChunkFirst) throws Exception {
+    @ParameterizedTest
+    @MethodSource("provideParameters")
+    public void testInitialStartupModeWithOpts(
+            boolean unboundedChunkFirst, boolean isTableIdIncludeDatabase) throws Exception {
         inventoryDatabase.createAndInitialize();
         org.apache.flink.cdc.common.configuration.Configuration sourceConfiguration =
                 new org.apache.flink.cdc.common.configuration.Configuration();
@@ -365,6 +378,8 @@ public class PostgresPipelineITCaseTest extends PostgresTestBase {
         sourceConfiguration.set(
                 PostgresDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED,
                 unboundedChunkFirst);
+        sourceConfiguration.set(
+                PostgresDataSourceOptions.TABLE_ID_INCLUDE_DATABASE, isTableIdIncludeDatabase);
 
         Factory.Context context =
                 new FactoryHelper.DefaultContext(
@@ -384,7 +399,12 @@ public class PostgresPipelineITCaseTest extends PostgresTestBase {
                                 new EventTypeInfo())
                         .executeAndCollect();
 
-        TableId tableId = TableId.tableId("inventory", "products");
+        TableId tableId;
+        if (isTableIdIncludeDatabase) {
+            tableId = TableId.tableId(inventoryDatabase.getDatabaseName(), "inventory", "products");
+        } else {
+            tableId = TableId.tableId("inventory", "products");
+        }
         CreateTableEvent createTableEvent = getProductsCreateTableEvent(tableId);
 
         // generate snapshot data
@@ -565,6 +585,149 @@ public class PostgresPipelineITCaseTest extends PostgresTestBase {
                 .isEqualTo(String.format("Replication slot \"%s\" does not exist", slotName));
     }
 
+    @Test
+    public void testDatabaseNameWithHyphenEndToEnd() throws Exception {
+        // Create a real database with hyphen to verify full CDC sync works
+        // This test verifies the fix for FLINK-38512
+        String hyphenDbName = "test-db-with-hyphen";
+
+        // Create the database with hyphen (need to quote the name)
+        try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
+                Statement statement = connection.createStatement()) {
+            // Drop if exists and create new database with hyphen in name
+            statement.execute("DROP DATABASE IF EXISTS \"" + hyphenDbName + "\"");
+            statement.execute("CREATE DATABASE \"" + hyphenDbName + "\"");
+        }
+
+        // Connect to the new database and create a table with data
+        String jdbcUrl =
+                String.format(
+                        "jdbc:postgresql://%s:%d/%s",
+                        POSTGRES_CONTAINER.getHost(),
+                        POSTGRES_CONTAINER.getMappedPort(POSTGRESQL_PORT),
+                        hyphenDbName);
+        try (Connection connection =
+                        java.sql.DriverManager.getConnection(jdbcUrl, TEST_USER, TEST_PASSWORD);
+                Statement statement = connection.createStatement()) {
+            statement.execute("CREATE TABLE test_table (id INT PRIMARY KEY, name VARCHAR(100))");
+            statement.execute(
+                    "INSERT INTO test_table VALUES (1, 'test1'), (2, 'test2'), (3, 'test3')");
+        }
+
+        // Create PostgresDataSource using PostgresSourceConfigFactory
+        PostgresSourceConfigFactory configFactory =
+                (PostgresSourceConfigFactory)
+                        new PostgresSourceConfigFactory()
+                                .hostname(POSTGRES_CONTAINER.getHost())
+                                .port(POSTGRES_CONTAINER.getMappedPort(POSTGRESQL_PORT))
+                                .username(TEST_USER)
+                                .password(TEST_PASSWORD)
+                                .databaseList(hyphenDbName)
+                                .tableList("public.test_table")
+                                .startupOptions(StartupOptions.initial())
+                                .serverTimeZone("UTC");
+        configFactory.database(hyphenDbName);
+        configFactory.slotName(slotName);
+        configFactory.decodingPluginName("pgoutput");
+
+        PostgresDataSource dataSource = new PostgresDataSource(configFactory);
+
+        // Verify the configuration works
+        assertThat(dataSource.getPostgresSourceConfig().getTableList())
+                .isEqualTo(Arrays.asList("public.test_table"));
+        assertThat(dataSource.getPostgresSourceConfig().getDatabaseList()).contains(hyphenDbName);
+
+        // Now actually read data using the Flink streaming API
+        StreamExecutionEnvironment testEnv = StreamExecutionEnvironment.getExecutionEnvironment();
+        testEnv.setParallelism(1);
+        testEnv.enableCheckpointing(1000);
+        testEnv.setRestartStrategy(RestartStrategies.noRestart());
+
+        FlinkSourceProvider sourceProvider =
+                (FlinkSourceProvider) dataSource.getEventSourceProvider();
+
+        CloseableIterator<Event> events =
+                testEnv.fromSource(
+                                sourceProvider.getSource(),
+                                WatermarkStrategy.noWatermarks(),
+                                PostgresDataSourceFactory.IDENTIFIER,
+                                new EventTypeInfo())
+                        .executeAndCollect();
+
+        // Collect events and verify data
+        List<Event> collectedEvents = new ArrayList<>();
+        int expectedDataCount = 3; // We inserted 3 rows
+        int dataCount = 0;
+        int maxEvents = 10; // Safety limit
+
+        while (events.hasNext() && collectedEvents.size() < maxEvents) {
+            Event event = events.next();
+            collectedEvents.add(event);
+            if (event instanceof DataChangeEvent) {
+                dataCount++;
+                if (dataCount >= expectedDataCount) {
+                    break;
+                }
+            }
+        }
+        events.close();
+
+        // Verify we received CreateTableEvent and DataChangeEvents
+        assertThat(collectedEvents).isNotEmpty();
+
+        // Check for CreateTableEvent
+        long createTableEventCount =
+                collectedEvents.stream().filter(e -> e instanceof CreateTableEvent).count();
+        assertThat(createTableEventCount).isGreaterThanOrEqualTo(1);
+
+        // Check for DataChangeEvents (INSERT events from snapshot)
+        List<DataChangeEvent> dataChangeEvents =
+                collectedEvents.stream()
+                        .filter(e -> e instanceof DataChangeEvent)
+                        .map(e -> (DataChangeEvent) e)
+                        .collect(Collectors.toList());
+
+        assertThat(dataChangeEvents).hasSize(expectedDataCount);
+
+        // Verify the table ID in events
+        for (DataChangeEvent dce : dataChangeEvents) {
+            assertThat(dce.tableId().getSchemaName()).isEqualTo("public");
+            assertThat(dce.tableId().getTableName()).isEqualTo("test_table");
+        }
+
+        // Verify the data content - we should have 3 INSERT events with ids 1, 2, 3
+        List<Integer> actualIds =
+                dataChangeEvents.stream()
+                        .map(
+                                dce -> {
+                                    RecordData after = dce.after();
+                                    return after.getInt(0); // id column
+                                })
+                        .sorted()
+                        .collect(Collectors.toList());
+        assertThat(actualIds).containsExactly(1, 2, 3);
+
+        // Cleanup - first drop replication slot, then terminate connections and drop database
+        try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
+                Statement statement = connection.createStatement()) {
+            // Drop replication slot first (it was created during CDC connection)
+            try {
+                statement.execute(String.format("SELECT pg_drop_replication_slot('%s')", slotName));
+            } catch (SQLException e) {
+                // Ignore if slot doesn't exist
+                LOG.warn("Failed to drop replication slot: {}", e.getMessage());
+            }
+            // Terminate all connections to the database
+            statement.execute(
+                    "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '"
+                            + hyphenDbName
+                            + "'");
+            // Small delay to ensure connections are terminated
+            Thread.sleep(500);
+            statement.execute("DROP DATABASE IF EXISTS \"" + hyphenDbName + "\"");
+        }
+    }
+
     private static <T> List<T> fetchResultsExcept(Iterator<T> iter, int size, T sideEvent) {
         List<T> result = new ArrayList<>(size);
         List<T> sideResults = new ArrayList<>();
@@ -580,16 +743,6 @@ public class PostgresPipelineITCaseTest extends PostgresTestBase {
         // Also ensure we've received at least one or many side events.
         assertThat(sideResults).isNotEmpty();
         return result;
-    }
-
-    // Helper method to create a temporary directory for savepoint
-    private Path createTempSavepointDir() throws Exception {
-        return Files.createTempDirectory("postgres-savepoint");
-    }
-
-    // Helper method to execute the job and create a savepoint
-    private String createSavepoint(JobClient jobClient, Path savepointDir) throws Exception {
-        return jobClient.stopWithSavepoint(true, savepointDir.toAbsolutePath().toString()).get();
     }
 
     private List<Event> getSnapshotExpected(TableId tableId) {

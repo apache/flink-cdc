@@ -419,6 +419,10 @@ public class DataTypes {
         return RowType.builder().fields(fieldTypes).build();
     }
 
+    public static VariantType VARIANT() {
+        return new VariantType();
+    }
+
     public static OptionalInt getPrecision(DataType dataType) {
         return dataType.accept(PRECISION_EXTRACTOR);
     }

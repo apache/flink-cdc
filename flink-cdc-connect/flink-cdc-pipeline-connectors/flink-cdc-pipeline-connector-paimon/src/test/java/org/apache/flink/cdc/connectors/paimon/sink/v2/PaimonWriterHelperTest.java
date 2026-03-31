@@ -33,6 +33,7 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
+import org.apache.flink.cdc.common.types.variant.BinaryVariantInternalBuilder;
 import org.apache.flink.cdc.connectors.paimon.sink.PaimonMetadataApplier;
 import org.apache.flink.cdc.runtime.serializer.data.MapDataSerializer;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
@@ -45,6 +46,7 @@ import org.apache.paimon.data.GenericRow;
 import org.apache.paimon.data.InternalMap;
 import org.apache.paimon.data.NestedRow;
 import org.apache.paimon.data.Timestamp;
+import org.apache.paimon.data.variant.GenericVariant;
 import org.apache.paimon.flink.FlinkCatalogFactory;
 import org.apache.paimon.options.Options;
 import org.apache.paimon.table.Table;
@@ -54,6 +56,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -68,7 +71,7 @@ class PaimonWriterHelperTest {
     @TempDir public static java.nio.file.Path temporaryFolder;
 
     @Test
-    void testConvertEventToGenericRowOfAllDataTypes() {
+    void testConvertEventToGenericRowOfAllDataTypes() throws IOException {
         RowType rowType =
                 RowType.of(
                         DataTypes.BOOLEAN(),
@@ -92,7 +95,8 @@ class PaimonWriterHelperTest {
                         DataTypes.TIMESTAMP(3),
                         DataTypes.TIMESTAMP_LTZ(),
                         DataTypes.TIMESTAMP_LTZ(3),
-                        DataTypes.STRING());
+                        DataTypes.STRING(),
+                        DataTypes.VARIANT());
         Object[] testData =
                 new Object[] {
                     true,
@@ -117,7 +121,9 @@ class PaimonWriterHelperTest {
                     TimestampData.fromTimestamp(java.sql.Timestamp.valueOf("2023-01-01 00:00:00")),
                     LocalZonedTimestampData.fromInstant(Instant.parse("2023-01-01T00:00:00.000Z")),
                     LocalZonedTimestampData.fromInstant(Instant.parse("2023-01-01T00:00:00.000Z")),
-                    null
+                    null,
+                    BinaryVariantInternalBuilder.parseJson(
+                            "{\"a\":1,\"b\":\"hello\",\"c\":3.1}", false)
                 };
         BinaryRecordData recordData = new BinaryRecordDataGenerator(rowType).generate(testData);
         Schema schema = Schema.newBuilder().fromRowDataType(rowType).build();
@@ -154,7 +160,8 @@ class PaimonWriterHelperTest {
                                         java.sql.Timestamp.valueOf("2023-01-01 00:00:00")),
                                 Timestamp.fromInstant(Instant.parse("2023-01-01T00:00:00.000Z")),
                                 Timestamp.fromInstant(Instant.parse("2023-01-01T00:00:00.000Z")),
-                                null));
+                                null,
+                                GenericVariant.fromJson("{\"a\":1,\"b\":\"hello\",\"c\":3.1}")));
     }
 
     @Test
@@ -368,6 +375,7 @@ class PaimonWriterHelperTest {
                         .physicalColumn("timestamp_with_precision", DataTypes.TIMESTAMP(3))
                         .physicalColumn("timestamp_ltz", DataTypes.TIMESTAMP_LTZ())
                         .physicalColumn("timestamp_ltz_with_precision", DataTypes.TIMESTAMP_LTZ(3))
+                        .physicalColumn("variant", DataTypes.VARIANT())
                         .primaryKey("col1")
                         .build();
         CreateTableEvent createTableEvent =

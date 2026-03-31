@@ -1,0 +1,365 @@
+################################################################################
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#      http://www.apache.org/licenses/LICENSE-2.0
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+################################################################################
+
+- do: Select Nested Objects
+  projection: |-
+    id_
+    array_int_
+    array_string_
+    map_int_string_
+    map_string_array_string_
+    complex_row_
+    variant_
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`array_int_` ARRAY<INT>,`array_string_` ARRAY<STRING>,`map_int_string_` MAP<INT, STRING>,`map_string_array_string_` MAP<STRING, ARRAY<STRING>>,`complex_row_` ROW<`name` STRING, `length` INT>,`variant_` VARIANT}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, [1, 1, 2, 3, 5, 8, 13], [one, one, two, three, five], {1 -> one, 2 -> two, 3 -> three}, {two -> [T, W, O], one -> [O, N, E], three -> [T, H, R, E, E]}, {name: STRING -> Alice, length: INT -> 5}, {"array":[1,2,{"kk":1.123}],"k":1,"object":{"k":"hello"}}], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, [1, 1, 2, 3, 5, 8, 13], [one, one, two, three, five], {1 -> one, 2 -> two, 3 -> three}, {two -> [T, W, O], one -> [O, N, E], three -> [T, H, R, E, E]}, {name: STRING -> Alice, length: INT -> 5}, {"array":[1,2,{"kk":1.123}],"k":1,"object":{"k":"hello"}}], after=[-1, [2, 3, 5, 7, 11, 13, 17, 19], [二, san, 五, qi, 十一], {1 -> yi, 2 -> er, 3 -> san}, {二 -> [E, R], 三 -> [S, A, N], 一 -> [Y, I]}, {name: STRING -> Derrida, length: INT -> 7}, [{"k":1},"hello",{"k":2}]], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, [2, 3, 5, 7, 11, 13, 17, 19], [二, san, 五, qi, 十一], {1 -> yi, 2 -> er, 3 -> san}, {二 -> [E, R], 三 -> [S, A, N], 一 -> [Y, I]}, {name: STRING -> Derrida, length: INT -> 7}, [{"k":1},"hello",{"k":2}]], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null, null, null, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null, null, null, null, null], after=[], op=DELETE, meta=()}
+- do: Parse Variant from JSON
+  projection: |-
+    id_
+    PARSE_JSON(id_) AS variant_id_
+    PARSE_JSON('[' || id_ || ',' || bool_ || ']') AS variant_array_
+    PARSE_JSON('{"id": ' || id_ || ', "name": "' || string_ || '"}') AS variant_doc_
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`variant_id_` VARIANT,`variant_array_` VARIANT,`variant_doc_` VARIANT}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, 1, [1,true], {"id":1,"name":"From A to Z is Lie"}], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, 1, [1,true], {"id":1,"name":"From A to Z is Lie"}], after=[-1, -1, [-1,false], {"id":-1,"name":"天地玄黄宇宙洪荒"}], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, -1, [-1,false], {"id":-1,"name":"天地玄黄宇宙洪荒"}], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, 0, [0,null], {"id":0,"name":"null"}], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, 0, [0,null], {"id":0,"name":"null"}], after=[], op=DELETE, meta=()}
+- do: Parse Variant from JSON with Error
+  projection: |-
+    id_
+    PARSE_JSON('NOT A VALID JSON') AS variant_
+  primary-key: id_
+  expect-error: 'Failed to parse json string: NOT A VALID JSON'
+- do: Try Parse Variant from JSON
+  projection: |-
+    id_
+    TRY_PARSE_JSON(id_) AS variant_id_
+    TRY_PARSE_JSON('[' || id_ || ',' || bool_ || ']') AS variant_array_
+    TRY_PARSE_JSON('{"id": ' || id_ || ', "name": "' || string_ || '"}') AS variant_doc_
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`variant_id_` VARIANT,`variant_array_` VARIANT,`variant_doc_` VARIANT}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, 1, [1,true], {"id":1,"name":"From A to Z is Lie"}], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, 1, [1,true], {"id":1,"name":"From A to Z is Lie"}], after=[-1, -1, [-1,false], {"id":-1,"name":"天地玄黄宇宙洪荒"}], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, -1, [-1,false], {"id":-1,"name":"天地玄黄宇宙洪荒"}], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, 0, [0,null], {"id":0,"name":"null"}], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, 0, [0,null], {"id":0,"name":"null"}], after=[], op=DELETE, meta=()}
+- do: Try Parse Variant from JSON with Error
+  projection: |-
+    id_
+    TRY_PARSE_JSON('NOT A VALID JSON') AS variant_
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`variant_` VARIANT}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, null], after=[-1, null], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, null], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null], after=[], op=DELETE, meta=()}
+- do: Parse Variant from JSON with duplicate key rejected
+  projection: |-
+    id_
+    PARSE_JSON('{"id": 1, "id": 2}') AS variant_
+  primary-key: id_
+  expect-error: 'org.apache.flink.cdc.common.types.variant.VariantTypeException: VARIANT_DUPLICATE_KEY'
+- do: Parse Variant from JSON with duplicate key allowed
+  projection: |-
+    id_
+    PARSE_JSON('{"id": 1, "id": 2}', TRUE) AS variant_
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`variant_` VARIANT}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, {"id":2}], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, {"id":2}], after=[-1, {"id":2}], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, {"id":2}], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, {"id":2}], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, {"id":2}], after=[], op=DELETE, meta=()}
+- do: Try Parse Variant from JSON with duplicate key rejected
+  projection: |-
+    id_
+    TRY_PARSE_JSON('{"id": 1, "id": 2}') AS variant_
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`variant_` VARIANT}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, null], after=[-1, null], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, null], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null], after=[], op=DELETE, meta=()}
+- do: Try Parse Variant from JSON with duplicate key allowed
+  projection: |-
+    id_
+    TRY_PARSE_JSON('{"id": 1, "id": 2}', TRUE) AS variant_
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`variant_` VARIANT}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, {"id":2}], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, {"id":2}], after=[-1, {"id":2}], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, {"id":2}], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, {"id":2}], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, {"id":2}], after=[], op=DELETE, meta=()}
+- do: Integer Array Subscripting
+  projection: |-
+    id_
+    array_int_
+    array_int_[4] AS sc_int_array
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`array_int_` ARRAY<INT>,`sc_int_array` INT}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, [1, 1, 2, 3, 5, 8, 13], 3], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, [1, 1, 2, 3, 5, 8, 13], 3], after=[-1, [2, 3, 5, 7, 11, 13, 17, 19], 7], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, [2, 3, 5, 7, 11, 13, 17, 19], 7], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null], after=[], op=DELETE, meta=()}
+- do: String Array Subscripting
+  projection: |-
+    id_
+    array_string_
+    array_string_[4] AS sc_str_array
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`array_string_` ARRAY<STRING>,`sc_str_array` STRING}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, [one, one, two, three, five], three], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, [one, one, two, three, five], three], after=[-1, [二, san, 五, qi, 十一], qi], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, [二, san, 五, qi, 十一], qi], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null], after=[], op=DELETE, meta=()}
+- do: Array OOB Subscripting
+  projection: |-
+    id_
+    array_string_[0] AS negative_overflow
+    array_string_[10000] AS positive_overflow
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`negative_overflow` STRING,`positive_overflow` STRING}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, null, null], after=[-1, null, null], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, null, null], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null], after=[], op=DELETE, meta=()}
+- do: Array Subscripting With Sub Expression
+  projection: |-
+    id_
+    array_int_[1 + 1] AS int_key
+    array_string_[array_int_[1 + 1]] AS str_key
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`int_key` INT,`str_key` STRING}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, 1, one], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, 1, one], after=[-1, 3, 五], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, 3, 五], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null], after=[], op=DELETE, meta=()}
+- do: Filter by Array-related Expression
+  projection: id_, array_string_
+  filter: array_string_[3] = '五'
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`array_string_` ARRAY<STRING>}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, [one, one, two, three, five]], after=[-1, [二, san, 五, qi, 十一]], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, [二, san, 五, qi, 十一]], after=[], op=DELETE, meta=()}
+- do: Map Subscripting
+  projection: |-
+    id_
+    map_int_string_
+    map_int_string_[2] AS map_value
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`map_int_string_` MAP<INT, STRING>,`map_value` STRING}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, {1 -> one, 2 -> two, 3 -> three}, two], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, {1 -> one, 2 -> two, 3 -> three}, two], after=[-1, {1 -> yi, 2 -> er, 3 -> san}, er], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, {1 -> yi, 2 -> er, 3 -> san}, er], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null], after=[], op=DELETE, meta=()}
+- do: Map Subscripting with absent key
+  projection: |-
+    id_
+    map_int_string_[233] AS map_value
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`map_value` STRING}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, null], after=[-1, null], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, null], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null], after=[], op=DELETE, meta=()}
+- do: Map Subscripting with complex expression
+  projection: |-
+    id_
+    map_int_string_[1 + 2] AS map_value
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`map_value` STRING}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, three], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, three], after=[-1, san], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, san], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null], after=[], op=DELETE, meta=()}
+- do: Map Subscripting with nested expressions
+  projection: |-
+    id_
+    map_string_array_string_[lower('ONE')] AS index_1
+    map_string_array_string_['o' || 'n' || 'e'][1] AS index_2
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`index_1` ARRAY<STRING>,`index_2` STRING}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, [O, N, E], O], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, [O, N, E], O], after=[-1, null, null], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, null, null], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null], after=[], op=DELETE, meta=()}
+- do: Map Subscripting With Absent Object
+  projection: |-
+    id_
+    map_string_array_string_['foo'] AS index_1
+    map_string_array_string_['bar'][1] AS index_2
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`index_1` ARRAY<STRING>,`index_2` STRING}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, null, null], after=[-1, null, null], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, null, null], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null], after=[], op=DELETE, meta=()}
+- do: Filter by Map-related Expression
+  projection: id_, map_int_string_
+  filter: map_int_string_[1] = 'one'
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`map_int_string_` MAP<INT, STRING>}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, {1 -> one, 2 -> two, 3 -> three}], op=INSERT, meta=()}
+- do: Record Subscripting With Index
+  projection: |-
+    id_
+    complex_row_
+    complex_row_[1] AS name
+    complex_row_[2] AS length
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`complex_row_` ROW<`name` STRING, `length` INT>,`name` STRING,`length` INT}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, {name: STRING -> Alice, length: INT -> 5}, Alice, 5], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, {name: STRING -> Alice, length: INT -> 5}, Alice, 5], after=[-1, {name: STRING -> Derrida, length: INT -> 7}, Derrida, 7], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, {name: STRING -> Derrida, length: INT -> 7}, Derrida, 7], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null, null], after=[], op=DELETE, meta=()}
+- do: Record Subscripting With Invalid Index
+  projection: |-
+    id_
+    complex_row_
+    complex_row_[0] AS bad_key
+  primary-key: id_
+  expect-error: 'Cannot infer type of field at position 0 within ROW type: RecordType(VARCHAR(65536) name, INTEGER length)'
+- do: Record Subscripting With Computed Index (Illegal, type must be statically determined)
+  projection: |-
+    id_
+    complex_row_
+    complex_row_[1 + 1] AS bad_key
+  primary-key: id_
+  expect-error: 'Cannot infer type of field at position null within ROW type: RecordType(VARCHAR(65536) name, INTEGER length)'
+- do: Filter by Record-related Expression
+  projection: id_, complex_row_
+  filter: complex_row_[1] = 'Derrida'
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`complex_row_` ROW<`name` STRING, `length` INT>}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, {name: STRING -> Alice, length: INT -> 5}], after=[-1, {name: STRING -> Derrida, length: INT -> 7}], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, {name: STRING -> Derrida, length: INT -> 7}], after=[], op=DELETE, meta=()}
+- do: Variant Object Subscripting With String Key
+  projection: |-
+    id_
+    variant_
+    variant_['k'] AS variant_k
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`variant_` VARIANT,`variant_k` VARIANT}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, {"array":[1,2,{"kk":1.123}],"k":1,"object":{"k":"hello"}}, 1], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, {"array":[1,2,{"kk":1.123}],"k":1,"object":{"k":"hello"}}, 1], after=[-1, [{"k":1},"hello",{"k":2}], null], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, [{"k":1},"hello",{"k":2}], null], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null], after=[], op=DELETE, meta=()}
+- do: Variant Array Subscripting With Integer Index
+  projection: |-
+    id_
+    variant_
+    variant_[1] AS variant_first
+    variant_[2] AS variant_second
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`variant_` VARIANT,`variant_first` VARIANT,`variant_second` VARIANT}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, {"array":[1,2,{"kk":1.123}],"k":1,"object":{"k":"hello"}}, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, {"array":[1,2,{"kk":1.123}],"k":1,"object":{"k":"hello"}}, null, null], after=[-1, [{"k":1},"hello",{"k":2}], {"k":1}, "hello"], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, [{"k":1},"hello",{"k":2}], {"k":1}, "hello"], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null, null], after=[], op=DELETE, meta=()}
+- do: Variant Nested Subscripting
+  projection: |-
+    id_
+    variant_['object']['k'] AS nested_object_k
+    variant_['array'][1] AS nested_array_first
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`nested_object_k` VARIANT,`nested_array_first` VARIANT}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, "hello", 1], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, "hello", 1], after=[-1, null, null], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, null, null], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null], after=[], op=DELETE, meta=()}
+- do: Variant Subscripting With Absent Key
+  projection: |-
+    id_
+    variant_['nonexistent'] AS absent_key
+    variant_[1000] AS absent_index
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`absent_key` VARIANT,`absent_index` VARIANT}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, null, null], after=[-1, null, null], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, null, null], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null], after=[], op=DELETE, meta=()}
+- do: Variant Subscripting With Parsed JSON
+  projection: |-
+    id_
+    PARSE_JSON('[1, 2, 3]')[2] AS array_second
+    PARSE_JSON('[10, 20, 30]')[1] AS array_first
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`array_second` VARIANT,`array_first` VARIANT}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, 2, 10], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, 2, 10], after=[-1, 2, 10], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, 2, 10], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, 2, 10], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, 2, 10], after=[], op=DELETE, meta=()}
+- do: Variant Subscripting With Parsed JSON Object
+  projection: |-
+    id_
+    PARSE_JSON('{"key": "value"}')['key'] AS json_key
+    PARSE_JSON('{"nested": {"inner": 42}}')['nested']['inner'] AS nested_value
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`json_key` VARIANT,`nested_value` VARIANT}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, "value", 42], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, "value", 42], after=[-1, "value", 42], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, "value", 42], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, "value", 42], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, "value", 42], after=[], op=DELETE, meta=()}

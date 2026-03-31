@@ -65,8 +65,14 @@ public class PostgresDataSource implements DataSource {
 
     @Override
     public EventSourceProvider getEventSourceProvider() {
+        String databaseName = postgresSourceConfig.getDatabaseList().get(0);
+        boolean includeDatabaseInTableId = postgresSourceConfig.isIncludeDatabaseInTableId();
         DebeziumEventDeserializationSchema deserializer =
-                new PostgresEventDeserializer(DebeziumChangelogMode.ALL, readableMetadataList);
+                new PostgresEventDeserializer(
+                        DebeziumChangelogMode.ALL,
+                        readableMetadataList,
+                        includeDatabaseInTableId,
+                        databaseName);
 
         PostgresOffsetFactory postgresOffsetFactory = new PostgresOffsetFactory();
         PostgresDialect postgresDialect = new PostgresDialect(postgresSourceConfig);

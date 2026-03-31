@@ -270,6 +270,18 @@ pipeline:
         此为实验性选项，默认值为 false。
       </td>
     </tr>
+    <tr>
+      <td>table-id.include-database</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        是否在生成的 Table ID 中包含数据库名称。<br>
+        如果设置为 true，Table ID 的格式为 (数据库, 模式, 表)。<br>
+        如果设置为 false，Table ID 的格式为 (模式, 表)。<br>
+        默认值为 false。
+      </td>
+    </tr>
     </tbody>
 </table>
 </div>
