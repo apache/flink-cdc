@@ -570,6 +570,96 @@ class TransformParserTest {
     }
 
     @Test
+    void testKeyPreservingCastOfSinglePhysicalColumnHasProvableKeyLineage() {
+        List<Column> columns =
+                Collections.singletonList(Column.physicalColumn("id", DataTypes.INT(), "id"));
+        List<ProjectionColumn> result =
+                TransformParser.generateProjectionColumns(
+                        "cast(id as decimal(20, 0)) AS ID",
+                        columns,
+                        Collections.emptyList(),
+                        new SupportedMetadataColumn[0]);
+        Assertions.assertThat(result).hasSize(1);
+        Assertions.assertThat(result.get(0).isSimpleColumnRenameOrForward()).isTrue();
+        Assertions.assertThat(result.get(0).getOriginalColumnNames()).containsExactly("id");
+        Assertions.assertThat(result.get(0).getColumnName()).isEqualTo("ID");
+    }
+
+    @Test
+    void testLossyCastOfSinglePhysicalColumnDoesNotHaveProvableKeyLineage() {
+        List<ProjectionColumn> narrowedDecimalResult =
+                TransformParser.generateProjectionColumns(
+                        "cast(id as decimal(4, 2)) AS narrowed_id",
+                        Collections.singletonList(
+                                Column.physicalColumn("id", DataTypes.INT(), "id")),
+                        Collections.emptyList(),
+                        new SupportedMetadataColumn[0]);
+        Assertions.assertThat(narrowedDecimalResult).hasSize(1);
+        Assertions.assertThat(narrowedDecimalResult.get(0).isSimpleColumnRenameOrForward())
+                .isFalse();
+
+        List<ProjectionColumn> approximateNumericResult =
+                TransformParser.generateProjectionColumns(
+                        "cast(id as double) AS double_id",
+                        Collections.singletonList(
+                                Column.physicalColumn("id", DataTypes.BIGINT(), "id")),
+                        Collections.emptyList(),
+                        new SupportedMetadataColumn[0]);
+        Assertions.assertThat(approximateNumericResult).hasSize(1);
+        Assertions.assertThat(approximateNumericResult.get(0).isSimpleColumnRenameOrForward())
+                .isFalse();
+
+        List<ProjectionColumn> truncatingTemporalResult =
+                TransformParser.generateProjectionColumns(
+                        "cast(ts as timestamp(0)) AS ts0",
+                        Collections.singletonList(
+                                Column.physicalColumn("ts", DataTypes.TIMESTAMP(3), "ts")),
+                        Collections.emptyList(),
+                        new SupportedMetadataColumn[0]);
+        Assertions.assertThat(truncatingTemporalResult).hasSize(1);
+        Assertions.assertThat(truncatingTemporalResult.get(0).isSimpleColumnRenameOrForward())
+                .isFalse();
+    }
+
+    @Test
+    void testGuaranteedNonNullSinglePhysicalCastPreservesNotNull() {
+        List<ProjectionColumn> result =
+                TransformParser.generateProjectionColumns(
+                        "cast(id as varchar) AS id_text,"
+                                + " cast(id as decimal(20, 0)) AS id_decimal,"
+                                + " cast(id as boolean) AS id_bool",
+                        Collections.singletonList(
+                                Column.physicalColumn("id", DataTypes.INT().notNull(), "id")),
+                        Collections.emptyList(),
+                        new SupportedMetadataColumn[0]);
+
+        Assertions.assertThat(result).hasSize(3);
+        Assertions.assertThat(result)
+                .extracting(column -> column.getDataType().isNullable())
+                .containsExactly(false, false, false);
+    }
+
+    @Test
+    void testPotentiallyNullSinglePhysicalCastStaysNullable() {
+        List<ProjectionColumn> result =
+                TransformParser.generateProjectionColumns(
+                        "cast(code as int) AS code_int,"
+                                + " cast(id as decimal(4, 2)) AS narrowed_id,"
+                                + " cast(optional_id as varchar) AS optional_id_text",
+                        Arrays.asList(
+                                Column.physicalColumn("code", DataTypes.STRING().notNull(), "code"),
+                                Column.physicalColumn("id", DataTypes.INT().notNull(), "id"),
+                                Column.physicalColumn("optional_id", DataTypes.INT(), "optional")),
+                        Collections.emptyList(),
+                        new SupportedMetadataColumn[0]);
+
+        Assertions.assertThat(result).hasSize(3);
+        Assertions.assertThat(result)
+                .extracting(column -> column.getDataType().isNullable())
+                .containsExactly(true, true, true);
+    }
+
+    @Test
     public void testGenerateProjectionColumnsWithPrecision() {
         List<Column> testColumns =
                 Arrays.asList(
