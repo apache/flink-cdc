@@ -18,7 +18,6 @@
 package org.apache.flink.cdc.connectors.mysql.source;
 
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
-import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils;
 import org.apache.flink.cdc.connectors.mysql.table.MySqlReadableMetadata;
@@ -30,9 +29,11 @@ import org.apache.flink.core.execution.JobClient;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.operators.collect.CollectResultIterator;
+import org.apache.flink.streaming.api.operators.collect.CollectResultIteratorAdapter;
 import org.apache.flink.streaming.api.operators.collect.CollectSinkOperator;
 import org.apache.flink.streaming.api.operators.collect.CollectSinkOperatorFactory;
 import org.apache.flink.streaming.api.operators.collect.CollectStreamSink;
+import org.apache.flink.streaming.util.RestartStrategyUtils;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.runtime.typeutils.InternalTypeInfo;
@@ -137,7 +138,7 @@ class BinlogOnlyNewlyAddedTableITCase extends MySqlSourceTestBase {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.setParallelism(1);
         env.enableCheckpointing(200L);
-        env.setRestartStrategy(RestartStrategies.noRestart());
+        RestartStrategyUtils.configureNoRestartStrategy(env);
 
         RowDataDebeziumDeserializeSchema deserializer =
                 RowDataDebeziumDeserializeSchema.newBuilder()
@@ -252,7 +253,7 @@ class BinlogOnlyNewlyAddedTableITCase extends MySqlSourceTestBase {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.setParallelism(1);
         env.enableCheckpointing(200L);
-        env.setRestartStrategy(RestartStrategies.noRestart());
+        RestartStrategyUtils.configureNoRestartStrategy(env);
 
         RowDataDebeziumDeserializeSchema deserializer =
                 RowDataDebeziumDeserializeSchema.newBuilder()
@@ -338,21 +339,26 @@ class BinlogOnlyNewlyAddedTableITCase extends MySqlSourceTestBase {
     }
 
     private CollectResultIterator<RowData> addCollectSink(DataStreamSource<RowData> stream) {
+        StreamExecutionEnvironment env = stream.getExecutionEnvironment();
         TypeSerializer<RowData> serializer =
-                stream.getType().createSerializer(stream.getExecutionConfig());
+                stream.getTransformation()
+                        .getOutputType()
+                        .createSerializer(env.getConfig().getSerializerConfig());
         String accumulatorName = "dataStreamCollect_" + UUID.randomUUID();
         CollectSinkOperatorFactory<RowData> factory =
                 new CollectSinkOperatorFactory<>(serializer, accumulatorName);
         CollectSinkOperator<RowData> operator =
                 (CollectSinkOperator<RowData>) factory.getOperator();
         CollectStreamSink<RowData> sink = new CollectStreamSink<>(stream, factory);
-        sink.name("Binlog Collect Sink");
-        stream.getExecutionEnvironment().addOperator(sink.getTransformation());
-        return new CollectResultIterator(
-                operator.getOperatorIdFuture(),
+        String operatorUid = "Binlog Collect Sink";
+        sink.name(operatorUid).uid(operatorUid);
+        env.addOperator(sink.getTransformation());
+        return new CollectResultIteratorAdapter<>(
+                operatorUid,
+                operator,
                 serializer,
                 accumulatorName,
-                stream.getExecutionEnvironment().getCheckpointConfig(),
+                env.getCheckpointConfig(),
                 10000L);
     }
 
