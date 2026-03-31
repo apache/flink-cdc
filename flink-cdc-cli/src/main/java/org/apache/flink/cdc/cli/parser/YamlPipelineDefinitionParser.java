@@ -21,6 +21,7 @@ import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.SchemaChangeEventTypeFamily;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
+import org.apache.flink.cdc.common.pipeline.SchemaColumnCaseFormat;
 import org.apache.flink.cdc.common.utils.ChangeEventUtils;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.common.utils.StringUtils;
@@ -41,12 +42,16 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMap
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -58,6 +63,8 @@ import static org.apache.flink.cdc.common.utils.Preconditions.checkNotNull;
 
 /** Parser for converting YAML formatted pipeline definition to {@link PipelineDef}. */
 public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
+
+    private static final Logger LOG = LoggerFactory.getLogger(YamlPipelineDefinitionParser.class);
 
     private static final String TOP_LEVEL_NAME = "top-level";
 
@@ -107,6 +114,8 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     public static final String TRANSFORM_TABLE_OPTION_KEY = "table-options";
 
     public static final String TRANSFORM_TABLE_OPTION_DELIMITER_KEY = "table-options.delimiter";
+
+    private static final String TRANSFORM_SCHEMA_COLUMN_CASE_FORMAT_KEY = "column-name-case";
 
     private final ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
 
@@ -351,7 +360,8 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                         TRANSFORM_TABLE_OPTION_KEY,
                         TRANSFORM_TABLE_OPTION_DELIMITER_KEY,
                         TRANSFORM_DESCRIPTION_KEY,
-                        TRANSFORM_CONVERTER_AFTER_TRANSFORM_KEY));
+                        TRANSFORM_CONVERTER_AFTER_TRANSFORM_KEY,
+                        TRANSFORM_SCHEMA_COLUMN_CASE_FORMAT_KEY));
 
         String sourceTable =
                 checkNotNull(
@@ -395,17 +405,67 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                 Optional.ofNullable(transformNode.get(TRANSFORM_CONVERTER_AFTER_TRANSFORM_KEY))
                         .map(JsonNode::asText)
                         .orElse(null);
+        SchemaColumnCaseFormat columnCaseFormat =
+                parseOptionalColumnCaseFormat(
+                        transformNode, TRANSFORM_SCHEMA_COLUMN_CASE_FORMAT_KEY);
 
-        return new TransformDef(
-                sourceTable,
-                projection,
-                filter,
-                primaryKeys,
-                partitionKeys,
-                tableOptions,
-                tableOptionsDelimiter,
-                description,
-                postTransformConverter);
+        TransformDef transformDef =
+                new TransformDef(
+                        sourceTable,
+                        projection,
+                        filter,
+                        primaryKeys,
+                        partitionKeys,
+                        tableOptions,
+                        tableOptionsDelimiter,
+                        description,
+                        postTransformConverter,
+                        columnCaseFormat);
+        warnIfTransformDoesNotRegisterPostRule(transformDef);
+        return transformDef;
+    }
+
+    /**
+     * Warn when YAML lists post-phase-only fields but omits any setting that registers a
+     * post-transform rule, so {@link
+     * org.apache.flink.cdc.composer.definition.TransformDef#registersPostTransformRule()} is false.
+     */
+    private static void warnIfTransformDoesNotRegisterPostRule(TransformDef def) {
+        if (def.registersPostTransformRule()) {
+            return;
+        }
+        boolean hasPostPhaseHints =
+                !StringUtils.isNullOrWhitespaceOnly(def.getPrimaryKeys())
+                        || !StringUtils.isNullOrWhitespaceOnly(def.getPartitionKeys())
+                        || !StringUtils.isNullOrWhitespaceOnly(def.getPostTransformConverter());
+        if (hasPostPhaseHints) {
+            LOG.warn(
+                    "Transform source-table '{}' declares primary-keys, partition-keys, and/or converter-after-transform "
+                            + "but has no projection and no filter. This entry is not registered on the post-transform "
+                            + "operator, so those post-phase settings will not apply. Add a projection (e.g. '*') or a "
+                            + "filter, or rely on pipeline column-name-case with an implicit catch-all when UPPER/LOWER is set.",
+                    def.getSourceTable());
+        }
+    }
+
+    private static SchemaColumnCaseFormat parseOptionalColumnCaseFormat(
+            JsonNode transformNode, String fieldKey) {
+        JsonNode n = transformNode.get(fieldKey);
+        if (n == null || n.isNull()) {
+            return null;
+        }
+        String raw = n.asText().trim();
+        if (raw.isEmpty()) {
+            return null;
+        }
+        try {
+            return SchemaColumnCaseFormat.valueOf(raw.toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException(
+                    String.format(
+                            "Invalid %s value '%s'. Expected AS_IS, UPPER, or LOWER.",
+                            fieldKey, raw));
+        }
     }
 
     private Configuration toPipelineConfig(JsonNode pipelineConfigNode) {
