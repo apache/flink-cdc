@@ -20,64 +20,90 @@ package org.apache.flink.cdc.common.event.visitor;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
+import org.apache.flink.cdc.common.event.AlterTableCommentEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TruncateTableEvent;
+import org.apache.flink.cdc.common.utils.Preconditions;
+
+import javax.annotation.Nonnull;
 
 /** Visitor clas for all {@link SchemaChangeEvent}s and returns a specific typed object. */
 @Internal
 public class SchemaChangeEventVisitor {
     public static <T, E extends Throwable> T visit(
             SchemaChangeEvent event,
-            AddColumnEventVisitor<T, E> addColumnVisitor,
-            AlterColumnTypeEventVisitor<T, E> alterColumnTypeEventVisitor,
-            CreateTableEventVisitor<T, E> createTableEventVisitor,
-            DropColumnEventVisitor<T, E> dropColumnEventVisitor,
-            DropTableEventVisitor<T, E> dropTableEventVisitor,
-            RenameColumnEventVisitor<T, E> renameColumnEventVisitor,
-            TruncateTableEventVisitor<T, E> truncateTableEventVisitor)
+            @Nonnull VisitorHandler<AddColumnEvent, T, E> addColumnVisitor,
+            @Nonnull VisitorHandler<AlterColumnTypeEvent, T, E> alterColumnTypeEventVisitor,
+            @Nonnull VisitorHandler<CreateTableEvent, T, E> createTableEventVisitor,
+            @Nonnull VisitorHandler<DropColumnEvent, T, E> dropColumnEventVisitor,
+            @Nonnull VisitorHandler<DropTableEvent, T, E> dropTableEventVisitor,
+            @Nonnull VisitorHandler<RenameColumnEvent, T, E> renameColumnEventVisitor,
+            @Nonnull VisitorHandler<TruncateTableEvent, T, E> truncateTableEventVisitor,
+            @Nonnull VisitorHandler<AlterTableCommentEvent, T, E> alterTableCommentEventVisitor)
             throws E {
         if (event instanceof AddColumnEvent) {
-            if (addColumnVisitor == null) {
-                return null;
-            }
+            Preconditions.checkNotNull(addColumnVisitor);
             return addColumnVisitor.visit((AddColumnEvent) event);
         } else if (event instanceof AlterColumnTypeEvent) {
-            if (alterColumnTypeEventVisitor == null) {
-                return null;
-            }
+            Preconditions.checkNotNull(alterColumnTypeEventVisitor);
             return alterColumnTypeEventVisitor.visit((AlterColumnTypeEvent) event);
         } else if (event instanceof CreateTableEvent) {
-            if (createTableEventVisitor == null) {
-                return null;
-            }
+            Preconditions.checkNotNull(createTableEventVisitor);
             return createTableEventVisitor.visit((CreateTableEvent) event);
         } else if (event instanceof DropColumnEvent) {
-            if (dropColumnEventVisitor == null) {
-                return null;
-            }
+            Preconditions.checkNotNull(dropColumnEventVisitor);
             return dropColumnEventVisitor.visit((DropColumnEvent) event);
         } else if (event instanceof DropTableEvent) {
-            if (dropTableEventVisitor == null) {
-                return null;
-            }
+            Preconditions.checkNotNull(dropTableEventVisitor);
             return dropTableEventVisitor.visit((DropTableEvent) event);
         } else if (event instanceof RenameColumnEvent) {
-            if (renameColumnEventVisitor == null) {
-                return null;
-            }
+            Preconditions.checkNotNull(renameColumnEventVisitor);
             return renameColumnEventVisitor.visit((RenameColumnEvent) event);
         } else if (event instanceof TruncateTableEvent) {
-            if (truncateTableEventVisitor == null) {
-                return null;
-            }
+            Preconditions.checkNotNull(truncateTableEventVisitor);
             return truncateTableEventVisitor.visit((TruncateTableEvent) event);
+        } else if (event instanceof AlterTableCommentEvent) {
+            Preconditions.checkNotNull(alterTableCommentEventVisitor);
+            return alterTableCommentEventVisitor.visit((AlterTableCommentEvent) event);
         } else {
             throw new IllegalArgumentException(
                     "Unknown schema change event type " + event.getType());
         }
+    }
+
+    public static <E extends Throwable> void voidVisit(
+            SchemaChangeEvent event,
+            @Nonnull VoidVisitorHandler<AddColumnEvent, E> addColumnVisitor,
+            @Nonnull VoidVisitorHandler<AlterColumnTypeEvent, E> alterColumnTypeEventVisitor,
+            @Nonnull VoidVisitorHandler<CreateTableEvent, E> createTableEventVisitor,
+            @Nonnull VoidVisitorHandler<DropColumnEvent, E> dropColumnEventVisitor,
+            @Nonnull VoidVisitorHandler<DropTableEvent, E> dropTableEventVisitor,
+            @Nonnull VoidVisitorHandler<RenameColumnEvent, E> renameColumnEventVisitor,
+            @Nonnull VoidVisitorHandler<TruncateTableEvent, E> truncateTableEventVisitor,
+            @Nonnull VoidVisitorHandler<AlterTableCommentEvent, E> alterTableCommentEventHandler)
+            throws E {
+        visit(
+                event,
+                wrapVoidVisitor(addColumnVisitor),
+                wrapVoidVisitor(alterColumnTypeEventVisitor),
+                wrapVoidVisitor(createTableEventVisitor),
+                wrapVoidVisitor(dropColumnEventVisitor),
+                wrapVoidVisitor(dropTableEventVisitor),
+                wrapVoidVisitor(renameColumnEventVisitor),
+                wrapVoidVisitor(truncateTableEventVisitor),
+                wrapVoidVisitor(alterTableCommentEventHandler));
+    }
+
+    private static <EVT extends SchemaChangeEvent, E extends Throwable>
+            VisitorHandler<EVT, Void, E> wrapVoidVisitor(VoidVisitorHandler<EVT, E> handler) {
+        Preconditions.checkNotNull(handler);
+        return event -> {
+            handler.visit(event);
+            return null;
+        };
     }
 }

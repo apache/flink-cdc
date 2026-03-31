@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.paimon.sink;
 
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
+import org.apache.flink.cdc.common.event.AlterTableCommentEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.DropTableEvent;
@@ -29,7 +30,6 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.event.visitor.SchemaChangeEventVisitor;
 import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
-import org.apache.flink.cdc.common.exceptions.UnsupportedSchemaChangeEventException;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.connectors.paimon.sink.utils.TypeUtils;
@@ -120,36 +120,16 @@ public class PaimonMetadataApplier implements MetadataApplier {
         if (catalog == null) {
             catalog = FlinkCatalogFactory.createPaimonCatalog(catalogOptions);
         }
-        SchemaChangeEventVisitor.visit(
+        SchemaChangeEventVisitor.voidVisit(
                 schemaChangeEvent,
-                addColumnEvent -> {
-                    applyAddColumn(addColumnEvent);
-                    return null;
-                },
-                alterColumnTypeEvent -> {
-                    applyAlterColumnType(alterColumnTypeEvent);
-                    return null;
-                },
-                createTableEvent -> {
-                    applyCreateTable(createTableEvent);
-                    return null;
-                },
-                dropColumnEvent -> {
-                    applyDropColumn(dropColumnEvent);
-                    return null;
-                },
-                dropTableEvent -> {
-                    applyDropTable(dropTableEvent);
-                    return null;
-                },
-                renameColumnEvent -> {
-                    applyRenameColumn(renameColumnEvent);
-                    return null;
-                },
-                truncateTableEvent -> {
-                    applyTruncateTable(truncateTableEvent);
-                    return null;
-                });
+                this::applyAddColumn,
+                this::applyAlterColumnType,
+                this::applyCreateTable,
+                this::applyDropColumn,
+                this::applyDropTable,
+                this::applyRenameColumn,
+                this::applyTruncateTable,
+                this::applyAlterTableComment);
     }
 
     @Override
@@ -330,6 +310,14 @@ public class PaimonMetadataApplier implements MetadataApplier {
                                     tableChangeList.add(
                                             SchemaChangeProvider.updateColumnType(
                                                     oldName, newType)));
+            event.getComments()
+                    .forEach(
+                            (name, comment) -> {
+                                if (comment != null) {
+                                    tableChangeList.add(
+                                            SchemaChange.updateColumnComment(name, comment));
+                                }
+                            });
             catalog.alterTable(tableIdToIdentifier(event), tableChangeList, true);
         } catch (Catalog.TableNotExistException
                 | Catalog.ColumnAlreadyExistException
@@ -341,10 +329,6 @@ public class PaimonMetadataApplier implements MetadataApplier {
     private void applyTruncateTable(TruncateTableEvent event) throws SchemaEvolveException {
         try {
             Table table = catalog.getTable(tableIdToIdentifier(event));
-            if (table.options().get("deletion-vectors.enabled").equals("true")) {
-                throw new UnsupportedSchemaChangeEventException(
-                        event, "Unable to truncate a table with deletion vectors enabled.", null);
-            }
             try (BatchTableCommit batchTableCommit = table.newBatchWriteBuilder().newCommit()) {
                 batchTableCommit.truncateTable();
             }
@@ -358,6 +342,17 @@ public class PaimonMetadataApplier implements MetadataApplier {
             catalog.dropTable(tableIdToIdentifier(event), true);
         } catch (Catalog.TableNotExistException e) {
             throw new SchemaEvolveException(event, "Failed to apply drop table event", e);
+        }
+    }
+
+    private void applyAlterTableComment(AlterTableCommentEvent event) throws SchemaEvolveException {
+        try {
+            catalog.alterTable(
+                    tableIdToIdentifier(event),
+                    SchemaChange.updateComment(event.getComment()),
+                    true);
+        } catch (Exception e) {
+            throw new SchemaEvolveException(event, "Failed to apply alter table comment event", e);
         }
     }
 

@@ -26,9 +26,9 @@ import org.apache.flink.metrics.Meter;
 /** An implementation of Flink's {@link Meter} which wraps Fluss's Meter. */
 public class WrapperFlussMeter implements Meter {
 
-    private final com.alibaba.fluss.metrics.Meter flussMeter;
+    private final org.apache.fluss.metrics.Meter flussMeter;
 
-    public WrapperFlussMeter(com.alibaba.fluss.metrics.Meter flussMeter) {
+    public WrapperFlussMeter(org.apache.fluss.metrics.Meter flussMeter) {
         this.flussMeter = flussMeter;
     }
 

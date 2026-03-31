@@ -86,8 +86,8 @@ public class PreCommitOperator
                                     true,
                                     context.isRestored(),
                                     context.getOperatorStateStore(),
-                                    getRuntimeContext().getNumberOfParallelSubtasks(),
-                                    getRuntimeContext().getIndexOfThisSubtask()));
+                                    getRuntimeContext().getTaskInfo().getNumberOfParallelSubtasks(),
+                                    getRuntimeContext().getTaskInfo().getIndexOfThisSubtask()));
         }
     }
 

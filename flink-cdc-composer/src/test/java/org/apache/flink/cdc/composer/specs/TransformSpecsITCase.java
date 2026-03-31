@@ -501,13 +501,6 @@ class TransformSpecsITCase {
         }
     }
 
-    enum SpecContext {
-        PROJECTION,
-        EXPECT,
-        EXPECT_ERROR,
-        NULL
-    }
-
     private static final String[] EXPECTED_SPECS = {
         "specs/arithmetic.yaml",
         "specs/basic.yaml",

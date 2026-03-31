@@ -18,12 +18,12 @@
 package org.apache.flink.cdc.connectors.mysql.source;
 
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
-import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
+import org.apache.flink.cdc.common.event.AlterTableCommentEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
@@ -54,6 +54,7 @@ import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.util.RestartStrategyUtils;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.util.CloseableIterator;
 
@@ -125,7 +126,7 @@ class MySqlPipelineITCase extends MySqlSourceTestBase {
         TestValuesTableFactory.clearAllData();
         env.setParallelism(4);
         env.enableCheckpointing(2000);
-        env.setRestartStrategy(RestartStrategies.noRestart());
+        RestartStrategyUtils.configureNoRestartStrategy(env);
     }
 
     @Test
@@ -292,7 +293,7 @@ class MySqlPipelineITCase extends MySqlSourceTestBase {
                                     + "       (default,\"hammer\",\"14oz carpenter's hammer\",0.875),\n"
                                     + "       (default,\"hammer\",\"16oz carpenter's hammer\",1.0),\n"
                                     + "       (default,\"rocks\",\"box of assorted rocks\",5.3),\n"
-                                    + "       (default,\"jacket\",\"water resistent black wind breaker\",0.1),\n"
+                                    + "       (default,\"jacket\",\"water resistant black wind breaker\",0.1),\n"
                                     + "       (default,\"spare tire\",\"24 inch spare tire\",22.2);",
                             StatementUtils.quote(inventoryDatabase.getDatabaseName()),
                             StatementUtils.quote(sqlInjectionTable)));
@@ -540,8 +541,8 @@ class MySqlPipelineITCase extends MySqlSourceTestBase {
                         .tableList(databaseName + ".*")
                         .excludeTableList(
                                 String.format(
-                                        "%s.customers, %s.orders, %s.multi_max_table",
-                                        databaseName, databaseName, databaseName))
+                                        "%s.customers, %s.orders, %s.multi_max_table, %s.uppercase_products",
+                                        databaseName, databaseName, databaseName, databaseName))
                         .startupOptions(StartupOptions.initial())
                         .serverId(getServerId(env.getParallelism()))
                         .serverTimeZone("UTC")
@@ -1630,6 +1631,63 @@ class MySqlPipelineITCase extends MySqlSourceTestBase {
     }
 
     @Test
+    public void testAlterTableComment() throws Exception {
+        env.setParallelism(1);
+        inventoryDatabase.createAndInitialize();
+        TableId tableId = TableId.tableId(inventoryDatabase.getDatabaseName(), "tbl_with_comments");
+
+        String createTableSql =
+                String.format(
+                        "CREATE TABLE IF NOT EXISTS `%s`.`%s` (\n"
+                                + "  id INTEGER NOT NULL AUTO_INCREMENT COMMENT 'column comment of id' PRIMARY KEY,\n"
+                                + "  name VARCHAR(255) NOT NULL DEFAULT 'flink' COMMENT 'column comment of name',\n"
+                                + "  weight FLOAT(6) COMMENT 'column comment of weight'\n"
+                                + ")\n"
+                                + "COMMENT 'table comment of products';",
+                        inventoryDatabase.getDatabaseName(), "tbl_with_comments");
+        executeSql(inventoryDatabase, createTableSql);
+
+        Map<String, String> options = new HashMap<>();
+        options.put(HOSTNAME.key(), MYSQL8_CONTAINER.getHost());
+        options.put(PORT.key(), String.valueOf(MYSQL8_CONTAINER.getDatabasePort()));
+        options.put(USERNAME.key(), TEST_USER);
+        options.put(PASSWORD.key(), TEST_PASSWORD);
+        options.put(SERVER_TIME_ZONE.key(), "UTC");
+        options.put(INCLUDE_COMMENTS_ENABLED.key(), "true");
+        options.put(TABLES.key(), inventoryDatabase.getDatabaseName() + ".tbl_with_comments");
+        Factory.Context context =
+                new FactoryHelper.DefaultContext(
+                        Configuration.fromMap(options), null, this.getClass().getClassLoader());
+
+        MySqlDataSourceFactory factory = new MySqlDataSourceFactory();
+        MySqlDataSource dataSource = (MySqlDataSource) factory.createDataSource(context);
+        FlinkSourceProvider sourceProvider =
+                (FlinkSourceProvider) dataSource.getEventSourceProvider();
+
+        CloseableIterator<Event> events =
+                env.fromSource(
+                                sourceProvider.getSource(),
+                                WatermarkStrategy.noWatermarks(),
+                                MySqlDataSourceFactory.IDENTIFIER,
+                                new EventTypeInfo())
+                        .executeAndCollect();
+        Thread.sleep(5_000);
+
+        // alter table comment
+        String addColumnSql =
+                String.format(
+                        "ALTER TABLE `%s`.`tbl_with_comments` COMMENT = 'new table comment';",
+                        inventoryDatabase.getDatabaseName());
+        executeSql(inventoryDatabase, addColumnSql);
+
+        List<Event> expectedEvents = getEventsWithTableComments(tableId);
+        List<Event> actual = fetchResults(events, expectedEvents.size());
+        assertEqualsInAnyOrder(
+                expectedEvents.stream().map(Object::toString).collect(Collectors.toList()),
+                actual.stream().map(Object::toString).collect(Collectors.toList()));
+    }
+
+    @Test
     public void testIncludeCommentsForScanBinlogNewlyAddedTableEnabled() throws Exception {
         env.setParallelism(1);
         inventoryDatabase.createAndInitialize();
@@ -1703,6 +1761,26 @@ class MySqlPipelineITCase extends MySqlSourceTestBase {
                 Statement statement = connection.createStatement()) {
             statement.execute(sql);
         }
+    }
+
+    private List<Event> getEventsWithTableComments(TableId tableId) {
+        return Arrays.asList(
+                new CreateTableEvent(
+                        tableId,
+                        Schema.newBuilder()
+                                .physicalColumn(
+                                        "id", DataTypes.INT().notNull(), "column comment of id")
+                                .physicalColumn(
+                                        "name",
+                                        DataTypes.VARCHAR(255).notNull(),
+                                        "column comment of name",
+                                        "flink")
+                                .physicalColumn(
+                                        "weight", DataTypes.FLOAT(), "column comment of weight")
+                                .primaryKey(Collections.singletonList("id"))
+                                .comment("table comment of products")
+                                .build()),
+                new AlterTableCommentEvent(tableId, "new table comment"));
     }
 
     private List<Event> getEventsWithComments(TableId tableId) {
@@ -1835,7 +1913,7 @@ class MySqlPipelineITCase extends MySqlSourceTestBase {
                                     108,
                                     BinaryStringData.fromString("jacket"),
                                     BinaryStringData.fromString(
-                                            "water resistent black wind breaker"),
+                                            "water resistant black wind breaker"),
                                     0.1f
                                 })));
         snapshotExpected.add(

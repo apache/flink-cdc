@@ -30,7 +30,6 @@ import org.apache.flink.cdc.runtime.operators.transform.PreTransformOperatorBuil
 import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.streaming.api.datastream.DataStream;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -75,6 +74,7 @@ public class TransformTranslator {
                     transform.getPrimaryKeys(),
                     transform.getPartitionKeys(),
                     transform.getTableOptions(),
+                    transform.getTableOptionsDelimiter(),
                     transform.getPostTransformConverter(),
                     supportedMetadataColumns);
         }
@@ -112,6 +112,7 @@ public class TransformTranslator {
                     transform.getPrimaryKeys(),
                     transform.getPartitionKeys(),
                     transform.getTableOptions(),
+                    transform.getTableOptionsDelimiter(),
                     transform.getPostTransformConverter(),
                     supportedMetadataColumns);
         }
@@ -133,6 +134,6 @@ public class TransformTranslator {
     }
 
     private Tuple3<String, String, Map<String, String>> udfDefToUDFTuple(UdfDef udf) {
-        return Tuple3.of(udf.getName(), udf.getClasspath(), new HashMap<>());
+        return Tuple3.of(udf.getName(), udf.getClasspath(), udf.getOptions());
     }
 }

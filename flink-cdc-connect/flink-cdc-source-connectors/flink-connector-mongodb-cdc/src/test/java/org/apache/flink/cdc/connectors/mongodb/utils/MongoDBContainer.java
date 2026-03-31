@@ -24,7 +24,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.output.OutputFrame;
-import org.testcontainers.containers.wait.strategy.Wait;
 
 import java.io.IOException;
 import java.net.URL;
@@ -88,7 +87,6 @@ public class MongoDBContainer extends org.testcontainers.containers.MongoDBConta
                 throw new IllegalStateException(
                         "Execute mongo command failed " + execResult.getStderr());
             }
-            this.waitingFor(Wait.forLogMessage("Flink test user created.\\s", 1));
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

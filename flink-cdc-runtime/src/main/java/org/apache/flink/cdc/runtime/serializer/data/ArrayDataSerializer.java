@@ -20,6 +20,7 @@ package org.apache.flink.cdc.runtime.serializer.data;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.common.typeutils.TypeSerializerSchemaCompatibility;
 import org.apache.flink.api.common.typeutils.TypeSerializerSnapshot;
+import org.apache.flink.api.common.typeutils.TypeSerializerSnapshotAdapter;
 import org.apache.flink.api.java.typeutils.runtime.DataInputViewStream;
 import org.apache.flink.api.java.typeutils.runtime.DataOutputViewStream;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
@@ -52,12 +53,12 @@ public class ArrayDataSerializer extends TypeSerializer<ArrayData> {
     private transient BinaryArrayWriter reuseWriter;
 
     public ArrayDataSerializer(DataType eleType) {
-        this(eleType, InternalSerializers.create(eleType));
+        this(eleType, new NullableSerializerWrapper<>(InternalSerializers.create(eleType)));
     }
 
     private ArrayDataSerializer(DataType eleType, TypeSerializer<Object> eleSer) {
         this.eleType = eleType;
-        this.eleSer = new NullableSerializerWrapper<>(eleSer);
+        this.eleSer = eleSer;
         this.elementGetter = ArrayData.createElementGetter(eleType);
     }
 
@@ -218,7 +219,7 @@ public class ArrayDataSerializer extends TypeSerializer<ArrayData> {
 
     /** {@link TypeSerializerSnapshot} for {@link ArrayDataSerializer}. */
     public static final class ArrayDataSerializerSnapshot
-            implements TypeSerializerSnapshot<ArrayData> {
+            implements TypeSerializerSnapshotAdapter<ArrayData> {
         private static final int CURRENT_VERSION = 3;
 
         private DataType previousType;

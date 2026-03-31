@@ -18,7 +18,6 @@
 package org.apache.flink.cdc.connectors.oracle.source;
 
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
-import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.data.RecordData;
@@ -46,16 +45,19 @@ import org.apache.flink.cdc.connectors.oracle.factory.OracleDataSourceFactory;
 import org.apache.flink.cdc.connectors.oracle.source.config.OracleSourceConfigFactory;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
+import org.apache.flink.configuration.StateRecoveryOptions;
 import org.apache.flink.core.execution.JobClient;
-import org.apache.flink.runtime.jobgraph.SavepointConfigOptions;
+import org.apache.flink.core.execution.SavepointFormatType;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.operators.collect.AbstractCollectResultBuffer;
 import org.apache.flink.streaming.api.operators.collect.CheckpointedCollectResultBuffer;
 import org.apache.flink.streaming.api.operators.collect.CollectResultIterator;
+import org.apache.flink.streaming.api.operators.collect.CollectResultIteratorAdapter;
 import org.apache.flink.streaming.api.operators.collect.CollectSinkOperator;
 import org.apache.flink.streaming.api.operators.collect.CollectSinkOperatorFactory;
 import org.apache.flink.streaming.api.operators.collect.CollectStreamSink;
+import org.apache.flink.streaming.util.RestartStrategyUtils;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.util.CloseableIterator;
 
@@ -121,7 +123,7 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
     public void before() throws Exception {
         TestValuesTableFactory.clearAllData();
         env.setParallelism(1);
-        env.setRestartStrategy(RestartStrategies.noRestart());
+        RestartStrategyUtils.configureNoRestartStrategy(env);
         Connection conn = getJdbcConnectionAsDBA();
         conn.createStatement().execute("GRANT ANALYZE ANY TO " + CONNECTOR_USER);
     }
@@ -981,10 +983,10 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
                 new CreateTableEvent(
                         TableId.tableId("DEBEZIUM", "MYLAKE"),
                         Schema.newBuilder()
-                                .physicalColumn("feature_id", DataTypes.BIGINT().notNull())
-                                .physicalColumn("name", DataTypes.VARCHAR(32))
-                                .physicalColumn("shape", DataTypes.STRING())
-                                .primaryKey(Arrays.asList("feature_id"))
+                                .physicalColumn("FEATURE_ID", DataTypes.BIGINT().notNull())
+                                .physicalColumn("NAME", DataTypes.VARCHAR(32))
+                                .physicalColumn("SHAPE", DataTypes.STRING())
+                                .primaryKey(Arrays.asList("FEATURE_ID"))
                                 .build());
 
         RowType rowType =
@@ -1392,7 +1394,9 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
                         new EventTypeInfo());
 
         TypeSerializer<Event> serializer =
-                source.getTransformation().getOutputType().createSerializer(env.getConfig());
+                source.getTransformation()
+                        .getOutputType()
+                        .createSerializer(env.getConfig().getSerializerConfig());
         CheckpointedCollectResultBuffer<Event> resultBuffer =
                 new CheckpointedCollectResultBuffer<>(serializer);
         String accumulatorName = "dataStreamCollect_" + UUID.randomUUID();
@@ -1453,7 +1457,7 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
                 restoredSource
                         .getTransformation()
                         .getOutputType()
-                        .createSerializer(restoredEnv.getConfig());
+                        .createSerializer(restoredEnv.getConfig().getSerializerConfig());
 
         CheckpointedCollectResultBuffer<Event> restoredResultBuffer =
                 new CheckpointedCollectResultBuffer<>(restoredSerializer);
@@ -1511,7 +1515,9 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
         final int maxRetries = 600;
         while (retryCount < maxRetries) {
             try {
-                return jobClient.stopWithSavepoint(true, savepointDirectory).get();
+                return jobClient
+                        .stopWithSavepoint(true, savepointDirectory, SavepointFormatType.DEFAULT)
+                        .get();
             } catch (Exception e) {
                 retryCount++;
                 LOG.error(
@@ -1537,13 +1543,17 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
             String accumulatorName) {
         CollectSinkOperatorFactory<T> sinkFactory =
                 new CollectSinkOperatorFactory<>(serializer, accumulatorName);
-        CollectSinkOperator<T> operator = (CollectSinkOperator<T>) sinkFactory.getOperator();
-        CollectResultIterator<T> iterator =
-                new CollectResultIterator<>(
-                        buffer, operator.getOperatorIdFuture(), accumulatorName, 0);
         CollectStreamSink<T> sink = new CollectStreamSink<>(source, sinkFactory);
-        sink.name("Data stream collect sink");
+        // Set both name and uid to the same value. The uid is used by Flink to generate
+        // OperatorID via StreamGraphHasherV2.generateUserSpecifiedHash(uid), and the same
+        // uid string must be passed to CollectResultIteratorAdapter for coordinator lookup.
+        String operatorUid = "Data stream collect sink";
+        sink.name(operatorUid).uid(operatorUid);
+        CollectSinkOperator<T> operator = (CollectSinkOperator<T>) sinkFactory.getOperator();
         env.addOperator(sink.getTransformation());
+        CollectResultIterator<T> iterator =
+                new CollectResultIteratorAdapter<>(
+                        buffer, operatorUid, operator, accumulatorName, 0);
         env.registerCollectIterator(iterator);
         return iterator;
     }
@@ -1554,13 +1564,13 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
         org.apache.flink.configuration.Configuration configuration =
                 new org.apache.flink.configuration.Configuration();
         if (finishedSavePointPath != null) {
-            configuration.setString(SavepointConfigOptions.SAVEPOINT_PATH, finishedSavePointPath);
+            configuration.set(StateRecoveryOptions.SAVEPOINT_PATH, finishedSavePointPath);
         }
         StreamExecutionEnvironment env =
                 StreamExecutionEnvironment.getExecutionEnvironment(configuration);
         env.setParallelism(parallelism);
         env.enableCheckpointing(500L);
-        env.setRestartStrategy(RestartStrategies.noRestart());
+        RestartStrategyUtils.configureNoRestartStrategy(env);
         return env;
     }
 
@@ -1568,11 +1578,11 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
         return new CreateTableEvent(
                 tableId,
                 Schema.newBuilder()
-                        .physicalColumn("id", DataTypes.BIGINT().notNull())
-                        .physicalColumn("name", DataTypes.VARCHAR(255).notNull())
-                        .physicalColumn("description", DataTypes.VARCHAR(512))
-                        .physicalColumn("weight", DataTypes.FLOAT())
-                        .primaryKey(Collections.singletonList("id"))
+                        .physicalColumn("ID", DataTypes.BIGINT().notNull())
+                        .physicalColumn("NAME", DataTypes.VARCHAR(255).notNull())
+                        .physicalColumn("DESCRIPTION", DataTypes.VARCHAR(512))
+                        .physicalColumn("WEIGHT", DataTypes.FLOAT())
+                        .primaryKey(Collections.singletonList("ID"))
                         .build());
     }
 
@@ -1727,13 +1737,20 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
 
         statement.execute(
                 String.format(
-                        "ALTER TABLE %s.products ADD DESC1 VARCHAR(45) DEFAULT NULL", "debezium"));
+                        "ALTER TABLE %s.products ADD DESC1 VARCHAR(45) DEFAULT 'N/A' NOT NULL",
+                        "debezium"));
         expected.add(
                 new AddColumnEvent(
                         tableId,
                         Collections.singletonList(
                                 new AddColumnEvent.ColumnWithPosition(
-                                        Column.physicalColumn("DESC1", DataTypes.VARCHAR(45))))));
+                                        Column.physicalColumn(
+                                                "DESC1", DataTypes.VARCHAR(45).notNull())))));
+
+        statement.execute(String.format("ALTER TABLE %s.products MODIFY DESC1 NULL", "debezium"));
+        expected.add(
+                new AlterColumnTypeEvent(
+                        tableId, Collections.singletonMap("DESC1", DataTypes.VARCHAR(45))));
 
         statement.execute(
                 String.format(

@@ -90,6 +90,8 @@ pipeline:
 
 > 在 Lenient 模式下，`TruncateTableEvent` 和 `DropTableEvent` 默认会被忽略。在任何其他模式下，默认不会忽略任何事件。
 
+> `CreateTableEvent` 是所有后续 schema 变更处理的基础。当显式指定 `include.schema.changes` 时，`create.table` 会被自动添加，除非用户通过 `exclude.schema.changes` 明确将其排除。
+
 以下是可配置架构变更事件类型的完整列表：
 
 | 事件类型                | 注释           |

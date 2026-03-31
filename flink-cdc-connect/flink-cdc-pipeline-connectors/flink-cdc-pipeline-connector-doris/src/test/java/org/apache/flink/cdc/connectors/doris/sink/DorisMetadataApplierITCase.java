@@ -17,8 +17,6 @@
 
 package org.apache.flink.cdc.connectors.doris.sink;
 
-import org.apache.flink.api.common.restartstrategy.RestartStrategies;
-import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
@@ -48,9 +46,11 @@ import org.apache.flink.cdc.connectors.doris.sink.utils.DorisContainer;
 import org.apache.flink.cdc.connectors.doris.sink.utils.DorisSinkTestBase;
 import org.apache.flink.cdc.connectors.doris.utils.DorisSchemaUtils;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
+import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.runtime.client.JobExecutionException;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.util.RestartStrategyUtils;
 
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
@@ -85,7 +85,7 @@ class DorisMetadataApplierITCase extends DorisSinkTestBase {
     public static void before() {
         env.setParallelism(DEFAULT_PARALLELISM);
         env.enableCheckpointing(3000);
-        env.setRestartStrategy(RestartStrategies.noRestart());
+        RestartStrategyUtils.configureNoRestartStrategy(env);
     }
 
     @BeforeEach
@@ -630,9 +630,110 @@ class DorisMetadataApplierITCase extends DorisSinkTestBase {
         assertEqualsInOrder(expected, actual);
     }
 
+    /** Microsecond variant: '0000-00-00 00:00:00.000000'. */
+    private static final String INVALID_DATETIME_WITH_MICROS = "0000-00-00 00:00:00.000000";
+
+    @ParameterizedTest(name = "batchMode: {0}")
+    @ValueSource(booleans = {true, false})
+    void testMysqlDefaultTimestampValueWithMicrosInCreateTable(boolean batchMode) throws Exception {
+        TableId tableId =
+                TableId.tableId(
+                        DorisContainer.DORIS_DATABASE_NAME, DorisContainer.DORIS_TABLE_NAME);
+
+        Schema schema =
+                Schema.newBuilder()
+                        .column(new PhysicalColumn("id", DataTypes.INT().notNull(), null))
+                        .column(new PhysicalColumn("name", DataTypes.VARCHAR(50), null))
+                        .column(
+                                new PhysicalColumn(
+                                        "created_time",
+                                        DataTypes.TIMESTAMP(6),
+                                        null,
+                                        INVALID_DATETIME_WITH_MICROS))
+                        .column(
+                                new PhysicalColumn(
+                                        "updated_time",
+                                        DataTypes.TIMESTAMP_LTZ(6),
+                                        null,
+                                        INVALID_DATETIME_WITH_MICROS))
+                        .primaryKey("id")
+                        .build();
+
+        runJobWithEvents(
+                Collections.singletonList(new CreateTableEvent(tableId, schema)), batchMode);
+
+        List<String> actual = inspectTableSchema(tableId);
+
+        List<String> expected =
+                Arrays.asList(
+                        "id | INT | Yes | true | null",
+                        "name | VARCHAR(150) | Yes | false | null",
+                        "created_time | DATETIME(6) | Yes | false | "
+                                + DorisSchemaUtils.DEFAULT_DATETIME,
+                        "updated_time | DATETIME(6) | Yes | false | "
+                                + DorisSchemaUtils.DEFAULT_DATETIME);
+
+        assertEqualsInOrder(expected, actual);
+    }
+
+    @ParameterizedTest(name = "batchMode: {0}")
+    @ValueSource(booleans = {true, false})
+    void testMysqlDefaultTimestampValueWithMicrosInAddColumn(boolean batchMode) throws Exception {
+        TableId tableId =
+                TableId.tableId(
+                        DorisContainer.DORIS_DATABASE_NAME, DorisContainer.DORIS_TABLE_NAME);
+
+        Schema initialSchema =
+                Schema.newBuilder()
+                        .column(new PhysicalColumn("id", DataTypes.INT().notNull(), null))
+                        .column(new PhysicalColumn("name", DataTypes.VARCHAR(50), null))
+                        .primaryKey("id")
+                        .build();
+
+        List<Event> events = new ArrayList<>();
+        events.add(new CreateTableEvent(tableId, initialSchema));
+
+        PhysicalColumn createdTimeCol =
+                new PhysicalColumn(
+                        "created_time", DataTypes.TIMESTAMP(6), null, INVALID_DATETIME_WITH_MICROS);
+
+        PhysicalColumn updatedTimeCol =
+                new PhysicalColumn(
+                        "updated_time",
+                        DataTypes.TIMESTAMP_LTZ(6),
+                        null,
+                        INVALID_DATETIME_WITH_MICROS);
+
+        events.add(
+                new AddColumnEvent(
+                        tableId,
+                        Collections.singletonList(
+                                new AddColumnEvent.ColumnWithPosition(createdTimeCol))));
+
+        events.add(
+                new AddColumnEvent(
+                        tableId,
+                        Collections.singletonList(
+                                new AddColumnEvent.ColumnWithPosition(updatedTimeCol))));
+
+        runJobWithEvents(events, batchMode);
+
+        List<String> actual = inspectTableSchema(tableId);
+
+        List<String> expected =
+                Arrays.asList(
+                        "id | INT | Yes | true | null",
+                        "name | VARCHAR(150) | Yes | false | null",
+                        "created_time | DATETIME(6) | Yes | false | "
+                                + DorisSchemaUtils.DEFAULT_DATETIME,
+                        "updated_time | DATETIME(6) | Yes | false | "
+                                + DorisSchemaUtils.DEFAULT_DATETIME);
+
+        assertEqualsInOrder(expected, actual);
+    }
+
     private void runJobWithEvents(List<Event> events, boolean batchMode) throws Exception {
-        DataStream<Event> stream =
-                env.fromCollection(events, TypeInformation.of(Event.class)).setParallelism(1);
+        DataStream<Event> stream = env.fromData(events, new EventTypeInfo()).setParallelism(1);
 
         Configuration config =
                 new Configuration()

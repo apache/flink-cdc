@@ -23,8 +23,8 @@ import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.connectors.fluss.sink.FlussDataSink;
 
-import com.alibaba.fluss.config.ConfigOptions;
-import com.alibaba.fluss.config.Configuration;
+import org.apache.fluss.config.ConfigOptions;
+import org.apache.fluss.config.Configuration;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -32,13 +32,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import static org.apache.flink.cdc.connectors.fluss.sink.FlussConfigUtils.parseBucketKeys;
-import static org.apache.flink.cdc.connectors.fluss.sink.FlussConfigUtils.parseBucketNumber;
 import static org.apache.flink.cdc.connectors.fluss.sink.FlussDataSinkOptions.BOOTSTRAP_SERVERS;
 import static org.apache.flink.cdc.connectors.fluss.sink.FlussDataSinkOptions.BUCKET_KEY;
 import static org.apache.flink.cdc.connectors.fluss.sink.FlussDataSinkOptions.BUCKET_NUMBER;
 import static org.apache.flink.cdc.connectors.fluss.sink.FlussDataSinkOptions.CLIENT_PROPERTIES_PREFIX;
 import static org.apache.flink.cdc.connectors.fluss.sink.FlussDataSinkOptions.TABLE_PROPERTIES_PREFIX;
+import static org.apache.flink.cdc.connectors.fluss.utils.FlussConfigUtils.parseBucketKeys;
+import static org.apache.flink.cdc.connectors.fluss.utils.FlussConfigUtils.parseBucketNumber;
 
 /** Factory for creating configured instances of {@link FlussDataSink}. */
 public class FlussDataSinkFactory implements DataSinkFactory {

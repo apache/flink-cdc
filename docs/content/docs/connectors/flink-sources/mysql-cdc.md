@@ -31,9 +31,9 @@ The MySQL CDC connector allows for reading snapshot data and incremental data fr
 
 ## Supported Databases
 
-| Connector | Database                                                                                                                                                                                                                                                                                                                                                                                               | Driver              |
-|-----------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------|
-| mysql-cdc | <li> [MySQL](https://dev.mysql.com/doc): 5.6, 5.7, 8.0.x <li> [RDS MySQL](https://www.aliyun.com/product/rds/mysql): 5.6, 5.7, 8.0.x <li> [PolarDB MySQL](https://www.aliyun.com/product/polardb): 5.6, 5.7, 8.0.x <li> [Aurora MySQL](https://aws.amazon.com/cn/rds/aurora): 5.6, 5.7, 8.0.x <li> [MariaDB](https://mariadb.org): 10.x <li> [PolarDB X](https://github.com/ApsaraDB/galaxysql): 2.0.1 | JDBC Driver: 8.0.27 |
+| Connector | Database                                                                                                                                                                                                                                                                                                                                                                                                | Driver              |
+|-----------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------|
+| mysql-cdc | <li> [MySQL](https://dev.mysql.com/doc): 5.7, 8.0.x, 8.4+ <li> [RDS MySQL](https://www.aliyun.com/product/rds/mysql): 5.6, 5.7, 8.0.x <li> [PolarDB MySQL](https://www.aliyun.com/product/polardb): 5.6, 5.7, 8.0.x <li> [Aurora MySQL](https://aws.amazon.com/cn/rds/aurora): 5.6, 5.7, 8.0.x <li> [MariaDB](https://mariadb.org): 10.x <li> [PolarDB X](https://github.com/ApsaraDB/galaxysql): 2.0.1 | JDBC Driver: 8.0.27 |
 
 Dependencies
 ------------
@@ -46,9 +46,7 @@ In order to setup the MySQL CDC connector, the following table provides dependen
 
 ### SQL Client JAR
 
-```Download link is available only for stable releases.```
-
-Download [flink-sql-connector-mysql-cdc-{{< param Version >}}.jar](https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-mysql-cdc/{{< param Version >}}/flink-sql-connector-mysql-cdc-{{< param Version >}}.jar) and put it under `<FLINK_HOME>/lib/`.
+Download [flink-sql-connector-mysql-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-mysql-cdc) and put it under `<FLINK_HOME>/lib/`.
 
 **Note:** Refer to [flink-sql-connector-mysql-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-mysql-cdc), more released versions will be available in the Maven central warehouse.
 
@@ -114,6 +112,16 @@ e.g.  assuming the source parallelism is 4, then we can use `SELECT * FROM sourc
 When an initial consistent snapshot is made for large databases, your established connection could timeout while the tables are being read. You can prevent this behavior by configuring interactive_timeout and wait_timeout in your MySQL configuration file.
 - `interactive_timeout`: The number of seconds the server waits for activity on an interactive connection before closing it. See [MySQL documentations](https://dev.mysql.com/doc/refman/8.0/en/server-system-variables.html#sysvar_interactive_timeout).
 - `wait_timeout`: The number of seconds the server waits for activity on a noninteractive connection before closing it. See [MySQL documentations](https://dev.mysql.com/doc/refman/8.0/en/server-system-variables.html#sysvar_wait_timeout).
+
+
+### MySQL 8.4+ Compatibility
+
+MySQL 8.4 introduced some breaking changes that affect CDC connectors:
+
+- `SHOW MASTER STATUS` is deprecated and replaced by `SHOW BINARY LOG STATUS`
+- Error message terminology changed from `slave/master` to `replica/source`
+
+The MySQL CDC connector automatically probes the MySQL server version and uses the appropriate SQL statements based on the server version. This ensures compatibility with both MySQL 8.4+ and earlier versions without any additional configuration.
 
 
 How to create a MySQL CDC table

@@ -72,6 +72,10 @@ class SqlServerConnectorITCase extends SqlServerTestBase {
         setup(parallelismSnapshot);
         initializeSqlServerTable("inventory");
         initializeSqlServerTable("product");
+        int expectedSize = 20;
+        if (parallelismSnapshot) {
+            expectedSize = 22;
+        }
         String sourceDDL =
                 String.format(
                         "CREATE TABLE debezium_source ("
@@ -98,15 +102,17 @@ class SqlServerConnectorITCase extends SqlServerTestBase {
                         "inventory",
                         "dbo.products");
         String sinkDDL =
-                "CREATE TABLE sink ("
-                        + " name STRING,"
-                        + " weightSum DECIMAL(10,3),"
-                        + " PRIMARY KEY (name) NOT ENFORCED"
-                        + ") WITH ("
-                        + " 'connector' = 'values',"
-                        + " 'sink-insert-only' = 'false',"
-                        + " 'sink-expected-messages-num' = '20'"
-                        + ")";
+                String.format(
+                        "CREATE TABLE sink ("
+                                + " name STRING,"
+                                + " weightSum DECIMAL(10,3),"
+                                + " PRIMARY KEY (name) NOT ENFORCED"
+                                + ") WITH ("
+                                + " 'connector' = 'values',"
+                                + " 'sink-insert-only' = 'false',"
+                                + " 'sink-expected-messages-num' = '%s'"
+                                + ")",
+                        expectedSize);
         tEnv.executeSql(sourceDDL);
         tEnv.executeSql(sinkDDL);
 
@@ -151,7 +157,7 @@ class SqlServerConnectorITCase extends SqlServerTestBase {
             statement.execute("UPDATE inventory.dbo.products SET volume='1.2' WHERE id=110;");
         }
 
-        waitForSinkSize("sink", 20);
+        waitForSinkSize("sink", expectedSize);
 
         /*
          * <pre>

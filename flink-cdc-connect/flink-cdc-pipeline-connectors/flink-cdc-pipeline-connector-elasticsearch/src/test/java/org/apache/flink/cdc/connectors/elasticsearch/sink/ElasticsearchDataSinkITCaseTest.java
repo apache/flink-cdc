@@ -17,7 +17,6 @@
 
 package org.apache.flink.cdc.connectors.elasticsearch.sink;
 
-import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.connector.sink2.Sink;
 import org.apache.flink.cdc.common.event.Event;
@@ -29,6 +28,7 @@ import org.apache.flink.cdc.connectors.elasticsearch.sink.utils.ElasticsearchTes
 import org.apache.flink.cdc.connectors.elasticsearch.v2.NetworkConfig;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.util.RestartStrategyUtils;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch.core.GetRequest;
@@ -231,7 +231,7 @@ class ElasticsearchDataSinkITCaseTest {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.setParallelism(1);
         env.enableCheckpointing(3000);
-        env.setRestartStrategy(RestartStrategies.noRestart());
+        RestartStrategyUtils.configureNoRestartStrategy(env);
         return env;
     }
 

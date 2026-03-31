@@ -19,10 +19,16 @@ package org.apache.flink.cdc.pipeline.tests.utils;
 
 import org.apache.flink.cdc.common.test.utils.TestUtils;
 
+import com.github.dockerjava.api.DockerClient;
+import com.github.dockerjava.api.command.ExecCreateCmdResponse;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.output.FrameConsumerResultCallback;
+import org.testcontainers.containers.output.OutputFrame;
+import org.testcontainers.containers.output.ToStringConsumer;
 import org.testcontainers.utility.MountableFile;
 
 import java.net.URL;
@@ -60,11 +66,11 @@ public abstract class TarballFetcher {
 
             container.copyFileToContainer(
                     MountableFile.forHostPath(
-                            TestUtils.getResource("flink-cdc.sh", "flink-cdc-dist", "src"), 755),
+                            TestUtils.getResource("flink-cdc.sh", "flink-cdc-dist", "src")),
                     version.workDir() + "/bin/flink-cdc.sh");
             container.copyFileToContainer(
                     MountableFile.forHostPath(
-                            TestUtils.getResource("flink-cdc.yaml", "flink-cdc-dist", "src"), 755),
+                            TestUtils.getResource("flink-cdc.yaml", "flink-cdc-dist", "src")),
                     version.workDir() + "/conf/flink-cdc.yaml");
             container.copyFileToContainer(
                     MountableFile.forHostPath(TestUtils.getResource("flink-cdc-dist.jar")),
@@ -77,6 +83,9 @@ public abstract class TarballFetcher {
                     MountableFile.forHostPath(
                             TestUtils.getResource("values-cdc-pipeline-connector.jar")),
                     version.workDir() + "/lib/values-cdc-pipeline-connector.jar");
+
+            // Ensure the script has execute permission
+            runInContainerAsRoot(container, "chmod", "+x", version.workDir() + "/bin/flink-cdc.sh");
 
         } else {
             LOG.info("CDC {} is a released version, download it from the Internet...", version);
@@ -107,6 +116,23 @@ public abstract class TarballFetcher {
                 (int) Duration.ofMinutes(1).toMillis(),
                 (int) Duration.ofMinutes(5).toMillis());
         container.copyFileToContainer(MountableFile.forHostPath(tempFile), containerPath);
+    }
+
+    private static void runInContainerAsRoot(GenericContainer<?> container, String... command)
+            throws InterruptedException {
+        ToStringConsumer stdoutConsumer = new ToStringConsumer();
+        ToStringConsumer stderrConsumer = new ToStringConsumer();
+        DockerClient dockerClient = DockerClientFactory.instance().client();
+        ExecCreateCmdResponse execCreateCmdResponse =
+                dockerClient
+                        .execCreateCmd(container.getContainerId())
+                        .withUser("root")
+                        .withCmd(command)
+                        .exec();
+        FrameConsumerResultCallback callback = new FrameConsumerResultCallback();
+        callback.addConsumer(OutputFrame.OutputType.STDOUT, stdoutConsumer);
+        callback.addConsumer(OutputFrame.OutputType.STDERR, stderrConsumer);
+        dockerClient.execStartCmd(execCreateCmdResponse.getId()).exec(callback).awaitCompletion();
     }
 
     /** Enum for all released Flink CDC version tags. */

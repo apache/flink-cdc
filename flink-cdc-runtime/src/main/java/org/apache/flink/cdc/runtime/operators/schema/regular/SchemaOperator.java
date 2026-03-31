@@ -24,11 +24,13 @@ import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.pipeline.RouteMode;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.route.TableIdRouter;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
+import org.apache.flink.cdc.runtime.operators.AbstractStreamOperatorAdapter;
 import org.apache.flink.cdc.runtime.operators.schema.common.CoordinationResponseUtils;
 import org.apache.flink.cdc.runtime.operators.schema.common.SchemaDerivator;
 import org.apache.flink.cdc.runtime.operators.schema.common.metrics.SchemaOperatorMetrics;
@@ -38,7 +40,6 @@ import org.apache.flink.runtime.jobgraph.tasks.TaskOperatorEventGateway;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
 import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
 import org.apache.flink.streaming.api.graph.StreamConfig;
-import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.api.operators.Output;
@@ -65,7 +66,7 @@ import static org.apache.flink.cdc.common.pipeline.PipelineOptions.DEFAULT_SCHEM
  * SchemaChangeEvent}s and block the stream for tables before their schema changes finish.
  */
 @Internal
-public class SchemaOperator extends AbstractStreamOperator<Event>
+public class SchemaOperator extends AbstractStreamOperatorAdapter<Event>
         implements OneInputStreamOperator<Event, Event>, Serializable {
 
     private static final long serialVersionUID = 1L;
@@ -76,6 +77,7 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
     private final Duration rpcTimeout;
     private final SchemaChangeBehavior schemaChangeBehavior;
     private final List<RouteRule> routingRules;
+    private final RouteMode routeMode;
 
     // Transient fields that are set during open()
     private transient int subTaskId;
@@ -88,24 +90,26 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
 
     @VisibleForTesting
     public SchemaOperator(List<RouteRule> routingRules) {
-        this(routingRules, DEFAULT_SCHEMA_OPERATOR_RPC_TIMEOUT);
+        this(routingRules, RouteMode.ALL_MATCH, DEFAULT_SCHEMA_OPERATOR_RPC_TIMEOUT);
     }
 
     @VisibleForTesting
-    public SchemaOperator(List<RouteRule> routingRules, Duration rpcTimeOut) {
-        this(routingRules, rpcTimeOut, SchemaChangeBehavior.EVOLVE);
+    public SchemaOperator(List<RouteRule> routingRules, RouteMode routeMode, Duration rpcTimeOut) {
+        this(routingRules, routeMode, rpcTimeOut, SchemaChangeBehavior.EVOLVE);
     }
 
     @VisibleForTesting
     public SchemaOperator(
             List<RouteRule> routingRules,
+            RouteMode routeMode,
             Duration rpcTimeOut,
             SchemaChangeBehavior schemaChangeBehavior) {
-        this(routingRules, rpcTimeOut, schemaChangeBehavior, "UTC");
+        this(routingRules, routeMode, rpcTimeOut, schemaChangeBehavior, "UTC");
     }
 
     public SchemaOperator(
             List<RouteRule> routingRules,
+            RouteMode routeMode,
             Duration rpcTimeOut,
             SchemaChangeBehavior schemaChangeBehavior,
             String timezone) {
@@ -114,6 +118,7 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
         this.schemaChangeBehavior = schemaChangeBehavior;
         this.timezone = timezone;
         this.routingRules = routingRules;
+        this.routeMode = routeMode;
     }
 
     @Override
@@ -131,10 +136,10 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
         this.schemaOperatorMetrics =
                 new SchemaOperatorMetrics(
                         getRuntimeContext().getMetricGroup(), schemaChangeBehavior);
-        this.subTaskId = getRuntimeContext().getIndexOfThisSubtask();
+        this.subTaskId = getRuntimeContext().getTaskInfo().getIndexOfThisSubtask();
         this.originalSchemaMap = new HashMap<>();
         this.evolvedSchemaMap = new HashMap<>();
-        this.router = new TableIdRouter(routingRules);
+        this.router = new TableIdRouter(routingRules, routeMode);
         this.derivator = new SchemaDerivator();
     }
 

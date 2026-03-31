@@ -22,6 +22,8 @@ import org.apache.flink.table.types.logical.RowType;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -76,6 +78,24 @@ public class StatementUtils {
                 });
     }
 
+    // PreparedStatement#setObject method will be converted to long type when handling bigint
+    // unsigned, which poses a data overflow issue for values exceeding Long.MAX_VALUE.
+    // Therefore, we need to convert to BigDecimal when the value is outside the long range
+    public static void setSafeObject(PreparedStatement ps, int parameterIndex, Object value)
+            throws SQLException {
+        if (value instanceof BigInteger) {
+            BigInteger bigIntValue = (BigInteger) value;
+            if (bigIntValue.compareTo(BigInteger.valueOf(Long.MAX_VALUE)) > 0
+                    || bigIntValue.compareTo(BigInteger.valueOf(Long.MIN_VALUE)) < 0) {
+                ps.setBigDecimal(parameterIndex, new BigDecimal(bigIntValue));
+            } else {
+                ps.setObject(parameterIndex, bigIntValue.longValueExact());
+            }
+        } else {
+            ps.setObject(parameterIndex, value);
+        }
+    }
+
     public static Object queryMin(
             JdbcConnection jdbc, TableId tableId, String columnName, Object excludedLowerBound)
             throws SQLException {
@@ -85,7 +105,7 @@ public class StatementUtils {
                         quote(columnName), quote(tableId), quote(columnName));
         return jdbc.prepareQueryAndMap(
                 minQuery,
-                ps -> ps.setObject(1, excludedLowerBound),
+                ps -> setSafeObject(ps, 1, excludedLowerBound),
                 rs -> {
                     if (!rs.next()) {
                         // this should never happen
@@ -118,7 +138,7 @@ public class StatementUtils {
                         chunkSize);
         return jdbc.prepareQueryAndMap(
                 query,
-                ps -> ps.setObject(1, includedLowerBound),
+                ps -> setSafeObject(ps, 1, includedLowerBound),
                 rs -> {
                     if (!rs.next()) {
                         // this should never happen
@@ -204,18 +224,18 @@ public class StatementUtils {
             }
             if (isFirstSplit) {
                 for (int i = 0; i < primaryKeyNum; i++) {
-                    statement.setObject(i + 1, splitEnd[i]);
-                    statement.setObject(i + 1 + primaryKeyNum, splitEnd[i]);
+                    setSafeObject(statement, i + 1, splitEnd[i]);
+                    setSafeObject(statement, i + 1 + primaryKeyNum, splitEnd[i]);
                 }
             } else if (isLastSplit) {
                 for (int i = 0; i < primaryKeyNum; i++) {
-                    statement.setObject(i + 1, splitStart[i]);
+                    setSafeObject(statement, i + 1, splitStart[i]);
                 }
             } else {
                 for (int i = 0; i < primaryKeyNum; i++) {
-                    statement.setObject(i + 1, splitStart[i]);
-                    statement.setObject(i + 1 + primaryKeyNum, splitEnd[i]);
-                    statement.setObject(i + 1 + 2 * primaryKeyNum, splitEnd[i]);
+                    setSafeObject(statement, i + 1, splitStart[i]);
+                    setSafeObject(statement, i + 1 + primaryKeyNum, splitEnd[i]);
+                    setSafeObject(statement, i + 1 + 2 * primaryKeyNum, splitEnd[i]);
                 }
             }
             return statement;

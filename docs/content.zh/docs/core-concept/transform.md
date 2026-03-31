@@ -31,16 +31,17 @@ under the License.
 # 参数
 为了定义一个 transform 规则，可以使用以下参数：
 
-| 参数                        | 含义                                                     | 是否必填     |
-|---------------------------|--------------------------------------------------------|----------|
-| source-table              | 源表 ID，支持正则表达式                                         | 必填       |
-| projection                | 投影规则，支持类似 SQL 中 SELECT 子句的语法                           | 可选       |
-| filter                    | 过滤规则，支持类似 SQL 中 WHERE 子句的语法                            | 可选       |
-| primary-keys              | 目标表主键，以逗号分隔                                            | 可选       |
-| partition-keys            | 目标表分区键，以逗号分隔                                           | 可选       |
-| table-options             | 用于配置自动建表时的建表语句                                         | 可选       |
-| converter-after-transform | 用于在 transform 处理后添加转换器来修改 DataChangeEvent                | 可选       |
-| description               | Transform 规则描述                                         | 可选       |
+| 参数                        | 含义                                        | 是否必填 |
+|---------------------------|-------------------------------------------|------|
+| source-table              | 源表 ID，支持正则表达式                             | 必填   |
+| projection                | 投影规则，支持类似 SQL 中 SELECT 子句的语法              | 可选   |
+| filter                    | 过滤规则，支持类似 SQL 中 WHERE 子句的语法               | 可选   |
+| primary-keys              | 目标表主键，以逗号分隔                               | 可选   |
+| partition-keys            | 目标表分区键，以逗号分隔                              | 可选   |
+| table-options             | 用于配置自动建表时的建表语句                            | 可选   |
+| table-options.delimiter   | 多个表属性的分隔符, 默认值为 `,`       | 可选   |
+| converter-after-transform | 用于在 transform 处理后添加转换器来修改 DataChangeEvent | 可选   |
+| description               | Transform 规则描述                            | 可选   |
 
 多个 transform 规则可以声明在一个 pipeline YAML 文件中。
 
@@ -335,10 +336,16 @@ transform:
     table-options: comment=web order
     description: auto creating table options example
 ```
-小技巧：table-options 的格式是 `key1=value1,key2=value2`。
+小技巧：table-options 的格式是 `key1=value1,key2=value2`；如果 value 中包含逗号或其他特殊字符，可以使用 `table-options.delimiter` 指定自定义分隔符（如 `;`、`|`、`$` 等）：
+```yaml
+transform:
+  - source-table: mydb.web_order
+    table-options: sequence.field=gxsj,jjsj;file-index.bloom-filter.columns=jjdbh
+    table-options.delimiter: ";"
+```
 
 ## 分类映射
-多个转换规则可以定义为分类映射。
+在一张表同时被多个转换规则命中时，
 只有第一个匹配的转换规则将应用。
 举个例子，我们可以定义一个转换规则如下：
 
@@ -346,13 +353,12 @@ transform:
 transform:
   - source-table: mydb.web_order
     projection: id, order_id
-    filter: UPPER(province) = 'SHANGHAI'
-    description: classification mapping example
-  - source-table: mydb.web_order
-    projection: order_id as id, id as order_id
-    filter: UPPER(province) = 'BEIJING'
-    description: classification mapping example
+    filter: id > 1001
+  - source-table: mydb.\.*
+    projection: \*, 'fallback' AS FALLBACK
 ```
+
+这里，即使 `mydb.web_order` 表同样可以被第二条规则匹配，但因为排序靠前的第一条规则已经匹配，因此不会落入后续的 Transform 规则中。
 
 ## 用户自定义函数
 用户自定义函数（UDF）可以在转换规则中使用。
@@ -412,6 +418,51 @@ pipeline:
 
 注意这里的 `classpath` 必须是全限定名，并且对应的 `jar` 文件必须包含在 Flink `/lib` 文件夹中，或者通过 `flink-cdc.sh --jar` 选项传递。
 
+### UDF 配置选项
+
+你可以通过添加 `options` 块来向 UDF 传递额外的配置选项。这些选项可以在 `open` 方法中通过 `UserDefinedFunctionContext.configuration()` 获取：
+
+```yaml
+pipeline:
+  user-defined-function:
+    - name: query_redis
+      classpath: com.example.flink.cdc.udf.RedisQueryFunction
+      options:
+        hostname: localhost
+        port: "6379"
+        cache.enabled: "true"
+```
+
+在你的 UDF 实现中，可以通过定义 `ConfigOption` 实例来访问这些配置选项：
+
+```java
+import org.apache.flink.cdc.common.configuration.ConfigOption;
+import org.apache.flink.cdc.common.configuration.ConfigOptions;
+
+public class RedisQueryFunction implements UserDefinedFunction {
+    private static final ConfigOption<String> HOSTNAME =
+        ConfigOptions.key("hostname").stringType().noDefaultValue();
+    private static final ConfigOption<Integer> PORT =
+        ConfigOptions.key("port").intType().defaultValue(6379);
+
+    private String hostname;
+    private int port;
+    
+    @Override
+    public void open(UserDefinedFunctionContext context) throws Exception {
+        hostname = context.configuration().get(HOSTNAME);
+        port = context.configuration().get(PORT);
+        // 在这里初始化你的连接...
+    }
+    
+    public Object eval(String key) {
+        // 使用 hostname 和 port 查询 Redis...
+    }
+}
+```
+
+`options` 字段是可选的。如果未指定，将会传递一个空的配置给 UDF。
+
 在正确注册后，UDF 可以在 `projection` 和 `filter` 表达式中使用，就像内置函数一样：
 
 ```yaml
@@ -423,8 +474,8 @@ transform:
 
 ## Embedding AI 模型
 
-Embedding AI 模型可以在 transform 规则中使用。
-为了使用 Embedding AI 模型，你需要下载内置模型的 jar，然后在 `flink-cdc.sh` 命令中添加 `--jar {$BUILT_IN_MODEL_PATH}`。
+内置 AI 模型可以在 transform 规则中使用。
+为了使用内置 AI 模型，你需要下载内置模型的 jar ，然后在 `flink-cdc.sh` 命令中添加 `--jar {$BUILT_IN_MODEL_PATH}`。
 
 如何定义一个 Embedding AI 模型：
 

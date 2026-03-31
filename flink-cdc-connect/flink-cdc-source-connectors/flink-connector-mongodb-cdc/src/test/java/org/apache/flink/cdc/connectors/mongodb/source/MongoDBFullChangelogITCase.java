@@ -19,7 +19,6 @@ package org.apache.flink.cdc.connectors.mongodb.source;
 
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
-import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.connectors.base.source.utils.hooks.SnapshotPhaseHook;
 import org.apache.flink.cdc.connectors.base.source.utils.hooks.SnapshotPhaseHooks;
@@ -29,6 +28,7 @@ import org.apache.flink.cdc.connectors.mongodb.source.utils.MongoUtils;
 import org.apache.flink.cdc.connectors.mongodb.utils.MongoDBTestUtils;
 import org.apache.flink.cdc.connectors.mongodb.utils.TestTable;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.util.RestartStrategyUtils;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.catalog.ResolvedSchema;
@@ -586,7 +586,7 @@ class MongoDBFullChangelogITCase extends MongoDBSourceTestBase {
 
         env.setParallelism(parallelism);
         env.enableCheckpointing(200L);
-        env.setRestartStrategy(RestartStrategies.fixedDelayRestart(1, 0));
+        RestartStrategyUtils.configureFixedDelayRestartStrategy(env, 1, 0);
 
         String sourceDDL =
                 String.format(
@@ -757,7 +757,7 @@ class MongoDBFullChangelogITCase extends MongoDBSourceTestBase {
 
         env.setParallelism(parallelism);
         env.enableCheckpointing(200L);
-        env.setRestartStrategy(RestartStrategies.fixedDelayRestart(1, 0));
+        RestartStrategyUtils.configureFixedDelayRestartStrategy(env, 1, 0);
 
         String sourceDDL =
                 String.format(

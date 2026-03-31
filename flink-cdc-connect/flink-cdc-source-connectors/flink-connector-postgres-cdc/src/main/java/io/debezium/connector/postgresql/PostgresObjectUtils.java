@@ -17,12 +17,14 @@
 
 package io.debezium.connector.postgresql;
 
+import org.apache.flink.cdc.connectors.postgres.source.schema.RelationAwarePostgresSchema;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import io.debezium.connector.postgresql.connection.PostgresConnection;
 import io.debezium.connector.postgresql.connection.ReplicationConnection;
 import io.debezium.connector.postgresql.spi.SlotState;
 import io.debezium.relational.TableId;
+import io.debezium.relational.history.TableChanges;
 import io.debezium.schema.TopicSelector;
 import io.debezium.util.Clock;
 import io.debezium.util.Metronome;
@@ -32,6 +34,7 @@ import org.slf4j.LoggerFactory;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.time.Duration;
+import java.util.Collection;
 
 /**
  * A factory for creating various Debezium objects
@@ -42,21 +45,40 @@ public class PostgresObjectUtils {
     private static final Logger LOGGER = LoggerFactory.getLogger(PostgresObjectUtils.class);
 
     /** Create a new PostgresSchema and initialize the content of the schema. */
-    public static PostgresSchema newSchema(
+    public static RelationAwarePostgresSchema newSchema(
             PostgresConnection connection,
             PostgresConnectorConfig config,
             TypeRegistry typeRegistry,
             TopicSelector<TableId> topicSelector,
             PostgresValueConverter valueConverter)
             throws SQLException {
-        PostgresSchema schema =
-                new PostgresSchema(
+        RelationAwarePostgresSchema schema =
+                new RelationAwarePostgresSchema(
                         config,
                         typeRegistry,
                         connection.getDefaultValueConverter(),
                         topicSelector,
                         valueConverter);
         schema.refresh(connection, false);
+        return schema;
+    }
+
+    public static RelationAwarePostgresSchema newSchema(
+            PostgresConnection connection,
+            PostgresConnectorConfig config,
+            TypeRegistry typeRegistry,
+            TopicSelector<TableId> topicSelector,
+            PostgresValueConverter valueConverter,
+            Collection<TableChanges.TableChange> tableChanges)
+            throws SQLException {
+        RelationAwarePostgresSchema schema =
+                new RelationAwarePostgresSchema(
+                        config,
+                        typeRegistry,
+                        connection.getDefaultValueConverter(),
+                        topicSelector,
+                        valueConverter);
+        tableChanges.forEach(tableChange -> schema.buildAndRegisterSchema(tableChange.getTable()));
         return schema;
     }
 

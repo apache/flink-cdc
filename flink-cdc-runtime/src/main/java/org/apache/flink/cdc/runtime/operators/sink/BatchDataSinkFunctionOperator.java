@@ -21,7 +21,6 @@ import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.runtime.operators.sink.exception.SinkWrapperException;
 import org.apache.flink.streaming.api.functions.sink.SinkFunction;
-import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.operators.StreamSink;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 
@@ -37,7 +36,6 @@ public class BatchDataSinkFunctionOperator extends StreamSink<Event> {
 
     public BatchDataSinkFunctionOperator(SinkFunction<Event> userFunction) {
         super(userFunction);
-        this.chainingStrategy = ChainingStrategy.ALWAYS;
     }
 
     @Override

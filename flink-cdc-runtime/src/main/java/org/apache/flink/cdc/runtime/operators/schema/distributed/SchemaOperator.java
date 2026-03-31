@@ -24,11 +24,13 @@ import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
+import org.apache.flink.cdc.common.pipeline.RouteMode;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.route.TableIdRouter;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
+import org.apache.flink.cdc.runtime.operators.AbstractStreamOperatorAdapter;
 import org.apache.flink.cdc.runtime.operators.schema.common.CoordinationResponseUtils;
 import org.apache.flink.cdc.runtime.operators.schema.common.SchemaDerivator;
 import org.apache.flink.cdc.runtime.operators.schema.common.metrics.SchemaOperatorMetrics;
@@ -39,7 +41,6 @@ import org.apache.flink.runtime.jobgraph.tasks.TaskOperatorEventGateway;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
 import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
 import org.apache.flink.streaming.api.graph.StreamConfig;
-import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.api.operators.Output;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
@@ -61,7 +62,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 /** This operator merges upstream inferred schema into a centralized Schema Registry. */
-public class SchemaOperator extends AbstractStreamOperator<Event>
+public class SchemaOperator extends AbstractStreamOperatorAdapter<Event>
         implements OneInputStreamOperator<PartitioningEvent, Event>, Serializable {
 
     private static final Logger LOG = LoggerFactory.getLogger(SchemaOperator.class);
@@ -71,13 +72,16 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
     private final String timezone;
     private final SchemaChangeBehavior schemaChangeBehavior;
     private final List<RouteRule> routingRules;
+    private final RouteMode routeMode;
 
     public SchemaOperator(
             List<RouteRule> routingRules,
+            RouteMode routeMode,
             Duration rpcTimeOut,
             SchemaChangeBehavior schemaChangeBehavior,
             String timezone) {
         this.routingRules = routingRules;
+        this.routeMode = routeMode;
         this.rpcTimeOut = rpcTimeOut;
         this.schemaChangeBehavior = schemaChangeBehavior;
         this.timezone = timezone;
@@ -97,10 +101,10 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
     @Override
     public void open() throws Exception {
         super.open();
-        subTaskId = getRuntimeContext().getIndexOfThisSubtask();
+        subTaskId = getRuntimeContext().getTaskInfo().getIndexOfThisSubtask();
         upstreamSchemaTable = HashBasedTable.create();
         evolvedSchemaMap = new HashMap<>();
-        tableIdRouter = new TableIdRouter(routingRules);
+        tableIdRouter = new TableIdRouter(routingRules, routeMode);
         derivator = new SchemaDerivator();
         this.schemaOperatorMetrics =
                 new SchemaOperatorMetrics(

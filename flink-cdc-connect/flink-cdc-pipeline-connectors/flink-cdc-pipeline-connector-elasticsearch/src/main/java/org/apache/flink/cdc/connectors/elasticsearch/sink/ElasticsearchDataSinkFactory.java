@@ -73,7 +73,7 @@ public class ElasticsearchDataSinkFactory implements DataSinkFactory {
 
         ZoneId zoneId = determineZoneId(context);
         ElasticsearchSinkOptions sinkOptions = buildSinkConnectorOptions(configuration);
-        return new ElasticsearchDataSink(sinkOptions, zoneId);
+        return new ElasticsearchDataSink<>(sinkOptions, zoneId);
     }
 
     private ZoneId determineZoneId(Context context) {

@@ -18,7 +18,9 @@
 package org.apache.flink.cdc.composer.flink.translator;
 
 import org.apache.flink.cdc.common.annotation.Internal;
+import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.pipeline.RouteMode;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
@@ -55,12 +57,25 @@ public class SchemaOperatorTranslator {
         this.timezone = timezone;
     }
 
+    @VisibleForTesting
     public DataStream<Event> translateRegular(
             DataStream<Event> input,
             int parallelism,
             MetadataApplier metadataApplier,
             List<RouteDef> routes) {
-        return translateRegular(input, parallelism, false, metadataApplier, routes);
+        return translateRegular(
+                input, parallelism, false, metadataApplier, routes, RouteMode.ALL_MATCH);
+    }
+
+    @VisibleForTesting
+    public DataStream<Event> translateRegular(
+            DataStream<Event> input,
+            int parallelism,
+            boolean isBatchMode,
+            MetadataApplier metadataApplier,
+            List<RouteDef> routes) {
+        return translateRegular(
+                input, parallelism, isBatchMode, metadataApplier, routes, RouteMode.ALL_MATCH);
     }
 
     public DataStream<Event> translateRegular(
@@ -68,16 +83,18 @@ public class SchemaOperatorTranslator {
             int parallelism,
             boolean isBatchMode,
             MetadataApplier metadataApplier,
-            List<RouteDef> routes) {
+            List<RouteDef> routes,
+            RouteMode routeMode) {
 
         return isBatchMode
                 ? addRegularSchemaBatchOperator(
-                        input, parallelism, metadataApplier, routes, timezone)
+                        input, parallelism, metadataApplier, routes, routeMode, timezone)
                 : addRegularSchemaOperator(
                         input,
                         parallelism,
                         metadataApplier,
                         routes,
+                        routeMode,
                         schemaChangeBehavior,
                         timezone);
     }
@@ -86,9 +103,16 @@ public class SchemaOperatorTranslator {
             DataStream<PartitioningEvent> input,
             int parallelism,
             MetadataApplier metadataApplier,
-            List<RouteDef> routes) {
+            List<RouteDef> routes,
+            RouteMode routeMode) {
         return addDistributedSchemaOperator(
-                input, parallelism, metadataApplier, routes, schemaChangeBehavior, timezone);
+                input,
+                parallelism,
+                metadataApplier,
+                routes,
+                routeMode,
+                schemaChangeBehavior,
+                timezone);
     }
 
     @Deprecated
@@ -101,6 +125,7 @@ public class SchemaOperatorTranslator {
             int parallelism,
             MetadataApplier metadataApplier,
             List<RouteDef> routes,
+            RouteMode routeMode,
             SchemaChangeBehavior schemaChangeBehavior,
             String timezone) {
         List<RouteRule> routingRules = new ArrayList<>();
@@ -118,6 +143,7 @@ public class SchemaOperatorTranslator {
                         new SchemaOperatorFactory(
                                 metadataApplier,
                                 routingRules,
+                                routeMode,
                                 rpcTimeOut,
                                 schemaChangeBehavior,
                                 timezone));
@@ -130,6 +156,7 @@ public class SchemaOperatorTranslator {
             int parallelism,
             MetadataApplier metadataApplier,
             List<RouteDef> routes,
+            RouteMode routeMode,
             String timezone) {
         List<RouteRule> routingRules = new ArrayList<>();
         for (RouteDef route : routes) {
@@ -143,7 +170,8 @@ public class SchemaOperatorTranslator {
                 input.transform(
                         "SchemaBatchOperator",
                         new EventTypeInfo(),
-                        new BatchSchemaOperator(routingRules, metadataApplier, timezone));
+                        new BatchSchemaOperator(
+                                routingRules, routeMode, metadataApplier, timezone));
         stream.uid(schemaOperatorUid).setParallelism(parallelism);
         return stream;
     }
@@ -153,6 +181,7 @@ public class SchemaOperatorTranslator {
             int parallelism,
             MetadataApplier metadataApplier,
             List<RouteDef> routes,
+            RouteMode routeMode,
             SchemaChangeBehavior schemaChangeBehavior,
             String timezone) {
         Preconditions.checkArgument(
@@ -181,6 +210,7 @@ public class SchemaOperatorTranslator {
                                 .SchemaOperatorFactory(
                                 metadataApplier,
                                 routingRules,
+                                routeMode,
                                 rpcTimeOut,
                                 schemaChangeBehavior,
                                 timezone))

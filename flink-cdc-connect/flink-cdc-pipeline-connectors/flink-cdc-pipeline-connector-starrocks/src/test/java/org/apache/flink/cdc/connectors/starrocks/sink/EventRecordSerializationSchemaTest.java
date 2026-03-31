@@ -28,6 +28,7 @@ import org.apache.flink.api.connector.sink2.Sink;
 import org.apache.flink.cdc.common.data.DateData;
 import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
+import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
@@ -37,6 +38,7 @@ import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.common.types.BinaryType;
 import org.apache.flink.cdc.common.types.BooleanType;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DateType;
@@ -45,7 +47,9 @@ import org.apache.flink.cdc.common.types.FloatType;
 import org.apache.flink.cdc.common.types.IntType;
 import org.apache.flink.cdc.common.types.LocalZonedTimestampType;
 import org.apache.flink.cdc.common.types.SmallIntType;
+import org.apache.flink.cdc.common.types.TimeType;
 import org.apache.flink.cdc.common.types.TimestampType;
+import org.apache.flink.cdc.common.types.VarBinaryType;
 import org.apache.flink.cdc.common.types.VarCharType;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
@@ -71,9 +75,11 @@ import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.Objects;
 import java.util.OptionalLong;
@@ -260,6 +266,298 @@ class EventRecordSerializationSchemaTest {
                 Objects.requireNonNull(serializer.serialize(insertEvent3)));
     }
 
+    @Test
+    void testTimeTypeSerialization() throws Exception {
+        TableId tableId = TableId.parse("test.time_table");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", new IntType())
+                        .physicalColumn("start_time", new TimeType())
+                        .physicalColumn(
+                                "end_time", new TimeType(3)) // TIME with millisecond precision
+                        .primaryKey("id")
+                        .build();
+
+        // Create table
+        CreateTableEvent createTableEvent = new CreateTableEvent(tableId, schema);
+        Assertions.assertThat(serializer.serialize(createTableEvent)).isNull();
+
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(schema.getColumnDataTypes().toArray(new DataType[0]));
+
+        // Test insert with TIME values
+        DataChangeEvent insertEvent =
+                DataChangeEvent.insertEvent(
+                        tableId,
+                        generator.generate(
+                                new Object[] {
+                                    1,
+                                    TimeData.fromLocalTime(LocalTime.of(9, 30, 15)), // 09:30:15
+                                    TimeData.fromLocalTime(
+                                            LocalTime.of(17, 45, 30, 123000000)) // 17:45:30.123
+                                }));
+
+        StarRocksRowData result = serializer.serialize(insertEvent);
+        Assertions.assertThat(result).isNotNull();
+
+        verifySerializeResult(
+                tableId,
+                "{\"id\":1,\"start_time\":\"09:30:15\",\"end_time\":\"17:45:30.123\",\"__op\":0}",
+                result);
+    }
+
+    @Test
+    void testTimeTypeZeroSecondsFormat() throws Exception {
+        TableId tableId = TableId.parse("test.time_zero_seconds_table");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", new IntType())
+                        .physicalColumn("zero_time", new TimeType())
+                        .primaryKey("id")
+                        .build();
+
+        CreateTableEvent createTableEvent = new CreateTableEvent(tableId, schema);
+        Assertions.assertThat(serializer.serialize(createTableEvent)).isNull();
+
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(schema.getColumnDataTypes().toArray(new DataType[0]));
+
+        DataChangeEvent insertEvent =
+                DataChangeEvent.insertEvent(
+                        tableId,
+                        generator.generate(
+                                new Object[] {1, TimeData.fromLocalTime(LocalTime.of(16, 0, 0))}));
+
+        StarRocksRowData result = serializer.serialize(insertEvent);
+        Assertions.assertThat(result).isNotNull();
+
+        verifySerializeResult(tableId, "{\"id\":1,\"zero_time\":\"16:00:00\",\"__op\":0}", result);
+    }
+
+    @Test
+    void testTimeTypeWithSchemaEvolution() throws Exception {
+        TableId tableId = TableId.parse("test.time_evolution_table");
+        Schema initialSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", new IntType())
+                        .physicalColumn("name", new VarCharType(20))
+                        .primaryKey("id")
+                        .build();
+
+        // Create initial table
+        CreateTableEvent createTableEvent = new CreateTableEvent(tableId, initialSchema);
+        Assertions.assertThat(serializer.serialize(createTableEvent)).isNull();
+
+        BinaryRecordDataGenerator initialGenerator =
+                new BinaryRecordDataGenerator(
+                        initialSchema.getColumnDataTypes().toArray(new DataType[0]));
+
+        // Insert initial data
+        DataChangeEvent initialInsert =
+                DataChangeEvent.insertEvent(
+                        tableId,
+                        initialGenerator.generate(
+                                new Object[] {1, BinaryStringData.fromString("Initial Record")}));
+
+        StarRocksRowData initialResult = serializer.serialize(initialInsert);
+        Assertions.assertThat(initialResult).isNotNull();
+
+        verifySerializeResult(
+                tableId, "{\"id\":1,\"name\":\"Initial Record\",\"__op\":0}", initialResult);
+
+        // Simulate schema evolution: add TIME column
+        Schema evolvedSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", new IntType())
+                        .physicalColumn("name", new VarCharType(20))
+                        .physicalColumn("created_time", new TimeType())
+                        .primaryKey("id")
+                        .build();
+
+        // Create AddColumnEvent to simulate schema evolution
+        AddColumnEvent addColumnEvent =
+                new AddColumnEvent(
+                        tableId,
+                        Arrays.asList(
+                                new AddColumnEvent.ColumnWithPosition(
+                                        Column.physicalColumn("created_time", new TimeType()),
+                                        AddColumnEvent.ColumnPosition.LAST,
+                                        null)));
+        serializer.serialize(addColumnEvent);
+
+        // Insert data with TIME column after schema evolution
+        BinaryRecordDataGenerator evolvedGenerator =
+                new BinaryRecordDataGenerator(
+                        evolvedSchema.getColumnDataTypes().toArray(new DataType[0]));
+
+        DataChangeEvent evolvedInsert =
+                DataChangeEvent.insertEvent(
+                        tableId,
+                        evolvedGenerator.generate(
+                                new Object[] {
+                                    2,
+                                    BinaryStringData.fromString("Evolved Record"),
+                                    TimeData.fromLocalTime(LocalTime.of(14, 30, 0)) // 14:30:00
+                                }));
+
+        StarRocksRowData evolvedResult = serializer.serialize(evolvedInsert);
+        Assertions.assertThat(evolvedResult).isNotNull();
+
+        verifySerializeResult(
+                tableId,
+                "{\"id\":2,\"name\":\"Evolved Record\",\"created_time\":\"14:30:00\",\"__op\":0}",
+                evolvedResult);
+    }
+
+    @Test
+    void testTimeTypeBoundaryValues() throws Exception {
+        TableId tableId = TableId.parse("test.time_boundary_table");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", new IntType())
+                        .physicalColumn("min_time", new TimeType())
+                        .physicalColumn("max_time", new TimeType())
+                        .physicalColumn("midnight", new TimeType())
+                        .primaryKey("id")
+                        .build();
+
+        CreateTableEvent createTableEvent = new CreateTableEvent(tableId, schema);
+        Assertions.assertThat(serializer.serialize(createTableEvent)).isNull();
+
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(schema.getColumnDataTypes().toArray(new DataType[0]));
+
+        // Test boundary TIME values
+        DataChangeEvent insertEvent =
+                DataChangeEvent.insertEvent(
+                        tableId,
+                        generator.generate(
+                                new Object[] {
+                                    1,
+                                    TimeData.fromLocalTime(LocalTime.MIN), // 00:00:00
+                                    TimeData.fromLocalTime(
+                                            LocalTime
+                                                    .MAX), // 23:59:59.999 (truncated to millisecond
+                                    // precision)
+                                    TimeData.fromLocalTime(LocalTime.MIDNIGHT) // 00:00:00
+                                }));
+
+        StarRocksRowData result = serializer.serialize(insertEvent);
+        Assertions.assertThat(result).isNotNull();
+
+        verifySerializeResult(
+                tableId,
+                "{\"id\":1,\"min_time\":\"00:00:00\",\"max_time\":\"23:59:59\",\"midnight\":\"00:00:00\",\"__op\":0}",
+                result);
+    }
+
+    @Test
+    void testTimeTypeWithNullValues() throws Exception {
+        TableId tableId = TableId.parse("test.time_null_table");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", new IntType())
+                        .physicalColumn("nullable_time", new TimeType())
+                        .physicalColumn("not_null_time", new TimeType().notNull())
+                        .primaryKey("id")
+                        .build();
+
+        CreateTableEvent createTableEvent = new CreateTableEvent(tableId, schema);
+        Assertions.assertThat(serializer.serialize(createTableEvent)).isNull();
+
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(schema.getColumnDataTypes().toArray(new DataType[0]));
+
+        // Test TIME values with null
+        DataChangeEvent insertEvent =
+                DataChangeEvent.insertEvent(
+                        tableId,
+                        generator.generate(
+                                new Object[] {
+                                    1,
+                                    null, // Null value for nullable column
+                                    TimeData.fromLocalTime(
+                                            LocalTime.of(12, 0, 0)) // Not null column
+                                }));
+
+        StarRocksRowData result = serializer.serialize(insertEvent);
+        Assertions.assertThat(result).isNotNull();
+
+        verifySerializeResult(
+                tableId, "{\"id\":1,\"not_null_time\":\"12:00:00\",\"__op\":0}", result);
+    }
+
+    @Test
+    void testBinaryTypeSerialization() throws Exception {
+        TableId tableId = TableId.parse("test.binary_table");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", new IntType())
+                        .physicalColumn("bin_col", new BinaryType(10))
+                        .physicalColumn("varbin_col", new VarBinaryType(255))
+                        .primaryKey("id")
+                        .build();
+
+        CreateTableEvent createTableEvent = new CreateTableEvent(tableId, schema);
+        Assertions.assertThat(serializer.serialize(createTableEvent)).isNull();
+
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(schema.getColumnDataTypes().toArray(new DataType[0]));
+
+        byte[] binData = new byte[] {1, 2, 3, 4, 5};
+        byte[] varBinData = new byte[] {0x0A, 0x0B, 0x0C};
+
+        DataChangeEvent insertEvent =
+                DataChangeEvent.insertEvent(
+                        tableId, generator.generate(new Object[] {1, binData, varBinData}));
+
+        StarRocksRowData result = serializer.serialize(insertEvent);
+        Assertions.assertThat(result).isNotNull();
+        Assertions.assertThat(result.getDatabase()).isEqualTo(tableId.getSchemaName());
+        Assertions.assertThat(result.getTable()).isEqualTo(tableId.getTableName());
+
+        // Binary data is serialized as Base64-encoded strings in JSON by Jackson
+        String expectedBin = Base64.getEncoder().encodeToString(binData);
+        String expectedVarBin = Base64.getEncoder().encodeToString(varBinData);
+        String expectedJson =
+                String.format(
+                        "{\"id\":1,\"bin_col\":\"%s\",\"varbin_col\":\"%s\",\"__op\":0}",
+                        expectedBin, expectedVarBin);
+
+        SortedMap<String, Object> expectMap =
+                objectMapper.readValue(
+                        expectedJson, new TypeReference<TreeMap<String, Object>>() {});
+        SortedMap<String, Object> actualMap =
+                objectMapper.readValue(
+                        result.getRow(), new TypeReference<TreeMap<String, Object>>() {});
+        Assertions.assertThat(actualMap).isEqualTo(expectMap);
+    }
+
+    @Test
+    void testBinaryTypeWithNullValues() throws Exception {
+        TableId tableId = TableId.parse("test.binary_null_table");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", new IntType())
+                        .physicalColumn("nullable_bin", new VarBinaryType(100))
+                        .primaryKey("id")
+                        .build();
+
+        CreateTableEvent createTableEvent = new CreateTableEvent(tableId, schema);
+        Assertions.assertThat(serializer.serialize(createTableEvent)).isNull();
+
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(schema.getColumnDataTypes().toArray(new DataType[0]));
+
+        DataChangeEvent insertEvent =
+                DataChangeEvent.insertEvent(tableId, generator.generate(new Object[] {1, null}));
+
+        StarRocksRowData result = serializer.serialize(insertEvent);
+        Assertions.assertThat(result).isNotNull();
+
+        verifySerializeResult(tableId, "{\"id\":1,\"__op\":0}", result);
+    }
+
     private void verifySerializeResult(
             TableId expectTable, String expectRow, StarRocksRowData actualRowData)
             throws Exception {
@@ -309,17 +607,14 @@ class EventRecordSerializationSchemaTest {
             throw new UnsupportedOperationException();
         }
 
-        @Override
         public int getSubtaskId() {
             throw new UnsupportedOperationException();
         }
 
-        @Override
         public int getNumberOfParallelSubtasks() {
             throw new UnsupportedOperationException();
         }
 
-        @Override
         public int getAttemptNumber() {
             throw new UnsupportedOperationException();
         }
@@ -350,7 +645,6 @@ class EventRecordSerializationSchemaTest {
             throw new UnsupportedOperationException();
         }
 
-        @Override
         public JobID getJobId() {
             throw new UnsupportedOperationException();
         }

@@ -156,7 +156,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
         executorService.execute(
                 () -> {
                     try {
-                        currentTaskRunning = true;
+                        startCurrentTask();
                         final SnapshotSplitChangeEventSourceContextImpl sourceContext =
                                 new SnapshotSplitChangeEventSourceContextImpl();
 
@@ -433,6 +433,11 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
         } catch (Exception e) {
             LOG.error("Close snapshot reader error", e);
         }
+    }
+
+    private void startCurrentTask() {
+        currentTaskRunning = true;
+        changeEventSourceContext.startChangeEventSource();
     }
 
     private void stopCurrentTask() {

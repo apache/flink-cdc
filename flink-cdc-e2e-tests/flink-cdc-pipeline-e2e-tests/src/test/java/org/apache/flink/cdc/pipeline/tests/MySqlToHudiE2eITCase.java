@@ -35,6 +35,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.BindMode;
@@ -64,6 +65,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /** End-to-end tests for mysql cdc to Iceberg pipeline job. */
+@EnabledIfSystemProperty(named = "specifiedFlinkVersion", matches = "^1.*")
 public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
 
     private static final Logger LOG = LoggerFactory.getLogger(MySqlToHudiE2eITCase.class);
@@ -236,7 +238,6 @@ public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
         Path hudiCdcConnector = TestUtils.getResource("hudi-cdc-pipeline-connector.jar");
         Path hadoopJar = TestUtils.getResource("flink-shade-hadoop.jar");
         Path hadoopCompatibilityJar = TestUtils.getResource("flink-hadoop-compatibility.jar");
-        Path dropMetricsJar = TestUtils.getResource("flink-metrics-dropwizard.jar");
         Path flinkParquet = TestUtils.getResource("flink-parquet.jar");
         JobID pipelineJobID =
                 submitPipelineJob(
@@ -244,7 +245,6 @@ public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
                         hudiCdcConnector,
                         hadoopJar,
                         hadoopCompatibilityJar,
-                        dropMetricsJar,
                         flinkParquet);
         waitUntilJobRunning(pipelineJobID, Duration.ofSeconds(60));
         LOG.info("Pipeline job is running");
@@ -570,7 +570,6 @@ public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
         Path hudiHadoopCommonJar = TestUtils.getResource("hudi-hadoop-common.jar");
         Path hadoopJar = TestUtils.getResource("flink-shade-hadoop.jar");
         Path hadoopCompatibilityJar = TestUtils.getResource("flink-hadoop-compatibility.jar");
-        Path dropMetricsJar = TestUtils.getResource("flink-metrics-dropwizard.jar");
         Path flinkParquet = TestUtils.getResource("flink-parquet.jar");
 
         // Start the pipeline job
@@ -582,7 +581,6 @@ public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
                         hudiHadoopCommonJar,
                         hadoopJar,
                         hadoopCompatibilityJar,
-                        dropMetricsJar,
                         flinkParquet);
         waitUntilJobRunning(pipelineJobID1, Duration.ofSeconds(60));
 
@@ -660,7 +658,6 @@ public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
                         hudiHadoopCommonJar,
                         hadoopJar,
                         hadoopCompatibilityJar,
-                        dropMetricsJar,
                         flinkParquet);
         waitUntilJobRunning(pipelineJobID2, Duration.ofSeconds(60));
         LOG.info("Job restarted from savepoint");

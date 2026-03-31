@@ -22,6 +22,8 @@ import org.apache.flink.cdc.connectors.base.source.meta.offset.Offset;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.meta.wartermark.WatermarkEvent;
 import org.apache.flink.cdc.connectors.base.source.meta.wartermark.WatermarkKind;
+import org.apache.flink.cdc.connectors.postgres.source.schema.PostgresSchemaRecord;
+import org.apache.flink.cdc.connectors.postgres.source.schema.SchemaDispatcher;
 
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.connector.postgresql.PostgresConnectorConfig;
@@ -30,6 +32,7 @@ import io.debezium.heartbeat.HeartbeatFactory;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.source.spi.EventMetadataProvider;
 import io.debezium.pipeline.spi.ChangeEventCreator;
+import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
 import io.debezium.schema.DataCollectionFilters;
 import io.debezium.schema.DatabaseSchema;
@@ -41,7 +44,7 @@ import java.util.Map;
 
 /** Postgres Dispatcher for cdc source with watermark. */
 public class CDCPostgresDispatcher extends PostgresEventDispatcher<TableId>
-        implements WatermarkDispatcher {
+        implements WatermarkDispatcher, SchemaDispatcher {
     private final String topic;
     private final ChangeEventQueue<DataChangeEvent> queue;
 
@@ -80,5 +83,16 @@ public class CDCPostgresDispatcher extends PostgresEventDispatcher<TableId>
                 WatermarkEvent.create(
                         sourcePartition, topic, sourceSplit.splitId(), watermarkKind, watermark);
         queue.enqueue(new DataChangeEvent(sourceRecord));
+    }
+
+    @Override
+    public void dispatch(Table table) {
+        PostgresSchemaRecord schemaRecord = new PostgresSchemaRecord(table);
+        try {
+            queue.enqueue(new DataChangeEvent(schemaRecord));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException(e);
+        }
     }
 }

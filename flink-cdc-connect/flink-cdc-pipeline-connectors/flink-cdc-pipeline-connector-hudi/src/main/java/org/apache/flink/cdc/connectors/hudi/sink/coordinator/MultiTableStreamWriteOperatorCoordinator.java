@@ -148,13 +148,12 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
         final int commitsThreshold;
 
         TableState(Configuration conf) {
-            this.operationType =
-                    WriteOperationType.fromValue(conf.getString(FlinkOptions.OPERATION));
+            this.operationType = WriteOperationType.fromValue(conf.get(FlinkOptions.OPERATION));
             this.commitAction =
                     CommitUtils.getCommitActionType(
                             this.operationType,
                             HoodieTableType.valueOf(
-                                    conf.getString(FlinkOptions.TABLE_TYPE).toUpperCase()));
+                                    conf.get(FlinkOptions.TABLE_TYPE).toUpperCase()));
             this.isOverwrite = WriteOperationType.isOverwrite(this.operationType);
             this.scheduleCompaction = OptionsResolver.needsScheduleCompaction(conf);
             this.scheduleClustering = OptionsResolver.needsScheduleClustering(conf);
@@ -467,7 +466,7 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
                             LOG.info("New table detected: {}. Initializing Hudi resources.", tId);
                             try {
                                 Configuration tableConfig = createTableSpecificConfig(tId);
-                                String tablePath = tableConfig.getString(FlinkOptions.PATH);
+                                String tablePath = tableConfig.get(FlinkOptions.PATH);
                                 pathToTableId.put(tablePath, tId);
 
                                 // Create physical directory for Hudi table before initializing
@@ -689,7 +688,7 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
                                 tableId,
                                 tId -> {
                                     Configuration tableConfig = createTableSpecificConfig(tId);
-                                    String tablePath = tableConfig.getString(FlinkOptions.PATH);
+                                    String tablePath = tableConfig.get(FlinkOptions.PATH);
                                     pathToTableId.put(tablePath, tId);
                                     TableState tableState = new TableState(tableConfig);
                                     EventBuffers eventBuffers =

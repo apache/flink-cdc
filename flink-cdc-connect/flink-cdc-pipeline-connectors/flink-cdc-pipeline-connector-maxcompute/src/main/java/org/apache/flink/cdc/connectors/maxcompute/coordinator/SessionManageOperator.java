@@ -36,6 +36,7 @@ import org.apache.flink.cdc.connectors.maxcompute.coordinator.message.WaitForFlu
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeOptions;
 import org.apache.flink.cdc.connectors.maxcompute.utils.MaxComputeUtils;
 import org.apache.flink.cdc.connectors.maxcompute.utils.TypeConvertUtils;
+import org.apache.flink.cdc.runtime.operators.AbstractStreamOperatorAdapter;
 import org.apache.flink.cdc.runtime.operators.schema.common.CoordinationResponseUtils;
 import org.apache.flink.cdc.runtime.operators.sink.SchemaEvolutionClient;
 import org.apache.flink.runtime.jobgraph.OperatorID;
@@ -46,7 +47,6 @@ import org.apache.flink.runtime.operators.coordination.OperatorEvent;
 import org.apache.flink.runtime.operators.coordination.OperatorEventHandler;
 import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.graph.StreamConfig;
-import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.BoundedOneInput;
 import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
@@ -75,7 +75,7 @@ import java.util.concurrent.Future;
  * SessionManageCoordinator} to create a writing session. Subsequently, it incorporates the
  * SessionId into the metadata of the {@link DataChangeEvent} for downstream processing.
  */
-public class SessionManageOperator extends AbstractStreamOperator<Event>
+public class SessionManageOperator extends AbstractStreamOperatorAdapter<Event>
         implements OneInputStreamOperator<Event, Event>, OperatorEventHandler, BoundedOneInput {
     private static final long serialVersionUID = 1L;
     private static final Logger LOG = LoggerFactory.getLogger(SessionManageOperator.class);
@@ -125,7 +125,7 @@ public class SessionManageOperator extends AbstractStreamOperator<Event>
                 new SchemaEvolutionClient(
                         containingTask.getEnvironment().getOperatorCoordinatorEventGateway(),
                         schemaOperatorUid);
-        indexOfThisSubtask = getRuntimeContext().getIndexOfThisSubtask();
+        indexOfThisSubtask = getRuntimeContext().getTaskInfo().getIndexOfThisSubtask();
     }
 
     @Override
@@ -221,7 +221,7 @@ public class SessionManageOperator extends AbstractStreamOperator<Event>
         snapshotFlushSuccess =
                 submitRequestToOperator(
                         new WaitForFlushSuccessRequest(
-                                getRuntimeContext().getIndexOfThisSubtask()));
+                                getRuntimeContext().getTaskInfo().getIndexOfThisSubtask()));
     }
 
     @Override
@@ -242,7 +242,7 @@ public class SessionManageOperator extends AbstractStreamOperator<Event>
         snapshotFlushSuccess =
                 submitRequestToOperator(
                         new WaitForFlushSuccessRequest(
-                                getRuntimeContext().getIndexOfThisSubtask()));
+                                getRuntimeContext().getTaskInfo().getIndexOfThisSubtask()));
     }
 
     private void waitLastSnapshotFlushSuccess() throws Exception {

@@ -39,6 +39,29 @@ under the License.
 
 一个 Route 模块可以包含一个或多个 source-table/sink-table 规则。
 
+# 路由模式
+默认情况下，所有匹配的路由规则都会被应用到表上。你可以在 pipeline 配置中通过 `route-mode` 选项来改变这一行为：
+
+| 值            | 描述                                              |
+|--------------|-------------------------------------------------|
+| `ALL_MATCH`  | 应用所有匹配的路由规则到表上。这是默认模式。                          |
+| `FIRST_MATCH`| 只应用第一个匹配的路由规则，并停止后续规则的计算。                       |
+
+例如，使用 `FIRST_MATCH` 模式：
+
+```yaml
+pipeline:
+  name: Sync MySQL Database to Doris
+  parallelism: 2
+  route-mode: FIRST_MATCH
+```
+
+{{< hint info >}}
+
+当使用 `FIRST_MATCH` 模式时，路由规则会按照定义的顺序进行计算。第一个匹配源表的规则会被应用，后续的规则将被跳过。
+
+{{< /hint >}}
+
 # 示例
 ## 路由一个 Data Source 表到一个 Data Sink 表
 如果同步一个 `mydb` 数据库中的 `web_order` 表到一个相同库的 `ods_web_order` 表，我们可以使用下面的 yaml 文件来定义这个路由：

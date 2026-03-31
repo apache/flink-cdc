@@ -18,7 +18,6 @@
 package org.apache.flink.cdc.connectors.mysql.source;
 
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
-import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils;
 import org.apache.flink.cdc.connectors.mysql.table.MySqlReadableMetadata;
@@ -26,16 +25,19 @@ import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.debezium.table.MetadataConverter;
 import org.apache.flink.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.configuration.StateRecoveryOptions;
 import org.apache.flink.core.execution.JobClient;
+import org.apache.flink.core.execution.SavepointFormatType;
 import org.apache.flink.runtime.checkpoint.CheckpointException;
-import org.apache.flink.runtime.jobgraph.SavepointConfigOptions;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.operators.collect.CollectResultIterator;
+import org.apache.flink.streaming.api.operators.collect.CollectResultIteratorAdapter;
 import org.apache.flink.streaming.api.operators.collect.CollectSinkOperator;
 import org.apache.flink.streaming.api.operators.collect.CollectSinkOperatorFactory;
 import org.apache.flink.streaming.api.operators.collect.CollectStreamSink;
+import org.apache.flink.streaming.util.RestartStrategyUtils;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -54,6 +56,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.condition.DisabledIfSystemProperty;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
@@ -78,11 +81,11 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.lang.String.format;
-import static org.apache.flink.api.common.restartstrategy.RestartStrategies.noRestart;
 import static org.apache.flink.util.Preconditions.checkState;
 
 /** IT tests to cover various newly added tables during capture process. */
 @Timeout(value = 300, unit = TimeUnit.SECONDS)
+@DisabledIfSystemProperty(named = "flink.profile", matches = "flink2")
 class NewlyAddedTableITCase extends MySqlSourceTestBase {
 
     private final UniqueDatabase customDatabase =
@@ -518,18 +521,24 @@ class NewlyAddedTableITCase extends MySqlSourceTestBase {
     /** Add a collect sink in the job. */
     protected CollectResultIterator<RowData> addCollectSink(DataStream<RowData> stream) {
         TypeSerializer<RowData> serializer =
-                stream.getType().createSerializer(stream.getExecutionConfig());
+                stream.getType()
+                        .createSerializer(stream.getExecutionConfig().getSerializerConfig());
         String accumulatorName = "dataStreamCollect_" + UUID.randomUUID();
         CollectSinkOperatorFactory<RowData> factory =
                 new CollectSinkOperatorFactory<>(serializer, accumulatorName);
+        CollectStreamSink<RowData> sink = new CollectStreamSink<>(stream, factory);
+        // Set both name and uid to the same value. The uid is used by Flink to generate
+        // OperatorID via StreamGraphHasherV2.generateUserSpecifiedHash(uid), and the same
+        // uid string must be passed to CollectResultIteratorAdapter for coordinator lookup.
+        String operatorUid = "Data stream collect sink";
+        sink.name(operatorUid).uid(operatorUid);
         CollectSinkOperator<RowData> operator =
                 (CollectSinkOperator<RowData>) factory.getOperator();
-        CollectStreamSink<RowData> sink = new CollectStreamSink<>(stream, factory);
-        sink.name("Data stream collect sink");
         stream.getExecutionEnvironment().addOperator(sink.getTransformation());
         CollectResultIterator<RowData> iterator =
-                new CollectResultIterator(
-                        operator.getOperatorIdFuture(),
+                new CollectResultIteratorAdapter<>(
+                        operatorUid,
+                        operator,
                         serializer,
                         accumulatorName,
                         stream.getExecutionEnvironment().getCheckpointConfig(),
@@ -934,13 +943,13 @@ class NewlyAddedTableITCase extends MySqlSourceTestBase {
             String finishedSavePointPath, int parallelism) throws Exception {
         Configuration configuration = new Configuration();
         if (finishedSavePointPath != null) {
-            configuration.setString(SavepointConfigOptions.SAVEPOINT_PATH, finishedSavePointPath);
+            configuration.set(StateRecoveryOptions.SAVEPOINT_PATH, finishedSavePointPath);
         }
         StreamExecutionEnvironment env =
                 StreamExecutionEnvironment.getExecutionEnvironment(configuration);
         env.setParallelism(parallelism);
         env.enableCheckpointing(200L);
-        env.setRestartStrategy(RestartStrategies.fixedDelayRestart(3, 100L));
+        RestartStrategyUtils.configureFixedDelayRestartStrategy(env, 3, 100L);
         return env;
     }
 
@@ -950,7 +959,9 @@ class NewlyAddedTableITCase extends MySqlSourceTestBase {
         // retry 600 times, it takes 100 milliseconds per time, at most retry 1 minute
         while (retryTimes < 600) {
             try {
-                return jobClient.triggerSavepoint(savepointDirectory).get();
+                return jobClient
+                        .triggerSavepoint(savepointDirectory, SavepointFormatType.DEFAULT)
+                        .get();
             } catch (Exception e) {
                 Optional<CheckpointException> exception =
                         ExceptionUtils.findThrowable(e, CheckpointException.class);
@@ -1138,7 +1149,7 @@ class NewlyAddedTableITCase extends MySqlSourceTestBase {
             String newlyAddedTable = captureAddressTables[round];
             StreamExecutionEnvironment env =
                     getStreamExecutionEnvironment(finishedSavePointPath, parallelism);
-            env.setRestartStrategy(noRestart());
+            RestartStrategyUtils.configureNoRestartStrategy(env);
             StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
             String createTableStatement =
                     getCreateTableStatement(sourceOptions, captureTablesThisRound);

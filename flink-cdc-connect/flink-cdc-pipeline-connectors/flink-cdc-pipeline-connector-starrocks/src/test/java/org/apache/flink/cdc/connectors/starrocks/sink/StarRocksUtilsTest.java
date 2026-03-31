@@ -26,6 +26,7 @@ import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.BigIntType;
+import org.apache.flink.cdc.common.types.BinaryType;
 import org.apache.flink.cdc.common.types.BooleanType;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
@@ -37,6 +38,7 @@ import org.apache.flink.cdc.common.types.LocalZonedTimestampType;
 import org.apache.flink.cdc.common.types.SmallIntType;
 import org.apache.flink.cdc.common.types.TimestampType;
 import org.apache.flink.cdc.common.types.TinyIntType;
+import org.apache.flink.cdc.common.types.VarBinaryType;
 import org.apache.flink.cdc.common.types.VarCharType;
 import org.apache.flink.cdc.common.types.ZonedTimestampType;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
@@ -300,13 +302,36 @@ class StarRocksUtilsTest {
     }
 
     @Test
-    void testToStarRocksDataTypeUnsupported() {
+    void testToStarRocksDataTypeBinary() {
         StarRocksColumn.Builder builder =
                 new StarRocksColumn.Builder().setColumnName("col").setOrdinalPosition(0);
-        assertThatThrownBy(
-                        () -> StarRocksUtils.toStarRocksDataType(DataTypes.BYTES(), false, builder))
-                .isInstanceOf(UnsupportedOperationException.class)
-                .hasMessageContaining("Unsupported CDC data type");
+        StarRocksUtils.toStarRocksDataType(new BinaryType(17), false, builder);
+        StarRocksColumn column = builder.build();
+        assertThat(column.getDataType()).isEqualTo(StarRocksUtils.VARBINARY);
+        assertThat(column.getColumnSize()).hasValue(17);
+        assertThat(column.isNullable()).isTrue();
+    }
+
+    @Test
+    void testToStarRocksDataTypeVarBinary() {
+        StarRocksColumn.Builder builder =
+                new StarRocksColumn.Builder().setColumnName("col").setOrdinalPosition(0);
+        StarRocksUtils.toStarRocksDataType(new VarBinaryType(255), false, builder);
+        StarRocksColumn column = builder.build();
+        assertThat(column.getDataType()).isEqualTo(StarRocksUtils.VARBINARY);
+        assertThat(column.getColumnSize()).hasValue(255);
+        assertThat(column.isNullable()).isTrue();
+    }
+
+    @Test
+    void testToStarRocksDataTypeBytes() {
+        StarRocksColumn.Builder builder =
+                new StarRocksColumn.Builder().setColumnName("col").setOrdinalPosition(0);
+        StarRocksUtils.toStarRocksDataType(DataTypes.BYTES(), false, builder);
+        StarRocksColumn column = builder.build();
+        assertThat(column.getDataType()).isEqualTo(StarRocksUtils.VARBINARY);
+        assertThat(column.getColumnSize()).hasValue(StarRocksUtils.MAX_VARBINARY_SIZE);
+        assertThat(column.isNullable()).isTrue();
     }
 
     private void assertStarRocksDataType(DataType cdcType, String expectedStarRocksType) {
@@ -418,12 +443,37 @@ class StarRocksUtilsTest {
     }
 
     @Test
-    void testCreateFieldGetterUnsupportedType() {
-        assertThatThrownBy(
-                        () ->
-                                StarRocksUtils.createFieldGetter(
-                                        DataTypes.BYTES(), 0, ZoneId.of("UTC")))
-                .isInstanceOf(UnsupportedOperationException.class)
-                .hasMessageContaining("Don't support data type");
+    void testCreateFieldGetterBinary() {
+        RecordData.FieldGetter getter =
+                StarRocksUtils.createFieldGetter(new BinaryType(10), 0, ZoneId.of("UTC"));
+
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(new DataType[] {new BinaryType(10)});
+        byte[] expected = new byte[] {1, 2, 3, 4, 5};
+        BinaryRecordData record = generator.generate(new Object[] {expected});
+        assertThat(getter.getFieldOrNull(record)).isEqualTo(expected);
+    }
+
+    @Test
+    void testCreateFieldGetterVarBinary() {
+        RecordData.FieldGetter getter =
+                StarRocksUtils.createFieldGetter(new VarBinaryType(255), 0, ZoneId.of("UTC"));
+
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(new DataType[] {new VarBinaryType(255)});
+        byte[] expected = new byte[] {0x0A, 0x0B, 0x0C};
+        BinaryRecordData record = generator.generate(new Object[] {expected});
+        assertThat(getter.getFieldOrNull(record)).isEqualTo(expected);
+    }
+
+    @Test
+    void testCreateFieldGetterBinaryNullable() {
+        RecordData.FieldGetter getter =
+                StarRocksUtils.createFieldGetter(DataTypes.BYTES(), 0, ZoneId.of("UTC"));
+
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(new DataType[] {DataTypes.BYTES()});
+        BinaryRecordData record = generator.generate(new Object[] {null});
+        assertThat(getter.getFieldOrNull(record)).isNull();
     }
 }

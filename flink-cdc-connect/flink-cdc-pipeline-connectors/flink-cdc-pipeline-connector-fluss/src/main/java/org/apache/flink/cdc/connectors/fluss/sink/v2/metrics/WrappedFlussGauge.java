@@ -26,9 +26,9 @@ import org.apache.flink.metrics.Gauge;
 /** An implementation of Flink's {@link Gauge} which wraps Fluss's Gauge. */
 public class WrappedFlussGauge<T> implements Gauge<T> {
 
-    private final com.alibaba.fluss.metrics.Gauge<T> flussGauge;
+    private final org.apache.fluss.metrics.Gauge<T> flussGauge;
 
-    public WrappedFlussGauge(com.alibaba.fluss.metrics.Gauge<T> flussGauge) {
+    public WrappedFlussGauge(org.apache.fluss.metrics.Gauge<T> flussGauge) {
         this.flussGauge = flussGauge;
     }
 
