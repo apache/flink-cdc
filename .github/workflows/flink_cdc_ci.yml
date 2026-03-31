@@ -22,7 +22,6 @@ on:
     paths-ignore:
       - 'docs/**'
       - 'README.md'
-      - '.dlc.json'
   pull_request:
     branches:
       - master
@@ -30,7 +29,6 @@ on:
     paths-ignore:
       - 'docs/**'
       - 'README.md'
-      - '.dlc.json'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.number || github.run_id }}
