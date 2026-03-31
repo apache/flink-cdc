@@ -44,6 +44,7 @@ public class MySqlSourceConfigFactory implements Serializable {
 
     private int port = 3306; // default 3306 port
     private String hostname;
+    private String snapshotHostname;
     private String username;
     private String password;
     private ServerIdRange serverIdRange;
@@ -78,6 +79,16 @@ public class MySqlSourceConfigFactory implements Serializable {
 
     public MySqlSourceConfigFactory hostname(String hostname) {
         this.hostname = hostname;
+        return this;
+    }
+
+    /**
+     * Optional hostname of a MySQL read replica to use for snapshot queries. When set, snapshot
+     * data will be read from this replica instead of the primary writer instance, reducing the load
+     * on the writer. The binlog position will still be obtained from the primary writer instance.
+     */
+    public MySqlSourceConfigFactory snapshotHostname(String snapshotHostname) {
+        this.snapshotHostname = snapshotHostname;
         return this;
     }
 
@@ -401,6 +412,7 @@ public class MySqlSourceConfigFactory implements Serializable {
 
         return new MySqlSourceConfig(
                 hostname,
+                snapshotHostname,
                 port,
                 username,
                 password,

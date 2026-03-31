@@ -35,23 +35,40 @@ public class JdbcConnectionFactory implements JdbcConnection.ConnectionFactory {
     private static final Logger LOG = LoggerFactory.getLogger(JdbcConnectionFactory.class);
 
     private final MySqlSourceConfig sourceConfig;
+    private final String hostnameOverride;
 
     public JdbcConnectionFactory(MySqlSourceConfig sourceConfig) {
+        this(sourceConfig, null);
+    }
+
+    /**
+     * Creates a factory that connects to a specific hostname instead of the configured one.
+     *
+     * @param sourceConfig the source configuration
+     * @param hostnameOverride if non-null, connect to this host instead of
+     *                         sourceConfig.getHostname()
+     */
+    public JdbcConnectionFactory(MySqlSourceConfig sourceConfig, String hostnameOverride) {
         this.sourceConfig = sourceConfig;
+        this.hostnameOverride = hostnameOverride;
     }
 
     @Override
     public Connection connect(JdbcConfiguration config) throws SQLException {
         final int connectRetryTimes = sourceConfig.getConnectMaxRetries();
+        final String targetHostname =
+                hostnameOverride != null ? hostnameOverride : sourceConfig.getHostname();
 
         final ConnectionPoolId connectionPoolId =
                 new ConnectionPoolId(
-                        sourceConfig.getHostname(),
-                        sourceConfig.getPort(),
-                        sourceConfig.getUsername());
+                        targetHostname, sourceConfig.getPort(), sourceConfig.getUsername());
 
         HikariDataSource dataSource =
-                JdbcConnectionPools.getInstance()
+                hostnameOverride != null
+                        ? JdbcConnectionPools.getInstance()
+                        .getOrCreateConnectionPool(
+                                connectionPoolId, sourceConfig, hostnameOverride)
+                        : JdbcConnectionPools.getInstance()
                         .getOrCreateConnectionPool(connectionPoolId, sourceConfig);
 
         int i = 0;

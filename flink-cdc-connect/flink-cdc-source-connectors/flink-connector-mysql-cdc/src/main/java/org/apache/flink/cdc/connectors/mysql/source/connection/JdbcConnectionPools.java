@@ -44,10 +44,22 @@ public class JdbcConnectionPools implements ConnectionPools {
     @Override
     public HikariDataSource getOrCreateConnectionPool(
             ConnectionPoolId poolId, MySqlSourceConfig sourceConfig) {
+        return getOrCreateConnectionPool(poolId, sourceConfig, poolId.getHost());
+    }
+
+    /**
+     * Gets or creates a connection pool for the specified pool ID with a hostname override. This is
+     * useful for creating reader connection pools that connect to a different host than the primary
+     * writer.
+     */
+    public HikariDataSource getOrCreateConnectionPool(
+            ConnectionPoolId poolId, MySqlSourceConfig sourceConfig, String hostname) {
         synchronized (pools) {
             if (!pools.containsKey(poolId)) {
-                LOG.info("Create and register connection pool {}", poolId);
-                pools.put(poolId, PooledDataSourceFactory.createPooledDataSource(sourceConfig));
+                LOG.info("Create and register connection pool {} for hostname {}", poolId, hostname);
+                pools.put(
+                        poolId,
+                        PooledDataSourceFactory.createPooledDataSource(sourceConfig, hostname));
             }
             return pools.get(poolId);
         }
