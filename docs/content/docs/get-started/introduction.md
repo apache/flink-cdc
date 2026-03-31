@@ -128,6 +128,7 @@ Check out the quickstart guide to learn how to establish a Flink CDC pipeline:
 | MySQL to Apache Doris | [1.20.x]({{< ref "docs/get-started/quickstart-for-1.20/mysql-to-doris" >}}) / [2.2.x]({{< ref "docs/get-started/quickstart-for-2.2/mysql-to-doris" >}}) |
 | MySQL to StarRocks | [1.20.x]({{< ref "docs/get-started/quickstart-for-1.20/mysql-to-starrocks" >}}) / [2.2.x]({{< ref "docs/get-started/quickstart-for-2.2/mysql-to-starrocks" >}}) |
 | MySQL to Kafka | [1.20.x]({{< ref "docs/get-started/quickstart-for-1.20/mysql-to-kafka" >}}) / [2.2.x]({{< ref "docs/get-started/quickstart-for-2.2/mysql-to-kafka" >}}) |
+| PostgreSQL to Fluss | [1.20.x]({{< ref "docs/get-started/quickstart-for-1.20/postgres-to-fluss" >}}) / [2.2.x]({{< ref "docs/get-started/quickstart-for-2.2/postgres-to-fluss" >}}) |
 
 ### Understand Core Concepts
 
