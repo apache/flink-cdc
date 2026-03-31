@@ -58,6 +58,7 @@ import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.SI
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.SINK_MAX_RETRIES;
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.SINK_USE_CACHE;
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.STREAM_LOAD_PROP_PREFIX;
+import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.TABLE_BUCKETS;
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.TABLE_CREATE_AUTO_PARTITION_PROPERTIES_PREFIX;
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.TABLE_CREATE_PROPERTIES_PREFIX;
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.USERNAME;
@@ -65,6 +66,9 @@ import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.US
 /** A dummy {@link DataSinkFactory} to create {@link DorisDataSink}. */
 @Internal
 public class DorisDataSinkFactory implements DataSinkFactory {
+
+    public static final String IDENTIFIER = "doris";
+
     @Override
     public DataSink createDataSink(Context context) {
         FactoryHelper.createFactoryHelper(this, context)
@@ -130,7 +134,7 @@ public class DorisDataSinkFactory implements DataSinkFactory {
 
     @Override
     public String identifier() {
-        return "doris";
+        return IDENTIFIER;
     }
 
     @Override
@@ -165,6 +169,7 @@ public class DorisDataSinkFactory implements DataSinkFactory {
         options.add(SINK_BUFFER_FLUSH_INTERVAL);
         options.add(SINK_IGNORE_UPDATE_BEFORE);
         options.add(SINK_USE_CACHE);
+        options.add(TABLE_BUCKETS);
 
         return options;
     }

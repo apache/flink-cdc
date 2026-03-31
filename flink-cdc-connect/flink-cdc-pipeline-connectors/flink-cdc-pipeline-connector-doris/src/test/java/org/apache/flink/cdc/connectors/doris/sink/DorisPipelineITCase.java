@@ -137,6 +137,14 @@ class DorisPipelineITCase extends DorisSinkTestBase {
         runValuesToDorisJob(true);
     }
 
+    @Test
+    void testDorisSinkStreamJobWithCsvFormat() throws Exception {
+        Configuration extraConfig = new Configuration();
+        extraConfig.addAll(
+                Configuration.fromMap(Collections.singletonMap("sink.properties.format", "csv")));
+        runValuesToDorisJob(false, extraConfig);
+    }
+
     private List<Event> generateEvents(TableId tableId) {
         Schema schema =
                 Schema.newBuilder()
@@ -217,6 +225,11 @@ class DorisPipelineITCase extends DorisSinkTestBase {
     }
 
     private void runValuesToDorisJob(boolean batchMode) throws Exception {
+        runValuesToDorisJob(batchMode, new Configuration());
+    }
+
+    private void runValuesToDorisJob(boolean batchMode, Configuration extraConfig)
+            throws Exception {
         TableId tableId =
                 TableId.tableId(
                         DorisContainer.DORIS_DATABASE_NAME, DorisContainer.DORIS_TABLE_NAME);
@@ -236,6 +249,7 @@ class DorisPipelineITCase extends DorisSinkTestBase {
         config.addAll(
                 Configuration.fromMap(
                         Collections.singletonMap("table.create.properties.replication_num", "1")));
+        config.addAll(extraConfig);
 
         Sink<Event> dorisSink =
                 ((FlinkSinkProvider) createDorisDataSink(config).getEventSinkProvider()).getSink();

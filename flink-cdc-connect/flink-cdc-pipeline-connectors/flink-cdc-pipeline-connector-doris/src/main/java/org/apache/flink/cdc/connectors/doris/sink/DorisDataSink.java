@@ -62,14 +62,16 @@ public class DorisDataSink implements DataSink, Serializable {
                             dorisOptions,
                             readOptions,
                             executionOptions,
-                            new DorisEventSerializer(zoneId, configuration)));
+                            new DorisEventSerializer(
+                                    zoneId, configuration, executionOptions, dorisOptions)));
         } else {
             return FlinkSinkProvider.of(
                     new DorisBatchSink<>(
                             dorisOptions,
                             readOptions,
                             executionOptions,
-                            new DorisEventSerializer(zoneId, configuration)));
+                            new DorisEventSerializer(
+                                    zoneId, configuration, executionOptions, dorisOptions)));
         }
     }
 

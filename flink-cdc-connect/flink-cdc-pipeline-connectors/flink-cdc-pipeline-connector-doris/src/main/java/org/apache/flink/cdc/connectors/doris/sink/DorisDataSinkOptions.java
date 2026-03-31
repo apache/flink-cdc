@@ -182,6 +182,15 @@ public class DorisDataSinkOptions {
     public static final String TABLE_CREATE_AUTO_PARTITION_PROPERTIES_EXCLUDE =
             TABLE_CREATE_AUTO_PARTITION_PROPERTIES_PREFIX + TABLE_CREATE_PARTITION_EXCLUDE;
 
+    public static final ConfigOption<String> TABLE_BUCKETS =
+            ConfigOptions.key("table-buckets")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "Set the number of buckets for tables. "
+                                    + "The format is \"tbl1:10,tbl2:20,a.*:30,.*:50\". "
+                                    + "Supports exact table name and regex pattern matching.");
+
     public static Map<String, String> getPropertiesByPrefix(
             Configuration tableOptions, String prefix) {
         final Map<String, String> props = new HashMap<>();
