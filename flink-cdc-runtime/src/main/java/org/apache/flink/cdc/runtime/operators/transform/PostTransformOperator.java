@@ -132,7 +132,7 @@ public class PostTransformOperator extends AbstractStreamOperatorAdapter<Event>
                 CacheBuilder.newBuilder()
                         .maximumSize(1024)
                         .build(
-                                new CacheLoader<>() {
+                                new CacheLoader<TableId, Optional<PostTransformer>>() {
                                     @Override
                                     public Optional<PostTransformer> load(TableId tableId) {
                                         return getEffectiveTransformer(tableId);

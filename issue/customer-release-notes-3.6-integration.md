@@ -1,0 +1,190 @@
+# Flink CDC 3.6 集成版 — 客户升级说明
+
+**文档版本**：1.0  
+**适用对象**：使用 **Apache Flink CDC 3.6** 基线、并采用 **realfuture-ai** 在 `release-3.6` 上合并的增强的客户与集成方  
+**最后更新**：2026-03-31  
+
+---
+
+## 1. 文档目的与阅读说明
+
+本文档说明在 **官方 Apache Flink CDC 3.6** 之上，通过 **6 个已合并的 Pull Request** 所引入的**增量能力**、**行为变化**与**升级时注意点**，便于客户评估升级收益、排期验证与对外沟通。
+
+**重要区分**：
+
+- **官方 3.6 通用变更**（Flink 版本矩阵、连接器矩阵、安全与依赖升级等）仍以 [Apache Flink CDC 官方 Release / 文档](https://github.com/apache/flink-cdc) 为准；本文**不替代**官方 Release Notes。
+- 本文聚焦 **realfuture-ai/apache-flink-cdc** 仓库 `**release-3.6` 分支**上、相对「仅官方 3.6.0 基线」**额外合入**的增强（PR #1–#6）。
+
+**集成仓库与分支**：
+
+- GitHub：[https://github.com/realfuture-ai/apache-flink-cdc](https://github.com/realfuture-ai/apache-flink-cdc)
+- 集成完成时参考提交：`release-3.6` 包含合并 **PR #6** 后的 tip（文档编制时记录为 `**6eecc4dd`**，实际以贵司检出时的 `git log` 为准）。
+
+---
+
+## 2. 变更总览（PR 清单）
+
+以下 PR 均已合并至 `**release-3.6**`，按**依赖顺序**排列（请勿打乱回滚顺序的理解：先合入的 PR 为后续 PR 的基线）。
+
+
+| PR     | 主题                                                                            | 链接                                                                                                                   |
+| ------ | ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| **#1** | 路由与表匹配（TableIdRouter / FLINK-38779 相关加固）                                      | [https://github.com/realfuture-ai/apache-flink-cdc/pull/1](https://github.com/realfuture-ai/apache-flink-cdc/pull/1) |
+| **#2** | Pipeline 列名大小写 — 配置与选项（Phase 2-A）                                             | [https://github.com/realfuture-ai/apache-flink-cdc/pull/2](https://github.com/realfuture-ai/apache-flink-cdc/pull/2) |
+| **#3** | Pipeline 列名大小写 — YAML / TransformDef 解析（Phase 2-B）                            | [https://github.com/realfuture-ai/apache-flink-cdc/pull/3](https://github.com/realfuture-ai/apache-flink-cdc/pull/3) |
+| **#4** | Pipeline 列名大小写 — Composer / Translator / Runtime 接线（Phase 2-C/D）              | [https://github.com/realfuture-ai/apache-flink-cdc/pull/4](https://github.com/realfuture-ai/apache-flink-cdc/pull/4) |
+| **#5** | Transform 投影主键 / CAST 血缘与 nullability（Phase 3）                                | [https://github.com/realfuture-ai/apache-flink-cdc/pull/5](https://github.com/realfuture-ai/apache-flink-cdc/pull/5) |
+| **#6** | Doris Pipeline Sink 增强（CSV/JSON Stream Load、`table-buckets`、元数据与列演进等，Phase 4） | [https://github.com/realfuture-ai/apache-flink-cdc/pull/6](https://github.com/realfuture-ai/apache-flink-cdc/pull/6) |
+
+
+**未包含在本次「客户可见迁移包」中的计划项**（已正式结论，**无对应合并 PR**）：
+
+- 原拟 **PR #7**（MySQL snapshot / backfill reader 一类改动）：**不迁移**（以上游 3.6 为准，本侧未作为交付项）。
+- **Postgres / Paimon / 根 POM** 从旧 fork **整包回迁**：查重后**未**作为独立 PR 合入本集成线。
+- **Kingbase**、**Oracle Pipeline 从内部 fork 搬运实现**：执行计划明确**排除**（Oracle 能力以**官方 3.6 上游实现**为准）。
+
+---
+
+## 3. 能力升级说明（按主题）
+
+### 3.1 路由与表匹配（PR #1）
+
+**升级内容**：
+
+- 在保留 Apache 3.6 **路由语义**（如 `RouteMode` 等）的前提下，合入与 **FLINK-38779** 及**表名正则路由**相关的修复与加固。
+- 覆盖 **占位符、`$n` 组引用、交替匹配顺序、字面量 `$` 处理**等行为，并配套 **DEBUG 级**诊断日志，便于排查「为何未匹配到规则」。
+
+**客户价值**：
+
+- 降低 **误匹配 / 漏匹配** 导致的表路由错误风险。
+- 复杂正则与多规则并存时，行为更可预期，**与 3.6 官方路由模型兼容**而非整段替换。
+
+**典型受益场景**：
+
+- 多库多表、正则批量路由、与替换模板组合使用的 **Pipeline 路由**配置。
+
+---
+
+### 3.2 Pipeline 列名大小写（PR #2、#3、#4）
+
+**升级内容**：
+
+- 新增 **Pipeline 级**与 **Transform 级**的列名大小写策略，统一在 **post-transform 投影**链路中生效。
+- 引入枚举 `**SchemaColumnCaseFormat`**（如 `**AS_IS` / `UPPER` / `LOWER**`，按 `Locale.ROOT`），通过配置项控制物理列名在投影后的展示形式。
+- **YAML**：支持在 **pipeline** 与 **transform** 上配置 `column-name-case`；**TransformDef** 增加相应字段及 `**registersPostTransformRule`** 等语义，保证「有投影/过滤的 transform」与「仅全局策略」能协同。
+- **Composer / TransformTranslator / PostTransform 运行时**：完成端到端接线；当 pipeline 未配置 transform、但需要全局列名格式时，可通过**默认表包含模式**挂载**隐式 post-transform**，使列名策略对**各类 TableId 形态**（单段、两段、三段）仍生效。
+
+**主要配置键（Pipeline 层）**：
+
+- `column-name-case`：全局默认列名大小写策略（默认 `**AS_IS`**，即不改变）。
+
+**客户价值**：
+
+- 下游系统（数仓、检索、对账）对**列名大小写敏感**时，可在 **CDC Pipeline** 内统一规范，减少 **Flink 侧 SQL / Sink DDL** 再写一层转换。
+- **Transform 级**可覆盖 **Pipeline 级**，便于单表例外。
+
+**注意**：
+
+- **显式投影别名**按设计**不参与**大小写重写（仅物理列名在规则适用范围内规范化）。详细边界见仓库内 `design-doc` 中与 schema column case 相关的用户说明。
+
+---
+
+### 3.3 Transform 投影、主键与 CAST（PR #5）
+
+**升级内容**：
+
+- 修复并增强 **Transform** 场景下 **投影列与主键 / 分区键** 的一致性（例如与**投影别名**对齐的语义）。
+- **TransformParser** 侧对 **CAST** 的 **key lineage** 与 **nullability** 处理更贴近运行时语义，减少「解析期类型」与「运行期数据」不一致的问题。
+- 与 **Phase 2 列名大小写** 按依赖顺序合并，避免半集成导致的键或元数据错乱。
+
+**客户价值**：
+
+- 使用 **列裁剪、别名、CAST** 的 Pipeline 时，**主键推断、分区键、Schema 演进**更稳定。
+- 降低因 **投影与键不一致** 导致的写入失败或静默错误风险。
+
+**建议验证**：
+
+- 带 **投影 + 主键变更 + CAST** 的 YAML 作业；结合贵司 `design-doc` 中 Transform/主键相关用户指南中的用例。
+
+---
+
+### 3.4 Doris Pipeline Sink（PR #6）
+
+**升级内容（摘要）**：
+
+- **Stream Load 格式**：支持在 **JSON** 与 **CSV** 等格式间按配置组织写入（与 Doris Stream Load、`sink.properties.*` 协同）。
+- `**DorisEventSerializer`**：增强序列化路径，包括 **schema 历史**、`**sink.properties.columns`** 等与 Doris 写入行为的衔接。
+- `**table-buckets**`：新增配置，用于按表（支持**精确表名**与**正则**）指定 **bucket 数量**，格式示例：`tbl1:10,tbl2:20,a.*:30,.*:50`（详见选项说明）。
+- `**DorisMetadataApplier`**：**schema 缓存**、**按表设置 buckets**、**AddColumn 位置**等与 DDL 应用相关的增强；并与上游 3.6 已有路径（如 `**AlterTableComment` / `AlterColumnType`** 等注释类事件）**并存**，避免覆盖官方语义。
+- `**DorisRowConverter`**：例如 **TIME** 类型在 **JSON** 序列化场景下按字符串等策略处理，减少类型与格式不兼容。
+- **测试**：扩展/新增 **单测**；**IT** 依赖 Doris 环境（如容器），客户环境需自行启用。
+
+**主要配置键（节选）**：
+
+- `table-buckets`：表级 bucket 映射（可选，无默认值）。
+- 既有 `sink.properties.` 前缀下的 Doris Stream Load 参数仍适用；具体键名以运行时所载 **Flink CDC 配置类** 与 Doris 官方说明为准。
+
+**客户价值**：
+
+- **Load 格式与列映射**更灵活，便于与 Doris 侧表结构、导入规范对齐。
+- **自动建表 / 演进**场景下，**分桶策略**可配置化，**列位置演进**与 **元数据缓存**有助于降低频繁 DDL 带来的抖动与失败重试成本。
+
+---
+
+## 4. 带来的整体提升（客户视角归纳）
+
+
+| 维度              | 提升说明                                                   |
+| --------------- | ------------------------------------------------------ |
+| **可运维性**        | 路由与正则行为更清晰、可日志诊断；Doris 侧元数据与写入参数更可配置。                  |
+| **数据一致性风险**     | Transform 下主键/投影/CAST 语义收紧，减少「能跑但结果错」类问题。              |
+| **企业规范对接**      | Pipeline / Transform 级 **列名大小写**统一，便于对接对标识符大小写敏感的目标系统。 |
+| **数仓落地（Doris）** | Stream Load 能力面扩展（含 CSV 等场景）、分桶与列演进增强，更贴近生产建表与导入实践。    |
+| **可追溯性**        | 能力按 **PR 切片**交付，便于问题定位、选择性 cherry-pick 与版本沟通。          |
+
+
+---
+
+## 5. 升级与兼容建议
+
+1. **二进制 / 镜像**
+  - 请使用基于 **realfuture-ai/apache-flink-cdc `release-3.6`**（已含 PR #1–#6）的构建产物，并与贵司选定的 **Flink 1.x / 2.x profile**（官方 3.6 支持双线）一致。
+2. **配置与 YAML**
+  - 若需 **列名大小写**：在 pipeline 或 transform 上增加 `column-name-case`，并从默认 `**AS_IS`** 逐步改为 `UPPER` / `LOWER`，在测试环境验证下游消费。  
+  - 若使用 **Doris Sink**：按需配置 `table-buckets` 与 `sink.properties.`*；在测试集群验证 **JSON / CSV** 与表结构一致性。
+3. **回归范围建议**
+  - **路由规则**密集的作业：重点回归 **表是否仍路由到预期 Sink**。  
+  - **带 Transform 的作业**：重点回归 **主键列、分区键、Upsert 语义**。  
+  - **Doris 自动建表 / 演进**：重点回归 **分桶数、列顺序、注释类变更**。
+4. **官方 3.6 基线**
+  - 同步阅读 **Apache Flink CDC 3.6** 官方变更（连接器清单、Breaking changes、CVE 与依赖），与本增量说明一并纳入客户发布说明。
+
+---
+
+## 6. 明确不在本文档承诺范围内的项
+
+以下**不属于**本次 PR #1–#6 交付范围，避免客户预期偏差：
+
+- **MySQL snapshot reader** 专项内部补丁（PR #7）**未合入**本线。  
+- **Postgres / Paimon** 连接器：未做「从旧 fork 到本 `release-3.6`」的整包迁移 PR。  
+- **Oracle SQL/DataStream 连接器**：未从内部 fork 搬运；客户应使用 **官方 3.6 Oracle 实现**（含上游已提供的类型与连接增强）。  
+- **Kingbase**：不在支持范围内。  
+- **全量 CI / pipeline e2e**：取决于贵司环境与排期，本文不替代贵司验收测试报告。
+
+---
+
+## 7. 内部参考与扩展阅读
+
+- 执行计划与 Phase 定义：`design-doc/upstream-3.6-integration-execution-plan.md`  
+- Transform / 投影 / 主键等行为细节：仓库内 `design-doc/user-guide-transform-projection-primary-keys.md` 等（若随版本有更新，以客户交付包内版本为准）。
+
+---
+
+## 8. 修订记录
+
+
+| 日期         | 说明                                 |
+| ---------- | ---------------------------------- |
+| 2026-03-31 | 初版：汇总 PR #1–#6、能力与客户价值、升级建议及范围排除项。 |
+
+
