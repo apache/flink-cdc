@@ -24,6 +24,7 @@ import org.apache.flink.cdc.runtime.operators.schema.common.SchemaTestBase;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -262,5 +263,207 @@ public class TableIdRouterTest extends SchemaTestBase {
                         "[Database2.Collection2]",
                         "[Database2.Collection3]",
                         "[Database3.Collection3]");
+    }
+
+    // ==================== Alternation / replaceAll regression (FLINK-38779 style)
+    // ====================
+
+    private static List<String> routeWith(String source, String sink, List<String> tables) {
+        TableIdRouter router =
+                new TableIdRouter(
+                        Collections.singletonList(new RouteRule(source, sink)),
+                        RouteMode.ALL_MATCH);
+        return tables.stream()
+                .map(TableId::parse)
+                .map(router::route)
+                .map(ids -> ids.stream().map(TableId::toString).collect(Collectors.toList()))
+                .map(list -> list.get(0))
+                .collect(Collectors.toList());
+    }
+
+    @Test
+    void testAlternationOrderInDatabasePart() {
+        List<String> testTables =
+                Arrays.asList(
+                        "saas_pw_00.users",
+                        "saas_pw_01.orders",
+                        "saas_pw_02.items",
+                        "saas_pw.config");
+
+        assertThat(
+                        routeWith(
+                                "(saas_pw_00|saas_pw_01|saas_pw_02|saas_pw).(\\.*)",
+                                "target_db.merged",
+                                testTables))
+                .as("Longer-first order should route all tables to target_db.merged")
+                .containsExactly(
+                        "target_db.merged",
+                        "target_db.merged",
+                        "target_db.merged",
+                        "target_db.merged");
+
+        assertThat(
+                        routeWith(
+                                "(saas_pw|saas_pw_00|saas_pw_01|saas_pw_02).(\\.*)",
+                                "target_db.merged",
+                                testTables))
+                .as("Shorter-first order should also route all tables to target_db.merged")
+                .containsExactly(
+                        "target_db.merged",
+                        "target_db.merged",
+                        "target_db.merged",
+                        "target_db.merged");
+
+        assertThat(
+                        routeWith(
+                                "(saas_pw_00|saas_pw|saas_pw_01|saas_pw_02).(\\.*)",
+                                "target_db.merged",
+                                testTables))
+                .as("Shorter-in-middle order should also route all tables to target_db.merged")
+                .containsExactly(
+                        "target_db.merged",
+                        "target_db.merged",
+                        "target_db.merged",
+                        "target_db.merged");
+    }
+
+    @Test
+    void testAlternationOrderInTablePart() {
+        List<String> testTables =
+                Arrays.asList(
+                        "mydb.saas_pw_00", "mydb.saas_pw_01", "mydb.saas_pw_02", "mydb.saas_pw");
+
+        assertThat(
+                        routeWith(
+                                "mydb.(saas_pw_00|saas_pw_01|saas_pw_02|saas_pw)",
+                                "target_db.merged",
+                                testTables))
+                .as("Longer-first in table part")
+                .containsExactly(
+                        "target_db.merged",
+                        "target_db.merged",
+                        "target_db.merged",
+                        "target_db.merged");
+
+        assertThat(
+                        routeWith(
+                                "mydb.(saas_pw|saas_pw_00|saas_pw_01|saas_pw_02)",
+                                "target_db.merged",
+                                testTables))
+                .as("Shorter-first in table part")
+                .containsExactly(
+                        "target_db.merged",
+                        "target_db.merged",
+                        "target_db.merged",
+                        "target_db.merged");
+    }
+
+    @Test
+    void testAlternationOrderWithCaptureGroupReplacement() {
+        List<String> testTables =
+                Arrays.asList("order.users", "order_detail.users", "order_archive.users");
+
+        assertThat(
+                        routeWith(
+                                "(order|order_detail|order_archive).(\\.*)",
+                                "warehouse.$1_$2",
+                                testTables))
+                .as("Capture group $1 should reflect full match, not partial")
+                .containsExactly(
+                        "warehouse.order_users",
+                        "warehouse.order_detail_users",
+                        "warehouse.order_archive_users");
+
+        assertThat(
+                        routeWith(
+                                "(order_archive|order_detail|order).(\\.*)",
+                                "warehouse.$1_$2",
+                                testTables))
+                .as("Capture group with longer-first should produce identical results")
+                .containsExactly(
+                        "warehouse.order_users",
+                        "warehouse.order_detail_users",
+                        "warehouse.order_archive_users");
+    }
+
+    @Test
+    void testSinkTableWithLiteralDollarSign() {
+        TableIdRouter router =
+                new TableIdRouter(
+                        List.of(new RouteRule("mydb.tbl", "price$market.data")),
+                        RouteMode.ALL_MATCH);
+        List<String> result =
+                router.route(TableId.parse("mydb.tbl")).stream()
+                        .map(TableId::toString)
+                        .collect(Collectors.toList());
+        assertThat(result).containsExactly("price$market.data");
+    }
+
+    @Test
+    void testSinkTableWithTrailingDollarSign() {
+        TableIdRouter router =
+                new TableIdRouter(
+                        List.of(new RouteRule("mydb.tbl", "target.price$")), RouteMode.ALL_MATCH);
+        List<String> result =
+                router.route(TableId.parse("mydb.tbl")).stream()
+                        .map(TableId::toString)
+                        .collect(Collectors.toList());
+        assertThat(result).containsExactly("target.price$");
+    }
+
+    @Test
+    void testSinkTableWithBackslash() {
+        TableIdRouter router =
+                new TableIdRouter(
+                        List.of(new RouteRule("mydb.tbl", "target.path\\data")),
+                        RouteMode.ALL_MATCH);
+        List<String> result =
+                router.route(TableId.parse("mydb.tbl")).stream()
+                        .map(TableId::toString)
+                        .collect(Collectors.toList());
+        assertThat(result).containsExactly("target.path\\data");
+    }
+
+    @Test
+    void testShardingTablesMergeToDataWarehouse() {
+        List<String> shardingTables =
+                List.of(
+                        "order_01.order_info_0001",
+                        "order_02.order_info_0002",
+                        "order_99.order_info_9999",
+                        "order_1000.order_info_0001");
+
+        assertThat(
+                        testStdRegExpRoute(
+                                "order_\\d+.order_info_\\d+",
+                                "ods.ods_order_order_info",
+                                shardingTables))
+                .containsExactly(
+                        "[ods.ods_order_order_info]",
+                        "[ods.ods_order_order_info]",
+                        "[ods.ods_order_order_info]",
+                        "[ods.ods_order_order_info]");
+
+        assertThat(
+                        testStdRegExpRoute(
+                                "(order)_\\d+.(order_info)_\\d+", "ods.ods_$1_$2", shardingTables))
+                .containsExactly(
+                        "[ods.ods_order_order_info]",
+                        "[ods.ods_order_order_info]",
+                        "[ods.ods_order_order_info]",
+                        "[ods.ods_order_order_info]");
+
+        assertThat(
+                        testStdRegExpRoute(
+                                "(\\.*)_\\d+.(\\.*)_\\d+",
+                                "ods.ods_$1_$2",
+                                List.of(
+                                        "order_01.order_info_0001",
+                                        "user_01.user_info_0001",
+                                        "product_99.product_detail_9999")))
+                .containsExactly(
+                        "[ods.ods_order_order_info]",
+                        "[ods.ods_user_user_info]",
+                        "[ods.ods_product_product_detail]");
     }
 }
