@@ -48,7 +48,7 @@ using a build automation tool (such as Maven or SBT) and SQL Client with SQL JAR
 
 ### SQL Client JAR
 
-Download [flink-sql-connector-db2-cdc-{{< param Version >}}.jar](https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-db2-cdc/{{< param Version >}}/flink-sql-connector-db2-cdc-{{< param Version >}}.jar) and
+Download [flink-sql-connector-db2-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-db2-cdc) and
 put it under `<FLINK_HOME>/lib/`.
 
 **Note:** Refer to
