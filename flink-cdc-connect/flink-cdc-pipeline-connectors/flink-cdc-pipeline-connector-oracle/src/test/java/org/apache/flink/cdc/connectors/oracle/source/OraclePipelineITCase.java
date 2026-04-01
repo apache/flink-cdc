@@ -94,7 +94,9 @@ import static org.apache.flink.cdc.connectors.oracle.source.OracleDataSourceOpti
 import static org.apache.flink.cdc.connectors.oracle.source.OracleDataSourceOptions.PASSWORD;
 import static org.apache.flink.cdc.connectors.oracle.source.OracleDataSourceOptions.PORT;
 import static org.apache.flink.cdc.connectors.oracle.source.OracleDataSourceOptions.SCAN_STARTUP_MODE;
+import static org.apache.flink.cdc.connectors.oracle.source.OracleDataSourceOptions.SCHEMA_CHANGE_ENABLED;
 import static org.apache.flink.cdc.connectors.oracle.source.OracleDataSourceOptions.TABLES;
+import static org.apache.flink.cdc.connectors.oracle.source.OracleDataSourceOptions.TABLES_EXCLUDE;
 import static org.apache.flink.cdc.connectors.oracle.source.OracleDataSourceOptions.USERNAME;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -1108,6 +1110,54 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
     }
 
     @Test
+    @Order(10)
+    public void testLatestOffsetModeWithTablesExclude() throws Exception {
+        createAndInitialize("product.sql");
+
+        Map<String, String> options = baseFactoryOptions("debezium.products,debezium.category");
+        options.put(TABLES_EXCLUDE.key(), "debezium.category");
+        options.put(SCAN_STARTUP_MODE.key(), "latest-offset");
+
+        FlinkSourceProvider sourceProvider = createSourceProvider(options);
+
+        try (CloseableIterator<Event> events =
+                env.fromSource(
+                                sourceProvider.getSource(),
+                                WatermarkStrategy.noWatermarks(),
+                                OracleDataSourceFactory.IDENTIFIER,
+                                new EventTypeInfo())
+                        .executeAndCollect()) {
+            Thread.sleep(5_000);
+
+            TableId productsTableId = TableId.tableId("DEBEZIUM", "PRODUCTS");
+            TableId categoryTableId = TableId.tableId("DEBEZIUM", "CATEGORY");
+            try (Connection connection = getJdbcConnection();
+                    Statement statement = connection.createStatement()) {
+                statement.execute(
+                        "INSERT INTO DEBEZIUM.CATEGORY (ID, CATEGORY_NAME) VALUES (201, 'tools')");
+                statement.execute(
+                        "INSERT INTO DEBEZIUM.PRODUCTS VALUES (110, 'jack', '13V jack', 5.5)");
+            }
+
+            List<Event> actual = fetchResults(events, 2);
+            assertThat(actual).hasSize(2);
+            assertThat(actual.get(0)).isInstanceOf(CreateTableEvent.class);
+            assertThat(actual.get(1)).isInstanceOf(DataChangeEvent.class);
+            assertThat(((ChangeEvent) actual.get(0)).tableId()).isEqualTo(productsTableId);
+            assertThat(((ChangeEvent) actual.get(1)).tableId()).isEqualTo(productsTableId);
+            assertThat(actual)
+                    .allMatch(
+                            event ->
+                                    !(event instanceof ChangeEvent)
+                                            || !((ChangeEvent) event)
+                                                    .tableId()
+                                                    .equals(categoryTableId));
+        } finally {
+            env.close();
+        }
+    }
+
+    @Test
     @Order(8)
     public void testLatestOffsetStartupModeWithOpTs() throws Exception {
         Map<String, String> options = new HashMap<>();
@@ -1244,6 +1294,51 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
                                                 .meta()
                                                 .get("op_ts")));
             }
+        }
+    }
+
+    @Test
+    @Order(11)
+    public void testLatestOffsetModeWithSchemaChangeDisabled() throws Exception {
+        createAndInitialize("product.sql");
+
+        Map<String, String> options = baseFactoryOptions("debezium.products");
+        options.put(SCAN_STARTUP_MODE.key(), "latest-offset");
+        options.put(SCHEMA_CHANGE_ENABLED.key(), "false");
+
+        FlinkSourceProvider sourceProvider = createSourceProvider(options);
+
+        try (CloseableIterator<Event> events =
+                env.fromSource(
+                                sourceProvider.getSource(),
+                                WatermarkStrategy.noWatermarks(),
+                                OracleDataSourceFactory.IDENTIFIER,
+                                new EventTypeInfo())
+                        .executeAndCollect()) {
+            Thread.sleep(5_000);
+
+            TableId productsTableId = TableId.tableId("DEBEZIUM", "PRODUCTS");
+            try (Connection connection = getJdbcConnection();
+                    Statement statement = connection.createStatement()) {
+                statement.execute("ALTER TABLE DEBEZIUM.PRODUCTS ADD EXTRA_COL VARCHAR2(10)");
+                statement.execute(
+                        "INSERT INTO DEBEZIUM.PRODUCTS (ID, NAME, DESCRIPTION, WEIGHT, EXTRA_COL) "
+                                + "VALUES (110, 'jack', '13V jack', 5.5, 'x')");
+            }
+
+            List<Event> actual = fetchResults(events, 2);
+            assertThat(actual).hasSize(2);
+            assertThat(actual.get(0)).isInstanceOf(CreateTableEvent.class);
+            assertThat(actual.get(1)).isInstanceOf(DataChangeEvent.class);
+            assertThat(((ChangeEvent) actual.get(0)).tableId()).isEqualTo(productsTableId);
+            assertThat(((ChangeEvent) actual.get(1)).tableId()).isEqualTo(productsTableId);
+            assertThat(actual)
+                    .noneMatch(
+                            event ->
+                                    event instanceof SchemaChangeEvent
+                                            && !(event instanceof CreateTableEvent));
+        } finally {
+            env.close();
         }
     }
 
@@ -1801,6 +1896,23 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
             size--;
         }
         return result;
+    }
+
+    private Map<String, String> baseFactoryOptions(String tables) {
+        Map<String, String> options = new HashMap<>();
+        options.put(HOSTNAME.key(), ORACLE_CONTAINER.getHost());
+        options.put(PORT.key(), String.valueOf(ORACLE_CONTAINER.getOraclePort()));
+        options.put(USERNAME.key(), CONNECTOR_USER);
+        options.put(PASSWORD.key(), CONNECTOR_PWD);
+        options.put(TABLES.key(), tables);
+        options.put(DATABASE.key(), ORACLE_CONTAINER.getDatabaseName());
+        return options;
+    }
+
+    private FlinkSourceProvider createSourceProvider(Map<String, String> options) {
+        Factory.Context context = new MockContext(Configuration.fromMap(options));
+        return (FlinkSourceProvider)
+                new OracleDataSourceFactory().createDataSource(context).getEventSourceProvider();
     }
 
     class MockContext implements Factory.Context {

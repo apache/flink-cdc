@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.oracle.util;
 
+import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.connectors.oracle.source.utils.OracleTypeUtils;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.types.logical.RowType;
@@ -48,17 +49,18 @@ public class ChunkUtils {
 
     public static Column getChunkKeyColumn(Table table, @Nullable String chunkKeyColumn) {
         List<Column> primaryKeys = table.primaryKeyColumns();
+        String resolvedChunkKeyColumn = resolveChunkKeyColumn(table, chunkKeyColumn);
 
-        if (primaryKeys.isEmpty() && chunkKeyColumn == null) {
+        if (primaryKeys.isEmpty() && resolvedChunkKeyColumn == null) {
             throw new ValidationException(
                     "To use incremental snapshot, 'scan.incremental.snapshot.chunk.key-column' must be set when the table doesn't have primary keys.");
         }
 
         List<Column> searchColumns = table.columns();
-        if (chunkKeyColumn != null) {
+        if (resolvedChunkKeyColumn != null) {
             Optional<Column> targetPkColumn =
                     searchColumns.stream()
-                            .filter(col -> chunkKeyColumn.equals(col.name()))
+                            .filter(col -> resolvedChunkKeyColumn.equals(col.name()))
                             .findFirst();
             if (targetPkColumn.isPresent()) {
                 return targetPkColumn.get();
@@ -66,7 +68,7 @@ public class ChunkUtils {
             throw new ValidationException(
                     String.format(
                             "Chunk key column '%s' doesn't exist in the columns [%s] of the table %s.",
-                            chunkKeyColumn,
+                            resolvedChunkKeyColumn,
                             searchColumns.stream()
                                     .map(Column::name)
                                     .collect(Collectors.joining(",")),
@@ -75,5 +77,49 @@ public class ChunkUtils {
 
         // Use the ROWID column as the chunk key column by default for oracle cdc connector
         return Column.editor().jdbcType(Types.VARCHAR).name(ROWID.class.getSimpleName()).create();
+    }
+
+    @Nullable
+    private static String resolveChunkKeyColumn(
+            Table table, @Nullable String configuredChunkKeyColumn) {
+        if (configuredChunkKeyColumn == null) {
+            return null;
+        }
+
+        String chunkKeyColumn = configuredChunkKeyColumn.trim();
+        if (chunkKeyColumn.isEmpty()) {
+            return null;
+        }
+
+        // Keep the legacy single-column behavior for source/table API paths.
+        if (!chunkKeyColumn.contains(":")) {
+            return chunkKeyColumn;
+        }
+
+        String resolvedChunkKeyColumn = null;
+        org.apache.flink.cdc.common.event.TableId flinkTableId =
+                org.apache.flink.cdc.common.event.TableId.tableId(
+                        table.id().schema(), table.id().table());
+        for (String chunkKeyMapping : chunkKeyColumn.split(";")) {
+            String entry = chunkKeyMapping.trim();
+            if (entry.isEmpty()) {
+                continue;
+            }
+
+            String[] splits = entry.split(":");
+            if (splits.length != 2 || splits[0].trim().isEmpty() || splits[1].trim().isEmpty()) {
+                throw new ValidationException(
+                        String.format(
+                                "Chunk key column mapping '%s' failed to parse for table %s.",
+                                entry, table.id()));
+            }
+
+            Selectors chunkKeySelector =
+                    new Selectors.SelectorsBuilder().includeTables(splits[0].trim()).build();
+            if (chunkKeySelector.isMatch(flinkTableId)) {
+                resolvedChunkKeyColumn = splits[1].trim();
+            }
+        }
+        return resolvedChunkKeyColumn;
     }
 }

@@ -82,6 +82,15 @@ public class OracleDataSourceOptions {
                                     + "it is necessary to escape the dot with a backslash."
                                     + "eg. test.user_table_[0-9]+, test[0-9].[app|web]_order_\\.*");
 
+    public static final ConfigOption<String> TABLES_EXCLUDE =
+            ConfigOptions.key("tables.exclude")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "An optional comma-separated list of regular expressions that match "
+                                    + "fully-qualified table identifiers for tables to be excluded from monitoring. "
+                                    + "Any table not included in tables.exclude will be monitored.");
+
     public static final ConfigOption<String> SERVER_TIME_ZONE =
             ConfigOptions.key("server-time-zone")
                     .stringType()
@@ -198,6 +207,25 @@ public class OracleDataSourceOptions {
                     .defaultValue(false)
                     .withDescription(
                             "Whether to skip backfill in snapshot reading phase. If backfill is skipped, changes on captured tables during snapshot phase will be consumed later in incremental reading phase instead of being merged into the snapshot.WARNING: Skipping backfill might lead to data inconsistency because some binlog events happened within the snapshot phase might be replayed (only at-least-once semantic is promised). For example updating an already updated value in snapshot, or deleting an already deleted entry in snapshot. These replayed binlog events should be handled specially.");
+
+    @Experimental
+    public static final ConfigOption<Boolean> SCHEMA_CHANGE_ENABLED =
+            ConfigOptions.key("schema-change.enabled")
+                    .booleanType()
+                    .defaultValue(true)
+                    .withDescription(
+                            "Whether to send schema change events. By default is true. "
+                                    + "If set to false, the schema changes (DDL statements) will not be sent to downstream.");
+
+    @Experimental
+    public static final ConfigOption<String> SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN =
+            ConfigOptions.key("scan.incremental.snapshot.chunk-key.column")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "The chunk key column for splitting table snapshot by table pattern. "
+                                    + "Format: 'schema.table:column_name;schema.table2:column_name2'. "
+                                    + "By default, the chunk key is the first column of the primary key.");
 
     @Experimental
     public static final ConfigOption<String> METADATA_LIST =

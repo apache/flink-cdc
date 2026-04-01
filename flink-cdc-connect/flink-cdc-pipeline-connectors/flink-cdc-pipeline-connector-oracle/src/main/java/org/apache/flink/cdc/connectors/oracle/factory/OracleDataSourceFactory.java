@@ -24,6 +24,8 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.factories.DataSourceFactory;
 import org.apache.flink.cdc.common.factories.Factory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
+import org.apache.flink.cdc.common.pipeline.PipelineOptions;
+import org.apache.flink.cdc.common.pipeline.RuntimeExecutionMode;
 import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.common.utils.StringUtils;
@@ -31,11 +33,13 @@ import org.apache.flink.cdc.connectors.base.options.SourceOptions;
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.connectors.oracle.source.OracleDataSource;
 import org.apache.flink.cdc.connectors.oracle.source.OracleDataSourceOptions;
-import org.apache.flink.cdc.connectors.oracle.source.config.OracleSourceConfig;
 import org.apache.flink.cdc.connectors.oracle.source.config.OracleSourceConfigFactory;
 import org.apache.flink.cdc.connectors.oracle.table.OracleReadableMetaData;
 import org.apache.flink.cdc.connectors.oracle.utils.OracleSchemaUtils;
 import org.apache.flink.table.api.ValidationException;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -58,6 +62,8 @@ import static org.apache.flink.util.Preconditions.checkState;
 /** A {@link Factory} to create {@link OracleDataSource}. */
 @Internal
 public class OracleDataSourceFactory implements DataSourceFactory {
+
+    private static final Logger LOG = LoggerFactory.getLogger(OracleDataSourceFactory.class);
 
     public static final String IDENTIFIER = "oracle";
     private static final String SCAN_STARTUP_MODE_VALUE_INITIAL = "initial";
@@ -111,6 +117,20 @@ public class OracleDataSourceFactory implements DataSourceFactory {
         map.keySet().forEach(e -> dbzProperties.put(e, map.get(e)));
         StartupOptions startupOptions = getStartupOptions(config);
 
+        // Check BATCH mode compatibility
+        Configuration pipelineConfiguration = context.getPipelineConfiguration();
+        if (pipelineConfiguration != null
+                && pipelineConfiguration.contains(PipelineOptions.PIPELINE_EXECUTION_RUNTIME_MODE)
+                && RuntimeExecutionMode.BATCH.equals(
+                        pipelineConfiguration.get(PipelineOptions.PIPELINE_EXECUTION_RUNTIME_MODE))
+                && !StartupOptions.snapshot().equals(startupOptions)) {
+            throw new IllegalArgumentException(
+                    String.format(
+                            "Only \"snapshot\" of OracleDataSource StartupOption is supported in BATCH pipeline, "
+                                    + "but actual OracleDataSource StartupOption is %s.",
+                            startupOptions.startupMode));
+        }
+
         Duration connectTimeout = config.get(OracleDataSourceOptions.CONNECT_TIMEOUT);
 
         boolean closeIdleReaders =
@@ -136,16 +156,46 @@ public class OracleDataSourceFactory implements DataSourceFactory {
         configFactory.distributionFactorLower(distributionFactorLower);
         configFactory.closeIdleReaders(closeIdleReaders);
         configFactory.skipSnapshotBackfill(skipSnapshotBackfill);
-        configFactory.includeSchemaChanges(true);
+        boolean schemaChangeEnabled = config.get(OracleDataSourceOptions.SCHEMA_CHANGE_ENABLED);
+        configFactory.includeSchemaChanges(schemaChangeEnabled);
         configFactory.serverTimeZone(serverTimeZone);
 
         Selectors selectors = new Selectors.SelectorsBuilder().includeTables(tables).build();
-        String[] capturedTables = getTableList(configFactory.create(0), selectors);
-        if (capturedTables.length == 0) {
+        List<TableId> allTableIds = OracleSchemaUtils.listTables(configFactory.create(0), null);
+        List<String> capturedTables = getTableList(allTableIds, selectors);
+        if (capturedTables.isEmpty()) {
             throw new IllegalArgumentException(
                     "Cannot find any table by the option 'tables' = " + tables);
         }
-        configFactory.tableList(capturedTables);
+
+        // Handle tables.exclude
+        String tablesExclude = config.get(OracleDataSourceOptions.TABLES_EXCLUDE);
+        if (tablesExclude != null) {
+            Selectors excludeSelectors =
+                    new Selectors.SelectorsBuilder().includeTables(tablesExclude).build();
+            List<String> excludeTables = getTableList(allTableIds, excludeSelectors);
+            if (!excludeTables.isEmpty()) {
+                capturedTables.removeAll(excludeTables);
+                LOG.info(
+                        "Excluded {} tables matching pattern: {}",
+                        excludeTables.size(),
+                        tablesExclude);
+            }
+            if (capturedTables.isEmpty()) {
+                throw new IllegalArgumentException(
+                        "Cannot find any table after applying 'tables.exclude' = " + tablesExclude);
+            }
+        }
+
+        configFactory.tableList(capturedTables.toArray(new String[0]));
+
+        // Handle chunk key column mapping
+        String chunkKeyColumns =
+                config.get(OracleDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN);
+        if (!StringUtils.isNullOrWhitespaceOnly(chunkKeyColumns)) {
+            configFactory.chunkKeyColumn(normalizeChunkKeyColumns(chunkKeyColumns, allTableIds));
+        }
+
         return new OracleDataSource(configFactory, config, readableMetadataList);
     }
 
@@ -199,7 +249,10 @@ public class OracleDataSourceFactory implements DataSourceFactory {
         options.add(OracleDataSourceOptions.CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND);
         options.add(OracleDataSourceOptions.CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
         options.add(OracleDataSourceOptions.CONNECT_MAX_RETRIES);
+        options.add(OracleDataSourceOptions.TABLES_EXCLUDE);
+        options.add(OracleDataSourceOptions.SCHEMA_CHANGE_ENABLED);
         options.add(OracleDataSourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
+        options.add(OracleDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN);
         options.add(OracleDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP);
         options.add(OracleDataSourceOptions.LOG_MINING_STRATEGY);
         options.add(OracleDataSourceOptions.DATABASE_CONNECTION_ADAPTER);
@@ -212,11 +265,48 @@ public class OracleDataSourceFactory implements DataSourceFactory {
         return IDENTIFIER;
     }
 
-    private static String[] getTableList(OracleSourceConfig sourceConfig, Selectors selectors) {
-        return OracleSchemaUtils.listTables(sourceConfig, null).stream()
+    private static List<String> getTableList(List<TableId> tableIds, Selectors selectors) {
+        return tableIds.stream()
                 .filter(selectors::isMatch)
                 .map(TableId::toString)
-                .toArray(String[]::new);
+                .collect(Collectors.toList());
+    }
+
+    private static String normalizeChunkKeyColumns(String chunkKeyColumns, List<TableId> tableIds) {
+        List<String> normalizedEntries = new ArrayList<>();
+        for (String chunkKeyColumn : chunkKeyColumns.split(";")) {
+            String entry = chunkKeyColumn.trim();
+            if (entry.isEmpty()) {
+                continue;
+            }
+
+            String[] splits = entry.split(":");
+            if (splits.length != 2
+                    || StringUtils.isNullOrWhitespaceOnly(splits[0])
+                    || StringUtils.isNullOrWhitespaceOnly(splits[1])) {
+                throw new IllegalArgumentException(
+                        OracleDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN.key()
+                                + " = "
+                                + chunkKeyColumns
+                                + " failed to be parsed in this part '"
+                                + entry
+                                + "'.");
+            }
+
+            String tablePattern = splits[0].trim();
+            String columnName = splits[1].trim();
+            Selectors chunkKeySelector =
+                    new Selectors.SelectorsBuilder().includeTables(tablePattern).build();
+            List<String> matchedTables = getTableList(tableIds, chunkKeySelector);
+            if (matchedTables.isEmpty()) {
+                LOG.warn(
+                        "Table pattern '{}' in chunk key column config '{}' did not match any tables",
+                        tablePattern,
+                        entry);
+            }
+            normalizedEntries.add(tablePattern + ":" + columnName);
+        }
+        return normalizedEntries.isEmpty() ? null : String.join(";", normalizedEntries);
     }
 
     /** Checks the value of given integer option is valid. */

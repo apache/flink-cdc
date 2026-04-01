@@ -71,7 +71,10 @@ public class OracleDataSource implements DataSource, SupportsReadingMetadata {
 
         OracleDialect oracleDialect = new OracleDialect();
         OracleEventDeserializer deserializer =
-                new OracleEventDeserializer(DebeziumChangelogMode.ALL, true, readableMetadataList);
+                new OracleEventDeserializer(
+                        DebeziumChangelogMode.ALL,
+                        sourceConfig.isIncludeSchemaChanges(),
+                        readableMetadataList);
 
         RedoLogOffsetFactory offsetFactory = new RedoLogOffsetFactory();
         OracleTableSourceReader oracleChangeEventSource =
