@@ -86,7 +86,8 @@ class DebeziumUtilsTest {
 
         // Primary connection should point to primary hostname
         Assertions.assertThat(primaryConnection.connectionString()).contains(PRIMARY_HOSTNAME);
-        Assertions.assertThat(primaryConnection.connectionString()).doesNotContain(SNAPSHOT_HOSTNAME);
+        Assertions.assertThat(primaryConnection.connectionString())
+                .doesNotContain(SNAPSHOT_HOSTNAME);
     }
 
     @Test

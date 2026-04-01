@@ -56,7 +56,8 @@ public class JdbcConnectionPools implements ConnectionPools {
             ConnectionPoolId poolId, MySqlSourceConfig sourceConfig, String hostname) {
         synchronized (pools) {
             if (!pools.containsKey(poolId)) {
-                LOG.info("Create and register connection pool {} for hostname {}", poolId, hostname);
+                LOG.info(
+                        "Create and register connection pool {} for hostname {}", poolId, hostname);
                 pools.put(
                         poolId,
                         PooledDataSourceFactory.createPooledDataSource(sourceConfig, hostname));

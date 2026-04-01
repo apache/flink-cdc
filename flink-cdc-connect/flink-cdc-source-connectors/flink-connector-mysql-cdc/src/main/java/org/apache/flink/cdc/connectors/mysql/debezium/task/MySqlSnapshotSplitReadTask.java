@@ -89,7 +89,8 @@ public class MySqlSnapshotSplitReadTask
      * Creates a new MySqlSnapshotSplitReadTask with separate writer and reader connections.
      *
      * @param primaryConnection Connection to the primary writer instance (used for binlog position)
-     * @param snapshotConnection Connection to the snapshot instance (used for snapshot data queries)
+     * @param snapshotConnection Connection to the snapshot instance (used for snapshot data
+     *     queries)
      */
     public MySqlSnapshotSplitReadTask(
             MySqlSourceConfig sourceConfig,

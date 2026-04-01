@@ -65,7 +65,8 @@ class MySqlSnapshotSplitReadTaskConnectionTest {
 
         // Create StatefulTaskContext with both connections
         StatefulTaskContext context =
-                new StatefulTaskContext(config, binaryLogClient, writerConnection, readerConnection);
+                new StatefulTaskContext(
+                        config, binaryLogClient, writerConnection, readerConnection);
 
         // Verify the context returns the correct connections
         assertThat(context.getConnection()).isSameAs(writerConnection);
@@ -87,7 +88,8 @@ class MySqlSnapshotSplitReadTaskConnectionTest {
 
         // Create StatefulTaskContext
         StatefulTaskContext context =
-                new StatefulTaskContext(config, binaryLogClient, writerConnection, readerConnection);
+                new StatefulTaskContext(
+                        config, binaryLogClient, writerConnection, readerConnection);
 
         // Verify both connections point to the same host (writer)
         assertThat(context.getConnection().connectionString()).contains(PRIMARY_HOSTNAME);
@@ -101,8 +103,7 @@ class MySqlSnapshotSplitReadTaskConnectionTest {
 
         // Use the legacy constructor that takes only one connection
         MySqlConnection connection = DebeziumUtils.createMySqlConnection(config);
-        StatefulTaskContext context =
-                new StatefulTaskContext(config, binaryLogClient, connection);
+        StatefulTaskContext context = new StatefulTaskContext(config, binaryLogClient, connection);
 
         // Both getConnection() and getReaderConnection() should return the same instance
         assertThat(context.getConnection()).isSameAs(context.getSnapshotConnection());

@@ -64,9 +64,7 @@ public class DebeziumUtils {
 
     /** Creates and opens a new {@link JdbcConnection} to the primary writer instance. */
     public static JdbcConnection openJdbcConnection(MySqlSourceConfig sourceConfig) {
-        LOG.info(
-                "Opening a new JDBC connection to MySQL server at {}",
-                sourceConfig.getHostname());
+        LOG.info("Opening a new JDBC connection to MySQL server at {}", sourceConfig.getHostname());
         JdbcConnection jdbc =
                 new JdbcConnection(
                         JdbcConfiguration.adapt(sourceConfig.getDbzConfiguration()),
@@ -76,8 +74,7 @@ public class DebeziumUtils {
         try {
             jdbc.connect();
         } catch (Exception e) {
-            LOG.error(
-                    "Failed to open MySQL connection to {}", sourceConfig.getHostname(), e);
+            LOG.error("Failed to open MySQL connection to {}", sourceConfig.getHostname(), e);
             throw new FlinkRuntimeException(e);
         }
         return jdbc;
@@ -122,13 +119,10 @@ public class DebeziumUtils {
     public static MySqlConnection createSnapshotMySqlConnection(MySqlSourceConfig sourceConfig) {
         String snapshotHostname = sourceConfig.getSnapshotHostname();
         if (snapshotHostname == null) {
-            LOG.debug(
-                    "No snapshot hostname configured, using primary for snapshot queries");
+            LOG.debug("No snapshot hostname configured, using primary for snapshot queries");
             return createMySqlConnection(sourceConfig);
         }
-        LOG.info(
-                "Creating MySQL connection for snapshot queries at {}",
-                snapshotHostname);
+        LOG.info("Creating MySQL connection for snapshot queries at {}", snapshotHostname);
         Configuration dbzConfig = sourceConfig.getDbzConfiguration();
         Configuration snapshotConfig =
                 dbzConfig.edit().with("database.hostname", snapshotHostname).build();

@@ -114,10 +114,8 @@ class ReaderConnectionTest {
     @Test
     void testConnectionPoolIdDifferentForWriterAndReader() {
         // Pool IDs should be different for writer and reader to ensure separate pools
-        ConnectionPoolId writerPoolId =
-                new ConnectionPoolId(WRITER_HOSTNAME, PORT, "testuser");
-        ConnectionPoolId readerPoolId =
-                new ConnectionPoolId(READER_HOSTNAME, PORT, "testuser");
+        ConnectionPoolId writerPoolId = new ConnectionPoolId(WRITER_HOSTNAME, PORT, "testuser");
+        ConnectionPoolId readerPoolId = new ConnectionPoolId(READER_HOSTNAME, PORT, "testuser");
 
         assertThat(writerPoolId).isNotEqualTo(readerPoolId);
         assertThat(writerPoolId.getHost()).isEqualTo(WRITER_HOSTNAME);
@@ -127,10 +125,8 @@ class ReaderConnectionTest {
     @Test
     void testConnectionPoolIdSameForSameHostname() {
         // Same hostname should result in equal pool IDs
-        ConnectionPoolId poolId1 =
-                new ConnectionPoolId(WRITER_HOSTNAME, PORT, "testuser");
-        ConnectionPoolId poolId2 =
-                new ConnectionPoolId(WRITER_HOSTNAME, PORT, "testuser");
+        ConnectionPoolId poolId1 = new ConnectionPoolId(WRITER_HOSTNAME, PORT, "testuser");
+        ConnectionPoolId poolId2 = new ConnectionPoolId(WRITER_HOSTNAME, PORT, "testuser");
 
         assertThat(poolId1).isEqualTo(poolId2);
         assertThat(poolId1.hashCode()).isEqualTo(poolId2.hashCode());

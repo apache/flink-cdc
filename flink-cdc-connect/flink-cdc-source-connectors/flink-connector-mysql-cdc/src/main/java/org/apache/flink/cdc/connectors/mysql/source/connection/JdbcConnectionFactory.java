@@ -46,7 +46,7 @@ public class JdbcConnectionFactory implements JdbcConnection.ConnectionFactory {
      *
      * @param sourceConfig the source configuration
      * @param hostnameOverride if non-null, connect to this host instead of
-     *                         sourceConfig.getHostname()
+     *     sourceConfig.getHostname()
      */
     public JdbcConnectionFactory(MySqlSourceConfig sourceConfig, String hostnameOverride) {
         this.sourceConfig = sourceConfig;
@@ -66,10 +66,10 @@ public class JdbcConnectionFactory implements JdbcConnection.ConnectionFactory {
         HikariDataSource dataSource =
                 hostnameOverride != null
                         ? JdbcConnectionPools.getInstance()
-                        .getOrCreateConnectionPool(
-                                connectionPoolId, sourceConfig, hostnameOverride)
+                                .getOrCreateConnectionPool(
+                                        connectionPoolId, sourceConfig, hostnameOverride)
                         : JdbcConnectionPools.getInstance()
-                        .getOrCreateConnectionPool(connectionPoolId, sourceConfig);
+                                .getOrCreateConnectionPool(connectionPoolId, sourceConfig);
 
         int i = 0;
         while (i < connectRetryTimes) {
