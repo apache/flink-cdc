@@ -36,7 +36,7 @@ public class OracleContainer extends JdbcDatabaseContainer<OracleContainer> {
     public static final String NAME = "oracle";
 
     private static final DockerImageName DEFAULT_IMAGE_NAME =
-            DockerImageName.parse("goodboy008/oracle-19.3.0-ee");
+            DockerImageName.parse("akaiot/oracle_11g");
 
     static final String DEFAULT_TAG = "latest";
 

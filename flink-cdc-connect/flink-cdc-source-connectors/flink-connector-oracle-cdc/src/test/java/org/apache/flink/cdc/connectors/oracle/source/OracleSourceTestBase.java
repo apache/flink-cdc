@@ -81,7 +81,8 @@ public class OracleSourceTestBase extends TestLogger {
                                                             .getArch()
                                                             .equals("amd64")
                                                     ? "non-cdb"
-                                                    : "arm-non-cdb"))
+                                                    : "arm-non-cdb")
+                                    .asCompatibleSubstituteFor("akaiot/oracle_11g"))
                     .withUsername(CONNECTOR_USER)
                     .withPassword(CONNECTOR_PWD)
                     .withDatabaseName(ORACLE_DATABASE)

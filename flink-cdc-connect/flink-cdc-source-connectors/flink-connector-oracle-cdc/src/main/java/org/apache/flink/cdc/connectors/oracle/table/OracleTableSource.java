@@ -65,6 +65,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
     private final String password;
     private final String tableName;
     private final String schemaName;
+    @Nullable private final String serverTimeZone;
     private final Properties dbzProperties;
     private final StartupOptions startupOptions;
     private final boolean enableParallelRead;
@@ -102,6 +103,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
             String schemaName,
             String username,
             String password,
+            @Nullable String serverTimeZone,
             Properties dbzProperties,
             StartupOptions startupOptions,
             boolean enableParallelRead,
@@ -127,6 +129,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
         this.schemaName = checkNotNull(schemaName);
         this.username = checkNotNull(username);
         this.password = checkNotNull(password);
+        this.serverTimeZone = serverTimeZone;
         this.dbzProperties = dbzProperties;
         this.startupOptions = startupOptions;
         this.producedDataType = physicalSchema.toPhysicalRowDataType();
@@ -179,6 +182,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                             .tableList(schemaName + "." + tableName)
                             .username(username)
                             .password(password)
+                            .serverTimeZone(serverTimeZone)
                             .startupOptions(startupOptions)
                             .deserializer(deserializer)
                             .debeziumProperties(dbzProperties)
@@ -199,6 +203,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
 
             return SourceProvider.of(oracleChangeEventSource);
         } else {
+            Properties legacySourceDbzProperties = getLegacySourceDbzProperties();
             OracleSource.Builder<RowData> builder =
                     OracleSource.<RowData>builder()
                             .hostname(hostname)
@@ -209,13 +214,27 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                             .schemaList(schemaName)
                             .username(username)
                             .password(password)
-                            .debeziumProperties(dbzProperties)
+                            .debeziumProperties(legacySourceDbzProperties)
                             .startupOptions(startupOptions)
                             .deserializer(deserializer);
             DebeziumSourceFunction<RowData> sourceFunction = builder.build();
 
             return SourceFunctionProvider.of(sourceFunction, false);
         }
+    }
+
+    private Properties getLegacySourceDbzProperties() {
+        if (serverTimeZone == null
+                || dbzProperties.containsKey("database.connectionTimeZone")
+                || dbzProperties.containsKey("database.serverTimezone")) {
+            return dbzProperties;
+        }
+
+        Properties properties = new Properties();
+        properties.putAll(dbzProperties);
+        properties.setProperty("database.connectionTimeZone", serverTimeZone);
+        properties.setProperty("database.serverTimezone", serverTimeZone);
+        return properties;
     }
 
     private MetadataConverter[] getMetadataConverters() {
@@ -247,6 +266,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                         schemaName,
                         username,
                         password,
+                        serverTimeZone,
                         dbzProperties,
                         startupOptions,
                         enableParallelRead,
@@ -286,6 +306,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                 && Objects.equals(password, that.password)
                 && Objects.equals(tableName, that.tableName)
                 && Objects.equals(schemaName, that.schemaName)
+                && Objects.equals(serverTimeZone, that.serverTimeZone)
                 && Objects.equals(dbzProperties, that.dbzProperties)
                 && Objects.equals(startupOptions, that.startupOptions)
                 && Objects.equals(producedDataType, that.producedDataType)
@@ -318,6 +339,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                 password,
                 tableName,
                 schemaName,
+                serverTimeZone,
                 dbzProperties,
                 startupOptions,
                 producedDataType,

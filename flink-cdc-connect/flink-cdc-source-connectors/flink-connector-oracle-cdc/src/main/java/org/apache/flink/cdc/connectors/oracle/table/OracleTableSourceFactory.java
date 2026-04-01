@@ -43,6 +43,7 @@ import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.HOS
 import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.PASSWORD;
 import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED;
 import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN;
+import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.SERVER_TIME_ZONE;
 import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.TABLE_NAME;
 import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.USERNAME;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.CHUNK_META_GROUP_SIZE;
@@ -95,6 +96,7 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
         String tableName = config.get(TABLE_NAME);
         String schemaName = config.get(SCHEMA_NAME);
         int port = config.get(PORT);
+        String serverTimeZone = config.get(SERVER_TIME_ZONE);
 
         StartupOptions startupOptions =
                 getStartupOptions(config, context.getCatalogTable().getOptions());
@@ -140,6 +142,7 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
                 schemaName,
                 username,
                 password,
+                serverTimeZone,
                 getDebeziumProperties(context.getCatalogTable().getOptions()),
                 startupOptions,
                 enableParallelRead,
@@ -180,6 +183,7 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
         options.add(URL);
         options.add(HOSTNAME);
         options.add(PORT);
+        options.add(SERVER_TIME_ZONE);
         options.add(SCAN_STARTUP_MODE);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE);

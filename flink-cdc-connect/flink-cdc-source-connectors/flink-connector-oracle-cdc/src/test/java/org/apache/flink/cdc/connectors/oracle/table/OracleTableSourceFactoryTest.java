@@ -80,6 +80,9 @@ class OracleTableSourceFactoryTest {
     private static final String MY_DATABASE = "MYDB";
     private static final String MY_TABLE = "myTable";
     private static final String MY_SCHEMA = "mySchema";
+    private static final String DEFAULT_SERVER_TIME_ZONE =
+            JdbcSourceOptions.SERVER_TIME_ZONE.defaultValue();
+    private static final String MY_SERVER_TIME_ZONE = "Asia/Shanghai";
     private static final Properties PROPERTIES = new Properties();
 
     @Test
@@ -99,6 +102,7 @@ class OracleTableSourceFactoryTest {
                         MY_SCHEMA,
                         MY_USERNAME,
                         MY_PASSWORD,
+                        DEFAULT_SERVER_TIME_ZONE,
                         PROPERTIES,
                         StartupOptions.initial(),
                         SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED.defaultValue(),
@@ -138,6 +142,7 @@ class OracleTableSourceFactoryTest {
                         MY_SCHEMA,
                         MY_USERNAME,
                         MY_PASSWORD,
+                        DEFAULT_SERVER_TIME_ZONE,
                         PROPERTIES,
                         StartupOptions.initial(),
                         SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED.defaultValue(),
@@ -182,6 +187,7 @@ class OracleTableSourceFactoryTest {
                         MY_SCHEMA,
                         MY_USERNAME,
                         MY_PASSWORD,
+                        DEFAULT_SERVER_TIME_ZONE,
                         dbzProperties,
                         StartupOptions.initial(),
                         SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED.defaultValue(),
@@ -257,6 +263,7 @@ class OracleTableSourceFactoryTest {
                         MY_SCHEMA,
                         MY_USERNAME,
                         MY_PASSWORD,
+                        DEFAULT_SERVER_TIME_ZONE,
                         dbzProperties,
                         StartupOptions.initial(),
                         SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED.defaultValue(),
@@ -294,6 +301,7 @@ class OracleTableSourceFactoryTest {
                         MY_SCHEMA,
                         MY_USERNAME,
                         MY_PASSWORD,
+                        DEFAULT_SERVER_TIME_ZONE,
                         PROPERTIES,
                         StartupOptions.initial(),
                         SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED.defaultValue(),
@@ -334,6 +342,7 @@ class OracleTableSourceFactoryTest {
                         MY_SCHEMA,
                         MY_USERNAME,
                         MY_PASSWORD,
+                        DEFAULT_SERVER_TIME_ZONE,
                         PROPERTIES,
                         StartupOptions.latest(),
                         SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED.defaultValue(),
@@ -378,6 +387,7 @@ class OracleTableSourceFactoryTest {
                         MY_SCHEMA,
                         MY_USERNAME,
                         MY_PASSWORD,
+                        DEFAULT_SERVER_TIME_ZONE,
                         new Properties(),
                         StartupOptions.initial(),
                         SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED.defaultValue(),
@@ -446,6 +456,46 @@ class OracleTableSourceFactoryTest {
                         "Invalid value for option 'scan.startup.mode'. Supported values are "
                                 + "[initial, snapshot, latest-offset], "
                                 + "but was: abc");
+    }
+
+    @Test
+    void testServerTimeZoneProperty() {
+        Map<String, String> properties = getAllRequiredOptionsWithHost();
+        properties.put(JdbcSourceOptions.SERVER_TIME_ZONE.key(), MY_SERVER_TIME_ZONE);
+
+        DynamicTableSource actualSource = createTableSource(properties);
+        OracleTableSource expectedSource =
+                new OracleTableSource(
+                        SCHEMA,
+                        null,
+                        MY_PORT,
+                        MY_LOCALHOST,
+                        MY_DATABASE,
+                        MY_TABLE,
+                        MY_SCHEMA,
+                        MY_USERNAME,
+                        MY_PASSWORD,
+                        MY_SERVER_TIME_ZONE,
+                        PROPERTIES,
+                        StartupOptions.initial(),
+                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED.defaultValue(),
+                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
+                        SourceOptions.CHUNK_META_GROUP_SIZE.defaultValue(),
+                        SourceOptions.SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
+                        JdbcSourceOptions.CONNECT_TIMEOUT.defaultValue(),
+                        JdbcSourceOptions.CONNECT_MAX_RETRIES.defaultValue(),
+                        JdbcSourceOptions.CONNECTION_POOL_SIZE.defaultValue(),
+                        JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND
+                                .defaultValue(),
+                        JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND
+                                .defaultValue(),
+                        null,
+                        SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue(),
+                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
+                        SourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue(),
+                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED
+                                .defaultValue());
+        Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     private Map<String, String> getAllRequiredOptions() {

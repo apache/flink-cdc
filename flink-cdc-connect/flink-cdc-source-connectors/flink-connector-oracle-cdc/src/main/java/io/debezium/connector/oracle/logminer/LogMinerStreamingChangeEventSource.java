@@ -43,6 +43,7 @@ import io.debezium.util.Stopwatch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.sql.SQLException;
 import java.text.DecimalFormat;
@@ -78,6 +79,7 @@ public class LogMinerStreamingChangeEventSource
     private static final int MAXIMUM_NAME_LENGTH = 30;
     private static final String ALL_COLUMN_LOGGING = "ALL COLUMN LOGGING";
     private static final int MINING_START_RETRIES = 5;
+    private static final long REDO_THREAD_CACHE_TTL_MS = 3000L;
 
     private final OracleConnection jdbcConnection;
     private final EventDispatcher<OraclePartition, TableId> dispatcher;
@@ -101,6 +103,8 @@ public class LogMinerStreamingChangeEventSource
     private Scn snapshotScn;
     private List<LogFile> currentLogFiles;
     private List<BigInteger> currentRedoLogSequences;
+    private Scn cachedMinRedoThreadScn;
+    private long redoThreadCacheTimestamp;
 
     public LogMinerStreamingChangeEventSource(
             OracleConnectorConfig connectorConfig,
@@ -196,6 +200,13 @@ public class LogMinerStreamingChangeEventSource
 
                         Instant start = Instant.now();
                         endScn = calculateEndScn(jdbcConnection, startScn, endScn);
+
+                        if (endScn == null || endScn.isNull()) {
+                            LOGGER.debug(
+                                    "End SCN calculation returned NULL, delaying mining session by one iteration");
+                            pauseBetweenMiningSessions();
+                            continue;
+                        }
 
                         // This is a small window where when archive log only mode has completely
                         // caught up to the last
@@ -681,7 +692,24 @@ public class LogMinerStreamingChangeEventSource
             streamingMetrics.addCurrentMiningSessionStart(Duration.between(start, Instant.now()));
             return true;
         } catch (SQLException e) {
-            if (e.getErrorCode() == 1291 || e.getMessage().startsWith("ORA-01291")) {
+            if (isOracleError(e, 1292, "ORA-01292")) {
+                LOGGER.warn(
+                        "Failed to start Oracle LogMiner due to missing log files, reinitializing mining logs before retry.");
+                try {
+                    initializeRedoLogsForMining(connection, false, startScn);
+                } catch (SQLException reinitError) {
+                    LOGGER.error(
+                            "Failed to reinitialize redo logs after ORA-01292 while starting LogMiner session.",
+                            reinitError);
+                }
+                if (attempts <= MINING_START_RETRIES) {
+                    return false;
+                }
+                LOGGER.error(
+                        "Failed to start Oracle LogMiner after '{}' attempts due to ORA-01292.",
+                        MINING_START_RETRIES,
+                        e);
+            } else if (isOracleError(e, 1291, "ORA-01291")) {
                 if (attempts <= MINING_START_RETRIES) {
                     LOGGER.warn("Failed to start Oracle LogMiner session, retrying...");
                     return false;
@@ -743,8 +771,8 @@ public class LogMinerStreamingChangeEventSource
      * @param connection database connection, should not be {@code null}
      * @param startScn upcoming mining session's starting change number, should not be {@code null}
      * @param prevEndScn last mining session's ending system change number, can be {@code null}
-     * @return the ending system change number to be used for the upcoming mining session, never
-     *     {@code null}
+     * @return the ending system change number to be used for the upcoming mining session, or {@link
+     *     Scn#NULL} when mining should be delayed
      * @throws SQLException if the current max system change number cannot be obtained from the
      *     database
      */
@@ -776,19 +804,19 @@ public class LogMinerStreamingChangeEventSource
                 streamingMetrics.changeSleepingTime(true);
             }
             LOGGER.debug("Using current SCN {} as end SCN.", currentScn);
-            return currentScn;
+            return applyFinalConstraints(connection, currentScn, startScn);
         } else {
             if (prevEndScn != null && topScnToMine.compareTo(prevEndScn) <= 0) {
                 LOGGER.debug(
                         "Max batch size too small, using current SCN {} as end SCN.", currentScn);
-                return currentScn;
+                return applyFinalConstraints(connection, currentScn, startScn);
             }
             streamingMetrics.changeSleepingTime(false);
             if (topScnToMine.compareTo(startScn) < 0) {
                 LOGGER.debug(
                         "Top SCN calculation resulted in end before start SCN, using current SCN {} as end SCN.",
                         currentScn);
-                return currentScn;
+                return applyFinalConstraints(connection, currentScn, startScn);
             }
 
             if (prevEndScn != null) {
@@ -816,7 +844,7 @@ public class LogMinerStreamingChangeEventSource
                                         prevEndScnTimestamp.get(),
                                         currentScn,
                                         currentScnTimestamp.get());
-                                return currentScn;
+                                return applyFinalConstraints(connection, currentScn, startScn);
                             }
                         }
                     }
@@ -828,8 +856,125 @@ public class LogMinerStreamingChangeEventSource
                     topScnToMine,
                     currentScn,
                     startScn);
-            return topScnToMine;
+            return applyFinalConstraints(connection, topScnToMine, startScn);
         }
+    }
+
+    private Scn applyFinalConstraints(
+            OracleConnection connection, Scn candidateEndScn, Scn startScn) throws SQLException {
+        Scn constrainedEndScn = applyRedoThreadConstraints(connection, candidateEndScn, startScn);
+        return finalizeEndScn(constrainedEndScn, startScn);
+    }
+
+    static Scn finalizeEndScn(Scn candidateEndScn, Scn startScn) {
+        if (candidateEndScn == null
+                || candidateEndScn.isNull()
+                || candidateEndScn.compareTo(startScn) <= 0) {
+            LOGGER.debug(
+                    "Cannot find valid end SCN for start SCN {}, delaying mining session",
+                    startScn);
+            return Scn.NULL;
+        }
+        return candidateEndScn;
+    }
+
+    private Scn applyRedoThreadConstraints(
+            OracleConnection connection, Scn candidateEndScn, Scn startScn) throws SQLException {
+        if (candidateEndScn == null || candidateEndScn.isNull()) {
+            return Scn.NULL;
+        }
+
+        try {
+            Scn minOpenRedoThreadScn = getMinRedoThreadScn(connection);
+            Scn constrainedEndScn =
+                    clampEndScnToRedoThreadWindow(candidateEndScn, startScn, minOpenRedoThreadScn);
+            if (constrainedEndScn != candidateEndScn) {
+                if (constrainedEndScn == null || constrainedEndScn.isNull()) {
+                    LOGGER.debug(
+                            "Redo thread constraint requires delay: min open redo thread SCN {} for start SCN {}",
+                            minOpenRedoThreadScn,
+                            startScn);
+                } else {
+                    LOGGER.debug(
+                            "Applying redo thread constraint: {} -> {}",
+                            candidateEndScn,
+                            constrainedEndScn);
+                }
+            }
+            return constrainedEndScn;
+        } catch (SQLException e) {
+            LOGGER.warn("Failed to apply redo thread constraints: {}", e.getMessage());
+        }
+
+        return candidateEndScn;
+    }
+
+    private Scn getMinRedoThreadScn(OracleConnection connection) throws SQLException {
+        long now = System.currentTimeMillis();
+        if (cachedMinRedoThreadScn != null
+                && (now - redoThreadCacheTimestamp) < REDO_THREAD_CACHE_TTL_MS) {
+            return cachedMinRedoThreadScn;
+        }
+
+        String threadTableName = getRedoThreadTableName(connectorConfig.getRacNodes());
+
+        String lastRedoChangeQuery =
+                "SELECT MIN(LAST_REDO_CHANGE#) FROM " + threadTableName + " WHERE STATUS = 'OPEN'";
+        Scn result = queryRedoThreadScn(connection, lastRedoChangeQuery);
+        if (result == null) {
+            String checkpointChangeQuery =
+                    "SELECT MIN(CHECKPOINT_CHANGE#) FROM "
+                            + threadTableName
+                            + " WHERE STATUS = 'OPEN'";
+            result = queryRedoThreadScn(connection, checkpointChangeQuery);
+        }
+
+        cachedMinRedoThreadScn = result;
+        redoThreadCacheTimestamp = now;
+        return result;
+    }
+
+    private Scn queryRedoThreadScn(OracleConnection connection, String query) throws SQLException {
+        return connection.queryAndMap(
+                query,
+                rs -> {
+                    if (!rs.next()) {
+                        return null;
+                    }
+                    BigDecimal value = rs.getBigDecimal(1);
+                    return value == null ? null : Scn.valueOf(value.toString());
+                });
+    }
+
+    static Scn clampEndScnToRedoThreadWindow(
+            Scn candidateEndScn, Scn startScn, Scn minOpenRedoThreadScn) {
+        if (candidateEndScn == null || candidateEndScn.isNull()) {
+            return Scn.NULL;
+        }
+        if (minOpenRedoThreadScn == null || minOpenRedoThreadScn.isNull()) {
+            return candidateEndScn;
+        }
+
+        Scn adjustedMinScn = minOpenRedoThreadScn.subtract(Scn.ONE);
+        if (adjustedMinScn.compareTo(startScn) < 0) {
+            return Scn.NULL;
+        }
+        if (adjustedMinScn.compareTo(candidateEndScn) < 0) {
+            return adjustedMinScn;
+        }
+        return candidateEndScn;
+    }
+
+    static String getRedoThreadTableName(Set<String> racNodes) {
+        return racNodes == null || racNodes.isEmpty() ? "V$THREAD" : "GV$THREAD";
+    }
+
+    static boolean isOracleError(SQLException exception, int errorCode, String messageFragment) {
+        if (exception.getErrorCode() == errorCode) {
+            return true;
+        }
+        String message = exception.getMessage();
+        return message != null && message.contains(messageFragment);
     }
 
     /**
