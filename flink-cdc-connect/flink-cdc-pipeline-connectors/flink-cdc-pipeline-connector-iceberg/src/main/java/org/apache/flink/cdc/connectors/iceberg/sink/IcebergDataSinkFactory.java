@@ -41,6 +41,7 @@ import java.util.Objects;
 import java.util.Set;
 
 import static org.apache.flink.cdc.connectors.iceberg.sink.IcebergDataSinkOptions.PREFIX_CATALOG_PROPERTIES;
+import static org.apache.flink.cdc.connectors.iceberg.sink.IcebergDataSinkOptions.PREFIX_HADOOP_CONF;
 import static org.apache.flink.cdc.connectors.iceberg.sink.IcebergDataSinkOptions.PREFIX_TABLE_PROPERTIES;
 
 /** A {@link DataSinkFactory} for Apache Iceberg. */
@@ -55,13 +56,15 @@ public class IcebergDataSinkFactory implements DataSinkFactory {
     @Override
     public DataSink createDataSink(Context context) {
         FactoryHelper.createFactoryHelper(this, context)
-                .validateExcept(PREFIX_TABLE_PROPERTIES, PREFIX_CATALOG_PROPERTIES);
+                .validateExcept(
+                        PREFIX_TABLE_PROPERTIES, PREFIX_CATALOG_PROPERTIES, PREFIX_HADOOP_CONF);
 
         Map<String, String> allOptions = context.getFactoryConfiguration().toMap();
         OptionUtils.printOptions(IDENTIFIER, allOptions);
 
         Map<String, String> catalogOptions = new HashMap<>();
         Map<String, String> tableOptions = new HashMap<>();
+        Map<String, String> hadoopConfOptions = extractHadoopConfOptions(allOptions);
         allOptions.forEach(
                 (key, value) -> {
                     if (key.startsWith(PREFIX_TABLE_PROPERTIES)) {
@@ -116,7 +119,19 @@ public class IcebergDataSinkFactory implements DataSinkFactory {
                 zoneId,
                 schemaOperatorUid,
                 compactionOptions,
-                jobIdPrefix);
+                jobIdPrefix,
+                hadoopConfOptions);
+    }
+
+    static Map<String, String> extractHadoopConfOptions(Map<String, String> allOptions) {
+        Map<String, String> hadoopConfOptions = new HashMap<>();
+        allOptions.forEach(
+                (key, value) -> {
+                    if (key.startsWith(PREFIX_HADOOP_CONF)) {
+                        hadoopConfOptions.put(key.substring(PREFIX_HADOOP_CONF.length()), value);
+                    }
+                });
+        return hadoopConfOptions;
     }
 
     private CompactionOptions getCompactionStrategy(Configuration configuration) {

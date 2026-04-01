@@ -241,6 +241,13 @@ Pipeline Connector Options
       <td>String</td>
       <td>Pass Iceberg table options to the pipeline，See <a href="https://iceberg.apache.org/docs/nightly/configuration/#write-properties">Iceberg table options</a>. </td>
     </tr>
+    <tr>
+      <td>hadoop.conf.*</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>Pass Hadoop <code>Configuration</code> options used by Iceberg catalog/table operations. The prefix <code>hadoop.conf.</code> will be stripped. For example, <code>hadoop.conf.fs.s3a.endpoint</code>.</td>
+    </tr>
     </tbody>
 </table>    
 </div>
