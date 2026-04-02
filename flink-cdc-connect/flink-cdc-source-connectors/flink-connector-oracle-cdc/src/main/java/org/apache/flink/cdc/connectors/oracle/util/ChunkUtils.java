@@ -48,13 +48,7 @@ public class ChunkUtils {
     }
 
     public static Column getChunkKeyColumn(Table table, @Nullable String chunkKeyColumn) {
-        List<Column> primaryKeys = table.primaryKeyColumns();
         String resolvedChunkKeyColumn = resolveChunkKeyColumn(table, chunkKeyColumn);
-
-        if (primaryKeys.isEmpty() && resolvedChunkKeyColumn == null) {
-            throw new ValidationException(
-                    "To use incremental snapshot, 'scan.incremental.snapshot.chunk.key-column' must be set when the table doesn't have primary keys.");
-        }
 
         List<Column> searchColumns = table.columns();
         if (resolvedChunkKeyColumn != null) {

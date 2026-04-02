@@ -18,22 +18,29 @@
 package org.apache.flink.cdc.connectors.oracle.source.reader;
 
 import org.apache.flink.api.connector.source.SourceOutput;
+import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.connectors.base.source.meta.offset.OffsetFactory;
+import org.apache.flink.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitState;
 import org.apache.flink.cdc.connectors.base.source.metrics.SourceReaderMetrics;
 import org.apache.flink.cdc.connectors.base.source.reader.IncrementalSourceRecordEmitter;
+import org.apache.flink.cdc.connectors.base.utils.SplitKeyUtils;
 import org.apache.flink.cdc.connectors.oracle.source.config.OracleSourceConfig;
+import org.apache.flink.cdc.connectors.oracle.source.rowid.OracleRowIdExtractor;
 import org.apache.flink.cdc.connectors.oracle.utils.OracleSchemaUtils;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
 
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
+import oracle.sql.ROWID;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -42,6 +49,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.apache.flink.cdc.connectors.base.source.meta.wartermark.WatermarkEvent.isLowWatermarkEvent;
@@ -51,6 +59,7 @@ import static org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils.isSch
 
 /** The {@link RecordEmitter} implementation for Oracle pipeline connector. */
 public class OraclePipelineRecordEmitter extends IncrementalSourceRecordEmitter<Event> {
+    private static final Logger LOG = LoggerFactory.getLogger(OraclePipelineRecordEmitter.class);
     private static final long serialVersionUID = 1L;
     // Used when startup mode is initial
     private final Set<TableId> alreadySendCreateTableTables;
@@ -67,15 +76,42 @@ public class OraclePipelineRecordEmitter extends IncrementalSourceRecordEmitter<
             boolean includeSchemaChanges,
             OffsetFactory offsetFactory,
             OracleSourceConfig sourceConfig) {
+        this(
+                debeziumDeserializationSchema,
+                sourceReaderMetrics,
+                includeSchemaChanges,
+                offsetFactory,
+                sourceConfig,
+                initializeCreateTableEventCache(sourceConfig),
+                new HashSet<>(),
+                StartupOptions.snapshot().equals(sourceConfig.getStartupOptions()));
+    }
+
+    @VisibleForTesting
+    OraclePipelineRecordEmitter(
+            DebeziumDeserializationSchema<Event> debeziumDeserializationSchema,
+            SourceReaderMetrics sourceReaderMetrics,
+            boolean includeSchemaChanges,
+            OffsetFactory offsetFactory,
+            OracleSourceConfig sourceConfig,
+            Map<TableId, CreateTableEvent> createTableEventCache,
+            Set<TableId> alreadySendCreateTableTables,
+            boolean isBounded) {
         super(
                 debeziumDeserializationSchema,
                 sourceReaderMetrics,
                 includeSchemaChanges,
                 offsetFactory);
-        List<String> tableList = sourceConfig.getTableList();
         this.sourceConfig = sourceConfig;
-        this.createTableEventCache = new HashMap<>();
-        this.alreadySendCreateTableTables = new HashSet<>();
+        this.createTableEventCache = createTableEventCache;
+        this.alreadySendCreateTableTables = alreadySendCreateTableTables;
+        this.isBounded = isBounded;
+    }
+
+    private static Map<TableId, CreateTableEvent> initializeCreateTableEventCache(
+            OracleSourceConfig sourceConfig) {
+        Map<TableId, CreateTableEvent> createTableEventCache = new HashMap<>();
+        List<String> tableList = sourceConfig.getTableList();
         try (JdbcConnection jdbc = OracleSchemaUtils.createOracleConnection(sourceConfig)) {
 
             List<TableId> capturedTableIds = new ArrayList<>();
@@ -95,16 +131,20 @@ public class OraclePipelineRecordEmitter extends IncrementalSourceRecordEmitter<
                                         tableId.catalog(), tableId.table()),
                                 schema));
             }
-            this.isBounded = StartupOptions.snapshot().equals(sourceConfig.getStartupOptions());
         } catch (SQLException e) {
             throw new RuntimeException("Cannot start emitter to fetch table schema.", e);
         }
+        return createTableEventCache;
     }
 
     @Override
     protected void processElement(
             SourceRecord element, SourceOutput<Event> output, SourceSplitState splitState)
             throws Exception {
+        if (shouldSkipSnapshotRecord(element, splitState)) {
+            return;
+        }
+
         if (shouldEmitAllCreateTableEventsInSnapshotMode && isBounded) {
             for (TableId tableId : createTableEventCache.keySet()) {
                 output.collect((Event) createTableEventCache.get(tableId));
@@ -141,6 +181,50 @@ public class OraclePipelineRecordEmitter extends IncrementalSourceRecordEmitter<
         }
 
         super.processElement(element, output, splitState);
+    }
+
+    private boolean shouldSkipSnapshotRecord(SourceRecord element, SourceSplitState splitState) {
+        if (!splitState.isSnapshotSplitState() || !isDataChangeRecord(element)) {
+            return false;
+        }
+
+        SnapshotSplit snapshotSplit = splitState.asSnapshotSplitState().toSourceSplit();
+        if (!isRowIdChunkKey(snapshotSplit)) {
+            return false;
+        }
+
+        Optional<ROWID> rowId = OracleRowIdExtractor.extractRowId(element);
+        if (!rowId.isPresent()) {
+            LOG.debug(
+                    "No ROWID found for snapshot data change record in split {}, accepting record without boundary check.",
+                    snapshotSplit.splitId());
+            return false;
+        }
+
+        boolean withinBoundary =
+                SplitKeyUtils.splitKeyRangeContains(
+                        new Object[] {rowId.get()},
+                        snapshotSplit.getSplitStart(),
+                        snapshotSplit.getSplitEnd());
+        if (!withinBoundary) {
+            LOG.debug(
+                    "Skipping snapshot data change record for table {} with ROWID {} outside split {} range [{}, {}).",
+                    getTableId(element),
+                    rowId.get(),
+                    snapshotSplit.splitId(),
+                    snapshotSplit.getSplitStart(),
+                    snapshotSplit.getSplitEnd());
+        }
+        return !withinBoundary;
+    }
+
+    @VisibleForTesting
+    static boolean isRowIdChunkKey(SnapshotSplit snapshotSplit) {
+        return snapshotSplit.getSplitKeyType() != null
+                && snapshotSplit
+                        .getSplitKeyType()
+                        .getFieldNames()
+                        .contains(ROWID.class.getSimpleName());
     }
 
     private CreateTableEvent sendCreateTableEvent(

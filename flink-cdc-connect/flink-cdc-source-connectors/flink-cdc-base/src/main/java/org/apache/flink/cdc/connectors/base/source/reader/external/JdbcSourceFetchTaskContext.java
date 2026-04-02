@@ -91,8 +91,8 @@ public abstract class JdbcSourceFetchTaskContext implements FetchTask.Context {
 
     @Override
     public void rewriteOutputBuffer(
-            Map<Struct, SourceRecord> outputBuffer, SourceRecord changeRecord) {
-        Struct key = (Struct) changeRecord.key();
+            Map<Object, SourceRecord> outputBuffer, SourceRecord changeRecord) {
+        Object key = getOutputBufferKey(changeRecord);
         Struct value = (Struct) changeRecord.value();
         if (value != null) {
             Envelope.Operation operation =

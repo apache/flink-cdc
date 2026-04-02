@@ -1343,6 +1343,56 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
     }
 
     @Test
+    @Order(12)
+    public void testSnapshotModeWithTableWithoutPrimaryKeyUsesRowIdChunking() throws Exception {
+        createAndInitialize("chunk_key_no_pk.sql");
+
+        Map<String, String> options = baseFactoryOptions("debezium.chunk_key_no_pk");
+        options.put(SCAN_STARTUP_MODE.key(), "snapshot");
+        options.put(OracleDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.key(), "2");
+        options.put("debezium.snapshot.locking.mode", "none");
+        options.put("debezium.database.history.store.only.captured.tables.ddl", "true");
+
+        FlinkSourceProvider sourceProvider = createSourceProvider(options);
+
+        try (CloseableIterator<Event> events =
+                env.fromSource(
+                                sourceProvider.getSource(),
+                                WatermarkStrategy.noWatermarks(),
+                                OracleDataSourceFactory.IDENTIFIER,
+                                new EventTypeInfo())
+                        .executeAndCollect()) {
+            TableId tableId = TableId.tableId("DEBEZIUM", "CHUNK_KEY_NO_PK");
+            List<Event> actual = fetchResults(events, 5);
+
+            assertThat(actual.get(0)).isInstanceOf(CreateTableEvent.class);
+            assertThat(((CreateTableEvent) actual.get(0)).tableId()).isEqualTo(tableId);
+            assertThat(actual.subList(1, actual.size()))
+                    .allMatch(event -> event instanceof DataChangeEvent);
+
+            List<RecordData.FieldGetter> fieldGetters =
+                    SchemaUtils.createFieldGetters(((CreateTableEvent) actual.get(0)).getSchema());
+            List<String> actualRows =
+                    actual.subList(1, actual.size()).stream()
+                            .map(DataChangeEvent.class::cast)
+                            .map(DataChangeEvent::after)
+                            .map(recordData -> getFields(fieldGetters, recordData).toString())
+                            .collect(Collectors.toList());
+
+            assertThat(actualRows)
+                    .as("actual snapshot rows: %s", actualRows)
+                    .containsExactlyInAnyOrder(
+                            "[1, alice, Shanghai]",
+                            "[2, bob, Hangzhou]",
+                            "[3, carol, Beijing]",
+                            "[4, david, Shenzhen]");
+            assertThat(actual).hasSize(5);
+        } finally {
+            env.close();
+        }
+    }
+
+    @Test
     @Order(4)
     public void testSnapshotOnlyMode() throws Exception {
         Map<String, String> options = new HashMap<>();

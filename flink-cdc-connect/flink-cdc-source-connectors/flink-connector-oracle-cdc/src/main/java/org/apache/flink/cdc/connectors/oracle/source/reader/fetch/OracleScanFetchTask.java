@@ -35,15 +35,21 @@ import io.debezium.pipeline.source.AbstractSnapshotChangeEventSource;
 import io.debezium.pipeline.source.spi.SnapshotProgressListener;
 import io.debezium.pipeline.spi.ChangeRecordEmitter;
 import io.debezium.pipeline.spi.SnapshotResult;
+import io.debezium.relational.Column;
 import io.debezium.relational.RelationalSnapshotChangeEventSource;
 import io.debezium.relational.SnapshotChangeRecordEmitter;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
+import io.debezium.relational.TableSchema;
 import io.debezium.util.Clock;
 import io.debezium.util.ColumnUtils;
 import io.debezium.util.Strings;
 import io.debezium.util.Threads;
+import oracle.sql.ROWID;
+import org.apache.kafka.connect.data.SchemaAndValue;
+import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.errors.ConnectException;
+import org.apache.kafka.connect.header.ConnectHeaders;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,6 +60,7 @@ import java.time.Duration;
 
 import static org.apache.flink.cdc.connectors.oracle.source.reader.fetch.OracleStreamFetchTask.RedoLogSplitReadTask;
 import static org.apache.flink.cdc.connectors.oracle.source.utils.OracleUtils.buildSplitScanQuery;
+import static org.apache.flink.cdc.connectors.oracle.source.utils.OracleUtils.buildSplitScanQueryWithHiddenRowId;
 import static org.apache.flink.cdc.connectors.oracle.source.utils.OracleUtils.readTableSplitDataStatement;
 
 /** The task to work for fetching data of Oracle table snapshot split. */
@@ -263,12 +270,19 @@ public class OracleScanFetchTask extends AbstractScanFetchTask {
                     snapshotSplit.splitId(),
                     table.id());
 
+            final boolean hasHiddenRowIdColumn = isRowIdChunkSplit(snapshotSplit);
             final String selectSql =
-                    buildSplitScanQuery(
-                            snapshotSplit.getTableId(),
-                            snapshotSplit.getSplitKeyType(),
-                            snapshotSplit.getSplitStart() == null,
-                            snapshotSplit.getSplitEnd() == null);
+                    hasHiddenRowIdColumn
+                            ? buildSplitScanQueryWithHiddenRowId(
+                                    snapshotSplit.getTableId(),
+                                    snapshotSplit.getSplitKeyType(),
+                                    snapshotSplit.getSplitStart() == null,
+                                    snapshotSplit.getSplitEnd() == null)
+                            : buildSplitScanQuery(
+                                    snapshotSplit.getTableId(),
+                                    snapshotSplit.getSplitKeyType(),
+                                    snapshotSplit.getSplitStart() == null,
+                                    snapshotSplit.getSplitEnd() == null);
             LOG.info(
                     "For split '{}' of table {} using select statement: '{}'",
                     snapshotSplit.splitId(),
@@ -287,14 +301,19 @@ public class OracleScanFetchTask extends AbstractScanFetchTask {
                                     connectorConfig.getQueryFetchSize());
                     ResultSet rs = selectStatement.executeQuery()) {
 
-                ColumnUtils.ColumnArray columnArray = ColumnUtils.toArray(rs, table);
+                ColumnUtils.ColumnArray columnArray =
+                        hasHiddenRowIdColumn ? null : ColumnUtils.toArray(rs, table);
                 long rows = 0;
                 Threads.Timer logTimer = getTableScanLogTimer();
 
                 while (rs.next()) {
                     rows++;
+                    final String snapshotRowId = hasHiddenRowIdColumn ? rs.getString(1) : null;
                     final Object[] row =
-                            jdbcConnection.rowToArray(table, databaseSchema, rs, columnArray);
+                            hasHiddenRowIdColumn
+                                    ? rowToArrayWithLeadingRowId(table, rs)
+                                    : jdbcConnection.rowToArray(
+                                            table, databaseSchema, rs, columnArray);
                     if (logTimer.expired()) {
                         long stop = clock.currentTimeInMillis();
                         LOG.info(
@@ -309,7 +328,7 @@ public class OracleScanFetchTask extends AbstractScanFetchTask {
                     eventDispatcher.dispatchSnapshotEvent(
                             snapshotContext.partition,
                             table.id(),
-                            getChangeRecordEmitter(snapshotContext, table.id(), row),
+                            getChangeRecordEmitter(snapshotContext, table.id(), row, snapshotRowId),
                             snapshotReceiver);
                 }
                 LOG.info(
@@ -326,13 +345,81 @@ public class OracleScanFetchTask extends AbstractScanFetchTask {
                 SnapshotContext<OraclePartition, OracleOffsetContext> snapshotContext,
                 TableId tableId,
                 Object[] row) {
+            return getChangeRecordEmitter(snapshotContext, tableId, row, null);
+        }
+
+        protected ChangeRecordEmitter<OraclePartition> getChangeRecordEmitter(
+                SnapshotContext<OraclePartition, OracleOffsetContext> snapshotContext,
+                TableId tableId,
+                Object[] row,
+                String rowId) {
             snapshotContext.offset.event(tableId, clock.currentTime());
-            return new SnapshotChangeRecordEmitter<>(
-                    snapshotContext.partition, snapshotContext.offset, row, clock);
+            if (rowId == null) {
+                return new SnapshotChangeRecordEmitter<>(
+                        snapshotContext.partition, snapshotContext.offset, row, clock);
+            }
+            return new RowIdSnapshotChangeRecordEmitter<>(
+                    snapshotContext.partition, snapshotContext.offset, row, clock, rowId);
         }
 
         private Threads.Timer getTableScanLogTimer() {
             return Threads.timer(clock, LOG_INTERVAL);
+        }
+
+        private Object[] rowToArrayWithLeadingRowId(Table table, ResultSet rs) throws SQLException {
+            int greatestColumnPosition = 0;
+            for (Column column : table.columns()) {
+                greatestColumnPosition = Math.max(greatestColumnPosition, column.position());
+            }
+
+            final Object[] row = new Object[greatestColumnPosition];
+            for (Column column : table.columns()) {
+                row[column.position() - 1] =
+                        jdbcConnection.getColumnValue(
+                                rs, column.position() + 1, column, table, databaseSchema);
+            }
+            return row;
+        }
+
+        private boolean isRowIdChunkSplit(SnapshotSplit split) {
+            return split.getSplitKeyType().getFieldNames().contains(ROWID.class.getSimpleName());
+        }
+    }
+
+    private static class RowIdSnapshotChangeRecordEmitter<P extends OraclePartition>
+            extends SnapshotChangeRecordEmitter<P> {
+
+        private final String rowId;
+
+        private RowIdSnapshotChangeRecordEmitter(
+                P partition, OracleOffsetContext offset, Object[] row, Clock clock, String rowId) {
+            super(partition, offset, row, clock);
+            this.rowId = rowId;
+        }
+
+        @Override
+        protected void emitReadRecord(Receiver<P> receiver, TableSchema tableSchema)
+                throws InterruptedException {
+            Object[] newColumnValues = getNewColumnValues();
+            Struct newKey = tableSchema.keyFromColumnData(newColumnValues);
+            Struct newValue = tableSchema.valueFromColumnData(newColumnValues);
+            Struct envelope =
+                    tableSchema
+                            .getEnvelopeSchema()
+                            .read(
+                                    newValue,
+                                    getOffset().getSourceInfo(),
+                                    getClock().currentTimeAsInstant());
+            ConnectHeaders headers = new ConnectHeaders();
+            headers.add(ROWID.class.getSimpleName(), new SchemaAndValue(null, rowId));
+            receiver.changeRecord(
+                    getPartition(),
+                    tableSchema,
+                    getOperation(),
+                    newKey,
+                    envelope,
+                    getOffset(),
+                    headers);
         }
     }
 }

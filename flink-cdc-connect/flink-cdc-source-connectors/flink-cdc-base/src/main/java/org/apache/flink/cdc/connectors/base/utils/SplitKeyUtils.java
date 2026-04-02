@@ -26,10 +26,22 @@ import org.apache.kafka.connect.source.SourceRecord;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.util.Arrays;
 import java.util.List;
 
 /** Utility class to deal split keys and split key ranges. */
 public class SplitKeyUtils {
+
+    private static final String ORACLE_ROWID_ALPHABET =
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    private static final int[] ORACLE_ROWID_CHAR_ORDER = new int[128];
+
+    static {
+        Arrays.fill(ORACLE_ROWID_CHAR_ORDER, -1);
+        for (int i = 0; i < ORACLE_ROWID_ALPHABET.length(); i++) {
+            ORACLE_ROWID_CHAR_ORDER[ORACLE_ROWID_ALPHABET.charAt(i)] = i;
+        }
+    }
 
     /** Returns the specific key contains in the split key range or not. */
     public static boolean splitKeyRangeContains(
@@ -39,13 +51,39 @@ public class SplitKeyUtils {
 
     @SuppressWarnings("unchecked")
     private static int compareObjects(Object o1, Object o2) {
-        if (o1 instanceof Comparable && o1.getClass().equals(o2.getClass())) {
+        if (isOracleRowId(o1) && isOracleRowId(o2)) {
+            return compareOracleRowIdStrings(o1.toString(), o2.toString());
+        } else if (o1 instanceof Comparable && o1.getClass().equals(o2.getClass())) {
             return ((Comparable) o1).compareTo(o2);
         } else if (isNumericObject(o1) && isNumericObject(o2)) {
             return toBigDecimal(o1).compareTo(toBigDecimal(o2));
         } else {
             return o1.toString().compareTo(o2.toString());
         }
+    }
+
+    private static boolean isOracleRowId(Object obj) {
+        return obj != null && "oracle.sql.ROWID".equals(obj.getClass().getName());
+    }
+
+    private static int compareOracleRowIdStrings(String left, String right) {
+        int maxIndex = Math.min(left.length(), right.length());
+        for (int i = 0; i < maxIndex; i++) {
+            int compareResult =
+                    Integer.compare(
+                            rowIdCharOrder(left.charAt(i)), rowIdCharOrder(right.charAt(i)));
+            if (compareResult != 0) {
+                return compareResult;
+            }
+        }
+        return Integer.compare(left.length(), right.length());
+    }
+
+    private static int rowIdCharOrder(char c) {
+        if (c < ORACLE_ROWID_CHAR_ORDER.length && ORACLE_ROWID_CHAR_ORDER[c] >= 0) {
+            return ORACLE_ROWID_CHAR_ORDER[c];
+        }
+        return c;
     }
 
     private static BigDecimal toBigDecimal(Object numericObj) {

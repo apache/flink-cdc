@@ -106,7 +106,30 @@ public class OracleUtils {
 
     public static String buildSplitScanQuery(
             TableId tableId, RowType pkRowType, boolean isFirstSplit, boolean isLastSplit) {
-        return buildSplitQuery(tableId, pkRowType, isFirstSplit, isLastSplit, -1, true);
+        return buildSplitScanQuery(
+                tableId, pkRowType, isFirstSplit, isLastSplit, "*", quoteSchemaAndTable(tableId));
+    }
+
+    public static String buildSplitScanQueryWithHiddenRowId(
+            TableId tableId, RowType pkRowType, boolean isFirstSplit, boolean isLastSplit) {
+        return buildSplitScanQuery(
+                tableId,
+                pkRowType,
+                isFirstSplit,
+                isLastSplit,
+                "ROWID AS " + quote("ROWID") + ", T.*",
+                quoteSchemaAndTable(tableId) + " T");
+    }
+
+    private static String buildSplitScanQuery(
+            TableId tableId,
+            RowType pkRowType,
+            boolean isFirstSplit,
+            boolean isLastSplit,
+            String projection,
+            String fromClause) {
+        return buildSplitQuery(
+                tableId, pkRowType, isFirstSplit, isLastSplit, -1, true, projection, fromClause);
     }
 
     private static String buildSplitQuery(
@@ -115,7 +138,9 @@ public class OracleUtils {
             boolean isFirstSplit,
             boolean isLastSplit,
             int limitSize,
-            boolean isScanningData) {
+            boolean isScanningData,
+            String scanningProjection,
+            String scanningFromClause) {
         final String condition;
 
         if (isFirstSplit && isLastSplit) {
@@ -148,7 +173,11 @@ public class OracleUtils {
 
         if (isScanningData) {
             return buildSelectWithRowLimits(
-                    tableId, limitSize, "*", Optional.ofNullable(condition), Optional.empty());
+                    scanningFromClause,
+                    limitSize,
+                    scanningProjection,
+                    Optional.ofNullable(condition),
+                    Optional.empty());
         } else {
             final String orderBy =
                     pkRowType.getFieldNames().stream().collect(Collectors.joining(", "));
@@ -291,14 +320,14 @@ public class OracleUtils {
     }
 
     private static String buildSelectWithRowLimits(
-            TableId tableId,
+            String fromClause,
             int limit,
             String projection,
             Optional<String> condition,
             Optional<String> orderBy) {
         final StringBuilder sql = new StringBuilder("SELECT ");
         sql.append(projection).append(" FROM ");
-        sql.append(quoteSchemaAndTable(tableId));
+        sql.append(fromClause);
         if (condition.isPresent()) {
             sql.append(" WHERE ").append(condition.get());
         }

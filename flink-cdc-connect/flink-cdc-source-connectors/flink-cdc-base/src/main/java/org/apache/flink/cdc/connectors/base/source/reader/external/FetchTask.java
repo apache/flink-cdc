@@ -28,7 +28,6 @@ import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
-import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 
 import java.util.Collection;
@@ -85,7 +84,11 @@ public interface FetchTask<Split> {
                     "Split key extraction is not supported by this fetch task context.");
         }
 
-        void rewriteOutputBuffer(Map<Struct, SourceRecord> outputBuffer, SourceRecord changeRecord);
+        default Object getOutputBufferKey(SourceRecord record) {
+            return record.key();
+        }
+
+        void rewriteOutputBuffer(Map<Object, SourceRecord> outputBuffer, SourceRecord changeRecord);
 
         List<SourceRecord> formatMessageTimestamp(Collection<SourceRecord> snapshotRecords);
 

@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.oracle.source.reader.fetch;
 
+import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.connectors.base.WatermarkDispatcher;
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
 import org.apache.flink.cdc.connectors.base.dialect.JdbcDataSourceDialect;
@@ -61,8 +62,10 @@ import io.debezium.schema.DataCollectionId;
 import io.debezium.schema.TopicSelector;
 import io.debezium.util.Collect;
 import oracle.sql.ROWID;
+import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.header.ConnectHeaders;
+import org.apache.kafka.connect.header.Header;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,6 +73,7 @@ import org.slf4j.LoggerFactory;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.apache.flink.cdc.connectors.oracle.source.utils.OracleConnectionUtils.createOracleConnection;
 import static org.apache.flink.cdc.connectors.oracle.util.ChunkUtils.getChunkKeyColumn;
@@ -214,20 +218,126 @@ public class OracleSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
 
         // RowId is chunk key column by default, compare RowId
         if (splitKeyType.getFieldNames().contains(ROWID.class.getSimpleName())) {
-            ConnectHeaders headers = (ConnectHeaders) record.headers();
-            ROWID rowId = null;
-            try {
-                rowId = new ROWID(headers.iterator().next().value().toString());
-            } catch (SQLException e) {
-                LOG.error("{} can not convert to RowId", record);
+            Optional<ROWID> rowId = extractRowId(record);
+            if (!rowId.isPresent()) {
+                LOG.warn(
+                        "Record without ROWID, accepting without boundary check. Table: {}",
+                        SourceRecordUtils.getTableId(record));
+                return true;
             }
-            Object[] rowIds = new ROWID[] {rowId};
+
+            Object[] rowIds = new ROWID[] {rowId.get()};
             return SplitKeyUtils.splitKeyRangeContains(rowIds, splitStart, splitEnd);
         } else {
             // config chunk key column compare
             Object[] key = SplitKeyUtils.getSplitKey(splitKeyType, record, getSchemaNameAdjuster());
             return SplitKeyUtils.splitKeyRangeContains(key, splitStart, splitEnd);
         }
+    }
+
+    @Override
+    public Object getOutputBufferKey(SourceRecord record) {
+        return outputBufferKey(record);
+    }
+
+    @VisibleForTesting
+    static Object outputBufferKey(SourceRecord record) {
+        if (record == null) {
+            return null;
+        }
+        if (hasUsableRecordKey(record)) {
+            return record.key();
+        }
+        return extractRowId(record).map(ROWID::toString).orElse(null);
+    }
+
+    private static boolean hasUsableRecordKey(SourceRecord record) {
+        Object key = record.key();
+        if (key == null) {
+            return false;
+        }
+        if (!(key instanceof Struct)) {
+            return true;
+        }
+
+        Struct structKey = (Struct) key;
+        if (structKey.schema() == null || structKey.schema().fields().isEmpty()) {
+            return false;
+        }
+
+        for (Field field : structKey.schema().fields()) {
+            if (structKey.get(field) != null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @VisibleForTesting
+    static Optional<ROWID> extractRowId(SourceRecord record) {
+        if (record == null) {
+            return Optional.empty();
+        }
+
+        Optional<String> rowIdString = extractRowIdFromValue(record);
+        if (!rowIdString.isPresent()) {
+            rowIdString = extractRowIdFromHeaders(record);
+        }
+
+        if (!rowIdString.isPresent()) {
+            return Optional.empty();
+        }
+
+        try {
+            return Optional.of(new ROWID(rowIdString.get()));
+        } catch (SQLException e) {
+            LOG.debug("Failed to convert record ROWID {}.", rowIdString.get(), e);
+            return Optional.empty();
+        }
+    }
+
+    private static Optional<String> extractRowIdFromValue(SourceRecord record) {
+        if (!(record.value() instanceof Struct)) {
+            return Optional.empty();
+        }
+
+        Struct value = (Struct) record.value();
+        Optional<String> rowId =
+                extractRowIdFromStruct(getStructIfPresent(value, Envelope.FieldName.AFTER));
+        if (rowId.isPresent()) {
+            return rowId;
+        }
+        return extractRowIdFromStruct(getStructIfPresent(value, Envelope.FieldName.BEFORE));
+    }
+
+    private static Struct getStructIfPresent(Struct value, String fieldName) {
+        if (value == null || value.schema() == null || value.schema().field(fieldName) == null) {
+            return null;
+        }
+        return value.getStruct(fieldName);
+    }
+
+    private static Optional<String> extractRowIdFromStruct(Struct struct) {
+        if (struct == null
+                || struct.schema() == null
+                || struct.schema().field(ROWID.class.getSimpleName()) == null) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(struct.getString(ROWID.class.getSimpleName()));
+    }
+
+    private static Optional<String> extractRowIdFromHeaders(SourceRecord record) {
+        if (!(record.headers() instanceof ConnectHeaders)) {
+            return Optional.empty();
+        }
+
+        ConnectHeaders headers = (ConnectHeaders) record.headers();
+        for (Header header : headers) {
+            if (ROWID.class.getSimpleName().equals(header.key()) && header.value() != null) {
+                return Optional.of(header.value().toString());
+            }
+        }
+        return Optional.empty();
     }
 
     @Override

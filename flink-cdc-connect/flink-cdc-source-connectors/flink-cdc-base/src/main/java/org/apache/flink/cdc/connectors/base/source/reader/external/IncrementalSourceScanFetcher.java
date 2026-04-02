@@ -27,7 +27,6 @@ import org.apache.flink.shaded.guava31.com.google.common.util.concurrent.ThreadF
 
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.pipeline.DataChangeEvent;
-import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -151,7 +150,7 @@ public class IncrementalSourceScanFetcher implements Fetcher<SourceRecords, Sour
         boolean reachChangeLogEnd = false;
         SourceRecord lowWatermark = null;
         SourceRecord highWatermark = null;
-        Map<Struct, SourceRecord> outputBuffer = new HashMap<>();
+        Map<Object, SourceRecord> outputBuffer = new HashMap<>();
         while (!reachChangeLogEnd) {
             checkReadException();
             List<DataChangeEvent> batch = queue.poll();
@@ -177,7 +176,7 @@ public class IncrementalSourceScanFetcher implements Fetcher<SourceRecords, Sour
                 }
 
                 if (!reachChangeLogStart) {
-                    outputBuffer.put((Struct) record.key(), record);
+                    outputBuffer.put(taskContext.getOutputBufferKey(record), record);
                 } else {
                     if (isChangeRecordInChunkRange(record)) {
                         // rewrite overlapping snapshot records through the record key
