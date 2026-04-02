@@ -143,10 +143,14 @@ class ChunkUtilsTest {
         ROWID lower = new ROWID("AAAzIdACKAAABWCAA" + lowerSuffix);
         ROWID upper = new ROWID("AAAzIdACKAAABWCAA" + upperSuffix);
 
-        assertThat(SplitKeyUtils.splitKeyRangeContains(new Object[] {lower}, null, new Object[] {upper}))
+        assertThat(
+                        SplitKeyUtils.splitKeyRangeContains(
+                                new Object[] {lower}, null, new Object[] {upper}))
                 .as("expected ROWID %s to be before %s", lower, upper)
                 .isTrue();
-        assertThat(SplitKeyUtils.splitKeyRangeContains(new Object[] {upper}, null, new Object[] {upper}))
+        assertThat(
+                        SplitKeyUtils.splitKeyRangeContains(
+                                new Object[] {upper}, null, new Object[] {upper}))
                 .as("upper boundary must remain exclusive for ROWID %s", upper)
                 .isFalse();
     }

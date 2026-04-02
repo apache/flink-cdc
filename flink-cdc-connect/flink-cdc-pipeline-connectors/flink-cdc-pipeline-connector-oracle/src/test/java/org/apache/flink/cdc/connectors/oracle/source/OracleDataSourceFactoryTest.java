@@ -23,6 +23,7 @@ import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.pipeline.RuntimeExecutionMode;
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.connectors.oracle.factory.OracleDataSourceFactory;
+import org.apache.flink.cdc.connectors.oracle.source.meta.offset.RedoLogOffset;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -31,6 +32,7 @@ import org.junit.jupiter.api.Test;
 import org.testcontainers.lifecycle.Startables;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -41,6 +43,7 @@ import static org.apache.flink.cdc.connectors.oracle.source.OracleDataSourceOpti
 import static org.apache.flink.cdc.connectors.oracle.source.OracleDataSourceOptions.PORT;
 import static org.apache.flink.cdc.connectors.oracle.source.OracleDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN;
 import static org.apache.flink.cdc.connectors.oracle.source.OracleDataSourceOptions.SCAN_STARTUP_MODE;
+import static org.apache.flink.cdc.connectors.oracle.source.OracleDataSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_SCN;
 import static org.apache.flink.cdc.connectors.oracle.source.OracleDataSourceOptions.SCHEMA_CHANGE_ENABLED;
 import static org.apache.flink.cdc.connectors.oracle.source.OracleDataSourceOptions.TABLES;
 import static org.apache.flink.cdc.connectors.oracle.source.OracleDataSourceOptions.TABLES_EXCLUDE;
@@ -217,6 +220,47 @@ public class OracleDataSourceFactoryTest extends OracleSourceTestBase {
     }
 
     @Test
+    public void testSpecificOffsetStartup() {
+        Map<String, String> options = baseOptions("debezium.products");
+        options.put(SCAN_STARTUP_MODE.key(), "specific-offset");
+        options.put(SCAN_STARTUP_SPECIFIC_OFFSET_SCN.key(), "123456");
+
+        OracleDataSource dataSource = createDataSource(options);
+
+        assertThat(dataSource.getSourceConfig().getStartupOptions())
+                .isEqualTo(
+                        StartupOptions.specificOffset(
+                                Collections.singletonMap(RedoLogOffset.SCN_KEY, "123456")));
+    }
+
+    @Test
+    public void testSpecificOffsetStartupRequiresScn() {
+        Map<String, String> options = baseOptions("debezium.products");
+        options.put(SCAN_STARTUP_MODE.key(), "specific-offset");
+
+        assertThatThrownBy(() -> createDataSource(options))
+                .isInstanceOf(org.apache.flink.table.api.ValidationException.class)
+                .hasMessageContaining(SCAN_STARTUP_SPECIFIC_OFFSET_SCN.key());
+    }
+
+    @Test
+    public void testBatchModeWithSpecificOffsetStartup() {
+        Map<String, String> options = baseOptions("debezium.products");
+        options.put(SCAN_STARTUP_MODE.key(), "specific-offset");
+        options.put(SCAN_STARTUP_SPECIFIC_OFFSET_SCN.key(), "123456");
+
+        assertThatThrownBy(
+                        () ->
+                                createDataSource(
+                                        new MockContext(
+                                                Configuration.fromMap(options),
+                                                createBatchPipelineConfiguration())))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining(
+                        "Only \"snapshot\" of OracleDataSource StartupOption is supported in BATCH pipeline");
+    }
+
+    @Test
     public void testOptionalOption() {
         Map<String, String> options = baseOptions("debezium.products");
         options.put(TABLES_EXCLUDE.key(), "debezium.category");
@@ -228,7 +272,8 @@ public class OracleDataSourceFactoryTest extends OracleSourceTestBase {
                 .contains(
                         TABLES_EXCLUDE,
                         SCHEMA_CHANGE_ENABLED,
-                        SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN);
+                        SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN,
+                        SCAN_STARTUP_SPECIFIC_OFFSET_SCN);
 
         OracleDataSource dataSource =
                 (OracleDataSource)

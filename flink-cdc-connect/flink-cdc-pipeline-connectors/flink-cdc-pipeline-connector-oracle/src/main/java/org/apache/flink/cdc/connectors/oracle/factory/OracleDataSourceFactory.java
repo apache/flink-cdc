@@ -34,6 +34,7 @@ import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.connectors.oracle.source.OracleDataSource;
 import org.apache.flink.cdc.connectors.oracle.source.OracleDataSourceOptions;
 import org.apache.flink.cdc.connectors.oracle.source.config.OracleSourceConfigFactory;
+import org.apache.flink.cdc.connectors.oracle.source.meta.offset.RedoLogOffset;
 import org.apache.flink.cdc.connectors.oracle.table.OracleReadableMetaData;
 import org.apache.flink.cdc.connectors.oracle.utils.OracleSchemaUtils;
 import org.apache.flink.table.api.ValidationException;
@@ -54,6 +55,7 @@ import java.util.stream.Collectors;
 import static org.apache.flink.cdc.connectors.base.utils.ObjectUtils.doubleCompare;
 import static org.apache.flink.cdc.connectors.oracle.source.OracleDataSourceOptions.METADATA_LIST;
 import static org.apache.flink.cdc.connectors.oracle.source.OracleDataSourceOptions.SCAN_STARTUP_MODE;
+import static org.apache.flink.cdc.connectors.oracle.source.OracleDataSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_SCN;
 import static org.apache.flink.cdc.debezium.table.DebeziumOptions.DEBEZIUM_OPTIONS_PREFIX;
 import static org.apache.flink.cdc.debezium.utils.JdbcUrlUtils.PROPERTIES_PREFIX;
 import static org.apache.flink.util.Preconditions.checkNotNull;
@@ -69,6 +71,7 @@ public class OracleDataSourceFactory implements DataSourceFactory {
     private static final String SCAN_STARTUP_MODE_VALUE_INITIAL = "initial";
     private static final String SCAN_STARTUP_MODE_VALUE_LATEST = "latest-offset";
     private static final String SCAN_STARTUP_MODE_VALUE_SNAPSHOT = "snapshot";
+    private static final String SCAN_STARTUP_MODE_VALUE_SPECIFIC_OFFSET = "specific-offset";
 
     @Override
     public DataSource createDataSource(Context context) {
@@ -257,6 +260,7 @@ public class OracleDataSourceFactory implements DataSourceFactory {
         options.add(OracleDataSourceOptions.LOG_MINING_STRATEGY);
         options.add(OracleDataSourceOptions.DATABASE_CONNECTION_ADAPTER);
         options.add(OracleDataSourceOptions.SCAN_STARTUP_MODE);
+        options.add(OracleDataSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_SCN);
         return options;
     }
 
@@ -355,16 +359,32 @@ public class OracleDataSourceFactory implements DataSourceFactory {
                 return StartupOptions.snapshot();
             case SCAN_STARTUP_MODE_VALUE_LATEST:
                 return StartupOptions.latest();
+            case SCAN_STARTUP_MODE_VALUE_SPECIFIC_OFFSET:
+                return StartupOptions.specificOffset(getSpecificOffset(config));
 
             default:
                 throw new ValidationException(
                         String.format(
-                                "Invalid value for option '%s'. Supported values are [%s, %s, %s], but was: %s",
+                                "Invalid value for option '%s'. Supported values are [%s, %s, %s, %s], but was: %s",
                                 SourceOptions.SCAN_STARTUP_MODE.key(),
                                 SCAN_STARTUP_MODE_VALUE_INITIAL,
                                 SCAN_STARTUP_MODE_VALUE_SNAPSHOT,
                                 SCAN_STARTUP_MODE_VALUE_LATEST,
+                                SCAN_STARTUP_MODE_VALUE_SPECIFIC_OFFSET,
                                 modeString));
         }
+    }
+
+    private static Map<String, String> getSpecificOffset(Configuration config) {
+        String specificOffsetScn = config.get(SCAN_STARTUP_SPECIFIC_OFFSET_SCN);
+        if (StringUtils.isNullOrWhitespaceOnly(specificOffsetScn)) {
+            throw new ValidationException(
+                    String.format(
+                            "Option '%s' is required when option '%s' is set to '%s'.",
+                            SCAN_STARTUP_SPECIFIC_OFFSET_SCN.key(),
+                            SCAN_STARTUP_MODE.key(),
+                            SCAN_STARTUP_MODE_VALUE_SPECIFIC_OFFSET));
+        }
+        return java.util.Collections.singletonMap(RedoLogOffset.SCN_KEY, specificOffsetScn);
     }
 }

@@ -74,6 +74,7 @@ import org.testcontainers.lifecycle.Startables;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
@@ -94,6 +95,7 @@ import static org.apache.flink.cdc.connectors.oracle.source.OracleDataSourceOpti
 import static org.apache.flink.cdc.connectors.oracle.source.OracleDataSourceOptions.PASSWORD;
 import static org.apache.flink.cdc.connectors.oracle.source.OracleDataSourceOptions.PORT;
 import static org.apache.flink.cdc.connectors.oracle.source.OracleDataSourceOptions.SCAN_STARTUP_MODE;
+import static org.apache.flink.cdc.connectors.oracle.source.OracleDataSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_SCN;
 import static org.apache.flink.cdc.connectors.oracle.source.OracleDataSourceOptions.SCHEMA_CHANGE_ENABLED;
 import static org.apache.flink.cdc.connectors.oracle.source.OracleDataSourceOptions.TABLES;
 import static org.apache.flink.cdc.connectors.oracle.source.OracleDataSourceOptions.TABLES_EXCLUDE;
@@ -1387,6 +1389,62 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
                             "[3, carol, Beijing]",
                             "[4, david, Shenzhen]");
             assertThat(actual).hasSize(5);
+        } finally {
+            env.close();
+        }
+    }
+
+    @Test
+    @Order(13)
+    public void testSpecificOffsetStartupModeWithScn() throws Exception {
+        createAndInitialize("customer.sql");
+
+        long currentScn;
+        try (Connection connection = getJdbcConnectionAsDBA();
+                Statement statement = connection.createStatement()) {
+            ResultSet resultSet = statement.executeQuery("SELECT CURRENT_SCN FROM V$DATABASE");
+            assertThat(resultSet.next()).isTrue();
+            currentScn = resultSet.getLong("CURRENT_SCN");
+        }
+
+        try (Connection connection = getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "INSERT INTO DEBEZIUM.CUSTOMERS "
+                            + "VALUES (9999, 'user_offset', 'Shanghai', '123567891234')");
+        }
+
+        Map<String, String> options = baseFactoryOptions("debezium.customers");
+        options.put(SCAN_STARTUP_MODE.key(), "specific-offset");
+        options.put(SCAN_STARTUP_SPECIFIC_OFFSET_SCN.key(), String.valueOf(currentScn));
+
+        FlinkSourceProvider sourceProvider = createSourceProvider(options);
+
+        try (CloseableIterator<Event> events =
+                env.fromSource(
+                                sourceProvider.getSource(),
+                                WatermarkStrategy.noWatermarks(),
+                                OracleDataSourceFactory.IDENTIFIER,
+                                new EventTypeInfo())
+                        .executeAndCollect()) {
+            List<Event> actual = fetchResults(events, 2);
+
+            assertThat(actual).hasSize(2);
+            assertThat(actual.get(0)).isInstanceOf(CreateTableEvent.class);
+            assertThat(actual.get(1)).isInstanceOf(DataChangeEvent.class);
+            assertThat(((ChangeEvent) actual.get(0)).tableId())
+                    .isEqualTo(TableId.tableId("DEBEZIUM", "CUSTOMERS"));
+            assertThat(((ChangeEvent) actual.get(1)).tableId())
+                    .isEqualTo(TableId.tableId("DEBEZIUM", "CUSTOMERS"));
+
+            List<RecordData.FieldGetter> fieldGetters =
+                    SchemaUtils.createFieldGetters(((CreateTableEvent) actual.get(0)).getSchema());
+            List<Object> actualFields =
+                    getFields(fieldGetters, ((DataChangeEvent) actual.get(1)).after());
+            assertThat(actualFields).hasSize(4);
+            assertThat(actualFields.get(0)).isNotNull();
+            assertThat(actualFields.subList(1, 4).toString())
+                    .isEqualTo("[user_offset, Shanghai, 123567891234]");
         } finally {
             env.close();
         }
