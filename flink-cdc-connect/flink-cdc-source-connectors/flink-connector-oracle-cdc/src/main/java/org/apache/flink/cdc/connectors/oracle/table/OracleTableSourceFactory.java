@@ -78,8 +78,9 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
                 SCAN_STARTUP_MODE_VALUE_SPECIFIC_OFFSETS_PREFIX);
 
         final ReadableConfig config = helper.getOptions();
-        String url = config.get(URL);
-        String hostname = config.get(HOSTNAME);
+        String url = emptyToNull(config.get(URL));
+        String hostname = emptyToNull(config.get(HOSTNAME));
+        validateConnectionOptions(url, hostname);
         String username = config.get(USERNAME);
         String password = config.get(PASSWORD);
         String databaseName = config.get(DATABASE_NAME);
@@ -247,6 +248,23 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
             }
         }
         return offset;
+    }
+
+    private static void validateConnectionOptions(String url, String hostname) {
+        if (url == null && hostname == null) {
+            throw new ValidationException(
+                    String.format(
+                            "Either option '%s' or option '%s' must be provided.",
+                            URL.key(), HOSTNAME.key()));
+        }
+    }
+
+    private static String emptyToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     /** Checks the value of given integer option is valid. */

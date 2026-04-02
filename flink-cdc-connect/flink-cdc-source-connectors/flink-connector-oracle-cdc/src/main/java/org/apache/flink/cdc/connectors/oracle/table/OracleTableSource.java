@@ -59,7 +59,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
     private final ResolvedSchema physicalSchema;
     @Nullable private final String url;
     private final int port;
-    private final String hostname;
+    @Nullable private final String hostname;
     private final String database;
     private final String username;
     private final String password;
@@ -97,7 +97,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
             ResolvedSchema physicalSchema,
             @Nullable String url,
             int port,
-            String hostname,
+            @Nullable String hostname,
             String database,
             String tableName,
             String schemaName,
@@ -123,7 +123,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
         this.physicalSchema = physicalSchema;
         this.url = url;
         this.port = port;
-        this.hostname = checkNotNull(hostname);
+        this.hostname = hostname;
         this.database = checkNotNull(database);
         this.tableName = checkNotNull(tableName);
         this.schemaName = checkNotNull(schemaName);

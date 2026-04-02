@@ -80,6 +80,8 @@ class OracleTableSourceFactoryTest {
     private static final String MY_DATABASE = "MYDB";
     private static final String MY_TABLE = "myTable";
     private static final String MY_SCHEMA = "mySchema";
+    private static final String MY_URL = "jdbc:oracle:thin:@localhost:1521:MYDB";
+    private static final String MY_TNS_ALIAS_URL = "jdbc:oracle:thin:@MYDB";
     private static final String DEFAULT_SERVER_TIME_ZONE =
             JdbcSourceOptions.SERVER_TIME_ZONE.defaultValue();
     private static final String MY_SERVER_TIME_ZONE = "Asia/Shanghai";
@@ -205,6 +207,84 @@ class OracleTableSourceFactoryTest {
                         SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue(),
                         SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
                         true,
+                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED
+                                .defaultValue());
+        Assertions.assertThat(actualSource).isEqualTo(expectedSource);
+    }
+
+    @Test
+    void testUrlOnlyProperties() {
+        Map<String, String> options = getAllRequiredOptionsWithUrl(MY_URL);
+
+        DynamicTableSource actualSource = createTableSource(options);
+        OracleTableSource expectedSource =
+                new OracleTableSource(
+                        SCHEMA,
+                        MY_URL,
+                        MY_PORT,
+                        null,
+                        MY_DATABASE,
+                        MY_TABLE,
+                        MY_SCHEMA,
+                        MY_USERNAME,
+                        MY_PASSWORD,
+                        DEFAULT_SERVER_TIME_ZONE,
+                        PROPERTIES,
+                        StartupOptions.initial(),
+                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED.defaultValue(),
+                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
+                        SourceOptions.CHUNK_META_GROUP_SIZE.defaultValue(),
+                        SourceOptions.SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
+                        JdbcSourceOptions.CONNECT_TIMEOUT.defaultValue(),
+                        JdbcSourceOptions.CONNECT_MAX_RETRIES.defaultValue(),
+                        JdbcSourceOptions.CONNECTION_POOL_SIZE.defaultValue(),
+                        JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND
+                                .defaultValue(),
+                        JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND
+                                .defaultValue(),
+                        null,
+                        SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue(),
+                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
+                        SourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue(),
+                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED
+                                .defaultValue());
+        Assertions.assertThat(actualSource).isEqualTo(expectedSource);
+    }
+
+    @Test
+    void testTnsAliasUrlOnlyProperties() {
+        Map<String, String> options = getAllRequiredOptionsWithUrl(MY_TNS_ALIAS_URL);
+
+        DynamicTableSource actualSource = createTableSource(options);
+        OracleTableSource expectedSource =
+                new OracleTableSource(
+                        SCHEMA,
+                        MY_TNS_ALIAS_URL,
+                        MY_PORT,
+                        null,
+                        MY_DATABASE,
+                        MY_TABLE,
+                        MY_SCHEMA,
+                        MY_USERNAME,
+                        MY_PASSWORD,
+                        DEFAULT_SERVER_TIME_ZONE,
+                        PROPERTIES,
+                        StartupOptions.initial(),
+                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED.defaultValue(),
+                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
+                        SourceOptions.CHUNK_META_GROUP_SIZE.defaultValue(),
+                        SourceOptions.SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
+                        JdbcSourceOptions.CONNECT_TIMEOUT.defaultValue(),
+                        JdbcSourceOptions.CONNECT_MAX_RETRIES.defaultValue(),
+                        JdbcSourceOptions.CONNECTION_POOL_SIZE.defaultValue(),
+                        JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND
+                                .defaultValue(),
+                        JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND
+                                .defaultValue(),
+                        null,
+                        SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue(),
+                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
+                        SourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue(),
                         JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED
                                 .defaultValue());
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
@@ -456,6 +536,15 @@ class OracleTableSourceFactoryTest {
                         "Invalid value for option 'scan.startup.mode'. Supported values are "
                                 + "[initial, snapshot, latest-offset], "
                                 + "but was: abc");
+
+        Assertions.assertThatThrownBy(
+                        () -> {
+                            Map<String, String> properties = getAllRequiredOptions();
+                            properties.remove("hostname");
+                            createTableSource(properties);
+                        })
+                .hasStackTraceContaining(
+                        "Either option 'url' or option 'hostname' must be provided.");
     }
 
     @Test
@@ -514,6 +603,13 @@ class OracleTableSourceFactoryTest {
     private Map<String, String> getAllRequiredOptionsWithHost() {
         Map<String, String> options = getAllRequiredOptions();
         options.put("hostname", MY_LOCALHOST);
+        return options;
+    }
+
+    private Map<String, String> getAllRequiredOptionsWithUrl(String url) {
+        Map<String, String> options = getAllRequiredOptions();
+        options.remove("hostname");
+        options.put("url", url);
         return options;
     }
 
