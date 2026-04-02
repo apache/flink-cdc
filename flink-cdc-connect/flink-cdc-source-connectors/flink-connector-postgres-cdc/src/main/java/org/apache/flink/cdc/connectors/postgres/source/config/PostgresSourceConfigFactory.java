@@ -100,6 +100,8 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
             props.setProperty("table.include.list", String.join(",", tableList));
         }
 
+        props.setProperty("snapshot.fetch.size", String.valueOf(fetchSize));
+
         // override the user-defined debezium properties
         if (dbzProperties != null) {
             props.putAll(dbzProperties);
