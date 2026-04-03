@@ -178,4 +178,11 @@ public class MongoDBSourceOptions {
                     .defaultValue(true)
                     .withDescription(
                             "MongoDB server normally times out idle cursors after an inactivity period (10 minutes) to prevent excess memory use. Set this option to true to prevent that.");
+
+    public static final ConfigOption<Double> RECORDS_PER_SECOND =
+            ConfigOptions.key("records.per.second")
+                    .doubleType()
+                    .defaultValue(-1d)
+                    .withDescription(
+                            "The maximum size of data processed per second, the default value: -1, not limited");
 }
