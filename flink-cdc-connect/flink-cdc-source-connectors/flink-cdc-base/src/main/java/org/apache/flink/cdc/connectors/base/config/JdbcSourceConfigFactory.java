@@ -63,6 +63,7 @@ public abstract class JdbcSourceConfigFactory implements Factory<JdbcSourceConfi
     protected boolean assignUnboundedChunkFirst =
             JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED
                     .defaultValue();
+    protected double recordsPerSecond = JdbcSourceOptions.RECORDS_PER_SECOND.defaultValue();
 
     /** Integer port number of the database server. */
     public JdbcSourceConfigFactory hostname(String hostname) {
@@ -263,6 +264,11 @@ public abstract class JdbcSourceConfigFactory implements Factory<JdbcSourceConfi
      */
     public JdbcSourceConfigFactory assignUnboundedChunkFirst(boolean assignUnboundedChunkFirst) {
         this.assignUnboundedChunkFirst = assignUnboundedChunkFirst;
+        return this;
+    }
+
+    public JdbcSourceConfigFactory recordsPerSecond(double recordsPerSecond) {
+        this.recordsPerSecond = recordsPerSecond;
         return this;
     }
 

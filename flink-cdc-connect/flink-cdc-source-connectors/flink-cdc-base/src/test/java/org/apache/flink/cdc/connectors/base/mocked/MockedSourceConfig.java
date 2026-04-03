@@ -59,7 +59,8 @@ public class MockedSourceConfig extends JdbcSourceConfig {
             Duration connectTimeout,
             int connectMaxRetries,
             int connectionPoolSize,
-            boolean isScanNewlyAddedTableEnabled) {
+            boolean isScanNewlyAddedTableEnabled,
+            double recordsPerSecond) {
         super(
                 startupOptions,
                 databaseList,
@@ -86,7 +87,8 @@ public class MockedSourceConfig extends JdbcSourceConfig {
                 null,
                 true,
                 isScanNewlyAddedTableEnabled,
-                false);
+                false,
+                recordsPerSecond);
     }
 
     @Override

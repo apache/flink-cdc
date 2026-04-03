@@ -113,7 +113,8 @@ class SqlServerTableFactoryTest {
                         false,
                         JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
                         JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED
-                                .defaultValue());
+                                .defaultValue(),
+                        JdbcSourceOptions.RECORDS_PER_SECOND.defaultValue());
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
@@ -158,7 +159,8 @@ class SqlServerTableFactoryTest {
                         true,
                         true,
                         JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED
-                                .defaultValue());
+                                .defaultValue(),
+                        JdbcSourceOptions.RECORDS_PER_SECOND.defaultValue());
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
@@ -201,7 +203,8 @@ class SqlServerTableFactoryTest {
                         true,
                         JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
                         JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED
-                                .defaultValue());
+                                .defaultValue(),
+                        JdbcSourceOptions.RECORDS_PER_SECOND.defaultValue());
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
@@ -243,7 +246,8 @@ class SqlServerTableFactoryTest {
                         false,
                         JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
                         JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED
-                                .defaultValue());
+                                .defaultValue(),
+                        JdbcSourceOptions.RECORDS_PER_SECOND.defaultValue());
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys =
                 Arrays.asList("op_ts", "database_name", "schema_name", "table_name");

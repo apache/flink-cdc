@@ -63,6 +63,7 @@ public class MongoDBSourceConfigFactory implements Factory<MongoDBSourceConfig> 
     protected boolean skipSnapshotBackfill = false;
     protected boolean scanNewlyAddedTableEnabled = false;
     protected boolean assignUnboundedChunkFirst = false;
+    private double recordsPerSecond = MongoDBSourceOptions.RECORDS_PER_SECOND.defaultValue();
 
     /** The protocol connected to MongoDB. For example mongodb or mongodb+srv. */
     public MongoDBSourceConfigFactory scheme(String scheme) {
@@ -280,6 +281,11 @@ public class MongoDBSourceConfigFactory implements Factory<MongoDBSourceConfig> 
         return this;
     }
 
+    public MongoDBSourceConfigFactory recordsPerSecond(double recordsPerSecond) {
+        this.recordsPerSecond = recordsPerSecond;
+        return this;
+    }
+
     /** Creates a new {@link MongoDBSourceConfig} for the given subtask {@code subtaskId}. */
     @Override
     public MongoDBSourceConfig create(int subtaskId) {
@@ -306,6 +312,7 @@ public class MongoDBSourceConfigFactory implements Factory<MongoDBSourceConfig> 
                 disableCursorTimeout,
                 skipSnapshotBackfill,
                 scanNewlyAddedTableEnabled,
-                assignUnboundedChunkFirst);
+                assignUnboundedChunkFirst,
+                recordsPerSecond);
     }
 }

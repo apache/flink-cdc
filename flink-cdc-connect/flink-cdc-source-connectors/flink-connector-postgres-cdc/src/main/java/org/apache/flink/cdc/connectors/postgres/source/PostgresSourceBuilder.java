@@ -321,6 +321,11 @@ public class PostgresSourceBuilder<T> {
         return this;
     }
 
+    public PostgresSourceBuilder<T> recordsPerSecond(double recordsPerSecond) {
+        this.configFactory.recordsPerSecond(recordsPerSecond);
+        return this;
+    }
+
     /**
      * Build the {@link PostgresIncrementalSource}.
      *
