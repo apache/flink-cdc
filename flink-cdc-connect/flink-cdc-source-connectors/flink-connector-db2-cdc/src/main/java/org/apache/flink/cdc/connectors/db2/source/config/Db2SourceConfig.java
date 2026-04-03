@@ -58,7 +58,8 @@ public class Db2SourceConfig extends JdbcSourceConfig {
             String chunkKeyColumn,
             boolean skipSnapshotBackfill,
             boolean assignUnboundedChunkFirst,
-            boolean releaseSnapshotMetadataEnabled) {
+            boolean releaseSnapshotMetadataEnabled,
+            double recordsPerSecond) {
         super(
                 startupOptions,
                 databaseList,
@@ -86,7 +87,8 @@ public class Db2SourceConfig extends JdbcSourceConfig {
                 skipSnapshotBackfill,
                 false,
                 assignUnboundedChunkFirst,
-                releaseSnapshotMetadataEnabled);
+                releaseSnapshotMetadataEnabled,
+                recordsPerSecond);
     }
 
     @Override

@@ -82,6 +82,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
     private final boolean scanNewlyAddedTableEnabled;
     private final boolean assignUnboundedChunkFirst;
     private final boolean releaseSnapshotMetadataEnabled;
+    private final double recordsPerSecond;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -119,7 +120,8 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
             boolean skipSnapshotBackfill,
             boolean scanNewlyAddedTableEnabled,
             boolean assignUnboundedChunkFirst,
-            boolean releaseSnapshotMetadataEnabled) {
+            boolean releaseSnapshotMetadataEnabled,
+            double recordsPerSecond) {
         this.physicalSchema = physicalSchema;
         this.url = url;
         this.port = port;
@@ -148,6 +150,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
         this.scanNewlyAddedTableEnabled = scanNewlyAddedTableEnabled;
         this.assignUnboundedChunkFirst = assignUnboundedChunkFirst;
         this.releaseSnapshotMetadataEnabled = releaseSnapshotMetadataEnabled;
+        this.recordsPerSecond = recordsPerSecond;
     }
 
     @Override
@@ -199,6 +202,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                             .scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled)
                             .assignUnboundedChunkFirst(assignUnboundedChunkFirst)
                             .releaseSnapshotMetadataEnabled(releaseSnapshotMetadataEnabled)
+                            .recordsPerSecond(recordsPerSecond)
                             .build();
 
             return SourceProvider.of(oracleChangeEventSource);
@@ -267,7 +271,8 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                         skipSnapshotBackfill,
                         scanNewlyAddedTableEnabled,
                         assignUnboundedChunkFirst,
-                        releaseSnapshotMetadataEnabled);
+                        releaseSnapshotMetadataEnabled,
+                        recordsPerSecond);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
@@ -310,7 +315,8 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                 && Objects.equals(scanNewlyAddedTableEnabled, that.scanNewlyAddedTableEnabled)
                 && Objects.equals(assignUnboundedChunkFirst, that.assignUnboundedChunkFirst)
                 && Objects.equals(
-                        releaseSnapshotMetadataEnabled, that.releaseSnapshotMetadataEnabled);
+                        releaseSnapshotMetadataEnabled, that.releaseSnapshotMetadataEnabled)
+                && Objects.equals(recordsPerSecond, that.recordsPerSecond);
     }
 
     @Override
@@ -343,7 +349,8 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                 skipSnapshotBackfill,
                 scanNewlyAddedTableEnabled,
                 assignUnboundedChunkFirst,
-                releaseSnapshotMetadataEnabled);
+                releaseSnapshotMetadataEnabled,
+                recordsPerSecond);
     }
 
     @Override
