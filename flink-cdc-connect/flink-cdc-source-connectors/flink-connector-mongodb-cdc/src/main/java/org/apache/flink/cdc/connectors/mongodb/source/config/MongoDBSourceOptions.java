@@ -242,4 +242,11 @@ public class MongoDBSourceOptions {
                     .withDescription(
                             "The type of trust store file. "
                                     + "This is optional and only needed if 'mongodb.ssl.truststore' is configured. Defaults to PKCS12.");
+
+    public static final ConfigOption<Double> RECORDS_PER_SECOND =
+            ConfigOptions.key("records.per.second")
+                    .doubleType()
+                    .defaultValue(-1d)
+                    .withDescription(
+                            "The maximum size of data processed per second, the default value: -1, not limited");
 }
