@@ -55,6 +55,7 @@ import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourc
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.PASSWORD;
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.POLL_AWAIT_TIME_MILLIS;
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.POLL_MAX_BATCH_SIZE;
+import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.RECORDS_PER_SECOND;
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SAMPLES;
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE_MB;
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED;
@@ -150,6 +151,8 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
                 config.getOptional(FULL_DOCUMENT_PRE_POST_IMAGE).orElse(false);
 
         boolean noCursorTimeout = config.getOptional(SCAN_NO_CURSOR_TIMEOUT).orElse(true);
+
+        double recordsPerSecond = config.get(RECORDS_PER_SECOND);
         ResolvedSchema physicalSchema =
                 getPhysicalSchema(context.getCatalogTable().getResolvedSchema());
         checkArgument(physicalSchema.getPrimaryKey().isPresent(), "Primary key must be present");
@@ -202,7 +205,8 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
                 sslKeyStoreType,
                 sslTrustStore,
                 sslTrustStorePassword,
-                sslTrustStoreType);
+                sslTrustStoreType,
+                recordsPerSecond);
     }
 
     private void checkPrimaryKey(UniqueConstraint pk, String message) {

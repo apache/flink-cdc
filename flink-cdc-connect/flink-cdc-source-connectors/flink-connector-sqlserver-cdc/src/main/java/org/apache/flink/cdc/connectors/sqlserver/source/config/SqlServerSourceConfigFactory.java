@@ -130,6 +130,7 @@ public class SqlServerSourceConfigFactory extends JdbcSourceConfigFactory {
                 skipSnapshotBackfill,
                 scanNewlyAddedTableEnabled,
                 assignUnboundedChunkFirst,
-                releaseSnapshotMetadataEnabled);
+                releaseSnapshotMetadataEnabled,
+                recordsPerSecond);
     }
 }
