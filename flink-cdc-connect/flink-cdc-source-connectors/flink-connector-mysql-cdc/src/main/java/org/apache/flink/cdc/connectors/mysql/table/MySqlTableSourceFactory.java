@@ -110,6 +110,8 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         boolean appendOnly =
                 config.get(MySqlSourceOptions.SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED);
 
+        double recordsPerSecond = config.get(MySqlSourceOptions.RECORDS_PER_SECOND);
+
         if (enableParallelRead) {
             validatePrimaryKeyIfEnableParallel(physicalSchema, chunkKeyColumn);
             validateIntegerOption(
@@ -156,7 +158,8 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                 parseOnLineSchemaChanges,
                 useLegacyJsonFormat,
                 assignUnboundedChunkFirst,
-                appendOnly);
+                appendOnly,
+                recordsPerSecond);
     }
 
     @Override

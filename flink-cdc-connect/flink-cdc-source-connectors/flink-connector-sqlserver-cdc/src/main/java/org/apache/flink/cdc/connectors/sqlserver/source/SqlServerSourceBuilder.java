@@ -235,6 +235,11 @@ public class SqlServerSourceBuilder<T> {
         return this;
     }
 
+    public SqlServerSourceBuilder<T> recordsPerSecond(double recordsPerSecond) {
+        this.configFactory.recordsPerSecond(recordsPerSecond);
+        return this;
+    }
+
     /**
      * Build the {@link SqlServerIncrementalSource}.
      *
