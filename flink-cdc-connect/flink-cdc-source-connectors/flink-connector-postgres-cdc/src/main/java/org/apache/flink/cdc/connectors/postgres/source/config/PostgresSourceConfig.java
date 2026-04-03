@@ -74,7 +74,8 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
             boolean includePartitionedTables,
             boolean includeDatabaseInTableId,
             List<String> logicalMessagePrefixes,
-            boolean releaseSnapshotMetadataEnabled) {
+            boolean releaseSnapshotMetadataEnabled,
+            double recordsPerSecond) {
         super(
                 startupOptions,
                 databaseList,
@@ -102,7 +103,8 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
                 skipSnapshotBackfill,
                 isScanNewlyAddedTableEnabled,
                 assignUnboundedChunkFirst,
-                releaseSnapshotMetadataEnabled);
+                releaseSnapshotMetadataEnabled,
+                recordsPerSecond);
         this.subtaskId = subtaskId;
         this.lsnCommitCheckpointsDelay = lsnCommitCheckpointsDelay;
         this.includePartitionedTables = includePartitionedTables;

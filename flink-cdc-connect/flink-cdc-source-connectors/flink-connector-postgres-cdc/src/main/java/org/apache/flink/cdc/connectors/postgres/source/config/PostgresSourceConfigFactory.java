@@ -144,7 +144,8 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
                 includePartitionedTables,
                 includeDatabaseInTableId,
                 logicalMessagePrefixes,
-                releaseSnapshotMetadataEnabled);
+                releaseSnapshotMetadataEnabled,
+                recordsPerSecond);
     }
 
     /**
