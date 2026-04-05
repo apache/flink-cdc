@@ -89,9 +89,12 @@ public class MySqlSourceConfigFactory implements Serializable {
      * Optional hostname of a MySQL read replica to use for snapshot queries. When set, snapshot
      * data will be read from this replica instead of the primary writer instance, reducing the load
      * on the writer. The binlog position will still be obtained from the primary writer instance.
+     *
+     * <p>An empty string is treated as {@code null}, falling back to the primary writer instance.
      */
     public MySqlSourceConfigFactory snapshotHostname(String snapshotHostname) {
-        this.snapshotHostname = snapshotHostname;
+        this.snapshotHostname =
+                (snapshotHostname != null && snapshotHostname.isEmpty()) ? null : snapshotHostname;
         return this;
     }
 

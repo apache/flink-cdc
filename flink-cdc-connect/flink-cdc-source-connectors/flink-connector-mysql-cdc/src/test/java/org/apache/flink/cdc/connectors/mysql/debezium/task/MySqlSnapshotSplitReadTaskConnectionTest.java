@@ -105,7 +105,7 @@ class MySqlSnapshotSplitReadTaskConnectionTest {
         MySqlConnection connection = DebeziumUtils.createMySqlConnection(config);
         StatefulTaskContext context = new StatefulTaskContext(config, binaryLogClient, connection);
 
-        // Both getConnection() and getReaderConnection() should return the same instance
+        // Both getConnection() and getSnapshotConnection() should return the same instance
         assertThat(context.getConnection()).isSameAs(context.getSnapshotConnection());
     }
 

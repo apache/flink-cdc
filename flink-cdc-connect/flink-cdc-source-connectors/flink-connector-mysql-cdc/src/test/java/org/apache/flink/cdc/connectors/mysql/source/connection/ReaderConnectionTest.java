@@ -106,9 +106,11 @@ class ReaderConnectionTest {
         JdbcConnectionFactory factoryWithOverride =
                 new JdbcConnectionFactory(config, READER_HOSTNAME);
 
-        // Verify the factories are created with correct configuration
-        assertThat(factoryWithoutOverride).isNotNull();
-        assertThat(factoryWithOverride).isNotNull();
+        // Verify the override hostname is stored correctly
+        assertThat(factoryWithoutOverride.getHostnameOverride()).isNull();
+        assertThat(factoryWithOverride.getHostnameOverride()).isEqualTo(READER_HOSTNAME);
+        assertThat(factoryWithOverride.getHostnameOverride())
+                .isNotEqualTo(config.getHostname());
     }
 
     @Test

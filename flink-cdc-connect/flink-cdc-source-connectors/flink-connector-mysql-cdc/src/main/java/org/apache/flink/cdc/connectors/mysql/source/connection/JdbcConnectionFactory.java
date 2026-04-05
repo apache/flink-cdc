@@ -53,6 +53,10 @@ public class JdbcConnectionFactory implements JdbcConnection.ConnectionFactory {
         this.hostnameOverride = hostnameOverride;
     }
 
+    String getHostnameOverride() {
+        return hostnameOverride;
+    }
+
     @Override
     public Connection connect(JdbcConfiguration config) throws SQLException {
         final int connectRetryTimes = sourceConfig.getConnectMaxRetries();
