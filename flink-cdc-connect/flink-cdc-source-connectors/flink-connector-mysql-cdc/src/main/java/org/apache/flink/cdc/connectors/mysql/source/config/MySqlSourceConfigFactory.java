@@ -94,7 +94,7 @@ public class MySqlSourceConfigFactory implements Serializable {
      */
     public MySqlSourceConfigFactory snapshotHostname(String snapshotHostname) {
         this.snapshotHostname =
-                (snapshotHostname != null && snapshotHostname.isEmpty()) ? null : snapshotHostname;
+                (snapshotHostname != null && snapshotHostname.trim().isEmpty()) ? null : snapshotHostname;
         return this;
     }
 
