@@ -371,6 +371,15 @@ pipeline:
         List of readable metadata from SourceRecord to be passed to downstream and could be used in transform module, split by `,`. Available readable metadata are: op_ts.
       </td>
     </tr>
+    <tr>
+      <td>records.per.second</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">true</td>
+      <td>Double</td>
+      <td>
+        The maximum size of data processed per second, the default value: -1, not limited.(only for flink2.x)
+      </td>
+    </tr>
     </tbody>
 </table>
 </div>

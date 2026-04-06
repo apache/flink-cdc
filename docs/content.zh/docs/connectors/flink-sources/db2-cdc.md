@@ -274,6 +274,15 @@ Db2 server.
         This might help reduce the risk of the TaskManager experiencing an out-of-memory (OOM) error when taking a snapshot of the largest unbounded chunk.<br> 
       </td>
     </tr>
+    <tr>
+      <td>records.per.second</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">true</td>
+      <td>Double</td>
+      <td>
+        The maximum size of data processed per second, the default value: -1, not limited.(only for flink2.x)
+      </td>
+    </tr>
     </tbody>
 </table>
 </div>

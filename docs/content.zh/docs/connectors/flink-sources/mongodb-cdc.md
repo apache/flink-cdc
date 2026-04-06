@@ -347,6 +347,15 @@ MongoDB 的更改事件记录在消息之前没有更新。因此，我们只能
         For example updating an already updated value in snapshot, or deleting an already deleted entry in snapshot. These replayed change log events should be handled specially.
       </td>
     </tr>
+    <tr>
+      <td>records.per.second</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">true</td>
+      <td>Double</td>
+      <td>
+        每秒处理的最大数据量，默认值：-1，无限制。(只适用于flink2.x)
+      </td>
+    </tr>
     </tbody>
 </table>
 </div>
