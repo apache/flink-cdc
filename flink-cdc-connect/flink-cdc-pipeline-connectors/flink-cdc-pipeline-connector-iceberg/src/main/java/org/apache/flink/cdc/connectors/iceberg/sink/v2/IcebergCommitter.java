@@ -43,11 +43,11 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.TreeMap;
 
 import static java.util.stream.Collectors.toList;
 import static org.apache.flink.runtime.checkpoint.CheckpointIDCounter.INITIAL_CHECKPOINT_ID;
@@ -110,17 +110,18 @@ public class IcebergCommitter implements Committer<WriteResultWrapper> {
         Map<TableId, List<WriteResultWrapper>> tableMap = new HashMap<>();
         for (WriteResultWrapper w : writeResultWrappers) {
             tableMap.computeIfAbsent(w.getTableId(), k -> new ArrayList<>()).add(w);
-            LOGGER.info(w.buildDescription());
         }
 
         for (Map.Entry<TableId, List<WriteResultWrapper>> entry : tableMap.entrySet()) {
             TableId tableId = entry.getKey();
 
-            // Sort ascending by batch index to guarantee correct Iceberg sequence number ordering.
-            // Equality-delete files in batch N will have sequence number > batch M (M < N), so
-            // they correctly supersede stale data written by earlier same-checkpoint batches.
-            List<WriteResultWrapper> batches = entry.getValue();
-            batches.sort(Comparator.comparingInt(WriteResultWrapper::getBatchIndex));
+            // Group by batchIndex so wrappers from different subtasks for the same batch
+            // are merged into one snapshot, not committed separately.
+            TreeMap<Integer, List<WriteResultWrapper>> batchGroups = new TreeMap<>();
+            for (WriteResultWrapper w : entry.getValue()) {
+                batchGroups.computeIfAbsent(w.getBatchIndex(), k -> new ArrayList<>()).add(w);
+                LOGGER.info(w.buildDescription());
+            }
 
             Table table =
                     catalog.loadTable(
@@ -150,31 +151,38 @@ public class IcebergCommitter implements Committer<WriteResultWrapper> {
             Optional<TableMetric> tableMetric = getTableMetric(tableId);
             tableMetric.ifPresent(TableMetric::increaseCommitTimes);
 
-            // Find the last non-empty batch so we know where to write MAX_COMMITTED_CHECKPOINT_ID.
-            int lastNonEmptyBatchPos = -1;
-            for (int i = batches.size() - 1; i >= startBatchIndex; i--) {
-                if (!isBatchEmpty(batches.get(i))) {
-                    lastNonEmptyBatchPos = i;
-                    break;
+            int lastNonEmptyBatchIndex = -1;
+            for (Map.Entry<Integer, List<WriteResultWrapper>> g : batchGroups.entrySet()) {
+                List<DataFile> df = collectDataFilesFromGroup(g.getValue());
+                List<DeleteFile> del = collectDeleteFilesFromGroup(g.getValue());
+                if (!df.isEmpty() || !del.isEmpty()) {
+                    lastNonEmptyBatchIndex = g.getKey();
                 }
             }
 
-            // Commit each batch as a separate Iceberg snapshot to get distinct sequence numbers.
-            for (int i = startBatchIndex; i < batches.size(); i++) {
-                WriteResultWrapper batch = batches.get(i);
-                List<DataFile> dataFiles = collectDataFiles(batch.getWriteResult());
-                List<DeleteFile> deleteFiles = collectDeleteFiles(batch.getWriteResult());
-
-                if (dataFiles.isEmpty() && deleteFiles.isEmpty()) {
+            // Commit each batch as a separate snapshot so sequence numbers increase per batch.
+            for (Map.Entry<Integer, List<WriteResultWrapper>> g : batchGroups.entrySet()) {
+                int batchIdx = g.getKey();
+                if (batchIdx < startBatchIndex) {
                     LOGGER.info(
-                            "Batch {} for checkpoint {} of table {} has nothing to commit, skipping",
-                            batch.getBatchIndex(),
+                            "Batch {} for checkpoint {} of table {} already committed, skipping",
+                            batchIdx,
                             checkpointId,
                             tableId.identifier());
                     continue;
                 }
 
-                boolean isLastNonEmptyBatch = (i == lastNonEmptyBatchPos);
+                List<DataFile> dataFiles = collectDataFilesFromGroup(g.getValue());
+                List<DeleteFile> deleteFiles = collectDeleteFilesFromGroup(g.getValue());
+
+                if (dataFiles.isEmpty() && deleteFiles.isEmpty()) {
+                    LOGGER.info(
+                            "Batch {} for checkpoint {} of table {} has nothing to commit, skipping",
+                            batchIdx,
+                            checkpointId,
+                            tableId.identifier());
+                    continue;
+                }
 
                 SnapshotUpdate<?> operation;
                 if (deleteFiles.isEmpty()) {
@@ -190,9 +198,9 @@ public class IcebergCommitter implements Committer<WriteResultWrapper> {
 
                 operation.set(SinkUtil.FLINK_JOB_ID, newFlinkJobId);
                 operation.set(SinkUtil.OPERATOR_ID, operatorId);
-                operation.set(FLINK_BATCH_INDEX, String.valueOf(batch.getBatchIndex()));
+                operation.set(FLINK_BATCH_INDEX, String.valueOf(batchIdx));
                 operation.set(FLINK_CHECKPOINT_ID_PROP, String.valueOf(checkpointId));
-                if (isLastNonEmptyBatch) {
+                if (batchIdx == lastNonEmptyBatchIndex) {
                     operation.set(
                             SinkUtil.MAX_COMMITTED_CHECKPOINT_ID, String.valueOf(checkpointId));
                 }
@@ -201,17 +209,16 @@ public class IcebergCommitter implements Committer<WriteResultWrapper> {
         }
     }
 
-    private static boolean isBatchEmpty(WriteResultWrapper batch) {
-        WriteResult r = batch.getWriteResult();
-        long dataCount =
-                r.dataFiles() == null
-                        ? 0
-                        : Arrays.stream(r.dataFiles()).filter(f -> f.recordCount() > 0).count();
-        long deleteCount =
-                r.deleteFiles() == null
-                        ? 0
-                        : Arrays.stream(r.deleteFiles()).filter(f -> f.recordCount() > 0).count();
-        return dataCount == 0 && deleteCount == 0;
+    private static List<DataFile> collectDataFilesFromGroup(List<WriteResultWrapper> group) {
+        return group.stream()
+                .flatMap(w -> collectDataFiles(w.getWriteResult()).stream())
+                .collect(toList());
+    }
+
+    private static List<DeleteFile> collectDeleteFilesFromGroup(List<WriteResultWrapper> group) {
+        return group.stream()
+                .flatMap(w -> collectDeleteFiles(w.getWriteResult()).stream())
+                .collect(toList());
     }
 
     private static List<DataFile> collectDataFiles(WriteResult result) {

@@ -46,6 +46,7 @@ import org.apache.iceberg.DataFile;
 import org.apache.iceberg.DeleteFile;
 import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.RowDelta;
+import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.TableIdentifier;
@@ -1077,6 +1078,409 @@ public class IcebergWriterTest {
         // TableB: only final value survives (internal position-delete handles dedup within writer).
         List<String> resultB = fetchTableContent(catalog, tableB, null);
         Assertions.assertThat(resultB).containsExactly("2, y");
+    }
+
+    /**
+     * Verifies that batchIndex stays in sync across subtasks even when a subtask has no writer for
+     * the table at schema-change flush time (parallelism > 1 scenario).
+     */
+    @Test
+    public void testBatchIndexInSyncWhenSubtaskHasNoWriterAtSchemaChange() throws Exception {
+        Map<String, String> catalogOptions = new HashMap<>();
+        catalogOptions.put("type", "hadoop");
+        catalogOptions.put(
+                "warehouse",
+                new File(temporaryFolder.toFile(), UUID.randomUUID().toString()).toString());
+        catalogOptions.put("cache-enabled", "false");
+        IcebergMetadataApplier icebergMetadataApplier = new IcebergMetadataApplier(catalogOptions);
+
+        String jobId = UUID.randomUUID().toString();
+        String operatorId = UUID.randomUUID().toString();
+
+        // Two subtask writers sharing the same catalog and table.
+        IcebergWriter writer0 =
+                new IcebergWriter(
+                        catalogOptions, 0, 1, ZoneId.systemDefault(), 0, jobId, operatorId);
+        IcebergWriter writer1 =
+                new IcebergWriter(
+                        catalogOptions, 1, 1, ZoneId.systemDefault(), 0, jobId, operatorId);
+
+        TableId tableId = TableId.parse("test.iceberg_table");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.BIGINT().notNull())
+                        .physicalColumn("name", DataTypes.VARCHAR(100))
+                        .primaryKey("id")
+                        .build();
+        CreateTableEvent createEvent = new CreateTableEvent(tableId, schema);
+        icebergMetadataApplier.applySchemaChange(createEvent);
+        writer0.write(createEvent, null);
+        writer1.write(createEvent, null);
+
+        BinaryRecordDataGenerator gen =
+                new BinaryRecordDataGenerator(
+                        schema.getColumnDataTypes().toArray(new DataType[0]));
+
+        // Only subtask 0 has data before the schema change.
+        writer0.write(
+                DataChangeEvent.insertEvent(
+                        tableId, gen.generate(new Object[] {1L, BinaryStringData.fromString("a")})),
+                null);
+        // Subtask 1 has no writer for the table yet.
+
+        // Both subtasks receive the same SchemaChangeEvent (broadcast).
+        AddColumnEvent addColumn =
+                new AddColumnEvent(
+                        tableId,
+                        Arrays.asList(
+                                AddColumnEvent.last(
+                                        new PhysicalColumn(
+                                                "extra", DataTypes.STRING(), null, null))));
+        icebergMetadataApplier.applySchemaChange(addColumn);
+        writer0.write(addColumn, null); // has writer → flushes at batchIndex=0; counter → 1
+        writer1.write(addColumn, null); // no writer  → counter must still advance to 1
+
+        Schema newSchema = SchemaUtils.applySchemaChangeEvent(schema, addColumn);
+        BinaryRecordDataGenerator newGen =
+                new BinaryRecordDataGenerator(
+                        newSchema.getColumnDataTypes().toArray(new DataType[0]));
+
+        // Subtask 1 writes data after the schema change.
+        writer1.write(
+                DataChangeEvent.insertEvent(
+                        tableId,
+                        newGen.generate(new Object[] {2L, BinaryStringData.fromString("b"), null})),
+                null);
+
+        Collection<WriteResultWrapper> results0 = writer0.prepareCommit();
+        Collection<WriteResultWrapper> results1 = writer1.prepareCommit();
+
+        // subtask 0: one batch at batchIndex=0 (pre-schema-change flush)
+        Assertions.assertThat(results0).hasSize(1);
+        Assertions.assertThat(results0.iterator().next().getBatchIndex()).isEqualTo(0);
+
+        // subtask 1: must be at batchIndex=1, not 0 — counter advanced at E1 even without a writer
+        Assertions.assertThat(results1).hasSize(1);
+        Assertions.assertThat(results1.iterator().next().getBatchIndex()).isEqualTo(1);
+    }
+
+    /**
+     * Verifies no duplicates when parallel subtasks share a table and one subtask has no data
+     * before the schema-change flush while the other has an UPDATE that produces an equality-delete.
+     */
+    @Test
+    public void testNoDuplicateWithParallelSubtasksMissingPreSchemaChangeData() throws Exception {
+        Map<String, String> catalogOptions = new HashMap<>();
+        String warehouse =
+                new File(temporaryFolder.toFile(), UUID.randomUUID().toString()).toString();
+        catalogOptions.put("type", "hadoop");
+        catalogOptions.put("warehouse", warehouse);
+        catalogOptions.put("cache-enabled", "false");
+        Catalog catalog =
+                CatalogUtil.buildIcebergCatalog(
+                        "cdc-iceberg-catalog", catalogOptions, new Configuration());
+        IcebergMetadataApplier icebergMetadataApplier = new IcebergMetadataApplier(catalogOptions);
+
+        String jobId = UUID.randomUUID().toString();
+        String operatorId = UUID.randomUUID().toString();
+
+        IcebergWriter writer0 =
+                new IcebergWriter(
+                        catalogOptions, 0, 1, ZoneId.systemDefault(), 0, jobId, operatorId);
+        IcebergWriter writer1 =
+                new IcebergWriter(
+                        catalogOptions, 1, 1, ZoneId.systemDefault(), 0, jobId, operatorId);
+
+        TableId tableId = TableId.parse("test.iceberg_table");
+        Schema initialSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.BIGINT().notNull())
+                        .physicalColumn("name", DataTypes.VARCHAR(100))
+                        .primaryKey("id")
+                        .build();
+        CreateTableEvent createEvent = new CreateTableEvent(tableId, initialSchema);
+        icebergMetadataApplier.applySchemaChange(createEvent);
+        writer0.write(createEvent, null);
+        writer1.write(createEvent, null);
+
+        BinaryRecordDataGenerator oldGen =
+                new BinaryRecordDataGenerator(
+                        initialSchema.getColumnDataTypes().toArray(new DataType[0]));
+
+        // Subtask 1 writes the "old" row before the schema change.
+        writer1.write(
+                DataChangeEvent.insertEvent(
+                        tableId,
+                        oldGen.generate(new Object[] {1L, BinaryStringData.fromString("old")})),
+                null);
+        // Subtask 0 has no data for the table yet.
+
+        // Schema-change E1 is broadcast to both subtasks.
+        AddColumnEvent addColumn =
+                new AddColumnEvent(
+                        tableId,
+                        Arrays.asList(
+                                AddColumnEvent.last(
+                                        new PhysicalColumn(
+                                                "extra", DataTypes.STRING(), null, null))));
+        icebergMetadataApplier.applySchemaChange(addColumn);
+        writer0.write(addColumn, null); // no writer  → batchIndex must still advance to 1 (fix)
+        writer1.write(addColumn, null); // has writer → flushes "old" at batchIndex=0; counter → 1
+
+        // Subtask 0 processes the UPDATE after E1, using the new schema.
+        Schema newSchema = SchemaUtils.applySchemaChangeEvent(initialSchema, addColumn);
+        BinaryRecordDataGenerator newGen =
+                new BinaryRecordDataGenerator(
+                        newSchema.getColumnDataTypes().toArray(new DataType[0]));
+        RecordData before =
+                newGen.generate(new Object[] {1L, BinaryStringData.fromString("old"), null});
+        RecordData after =
+                newGen.generate(new Object[] {1L, BinaryStringData.fromString("new"), null});
+        writer0.write(DataChangeEvent.updateEvent(tableId, before, after), null);
+
+        // Collect and commit all results from both subtasks.
+        List<WriteResultWrapper> allResults = new ArrayList<>();
+        allResults.addAll(writer0.prepareCommit());
+        allResults.addAll(writer1.prepareCommit());
+
+        IcebergCommitter committer = new IcebergCommitter(catalogOptions);
+        committer.commit(
+                allResults.stream()
+                        .map(MockCommitRequestImpl::new)
+                        .collect(Collectors.toList()));
+
+        // Only the updated value must survive; "old" must be deleted by the equality-delete in
+        // batch 1 (higher sequence number). Without the fix both rows appear.
+        List<String> result = fetchTableContent(catalog, tableId, null);
+        Assertions.assertThat(result).containsExactly("1, new, null");
+    }
+
+    /**
+     * Verifies that wrappers from two subtasks sharing the same batchIndex are merged into exactly
+     * one Iceberg snapshot, not two. This directly tests the committer-side grouping fix.
+     */
+    @Test
+    public void testSameBatchIndexFromTwoSubtasksMergedIntoOneSnapshot() throws Exception {
+        Map<String, String> catalogOptions = new HashMap<>();
+        catalogOptions.put("type", "hadoop");
+        catalogOptions.put(
+                "warehouse",
+                new File(temporaryFolder.toFile(), UUID.randomUUID().toString()).toString());
+        catalogOptions.put("cache-enabled", "false");
+        Catalog catalog =
+                CatalogUtil.buildIcebergCatalog(
+                        "cdc-iceberg-catalog", catalogOptions, new Configuration());
+        IcebergMetadataApplier icebergMetadataApplier = new IcebergMetadataApplier(catalogOptions);
+
+        String jobId = UUID.randomUUID().toString();
+        String operatorId = UUID.randomUUID().toString();
+
+        IcebergWriter writer0 =
+                new IcebergWriter(
+                        catalogOptions, 0, 1, ZoneId.systemDefault(), 0, jobId, operatorId);
+        IcebergWriter writer1 =
+                new IcebergWriter(
+                        catalogOptions, 1, 1, ZoneId.systemDefault(), 0, jobId, operatorId);
+
+        TableId tableId = TableId.parse("test.iceberg_table");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.BIGINT().notNull())
+                        .physicalColumn("name", DataTypes.VARCHAR(100))
+                        .primaryKey("id")
+                        .build();
+        CreateTableEvent createEvent = new CreateTableEvent(tableId, schema);
+        icebergMetadataApplier.applySchemaChange(createEvent);
+        writer0.write(createEvent, null);
+        writer1.write(createEvent, null);
+
+        BinaryRecordDataGenerator gen =
+                new BinaryRecordDataGenerator(
+                        schema.getColumnDataTypes().toArray(new DataType[0]));
+
+        // Both subtasks write data with no schema change, so both produce batchIndex=0.
+        writer0.write(
+                DataChangeEvent.insertEvent(
+                        tableId, gen.generate(new Object[] {1L, BinaryStringData.fromString("a")})),
+                null);
+        writer1.write(
+                DataChangeEvent.insertEvent(
+                        tableId, gen.generate(new Object[] {2L, BinaryStringData.fromString("b")})),
+                null);
+
+        List<WriteResultWrapper> allResults = new ArrayList<>();
+        allResults.addAll(writer0.prepareCommit());
+        allResults.addAll(writer1.prepareCommit());
+
+        // Both wrappers carry batchIndex=0.
+        Assertions.assertThat(allResults).hasSize(2);
+        Assertions.assertThat(allResults.stream().mapToInt(WriteResultWrapper::getBatchIndex).distinct().count())
+                .isEqualTo(1);
+
+        Table table =
+                catalog.loadTable(
+                        TableIdentifier.of(tableId.getSchemaName(), tableId.getTableName()));
+        long snapshotsBefore = countSnapshots(table);
+
+        IcebergCommitter committer = new IcebergCommitter(catalogOptions);
+        committer.commit(
+                allResults.stream()
+                        .map(MockCommitRequestImpl::new)
+                        .collect(Collectors.toList()));
+
+        table.refresh();
+        long snapshotsAfter = countSnapshots(table);
+
+        // Two wrappers with the same batchIndex must produce exactly ONE new snapshot, not two.
+        Assertions.assertThat(snapshotsAfter - snapshotsBefore).isEqualTo(1);
+
+        List<String> result = fetchTableContent(catalog, tableId, null);
+        Assertions.assertThat(result).containsExactlyInAnyOrder("1, a", "2, b");
+    }
+
+    /**
+     * Verifies no duplicates in the most complex parallel scenario: subtask 0 has data only before
+     * SC1, subtask 1 has data only between SC1 and SC2, and both have updates after SC2. This
+     * exercises all three batchIndex slots across two subtasks simultaneously and confirms that
+     * equality-deletes in batch 2 correctly suppress stale data from batches 0 and 1.
+     */
+    @Test
+    public void testNoDuplicateWithMixedDataAcrossSubtasksAndMultipleSchemaChanges()
+            throws Exception {
+        Map<String, String> catalogOptions = new HashMap<>();
+        catalogOptions.put("type", "hadoop");
+        catalogOptions.put(
+                "warehouse",
+                new File(temporaryFolder.toFile(), UUID.randomUUID().toString()).toString());
+        catalogOptions.put("cache-enabled", "false");
+        Catalog catalog =
+                CatalogUtil.buildIcebergCatalog(
+                        "cdc-iceberg-catalog", catalogOptions, new Configuration());
+        IcebergMetadataApplier icebergMetadataApplier = new IcebergMetadataApplier(catalogOptions);
+
+        String jobId = UUID.randomUUID().toString();
+        String operatorId = UUID.randomUUID().toString();
+
+        IcebergWriter writer0 =
+                new IcebergWriter(
+                        catalogOptions, 0, 1, ZoneId.systemDefault(), 0, jobId, operatorId);
+        IcebergWriter writer1 =
+                new IcebergWriter(
+                        catalogOptions, 1, 1, ZoneId.systemDefault(), 0, jobId, operatorId);
+
+        TableId tableId = TableId.parse("test.iceberg_table");
+        Schema schema0 =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.BIGINT().notNull())
+                        .physicalColumn("name", DataTypes.VARCHAR(100))
+                        .primaryKey("id")
+                        .build();
+        CreateTableEvent createEvent = new CreateTableEvent(tableId, schema0);
+        icebergMetadataApplier.applySchemaChange(createEvent);
+        writer0.write(createEvent, null);
+        writer1.write(createEvent, null);
+
+        BinaryRecordDataGenerator gen0 =
+                new BinaryRecordDataGenerator(
+                        schema0.getColumnDataTypes().toArray(new DataType[0]));
+
+        // Batch 0: only subtask 0 has data before SC1.
+        writer0.write(
+                DataChangeEvent.insertEvent(
+                        tableId, gen0.generate(new Object[] {1L, BinaryStringData.fromString("a")})),
+                null);
+        // Subtask 1 has no data before SC1.
+
+        // SC1 broadcast to both subtasks.
+        AddColumnEvent sc1 =
+                new AddColumnEvent(
+                        tableId,
+                        Arrays.asList(
+                                AddColumnEvent.last(
+                                        new PhysicalColumn(
+                                                "extra1", DataTypes.STRING(), null, null))));
+        icebergMetadataApplier.applySchemaChange(sc1);
+        writer0.write(sc1, null); // has writer → flush batchIndex=0; counter → 1
+        writer1.write(sc1, null); // no writer  → counter must still advance to 1
+
+        Schema schema1 = SchemaUtils.applySchemaChangeEvent(schema0, sc1);
+        BinaryRecordDataGenerator gen1 =
+                new BinaryRecordDataGenerator(
+                        schema1.getColumnDataTypes().toArray(new DataType[0]));
+
+        // Batch 1: only subtask 1 has data between SC1 and SC2.
+        writer1.write(
+                DataChangeEvent.insertEvent(
+                        tableId,
+                        gen1.generate(new Object[] {2L, BinaryStringData.fromString("b"), null})),
+                null);
+        // Subtask 0 has no data between SC1 and SC2.
+
+        // SC2 broadcast to both subtasks.
+        AddColumnEvent sc2 =
+                new AddColumnEvent(
+                        tableId,
+                        Arrays.asList(
+                                AddColumnEvent.last(
+                                        new PhysicalColumn(
+                                                "extra2", DataTypes.STRING(), null, null))));
+        icebergMetadataApplier.applySchemaChange(sc2);
+        writer0.write(sc2, null); // no writer  → counter must still advance to 2
+        writer1.write(sc2, null); // has writer → flush batchIndex=1; counter → 2
+
+        Schema schema2 = SchemaUtils.applySchemaChangeEvent(schema1, sc2);
+        BinaryRecordDataGenerator gen2 =
+                new BinaryRecordDataGenerator(
+                        schema2.getColumnDataTypes().toArray(new DataType[0]));
+
+        // Batch 2: both subtasks update their respective rows after SC2.
+        // Subtask 0 updates id=1 "a" → "c"; subtask 1 updates id=2 "b" → "d".
+        writer0.write(
+                DataChangeEvent.updateEvent(
+                        tableId,
+                        gen2.generate(new Object[] {1L, BinaryStringData.fromString("a"), null, null}),
+                        gen2.generate(
+                                new Object[] {1L, BinaryStringData.fromString("c"), null, null})),
+                null);
+        writer1.write(
+                DataChangeEvent.updateEvent(
+                        tableId,
+                        gen2.generate(new Object[] {2L, BinaryStringData.fromString("b"), null, null}),
+                        gen2.generate(
+                                new Object[] {2L, BinaryStringData.fromString("d"), null, null})),
+                null);
+
+        List<WriteResultWrapper> allResults = new ArrayList<>();
+        allResults.addAll(writer0.prepareCommit());
+        allResults.addAll(writer1.prepareCommit());
+
+        // Expect 3 batches: {0: sub0}, {1: sub1}, {2: sub0+sub1}
+        long distinctBatchIndices =
+                allResults.stream()
+                        .mapToInt(WriteResultWrapper::getBatchIndex)
+                        .distinct()
+                        .count();
+        Assertions.assertThat(distinctBatchIndices).isEqualTo(3);
+
+        IcebergCommitter committer = new IcebergCommitter(catalogOptions);
+        committer.commit(
+                allResults.stream()
+                        .map(MockCommitRequestImpl::new)
+                        .collect(Collectors.toList()));
+
+        // Only the final values must survive. Equality-deletes in batch 2 (seq N+2) must suppress
+        // the stale inserts in batch 0 (seq N) and batch 1 (seq N+1).
+        List<String> result = fetchTableContent(catalog, tableId, null);
+        Assertions.assertThat(result)
+                .containsExactlyInAnyOrder("1, c, null, null", "2, d, null, null");
+    }
+
+    private static long countSnapshots(Table table) {
+        long count = 0;
+        for (Snapshot ignored : table.snapshots()) {
+            count++;
+        }
+        return count;
     }
 
     /** Mock CommitRequestImpl. */
