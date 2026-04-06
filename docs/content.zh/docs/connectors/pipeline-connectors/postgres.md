@@ -294,6 +294,15 @@ pipeline:
         默认值为 false。
       </td>
     </tr>
+    <tr>
+      <td>records.per.second</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">true</td>
+      <td>Double</td>
+      <td>
+        每秒处理的最大数据量，默认值：-1，无限制。(只适用于flink2.x)
+      </td>
+    </tr>
     </tbody>
 </table>
 </div>

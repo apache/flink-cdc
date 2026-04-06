@@ -455,6 +455,15 @@ Connector Options
         For example updating an already updated value in snapshot, or deleting an already deleted entry in snapshot. These replayed change log events should be handled specially.
       </td>
     </tr>
+    <tr>
+      <td>records.per.second</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">true</td>
+      <td>Double</td>
+      <td>
+        The maximum size of data processed per second, the default value: -1, not limited.(only for flink2.x)
+      </td>
+    </tr>
     </tbody>
 </table>    
 </div>

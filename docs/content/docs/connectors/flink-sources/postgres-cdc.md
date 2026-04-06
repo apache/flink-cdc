@@ -289,6 +289,15 @@ SELECT * FROM shipments;
           (2) Table list (regex or predefined list) should only match the parent table name, if table list matches both parent and child tables, snapshot data will be read twice.
       </td>
     </tr>
+    <tr>
+      <td>records.per.second</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">true</td>
+      <td>Double</td>
+      <td>
+        The maximum size of data processed per second, the default value: -1, not limited.(only for flink2.x)
+      </td>
+    </tr>
     </tbody>
     </table>
 </div>
