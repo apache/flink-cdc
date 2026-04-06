@@ -362,6 +362,15 @@ pipeline:
           如果设置 'use.legacy.json.format' = 'false'， 这条数据会被转换为 {"key1": "value1", "key2": "value2"}， 也就是 key 和 value 前的空格都会被保留。
       </td>
     </tr>
+    <tr>
+      <td>records.per.second</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">true</td>
+      <td>Double</td>
+      <td>
+        每秒处理的最大数据量，默认值：-1，无限制。(只适用于flink2.x)
+      </td>
+    </tr>
     </tbody>
 </table>
 </div>

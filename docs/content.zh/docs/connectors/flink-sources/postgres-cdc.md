@@ -292,6 +292,15 @@ Connector Options
           (2) Table list (regex or predefined list) should only match the parent table name, if table list matches both parent and child tables, snapshot data will be read twice.
       </td>
     </tr>
+    <tr>
+      <td>records.per.second</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">true</td>
+      <td>Double</td>
+      <td>
+        每秒处理的最大数据量，默认值：-1，无限制。(只适用于flink2.x)
+      </td>
+    </tr>
     </tbody>
     </table>
 </div>
