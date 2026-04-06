@@ -490,6 +490,15 @@ Flink SQL> SELECT * FROM orders;
         例如，更新快照阶段已更新的值，或删除快照阶段已删除的数据。这些重放的 binlog 事件应进行特殊处理。
       </td>
     </tr>
+    <tr>
+      <td>records.per.second</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">true</td>
+      <td>Double</td>
+      <td>
+        每秒处理的最大数据量，默认值：-1，无限制。(只适用于flink2.x)
+      </td>
+    </tr>
     </tbody>
 </table>
 </div>

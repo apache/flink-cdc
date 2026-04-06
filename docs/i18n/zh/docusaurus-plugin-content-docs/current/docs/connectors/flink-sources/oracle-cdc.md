@@ -468,6 +468,15 @@ Flink SQL> SELECT * FROM products;
         例如，更新快照阶段已更新的值，或删除快照阶段已删除的数据。这些重放的 change log 事件应进行特殊处理。
       </td>
     </tr>
+    <tr>
+      <td>records.per.second</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">true</td>
+      <td>Double</td>
+      <td>
+        The maximum size of data processed per second, the default value: -1, not limited.(only for flink2.x)
+      </td>
+    </tr>
     </tbody>
 </table>    
 </div>
