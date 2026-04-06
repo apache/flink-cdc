@@ -410,6 +410,15 @@ MongoDB 的更改事件记录在消息之前没有更新。因此，我们只能
       <td>String</td>
       <td>信任库文件的类型。该项为可选，仅在配置了 <code>mongodb.ssl.truststore</code> 时才需要。默认为 PKCS12。</td>
     </tr>
+    <tr>
+      <td>records.per.second</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">true</td>
+      <td>Double</td>
+      <td>
+        每秒处理的最大数据量，默认值：-1，无限制。(只适用于flink2.x)
+      </td>
+    </tr>
     </tbody>
 </table>
 </div>

@@ -314,6 +314,15 @@ Connector Options
         使用 DataStream API 时，可以通过在 Debezium 参数中添加 "scan.pre-epoch-timestamp.wall-clock-conversion.enabled" 来开启该行为。
       </td>
     </tr>
+    <tr>
+      <td>records.per.second</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">true</td>
+      <td>Double</td>
+      <td>
+        每秒处理的最大数据量，默认值：-1，无限制。(只适用于flink2.x)
+      </td>
+    </tr>
     </tbody>
     </table>
 </div>

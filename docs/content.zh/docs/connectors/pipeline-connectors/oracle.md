@@ -269,6 +269,15 @@ pipeline:
       是否在快照读取阶段跳过回填。如果跳过回填，则快照阶段捕获的表上的更改将在稍后的增量读取阶段被使用，而不是合并到快照中。警告：跳过回填可能会导致数据不一致，因为在快照阶段发生的一些binlog事件可能会被重放（至少只有一次语义承诺）。例如，更新快照中已更新的值，或删除快照中已删除的条目。这些重放的增量事件应该特别处理。
       </td>
     </tr>
+    <tr>
+      <td>records.per.second</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">true</td>
+      <td>Double</td>
+      <td>
+        每秒处理的最大数据量，默认值：-1，无限制。(只适用于flink2.x)
+      </td>
+    </tr>
     </tbody>
 </table>
 </div>
