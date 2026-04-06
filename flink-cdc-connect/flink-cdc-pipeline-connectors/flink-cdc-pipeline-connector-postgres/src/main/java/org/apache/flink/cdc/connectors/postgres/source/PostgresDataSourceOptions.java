@@ -293,4 +293,11 @@ public class PostgresDataSourceOptions {
                                     + "to discover tables that match the source `tables:` pattern but were not part of "
                                     + "the captured set at savepoint time. Mirrors the MySQL Pipeline connector option "
                                     + "of the same name.");
+
+    public static final ConfigOption<Double> RECORDS_PER_SECOND =
+            ConfigOptions.key("records.per.second")
+                    .doubleType()
+                    .defaultValue(-1d)
+                    .withDescription(
+                            "The maximum size of data processed per second, the default value: -1, not limited");
 }
