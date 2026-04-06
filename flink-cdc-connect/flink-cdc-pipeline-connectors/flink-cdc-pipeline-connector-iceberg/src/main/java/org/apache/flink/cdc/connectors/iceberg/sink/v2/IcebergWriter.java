@@ -72,7 +72,7 @@ public class IcebergWriter
 
     private final List<WriteResultWrapper> temporaryWriteResult;
 
-    /** Per-table batch index within the current checkpoint; incremented on each schema-change flush. */
+    /** Per-table batch index; incremented on each schema-change flush, even when no writer exists. */
     private Map<TableId, Integer> tableBatchIndexMap;
 
     private Catalog catalog;
@@ -171,8 +171,11 @@ public class IcebergWriter
         } else {
             SchemaChangeEvent schemaChangeEvent = (SchemaChangeEvent) event;
             TableId tableId = schemaChangeEvent.tableId();
-            // Flush only this table before applying schema change to avoid global writer rotation.
-            flushTableWriter(tableId);
+            // Flush only when the table is already known; skip on initial CreateTableEvent since
+            // no data has been written yet and there is nothing to split.
+            if (schemaMap.containsKey(tableId)) {
+                flushTableWriter(tableId);
+            }
             TableSchemaWrapper tableSchemaWrapper = schemaMap.get(tableId);
 
             Schema newSchema =
@@ -185,7 +188,7 @@ public class IcebergWriter
     }
 
     @Override
-    public void flush(boolean flush) throws IOException {
+    public void flush(boolean flush) {
         // Flush may be called many times during one checkpoint by non-data events.
         // Avoid rotating all task writers here, which can split same-PK updates into multiple
         // batches within one checkpoint and break dedup semantics in downstream reads.
@@ -193,11 +196,12 @@ public class IcebergWriter
 
     private void flushTableWriter(TableId tableId) throws IOException {
         TaskWriter<RowData> writer = writerMap.remove(tableId);
+        // Advance even when no writer exists, to keep batchIndex in sync across subtasks.
+        int batchIndex = tableBatchIndexMap.getOrDefault(tableId, 0);
+        tableBatchIndexMap.put(tableId, batchIndex + 1);
         if (writer == null) {
             return;
         }
-        int batchIndex = tableBatchIndexMap.getOrDefault(tableId, 0);
-        tableBatchIndexMap.put(tableId, batchIndex + 1);
         WriteResultWrapper writeResultWrapper =
                 new WriteResultWrapper(
                         writer.complete(),
