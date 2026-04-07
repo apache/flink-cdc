@@ -300,6 +300,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         options.add(SSL_TRUSTSTORE);
         options.add(SSL_TRUSTSTORE_PASSWORD);
         options.add(SSL_TRUSTSTORE_TYPE);
+        options.add(RECORDS_PER_SECOND);
         return options;
     }
 }
