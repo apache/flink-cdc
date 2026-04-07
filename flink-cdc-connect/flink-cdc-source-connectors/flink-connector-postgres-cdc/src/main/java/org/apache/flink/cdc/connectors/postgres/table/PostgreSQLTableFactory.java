@@ -35,7 +35,13 @@ import java.time.Duration;
 import java.util.HashSet;
 import java.util.Set;
 
-import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.*;
+import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.DATABASE_NAME;
+import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.HOSTNAME;
+import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.PASSWORD;
+import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.RECORDS_PER_SECOND;
+import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.SCHEMA_NAME;
+import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.TABLE_NAME;
+import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.USERNAME;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED;
