@@ -629,6 +629,41 @@ class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
     }
 
     @Test
+    void testAlterColumnTypePreservesDefaultValue() throws Exception {
+        TableId tableId =
+                TableId.tableId(
+                        StarRocksContainer.STARROCKS_DATABASE_NAME,
+                        StarRocksContainer.STARROCKS_TABLE_NAME);
+
+        Schema schema =
+                Schema.newBuilder()
+                        .column(new PhysicalColumn("id", DataTypes.INT().notNull(), null))
+                        .column(new PhysicalColumn("number", DataTypes.DOUBLE(), null))
+                        .column(new PhysicalColumn("name", DataTypes.VARCHAR(17), null, "unknown"))
+                        .primaryKey("id")
+                        .build();
+
+        List<Event> events = new ArrayList<>();
+        events.add(new CreateTableEvent(tableId, schema));
+        events.add(
+                new AlterColumnTypeEvent(
+                        tableId, Collections.singletonMap("name", DataTypes.VARCHAR(19))));
+
+        runJobWithEvents(events);
+        waitAlterDone(tableId, 60000L);
+
+        List<String> actual = inspectTableSchema(tableId);
+
+        List<String> expected =
+                Arrays.asList(
+                        "id | int | NO | true | null",
+                        "number | double | YES | false | null",
+                        "name | varchar(57) | YES | false | unknown");
+
+        assertEqualsInOrder(expected, actual);
+    }
+
+    @Test
     void testMysqlDefaultTimestampValueWithMicrosInAddColumn() throws Exception {
         TableId tableId =
                 TableId.tableId(
