@@ -184,5 +184,5 @@ public class MongoDBSourceOptions {
                     .doubleType()
                     .defaultValue(-1d)
                     .withDescription(
-                            "The maximum size of data processed per second, the default value: -1, not limited");
+                            "The maximum number of records emitted per second, the default value: -1, means no rate limiting.");
 }
