@@ -1800,6 +1800,196 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
         return expected;
     }
 
+    @Test
+    @Order(10)
+    public void testPartitionedTable() throws Exception {
+        createAndInitialize("partition_table.sql");
+        Map<String, String> options = new HashMap<>();
+        options.put(HOSTNAME.key(), ORACLE_CONTAINER.getHost());
+        options.put(PORT.key(), String.valueOf(ORACLE_CONTAINER.getOraclePort()));
+        options.put(USERNAME.key(), CONNECTOR_USER);
+        options.put(PASSWORD.key(), CONNECTOR_PWD);
+        options.put(TABLES.key(), "debezium.partitioned_customers");
+        options.put(DATABASE.key(), ORACLE_CONTAINER.getDatabaseName());
+        options.put(SCAN_STARTUP_MODE.key(), "initial");
+        Factory.Context context = new MockContext(Configuration.fromMap(options));
+        Properties dbzProperties = new Properties();
+        dbzProperties.setProperty("database.connection.adapter", "logminer");
+        dbzProperties.setProperty("log.mining.strategy", "online_catalog");
+        dbzProperties.setProperty("snapshot.locking.mode", "none");
+        dbzProperties.setProperty("database.history.store.only.captured.tables.ddl", "true");
+        dbzProperties.setProperty("include.schema.changes", "true");
+        OracleSourceConfigFactory configFactory = new OracleSourceConfigFactory();
+        configFactory
+                .username(CONNECTOR_USER)
+                .password(CONNECTOR_PWD)
+                .port(ORACLE_CONTAINER.getOraclePort())
+                .databaseList(ORACLE_CONTAINER.getDatabaseName())
+                .hostname(ORACLE_CONTAINER.getHost())
+                .tableList("DEBEZIUM.PARTITIONED_CUSTOMERS")
+                .startupOptions(StartupOptions.initial())
+                .debeziumProperties(dbzProperties)
+                .includeSchemaChanges(true);
+        FlinkSourceProvider sourceProvider =
+                (FlinkSourceProvider)
+                        new OracleDataSource(
+                                        configFactory,
+                                        context.getFactoryConfiguration(),
+                                        new ArrayList<>())
+                                .getEventSourceProvider();
+        CloseableIterator<Event> events =
+                env.fromSource(
+                                sourceProvider.getSource(),
+                                WatermarkStrategy.noWatermarks(),
+                                OracleDataSourceFactory.IDENTIFIER,
+                                new EventTypeInfo())
+                        .executeAndCollect();
+        Thread.sleep(150_000);
+
+        TableId tableId = TableId.tableId("DEBEZIUM", "PARTITIONED_CUSTOMERS");
+
+        // Build expected CreateTableEvent
+        CreateTableEvent createTableEvent =
+                new CreateTableEvent(
+                        tableId,
+                        Schema.newBuilder()
+                                .physicalColumn("ID", DataTypes.BIGINT().notNull())
+                                .physicalColumn("NAME", DataTypes.VARCHAR(255).notNull())
+                                .physicalColumn("ADDRESS", DataTypes.VARCHAR(1024))
+                                .physicalColumn("PHONE_NUMBER", DataTypes.VARCHAR(512))
+                                .primaryKey(Collections.singletonList("ID"))
+                                .build());
+
+        // Build expected snapshot data
+        RowType rowType =
+                RowType.of(
+                        new DataType[] {
+                            DataTypes.BIGINT().notNull(),
+                            DataTypes.VARCHAR(255).notNull(),
+                            DataTypes.VARCHAR(1024),
+                            DataTypes.VARCHAR(512)
+                        },
+                        new String[] {"ID", "NAME", "ADDRESS", "PHONE_NUMBER"});
+        BinaryRecordDataGenerator generator = new BinaryRecordDataGenerator(rowType);
+
+        List<Event> expectedSnapshot = new ArrayList<>();
+        expectedSnapshot.add(createTableEvent);
+        // 21 rows across 4 partitions
+        long[][] snapshotIds = {
+            {101L},
+            {102L},
+            {103L},
+            {109L},
+            {110L},
+            {111L}, // partition p1 (< 500)
+            {501L},
+            {502L},
+            {513L}, // partition p2 (< 1000)
+            {1009L},
+            {1010L},
+            {1011L},
+            {1012L},
+            {1013L},
+            {1014L},
+            {1015L},
+            {1016L},
+            {1017L},
+            {1018L},
+            {1019L}, // partition p3 (< 2000)
+            {2000L} // partition p4 (MAXVALUE)
+        };
+        String[] names = {
+            "user_1", "user_2", "user_3", "user_4", "user_5", "user_6", "user_7", "user_8",
+            "user_9", "user_10", "user_11", "user_12", "user_13", "user_14", "user_15", "user_16",
+            "user_17", "user_18", "user_19", "user_20", "user_21"
+        };
+        for (int i = 0; i < snapshotIds.length; i++) {
+            expectedSnapshot.add(
+                    DataChangeEvent.insertEvent(
+                            tableId,
+                            generator.generate(
+                                    new Object[] {
+                                        snapshotIds[i][0],
+                                        BinaryStringData.fromString(names[i]),
+                                        BinaryStringData.fromString("Shanghai"),
+                                        BinaryStringData.fromString("123567891234")
+                                    })));
+        }
+
+        // Perform DML operations across partitions
+        List<Event> expectedBinlog = new ArrayList<>();
+        try (Connection connection = getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            // INSERT into partition p4
+            statement.execute(
+                    "INSERT INTO DEBEZIUM.PARTITIONED_CUSTOMERS VALUES (2001, 'user_22', 'Shanghai', '123567891234')");
+            expectedBinlog.add(
+                    DataChangeEvent.insertEvent(
+                            tableId,
+                            generator.generate(
+                                    new Object[] {
+                                        2001L,
+                                        BinaryStringData.fromString("user_22"),
+                                        BinaryStringData.fromString("Shanghai"),
+                                        BinaryStringData.fromString("123567891234")
+                                    })));
+            // UPDATE in partition p1
+            statement.execute(
+                    "UPDATE DEBEZIUM.PARTITIONED_CUSTOMERS SET ADDRESS = 'Hangzhou' WHERE ID = 103");
+            expectedBinlog.add(
+                    DataChangeEvent.updateEvent(
+                            tableId,
+                            generator.generate(
+                                    new Object[] {
+                                        103L,
+                                        BinaryStringData.fromString("user_3"),
+                                        BinaryStringData.fromString("Shanghai"),
+                                        BinaryStringData.fromString("123567891234")
+                                    }),
+                            generator.generate(
+                                    new Object[] {
+                                        103L,
+                                        BinaryStringData.fromString("user_3"),
+                                        BinaryStringData.fromString("Hangzhou"),
+                                        BinaryStringData.fromString("123567891234")
+                                    })));
+            // DELETE from partition p2
+            statement.execute("DELETE FROM DEBEZIUM.PARTITIONED_CUSTOMERS WHERE ID = 502");
+            expectedBinlog.add(
+                    DataChangeEvent.deleteEvent(
+                            tableId,
+                            generator.generate(
+                                    new Object[] {
+                                        502L,
+                                        BinaryStringData.fromString("user_8"),
+                                        BinaryStringData.fromString("Shanghai"),
+                                        BinaryStringData.fromString("123567891234")
+                                    })));
+        }
+
+        // Fetch and verify snapshot events
+        List<Event> actual = fetchResults(events, expectedSnapshot.size() + expectedBinlog.size());
+
+        Map<TableId, List<RecordData.FieldGetter>> fieldGetterMaps = new HashMap<>();
+        Schema schema = createTableEvent.getSchema();
+        fieldGetterMaps.put(tableId, SchemaUtils.createFieldGetters(schema));
+
+        StringBuilder actualSnapshotStr =
+                getResultString(actual.subList(0, expectedSnapshot.size()), fieldGetterMaps, false);
+        StringBuilder expectedSnapshotStr =
+                getResultString(expectedSnapshot, fieldGetterMaps, false);
+        assertThat(actualSnapshotStr.toString()).isEqualTo(expectedSnapshotStr.toString());
+
+        StringBuilder actualBinlogStr =
+                getResultString(
+                        actual.subList(expectedSnapshot.size(), actual.size()),
+                        fieldGetterMaps,
+                        false);
+        StringBuilder expectedBinlogStr = getResultString(expectedBinlog, fieldGetterMaps, false);
+        assertThat(actualBinlogStr.toString()).isEqualTo(expectedBinlogStr.toString());
+        env.close();
+    }
+
     public static <T> List<T> fetchResults(Iterator<T> iter, int size) {
         List<T> result = new ArrayList<>(size);
         while (size > 0 && iter.hasNext()) {
