@@ -241,6 +241,7 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
         options.add(SCAN_INCLUDE_PARTITIONED_TABLES_ENABLED);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED);
         options.add(SCAN_PRE_EPOCH_TIMESTAMP_WALL_CLOCK_CONVERSION_ENABLED);
+        options.add(RECORDS_PER_SECOND);
         return options;
     }
 
