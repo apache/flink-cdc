@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.iceberg.sink.v2.compaction;
 
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.connectors.iceberg.sink.utils.HadoopConfUtils;
 import org.apache.flink.cdc.connectors.iceberg.sink.v2.WriteResultWrapper;
 import org.apache.flink.cdc.runtime.operators.AbstractStreamOperatorAdapter;
 import org.apache.flink.runtime.state.StateSnapshotContext;
@@ -62,16 +63,21 @@ public class CompactionOperator
 
     private final CompactionOptions compactionOptions;
 
+    private final Map<String, String> hadoopConfOptions;
+
     private volatile Throwable throwable;
 
     private ExecutorService compactExecutor;
 
     public CompactionOperator(
-            Map<String, String> catalogOptions, CompactionOptions compactionOptions) {
+            Map<String, String> catalogOptions,
+            CompactionOptions compactionOptions,
+            Map<String, String> hadoopConfOptions) {
         this.tableCommitTimes = new HashMap<>();
         this.compactedTables = new HashSet<>();
         this.catalogOptions = catalogOptions;
         this.compactionOptions = compactionOptions;
+        this.hadoopConfOptions = hadoopConfOptions;
     }
 
     @Override
@@ -111,9 +117,10 @@ public class CompactionOperator
 
     private void compact(TableId tableId) {
         if (catalog == null) {
+            Configuration configuration = HadoopConfUtils.createConfiguration(hadoopConfOptions);
             catalog =
                     CatalogUtil.buildIcebergCatalog(
-                            this.getClass().getSimpleName(), catalogOptions, new Configuration());
+                            this.getClass().getSimpleName(), catalogOptions, configuration);
         }
         try {
             RewriteDataFilesActionResult rewriteResult =

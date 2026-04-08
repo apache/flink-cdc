@@ -35,11 +35,11 @@ without a single line of Java/Scala code or IDE installation.
 Prepare a Linux or MacOS computer with Docker installed.
 
 ### Prepare Flink Standalone cluster
-1. Download [Flink 1.20.3](https://archive.apache.org/dist/flink/flink-1.20.3/flink-1.20.3-bin-scala_2.12.tgz), unzip and get flink-1.20.3 directory.
-   Use the following command to navigate to the Flink directory and set FLINK_HOME to the directory where flink-1.20.3 is located.
+1. Download [Flink 2.2.0](https://archive.apache.org/dist/flink/flink-2.2.0/flink-2.2.0-bin-scala_2.12.tgz), unzip and get flink-2.2.0 directory.
+   Use the following command to navigate to the Flink directory and set FLINK_HOME to the directory where flink-2.2.0 is located.
 
    ```shell
-   cd flink-1.20.3
+   cd flink-2.2.0
    ```
 
 2. Enable checkpointing by appending the following parameters to the conf/config.yaml configuration file to perform a checkpoint every 3 seconds.
@@ -201,11 +201,11 @@ This command automatically starts all the containers defined in the Docker Compo
    [flink-cdc-{{< param Version >}}-bin.tar.gz](https://www.apache.org/dyn/closer.lua/flink/flink-cdc-{{< param Version >}}/flink-cdc-{{< param Version >}}-bin.tar.gz)
    flink-cdc-{{< param Version >}} directory will contain four directories: `bin`, `lib`, `log`, and `conf`.
 
-2. Download the connector packages listed below and move them to the `lib` directory    
+2. Download the connector packages listed below and move them to the `lib` directory
    **Download links are available only for stable releases, SNAPSHOT dependencies need to be built based on master or release branches by yourself.**
    **Please note that you need to move the jar to the lib directory of Flink CDC Home, not to the lib directory of Flink Home.**
-    - [Postgres pipeline connector {{< param Version >}}](https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-postgres/{{< param Version >}}/flink-cdc-pipeline-connector-postgres-{{< param Version >}}.jar)
-    - [Fluss pipeline connector {{< param Version >}}](https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-fluss/{{< param Version >}}/flink-cdc-pipeline-connector-fluss-{{< param Version >}}.jar)
+    - [flink-cdc-pipeline-connector-postgres](https://mvnrepository.com/artifact/org.apache.flink/flink-cdc-pipeline-connector-postgres)
+    - [flink-cdc-pipeline-connector-fluss](https://mvnrepository.com/artifact/org.apache.flink/flink-cdc-pipeline-connector-fluss)
 
 3. Write task configuration yaml file.
    Here is an example file for synchronizing the entire database `postgres-to-fluss.yaml`：
@@ -260,7 +260,7 @@ This command automatically starts all the containers defined in the Docker Compo
 ### Query data in Fluss
 To query the synchronized data in Fluss, you need to set up the Flink SQL Client.
 
-1. Download [fluss-flink-1.20-0.9.0-incubating.jar](https://repo1.maven.org/maven2/org/apache/fluss/fluss-flink-1.20/0.9.0-incubating/fluss-flink-1.20-0.9.0-incubating.jar) and place it in the Flink `lib` directory.
+1. Download [fluss-flink-2.2-0.9.0-incubating.jar](https://repo1.maven.org/maven2/org/apache/fluss/fluss-flink-2.2/0.9.0-incubating/fluss-flink-2.2-0.9.0-incubating.jar) and place it in the Flink `lib` directory.
 
 2. Start the Flink SQL Client:
    ```shell
@@ -399,7 +399,7 @@ After finishing the tutorial, run the following command to stop all containers i
    ```shell
    docker-compose down -v
    ```
-Run the following command to stop the Flink cluster in the directory of Flink `flink-1.20.3`:
+Run the following command to stop the Flink cluster in the directory of Flink `flink-2.2.0`:
 
    ```shell
    ./bin/stop-cluster.sh

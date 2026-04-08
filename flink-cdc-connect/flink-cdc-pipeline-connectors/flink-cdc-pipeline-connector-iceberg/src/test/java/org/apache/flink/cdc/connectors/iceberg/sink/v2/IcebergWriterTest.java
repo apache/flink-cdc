@@ -93,7 +93,14 @@ public class IcebergWriterTest {
         String operatorId = UUID.randomUUID().toString();
         IcebergWriter icebergWriter =
                 new IcebergWriter(
-                        catalogOptions, 1, 1, ZoneId.systemDefault(), 0, jobId, operatorId);
+                        catalogOptions,
+                        1,
+                        1,
+                        ZoneId.systemDefault(),
+                        0,
+                        jobId,
+                        operatorId,
+                        new HashMap<>());
         IcebergMetadataApplier icebergMetadataApplier = new IcebergMetadataApplier(catalogOptions);
         TableId tableId = TableId.parse("test.iceberg_table");
 
@@ -179,10 +186,12 @@ public class IcebergWriterTest {
         DataChangeEvent dataChangeEvent2 = DataChangeEvent.insertEvent(tableId, recordData2);
         icebergWriter.write(dataChangeEvent2, null);
         Collection<WriteResultWrapper> writeResults = icebergWriter.prepareCommit();
-        IcebergCommitter icebergCommitter = new IcebergCommitter(catalogOptions);
         Collection<Committer.CommitRequest<WriteResultWrapper>> collection =
                 writeResults.stream().map(MockCommitRequestImpl::new).collect(Collectors.toList());
-        icebergCommitter.commit(collection);
+        try (IcebergCommitter icebergCommitter =
+                new IcebergCommitter(catalogOptions, new HashMap<>())) {
+            icebergCommitter.commit(collection);
+        }
         List<String> result = fetchTableContent(catalog, tableId, null);
         Assertions.assertThat(result)
                 .containsExactlyInAnyOrder(
@@ -258,7 +267,10 @@ public class IcebergWriterTest {
         writeResults = icebergWriter.prepareCommit();
         collection =
                 writeResults.stream().map(MockCommitRequestImpl::new).collect(Collectors.toList());
-        icebergCommitter.commit(collection);
+        try (IcebergCommitter icebergCommitter =
+                new IcebergCommitter(catalogOptions, new HashMap<>())) {
+            icebergCommitter.commit(collection);
+        }
         result = fetchTableContent(catalog, tableId, null);
         Assertions.assertThat(result)
                 .containsExactlyInAnyOrder(
@@ -284,7 +296,15 @@ public class IcebergWriterTest {
         String jobId = UUID.randomUUID().toString();
         String operatorId = UUID.randomUUID().toString();
         IcebergWriter icebergWriter =
-                new IcebergWriter(catalogOptions, 1, 1, pipelineZoneId, 0, jobId, operatorId);
+                new IcebergWriter(
+                        catalogOptions,
+                        1,
+                        1,
+                        pipelineZoneId,
+                        0,
+                        jobId,
+                        operatorId,
+                        new HashMap<>());
         IcebergMetadataApplier icebergMetadataApplier = new IcebergMetadataApplier(catalogOptions);
         TableId tableId = TableId.parse("test.iceberg_table");
 
@@ -349,10 +369,12 @@ public class IcebergWriterTest {
         DataChangeEvent dataChangeEvent = DataChangeEvent.insertEvent(tableId, record1);
         icebergWriter.write(dataChangeEvent, null);
         Collection<WriteResultWrapper> writeResults = icebergWriter.prepareCommit();
-        IcebergCommitter icebergCommitter = new IcebergCommitter(catalogOptions);
         Collection<Committer.CommitRequest<WriteResultWrapper>> collection =
                 writeResults.stream().map(MockCommitRequestImpl::new).collect(Collectors.toList());
-        icebergCommitter.commit(collection);
+        try (IcebergCommitter icebergCommitter =
+                new IcebergCommitter(catalogOptions, new HashMap<>())) {
+            icebergCommitter.commit(collection);
+        }
         List<String> result = fetchTableContent(catalog, tableId, null);
         Assertions.assertThat(result)
                 .containsExactlyInAnyOrder(
@@ -393,7 +415,14 @@ public class IcebergWriterTest {
         String operatorId = UUID.randomUUID().toString();
         IcebergWriter icebergWriter =
                 new IcebergWriter(
-                        catalogOptions, 1, 1, ZoneId.systemDefault(), 0, jobId, operatorId);
+                        catalogOptions,
+                        1,
+                        1,
+                        ZoneId.systemDefault(),
+                        0,
+                        jobId,
+                        operatorId,
+                        new HashMap<>());
 
         TableId tableId = TableId.parse("test.iceberg_table");
         Map<TableId, List<String>> partitionMaps = new HashMap<>();
@@ -440,10 +469,12 @@ public class IcebergWriterTest {
         DataChangeEvent dataChangeEvent2 = DataChangeEvent.insertEvent(tableId, recordData2);
         icebergWriter.write(dataChangeEvent2, null);
         Collection<WriteResultWrapper> writeResults = icebergWriter.prepareCommit();
-        IcebergCommitter icebergCommitter = new IcebergCommitter(catalogOptions);
         Collection<Committer.CommitRequest<WriteResultWrapper>> collection =
                 writeResults.stream().map(MockCommitRequestImpl::new).collect(Collectors.toList());
-        icebergCommitter.commit(collection);
+        try (IcebergCommitter icebergCommitter =
+                new IcebergCommitter(catalogOptions, new HashMap<>())) {
+            icebergCommitter.commit(collection);
+        }
 
         Table table =
                 catalog.loadTable(
@@ -482,7 +513,15 @@ public class IcebergWriterTest {
         String jobId = UUID.randomUUID().toString();
         String operatorId = UUID.randomUUID().toString();
         IcebergWriter icebergWriter =
-                new IcebergWriter(catalogOptions, 1, 1, pipelineZoneId, 0, jobId, operatorId);
+                new IcebergWriter(
+                        catalogOptions,
+                        1,
+                        1,
+                        pipelineZoneId,
+                        0,
+                        jobId,
+                        operatorId,
+                        new HashMap<>());
         IcebergMetadataApplier icebergMetadataApplier = new IcebergMetadataApplier(catalogOptions);
         TableId tableId = TableId.parse("test.iceberg_table");
         TableIdentifier tableIdentifier =
@@ -514,10 +553,12 @@ public class IcebergWriterTest {
         DataChangeEvent dataChangeEvent = DataChangeEvent.insertEvent(tableId, record1);
         icebergWriter.write(dataChangeEvent, null);
         Collection<WriteResultWrapper> writeResults = icebergWriter.prepareCommit();
-        IcebergCommitter icebergCommitter = new IcebergCommitter(catalogOptions);
         Collection<Committer.CommitRequest<WriteResultWrapper>> collection =
                 writeResults.stream().map(MockCommitRequestImpl::new).collect(Collectors.toList());
-        icebergCommitter.commit(collection);
+        try (IcebergCommitter icebergCommitter =
+                new IcebergCommitter(catalogOptions, new HashMap<>())) {
+            icebergCommitter.commit(collection);
+        }
         List<String> result = fetchTableContent(catalog, tableId, null);
         Assertions.assertThat(result.size()).isEqualTo(1);
         Assertions.assertThat(result).containsExactlyInAnyOrder("1, char1");
@@ -538,8 +579,11 @@ public class IcebergWriterTest {
         writeResults = icebergWriter.prepareCommit();
         collection =
                 writeResults.stream().map(MockCommitRequestImpl::new).collect(Collectors.toList());
-        icebergCommitter.commit(collection);
-        icebergCommitter.commit(collection);
+        try (IcebergCommitter icebergCommitter =
+                new IcebergCommitter(catalogOptions, new HashMap<>())) {
+            icebergCommitter.commit(collection);
+            icebergCommitter.commit(collection);
+        }
         summary = catalog.loadTable(tableIdentifier).currentSnapshot().summary();
         Assertions.assertThat(summary.get("total-data-files")).isEqualTo("2");
         Assertions.assertThat(summary.get("added-records")).isEqualTo("1");

@@ -27,6 +27,7 @@ import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
+import org.apache.flink.cdc.connectors.iceberg.sink.utils.HadoopConfUtils;
 import org.apache.flink.cdc.connectors.iceberg.sink.utils.RowDataUtils;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.logical.RowType;
@@ -92,10 +93,12 @@ public class IcebergWriter
             ZoneId zoneId,
             long lastCheckpointId,
             String jobId,
-            String operatorId) {
+            String operatorId,
+            Map<String, String> hadoopConfOptions) {
+        Configuration configuration = HadoopConfUtils.createConfiguration(hadoopConfOptions);
         catalog =
                 CatalogUtil.buildIcebergCatalog(
-                        this.getClass().getSimpleName(), catalogOptions, new Configuration());
+                        this.getClass().getSimpleName(), catalogOptions, configuration);
         writerFactoryMap = new HashMap<>();
         writerMap = new HashMap<>();
         schemaMap = new HashMap<>();

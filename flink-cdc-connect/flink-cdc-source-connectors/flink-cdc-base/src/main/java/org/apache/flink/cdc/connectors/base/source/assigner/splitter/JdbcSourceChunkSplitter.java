@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.base.source.assigner.splitter;
 
 import org.apache.flink.cdc.common.annotation.Experimental;
+import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
 import org.apache.flink.cdc.connectors.base.dialect.JdbcDataSourceDialect;
 import org.apache.flink.cdc.connectors.base.source.assigner.state.ChunkSplitterState;
@@ -507,7 +508,8 @@ public abstract class JdbcSourceChunkSplitter implements ChunkSplitter {
         return splits;
     }
 
-    private Object nextChunkEnd(
+    @VisibleForTesting
+    Object nextChunkEnd(
             JdbcConnection jdbc,
             Object previousChunkEnd,
             TableId tableId,
@@ -518,6 +520,9 @@ public abstract class JdbcSourceChunkSplitter implements ChunkSplitter {
         // chunk end might be null when max values are removed
         Object chunkEnd =
                 queryNextChunkMax(jdbc, tableId, splitColumn, chunkSize, previousChunkEnd);
+        if (chunkEnd == null) {
+            return null;
+        }
         if (Objects.equals(previousChunkEnd, chunkEnd)) {
             // we don't allow equal chunk start and end,
             // should query the next one larger than chunkEnd

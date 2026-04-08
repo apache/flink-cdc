@@ -105,7 +105,8 @@ public class IcebergSinkITCase {
                         null,
                         null,
                         CompactionOptions.builder().build(),
-                        "FlinkCDC");
+                        "FlinkCDC",
+                        new HashMap<>());
         String[] expected = new String[] {"21, 1.732, Disenchanted", "17, 6.28, Doris Day"};
         stream.sinkTo(icebergSink);
         env.execute("Values to Iceberg Sink");

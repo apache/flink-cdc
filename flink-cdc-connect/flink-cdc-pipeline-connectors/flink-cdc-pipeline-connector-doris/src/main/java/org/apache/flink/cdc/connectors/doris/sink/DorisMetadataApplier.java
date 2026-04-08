@@ -112,40 +112,16 @@ public class DorisMetadataApplier implements MetadataApplier {
 
     @Override
     public void applySchemaChange(SchemaChangeEvent event) {
-        SchemaChangeEventVisitor.<Void, SchemaEvolveException>visit(
+        SchemaChangeEventVisitor.voidVisit(
                 event,
-                addColumnEvent -> {
-                    applyAddColumnEvent(addColumnEvent);
-                    return null;
-                },
-                alterColumnTypeEvent -> {
-                    applyAlterColumnTypeEvent(alterColumnTypeEvent);
-                    return null;
-                },
-                createTableEvent -> {
-                    applyCreateTableEvent(createTableEvent);
-                    return null;
-                },
-                dropColumnEvent -> {
-                    applyDropColumnEvent(dropColumnEvent);
-                    return null;
-                },
-                dropTableEvent -> {
-                    applyDropTableEvent(dropTableEvent);
-                    return null;
-                },
-                renameColumnEvent -> {
-                    applyRenameColumnEvent(renameColumnEvent);
-                    return null;
-                },
-                truncateTableEvent -> {
-                    applyTruncateTableEvent(truncateTableEvent);
-                    return null;
-                },
-                alterTableCommentEvent -> {
-                    applyAlterTableCommentEvent(alterTableCommentEvent);
-                    return null;
-                });
+                this::applyAddColumnEvent,
+                this::applyAlterColumnTypeEvent,
+                this::applyCreateTableEvent,
+                this::applyDropColumnEvent,
+                this::applyDropTableEvent,
+                this::applyRenameColumnEvent,
+                this::applyTruncateTableEvent,
+                this::applyAlterTableCommentEvent);
     }
 
     private void applyCreateTableEvent(CreateTableEvent event) throws SchemaEvolveException {
@@ -335,7 +311,7 @@ public class DorisMetadataApplier implements MetadataApplier {
                 || dataType instanceof TimestampType
                 || dataType instanceof ZonedTimestampType) {
 
-            if (DorisSchemaUtils.INVALID_OR_MISSING_DATATIME.equals(defaultValue)) {
+            if (defaultValue.startsWith(DorisSchemaUtils.INVALID_OR_MISSING_DATATIME)) {
                 return DorisSchemaUtils.DEFAULT_DATETIME;
             }
         }

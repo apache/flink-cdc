@@ -28,10 +28,8 @@ limitations under the License.
     <artifactId>flink-cdc-source-e2e-tests</artifactId>
 
     <properties>
-        <flink-1.19>1.19.3</flink-1.19>
         <flink-1.20>1.20.3</flink-1.20>
-        <jdbc.version-1.19>3.2.0-1.19</jdbc.version-1.19>
-        <jdbc.version-1.20>3.2.0-1.19</jdbc.version-1.20>
+        <jdbc.version-1.20>3.3.0-1.20</jdbc.version-1.20>
         <mysql.driver.version>8.0.27</mysql.driver.version>
         <postgresql.driver.version>42.7.3</postgresql.driver.version>
     </properties>
@@ -235,16 +233,6 @@ limitations under the License.
                             <artifactId>postgresql</artifactId>
                             <version>${postgresql.driver.version}</version>
                             <destFileName>postgresql-driver.jar</destFileName>
-                            <type>jar</type>
-                            <outputDirectory>${project.build.directory}/dependencies
-                            </outputDirectory>
-                        </artifactItem>
-
-                        <artifactItem>
-                            <groupId>org.apache.flink</groupId>
-                            <artifactId>flink-connector-jdbc</artifactId>
-                            <version>${jdbc.version-1.19}</version>
-                            <destFileName>jdbc-connector_${flink-1.19}.jar</destFileName>
                             <type>jar</type>
                             <outputDirectory>${project.build.directory}/dependencies
                             </outputDirectory>

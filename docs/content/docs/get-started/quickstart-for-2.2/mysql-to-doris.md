@@ -35,11 +35,11 @@ without a single line of Java/Scala code or IDE installation.
 Prepare a Linux or MacOS computer with Docker installed.
 
 ### Prepare Flink Standalone cluster
-1. Download [Flink 1.20.3](https://archive.apache.org/dist/flink/flink-1.20.3/flink-1.20.3-bin-scala_2.12.tgz) ，unzip and get flink-1.20.3 directory.
-   Use the following command to navigate to the Flink directory and set FLINK_HOME to the directory where flink-1.20.3 is located.
+1. Download [Flink 2.2.0](https://archive.apache.org/dist/flink/flink-2.2.0/flink-2.2.0-bin-scala_2.12.tgz) ，unzip and get flink-2.2.0 directory.
+   Use the following command to navigate to the Flink directory and set FLINK_HOME to the directory where flink-2.2.0 is located.
 
    ```shell
-   cd flink-1.20.3
+   cd flink-2.2.0
    ```
 
 2. Enable checkpointing by appending the following parameters to the conf/config.yaml configuration file to perform a checkpoint every 3 seconds.
@@ -58,7 +58,7 @@ Prepare a Linux or MacOS computer with Docker installed.
 
 If successfully started, you can access the Flink Web UI at [http://localhost:8081/](http://localhost:8081/), as shown below.
 
-{{< img src="/fig/mysql-doris-tutorial/flink-ui.png" alt="Flink UI" >}}
+{{< img src="/fig/mysql-doris-tutorial/flink-ui-flink22.png" alt="Flink UI" >}}
 
 Executing `start-cluster.sh` multiple times can start multiple `TaskManager`s.
 
@@ -184,15 +184,15 @@ This command automatically starts all the containers defined in the Docker Compo
    {{< img src="/fig/mysql-doris-tutorial/doris-create-table.png" alt="Doris create table" >}}
 
 ## Submit job with Flink CDC CLI
-1. Download the binary compressed packages listed below and extract them to the directory `flink cdc-{{< param Version >}}'`：    
+1. Download the binary compressed packages listed below and extract them to the directory `flink-cdc-{{< param Version >}}`：
    [flink-cdc-{{< param Version >}}-bin.tar.gz](https://www.apache.org/dyn/closer.lua/flink/flink-cdc-{{< param Version >}}/flink-cdc-{{< param Version >}}-bin.tar.gz)
-   flink-cdc-{{< param Version >}} directory will contain four directory: `bin`, `lib`, `log`, and `conf`.
+   `flink-cdc-{{< param Version >}}` directory will contain four directories: `bin`, `lib`, `log`, and `conf`.
 
-2. Download the connector package listed below and move it to the `lib` directory  
+2. Download the connector package listed below and move it to the `lib` directory
    **Download links are available only for stable releases, SNAPSHOT dependencies need to be built based on master or release branches by yourself.**
    **Please note that you need to move the jar to the lib directory of Flink CDC Home, not to the lib directory of Flink Home.**
-    - [MySQL pipeline connector {{< param Version >}}](https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-mysql/{{< param Version >}}/flink-cdc-pipeline-connector-mysql-{{< param Version >}}.jar)
-    - [Apache Doris pipeline connector {{< param Version >}}](https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-doris/{{< param Version >}}/flink-cdc-pipeline-connector-doris-{{< param Version >}}.jar)
+    - [flink-cdc-pipeline-connector-mysql](https://mvnrepository.com/artifact/org.apache.flink/flink-cdc-pipeline-connector-mysql)
+    - [flink-cdc-pipeline-connector-doris](https://mvnrepository.com/artifact/org.apache.flink/flink-cdc-pipeline-connector-doris)
 
      You also need to place MySQL connector into Flink `lib` folder or pass it with `--jar` argument, since they're no longer packaged with CDC connectors:
     - [MySQL Connector Java](https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar)
@@ -242,11 +242,11 @@ After successful submission, the return information is as follows：
    Job ID: ae30f4580f1918bebf16752d4963dc54
    Job Description: Sync MySQL Database to Doris
    ```
- We can find a job  named `Sync MySQL Database to Doris` is running through Flink Web UI.   
+ We can find a job  named `Sync MySQL Database to Doris` is running through Flink Web UI.
 
-{{< img src="/fig/mysql-doris-tutorial/mysql-to-doris.png" alt="MySQL-to-Doris" >}}
+{{< img src="/fig/mysql-doris-tutorial/mysql-to-doris-flink22.png" alt="MySQL-to-Doris" >}}
 
-We can find that tables are created and inserted through Doris Web UI.   
+We can find that tables are created and inserted through Doris Web UI.
 
 {{< img src="/fig/mysql-doris-tutorial/doris-display-data.png" alt="Doris display data" >}}
 
@@ -345,7 +345,7 @@ After finishing the tutorial, run the following command to stop all containers i
    ```shell
    docker-compose down
    ```
-Run the following command to stop the Flink cluster in the directory of Flink `flink-1.20.3`:
+Run the following command to stop the Flink cluster in the directory of Flink `flink-2.2.0`:
 
    ```shell
    ./bin/stop-cluster.sh

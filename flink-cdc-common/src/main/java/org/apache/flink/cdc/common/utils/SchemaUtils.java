@@ -143,8 +143,10 @@ public class SchemaUtils {
                         int index = columnNames.indexOf(columnWithPosition.getExistedColumnName());
                         if (index < 0) {
                             throw new IllegalArgumentException(
-                                    columnWithPosition.getExistedColumnName()
-                                            + " of AddColumnEvent is not existed");
+                                    String.format(
+                                            "BEFORE type AddColumnEvent error: Column %s does not exist in table %s",
+                                            columnWithPosition.getExistedColumnName(),
+                                            event.tableId()));
                         }
                         columns.add(index, columnWithPosition.getAddColumn());
                         break;
@@ -159,8 +161,10 @@ public class SchemaUtils {
                         int index = columnNames.indexOf(columnWithPosition.getExistedColumnName());
                         if (index < 0) {
                             throw new IllegalArgumentException(
-                                    columnWithPosition.getExistedColumnName()
-                                            + " of AddColumnEvent is not existed");
+                                    String.format(
+                                            "AFTER type AddColumnEvent error: Column %s does not exist in table %s",
+                                            columnWithPosition.getExistedColumnName(),
+                                            event.tableId()));
                         }
                         columns.add(index + 1, columnWithPosition.getAddColumn());
                         break;
