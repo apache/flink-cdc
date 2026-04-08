@@ -336,7 +336,7 @@ public class SqlServerPipelineITCaseTest extends SqlServerTestBase {
         while (size > 0 && iter.hasNext()) {
             T event = iter.next();
             if (sideEvent.getClass().isInstance(event)) {
-                sideResults.add(sideEvent);
+                sideResults.add(event);
             } else {
                 result.add(event);
                 size--;

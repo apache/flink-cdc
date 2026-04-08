@@ -75,6 +75,14 @@ public class SqlServerMetadataAccessorITCase extends SqlServerTestBase {
     }
 
     @Test
+    public void testListSchemasUsesConfiguredDatabaseWhenNamespaceIsNull() {
+        String[] tables = new String[] {"dbo.full_types"};
+        SqlServerMetadataAccessor metadataAccessor = getMetadataAccessor(tables);
+
+        assertThat(metadataAccessor.listSchemas(null)).contains("dbo");
+    }
+
+    @Test
     public void testListTables() {
         String[] tables =
                 new String[] {

@@ -40,6 +40,7 @@ import java.util.stream.Collectors;
 import static org.apache.flink.cdc.connectors.sqlserver.source.SqlServerDataSourceOptions.HOSTNAME;
 import static org.apache.flink.cdc.connectors.sqlserver.source.SqlServerDataSourceOptions.PASSWORD;
 import static org.apache.flink.cdc.connectors.sqlserver.source.SqlServerDataSourceOptions.PORT;
+import static org.apache.flink.cdc.connectors.sqlserver.source.SqlServerDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN;
 import static org.apache.flink.cdc.connectors.sqlserver.source.SqlServerDataSourceOptions.SCAN_STARTUP_MODE;
 import static org.apache.flink.cdc.connectors.sqlserver.source.SqlServerDataSourceOptions.SCAN_STARTUP_TIMESTAMP_MILLIS;
 import static org.apache.flink.cdc.connectors.sqlserver.source.SqlServerDataSourceOptions.TABLES;
@@ -216,6 +217,26 @@ public class SqlServerDataSourceFactoryTest extends SqlServerTestBase {
     }
 
     @Test
+    public void testChunkKeyColumnOptionIsSupported() {
+        Map<String, String> options = new HashMap<>();
+        options.put(HOSTNAME.key(), MSSQL_SERVER_CONTAINER.getHost());
+        options.put(
+                PORT.key(),
+                String.valueOf(MSSQL_SERVER_CONTAINER.getMappedPort(MS_SQL_SERVER_PORT)));
+        options.put(USERNAME.key(), MSSQL_SERVER_CONTAINER.getUsername());
+        options.put(PASSWORD.key(), MSSQL_SERVER_CONTAINER.getPassword());
+        options.put(TABLES.key(), DATABASE_NAME + ".dbo.products");
+        options.put(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN.key(), "id");
+
+        Factory.Context context = new MockContext(Configuration.fromMap(options));
+        SqlServerDataSourceFactory factory = new SqlServerDataSourceFactory();
+
+        assertThat(factory.optionalOptions()).contains(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN);
+        SqlServerDataSource dataSource = (SqlServerDataSource) factory.createDataSource(context);
+        assertThat(dataSource.getSqlServerSourceConfig().getChunkKeyColumn()).isEqualTo("id");
+    }
+
+    @Test
     public void testStartupFromTimestamp() {
         Map<String, String> options = new HashMap<>();
         options.put(HOSTNAME.key(), MSSQL_SERVER_CONTAINER.getHost());
@@ -315,6 +336,29 @@ public class SqlServerDataSourceFactoryTest extends SqlServerTestBase {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining(
                         "The value of option `tables` is `db1.dbo.table1,db2.dbo.table2`, but not all table names have the same database name");
+    }
+
+    @Test
+    public void testTableValidationRequiresDatabaseSchemaTableFormat() {
+        Map<String, String> options = new HashMap<>();
+        options.put(HOSTNAME.key(), MSSQL_SERVER_CONTAINER.getHost());
+        options.put(
+                PORT.key(),
+                String.valueOf(MSSQL_SERVER_CONTAINER.getMappedPort(MS_SQL_SERVER_PORT)));
+        options.put(USERNAME.key(), MSSQL_SERVER_CONTAINER.getUsername());
+        options.put(PASSWORD.key(), MSSQL_SERVER_CONTAINER.getPassword());
+        options.put(TABLES.key(), DATABASE_NAME + ".dbo");
+
+        SqlServerDataSourceFactory factory = new SqlServerDataSourceFactory();
+        Factory.Context context = new MockContext(Configuration.fromMap(options));
+
+        assertThatThrownBy(() -> factory.createDataSource(context))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining(
+                        "Table '"
+                                + DATABASE_NAME
+                                + ".dbo' does not match the expected 'database.schema.table' format.")
+                .hasMessageContaining(TABLES.key());
     }
 
     static class MockContext implements Factory.Context {

@@ -160,7 +160,7 @@ public class SqlServerSchemaUtils {
     }
 
     public static String quote(String dbOrTableName) {
-        return "[" + dbOrTableName + "]";
+        return "[" + dbOrTableName.replace("]", "]]") + "]";
     }
 
     public static Schema getTableSchema(

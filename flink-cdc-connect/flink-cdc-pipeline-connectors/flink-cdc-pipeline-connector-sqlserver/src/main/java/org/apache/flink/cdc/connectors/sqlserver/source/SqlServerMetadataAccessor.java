@@ -23,6 +23,7 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.source.MetadataAccessor;
 import org.apache.flink.cdc.connectors.sqlserver.source.config.SqlServerSourceConfig;
 import org.apache.flink.cdc.connectors.sqlserver.utils.SqlServerSchemaUtils;
+import org.apache.flink.table.api.ValidationException;
 
 import javax.annotation.Nullable;
 
@@ -56,7 +57,22 @@ public class SqlServerMetadataAccessor implements MetadataAccessor {
      */
     @Override
     public List<String> listSchemas(@Nullable String namespace) {
-        return SqlServerSchemaUtils.listSchemas(sourceConfig, namespace);
+        return SqlServerSchemaUtils.listSchemas(sourceConfig, resolveNamespace(namespace));
+    }
+
+    private String resolveNamespace(@Nullable String namespace) {
+        if (namespace != null) {
+            return namespace;
+        }
+
+        List<String> configuredDatabases = sourceConfig.getDatabaseList();
+        if (configuredDatabases != null && !configuredDatabases.isEmpty()) {
+            return configuredDatabases.get(0);
+        }
+
+        throw new ValidationException(
+                "Namespace must not be null when listing SQL Server schemas and no database "
+                        + "is configured in the source configuration.");
     }
 
     /**

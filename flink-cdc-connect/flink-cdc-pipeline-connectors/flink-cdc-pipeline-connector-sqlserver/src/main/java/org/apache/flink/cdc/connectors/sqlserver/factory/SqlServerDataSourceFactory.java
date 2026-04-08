@@ -50,7 +50,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -77,8 +76,6 @@ import static org.apache.flink.cdc.connectors.sqlserver.source.SqlServerDataSour
 import static org.apache.flink.cdc.connectors.sqlserver.source.SqlServerDataSourceOptions.SCAN_STARTUP_TIMESTAMP_MILLIS;
 import static org.apache.flink.cdc.connectors.sqlserver.source.SqlServerDataSourceOptions.SCHEMA_CHANGE_ENABLED;
 import static org.apache.flink.cdc.connectors.sqlserver.source.SqlServerDataSourceOptions.SERVER_TIME_ZONE;
-import static org.apache.flink.cdc.connectors.sqlserver.source.SqlServerDataSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND;
-import static org.apache.flink.cdc.connectors.sqlserver.source.SqlServerDataSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND;
 import static org.apache.flink.cdc.connectors.sqlserver.source.SqlServerDataSourceOptions.TABLES;
 import static org.apache.flink.cdc.connectors.sqlserver.source.SqlServerDataSourceOptions.TABLES_EXCLUDE;
 import static org.apache.flink.cdc.connectors.sqlserver.source.SqlServerDataSourceOptions.USERNAME;
@@ -141,7 +138,7 @@ public class SqlServerDataSourceFactory implements DataSourceFactory {
 
         Map<String, String> configMap = config.toMap();
         mergeJdbcPropertiesIntoDebeziumProperties(configMap);
-        String databaseName = getValidateDatabaseName(tables).orElseThrow();
+        String databaseName = getValidateDatabaseName(tables);
 
         SqlServerSourceConfigFactory configFactory = new SqlServerSourceConfigFactory();
         configFactory
@@ -249,6 +246,7 @@ public class SqlServerDataSourceFactory implements DataSourceFactory {
         Set<ConfigOption<?>> options = new HashSet<>();
         options.add(PORT);
         options.add(TABLES_EXCLUDE);
+        options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE);
         options.add(SCAN_SNAPSHOT_FETCH_SIZE);
         options.add(SCHEMA_CHANGE_ENABLED);
@@ -341,7 +339,7 @@ public class SqlServerDataSourceFactory implements DataSourceFactory {
                 doubleCompare(distributionFactorUpper, 1.0d) >= 0,
                 String.format(
                         "The value of option '%s' must larger than or equals %s, but is %s",
-                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.key(),
+                        CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.key(),
                         1.0d,
                         distributionFactorUpper));
     }
@@ -353,7 +351,7 @@ public class SqlServerDataSourceFactory implements DataSourceFactory {
                         && doubleCompare(distributionFactorLower, 1.0d) <= 0,
                 String.format(
                         "The value of option '%s' must between %s and %s inclusively, but is %s",
-                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.key(),
+                        CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.key(),
                         0.0d,
                         1.0d,
                         distributionFactorLower));
@@ -365,41 +363,35 @@ public class SqlServerDataSourceFactory implements DataSourceFactory {
      * @param tables Table name list, format is "db.schema.table,db.schema.table,..." Each table
      *     name consists of three parts separated by ".", which are database name, schema name, and
      *     table name.
-     * @return Database name if found, otherwise returns Optional.empty()
      * @throws IllegalArgumentException If the input parameter is null or does not match the
      *     expected format, or if database names are inconsistent.
      */
-    private Optional<String> getValidateDatabaseName(String tables) {
-        // Input validation
+    private String getValidateDatabaseName(String tables) {
         if (tables == null || tables.trim().isEmpty()) {
             throw new IllegalArgumentException("Parameter tables cannot be null or empty");
         }
 
-        // Split table name list
         String[] tableNames = tables.split(",");
         String dbName = null;
 
         for (String tableName : tableNames) {
-            // Trim whitespace and split table name
             String trimmedTableName = tableName.trim();
-            if (!trimmedTableName.contains(".")) {
-                continue; // Skip table names that do not match the expected format
-            }
-
-            String[] tableNameParts =
-                    trimmedTableName.split(
-                            "(?<!\\\\)\\.", -1); // Use -1 to avoid ignoring trailing empty elements
+            String[] tableNameParts = trimmedTableName.split("(?<!\\\\)\\.", -1);
 
             checkState(
                     tableNameParts.length == 3,
                     String.format(
-                            "Tables format must db.schema.table, can not 'tables' = %s",
-                            TABLES.key()));
+                            "Table '%s' does not match the expected 'database.schema.table' "
+                                    + "format. Please check the value of option '%s'.",
+                            trimmedTableName, TABLES.key()));
             String currentDbName = tableNameParts[0];
 
             checkState(
                     isValidSqlServerDbName(currentDbName),
-                    String.format("%s is not a valid SQL Server database name", currentDbName));
+                    String.format(
+                            "Database name '%s' exceeds SQL Server's maximum identifier length "
+                                    + "of 128 characters.",
+                            currentDbName));
             if (dbName == null) {
                 dbName = currentDbName;
             } else {
@@ -411,20 +403,18 @@ public class SqlServerDataSourceFactory implements DataSourceFactory {
             }
         }
 
-        // If no valid table name is found, return Optional.empty()
-        return Optional.ofNullable(dbName);
+        if (dbName == null) {
+            throw new IllegalArgumentException(
+                    "Cannot determine database name from 'tables' option: "
+                            + tables
+                            + ". Expected format: database.schema.table");
+        }
+        return dbName;
     }
 
     /** Validate if the database name conforms to SQL Server naming conventions. */
     private boolean isValidSqlServerDbName(String dbName) {
-        // SQL Server database name conventions:
-        // 1. Length does not exceed 128 characters
-        // 2. Can contain letters, numbers, underscores, at sign, and dollar signs
-        // 3. Cannot start with a digit or special character (except underscore)
-        if (dbName == null || dbName.length() > 128) {
-            return false;
-        }
-        return dbName.matches("[a-zA-Z_@#][a-zA-Z0-9_@#$]*");
+        return !StringUtils.isNullOrWhitespaceOnly(dbName) && dbName.length() <= 128;
     }
 
     /** Replaces the default timezone placeholder with session timezone, if applicable. */

@@ -68,7 +68,7 @@ public class SqlServerSourceTestUtils {
             TimeUnit.MILLISECONDS.sleep(interval.toMillis());
         }
         throw new TimeoutException(
-                "Ran out of time when waiting for " + description + " to success.");
+                "Ran out of time when waiting for " + description + " to succeed.");
     }
 
     private SqlServerSourceTestUtils() {}

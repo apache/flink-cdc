@@ -458,7 +458,8 @@ public class SqlServerStreamingChangeEventSource
                     afterHandleLsn(partition, toLsn);
                 } catch (SQLException e) {
                     tablesSlot.set(
-                            processErrorFromChangeTableQuery(databaseName, e, tablesSlot.get()));
+                            processErrorFromChangeTableQuery(
+                                    databaseName, lastProcessedPosition, e, tablesSlot.get()));
                 }
             }
         } catch (Exception e) {
@@ -507,7 +508,10 @@ public class SqlServerStreamingChangeEventSource
     }
 
     private SqlServerChangeTable[] processErrorFromChangeTableQuery(
-            String databaseName, SQLException exception, SqlServerChangeTable[] currentChangeTables)
+            String databaseName,
+            TxLogPosition lastProcessedPosition,
+            SQLException exception,
+            SqlServerChangeTable[] currentChangeTables)
             throws Exception {
         final Matcher m = MISSING_CDC_FUNCTION_CHANGES_ERROR.matcher(exception.getMessage());
         if (m.matches() && m.group(1).equals(databaseName)) {
@@ -518,13 +522,40 @@ public class SqlServerStreamingChangeEventSource
                     .toArray(SqlServerChangeTable[]::new);
         }
         if (exception.getErrorCode() == INVALID_CDC_LSN_RANGE_ERROR_CODE) {
-            LOGGER.warn(
-                    "SQL Server rejected the CDC query window for database {}. Retrying with the current change table set. message={}",
+            throw buildInvalidCdcLsnRangeException(
                     databaseName,
-                    exception.getMessage());
-            return currentChangeTables;
+                    lastProcessedPosition,
+                    Arrays.stream(currentChangeTables)
+                            .map(SqlServerChangeTable::getCaptureInstance)
+                            .distinct()
+                            .collect(Collectors.toList()),
+                    exception);
         }
         throw exception;
+    }
+
+    static IllegalStateException buildInvalidCdcLsnRangeException(
+            String databaseName,
+            TxLogPosition lastProcessedPosition,
+            List<String> captureInstances,
+            SQLException exception) {
+        final String captureInstancesMessage =
+                captureInstances.isEmpty() ? "unknown" : String.join(", ", captureInstances);
+        return new IllegalStateException(
+                String.format(
+                        "SQL Server rejected the CDC query window for database '%s' at offset '%s' "
+                                + "(error %d). This usually means the CDC data for the current LSN "
+                                + "has already been purged and the saved offset is no longer valid. "
+                                + "Affected capture instances: [%s]. Please restart with a new "
+                                + "snapshot or manually advance the offset to the minimum available "
+                                + "LSN for the affected capture instance(s), for example with "
+                                + "sys.fn_cdc_get_min_lsn('<capture_instance>'). Original message: %s",
+                        databaseName,
+                        lastProcessedPosition,
+                        exception.getErrorCode(),
+                        captureInstancesMessage,
+                        exception.getMessage()),
+                exception);
     }
 
     private SqlServerChangeTable[] getChangeTablesToQuery(

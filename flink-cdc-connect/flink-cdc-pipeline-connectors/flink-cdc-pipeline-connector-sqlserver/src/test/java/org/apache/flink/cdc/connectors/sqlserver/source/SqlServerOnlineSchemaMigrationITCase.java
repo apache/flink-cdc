@@ -106,8 +106,6 @@ class SqlServerOnlineSchemaMigrationITCase extends SqlServerTestBase {
                                 new EventTypeInfo())
                         .executeAndCollect();
 
-        Thread.sleep(5_000);
-
         List<Event> expected = new ArrayList<>();
         Schema schemaV1 =
                 Schema.newBuilder()
@@ -123,9 +121,6 @@ class SqlServerOnlineSchemaMigrationITCase extends SqlServerTestBase {
         Assertions.assertThat(actual.stream().map(Object::toString))
                 .containsExactlyInAnyOrderElementsOf(
                         expected.stream().map(Object::toString).collect(Collectors.toList()));
-
-        // Wait for a little while until we're in streaming mode.
-        Thread.sleep(5_000);
 
         // ADD COLUMN
         try (Connection connection = getJdbcConnection();

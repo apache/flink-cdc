@@ -29,8 +29,8 @@ public class SqlServerSchemaDataTypeInference extends DebeziumSchemaDataTypeInfe
 
     private static final long serialVersionUID = 1L;
 
-    // SQL Server doesn't have special geometry types like PostgreSQL,
-    // so we can use the default implementation from the parent class.
-    // If there are SQL Server specific types that need special handling,
-    // they can be added here by overriding the inferStruct method.
+    // SQL Server has database-specific types, but no special handling is currently
+    // needed here, so this class uses the default implementation from the parent class.
+    // If SQL Server-specific types require special handling in the future,
+    // it can be added here by overriding the inferStruct method.
 }

@@ -322,9 +322,6 @@ class SqlServerPipelineNewlyAddedTableITCase extends SqlServerTestBase {
             initialAddressTables(testParam.getSecondRoundInitTables());
         }
 
-        // sleep 1s to wait for the assign status to INITIAL_ASSIGNING_FINISHED.
-        // Otherwise, the restart job won't read newly added tables, and this test will be stuck.
-        Thread.sleep(1000L);
         // step 4: trigger a savepoint and cancel the job
         finishedSavePointPath = triggerSavepointWithRetry(jobClient, savepointDirectory);
         jobClient.cancel().get();
@@ -461,7 +458,10 @@ class SqlServerPipelineNewlyAddedTableITCase extends SqlServerTestBase {
                 }
             }
         }
-        return null;
+        throw new AssertionError(
+                String.format(
+                        "Failed to trigger savepoint in directory '%s' after %d retries.",
+                        savepointDirectory, retryTimes));
     }
 
     private void initialAddressTables(List<String> addressTables) throws SQLException {
