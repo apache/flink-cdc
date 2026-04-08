@@ -20,14 +20,16 @@
 package org.apache.flink.cdc.connectors.elasticsearch.v2;
 
 import org.apache.flink.annotation.VisibleForTesting;
-import org.apache.flink.connector.base.sink.AsyncSinkBase;
+import org.apache.flink.api.connector.sink2.InitContextAdapter;
+import org.apache.flink.api.connector.sink2.SinkWriter;
+import org.apache.flink.api.connector.sink2.StatefulSinkWriterAdapter;
+import org.apache.flink.api.connector.sink2.WriterInitContext;
+import org.apache.flink.connector.base.sink.AsyncSinkBaseAdapter;
 import org.apache.flink.connector.base.sink.writer.BufferedRequestState;
 import org.apache.flink.connector.base.sink.writer.ElementConverter;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
+import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
 
@@ -38,8 +40,7 @@ import java.util.Collections;
  * @param <InputT> type of records that will be converted into {@link Operation}. See {@link
  *     Elasticsearch8AsyncSinkBuilder} on how to construct valid instances.
  */
-public class Elasticsearch8AsyncSink<InputT> extends AsyncSinkBase<InputT, Operation> {
-    private static final Logger LOG = LoggerFactory.getLogger(Elasticsearch8AsyncSink.class);
+public class Elasticsearch8AsyncSink<InputT> extends AsyncSinkBaseAdapter<InputT, Operation> {
 
     @VisibleForTesting protected final NetworkConfig networkConfig;
 
@@ -84,8 +85,7 @@ public class Elasticsearch8AsyncSink<InputT> extends AsyncSinkBase<InputT, Opera
      * @return a new instance of {@link Elasticsearch8AsyncWriter}.
      */
     @Override
-    public StatefulSinkWriter<InputT, BufferedRequestState<Operation>> createWriter(
-            InitContext context) {
+    public SinkWriter<InputT> createWriter(InitContext context) {
         return new Elasticsearch8AsyncWriter<>(
                 getElementConverter(),
                 context,
@@ -107,11 +107,12 @@ public class Elasticsearch8AsyncSink<InputT> extends AsyncSinkBase<InputT, Opera
      * @return a restored instance of {@link Elasticsearch8AsyncWriter}.
      */
     @Override
-    public StatefulSinkWriter<InputT, BufferedRequestState<Operation>> restoreWriter(
-            InitContext context, Collection<BufferedRequestState<Operation>> recoveredState) {
+    public StatefulSinkWriterAdapter<InputT, BufferedRequestState<Operation>> restoreWriterAdapter(
+            WriterInitContext context, Collection<BufferedRequestState<Operation>> recoveredState)
+            throws IOException {
         return new Elasticsearch8AsyncWriter<>(
                 getElementConverter(),
-                context,
+                new InitContextAdapter(context),
                 getMaxBatchSize(),
                 getMaxInFlightRequests(),
                 getMaxBufferedRequests(),
