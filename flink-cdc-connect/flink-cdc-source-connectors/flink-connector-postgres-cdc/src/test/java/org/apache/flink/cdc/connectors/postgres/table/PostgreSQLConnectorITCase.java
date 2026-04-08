@@ -1165,6 +1165,7 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
     void testNoPKTableWithChunkKey() throws SQLException, ExecutionException, InterruptedException {
         setup(true);
         initializePostgresTable(POSTGRES_CONTAINER, "inventory");
+        initializePostgresTable(POSTGRES_CONTAINER, "inventory_no_pk");
         String sourceDDL =
                 String.format(
                         "CREATE TABLE no_pk_source ("
@@ -1256,6 +1257,7 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
             throws SQLException, ExecutionException, InterruptedException {
         setup(true);
         initializePostgresTable(POSTGRES_CONTAINER, "inventory");
+        initializePostgresTable(POSTGRES_CONTAINER, "inventory_no_pk");
         String sourceDDL =
                 String.format(
                         "CREATE TABLE no_pk_source_fail ("
