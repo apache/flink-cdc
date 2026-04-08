@@ -24,6 +24,7 @@ import org.apache.flink.cdc.debezium.utils.ResolvedSchemaUtils;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.Schema;
+import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.CatalogTableAdapter;
 import org.apache.flink.table.catalog.Column;
 import org.apache.flink.table.catalog.ObjectIdentifier;
@@ -249,6 +250,54 @@ class SqlServerTableFactoryTest {
                 Arrays.asList("op_ts", "database_name", "schema_name", "table_name");
 
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
+    }
+
+    @Test
+    void testStartupFromTimestamp() {
+        Map<String, String> properties = getAllOptions();
+        properties.put("scan.startup.mode", "timestamp");
+        properties.put("scan.startup.timestamp-millis", "1667232000000");
+
+        DynamicTableSource actualSource = createTableSource(SCHEMA, properties);
+        SqlServerTableSource expectedSource =
+                new SqlServerTableSource(
+                        SCHEMA,
+                        1433,
+                        MY_LOCALHOST,
+                        MY_DATABASE,
+                        MY_TABLE,
+                        ZoneId.of("UTC"),
+                        MY_USERNAME,
+                        MY_PASSWORD,
+                        PROPERTIES,
+                        StartupOptions.timestamp(1667232000000L),
+                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED.defaultValue(),
+                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
+                        SourceOptions.CHUNK_META_GROUP_SIZE.defaultValue(),
+                        SourceOptions.SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
+                        JdbcSourceOptions.CONNECT_TIMEOUT.defaultValue(),
+                        JdbcSourceOptions.CONNECT_MAX_RETRIES.defaultValue(),
+                        JdbcSourceOptions.CONNECTION_POOL_SIZE.defaultValue(),
+                        JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND
+                                .defaultValue(),
+                        JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND
+                                .defaultValue(),
+                        null,
+                        false,
+                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
+                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED
+                                .defaultValue());
+        Assertions.assertThat(actualSource).isEqualTo(expectedSource);
+    }
+
+    @Test
+    void testTimestampStartupRequiresTimestampMillis() {
+        Map<String, String> properties = getAllOptions();
+        properties.put("scan.startup.mode", "timestamp");
+
+        Assertions.assertThatThrownBy(() -> createTableSource(SCHEMA, properties))
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining("scan.startup.timestamp-millis");
     }
 
     private Map<String, String> getAllOptions() {

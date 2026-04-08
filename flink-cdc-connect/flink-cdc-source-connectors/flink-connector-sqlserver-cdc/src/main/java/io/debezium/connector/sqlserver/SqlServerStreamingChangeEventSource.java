@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Queue;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
@@ -62,6 +63,12 @@ import java.util.stream.Collectors;
 public class SqlServerStreamingChangeEventSource
         implements StreamingChangeEventSource<SqlServerPartition, SqlServerOffsetContext> {
 
+    /**
+     * SQL Server Msg 313 is misleading for CDC table-valued functions. In this path it usually
+     * means the requested LSN interval fell behind the cleanup window.
+     */
+    private static final int INVALID_CDC_LSN_RANGE_ERROR_CODE = 313;
+
     private static final Pattern MISSING_CDC_FUNCTION_CHANGES_ERROR =
             Pattern.compile("Invalid object name '(.*)\\.cdc.fn_cdc_get_all_changes_(.*)'\\.");
 
@@ -93,6 +100,8 @@ public class SqlServerStreamingChangeEventSource
     private final ElapsedTimeStrategy pauseBetweenCommits;
     private final Map<SqlServerPartition, SqlServerStreamingExecutionContext>
             streamingExecutionContexts;
+
+    private final Map<String, Lsn> minimumLsnByCaptureInstance = new ConcurrentHashMap<>();
 
     public SqlServerStreamingChangeEventSource(
             SqlServerConnectorConfig connectorConfig,
@@ -500,6 +509,31 @@ public class SqlServerStreamingChangeEventSource
         newTable.setSourceTable(tableSchema);
     }
 
+    /**
+     * Refreshes the current CDC minimum LSN cache for the supplied capture instances. SQL Server
+     * may advance the cleanup window while the connector is stopped, causing a previously valid
+     * checkpoint to become unreadable.
+     */
+    public void refreshMinLsnCache(String databaseName, SqlServerChangeTable[] changeTables)
+            throws SQLException {
+        if (changeTables == null) {
+            return;
+        }
+        for (SqlServerChangeTable changeTable : changeTables) {
+            final Lsn minLsn =
+                    dataConnection.getMinLsn(databaseName, changeTable.getCaptureInstance());
+            if (minLsn.isAvailable()) {
+                minimumLsnByCaptureInstance.put(changeTable.getCaptureInstance(), minLsn);
+                LOGGER.info(
+                        "Refreshed minimum LSN {} for capture instance {}",
+                        minLsn,
+                        changeTable.getCaptureInstance());
+            } else {
+                minimumLsnByCaptureInstance.remove(changeTable.getCaptureInstance());
+            }
+        }
+    }
+
     private SqlServerChangeTable[] processErrorFromChangeTableQuery(
             String databaseName, SQLException exception, SqlServerChangeTable[] currentChangeTables)
             throws Exception {
@@ -510,6 +544,14 @@ public class SqlServerStreamingChangeEventSource
             return Arrays.stream(currentChangeTables)
                     .filter(x -> !x.getCaptureInstance().equals(captureName))
                     .toArray(SqlServerChangeTable[]::new);
+        }
+        if (exception.getErrorCode() == INVALID_CDC_LSN_RANGE_ERROR_CODE) {
+            LOGGER.warn(
+                    "SQL Server rejected the CDC query window for database {}. Refreshing the current minimum LSN cache before retrying. message={}",
+                    databaseName,
+                    exception.getMessage());
+            refreshMinLsnCache(databaseName, currentChangeTables);
+            return currentChangeTables;
         }
         throw exception;
     }
