@@ -1162,8 +1162,7 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
     }
 
     @Test
-    void testNoPKTableWithChunkKey()
-            throws SQLException, ExecutionException, InterruptedException {
+    void testNoPKTableWithChunkKey() throws SQLException, ExecutionException, InterruptedException {
         setup(true);
         initializePostgresTable(POSTGRES_CONTAINER, "inventory");
         String sourceDDL =
@@ -1291,15 +1290,16 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
         TableResult result = tEnv.executeSql("SELECT * FROM no_pk_source_fail");
 
         Assertions.assertThatThrownBy(result::await)
-                .hasStackTraceContaining(
-                        "scan.incremental.snapshot.chunk.key-column");
+                .hasStackTraceContaining("scan.incremental.snapshot.chunk.key-column");
 
-        result.getJobClient().ifPresent(client -> {
-            try {
-                client.cancel().get();
-            } catch (Exception e) {
-                // ignore
-            }
-        });
+        result.getJobClient()
+                .ifPresent(
+                        client -> {
+                            try {
+                                client.cancel().get();
+                            } catch (Exception e) {
+                                // ignore
+                            }
+                        });
     }
 }
