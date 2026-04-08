@@ -1160,4 +1160,146 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
         tableResult.getJobClient().get().cancel().get();
         RowUtils.USE_LEGACY_TO_STRING = true;
     }
+
+    @Test
+    void testNoPKTableWithChunkKey()
+            throws SQLException, ExecutionException, InterruptedException {
+        setup(true);
+        initializePostgresTable(POSTGRES_CONTAINER, "inventory");
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE no_pk_source ("
+                                + " id INT NOT NULL,"
+                                + " name STRING,"
+                                + " description STRING,"
+                                + " weight DECIMAL(10,3)"
+                                + ") WITH ("
+                                + " 'connector' = 'postgres-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'schema-name' = '%s',"
+                                + " 'table-name' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = 'true',"
+                                + " 'scan.incremental.snapshot.chunk.key-column' = 'id',"
+                                + " 'scan.incremental.snapshot.chunk.size' = '4',"
+                                + " 'decoding.plugin.name' = 'pgoutput', "
+                                + " 'slot.name' = '%s'"
+                                + ")",
+                        POSTGRES_CONTAINER.getHost(),
+                        POSTGRES_CONTAINER.getMappedPort(POSTGRESQL_PORT),
+                        POSTGRES_CONTAINER.getUsername(),
+                        POSTGRES_CONTAINER.getPassword(),
+                        POSTGRES_CONTAINER.getDatabaseName(),
+                        "inventory",
+                        "products_no_pk",
+                        getSlotName());
+        String sinkDDL =
+                "CREATE TABLE sink ("
+                        + " name STRING,"
+                        + " weightSum DECIMAL(10,3),"
+                        + " PRIMARY KEY (name) NOT ENFORCED"
+                        + ") WITH ("
+                        + " 'connector' = 'values',"
+                        + " 'sink-insert-only' = 'false'"
+                        + ")";
+        tEnv.executeSql(sourceDDL);
+        tEnv.executeSql(sinkDDL);
+
+        // async submit job
+        TableResult result =
+                tEnv.executeSql(
+                        "INSERT INTO sink SELECT name, SUM(weight) FROM no_pk_source GROUP BY name");
+
+        waitForSnapshotStarted("sink");
+
+        // wait a bit to make sure the replication slot is ready
+        Thread.sleep(5000);
+
+        // generate WAL
+        try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "UPDATE inventory.products_no_pk SET description='18oz carpenter hammer' WHERE id=106;");
+            statement.execute("UPDATE inventory.products_no_pk SET weight='5.1' WHERE id=107;");
+            statement.execute(
+                    "INSERT INTO inventory.products_no_pk VALUES (110,'jacket','water resistent white wind breaker',0.2);");
+            statement.execute(
+                    "INSERT INTO inventory.products_no_pk VALUES (111,'scooter','Big 2-wheel scooter',5.18);");
+            statement.execute(
+                    "UPDATE inventory.products_no_pk SET description='new water resistent white wind breaker', weight='0.5' WHERE id=110;");
+            statement.execute("UPDATE inventory.products_no_pk SET weight='5.17' WHERE id=111;");
+            statement.execute("DELETE FROM inventory.products_no_pk WHERE id=111;");
+        }
+
+        String[] expected =
+                new String[] {
+                    "scooter,3.140",
+                    "car battery,8.100",
+                    "12-pack drill bits,0.800",
+                    "hammer,2.625",
+                    "rocks,5.100",
+                    "jacket,0.600",
+                    "spare tire,22.200"
+                };
+        waitForSinkResult("sink", Arrays.asList(expected));
+
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
+        Assertions.assertThat(actual).containsExactlyInAnyOrder(expected);
+
+        result.getJobClient().get().cancel().get();
+    }
+
+    @Test
+    void testNoPKTableWithoutChunkKey()
+            throws SQLException, ExecutionException, InterruptedException {
+        setup(true);
+        initializePostgresTable(POSTGRES_CONTAINER, "inventory");
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE no_pk_source_fail ("
+                                + " id INT NOT NULL,"
+                                + " name STRING,"
+                                + " description STRING,"
+                                + " weight DECIMAL(10,3)"
+                                + ") WITH ("
+                                + " 'connector' = 'postgres-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'schema-name' = '%s',"
+                                + " 'table-name' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = 'true',"
+                                + " 'decoding.plugin.name' = 'pgoutput', "
+                                + " 'slot.name' = '%s'"
+                                + ")",
+                        POSTGRES_CONTAINER.getHost(),
+                        POSTGRES_CONTAINER.getMappedPort(POSTGRESQL_PORT),
+                        POSTGRES_CONTAINER.getUsername(),
+                        POSTGRES_CONTAINER.getPassword(),
+                        POSTGRES_CONTAINER.getDatabaseName(),
+                        "inventory",
+                        "products_no_pk",
+                        getSlotName());
+        tEnv.executeSql(sourceDDL);
+
+        // async submit job
+        TableResult result = tEnv.executeSql("SELECT * FROM no_pk_source_fail");
+
+        Assertions.assertThatThrownBy(result::await)
+                .hasStackTraceContaining(
+                        "scan.incremental.snapshot.chunk.key-column");
+
+        result.getJobClient().ifPresent(client -> {
+            try {
+                client.cancel().get();
+            } catch (Exception e) {
+                // ignore
+            }
+        });
+    }
 }

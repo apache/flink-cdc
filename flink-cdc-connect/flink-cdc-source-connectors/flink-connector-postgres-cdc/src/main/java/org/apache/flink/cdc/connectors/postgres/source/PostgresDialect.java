@@ -44,10 +44,13 @@ import io.debezium.connector.postgresql.connection.PostgresConnection;
 import io.debezium.connector.postgresql.connection.PostgresConnectionUtils;
 import io.debezium.connector.postgresql.connection.PostgresReplicationConnection;
 import io.debezium.jdbc.JdbcConnection;
+import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
 import io.debezium.relational.history.TableChanges.TableChange;
 import io.debezium.schema.TopicSelector;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 
@@ -64,6 +67,7 @@ import static io.debezium.connector.postgresql.Utils.currentOffset;
 /** The dialect for Postgres. */
 public class PostgresDialect implements JdbcDataSourceDialect {
     private static final long serialVersionUID = 1L;
+    private static final Logger LOG = LoggerFactory.getLogger(PostgresDialect.class);
     private static final String CONNECTION_NAME = "postgres-cdc-connector";
 
     private final PostgresSourceConfig sourceConfig;
@@ -196,11 +200,62 @@ public class PostgresDialect implements JdbcDataSourceDialect {
         try (JdbcConnection jdbc = openJdbcConnection(sourceConfig)) {
             // fetch table schemas
             Map<TableId, TableChange> tableSchemas = queryTableSchema(jdbc, capturedTableIds);
+            // validate REPLICA IDENTITY for tables without primary key
+            validateReplicaIdentityForNoPkTables(jdbc, tableSchemas);
             return tableSchemas;
         } catch (Exception e) {
             throw new FlinkRuntimeException(
                     "Error to discover table schemas: " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * Validates that tables without primary key have REPLICA IDENTITY FULL set. This is required
+     * for PostgreSQL to include the full before image in WAL for UPDATE and DELETE events.
+     */
+    private void validateReplicaIdentityForNoPkTables(
+            JdbcConnection jdbc, Map<TableId, TableChange> tableSchemas) throws SQLException {
+        for (Map.Entry<TableId, TableChange> entry : tableSchemas.entrySet()) {
+            TableId tableId = entry.getKey();
+            Table table = entry.getValue().getTable();
+            if (table.primaryKeyColumnNames().isEmpty()) {
+                String replicaIdentity = queryReplicaIdentity(jdbc, tableId);
+                if (!"f".equalsIgnoreCase(replicaIdentity)) {
+                    throw new FlinkRuntimeException(
+                            String.format(
+                                    "Table '%s.%s' has no primary key. "
+                                            + "To use incremental snapshot for tables without primary key, "
+                                            + "REPLICA IDENTITY FULL must be set. "
+                                            + "Please execute: ALTER TABLE %s.%s REPLICA IDENTITY FULL",
+                                    tableId.schema(),
+                                    tableId.table(),
+                                    tableId.schema(),
+                                    tableId.table()));
+                }
+                LOG.info(
+                        "Table '{}.{}' has no primary key but has REPLICA IDENTITY FULL set.",
+                        tableId.schema(),
+                        tableId.table());
+            }
+        }
+    }
+
+    private String queryReplicaIdentity(JdbcConnection jdbc, TableId tableId) throws SQLException {
+        String query =
+                String.format(
+                        "SELECT relreplident FROM pg_class c "
+                                + "JOIN pg_namespace n ON c.relnamespace = n.oid "
+                                + "WHERE n.nspname = '%s' AND c.relname = '%s'",
+                        tableId.schema(), tableId.table());
+        final String[] result = new String[1];
+        jdbc.query(
+                query,
+                rs -> {
+                    if (rs.next()) {
+                        result[0] = rs.getString(1);
+                    }
+                });
+        return result[0];
     }
 
     @Override
