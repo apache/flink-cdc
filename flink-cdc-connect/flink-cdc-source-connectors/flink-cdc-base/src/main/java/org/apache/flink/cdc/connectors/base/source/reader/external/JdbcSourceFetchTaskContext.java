@@ -105,8 +105,7 @@ public abstract class JdbcSourceFetchTaskContext implements FetchTask.Context {
                 case CREATE:
                     if (hasPrimaryKey) {
                         outputBuffer.put(
-                                (Struct) changeRecord.key(),
-                                buildReadRecord(changeRecord));
+                                (Struct) changeRecord.key(), buildReadRecord(changeRecord));
                     } else {
                         Struct after = value.getStruct(Envelope.FieldName.AFTER);
                         outputBuffer.put(after, buildReadRecord(changeRecord));
@@ -115,8 +114,7 @@ public abstract class JdbcSourceFetchTaskContext implements FetchTask.Context {
                 case UPDATE:
                     if (hasPrimaryKey) {
                         outputBuffer.put(
-                                (Struct) changeRecord.key(),
-                                buildReadRecord(changeRecord));
+                                (Struct) changeRecord.key(), buildReadRecord(changeRecord));
                     } else {
                         // For no-PK table: remove the before image, insert the after image
                         Struct before = value.getStruct(Envelope.FieldName.BEFORE);
