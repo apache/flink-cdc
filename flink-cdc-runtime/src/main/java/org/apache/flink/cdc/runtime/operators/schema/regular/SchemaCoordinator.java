@@ -23,6 +23,7 @@ import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
 import org.apache.flink.cdc.common.exceptions.UnsupportedSchemaChangeEventException;
+import org.apache.flink.cdc.common.pipeline.RouteMode;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.schema.Schema;
@@ -100,6 +101,7 @@ public class SchemaCoordinator extends SchemaRegistry {
             ExecutorService coordinatorExecutor,
             MetadataApplier metadataApplier,
             List<RouteRule> routes,
+            RouteMode routeMode,
             SchemaChangeBehavior schemaChangeBehavior,
             Duration rpcTimeout) {
         super(
@@ -108,6 +110,7 @@ public class SchemaCoordinator extends SchemaRegistry {
                 coordinatorExecutor,
                 metadataApplier,
                 routes,
+                routeMode,
                 schemaChangeBehavior,
                 rpcTimeout);
         this.schemaChangeThreadPool = Executors.newSingleThreadExecutor();

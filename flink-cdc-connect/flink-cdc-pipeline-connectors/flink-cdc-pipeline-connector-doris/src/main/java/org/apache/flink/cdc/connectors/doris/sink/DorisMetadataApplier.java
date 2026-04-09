@@ -21,6 +21,7 @@ import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
+import org.apache.flink.cdc.common.event.AlterTableCommentEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.DropTableEvent;
@@ -45,6 +46,7 @@ import org.apache.flink.util.CollectionUtil;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.Sets;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.doris.flink.catalog.DorisTypeMapper;
 import org.apache.doris.flink.catalog.doris.DataModel;
 import org.apache.doris.flink.catalog.doris.FieldSchema;
@@ -110,36 +112,16 @@ public class DorisMetadataApplier implements MetadataApplier {
 
     @Override
     public void applySchemaChange(SchemaChangeEvent event) {
-        SchemaChangeEventVisitor.<Void, SchemaEvolveException>visit(
+        SchemaChangeEventVisitor.voidVisit(
                 event,
-                addColumnEvent -> {
-                    applyAddColumnEvent(addColumnEvent);
-                    return null;
-                },
-                alterColumnTypeEvent -> {
-                    applyAlterColumnTypeEvent(alterColumnTypeEvent);
-                    return null;
-                },
-                createTableEvent -> {
-                    applyCreateTableEvent(createTableEvent);
-                    return null;
-                },
-                dropColumnEvent -> {
-                    applyDropColumnEvent(dropColumnEvent);
-                    return null;
-                },
-                dropTableEvent -> {
-                    applyDropTableEvent(dropTableEvent);
-                    return null;
-                },
-                renameColumnEvent -> {
-                    applyRenameColumnEvent(renameColumnEvent);
-                    return null;
-                },
-                truncateTableEvent -> {
-                    applyTruncateTableEvent(truncateTableEvent);
-                    return null;
-                });
+                this::applyAddColumnEvent,
+                this::applyAlterColumnTypeEvent,
+                this::applyCreateTableEvent,
+                this::applyDropColumnEvent,
+                this::applyDropTableEvent,
+                this::applyRenameColumnEvent,
+                this::applyTruncateTableEvent,
+                this::applyAlterTableCommentEvent);
     }
 
     private void applyCreateTableEvent(CreateTableEvent event) throws SchemaEvolveException {
@@ -149,16 +131,14 @@ public class DorisMetadataApplier implements MetadataApplier {
             TableSchema tableSchema = new TableSchema();
             tableSchema.setTable(tableId.getTableName());
             tableSchema.setDatabase(tableId.getSchemaName());
+            tableSchema.setModel(
+                    CollectionUtils.isEmpty(schema.primaryKeys())
+                            ? DataModel.DUPLICATE
+                            : DataModel.UNIQUE);
             tableSchema.setFields(buildFields(schema));
+            tableSchema.setKeys(buildKeys(schema));
             tableSchema.setDistributeKeys(buildDistributeKeys(schema));
             tableSchema.setTableComment(schema.comment());
-
-            if (CollectionUtil.isNullOrEmpty(schema.primaryKeys())) {
-                tableSchema.setModel(DataModel.DUPLICATE);
-            } else {
-                tableSchema.setKeys(schema.primaryKeys());
-                tableSchema.setModel(DataModel.UNIQUE);
-            }
 
             Map<String, String> tableProperties =
                     DorisDataSinkOptions.getPropertiesByPrefix(
@@ -205,6 +185,10 @@ public class DorisMetadataApplier implements MetadataApplier {
                             column.getComment()));
         }
         return fieldSchemaMap;
+    }
+
+    private List<String> buildKeys(Schema schema) {
+        return buildDistributeKeys(schema);
     }
 
     private List<String> buildDistributeKeys(Schema schema) {
@@ -283,6 +267,7 @@ public class DorisMetadataApplier implements MetadataApplier {
         try {
             TableId tableId = event.tableId();
             Map<String, DataType> typeMapping = event.getTypeMapping();
+            Map<String, String> comments = event.getComments();
 
             for (Map.Entry<String, DataType> entry : typeMapping.entrySet()) {
                 schemaChangeManager.modifyColumnDataType(
@@ -291,9 +276,7 @@ public class DorisMetadataApplier implements MetadataApplier {
                         new FieldSchema(
                                 entry.getKey(),
                                 buildTypeString(entry.getValue()),
-                                null)); // Currently, AlterColumnTypeEvent carries no comment info.
-                // This
-                // will be fixed after FLINK-35243 got merged.
+                                comments.get(entry.getKey())));
             }
         } catch (Exception e) {
             throw new SchemaEvolveException(event, "fail to apply alter column type event", e);
@@ -328,11 +311,25 @@ public class DorisMetadataApplier implements MetadataApplier {
                 || dataType instanceof TimestampType
                 || dataType instanceof ZonedTimestampType) {
 
-            if (DorisSchemaUtils.INVALID_OR_MISSING_DATATIME.equals(defaultValue)) {
+            if (defaultValue.startsWith(DorisSchemaUtils.INVALID_OR_MISSING_DATATIME)) {
                 return DorisSchemaUtils.DEFAULT_DATETIME;
             }
         }
 
         return defaultValue;
+    }
+
+    private void applyAlterTableCommentEvent(AlterTableCommentEvent alterTableCommentEvent)
+            throws SchemaEvolveException {
+        TableId tableId = alterTableCommentEvent.tableId();
+        try {
+            schemaChangeManager.alterTableComment(
+                    tableId.getSchemaName(),
+                    tableId.getTableName(),
+                    alterTableCommentEvent.getComment());
+        } catch (Exception e) {
+            throw new SchemaEvolveException(
+                    alterTableCommentEvent, "fail to alter table comment", e);
+        }
     }
 }

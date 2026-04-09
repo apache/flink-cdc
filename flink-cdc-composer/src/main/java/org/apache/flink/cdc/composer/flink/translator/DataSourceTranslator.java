@@ -97,7 +97,8 @@ public class DataSourceTranslator {
                 new FactoryHelper.DefaultContext(
                         sourceDef.getConfig(),
                         pipelineConfig,
-                        Thread.currentThread().getContextClassLoader());
+                        Thread.currentThread().getContextClassLoader(),
+                        env.getConfiguration());
         return sourceFactory.createDataSource(context);
     }
 

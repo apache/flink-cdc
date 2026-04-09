@@ -64,11 +64,11 @@ FLINK_CDC_LOG="$FLINK_CDC_HOME"/log
 # Build Java classpath
 CLASSPATH=""
 # Add Flink libraries to the classpath
-for jar in "$FLINK_HOME"/lib/*.jar; do
+for jar in $(find "$FLINK_HOME"/lib -name "*.jar" -type f); do
   CLASSPATH=$CLASSPATH:$jar
 done
 # Add Flink CDC libraries to classpath
-for jar in "$FLINK_CDC_LIB"/*.jar; do
+for jar in $(find "$FLINK_CDC_LIB" -name "*.jar" -type f); do
   CLASSPATH=$CLASSPATH:$jar
 done
 # Add Hadoop classpath, which is defined in config.sh

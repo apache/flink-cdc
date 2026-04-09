@@ -22,8 +22,10 @@ import org.apache.flink.cdc.common.types.DataType
 import org.apache.flink.cdc.common.types.DataTypes
 import org.apache.flink.cdc.common.udf.UserDefinedFunction
 
+import java.time.Instant
+
 /** This is an example UDF class for testing purposes only. */
 class LocalZonedTimestampTypeReturningClass extends UserDefinedFunction {
   override def getReturnType: DataType = DataTypes.TIMESTAMP_LTZ(2)
-  def eval: LocalZonedTimestampData = LocalZonedTimestampData.fromEpochMillis(24 * 60 * 60 * 1000)
+  def eval: Instant = LocalZonedTimestampData.fromEpochMillis(24 * 60 * 60 * 1000).toInstant
 }

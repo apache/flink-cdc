@@ -39,6 +39,9 @@ public class IcebergDataSink implements DataSink, Serializable {
     // options for creating Iceberg table.
     private final Map<String, String> tableOptions;
 
+    // options for Hadoop configuration.
+    private final Map<String, String> hadoopConfOptions;
+
     private final Map<TableId, List<String>> partitionMaps;
 
     private final ZoneId zoneId;
@@ -47,30 +50,47 @@ public class IcebergDataSink implements DataSink, Serializable {
 
     public final CompactionOptions compactionOptions;
 
+    public final String jobIdPrefix;
+
     public IcebergDataSink(
             Map<String, String> catalogOptions,
             Map<String, String> tableOptions,
             Map<TableId, List<String>> partitionMaps,
             ZoneId zoneId,
             String schemaOperatorUid,
-            CompactionOptions compactionOptions) {
+            CompactionOptions compactionOptions,
+            String jobIdPrefix,
+            Map<String, String> hadoopConfOptions) {
         this.catalogOptions = catalogOptions;
         this.tableOptions = tableOptions;
         this.partitionMaps = partitionMaps;
         this.zoneId = zoneId;
         this.schemaOperatorUid = schemaOperatorUid;
         this.compactionOptions = compactionOptions;
+        this.jobIdPrefix = jobIdPrefix;
+        this.hadoopConfOptions = hadoopConfOptions;
     }
 
     @Override
     public EventSinkProvider getEventSinkProvider() {
         IcebergSink icebergEventSink =
-                new IcebergSink(catalogOptions, tableOptions, zoneId, compactionOptions);
+                new IcebergSink(
+                        catalogOptions,
+                        tableOptions,
+                        zoneId,
+                        compactionOptions,
+                        jobIdPrefix,
+                        hadoopConfOptions);
         return FlinkSinkProvider.of(icebergEventSink);
     }
 
     @Override
     public MetadataApplier getMetadataApplier() {
-        return new IcebergMetadataApplier(catalogOptions, tableOptions, partitionMaps);
+        return new IcebergMetadataApplier(
+                catalogOptions, tableOptions, partitionMaps, hadoopConfOptions);
+    }
+
+    public Map<String, String> getHadoopConfOptions() {
+        return hadoopConfOptions;
     }
 }

@@ -41,6 +41,8 @@ How to create Pipeline
 
 The pipeline for reading data from MySQL and sink to Iceberg can be defined as follows:
 
+### Hadoop Catalog Example
+
 ```yaml
 source:
   type: mysql
@@ -62,6 +64,70 @@ pipeline:
   name: MySQL to Iceberg Pipeline
   parallelism: 2
 ```
+
+### AWS Glue Catalog Example
+
+```yaml
+source:
+  type: mysql
+  name: MySQL Source
+  hostname: 127.0.0.1
+  port: 3306
+  username: admin
+  password: pass
+  tables: adb.\.*, bdb.user_table_[0-9]+, [app|web].order_\.*
+  server-id: 5401-5404
+
+sink:
+  type: iceberg
+  name: Iceberg Sink
+  catalog.properties.type: glue
+  catalog.properties.warehouse: s3://my-bucket/warehouse
+  catalog.properties.io-impl: org.apache.iceberg.aws.s3.S3FileIO
+  catalog.properties.client.region: us-east-1
+  catalog.properties.glue.skip-archive: true
+
+pipeline:
+  name: MySQL to Iceberg via Glue Pipeline
+  parallelism: 2
+```
+
+***Note:***
+Depending on the catalog type, you may need to add extra JARs manually and pass them with the `--jar` argument of Flink CDC CLI when submitting YAML pipeline jobs.
+
+<div class="wy-table-responsive">
+<table class="colwidths-auto docutils">
+    <thead>
+      <tr>
+        <th class="text-left">Catalog Type</th>
+        <th class="text-left">Dependency Item</th>
+        <th class="text-left">Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>all</td>
+        <td><a href="https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-flink-runtime-1.20">org.apache.iceberg:iceberg-flink-runtime-1.20</a></td>
+        <td>Iceberg Flink runtime. Required for all catalog types when not pre-installed in the runtime environment (e.g., standalone Flink clusters).</td>
+      </tr>
+      <tr>
+        <td>hadoop</td>
+        <td><a href="https://mvnrepository.com/artifact/org.apache.flink/flink-shaded-hadoop-2-uber/2.8.3-10.0">org.apache.flink:flink-shaded-hadoop-2-uber:2.8.3-10.0</a></td>
+        <td>Provides Hadoop filesystem dependencies.</td>
+      </tr>
+      <tr>
+        <td>glue</td>
+        <td><a href="https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-aws">org.apache.iceberg:iceberg-aws</a></td>
+        <td>Provides AWS Glue Catalog and S3 FileIO implementation.</td>
+      </tr>
+      <tr>
+        <td>glue</td>
+        <td><a href="https://mvnrepository.com/artifact/software.amazon.awssdk/bundle">software.amazon.awssdk:bundle</a></td>
+        <td>AWS SDK bundle required by iceberg-aws.</td>
+      </tr>
+    </tbody>
+</table>
+</div>
 
 Pipeline Connector Options
 ----------------
@@ -93,31 +159,73 @@ Pipeline Connector Options
     </tr>
     <tr>
       <td>catalog.properties.type</td>
-      <td>required</td>
+      <td>conditionally required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Metastore of Iceberg catalog, supports <code>hadoop</code> and <code>hive</code>.</td>
+      <td>Metastore type of Iceberg catalog, supports <code>hadoop</code>, <code>hive</code>, and <code>glue</code>. Either this option or <code>catalog.properties.catalog-impl</code> must be set.</td>
+    </tr>
+    <tr>
+      <td>catalog.properties.catalog-impl</td>
+      <td>conditionally required</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>Custom catalog implementation class, e.g. <code>org.apache.iceberg.aws.glue.GlueCatalog</code>. Either this option or <code>catalog.properties.type</code> must be set.</td>
     </tr>
     <tr>
       <td>catalog.properties.warehouse</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>The warehouse root path of catalog.</td>
+      <td>The warehouse root path of the Iceberg catalog, used by all catalog types. For <code>hadoop</code> and <code>hive</code> catalogs, this is typically a local or distributed filesystem path. For <code>glue</code> catalog, this is typically an object storage path like <code>s3://my-bucket/warehouse</code>.</td>
     </tr>
     <tr>
       <td>catalog.properties.uri</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Uri of metastore server.</td>
+      <td>URI of the metastore server (e.g. Hive Metastore thrift URI).</td>
+    </tr>
+    <tr>
+      <td>catalog.properties.io-impl</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>Custom FileIO implementation class. For AWS S3, use <code>org.apache.iceberg.aws.s3.S3FileIO</code>.</td>
+    </tr>
+    <tr>
+      <td>catalog.properties.client.region</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>The AWS region for the Glue catalog client (e.g. <code>us-east-1</code>).</td>
+    </tr>
+    <tr>
+      <td>catalog.properties.glue.id</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>The Glue catalog ID (AWS account ID). By default, the caller's AWS account ID is used.</td>
+    </tr>
+    <tr>
+      <td>catalog.properties.glue.skip-archive</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">true</td>
+      <td>Boolean</td>
+      <td>Whether to skip archiving older table versions in Glue.</td>
+    </tr>
+    <tr>
+      <td>catalog.properties.glue.skip-name-validation</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>Whether to skip name validation for Glue catalog.</td>
     </tr>
     <tr>
       <td>partition.key</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Partition keys for each partitioned table. Allow setting multiple primary keys for multiTables. Tables are separated by ';', and partition keys are separated by ','. For example, we can set <code>partition.key</code> of two tables using 'testdb.table1:id1,id2;testdb.table2:name'.</td>
+      <td>Partition keys for each partitioned table. Allow setting multiple primary keys for multiTables. Tables are separated by ';', and partition keys are separated by ','. For example, we can set <code>partition.key</code> of two tables using 'testdb.table1:id1,id2;testdb.table2:name'. For partition transforms, we can set <code>partition.key</code> using 'testdb.table1:truncate[10](id);testdb.table2:hour(create_time);testdb.table3:day(create_time);testdb.table4:month(create_time);testdb.table5:year(create_time);testdb.table6:bucket[10](create_time)'.</td>
     </tr>
     <tr>
       <td>catalog.properties.*</td>
@@ -132,6 +240,13 @@ Pipeline Connector Options
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>Pass Iceberg table options to the pipeline，See <a href="https://iceberg.apache.org/docs/nightly/configuration/#write-properties">Iceberg table options</a>. </td>
+    </tr>
+    <tr>
+      <td>hadoop.conf.*</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>Pass Hadoop <code>Configuration</code> options used by Iceberg catalog/table operations. The prefix <code>hadoop.conf.</code> will be stripped. For example, <code>hadoop.conf.fs.s3a.endpoint</code>.</td>
     </tr>
     </tbody>
 </table>    

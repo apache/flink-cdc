@@ -19,11 +19,13 @@ package org.apache.flink.cdc.debezium.event;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.cdc.common.annotation.Internal;
+import org.apache.flink.cdc.common.data.DateData;
 import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.GenericArrayData;
 import org.apache.flink.cdc.common.data.GenericMapData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.RecordData;
+import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.ChangeEvent;
@@ -52,6 +54,7 @@ import io.debezium.time.MicroTimestamp;
 import io.debezium.time.NanoTime;
 import io.debezium.time.NanoTimestamp;
 import io.debezium.time.Timestamp;
+import io.debezium.time.ZonedTimestamp;
 import org.apache.kafka.connect.data.Decimal;
 import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
@@ -64,6 +67,7 @@ import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -311,22 +315,29 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
     }
 
     protected Object convertToDate(Object dbzObj, Schema schema) {
-        return (int) TemporalConversions.toLocalDate(dbzObj).toEpochDay();
+        if (dbzObj instanceof Date) {
+            Instant instant = ((Date) dbzObj).toInstant();
+            return DateData.fromLocalDate(instant.atZone(java.time.ZoneOffset.UTC).toLocalDate());
+        }
+        return DateData.fromLocalDate(TemporalConversions.toLocalDate(dbzObj));
     }
 
     protected Object convertToTime(Object dbzObj, Schema schema) {
         if (dbzObj instanceof Long) {
             switch (schema.name()) {
                 case MicroTime.SCHEMA_NAME:
-                    return (int) ((long) dbzObj / 1000);
+                    return TimeData.fromMicroOfDay((long) dbzObj);
                 case NanoTime.SCHEMA_NAME:
-                    return (int) ((long) dbzObj / 1000_000);
+                    return TimeData.fromNanoOfDay((long) dbzObj);
             }
         } else if (dbzObj instanceof Integer) {
-            return dbzObj;
+            return TimeData.fromMillisOfDay((int) dbzObj);
+        } else if (dbzObj instanceof Date) {
+            long millisOfDay = ((Date) dbzObj).getTime() % (24 * 60 * 60 * 1000);
+            return TimeData.fromMillisOfDay((int) millisOfDay);
         }
         // get number of milliseconds of the day
-        return TemporalConversions.toLocalTime(dbzObj).toSecondOfDay() * 1000;
+        return TimeData.fromLocalTime(TemporalConversions.toLocalTime(dbzObj));
     }
 
     protected Object convertToTimestamp(Object dbzObj, Schema schema) {
@@ -344,6 +355,12 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
                             Math.floorDiv(nano, 1000_000), (int) (Math.floorMod(nano, 1000_000)));
             }
         }
+        if (dbzObj instanceof Date) {
+            if (schema.name().equals(org.apache.kafka.connect.data.Timestamp.LOGICAL_NAME)) {
+                Instant instant = ((Date) dbzObj).toInstant();
+                return TimestampData.fromMillis(instant.toEpochMilli());
+            }
+        }
         throw new IllegalArgumentException(
                 "Unable to convert to TIMESTAMP from unexpected value '"
                         + dbzObj
@@ -355,7 +372,7 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
         if (dbzObj instanceof String) {
             String str = (String) dbzObj;
             // TIMESTAMP_LTZ type is encoded in string type
-            Instant instant = Instant.parse(str);
+            Instant instant = ZonedTimestamp.FORMATTER.parse(str, Instant::from);
             return LocalZonedTimestampData.fromInstant(instant);
         }
         throw new IllegalArgumentException(
@@ -488,6 +505,13 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
         }
 
         Schema elementSchema = schema.valueSchema();
+        // Multidimensional arrays are not supported
+        if (elementSchema.type() == Schema.Type.ARRAY) {
+            throw new IllegalArgumentException(
+                    "Unable to convert multidimensional array value '"
+                            + dbzObj
+                            + "' to a flat array.");
+        }
         DataType elementType = schemaDataTypeInference.infer(null, elementSchema);
         DeserializationRuntimeConverter elementConverter = getOrCreateConverter(elementType);
 
@@ -497,13 +521,10 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
 
             for (int i = 0; i < list.size(); i++) {
                 Object element = list.get(i);
-                if (element != null && elementSchema.type() != Schema.Type.ARRAY) {
-                    array[i] = elementConverter.convert(element, elementSchema);
+                if (element == null) {
+                    array[i] = null;
                 } else {
-                    throw new IllegalArgumentException(
-                            "Unable convert multidimensional array value '"
-                                    + dbzObj
-                                    + "' to a flat array.");
+                    array[i] = elementConverter.convert(element, elementSchema);
                 }
             }
 
@@ -513,13 +534,10 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
             Object[] convertedArray = new Object[inputArray.length];
 
             for (int i = 0; i < inputArray.length; i++) {
-                if (inputArray[i] != null && elementSchema.type() != Schema.Type.ARRAY) {
-                    convertedArray[i] = elementConverter.convert(inputArray[i], elementSchema);
+                if (inputArray[i] == null) {
+                    convertedArray[i] = null;
                 } else {
-                    throw new IllegalArgumentException(
-                            "Unable convert multidimensional array value '"
-                                    + dbzObj
-                                    + "' to a flat array.");
+                    convertedArray[i] = elementConverter.convert(inputArray[i], elementSchema);
                 }
             }
 

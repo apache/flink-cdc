@@ -22,6 +22,8 @@ import org.apache.flink.api.connector.sink2.Committer;
 import org.apache.flink.api.connector.sink2.CommitterInitContext;
 import org.apache.flink.api.connector.sink2.Sink;
 import org.apache.flink.api.connector.sink2.SinkWriter;
+import org.apache.flink.api.connector.sink2.StatefulSinkWriter;
+import org.apache.flink.api.connector.sink2.SupportsWriterState;
 import org.apache.flink.api.connector.sink2.TwoPhaseCommittingSink;
 import org.apache.flink.api.connector.sink2.WriterInitContext;
 import org.apache.flink.cdc.common.event.Event;
@@ -30,6 +32,7 @@ import org.apache.flink.cdc.connectors.iceberg.sink.v2.compaction.CompactionOper
 import org.apache.flink.cdc.connectors.iceberg.sink.v2.compaction.CompactionOptions;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
 import org.apache.flink.metrics.groups.SinkCommitterMetricGroup;
+import org.apache.flink.runtime.checkpoint.CheckpointIDCounter;
 import org.apache.flink.streaming.api.connector.sink2.CommittableMessage;
 import org.apache.flink.streaming.api.connector.sink2.CommittableMessageTypeInfo;
 import org.apache.flink.streaming.api.connector.sink2.CommittableWithLineage;
@@ -39,8 +42,10 @@ import org.apache.flink.streaming.api.connector.sink2.WithPreWriteTopology;
 import org.apache.flink.streaming.api.datastream.DataStream;
 
 import java.time.ZoneId;
+import java.util.Collection;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 
 /** A {@link Sink} implementation for Apache Iceberg. */
 public class IcebergSink
@@ -48,24 +53,35 @@ public class IcebergSink
                 WithPreWriteTopology<Event>,
                 WithPreCommitTopology<Event, WriteResultWrapper>,
                 TwoPhaseCommittingSink<Event, WriteResultWrapper>,
-                WithPostCommitTopology<Event, WriteResultWrapper> {
+                WithPostCommitTopology<Event, WriteResultWrapper>,
+                SupportsWriterState<Event, IcebergWriterState> {
 
     protected final Map<String, String> catalogOptions;
     protected final Map<String, String> tableOptions;
+    protected final Map<String, String> hadoopConfOptions;
 
     private final ZoneId zoneId;
 
     private final CompactionOptions compactionOptions;
 
+    private String jobId;
+
+    private String operatorId;
+
     public IcebergSink(
             Map<String, String> catalogOptions,
             Map<String, String> tableOptions,
             ZoneId zoneId,
-            CompactionOptions compactionOptions) {
+            CompactionOptions compactionOptions,
+            String jobIdPrefix,
+            Map<String, String> hadoopConfOptions) {
         this.catalogOptions = catalogOptions;
         this.tableOptions = tableOptions;
         this.zoneId = zoneId;
         this.compactionOptions = compactionOptions;
+        this.jobId = jobIdPrefix + UUID.randomUUID();
+        this.operatorId = UUID.randomUUID().toString();
+        this.hadoopConfOptions = hadoopConfOptions;
     }
 
     @Override
@@ -73,16 +89,15 @@ public class IcebergSink
         return dataStream;
     }
 
-    @Override
     public Committer<WriteResultWrapper> createCommitter() {
-        return new IcebergCommitter(catalogOptions);
+        return new IcebergCommitter(catalogOptions, hadoopConfOptions);
     }
 
     @Override
     public Committer<WriteResultWrapper> createCommitter(
             CommitterInitContext committerInitContext) {
         SinkCommitterMetricGroup metricGroup = committerInitContext.metricGroup();
-        return new IcebergCommitter(catalogOptions, metricGroup);
+        return new IcebergCommitter(catalogOptions, metricGroup, hadoopConfOptions);
     }
 
     @Override
@@ -90,22 +105,66 @@ public class IcebergSink
         return new WriteResultWrapperSerializer();
     }
 
+    @Deprecated
     @Override
     public SinkWriter<Event> createWriter(InitContext context) {
+        long lastCheckpointId =
+                context.getRestoredCheckpointId()
+                        .orElse(CheckpointIDCounter.INITIAL_CHECKPOINT_ID - 1);
         return new IcebergWriter(
                 catalogOptions,
                 context.getTaskInfo().getIndexOfThisSubtask(),
                 context.getTaskInfo().getAttemptNumber(),
-                zoneId);
+                zoneId,
+                lastCheckpointId,
+                jobId,
+                operatorId,
+                hadoopConfOptions);
     }
 
     @Override
     public SinkWriter<Event> createWriter(WriterInitContext context) {
+        long lastCheckpointId =
+                context.getRestoredCheckpointId()
+                        .orElse(CheckpointIDCounter.INITIAL_CHECKPOINT_ID - 1);
         return new IcebergWriter(
                 catalogOptions,
                 context.getTaskInfo().getIndexOfThisSubtask(),
                 context.getTaskInfo().getAttemptNumber(),
-                zoneId);
+                zoneId,
+                lastCheckpointId,
+                jobId,
+                operatorId,
+                hadoopConfOptions);
+    }
+
+    @Override
+    public StatefulSinkWriter<Event, IcebergWriterState> restoreWriter(
+            WriterInitContext context, Collection<IcebergWriterState> writerStates) {
+        // No need to read checkpointId from state
+        long lastCheckpointId =
+                context.getRestoredCheckpointId()
+                        .orElse(CheckpointIDCounter.INITIAL_CHECKPOINT_ID - 1);
+        if (writerStates != null && !writerStates.isEmpty()) {
+            IcebergWriterState icebergWriterState = writerStates.iterator().next();
+            jobId = icebergWriterState.getJobId();
+            operatorId = icebergWriterState.getOperatorId();
+        }
+
+        return new IcebergWriter(
+                catalogOptions,
+                context.getTaskInfo().getIndexOfThisSubtask(),
+                context.getTaskInfo().getAttemptNumber(),
+                zoneId,
+                lastCheckpointId,
+                jobId,
+                operatorId,
+                hadoopConfOptions);
+    }
+
+    @Override
+    public SimpleVersionedSerializer<IcebergWriterState> getWriterStateSerializer() {
+        return new IcebergWriterStateSerializer();
     }
 
     @Override
@@ -136,7 +195,7 @@ public class IcebergSink
             // Shuffle by different table id.
             DataStream<CommittableMessage<WriteResultWrapper>> keyedStream =
                     committableMessageDataStream.partitionCustom(
-                            (bucket, numPartitions) -> bucket % numPartitions,
+                            Math::floorMod,
                             (committableMessage) -> {
                                 if (committableMessage instanceof CommittableWithLineage) {
                                     WriteResultWrapper multiTableCommittable =
@@ -155,7 +214,8 @@ public class IcebergSink
                     .transform(
                             "Compaction",
                             typeInformation,
-                            new CompactionOperator(catalogOptions, compactionOptions))
+                            new CompactionOperator(
+                                    catalogOptions, compactionOptions, hadoopConfOptions))
                     .setParallelism(parallelism);
         }
     }

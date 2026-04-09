@@ -28,8 +28,11 @@ import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedClass;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
@@ -56,12 +59,20 @@ import static org.apache.flink.cdc.connectors.mysql.source.MySqlSourceTestBase.a
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlSourceTestBase.assertEqualsInOrder;
 
 /** Integration tests to check mysql-cdc works well with different MySQL server version. */
+@ParameterizedClass
+@EnumSource(
+        value = MySqlVersion.class,
+        names = {"V5_7", "V8_0", "V8_4"})
 class MySqlCompatibilityITCase {
 
     private static final Logger LOG = LoggerFactory.getLogger(MySqlCompatibilityITCase.class);
 
-    private Path tempFolder;
+    private static Path tempFolder;
     private static File resourceFolder;
+
+    private final MySqlVersion version;
+    private final MySqlContainer mySqlContainer;
+    private final UniqueDatabase testDatabase;
 
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
@@ -69,72 +80,61 @@ class MySqlCompatibilityITCase {
             StreamTableEnvironment.create(
                     env, EnvironmentSettings.newInstance().inStreamingMode().build());
 
-    @BeforeEach
-    public void setup() throws Exception {
-        resourceFolder =
-                Paths.get(
-                                Objects.requireNonNull(
-                                                MySqlValidatorTest.class
-                                                        .getClassLoader()
-                                                        .getResource("."))
-                                        .toURI())
-                        .toFile();
-        env.setParallelism(4);
-        env.enableCheckpointing(200);
-        tempFolder = Files.createTempDirectory(resourceFolder.toPath(), "mysql-config");
-    }
-
-    @Test
-    void testMySqlV56() throws Exception {
-        testDifferentMySqlVersion(MySqlVersion.V5_6, false);
-    }
-
-    @Test
-    void testMySqlV56WithGtidModeOn() throws Exception {
-        testDifferentMySqlVersion(MySqlVersion.V5_6, true);
-    }
-
-    @Test
-    void testMySqlV57() throws Exception {
-        testDifferentMySqlVersion(MySqlVersion.V5_7, false);
-    }
-
-    @Test
-    void testMySqlV57WithGtidModeOn() throws Exception {
-        testDifferentMySqlVersion(MySqlVersion.V5_7, true);
-    }
-
-    @Test
-    void testMySqlV8() throws Exception {
-        testDifferentMySqlVersion(MySqlVersion.V8_0, false);
-    }
-
-    @Test
-    void testMySqlV8WithGtidModeOn() throws Exception {
-        testDifferentMySqlVersion(MySqlVersion.V8_0, true);
-    }
-
-    private void testDifferentMySqlVersion(MySqlVersion version, boolean enableGtid)
-            throws Exception {
-        final MySqlContainer mySqlContainer =
+    MySqlCompatibilityITCase(MySqlVersion version) {
+        this.version = version;
+        this.mySqlContainer =
                 (MySqlContainer)
                         new MySqlContainer(version)
-                                .withConfigurationOverride(
-                                        buildCustomMySqlConfig(version, enableGtid))
+                                .withConfigurationOverride(buildCustomMySqlConfig(version))
                                 .withSetupSQL("docker/setup.sql")
                                 .withDatabaseName("flink-test")
                                 .withUsername("flinkuser")
                                 .withPassword("flinkpw")
                                 .withLogConsumer(new Slf4jLogConsumer(LOG));
+        this.testDatabase = new UniqueDatabase(mySqlContainer, "inventory", "mysqluser", "mysqlpw");
+    }
 
-        LOG.info("Starting containers...");
+    @BeforeEach
+    void setup() throws Exception {
+        // Initialize static resources if needed
+        if (resourceFolder == null) {
+            resourceFolder =
+                    Paths.get(
+                                    Objects.requireNonNull(
+                                                    MySqlValidatorTest.class
+                                                            .getClassLoader()
+                                                            .getResource("."))
+                                            .toURI())
+                            .toFile();
+            tempFolder = Files.createTempDirectory(resourceFolder.toPath(), "mysql-config");
+        }
+
+        env.setParallelism(4);
+        env.enableCheckpointing(200);
+
+        LOG.info("Starting container for MySQL {}...", version.getVersion());
         Startables.deepStart(Stream.of(mySqlContainer)).join();
-        LOG.info("Containers are started.");
+        LOG.info("Container is started.");
 
-        UniqueDatabase testDatabase =
-                new UniqueDatabase(mySqlContainer, "inventory", "mysqluser", "mysqlpw");
         testDatabase.createAndInitialize();
+    }
 
+    @AfterEach
+    void tearDown() {
+        try {
+            testDatabase.dropDatabase();
+        } catch (IllegalStateException e) {
+            LOG.warn("Failed to drop test database during teardown.", e);
+        }
+        if (mySqlContainer != null) {
+            LOG.info("Stopping container for MySQL {}...", version.getVersion());
+            mySqlContainer.stop();
+            LOG.info("Container is stopped.");
+        }
+    }
+
+    @Test
+    void testMySqlVersionCompatibility() throws Exception {
         String sourceDDL =
                 String.format(
                         "CREATE TABLE products ("
@@ -163,7 +163,6 @@ class MySqlCompatibilityITCase {
                         getServerId());
         tEnv.executeSql(sourceDDL);
 
-        // async submit job
         TableResult result =
                 tEnv.executeSql("SELECT `id`, name, description, weight FROM products");
 
@@ -217,7 +216,6 @@ class MySqlCompatibilityITCase {
         assertEqualsInOrder(
                 Arrays.asList(expectedBinlog), fetchRows(iterator, expectedBinlog.length));
         result.getJobClient().get().cancel().get();
-        mySqlContainer.stop();
     }
 
     private String getServerId() {
@@ -236,29 +234,39 @@ class MySqlCompatibilityITCase {
         return rows;
     }
 
-    private String buildCustomMySqlConfig(MySqlVersion version, boolean enableGtid) {
+    private String buildCustomMySqlConfig(MySqlVersion version) {
         try {
-            Path cnf = Files.createFile(Paths.get(tempFolder.toString(), "my.cnf"));
+            if (resourceFolder == null) {
+                resourceFolder =
+                        Paths.get(
+                                        Objects.requireNonNull(
+                                                        MySqlValidatorTest.class
+                                                                .getClassLoader()
+                                                                .getResource("."))
+                                                .toURI())
+                                .toFile();
+                tempFolder = Files.createTempDirectory(resourceFolder.toPath(), "mysql-config");
+            }
+            // Create version-specific directory to avoid conflicts
+            Path versionDir =
+                    Files.createDirectories(
+                            Paths.get(
+                                    tempFolder.toString(), version.getVersion().replace(".", "_")));
+            Path cnf = Paths.get(versionDir.toString(), "my.cnf");
+            // Check if file already exists to avoid FileAlreadyExistsException
+            if (!Files.exists(cnf)) {
+                Files.createFile(cnf);
+            }
             StringBuilder mysqlConfBuilder = new StringBuilder();
             mysqlConfBuilder.append(
                     "[mysqld]\n"
                             + "binlog_format = row\n"
                             + "log_bin = mysql-bin\n"
                             + "server-id = 223344\n"
-                            + "binlog_row_image = FULL\n");
-            if (!enableGtid) {
-                mysqlConfBuilder.append("gtid-mode = OFF\n");
-            } else {
-                mysqlConfBuilder.append("gtid-mode = ON\n");
-                mysqlConfBuilder.append("enforce-gtid-consistency = 1\n");
-                // see
-                // https://dev.mysql.com/doc/refman/5.7/en/replication-options-gtids.html#sysvar_gtid_mode
-                if (version == MySqlVersion.V5_6 || version == MySqlVersion.V5_7) {
-                    mysqlConfBuilder.append("log-slave-updates = ON\n");
-                }
-            }
+                            + "binlog_row_image = FULL\n"
+                            + "gtid-mode = OFF\n");
 
-            if (version == MySqlVersion.V8_0) {
+            if (version == MySqlVersion.V8_0 || version == MySqlVersion.V8_4) {
                 mysqlConfBuilder.append("secure_file_priv=/var/lib/mysql\n");
             }
 
@@ -266,7 +274,7 @@ class MySqlCompatibilityITCase {
                     cnf,
                     Collections.singleton(mysqlConfBuilder.toString()),
                     StandardCharsets.UTF_8,
-                    StandardOpenOption.APPEND);
+                    StandardOpenOption.TRUNCATE_EXISTING);
             return Paths.get(resourceFolder.getAbsolutePath()).relativize(cnf).toString();
         } catch (Exception e) {
             throw new RuntimeException("Failed to create my.cnf file.", e);

@@ -110,7 +110,7 @@ Pipeline 连接器配置项
       <td>Hive metastore 的 uri，在 metastore 设置为 hive 的时候需要。</td>
     </tr>
     <tr>
-      <td>commit.user</td>
+      <td>commit.user-prefix</td>
       <td>optional</td>
       <td style="word-wrap: break-word;"><code>admin</code></td>
       <td>String</td>
@@ -207,7 +207,7 @@ Pipeline 连接器配置项
     </tr>
     <tr>
       <td>TIMESTAMP</td>
-      <td>DATETIME</td>
+      <td>TIMESTAMP</td>
       <td></td>
     </tr>
     <tr>
@@ -223,6 +223,11 @@ Pipeline 连接器配置项
     <tr>
       <td>VARCHAR(n)</td>
       <td>VARCHAR(n)</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>VARIANT</td>
+      <td>VARIANT</td>
       <td></td>
     </tr>
     </tbody>

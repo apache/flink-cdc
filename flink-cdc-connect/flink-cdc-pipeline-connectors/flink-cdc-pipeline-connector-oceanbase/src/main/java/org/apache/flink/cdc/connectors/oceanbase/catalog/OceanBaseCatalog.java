@@ -52,9 +52,13 @@ public abstract class OceanBaseCatalog implements Serializable {
         LOG.info("Open OceanBase catalog");
     }
 
-    protected List<String> executeSingleColumnStatement(String sql) throws SQLException {
+    protected List<String> executeSingleColumnStatement(String sql, Object... params)
+            throws SQLException {
         try (Connection conn = connectionProvider.getConnection();
                 PreparedStatement statement = conn.prepareStatement(sql)) {
+            for (int i = 0; i < params.length; i++) {
+                statement.setObject(i + 1, params[i]);
+            }
             List<String> columnValues = Lists.newArrayList();
             try (ResultSet rs = statement.executeQuery()) {
                 while (rs.next()) {
@@ -91,7 +95,11 @@ public abstract class OceanBaseCatalog implements Serializable {
             String schemaName, String tableName, List<String> dropColumns);
 
     public abstract void alterColumnType(
-            String schemaName, String tableName, String columnName, DataType dataType);
+            String schemaName,
+            String tableName,
+            String columnName,
+            DataType dataType,
+            String comment);
 
     public abstract void renameColumn(
             String schemaName, String tableName, String oldColumnName, String newColumnName);
@@ -99,6 +107,8 @@ public abstract class OceanBaseCatalog implements Serializable {
     public abstract void dropTable(String schemaName, String tableName);
 
     public abstract void truncateTable(String schemaName, String tableName);
+
+    public abstract void alterTable(String schemaName, String tableName, String comment);
 
     public void close() {
         LOG.info("Close OceanBase catalog");

@@ -117,11 +117,11 @@ public class DebeziumUtils {
     }
 
     /** Fetch current binlog offsets in MySql Server. */
-    public static BinlogOffset currentBinlogOffset(JdbcConnection jdbc) {
-        final String showMasterStmt = "SHOW MASTER STATUS";
+    public static BinlogOffset currentBinlogOffset(MySqlConnection jdbc) {
+        String showBinaryLogStatement = jdbc.getShowBinaryLogStatement();
         try {
             return jdbc.queryAndMap(
-                    showMasterStmt,
+                    showBinaryLogStatement,
                     rs -> {
                         if (rs.next()) {
                             final String binlogFilename = rs.getString(1);
@@ -135,14 +135,14 @@ public class DebeziumUtils {
                         } else {
                             throw new FlinkRuntimeException(
                                     "Cannot read the binlog filename and position via '"
-                                            + showMasterStmt
+                                            + showBinaryLogStatement
                                             + "'. Make sure your server is correctly configured");
                         }
                     });
         } catch (SQLException e) {
             throw new FlinkRuntimeException(
                     "Cannot read the binlog filename and position via '"
-                            + showMasterStmt
+                            + showBinaryLogStatement
                             + "'. Make sure your server is correctly configured",
                     e);
         }
@@ -202,7 +202,7 @@ public class DebeziumUtils {
         if (capturedTableIds.isEmpty()) {
             throw new IllegalArgumentException(
                     String.format(
-                            "Can't find any matched tables, please check your configured database-name: %s and table-name: %s",
+                            "No matched tables found. Please verify:\n1) The configured database(s) [%s] and table(s) [%s] exist;\n2) The MySQL user has sufficient permissions to access them.",
                             sourceConfig.getDatabaseList(), sourceConfig.getTableList()));
         }
         return capturedTableIds;

@@ -183,6 +183,7 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
 
     private transient ExecutorService executor;
     private transient DebeziumEngine<?> engine;
+
     /**
      * Unique name of this Debezium Engine instance across all the jobs. Currently we randomly
      * generate a UUID for it. This is used for {@link FlinkDatabaseHistory}.
@@ -249,12 +250,12 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
                 restoredOffsetState = new String(serializedOffset, StandardCharsets.UTF_8);
                 LOG.info(
                         "Consumer subtask {} starts to read from specified offset {}.",
-                        getRuntimeContext().getIndexOfThisSubtask(),
+                        getRuntimeContext().getTaskInfo().getIndexOfThisSubtask(),
                         restoredOffsetState);
             } else {
                 LOG.info(
                         "Consumer subtask {} has no restore state.",
-                        getRuntimeContext().getIndexOfThisSubtask());
+                        getRuntimeContext().getTaskInfo().getIndexOfThisSubtask());
             }
         }
     }
@@ -271,7 +272,7 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
         }
         LOG.info(
                 "Consumer subtask {} restored offset state: {}.",
-                getRuntimeContext().getIndexOfThisSubtask(),
+                getRuntimeContext().getTaskInfo().getIndexOfThisSubtask(),
                 restoredOffsetState);
     }
 
@@ -297,7 +298,7 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
         }
         LOG.info(
                 "Consumer subtask {} restored history records state: {} with {} records.",
-                getRuntimeContext().getIndexOfThisSubtask(),
+                getRuntimeContext().getTaskInfo().getIndexOfThisSubtask(),
                 engineInstanceName,
                 recordsCount);
     }
@@ -447,9 +448,12 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
             debeziumChangeFetcher.runFetchLoop();
         } catch (Throwable t) {
             if (t.getMessage() != null
-                    && t.getMessage()
-                            .contains(
-                                    "A slave with the same server_uuid/server_id as this slave has connected to the master")) {
+                    && (t.getMessage()
+                                    .contains(
+                                            "A slave with the same server_uuid/server_id as this slave has connected to the master")
+                            || t.getMessage()
+                                    .contains(
+                                            "A replica with the same server_uuid/server_id as this replica has connected to the source"))) {
                 throw new RuntimeException(
                         "The 'server-id' in the mysql cdc connector should be globally unique, but conflicts happen now.\n"
                                 + "The server id conflict may happen in the following situations: \n"
@@ -481,7 +485,7 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
             if (posInMap == -1) {
                 LOG.warn(
                         "Consumer subtask {} received confirmation for unknown checkpoint id {}",
-                        getRuntimeContext().getIndexOfThisSubtask(),
+                        getRuntimeContext().getTaskInfo().getIndexOfThisSubtask(),
                         checkpointId);
                 return;
             }
@@ -496,7 +500,7 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
             if (serializedOffsets == null || serializedOffsets.length == 0) {
                 LOG.debug(
                         "Consumer subtask {} has empty checkpoint state.",
-                        getRuntimeContext().getIndexOfThisSubtask());
+                        getRuntimeContext().getTaskInfo().getIndexOfThisSubtask());
                 return;
             }
 

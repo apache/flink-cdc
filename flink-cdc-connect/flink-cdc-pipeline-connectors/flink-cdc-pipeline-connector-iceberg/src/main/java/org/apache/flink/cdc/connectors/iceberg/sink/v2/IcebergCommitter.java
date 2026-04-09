@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.iceberg.sink.v2;
 
 import org.apache.flink.api.connector.sink2.Committer;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.connectors.iceberg.sink.utils.HadoopConfUtils;
 import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.metrics.groups.SinkCommitterMetricGroup;
 
@@ -28,10 +29,14 @@ import org.apache.iceberg.CatalogUtil;
 import org.apache.iceberg.DataFile;
 import org.apache.iceberg.DeleteFile;
 import org.apache.iceberg.RowDelta;
+import org.apache.iceberg.Snapshot;
+import org.apache.iceberg.SnapshotUpdate;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.flink.sink.SinkUtil;
 import org.apache.iceberg.io.WriteResult;
+import org.apache.iceberg.util.SnapshotUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,6 +49,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static java.util.stream.Collectors.toList;
+import static org.apache.flink.runtime.checkpoint.CheckpointIDCounter.INITIAL_CHECKPOINT_ID;
 
 /** A {@link Committer} for Apache Iceberg. */
 public class IcebergCommitter implements Committer<WriteResultWrapper> {
@@ -62,15 +68,19 @@ public class IcebergCommitter implements Committer<WriteResultWrapper> {
 
     private final Map<TableId, TableMetric> tableIdMetricMap;
 
-    public IcebergCommitter(Map<String, String> catalogOptions) {
-        this(catalogOptions, null);
+    public IcebergCommitter(
+            Map<String, String> catalogOptions, Map<String, String> hadoopConfOptions) {
+        this(catalogOptions, null, hadoopConfOptions);
     }
 
     public IcebergCommitter(
-            Map<String, String> catalogOptions, SinkCommitterMetricGroup metricGroup) {
+            Map<String, String> catalogOptions,
+            SinkCommitterMetricGroup metricGroup,
+            Map<String, String> hadoopConfOptions) {
+        Configuration configuration = HadoopConfUtils.createConfiguration(hadoopConfOptions);
         this.catalog =
                 CatalogUtil.buildIcebergCatalog(
-                        this.getClass().getSimpleName(), catalogOptions, new Configuration());
+                        this.getClass().getSimpleName(), catalogOptions, configuration);
         this.metricGroup = metricGroup;
         this.tableIdMetricMap = new HashMap<>();
     }
@@ -83,6 +93,14 @@ public class IcebergCommitter implements Committer<WriteResultWrapper> {
     }
 
     private void commit(List<WriteResultWrapper> writeResultWrappers) {
+        if (writeResultWrappers.isEmpty()) {
+            return;
+        }
+        // all commits a same checkpoint-id
+        long checkpointId = writeResultWrappers.get(0).getCheckpointId();
+        String newFlinkJobId = writeResultWrappers.get(0).getJobId();
+        String operatorId = writeResultWrappers.get(0).getOperatorId();
+
         Map<TableId, List<WriteResult>> tableMap = new HashMap<>();
         for (WriteResultWrapper writeResultWrapper : writeResultWrappers) {
             List<WriteResult> writeResult =
@@ -93,11 +111,29 @@ public class IcebergCommitter implements Committer<WriteResultWrapper> {
         }
         for (Map.Entry<TableId, List<WriteResult>> entry : tableMap.entrySet()) {
             TableId tableId = entry.getKey();
-            Optional<TableMetric> tableMetric = getTableMetric(tableId);
-            tableMetric.ifPresent(TableMetric::increaseCommitTimes);
+
             Table table =
                     catalog.loadTable(
                             TableIdentifier.of(tableId.getSchemaName(), tableId.getTableName()));
+
+            Snapshot snapshot = table.currentSnapshot();
+            if (snapshot != null) {
+                Iterable<Snapshot> ancestors =
+                        SnapshotUtil.ancestorsOf(snapshot.snapshotId(), table::snapshot);
+                long lastCheckpointId =
+                        getMaxCommittedCheckpointId(ancestors, newFlinkJobId, operatorId);
+                if (lastCheckpointId == checkpointId) {
+                    LOGGER.warn(
+                            "Checkpoint id {} has been committed to table {}, skipping",
+                            checkpointId,
+                            tableId.identifier());
+                    continue;
+                }
+            }
+
+            Optional<TableMetric> tableMetric = getTableMetric(tableId);
+            tableMetric.ifPresent(TableMetric::increaseCommitTimes);
+
             List<WriteResult> results = entry.getValue();
             List<DataFile> dataFiles =
                     results.stream()
@@ -117,15 +153,47 @@ public class IcebergCommitter implements Committer<WriteResultWrapper> {
                 if (deleteFiles.isEmpty()) {
                     AppendFiles append = table.newAppend();
                     dataFiles.forEach(append::appendFile);
-                    append.commit();
+                    commitOperation(append, newFlinkJobId, operatorId, checkpointId);
                 } else {
                     RowDelta delta = table.newRowDelta();
                     dataFiles.forEach(delta::addRows);
                     deleteFiles.forEach(delta::addDeletes);
-                    delta.commit();
+                    commitOperation(delta, newFlinkJobId, operatorId, checkpointId);
                 }
             }
         }
+    }
+
+    private static long getMaxCommittedCheckpointId(
+            Iterable<Snapshot> ancestors, String flinkJobId, String operatorId) {
+        long lastCommittedCheckpointId = INITIAL_CHECKPOINT_ID - 1;
+
+        for (Snapshot ancestor : ancestors) {
+            Map<String, String> summary = ancestor.summary();
+            String snapshotFlinkJobId = summary.get(SinkUtil.FLINK_JOB_ID);
+            String snapshotOperatorId = summary.get(SinkUtil.OPERATOR_ID);
+            if (flinkJobId.equals(snapshotFlinkJobId)
+                    && (snapshotOperatorId == null || snapshotOperatorId.equals(operatorId))) {
+                String value = summary.get(SinkUtil.MAX_COMMITTED_CHECKPOINT_ID);
+                if (value != null) {
+                    lastCommittedCheckpointId = Long.parseLong(value);
+                    break;
+                }
+            }
+        }
+
+        return lastCommittedCheckpointId;
+    }
+
+    private static void commitOperation(
+            SnapshotUpdate<?> operation,
+            String newFlinkJobId,
+            String operatorId,
+            long checkpointId) {
+        operation.set(SinkUtil.MAX_COMMITTED_CHECKPOINT_ID, Long.toString(checkpointId));
+        operation.set(SinkUtil.FLINK_JOB_ID, newFlinkJobId);
+        operation.set(SinkUtil.OPERATOR_ID, operatorId);
+        operation.commit();
     }
 
     private Optional<TableMetric> getTableMetric(TableId tableId) {
@@ -137,7 +205,9 @@ public class IcebergCommitter implements Committer<WriteResultWrapper> {
             }
             MetricGroup tableIdMetricGroup =
                     metricGroup
-                            .addGroup(NAMESPACE_GROUP_KEY, tableId.getNamespace())
+                            .addGroup(
+                                    NAMESPACE_GROUP_KEY,
+                                    tableId.getNamespace() == null ? "" : tableId.getNamespace())
                             .addGroup(SCHEMA_GROUP_KEY, tableId.getSchemaName())
                             .addGroup(TABLE_GROUP_KEY, tableId.getTableName());
             TableMetric tableMetric = new TableMetric(tableIdMetricGroup);

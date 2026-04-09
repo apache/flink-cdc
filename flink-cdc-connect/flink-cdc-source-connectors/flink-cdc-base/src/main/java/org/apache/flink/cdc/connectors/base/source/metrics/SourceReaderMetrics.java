@@ -78,6 +78,7 @@ public class SourceReaderMetrics {
 
     /** The total number of record that failed to consume, process or emit. */
     private final Counter numRecordsInErrorsCounter;
+
     /** The timestamp of the last record received. */
     private volatile long lastReceivedEventTime = UNDEFINED;
 

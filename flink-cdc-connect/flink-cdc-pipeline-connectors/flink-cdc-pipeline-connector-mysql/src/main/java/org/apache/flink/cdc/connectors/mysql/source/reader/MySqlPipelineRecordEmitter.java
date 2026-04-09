@@ -55,9 +55,11 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils.openJdbcConnection;
 import static org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils.getTableId;
@@ -80,6 +82,7 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
     // Used when startup mode is snapshot
     private boolean shouldEmitAllCreateTableEventsInSnapshotMode = true;
     private boolean isBounded = false;
+    private final boolean isTableIdCaseInsensitive;
 
     private final DebeziumDeserializationSchema<Event> debeziumDeserializationSchema;
 
@@ -88,11 +91,14 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
     public MySqlPipelineRecordEmitter(
             DebeziumDeserializationSchema<Event> debeziumDeserializationSchema,
             MySqlSourceReaderMetrics sourceReaderMetrics,
-            MySqlSourceConfig sourceConfig) {
+            MySqlSourceConfig sourceConfig,
+            boolean isTableIdCaseInsensitive) {
         super(
                 debeziumDeserializationSchema,
                 sourceReaderMetrics,
-                sourceConfig.isIncludeSchemaChanges());
+                sourceConfig.isIncludeSchemaChanges(),
+                false, // Explicitly disable heartbeat events
+                false); // Explicitly disable transaction metadata events
         this.debeziumDeserializationSchema = debeziumDeserializationSchema;
         this.sourceConfig = sourceConfig;
         this.alreadySendCreateTableTables = new HashSet<>();
@@ -100,6 +106,7 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
                 ((DebeziumEventDeserializationSchema) debeziumDeserializationSchema)
                         .getCreateTableEventCache();
         this.isBounded = StartupOptions.snapshot().equals(sourceConfig.getStartupOptions());
+        this.isTableIdCaseInsensitive = isTableIdCaseInsensitive;
     }
 
     @Override
@@ -141,7 +148,8 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
                 }
             }
         } else {
-            if (isDataChangeRecord(element) || isSchemaChangeEvent(element)) {
+            boolean isDataChangeRecord = isDataChangeRecord(element);
+            if (isDataChangeRecord || isSchemaChangeEvent(element)) {
                 TableId tableId = getTableId(element);
                 if (!alreadySendCreateTableTables.contains(tableId)) {
                     CreateTableEvent createTableEvent = createTableEventCache.get(tableId);
@@ -150,6 +158,20 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
                         output.collect(createTableEvent);
                     }
                     alreadySendCreateTableTables.add(tableId);
+                }
+                // In rare case, we may miss some CreateTableEvents before DataChangeEvents.
+                // Don't send CreateTableEvent for SchemaChangeEvents as it's the latest schema.
+                if (isDataChangeRecord && !createTableEventCache.containsKey(tableId)) {
+                    try (JdbcConnection jdbc = openJdbcConnection(sourceConfig)) {
+                        Schema schema = getSchema(jdbc, tableId);
+                        CreateTableEvent createTableEvent =
+                                new CreateTableEvent(
+                                        org.apache.flink.cdc.common.event.TableId.tableId(
+                                                tableId.catalog(), tableId.table()),
+                                        schema);
+                        output.collect(createTableEvent);
+                        createTableEventCache.put(tableId, createTableEvent);
+                    }
                 }
             }
         }
@@ -244,7 +266,10 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
         for (int i = 0; i < columns.size(); i++) {
             Column column = columns.get(i);
 
-            String colName = column.name();
+            String colName =
+                    this.isTableIdCaseInsensitive
+                            ? column.name().toLowerCase(Locale.ROOT)
+                            : column.name();
             DataType dataType =
                     MySqlTypeUtils.fromDbzColumn(column, sourceConfig.isTreatTinyInt1AsBoolean());
             if (!column.isOptional()) {
@@ -260,6 +285,12 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
 
         List<String> primaryKey = table.primaryKeyColumnNames();
         if (Objects.nonNull(primaryKey) && !primaryKey.isEmpty()) {
+            if (this.isTableIdCaseInsensitive) {
+                primaryKey =
+                        primaryKey.stream()
+                                .map(key -> key.toLowerCase(Locale.ROOT))
+                                .collect(Collectors.toList());
+            }
             tableBuilder.primaryKey(primaryKey);
         }
         return tableBuilder.build();

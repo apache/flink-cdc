@@ -28,34 +28,39 @@ under the License.
 
 Postgres connector allows reading snapshot data and incremental data from Postgres database and provides end-to-end full-database data synchronization capabilities.
 This document describes how to setup the Postgres connector.
-Note: Since the Postgres WAL log cannot parse table structure change records, Postgres CDC Pipeline Source does not support synchronizing table structure changes currently.
 
 ## Example
 
-An example of the pipeline for reading data from Postgres and sink to Doris can be defined as follows:
+An example of the pipeline for reading data from Postgres and sink to Fluss can be defined as follows:
 
 ```yaml
 source:
-   type: posgtres
+   type: postgres
    name: Postgres Source
    hostname: 127.0.0.1
    port: 5432
    username: admin
    password: pass
-   tables: adb.\.*.\.*, bdb.user_schema_[0-9].user_table_[0-9]+, [app|web].schema_\.*.order_\.*
+   # make sure all the tables share same database.
+   tables: adb.\.*.\.*
    decoding.plugin.name:  pgoutput
    slot.name: pgtest
+   schema-change.enabled: true
 
 sink:
-  type: doris
-  name: Doris Sink
-  fenodes: 127.0.0.1:8030
-  username: root
-  password: pass
+  type: fluss
+  name: Fluss Sink
+  bootstrap.servers: localhost:9123
+  # Security-related properties for the Fluss client
+  properties.client.security.protocol: sasl
+  properties.client.security.sasl.mechanism: PLAIN
+  properties.client.security.sasl.username: developer
+  properties.client.security.sasl.password: developer-pass
 
 pipeline:
-   name: Postgres to Doris Pipeline
+   name: Postgres to Fluss Pipeline
    parallelism: 4
+   schema.change.behavior: lenient
 ```
 
 ## Connector Options
@@ -106,9 +111,10 @@ pipeline:
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>Table name of the Postgres database to monitor. The table-name also supports regular expressions to monitor multiple tables that satisfy the regular expressions. <br>
-          It is important to note that the dot (.) is treated as a delimiter for database and table names. 
+          All the tables are required to share same database.  <br>
+          It is important to note that the dot (.) is treated as a delimiter for database, schema and table names.
           If there is a need to use a dot (.) in a regular expression to match any character, it is necessary to escape the dot with a backslash.<br>
-          例如，adb.\.*.\.*, bdb.user_schema_[0-9].user_table_[0-9]+, [app|web].schema_\.*.order_\.*</td>
+          for example:  bdb.user_schema_[0-9].user_table_[0-9]+, bdb.schema_\.*.order_\.*</td>
     </tr>
     <tr>
       <td>slot.name</td>
@@ -240,10 +246,10 @@ pipeline:
     <tr>
       <td>metadata.list</td>
       <td>optional</td>
-      <td style="word-wrap: break-word;">false</td>
+      <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>
-        List of readable metadata from SourceRecord to be passed to downstream and could be used in transform module, split by `,`. Available readable metadata are: op_ts.
+        List of readable metadata from SourceRecord to be passed to downstream and could be used in transform module, split by `,`. Available readable metadata are: op_ts, table_name, database_name, schema_name. See <a href="#supported-metadata-columns">Supported Metadata Columns</a> for more details.
       </td>
     </tr>
     <tr>
@@ -255,6 +261,29 @@ pipeline:
         Whether to assign the unbounded chunks first during snapshot reading phase.<br>
         This might help reduce the risk of the TaskManager experiencing an out-of-memory (OOM) error when taking a snapshot of the largest unbounded chunk.<br>
         Experimental option, defaults to false.
+      </td>
+    </tr>
+    <tr>
+      <td>table-id.include-database</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        Whether to include database in the generated Table ID.<br>
+        If set to true, the Table ID will be in the format (database, schema, table).<br>
+        If set to false, the Table ID will be in the format (schema, table).<br>
+        Defaults to false.
+      </td>
+    </tr>
+    <tr>
+      <td>schema-change.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        Whether to enable schema change inference for the Postgres source. When enabled, the connector infers schema change events (add column, drop column, rename column, alter column type) by comparing pgoutput Relation messages against the cached schema.<br>
+        Requires <code>decoding.plugin.name</code> to be set to <code>pgoutput</code>.<br>
+        Defaults to false.
       </td>
     </tr>
     </tbody>
@@ -293,6 +322,78 @@ Metrics can help understand the progress of assignments, and the following are t
 
 Notice:
 1. The group name is `namespace.schema.table`, where `namespace` is the actual database name, `schema` is the actual schema name, and `table` is the actual table name.
+
+## Supported Metadata Columns
+
+PostgreSQL CDC connector supports reading metadata columns from source records. These metadata columns can be used in transform operations or passed to downstream sinks.
+
+**Note:** Some metadata information is also available through Transform expressions (e.g., `__namespace_name__`, `__schema_name__`, `__table_name__`). The key differences are:
+- **`op_ts`**: Only available via `metadata.list` - provides the actual operation timestamp from the database.
+- **`table_name`, `database_name`, `schema_name`**: Can be obtained via either `metadata.list` or Transform expressions. Using `metadata.list` allows you to pass these values directly to downstream sinks without writing transform rules, which is simpler for basic use cases.
+
+To enable metadata columns, configure the `metadata.list` option with a comma-separated list of metadata column names:
+
+```yaml
+source:
+  type: postgres
+  # ... other configurations
+  metadata.list: op_ts,table_name,database_name,schema_name
+```
+
+The following metadata columns are supported:
+
+<div class="wy-table-responsive">
+<table class="colwidths-auto docutils">
+    <thead>
+      <tr>
+        <th class="text-left" style="width: 20%">Metadata Column</th>
+        <th class="text-left" style="width: 15%">Data Type</th>
+        <th class="text-left" style="width: 65%">Description</th>
+      </tr>
+    </thead>
+    <tbody>
+    <tr>
+      <td>op_ts</td>
+      <td>BIGINT NOT NULL</td>
+      <td>The timestamp (in milliseconds since epoch) when the change event occurred in the database. For snapshot records, this value is 0.</td>
+    </tr>
+    <tr>
+      <td>table_name</td>
+      <td>STRING NOT NULL</td>
+      <td>The name of the table that contains the changed row. Alternative: use <code>__table_name__</code> in Transform expressions.</td>
+    </tr>
+    <tr>
+      <td>database_name</td>
+      <td>STRING NOT NULL</td>
+      <td>The name of the database that contains the changed row. Alternative: use <code>__namespace_name__</code> in Transform expressions.</td>
+    </tr>
+    <tr>
+      <td>schema_name</td>
+      <td>STRING NOT NULL</td>
+      <td>The name of the schema that contains the changed row. This is specific to PostgreSQL. Alternative: use <code>__schema_name__</code> in Transform expressions.</td>
+    </tr>
+    </tbody>
+</table>
+</div>
+
+**Example Usage:**
+
+```yaml
+source:
+  type: postgres
+  hostname: localhost
+  port: 5432
+  username: postgres
+  password: postgres
+  tables: mydb.public.orders
+  slot.name: flink_slot
+  metadata.list: op_ts,table_name,schema_name
+
+transform:
+  - source-table: mydb.public.orders
+    projection: order_id, customer_id, op_ts, table_name, schema_name
+    description: Include metadata columns in output
+```
 
 ## Data Type Mapping
 
@@ -412,11 +513,11 @@ Other than PostgreSQL’s TIMESTAMPTZ data types, which contain time zone inform
 - debezium.time.precision.mode=adaptive_time_microseconds
 - debezium.time.precision.mode=connect 
 
-Note: Due to current CDC limitations in supporting time types, when <code>debezium.time.precision.mode</code> is set to "adaptive", "adaptive_time_microseconds", or when using Connect time types, all time values are converted to the Integer type with a precision of 3. This will be improved in future updates.
+Note: Due to the current CDC limitation, the precision for the TIME type is fixed at 3. Regardless of whether <code>debezium.time.precision.mode<code> is set to adaptive, adaptive_time_microseconds, or connect, the TIME type will be converted to TIME(3).
 
 <u>debezium.time.precision.mode=adaptive</u>
 
-When the <code>debezium.time.precision.mode</code> property is set to adaptive, the default, the connector determines the literal type and semantic type based on the column’s data type definition. This ensures that events exactly represent the values in the database.
+When the <code>debezium.time.precision.mode</code> property is set to the default value `adaptive_time_microseconds`, the precision of `TIME` is 3, and the precision of `TIMESTAMP` is 6.
 <div class="wy-table-responsive">
 <table class="colwidths-auto docutils">
     <thead>
@@ -435,13 +536,79 @@ When the <code>debezium.time.precision.mode</code> property is set to adaptive, 
         <td>
           TIME([P])
         </td>
-        <td>INTEGER</td>
+        <td>TIME(3)</td>
       </tr>
       <tr>
         <td>
           TIMESTAMP([P])
         </td>
         <td>TIMESTAMP([P])</td>
+      </tr>
+    </tbody>
+</table>
+</div>
+
+<u>debezium.time.precision.mode=adaptive_time_microseconds</u>
+
+When the `debezium.time.precision.mode` property is set to the value `adaptive_time_microseconds`, the precision of `TIME` is 3, and the precision of `TIMESTAMP` is 6.
+<div class="wy-table-responsive">
+<table class="colwidths-auto docutils">
+    <thead>
+      <tr>
+        <th class="text-left">PostgreSQL type<a href="https://www.postgresql.org/docs/12/datatype.html"></a></th>
+        <th class="text-left">CDC type<a href="{% link dev/table/types.md %}"></a></th>
+      </tr>
+    </thead>
+    <tbody>
+       <tr>
+        <td>
+          DATE
+        <td>DATE</td>
+      </tr>
+      <tr>
+        <td>
+          TIME([P])
+        </td>
+        <td>TIME(3)</td>
+      </tr>
+      <tr>
+        <td>
+          TIMESTAMP([P])
+        </td>
+        <td>TIMESTAMP([P])</td>
+      </tr>
+    </tbody>
+</table>
+</div>
+
+<u>debezium.time.precision.mode=connect</u>
+
+When the <code>debezium.time.precision.mode</code> property is set to the default value connect, both TIME and TIMESTAMP have a precision of 3.
+<div class="wy-table-responsive">
+<table class="colwidths-auto docutils">
+    <thead>
+      <tr>
+        <th class="text-left">PostgreSQL type<a href="https://www.postgresql.org/docs/12/datatype.html"></a></th>
+        <th class="text-left">CDC type<a href="{% link dev/table/types.md %}"></a></th>
+      </tr>
+    </thead>
+    <tbody>
+       <tr>
+        <td>
+          DATE
+        <td>DATE</td>
+      </tr>
+      <tr>
+        <td>
+          TIME([P])
+        </td>
+        <td>TIME(3)</td>
+      </tr>
+      <tr>
+        <td>
+          TIMESTAMP([P])
+        </td>
+        <td>TIMESTAMP(3)</td>
       </tr>
     </tbody>
 </table>

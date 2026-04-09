@@ -38,6 +38,7 @@ public class BinlogSplitMetaEvent implements SourceEvent {
 
     /** The metadata of binlog split is divided to multiple groups. */
     private final int metaGroupId;
+
     /**
      * The serialized metadata of binlog split, it's serialized/deserialize by {@link
      * FinishedSnapshotSplitInfo#serialize(FinishedSnapshotSplitInfo)} and {@link

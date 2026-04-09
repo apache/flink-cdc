@@ -36,22 +36,21 @@ import org.apache.flink.cdc.composer.utils.FactoryDiscoveryUtils;
 import org.apache.flink.cdc.runtime.operators.sink.BatchDataSinkFunctionOperator;
 import org.apache.flink.cdc.runtime.operators.sink.DataSinkFunctionOperator;
 import org.apache.flink.cdc.runtime.operators.sink.DataSinkWriterOperatorFactory;
-import org.apache.flink.core.io.SimpleVersionedSerializer;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.streaming.api.connector.sink2.CommittableMessage;
 import org.apache.flink.streaming.api.connector.sink2.CommittableMessageTypeInfo;
+import org.apache.flink.streaming.api.connector.sink2.SupportsPreCommitTopology;
+import org.apache.flink.streaming.api.connector.sink2.SupportsPreWriteTopology;
 import org.apache.flink.streaming.api.connector.sink2.WithPostCommitTopology;
 import org.apache.flink.streaming.api.connector.sink2.WithPreCommitTopology;
 import org.apache.flink.streaming.api.connector.sink2.WithPreWriteTopology;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.SinkFunction;
-import org.apache.flink.streaming.api.operators.OneInputStreamOperatorFactory;
 import org.apache.flink.streaming.api.operators.StreamSink;
 import org.apache.flink.streaming.api.transformations.LegacySinkTransformation;
 import org.apache.flink.streaming.api.transformations.PhysicalTransformation;
-
-import java.lang.reflect.InvocationTargetException;
+import org.apache.flink.streaming.runtime.operators.sink.CommitterOperatorFactory;
 
 /** Translator used to build {@link DataSink} for given {@link DataStream}. */
 @Internal
@@ -76,7 +75,8 @@ public class DataSinkTranslator {
                 new FactoryHelper.DefaultContext(
                         sinkDef.getConfig(),
                         pipelineConfig,
-                        Thread.currentThread().getContextClassLoader()));
+                        Thread.currentThread().getContextClassLoader(),
+                        env.getConfiguration()));
     }
 
     public void translate(
@@ -130,6 +130,8 @@ public class DataSinkTranslator {
         // Pre-write topology
         if (sink instanceof WithPreWriteTopology) {
             stream = ((WithPreWriteTopology<Event>) sink).addPreWriteTopology(stream);
+        } else if (sink instanceof SupportsPreWriteTopology) {
+            stream = ((SupportsPreWriteTopology<Event>) sink).addPreWriteTopology(stream);
         }
 
         if (sink instanceof TwoPhaseCommittingSink) {
@@ -177,8 +179,10 @@ public class DataSinkTranslator {
             boolean isBatchMode,
             OperatorID schemaOperatorID,
             OperatorUidGenerator operatorUidGenerator) {
+        TwoPhaseCommittingSink<Event, CommT> committingSink =
+                (TwoPhaseCommittingSink<Event, CommT>) sink;
         TypeInformation<CommittableMessage<CommT>> typeInformation =
-                CommittableMessageTypeInfo.of(() -> getCommittableSerializer(sink));
+                CommittableMessageTypeInfo.of(committingSink::getCommittableSerializer);
         DataStream<CommittableMessage<CommT>> written =
                 inputStream
                         .transform(
@@ -192,6 +196,8 @@ public class DataSinkTranslator {
         if (sink instanceof WithPreCommitTopology) {
             preCommitted =
                     ((WithPreCommitTopology<Event, CommT>) sink).addPreCommitTopology(written);
+        } else if (sink instanceof SupportsPreCommitTopology) {
+            preCommitted = ((SupportsPreCommitTopology) sink).addPreCommitTopology(written);
         }
 
         // TODO: Hard coding checkpoint
@@ -201,8 +207,8 @@ public class DataSinkTranslator {
                         .transform(
                                 SINK_COMMITTER_PREFIX + sinkName,
                                 typeInformation,
-                                getCommitterOperatorFactory(
-                                        sink, isBatchMode, isCheckpointingEnabled))
+                                new CommitterOperatorFactory<>(
+                                        committingSink, isBatchMode, isCheckpointingEnabled))
                         .uid(operatorUidGenerator.generateUid("sink-committer"));
 
         if (sink instanceof WithPostCommitTopology) {
@@ -213,38 +219,5 @@ public class DataSinkTranslator {
     private String generateSinkName(SinkDef sinkDef) {
         return sinkDef.getName()
                 .orElse(String.format("Flink CDC Event Sink: %s", sinkDef.getType()));
-    }
-
-    private static <CommT> SimpleVersionedSerializer<CommT> getCommittableSerializer(Object sink) {
-        // FIX ME: TwoPhaseCommittingSink has been deprecated, and its signature has changed
-        // during Flink 1.18 to 1.19. Remove this when Flink 1.18 is no longer supported.
-        try {
-            return (SimpleVersionedSerializer<CommT>)
-                    sink.getClass().getDeclaredMethod("getCommittableSerializer").invoke(sink);
-        } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
-            throw new RuntimeException("Failed to get CommittableSerializer", e);
-        }
-    }
-
-    private static <CommT>
-            OneInputStreamOperatorFactory<CommittableMessage<CommT>, CommittableMessage<CommT>>
-                    getCommitterOperatorFactory(
-                            Sink<Event> sink, boolean isBatchMode, boolean isCheckpointingEnabled) {
-        // FIX ME: OneInputStreamOperatorFactory is an @Internal class, and its signature has
-        // changed during Flink 1.18 to 1.19. Remove this when Flink 1.18 is no longer supported.
-        try {
-            return (OneInputStreamOperatorFactory<
-                            CommittableMessage<CommT>, CommittableMessage<CommT>>)
-                    Class.forName(
-                                    "org.apache.flink.streaming.runtime.operators.sink.CommitterOperatorFactory")
-                            .getDeclaredConstructors()[0]
-                            .newInstance(sink, isBatchMode, isCheckpointingEnabled);
-
-        } catch (ClassNotFoundException
-                | InstantiationException
-                | IllegalAccessException
-                | InvocationTargetException e) {
-            throw new RuntimeException("Failed to create CommitterOperatorFactory", e);
-        }
     }
 }

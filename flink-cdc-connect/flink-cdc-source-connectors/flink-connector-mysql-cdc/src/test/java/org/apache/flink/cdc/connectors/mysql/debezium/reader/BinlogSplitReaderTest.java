@@ -90,6 +90,7 @@ import static org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils.get
 import static org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils.getStartingOffsetOfBinlogSplit;
 import static org.apache.flink.cdc.connectors.mysql.testutils.MetricsUtils.getMySqlSplitEnumeratorContext;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Tests for {@link org.apache.flink.cdc.connectors.mysql.debezium.reader.BinlogSplitReader}. */
 class BinlogSplitReaderTest extends MySqlSourceTestBase {
@@ -786,6 +787,89 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
     }
 
     @Test
+    void testRestoreFromCheckpointWithGtidSetAndSkippingEventsAndRows() throws Exception {
+        // Preparations
+        customerDatabase.createAndInitialize();
+        MySqlSourceConfig connectionConfig = getConfig(new String[] {"customers"});
+        binaryLogClient = DebeziumUtils.createBinaryClient(connectionConfig.getDbzConfiguration());
+        mySqlConnection = DebeziumUtils.createMySqlConnection(connectionConfig);
+        DataType dataType =
+                DataTypes.ROW(
+                        DataTypes.FIELD("id", DataTypes.BIGINT()),
+                        DataTypes.FIELD("name", DataTypes.STRING()),
+                        DataTypes.FIELD("address", DataTypes.STRING()),
+                        DataTypes.FIELD("phone_number", DataTypes.STRING()));
+
+        // Capture the current binlog offset, and we will start the reader from here
+        BinlogOffset startingOffset = DebeziumUtils.currentBinlogOffset(mySqlConnection);
+
+        // In this case, the binlog is:
+        // Event 0: QUERY,BEGIN
+        // Event 1: TABLE_MAP
+        // Event 2: Update id = 101 and id = 102
+        //        ROW 1 : Update id=101
+        //        ROW 2 : Update id=102
+        // Event 3: TABLE_MAP
+        // Event 4: Update id = 103 and id = 109
+        //        ROW 1 : Update id=103
+        //        ROW 2 : Update id=109
+
+        // When a checkpoint is triggered
+        // after id=103 ,before id=109 ,
+        // the position restored from checkpoint will be event=4 and row=1
+        BinlogOffset checkpointOffset =
+                BinlogOffset.builder()
+                        .setBinlogFilePosition("", 0)
+                        .setGtidSet(startingOffset.getGtidSet())
+                        // Because the position restored from checkpoint
+                        // will skip 4 events to drop the first update:
+                        // QUERY / TABLE_MAP / EXT_UPDATE_ROWS / TABLE_MAP
+                        .setSkipEvents(4)
+                        // The position restored from checkpoint
+                        // will skip 1 rows to drop the first
+                        .setSkipRows(1)
+                        .build();
+
+        // Create a new config to start reading from the offset captured above
+        MySqlSourceConfig sourceConfig =
+                getConfig(
+                        StartupOptions.specificOffset(checkpointOffset),
+                        new String[] {"customers"});
+
+        // Create reader and submit splits
+        MySqlBinlogSplit split = createBinlogSplit(sourceConfig);
+        BinlogSplitReader reader = createBinlogReader(sourceConfig);
+        reader.submitSplit(split);
+
+        // Create some binlog events:
+        // Event 0: QUERY,BEGIN
+        // Event 1: TABLE_MAP
+        // Event 2: Update id = 101 and id = 102
+        //        ROW 1 : Update id=101
+        //        ROW 2 : Update id=102
+        // Event 3: TABLE_MAP
+        // Event 4: Update id = 103 and id = 109
+        //        ROW 1 : Update id=103
+        //        ROW 2 : Update id=109
+        // The event 0-3 will be dropped because skipEvents = 4.
+        // The row 1 in event 4 will be dropped because skipRows = 1.
+        // Only the update on 109 will be captured.
+        updateCustomersTableInBulk(
+                mySqlConnection, customerDatabase.qualifiedTableName("customers"));
+
+        // Read with binlog split reader and validate
+        String[] expected =
+                new String[] {
+                    "-U[109, user_4, Shanghai, 123567891234]",
+                    "+U[109, user_4, Pittsburgh, 123567891234]"
+                };
+        List<String> actual = readBinlogSplits(dataType, reader, expected.length);
+
+        reader.close();
+        assertEqualsInOrder(Arrays.asList(expected), actual);
+    }
+
+    @Test
     void testReadBinlogFromTimestamp() throws Exception {
         // Preparations
         customerDatabase.createAndInitialize();
@@ -1117,6 +1201,37 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
         List<SourceRecord> sourceRecords =
                 pollRecordsFromReader(binlogReader, RecordUtils::isDataChangeRecord);
         Assertions.assertThat(sourceRecords).isEmpty();
+    }
+
+    @Test
+    void testReadBinlogWithException() throws Exception {
+        customerDatabase.createAndInitialize();
+        MySqlSourceConfig sourceConfig =
+                getConfig(StartupOptions.latest(), new String[] {"customers"});
+        binaryLogClient = DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
+        mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig);
+
+        // Create reader and submit splits
+        StatefulTaskContext statefulTaskContext =
+                new StatefulTaskContext(sourceConfig, binaryLogClient, mySqlConnection);
+        MySqlBinlogSplit split = createBinlogSplit(sourceConfig);
+        BinlogSplitReader reader = new BinlogSplitReader(statefulTaskContext, 0);
+
+        // Mock an exception occurring during stream split reading by setting the error handler
+        // and stopping the change event source to test exception handling
+        reader.submitSplit(split);
+        statefulTaskContext
+                .getErrorHandler()
+                .setProducerThrowable(new RuntimeException("Test read with exception"));
+        reader.getChangeEventSourceContext().stopChangeEventSource();
+        // wait until executor is finished.
+        Thread.sleep(500L);
+
+        assertThatThrownBy(() -> pollRecordsFromReader(reader, RecordUtils::isDataChangeRecord))
+                .rootCause()
+                .isExactlyInstanceOf(RuntimeException.class)
+                .hasMessage("Test read with exception");
+        reader.close();
     }
 
     private BinlogSplitReader createBinlogReader(MySqlSourceConfig sourceConfig) {

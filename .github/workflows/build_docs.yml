@@ -35,9 +35,9 @@ jobs:
     if: github.repository == 'apache/flink-cdc'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v6
       - name: Check dead links
-        uses: gaurav-nelson/github-action-markdown-link-check@1.0.15
+        uses: tcort/github-action-markdown-link-check@e7c7a18363c842693fadde5d41a3bd3573a7a225
         with:
           config-file: '.dlc.json'
       - name: Build doc
@@ -54,11 +54,11 @@ jobs:
       matrix:
         branch:
           - master
-          - release-3.4
-          - release-3.3
+          - release-3.6
+          - release-3.5
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v6
         with:
           ref: ${{ matrix.branch }}
 
@@ -69,13 +69,13 @@ jobs:
           echo "flink_branch=${currentBranch}" >> ${GITHUB_ENV}
           
           if [ "${currentBranch}" = "master" ]; then
-          echo "flink_alias=release-3.5" >> ${GITHUB_ENV}
-          elif [ "${currentBranch}" = "release-3.4" ]; then
+          echo "flink_alias=release-3.7" >> ${GITHUB_ENV}
+          elif [ "${currentBranch}" = "release-3.6" ]; then
           echo "flink_alias=stable" >> ${GITHUB_ENV}
           fi
 
       - name: Check dead links
-        uses: gaurav-nelson/github-action-markdown-link-check@1.0.15
+        uses: tcort/github-action-markdown-link-check@e7c7a18363c842693fadde5d41a3bd3573a7a225
         with:
           config-file: '.dlc.json'
 

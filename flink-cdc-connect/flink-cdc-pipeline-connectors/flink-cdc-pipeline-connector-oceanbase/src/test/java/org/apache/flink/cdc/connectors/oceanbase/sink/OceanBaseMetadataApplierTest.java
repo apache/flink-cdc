@@ -145,6 +145,34 @@ class OceanBaseMetadataApplierTest {
                         .build();
 
         assertThat(actualTable).isEqualTo(expectTable);
+
+        tableId = TableId.tableId("nonexistent' OR '1'='1", "tabl1");
+        metadataApplier.applySchemaChange(new CreateTableEvent(tableId, schema));
+        actualTable =
+                catalog.getTable(tableId.getSchemaName(), tableId.getTableName()).orElse(null);
+        assertThat(actualTable).isNotNull();
+        assertThat(actualTable.getDatabaseName()).isEqualTo("nonexistent' OR '1'='1");
+
+        tableId = TableId.tableId("test", "nonexistent' OR '1'='1");
+        metadataApplier.applySchemaChange(new CreateTableEvent(tableId, schema));
+        actualTable =
+                catalog.getTable(tableId.getSchemaName(), tableId.getTableName()).orElse(null);
+        assertThat(actualTable).isNotNull();
+        assertThat(actualTable.getTableName()).isEqualTo("nonexistent' OR '1'='1");
+
+        tableId = TableId.tableId("nonexistent` OR `1`=`1", "tabl1");
+        metadataApplier.applySchemaChange(new CreateTableEvent(tableId, schema));
+        actualTable =
+                catalog.getTable(tableId.getSchemaName(), tableId.getTableName()).orElse(null);
+        assertThat(actualTable).isNotNull();
+        assertThat(actualTable.getDatabaseName()).isEqualTo("nonexistent` OR `1`=`1");
+
+        tableId = TableId.tableId("test", "nonexistent` OR `1`=`1");
+        metadataApplier.applySchemaChange(new CreateTableEvent(tableId, schema));
+        actualTable =
+                catalog.getTable(tableId.getSchemaName(), tableId.getTableName()).orElse(null);
+        assertThat(actualTable).isNotNull();
+        assertThat(actualTable.getTableName()).isEqualTo("nonexistent` OR `1`=`1");
     }
 
     @Test

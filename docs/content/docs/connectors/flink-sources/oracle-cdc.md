@@ -41,7 +41,7 @@ In order to setup the Oracle CDC connector, the following table provides depende
 
 **Download link is available only for stable releases.**
 
-Download [flink-sql-connector-oracle-cdc-{{< param Version >}}.jar](https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-oracle-cdc/{{< param Version >}}/flink-sql-connector-oracle-cdc-{{< param Version >}}.jar) and put it under `<FLINK_HOME>/lib/`.
+Download [flink-sql-connector-oracle-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-oracle-cdc) and put it under `<FLINK_HOME>/lib/`.
 
 **Note:** Refer to [flink-sql-connector-oracle-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-oracle-cdc), more released versions will be available in the Maven central warehouse.
 
@@ -352,8 +352,15 @@ Connector Options
       <td style="word-wrap: break-word;">initial</td>
       <td>String</td>
       <td>Optional startup mode for Oracle CDC consumer, valid enumerations are "initial"
-           and "latest-offset". 
+           , "latest-offset" , specific-offset. 
            Please see <a href="#startup-reading-position">Startup Reading Position</a> section for more detailed information.</td>
+    </tr>
+    <tr>
+      <td>scan.startup.specific-offset.scn</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>Long</td>
+      <td>Optional SCN used in case of "specific-offset" startup mode</td>
     </tr>
     <tr>
           <td>scan.incremental.snapshot.enabled</td>
@@ -544,12 +551,74 @@ The config option `scan.startup.mode` specifies the startup mode for Oracle CDC 
 - `initial` (default): Performs an initial snapshot on the monitored database tables upon first startup, and continue to read the latest redo log.
 - `latest-offset`: Never to perform a snapshot on the monitored database tables upon first startup, just read from
   the change since the connector was started.
+- `specific-offset`: Skip snapshot phase and start reading redo log from a specific offset with scn.
 
 _Note: the mechanism of `scan.startup.mode` option relying on Debezium's `snapshot.mode` configuration. So please do not use them together. If you specific both `scan.startup.mode` and `debezium.snapshot.mode` options in the table DDL, it may make `scan.startup.mode` doesn't work._
 
 ### Single Thread Reading
 
 The Oracle CDC source can't work in parallel reading, because there is only one task can receive change events.
+
+### Scan Newly Added Tables
+
+**Note:** This feature is available since Flink CDC 3.1.0.
+
+Scan Newly Added Tables feature enables you to add new tables to monitor for an existing running pipeline. The newly added tables will read their snapshot data first and then read their redo log automatically.
+
+Imagine this scenario: At the beginning, a Flink job monitors tables `[product, user, address]`, but after some days we would like the job to also monitor tables `[order, custom]` which contain historical data, and we need the job to still reuse existing state of the job. This feature can resolve this case gracefully.
+
+The following operations show how to enable this feature to resolve above scenario. An existing Flink job which uses Oracle CDC Source like:
+
+```java
+    JdbcIncrementalSource<String> oracleSource = new OracleSourceBuilder()
+        .hostname("yourHostname")
+        .port(1521)
+        .databaseList("ORCLCDB") // set captured database
+        .schemaList("INVENTORY") // set captured schema
+        .tableList("INVENTORY.PRODUCT", "INVENTORY.USER", "INVENTORY.ADDRESS") // set captured tables
+        .username("yourUsername")
+        .password("yourPassword")
+        .scanNewlyAddedTableEnabled(true) // enable scan newly added tables feature
+        .deserializer(new JsonDebeziumDeserializationSchema()) // converts SourceRecord to JSON String
+        .build();
+   // your business code
+```
+
+If we would like to add new tables `[INVENTORY.ORDER, INVENTORY.CUSTOM]` to an existing Flink job, we just need to update the `tableList()` value of the job to include `[INVENTORY.ORDER, INVENTORY.CUSTOM]` and restore the job from previous savepoint.
+
+_Step 1_: Stop the existing Flink job with savepoint.
+```shell
+$ ./bin/flink stop $Existing_Flink_JOB_ID
+```
+```shell
+Suspending job "cca7bc1061d61cf15238e92312c2fc20" with a savepoint.
+Savepoint completed. Path: file:/tmp/flink-savepoints/savepoint-cca7bc-bb1e257f0dab
+```
+_Step 2_: Update the table list option for the existing Flink job.
+1. update `tableList()` value.
+2. build the jar of updated job.
+```java
+    JdbcIncrementalSource<String> oracleSource = new OracleSourceBuilder()
+        .hostname("yourHostname")
+        .port(1521)
+        .databaseList("ORCLCDB")
+        .schemaList("INVENTORY")
+        .tableList("INVENTORY.PRODUCT", "INVENTORY.USER", "INVENTORY.ADDRESS", "INVENTORY.ORDER", "INVENTORY.CUSTOM") // set captured tables [PRODUCT, USER, ADDRESS, ORDER, CUSTOM]
+        .username("yourUsername")
+        .password("yourPassword")
+        .scanNewlyAddedTableEnabled(true)
+        .deserializer(new JsonDebeziumDeserializationSchema()) // converts SourceRecord to JSON String
+        .build();
+   // your business code
+```
+_Step 3_: Restore the updated Flink job from savepoint.
+```shell
+$ ./bin/flink run \
+      --detached \
+      --from-savepoint /tmp/flink-savepoints/savepoint-cca7bc-bb1e257f0dab \
+      ./FlinkCDCExample.jar
+```
+**Note:** Please refer the doc [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.17/docs/deployment/cli/#command-line-interface) for more details.
 
 ### DataStream Source
 

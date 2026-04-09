@@ -329,7 +329,7 @@ If it is the DataStream API, add the configuration item of debezium 'database.ta
 
 ### Q3: How does Oracle CDC switch to XStream?
 
-Add configuration item  'database.connection.adpter' = 'xstream', please use the configuration item 'debezium.database.connection.adpter' = 'xstream' if you're using SQL API.
+Add configuration item  'database.connection.adapter' = 'xstream', please use the configuration item 'debezium.database.connection.adapter' = 'xstream' if you're using SQL API.
 
 ### Q4: What are the database name and schema name of Oracle CDC?
 

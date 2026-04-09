@@ -146,6 +146,13 @@ pipeline:
       <td>Whether to send schema change events, so that downstream sinks can respond to schema changes and achieve table structure synchronization.</td>
     </tr>
     <tr>
+      <td>server-time-zone</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>The session time zone in database server. If not set, then ZoneId.systemDefault() is used to determine the server time zone.</td>
+    </tr>
+    <tr>
       <td>server-id</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
@@ -244,7 +251,7 @@ pipeline:
     <tr>
           <td>jdbc.properties.*</td>
           <td>optional</td>
-          <td style="word-wrap: break-word;">20</td>
+          <td style="word-wrap: break-word;">(none)</td>
           <td>String</td>
           <td>Option to pass custom JDBC URL properties. User can pass custom properties like 'jdbc.properties.useSSL' = 'false'.</td>
     </tr>
@@ -358,7 +365,7 @@ pipeline:
     <tr>
       <td>metadata.list</td>
       <td>optional</td>
-      <td style="word-wrap: break-word;">false</td>
+      <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>
         List of readable metadata from SourceRecord to be passed to downstream and could be used in transform module, split by `,`. Available readable metadata are: op_ts.

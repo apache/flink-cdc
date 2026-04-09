@@ -40,6 +40,7 @@ import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
 import org.apache.flink.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplit;
+import org.apache.flink.util.CollectionUtil;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.Lists;
@@ -126,7 +127,9 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
             LOG.info("The enumerator adds add binlog split back: {}", binlogSplit);
             this.binlogSplitTaskId = null;
         }
-        splitAssigner.addSplits(splits);
+        if (!CollectionUtil.isNullOrEmpty(splits)) {
+            splitAssigner.addSplits(splits);
+        }
     }
 
     @Override

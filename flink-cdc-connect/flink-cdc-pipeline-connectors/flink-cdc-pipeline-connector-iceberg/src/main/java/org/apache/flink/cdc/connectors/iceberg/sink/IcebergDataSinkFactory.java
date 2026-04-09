@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.iceberg.sink;
 
 import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.factories.DataSinkFactory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
@@ -31,13 +32,16 @@ import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 import org.apache.iceberg.CatalogProperties;
 
 import java.time.ZoneId;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
 import static org.apache.flink.cdc.connectors.iceberg.sink.IcebergDataSinkOptions.PREFIX_CATALOG_PROPERTIES;
+import static org.apache.flink.cdc.connectors.iceberg.sink.IcebergDataSinkOptions.PREFIX_HADOOP_CONF;
 import static org.apache.flink.cdc.connectors.iceberg.sink.IcebergDataSinkOptions.PREFIX_TABLE_PROPERTIES;
 
 /** A {@link DataSinkFactory} for Apache Iceberg. */
@@ -52,13 +56,15 @@ public class IcebergDataSinkFactory implements DataSinkFactory {
     @Override
     public DataSink createDataSink(Context context) {
         FactoryHelper.createFactoryHelper(this, context)
-                .validateExcept(PREFIX_TABLE_PROPERTIES, PREFIX_CATALOG_PROPERTIES);
+                .validateExcept(
+                        PREFIX_TABLE_PROPERTIES, PREFIX_CATALOG_PROPERTIES, PREFIX_HADOOP_CONF);
 
         Map<String, String> allOptions = context.getFactoryConfiguration().toMap();
         OptionUtils.printOptions(IDENTIFIER, allOptions);
 
         Map<String, String> catalogOptions = new HashMap<>();
         Map<String, String> tableOptions = new HashMap<>();
+        Map<String, String> hadoopConfOptions = extractHadoopConfOptions(allOptions);
         allOptions.forEach(
                 (key, value) -> {
                     if (key.startsWith(PREFIX_TABLE_PROPERTIES)) {
@@ -86,13 +92,46 @@ public class IcebergDataSinkFactory implements DataSinkFactory {
         CompactionOptions compactionOptions =
                 getCompactionStrategy(context.getFactoryConfiguration());
 
+        Map<TableId, List<String>> partitionMaps = new HashMap<>();
+        String partitionKey =
+                context.getFactoryConfiguration().get(IcebergDataSinkOptions.PARTITION_KEY);
+        if (partitionKey != null && !partitionKey.isEmpty()) {
+            for (String tables : partitionKey.trim().split(";")) {
+                String[] splits = tables.trim().split(":");
+                if (splits.length == 2) {
+                    TableId tableId = TableId.parse(splits[0]);
+                    List<String> partitions = Arrays.asList(splits[1].split(","));
+                    partitionMaps.put(tableId, partitions);
+                } else {
+                    throw new IllegalArgumentException(
+                            IcebergDataSinkOptions.PARTITION_KEY.key()
+                                    + " is malformed, please refer to the documents");
+                }
+            }
+        }
+        String jobIdPrefix =
+                context.getFactoryConfiguration().get(IcebergDataSinkOptions.JOB_ID_PREFIX);
+
         return new IcebergDataSink(
                 catalogOptions,
                 tableOptions,
-                new HashMap<>(),
+                partitionMaps,
                 zoneId,
                 schemaOperatorUid,
-                compactionOptions);
+                compactionOptions,
+                jobIdPrefix,
+                hadoopConfOptions);
+    }
+
+    static Map<String, String> extractHadoopConfOptions(Map<String, String> allOptions) {
+        Map<String, String> hadoopConfOptions = new HashMap<>();
+        allOptions.forEach(
+                (key, value) -> {
+                    if (key.startsWith(PREFIX_HADOOP_CONF)) {
+                        hadoopConfOptions.put(key.substring(PREFIX_HADOOP_CONF.length()), value);
+                    }
+                });
+        return hadoopConfOptions;
     }
 
     private CompactionOptions getCompactionStrategy(Configuration configuration) {
@@ -118,10 +157,18 @@ public class IcebergDataSinkFactory implements DataSinkFactory {
     public Set<ConfigOption<?>> optionalOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
         options.add(IcebergDataSinkOptions.TYPE);
+        options.add(IcebergDataSinkOptions.CATALOG_IMPL);
+        options.add(IcebergDataSinkOptions.IO_IMPL);
+        options.add(IcebergDataSinkOptions.GLUE_ID);
+        options.add(IcebergDataSinkOptions.GLUE_SKIP_ARCHIVE);
+        options.add(IcebergDataSinkOptions.GLUE_SKIP_NAME_VALIDATION);
+        options.add(IcebergDataSinkOptions.CLIENT_REGION);
         options.add(IcebergDataSinkOptions.WAREHOUSE);
         options.add(IcebergDataSinkOptions.PARTITION_KEY);
         options.add(IcebergDataSinkOptions.SINK_COMPACTION_ENABLED);
         options.add(IcebergDataSinkOptions.SINK_COMPACTION_COMMIT_INTERVAL);
+        options.add(IcebergDataSinkOptions.SINK_COMPACTION_PARALLELISM);
+        options.add(IcebergDataSinkOptions.JOB_ID_PREFIX);
         return options;
     }
 }

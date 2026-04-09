@@ -25,7 +25,6 @@ import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
 import org.apache.flink.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplit;
-import org.apache.flink.util.CollectionUtil;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -90,10 +89,8 @@ public class MySqlBinlogSplitAssigner implements MySqlSplitAssigner {
 
     @Override
     public void addSplits(Collection<MySqlSplit> splits) {
-        if (!CollectionUtil.isNullOrEmpty(splits)) {
-            // we don't store the split, but will re-create binlog split later
-            isBinlogSplitAssigned = false;
-        }
+        // we don't store the split, but will re-create binlog split later
+        isBinlogSplitAssigned = false;
     }
 
     @Override

@@ -159,6 +159,7 @@ public class PostgresTypeUtils {
             case PgOid.DATERANGE_OID:
                 return DataTypes.STRING();
             case PgOid.TEXT_ARRAY:
+            case PgOid.UUID_ARRAY:
                 return DataTypes.ARRAY(DataTypes.STRING());
             case PgOid.TIMESTAMP:
                 return handleTimestampWithTemporalMode(temporalPrecisionMode, scale);
@@ -277,7 +278,7 @@ public class PostgresTypeUtils {
             case ADAPTIVE:
             case ADAPTIVE_TIME_MICROSECONDS:
             case CONNECT:
-                return DataTypes.INT();
+                return DataTypes.TIME(scale);
             default:
                 throw new IllegalArgumentException("Unknown temporal precision mode: " + mode);
         }

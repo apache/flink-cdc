@@ -31,18 +31,67 @@ public class IcebergDataSinkOptions {
     // prefix for passing properties for catalog creation.
     public static final String PREFIX_CATALOG_PROPERTIES = "catalog.properties.";
 
+    // prefix for passing properties for Hadoop configuration.
+    public static final String PREFIX_HADOOP_CONF = "hadoop.conf.";
+
     public static final ConfigOption<String> TYPE =
             key("catalog.properties.type")
                     .stringType()
                     .noDefaultValue()
-                    .withDescription("Type of iceberg catalog, supports `hadoop` and `hive`.");
+                    .withDescription(
+                            "Type of iceberg catalog, supports `hadoop`, `hive` and `glue`.");
+
+    public static final ConfigOption<String> CATALOG_IMPL =
+            key("catalog.properties.catalog-impl")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "Custom catalog implementation class. "
+                                    + "For AWS Glue catalog, use `org.apache.iceberg.aws.glue.GlueCatalog`.");
+
+    public static final ConfigOption<String> IO_IMPL =
+            key("catalog.properties.io-impl")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "Custom FileIO implementation class. "
+                                    + "For AWS S3, use `org.apache.iceberg.aws.s3.S3FileIO`.");
+
+    public static final ConfigOption<String> GLUE_ID =
+            key("catalog.properties.glue.id")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "The Glue catalog ID (AWS account ID). By default, the caller's AWS account ID is used.");
+
+    public static final ConfigOption<Boolean> GLUE_SKIP_ARCHIVE =
+            key("catalog.properties.glue.skip-archive")
+                    .booleanType()
+                    .defaultValue(true)
+                    .withDescription(
+                            "Whether to skip archiving older table versions in Glue. Default is true.");
+
+    public static final ConfigOption<Boolean> GLUE_SKIP_NAME_VALIDATION =
+            key("catalog.properties.glue.skip-name-validation")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Whether to skip name validation for Glue catalog. Default is false.");
+
+    public static final ConfigOption<String> CLIENT_REGION =
+            key("catalog.properties.client.region")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription("The AWS region for the Glue catalog client.");
 
     public static final ConfigOption<String> WAREHOUSE =
             key("catalog.properties.warehouse")
                     .stringType()
                     .noDefaultValue()
                     .withDescription(
-                            "The warehouse root path of catalog, only usable when catalog.properties.type is `hadoop`.");
+                            "The warehouse root path of the Iceberg catalog, used by all catalog types. "
+                                    + "For `hadoop` and `hive` catalogs, this is typically a local or distributed filesystem path (for example, `hdfs://namenode:8020/warehouse`). "
+                                    + "For `glue` catalog, this is typically an object storage path like `s3://my-bucket/warehouse`.");
 
     public static final ConfigOption<String> PARTITION_KEY =
             key("partition.key")
@@ -51,7 +100,8 @@ public class IcebergDataSinkOptions {
                     .withDescription(
                             "Partition keys for each partitioned table, allow setting multiple primary keys for multiTables. "
                                     + "Tables are separated by ';', and partition keys are separated by ','. "
-                                    + "For example, we can set partition.key of two tables by 'testdb.table1:id1,id2;testdb.table2:name'.");
+                                    + "For example, we can set partition.key of two tables by 'testdb.table1:id1,id2;testdb.table2:name'."
+                                    + "For partition transforms,  we can set partition.key by 'testdb.table1:truncate[10](id);testdb.table2:hour(create_time);testdb.table3:day(create_time);testdb.table4:month(create_time);testdb.table5:year(create_time);testdb.table6:bucket[10](create_time)'.");
 
     @Experimental
     public static final ConfigOption<Boolean> SINK_COMPACTION_ENABLED =
@@ -77,4 +127,12 @@ public class IcebergDataSinkOptions {
                     .defaultValue(-1)
                     .withDescription(
                             "The parallelism for file compaction, default value is -1, which means that compaction parallelism is equal to sink writer parallelism.");
+
+    @Experimental
+    public static final ConfigOption<String> JOB_ID_PREFIX =
+            key("job.id.prefix")
+                    .stringType()
+                    .defaultValue("cdc")
+                    .withDescription(
+                            "The prefix of job id, which is used to distinguish different jobs.");
 }

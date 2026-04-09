@@ -17,10 +17,10 @@
 
 package org.apache.flink.cdc.connectors.postgres.table;
 
-import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.cdc.connectors.postgres.PostgresTestBase;
 import org.apache.flink.cdc.connectors.utils.StaticExternalResourceProxy;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.util.RestartStrategyUtils;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -103,7 +103,7 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
 
     void setup(boolean parallelismSnapshot) {
         TestValuesTableFactory.clearAllData();
-        env.setRestartStrategy(RestartStrategies.noRestart());
+        RestartStrategyUtils.configureNoRestartStrategy(env);
         if (parallelismSnapshot) {
             env.setParallelism(4);
             env.enableCheckpointing(200);
@@ -154,8 +154,7 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
                         + " PRIMARY KEY (name) NOT ENFORCED"
                         + ") WITH ("
                         + " 'connector' = 'values',"
-                        + " 'sink-insert-only' = 'false',"
-                        + " 'sink-expected-messages-num' = '20'"
+                        + " 'sink-insert-only' = 'false'"
                         + ")";
         tEnv.executeSql(sourceDDL);
         tEnv.executeSql(sinkDDL);
@@ -187,7 +186,20 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
             statement.execute("DELETE FROM inventory.products WHERE id=111;");
         }
 
-        waitForSinkSize("sink", 20);
+        // Wait for the final aggregated result
+        // Note: We use waitForSinkResult instead of waitForSinkSize because Flink 2.x
+        // optimizations may reduce the number of intermediate changelog messages
+        String[] expected =
+                new String[] {
+                    "scooter,3.140",
+                    "car battery,8.100",
+                    "12-pack drill bits,0.800",
+                    "hammer,2.625",
+                    "rocks,5.100",
+                    "jacket,0.600",
+                    "spare tire,22.200"
+                };
+        waitForSinkResult("sink", Arrays.asList(expected));
 
         /*
          * <pre>
@@ -215,16 +227,125 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
          * </pre>
          */
 
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
+        Assertions.assertThat(actual).containsExactlyInAnyOrder(expected);
+
+        result.getJobClient().get().cancel().get();
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void testConsumingAllEventsForPartitionedTable(boolean parallelismSnapshot)
+            throws SQLException, ExecutionException, InterruptedException {
+        setup(parallelismSnapshot);
+        initializePostgresTable(POSTGRES_CONTAINER, "inventory_partitioned");
+        String publicationName = "dbz_publication_" + new Random().nextInt(1000);
+        String slotName = getSlotName();
+        try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    String.format(
+                            "CREATE PUBLICATION %s FOR TABLE inventory_partitioned.products "
+                                    + " WITH (publish_via_partition_root=true)",
+                            publicationName));
+            statement.execute(
+                    String.format(
+                            "select pg_create_logical_replication_slot('%s','pgoutput');",
+                            slotName));
+        }
+
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE debezium_source ("
+                                + " id INT NOT NULL,"
+                                + " name STRING,"
+                                + " description STRING,"
+                                + " weight DECIMAL(10,3),"
+                                + " country STRING"
+                                + ") WITH ("
+                                + " 'connector' = 'postgres-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'schema-name' = '%s',"
+                                + " 'table-name' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'scan.include-partitioned-tables.enabled' = 'true',"
+                                + " 'decoding.plugin.name' = 'pgoutput', "
+                                + " 'debezium.publication.name'  = '%s',"
+                                + " 'slot.name' = '%s'"
+                                + ")",
+                        POSTGRES_CONTAINER.getHost(),
+                        POSTGRES_CONTAINER.getMappedPort(POSTGRESQL_PORT),
+                        POSTGRES_CONTAINER.getUsername(),
+                        POSTGRES_CONTAINER.getPassword(),
+                        POSTGRES_CONTAINER.getDatabaseName(),
+                        "inventory_partitioned",
+                        "products",
+                        parallelismSnapshot,
+                        publicationName,
+                        slotName);
+        String sinkDDL =
+                "CREATE TABLE sink ("
+                        + " id INT NOT NULL,"
+                        + " name STRING,"
+                        + " description STRING,"
+                        + " weight DECIMAL(10,3),"
+                        + " country STRING,"
+                        + " PRIMARY KEY (id, country) NOT ENFORCED"
+                        + ") WITH ("
+                        + " 'connector' = 'values',"
+                        + " 'sink-insert-only' = 'false',"
+                        + " 'sink-expected-messages-num' = '20'"
+                        + ")";
+        tEnv.executeSql(sourceDDL);
+        tEnv.executeSql(sinkDDL);
+
+        // async submit job
+        TableResult result =
+                tEnv.executeSql(
+                        "INSERT INTO sink SELECT id, name, description, weight, country FROM debezium_source");
+
+        waitForSnapshotStarted("sink");
+
+        // wait a bit to make sure the replication slot is ready
+        Thread.sleep(5000);
+
+        // generate WAL
+        try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "INSERT INTO inventory_partitioned.products VALUES (default,'jacket','water resistent white wind breaker',0.2, 'us');"); // 110
+            statement.execute(
+                    "INSERT INTO inventory_partitioned.products VALUES (default,'scooter','Big 2-wheel scooter ',5.18, 'uk');");
+            statement.execute(
+                    "CREATE TABLE inventory_partitioned.products_china PARTITION OF inventory_partitioned.products FOR VALUES IN ('china');");
+            statement.execute(
+                    "INSERT INTO inventory_partitioned.products VALUES (default,'bike','Big 2-wheel bycicle ',6.18, 'china');");
+        }
+
+        // consume both snapshot and wal events
+        // Note: We use waitForSinkResult instead of waitForSinkSize because Flink 2.x
+        // optimizations may reduce the number of intermediate changelog messages
         String[] expected =
                 new String[] {
-                    "scooter,3.140",
-                    "car battery,8.100",
-                    "12-pack drill bits,0.800",
-                    "hammer,2.625",
-                    "rocks,5.100",
-                    "jacket,0.600",
-                    "spare tire,22.200"
+                    "101,scooter,Small 2-wheel scooter,3.140,us",
+                    "102,car battery,12V car battery,8.100,us",
+                    "103,12-pack drill bits,12-pack of drill bits with sizes ranging from #40 to #3,0.800,us",
+                    "104,hammer,12oz carpenter's hammer,0.750,us",
+                    "105,hammer,14oz carpenter's hammer,0.875,us",
+                    "106,hammer,16oz carpenter's hammer,1.000,uk",
+                    "107,rocks,box of assorted rocks,5.300,uk",
+                    "108,jacket,water resistent black wind breaker,0.100,uk",
+                    "109,spare tire,24 inch spare tire,22.200,uk",
+                    "110,jacket,water resistent white wind breaker,0.200,us",
+                    "111,scooter,Big 2-wheel scooter ,5.180,uk",
+                    "112,bike,Big 2-wheel bycicle ,6.180,china"
                 };
+
+        waitForSinkResult("sink", Arrays.asList(expected));
 
         List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
         Assertions.assertThat(actual).containsExactlyInAnyOrder(expected);
@@ -295,10 +416,12 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
             statement.execute("DELETE FROM inventory.products WHERE id=111;");
         }
 
-        waitForSinkSize("sink", 5);
-
+        // Note: We use waitForSinkResult instead of waitForSinkSize because Flink 2.x
+        // optimizations may reduce the number of intermediate changelog messages
         String[] expected =
                 new String[] {"110,jacket,new water resistent white wind breaker,0.500"};
+
+        waitForSinkResult("sink", Arrays.asList(expected));
 
         List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
         Assertions.assertThat(actual).containsExactlyInAnyOrder(expected);
@@ -387,12 +510,15 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
         tEnv.executeSql(sinkDDL);
 
         TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM debezium_source");
-        waitForSinkSize("sink", 2);
 
+        // Note: We use waitForSinkResult instead of waitForSinkSize because Flink 2.x
+        // optimizations may reduce the number of intermediate changelog messages
         String[] expected =
                 new String[] {
                     "112,thirth,thirth description,0.100", "113,forth,forth description,0.200"
                 };
+
+        waitForSinkResult("sink", Arrays.asList(expected));
 
         List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
         Assertions.assertThat(actual).containsExactlyInAnyOrder(expected);
@@ -773,8 +899,7 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
                         + " PRIMARY KEY (name) NOT ENFORCED"
                         + ") WITH ("
                         + " 'connector' = 'values',"
-                        + " 'sink-insert-only' = 'false',"
-                        + " 'sink-expected-messages-num' = '20'"
+                        + " 'sink-insert-only' = 'false'"
                         + ")";
         tEnv.executeSql(sourceDDL);
         tEnv.executeSql(sinkDDL);
@@ -805,7 +930,20 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
             statement.execute("DELETE FROM inventory.products WHERE id=111;");
         }
 
-        waitForSinkSize("sink", 20);
+        // Wait for the final aggregated result
+        // Note: We use waitForSinkResult instead of waitForSinkSize because Flink 2.x
+        // optimizations may reduce the number of intermediate changelog messages
+        String[] expected =
+                new String[] {
+                    "scooter,3.140",
+                    "car battery,8.100",
+                    "12-pack drill bits,0.800",
+                    "hammer,2.625",
+                    "rocks,5.100",
+                    "jacket,0.600",
+                    "spare tire,22.200"
+                };
+        waitForSinkResult("sink", Arrays.asList(expected));
 
         /*
          * <pre>
@@ -833,21 +971,126 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
          * </pre>
          */
 
-        String[] expected =
-                new String[] {
-                    "scooter,3.140",
-                    "car battery,8.100",
-                    "12-pack drill bits,0.800",
-                    "hammer,2.625",
-                    "rocks,5.100",
-                    "jacket,0.600",
-                    "spare tire,22.200"
-                };
-
         List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
         Assertions.assertThat(actual).containsExactlyInAnyOrder(expected);
 
         result.getJobClient().get().cancel().get();
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void testArrayTypes(boolean parallelismSnapshot) throws Throwable {
+        setup(parallelismSnapshot);
+        initializePostgresTable(POSTGIS_CONTAINER, "column_type_test");
+
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE array_types ("
+                                + "    id INTEGER NOT NULL,"
+                                + "    text_a1 ARRAY<STRING>,"
+                                + "    int_a1 ARRAY<INT>,"
+                                + "    int_s1 ARRAY<INT>,"
+                                + "    uuid_a1 ARRAY<STRING>"
+                                + ") WITH ("
+                                + " 'connector' = 'postgres-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'schema-name' = '%s',"
+                                + " 'table-name' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'decoding.plugin.name' = 'pgoutput', "
+                                + " 'slot.name' = '%s'"
+                                + ")",
+                        POSTGIS_CONTAINER.getHost(),
+                        POSTGIS_CONTAINER.getMappedPort(POSTGRESQL_PORT),
+                        POSTGIS_CONTAINER.getUsername(),
+                        POSTGIS_CONTAINER.getPassword(),
+                        POSTGIS_CONTAINER.getDatabaseName(),
+                        "inventory",
+                        "array_types",
+                        parallelismSnapshot,
+                        getSlotName());
+
+        tEnv.executeSql(sourceDDL);
+
+        String sinkDDL =
+                "CREATE TABLE array_sink ("
+                        + "    id INTEGER NOT NULL,"
+                        + "    text_a1 ARRAY<STRING>,"
+                        + "    int_a1 ARRAY<INT>,"
+                        + "    int_s1 ARRAY<INT>,"
+                        + "    uuid_a1 ARRAY<STRING>,"
+                        + "    PRIMARY KEY (id) NOT ENFORCED"
+                        + ") WITH ("
+                        + "  'connector' = 'values',"
+                        + "  'sink-insert-only' = 'false'"
+                        + ")";
+        tEnv.executeSql(sinkDDL);
+
+        // async submit job
+        TableResult tableResult =
+                tEnv.executeSql("INSERT INTO array_sink SELECT * FROM array_types");
+
+        // wait for snapshot to complete
+        waitForSinkSize("array_sink", 1);
+
+        // verify snapshot data
+        List<String> snapshotResults = TestValuesTableFactory.getRawResultsAsStrings("array_sink");
+        Assertions.assertThat(snapshotResults).hasSize(1);
+
+        // verify snapshot contains expected array data patterns (insert record)
+        String snapshotRow = snapshotResults.get(0);
+        Assertions.assertThat(snapshotRow).startsWith("+I(");
+        Assertions.assertThat(snapshotRow).contains("electronics");
+        Assertions.assertThat(snapshotRow).contains("gadget");
+        Assertions.assertThat(snapshotRow).contains("sale");
+        Assertions.assertThat(snapshotRow).contains("85");
+        Assertions.assertThat(snapshotRow).contains("90");
+        Assertions.assertThat(snapshotRow).contains("78");
+        Assertions.assertThat(snapshotRow).contains("42");
+        Assertions.assertThat(snapshotRow)
+                .containsIgnoringCase("227496ad-fde9-ccfb-1f04-892fc505afd5");
+        Assertions.assertThat(snapshotRow)
+                .containsIgnoringCase("9d33f9e2-dfc7-fdef-9478-bcc5dbf7a6d7");
+
+        // wait a bit to make sure the replication slot is ready
+        Thread.sleep(5000);
+
+        // Test incremental (WAL) path - UPDATE array data including uuid_a1
+        try (Connection connection = getJdbcConnection(POSTGIS_CONTAINER);
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "UPDATE inventory.array_types SET text_a1=ARRAY['updated', 'array'], "
+                            + "int_a1='{100, 200}', "
+                            + "uuid_a1=ARRAY['aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', 'ffffffff-1111-2222-3333-444444444444']::UUID[] "
+                            + "WHERE id=1;");
+        }
+
+        // Wait for update event (-D and +I, total 3 records including initial +I)
+        waitForSinkSize("array_sink", 3);
+
+        // verify incremental update data with raw changelog
+        List<String> incrementalResults =
+                TestValuesTableFactory.getRawResultsAsStrings("array_sink");
+        Assertions.assertThat(incrementalResults).hasSize(3);
+
+        // verify updated array data is present in results
+        String allResults = String.join(",", incrementalResults);
+        Assertions.assertThat(allResults).contains("-D(");
+        Assertions.assertThat(allResults).contains("updated");
+        Assertions.assertThat(allResults).contains("array");
+        Assertions.assertThat(allResults).contains("100");
+        Assertions.assertThat(allResults).contains("200");
+        Assertions.assertThat(allResults)
+                .containsIgnoringCase("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
+        Assertions.assertThat(allResults)
+                .containsIgnoringCase("ffffffff-1111-2222-3333-444444444444");
+        Assertions.assertThat(allResults).contains("42");
+
+        tableResult.getJobClient().get().cancel().get();
     }
 
     @ParameterizedTest

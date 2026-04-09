@@ -21,13 +21,15 @@ import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.JobInfo;
 import org.apache.flink.api.common.RuntimeExecutionMode;
 import org.apache.flink.api.common.TaskInfo;
+import org.apache.flink.api.common.TaskInfoImpl;
 import org.apache.flink.api.common.operators.MailboxExecutor;
 import org.apache.flink.api.common.operators.ProcessingTimeService;
 import org.apache.flink.api.common.serialization.SerializationSchema;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.connector.sink2.Committer;
-import org.apache.flink.api.connector.sink2.Sink;
+import org.apache.flink.api.connector.sink2.CommitterInitContext;
+import org.apache.flink.api.connector.sink2.WriterInitContext;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
@@ -38,11 +40,11 @@ import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventTypeFamily;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
-import org.apache.flink.cdc.common.exceptions.UnsupportedSchemaChangeEventException;
 import org.apache.flink.cdc.common.factories.DataSinkFactory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
@@ -61,8 +63,11 @@ import org.apache.flink.cdc.composer.utils.FactoryDiscoveryUtils;
 import org.apache.flink.cdc.connectors.paimon.sink.PaimonDataSinkFactory;
 import org.apache.flink.cdc.connectors.paimon.sink.PaimonDataSinkOptions;
 import org.apache.flink.cdc.connectors.paimon.sink.PaimonMetadataApplier;
+import org.apache.flink.cdc.connectors.paimon.sink.v2.bucket.BucketAssignOperator;
+import org.apache.flink.cdc.runtime.operators.sink.SchemaEvolutionClient;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.metrics.MetricGroup;
+import org.apache.flink.metrics.groups.SinkCommitterMetricGroup;
 import org.apache.flink.metrics.groups.SinkWriterMetricGroup;
 import org.apache.flink.metrics.groups.UnregisteredMetricsGroup;
 import org.apache.flink.runtime.metrics.groups.InternalSinkCommitterMetricGroup;
@@ -86,6 +91,8 @@ import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.mockito.Mockito;
 
 import java.io.File;
 import java.io.IOException;
@@ -97,17 +104,21 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.common.pipeline.PipelineOptions.DEFAULT_SCHEMA_OPERATOR_RPC_TIMEOUT;
+import static org.apache.flink.cdc.common.types.DataTypes.INT;
 import static org.apache.flink.cdc.common.types.DataTypes.STRING;
-import static org.apache.flink.configuration.ConfigConstants.DEFAULT_PARALLELISM;
+import static org.apache.flink.cdc.common.types.DataTypes.VARCHAR;
 
 /** An ITCase for {@link PaimonWriter} and {@link PaimonCommitter}. */
 public class PaimonSinkITCase {
+
+    public static final int DEFAULT_PARALLELISM = 1;
 
     @TempDir public static java.nio.file.Path temporaryFolder;
 
@@ -122,7 +133,7 @@ public class PaimonSinkITCase {
     private final TableId table1 = TableId.tableId("test", "table1");
     private final TableId table2 = TableId.tableId("test", "table2");
 
-    private static int checkpointId = 1;
+    private int checkpointId = 1;
 
     public static final String TEST_DATABASE = "test";
     private static final String HADOOP_CONF_DIR =
@@ -182,6 +193,15 @@ public class PaimonSinkITCase {
     private List<Event> createTestEvents(
             boolean enableDeleteVectors, boolean appendOnly, boolean enabledBucketKey)
             throws SchemaEvolveException {
+        return createTestEvents(enableDeleteVectors, appendOnly, enabledBucketKey, null);
+    }
+
+    private List<Event> createTestEvents(
+            boolean enableDeleteVectors,
+            boolean appendOnly,
+            boolean enabledBucketKey,
+            SchemaChange schemaChange)
+            throws SchemaEvolveException {
         List<Event> testEvents = new ArrayList<>();
         Schema.Builder builder = Schema.newBuilder();
         if (!appendOnly) {
@@ -192,14 +212,19 @@ public class PaimonSinkITCase {
         }
         // create table
         Schema schema =
-                builder.physicalColumn("col1", STRING())
+                builder.physicalColumn("col1", STRING().notNull())
                         .physicalColumn("col2", STRING())
                         .option("deletion-vectors.enabled", String.valueOf(enableDeleteVectors))
                         .build();
         CreateTableEvent createTableEvent = new CreateTableEvent(table1, schema);
         testEvents.add(createTableEvent);
         PaimonMetadataApplier metadataApplier = new PaimonMetadataApplier(catalogOptions);
-        metadataApplier.applySchemaChange(createTableEvent);
+        if (schemaChange != null) {
+            metadataApplier.applySchemaChange(
+                    new CreateTableEvent(table1, generateRandomSchema(schema, schemaChange)));
+        } else {
+            metadataApplier.applySchemaChange(createTableEvent);
+        }
 
         // insert
         testEvents.add(
@@ -211,17 +236,52 @@ public class PaimonSinkITCase {
         return testEvents;
     }
 
+    private Schema generateRandomSchema(Schema schema, SchemaChange schemaChange) {
+        Schema.Builder builder = new Schema.Builder();
+        switch (schemaChange) {
+            case ADD_COLUMN:
+                {
+                    builder.physicalColumn("col1", STRING().notNull())
+                            .physicalColumn("col2", STRING())
+                            .physicalColumn("op_ts", INT());
+                    break;
+                }
+            case REMOVE_COLUMN:
+                {
+                    builder.physicalColumn("col1", STRING().notNull());
+                    break;
+                }
+            case REORDER_COLUMN:
+                {
+                    builder.physicalColumn("col2", STRING())
+                            .physicalColumn("col1", STRING().notNull());
+                    break;
+                }
+            case MODIFY_COLUMN:
+                {
+                    builder.physicalColumn("col1", STRING().notNull())
+                            .physicalColumn("col2", VARCHAR(10));
+                    break;
+                }
+        }
+        return schema.copy(builder.build().getColumns());
+    }
+
     @ParameterizedTest
     @CsvSource({"filesystem, true", "filesystem, false", "hive, true", "hive, false"})
     public void testSinkWithDataChange(String metastore, boolean enableDeleteVector)
-            throws IOException, InterruptedException, Catalog.DatabaseNotEmptyException,
-                    Catalog.DatabaseNotExistException, SchemaEvolveException {
+            throws IOException,
+                    InterruptedException,
+                    Catalog.DatabaseNotEmptyException,
+                    Catalog.DatabaseNotExistException,
+                    SchemaEvolveException {
         initialize(metastore);
         PaimonSink<Event> paimonSink =
                 new PaimonSink<>(
                         catalogOptions, new PaimonRecordEventSerializer(ZoneId.systemDefault()));
         PaimonWriter<Event> writer = paimonSink.createWriter(new MockInitContext());
-        Committer<MultiTableCommittable> committer = paimonSink.createCommitter();
+        Committer<MultiTableCommittable> committer =
+                paimonSink.createCommitter(new MockCommitterInitContext());
 
         // insert
         writeAndCommit(
@@ -272,14 +332,18 @@ public class PaimonSinkITCase {
     @ParameterizedTest
     @CsvSource({"filesystem, true", "hive, true", "filesystem, false", "hive, false"})
     public void testSinkWithDataChangeForAppendOnlyTable(String metastore, boolean enabledBucketKey)
-            throws IOException, InterruptedException, Catalog.DatabaseNotEmptyException,
-                    Catalog.DatabaseNotExistException, SchemaEvolveException {
+            throws IOException,
+                    InterruptedException,
+                    Catalog.DatabaseNotEmptyException,
+                    Catalog.DatabaseNotExistException,
+                    SchemaEvolveException {
         initialize(metastore);
         PaimonSink<Event> paimonSink =
                 new PaimonSink<>(
                         catalogOptions, new PaimonRecordEventSerializer(ZoneId.systemDefault()));
         PaimonWriter<Event> writer = paimonSink.createWriter(new MockInitContext());
-        Committer<MultiTableCommittable> committer = paimonSink.createCommitter();
+        Committer<MultiTableCommittable> committer =
+                paimonSink.createCommitter(new MockCommitterInitContext());
 
         // insert
         writeAndCommit(
@@ -302,19 +366,50 @@ public class PaimonSinkITCase {
                         Row.ofKind(RowKind.INSERT, "1", "1"),
                         Row.ofKind(RowKind.INSERT, "2", "2"),
                         Row.ofKind(RowKind.INSERT, "3", "3"));
+
+        // Delete
+        writeAndCommit(
+                writer,
+                committer,
+                generateDelete(
+                        table1, Arrays.asList(Tuple2.of(STRING(), "3"), Tuple2.of(STRING(), "3"))));
+        Assertions.assertThat(fetchResults(table1))
+                .containsExactlyInAnyOrder(
+                        Row.ofKind(RowKind.INSERT, "1", "1"),
+                        Row.ofKind(RowKind.INSERT, "2", "2"),
+                        Row.ofKind(RowKind.INSERT, "3", "3"));
+
+        // Update
+        writeAndCommit(
+                writer,
+                committer,
+                generateUpdate(
+                        table1,
+                        Arrays.asList(Tuple2.of(STRING(), "3"), Tuple2.of(STRING(), "3")),
+                        Arrays.asList(Tuple2.of(STRING(), "3"), Tuple2.of(STRING(), "x"))));
+        Assertions.assertThat(fetchResults(table1))
+                .containsExactlyInAnyOrder(
+                        Row.ofKind(RowKind.INSERT, "1", "1"),
+                        Row.ofKind(RowKind.INSERT, "2", "2"),
+                        Row.ofKind(RowKind.INSERT, "3", "3"),
+                        Row.ofKind(RowKind.INSERT, "3", "x"));
     }
 
     @ParameterizedTest
     @CsvSource({"filesystem, true", "filesystem, false", "hive, true", "hive, false"})
     public void testSinkWithSchemaChange(String metastore, boolean enableDeleteVector)
-            throws IOException, InterruptedException, Catalog.DatabaseNotEmptyException,
-                    Catalog.DatabaseNotExistException, SchemaEvolveException {
+            throws IOException,
+                    InterruptedException,
+                    Catalog.DatabaseNotEmptyException,
+                    Catalog.DatabaseNotExistException,
+                    SchemaEvolveException {
         initialize(metastore);
         PaimonSink<Event> paimonSink =
                 new PaimonSink<>(
                         catalogOptions, new PaimonRecordEventSerializer(ZoneId.systemDefault()));
         PaimonWriter<Event> writer = paimonSink.createWriter(new MockInitContext());
-        Committer<MultiTableCommittable> committer = paimonSink.createCommitter();
+        Committer<MultiTableCommittable> committer =
+                paimonSink.createCommitter(new MockCommitterInitContext());
 
         // 1. receive only DataChangeEvents during one checkpoint
         writeAndCommit(
@@ -393,18 +488,8 @@ public class PaimonSinkITCase {
                         Row.ofKind(RowKind.INSERT, "6", "6"));
 
         TruncateTableEvent truncateTableEvent = new TruncateTableEvent(table1);
-        if (enableDeleteVector) {
-            Assertions.assertThatThrownBy(
-                            () -> metadataApplier.applySchemaChange(truncateTableEvent))
-                    .isExactlyInstanceOf(SchemaEvolveException.class)
-                    .cause()
-                    .isExactlyInstanceOf(UnsupportedSchemaChangeEventException.class)
-                    .extracting("exceptionMessage")
-                    .isEqualTo("Unable to truncate a table with deletion vectors enabled.");
-        } else {
-            metadataApplier.applySchemaChange(truncateTableEvent);
-            Assertions.assertThat(fetchResults(table1)).isEmpty();
-        }
+        metadataApplier.applySchemaChange(truncateTableEvent);
+        Assertions.assertThat(fetchResults(table1)).isEmpty();
 
         DropTableEvent dropTableEvent = new DropTableEvent(table1);
         metadataApplier.applySchemaChange(dropTableEvent);
@@ -413,17 +498,236 @@ public class PaimonSinkITCase {
                 .hasRootCauseMessage("Object 'table1' not found within 'paimon_catalog.test'");
     }
 
+    // Table structure change events that will be executed on existing tables.
+    enum SchemaChange {
+        ADD_COLUMN,
+        REMOVE_COLUMN,
+        REORDER_COLUMN,
+        MODIFY_COLUMN;
+    }
+
+    @ParameterizedTest
+    @EnumSource(SchemaChange.class)
+    void testSinkWithSchemaChangeForExistedTable(SchemaChange schemaChange) throws Exception {
+        initialize("filesystem");
+        PaimonSink<Event> paimonSink =
+                new PaimonSink<>(
+                        catalogOptions, new PaimonRecordEventSerializer(ZoneId.systemDefault()));
+        PaimonWriter<Event> writer = paimonSink.createWriter(new MockInitContext());
+        Committer<MultiTableCommittable> committer =
+                paimonSink.createCommitter(new MockCommitterInitContext());
+        BucketAssignOperator bucketAssignOperator =
+                new BucketAssignOperator(catalogOptions, null, ZoneId.systemDefault(), null);
+        SchemaEvolutionClient schemaEvolutionClient = Mockito.mock(SchemaEvolutionClient.class);
+        Mockito.when(schemaEvolutionClient.getLatestEvolvedSchema(Mockito.any()))
+                .thenReturn(Optional.empty());
+        bucketAssignOperator.setSchemaEvolutionClient(schemaEvolutionClient);
+        bucketAssignOperator.open(new TaskInfoImpl("test_TaskInfo", 1, 0, 1, 0));
+
+        // 1. receive only DataChangeEvents during one checkpoint
+        writeAndCommit(
+                bucketAssignOperator,
+                writer,
+                committer,
+                createTestEvents(false, false, true, schemaChange).toArray(new Event[0]));
+        switch (schemaChange) {
+            case ADD_COLUMN:
+                {
+                    Assertions.assertThat(fetchResults(table1))
+                            .containsExactlyInAnyOrder(
+                                    Row.ofKind(RowKind.INSERT, "1", "1", null),
+                                    Row.ofKind(RowKind.INSERT, "2", "2", null));
+                    break;
+                }
+            case REMOVE_COLUMN:
+                {
+                    Assertions.assertThat(fetchResults(table1))
+                            .containsExactlyInAnyOrder(
+                                    Row.ofKind(RowKind.INSERT, "1"),
+                                    Row.ofKind(RowKind.INSERT, "2"));
+                    break;
+                }
+            case REORDER_COLUMN:
+                {
+                    Assertions.assertThat(fetchResults(table1))
+                            .containsExactlyInAnyOrder(
+                                    Row.ofKind(RowKind.INSERT, "1", "1"),
+                                    Row.ofKind(RowKind.INSERT, "2", "2"));
+                    break;
+                }
+            case MODIFY_COLUMN:
+                {
+                    Assertions.assertThat(fetchResults(table1))
+                            .containsExactlyInAnyOrder(
+                                    Row.ofKind(RowKind.INSERT, "1", "1"),
+                                    Row.ofKind(RowKind.INSERT, "2", "2"));
+                }
+        }
+
+        // 2. receive DataChangeEvents and SchemaChangeEvents during one checkpoint
+        writeAndCommit(
+                bucketAssignOperator,
+                writer,
+                committer,
+                generateInsert(
+                        table1, Arrays.asList(Tuple2.of(STRING(), "3"), Tuple2.of(STRING(), "3"))));
+
+        // add column
+        AddColumnEvent.ColumnWithPosition columnWithPosition =
+                new AddColumnEvent.ColumnWithPosition(Column.physicalColumn("col3", STRING()));
+        AddColumnEvent addColumnEvent =
+                new AddColumnEvent(table1, Collections.singletonList(columnWithPosition));
+        PaimonMetadataApplier metadataApplier = new PaimonMetadataApplier(catalogOptions);
+        metadataApplier.applySchemaChange(addColumnEvent);
+        writer.write(bucketAssignOperator.convertSchemaChangeEvent(addColumnEvent), null);
+
+        writeAndCommit(
+                bucketAssignOperator,
+                writer,
+                committer,
+                generateInsert(
+                        table1,
+                        Arrays.asList(
+                                Tuple2.of(STRING(), "4"),
+                                Tuple2.of(STRING(), "4"),
+                                Tuple2.of(STRING(), "4"))));
+        switch (schemaChange) {
+            case ADD_COLUMN:
+                {
+                    Assertions.assertThat(fetchResults(table1))
+                            .containsExactlyInAnyOrder(
+                                    Row.ofKind(RowKind.INSERT, "1", "1", null, null),
+                                    Row.ofKind(RowKind.INSERT, "2", "2", null, null),
+                                    Row.ofKind(RowKind.INSERT, "3", "3", null, null),
+                                    Row.ofKind(RowKind.INSERT, "4", "4", null, "4"));
+                    break;
+                }
+            case REMOVE_COLUMN:
+                {
+                    Assertions.assertThat(fetchResults(table1))
+                            .containsExactlyInAnyOrder(
+                                    Row.ofKind(RowKind.INSERT, "1", null),
+                                    Row.ofKind(RowKind.INSERT, "2", null),
+                                    Row.ofKind(RowKind.INSERT, "3", null),
+                                    Row.ofKind(RowKind.INSERT, "4", "4"));
+                    break;
+                }
+            case REORDER_COLUMN:
+                {
+                    Assertions.assertThat(fetchResults(table1))
+                            .containsExactlyInAnyOrder(
+                                    Row.ofKind(RowKind.INSERT, "1", "1", null),
+                                    Row.ofKind(RowKind.INSERT, "2", "2", null),
+                                    Row.ofKind(RowKind.INSERT, "3", "3", null),
+                                    Row.ofKind(RowKind.INSERT, "4", "4", "4"));
+                    break;
+                }
+            case MODIFY_COLUMN:
+                {
+                    Assertions.assertThat(fetchResults(table1))
+                            .containsExactlyInAnyOrder(
+                                    Row.ofKind(RowKind.INSERT, "1", "1", null),
+                                    Row.ofKind(RowKind.INSERT, "2", "2", null),
+                                    Row.ofKind(RowKind.INSERT, "3", "3", null),
+                                    Row.ofKind(RowKind.INSERT, "4", "4", "4"));
+                }
+        }
+
+        // 2. receive DataChangeEvents and SchemaChangeEvents during one checkpoint
+        writeAndCommit(
+                bucketAssignOperator,
+                writer,
+                committer,
+                generateInsert(
+                        table1,
+                        Arrays.asList(
+                                Tuple2.of(STRING(), "5"),
+                                Tuple2.of(STRING(), "5"),
+                                Tuple2.of(STRING(), "5"))));
+
+        // drop column
+        DropColumnEvent dropColumnEvent =
+                new DropColumnEvent(table1, Collections.singletonList("col2"));
+        metadataApplier.applySchemaChange(dropColumnEvent);
+        writer.write(bucketAssignOperator.convertSchemaChangeEvent(dropColumnEvent), null);
+
+        writeAndCommit(
+                bucketAssignOperator,
+                writer,
+                committer,
+                generateInsert(
+                        table1, Arrays.asList(Tuple2.of(STRING(), "6"), Tuple2.of(STRING(), "6"))));
+
+        List<Row> result = fetchResults(TableId.tableId("test", "`table1$files`"));
+        Set<Row> deduplicated = new HashSet<>(result);
+        Assertions.assertThat(result).hasSameSizeAs(deduplicated);
+
+        switch (schemaChange) {
+            case ADD_COLUMN:
+                {
+                    Assertions.assertThat(fetchResults(table1))
+                            .containsExactlyInAnyOrder(
+                                    Row.ofKind(RowKind.INSERT, "1", null, null),
+                                    Row.ofKind(RowKind.INSERT, "2", null, null),
+                                    Row.ofKind(RowKind.INSERT, "3", null, null),
+                                    Row.ofKind(RowKind.INSERT, "4", null, "4"),
+                                    Row.ofKind(RowKind.INSERT, "5", null, "5"),
+                                    Row.ofKind(RowKind.INSERT, "6", null, "6"));
+                    break;
+                }
+            case REMOVE_COLUMN:
+                {
+                    Assertions.assertThat(fetchResults(table1))
+                            .containsExactlyInAnyOrder(
+                                    Row.ofKind(RowKind.INSERT, "1", null),
+                                    Row.ofKind(RowKind.INSERT, "2", null),
+                                    Row.ofKind(RowKind.INSERT, "3", null),
+                                    Row.ofKind(RowKind.INSERT, "4", "4"),
+                                    Row.ofKind(RowKind.INSERT, "5", "5"),
+                                    Row.ofKind(RowKind.INSERT, "6", "6"));
+                    break;
+                }
+            case REORDER_COLUMN:
+                {
+                    Assertions.assertThat(fetchResults(table1))
+                            .containsExactlyInAnyOrder(
+                                    Row.ofKind(RowKind.INSERT, "1", null),
+                                    Row.ofKind(RowKind.INSERT, "2", null),
+                                    Row.ofKind(RowKind.INSERT, "3", null),
+                                    Row.ofKind(RowKind.INSERT, "4", "4"),
+                                    Row.ofKind(RowKind.INSERT, "5", "5"),
+                                    Row.ofKind(RowKind.INSERT, "6", "6"));
+                    break;
+                }
+            case MODIFY_COLUMN:
+                {
+                    Assertions.assertThat(fetchResults(table1))
+                            .containsExactlyInAnyOrder(
+                                    Row.ofKind(RowKind.INSERT, "1", null),
+                                    Row.ofKind(RowKind.INSERT, "2", null),
+                                    Row.ofKind(RowKind.INSERT, "3", null),
+                                    Row.ofKind(RowKind.INSERT, "4", "4"),
+                                    Row.ofKind(RowKind.INSERT, "5", "5"),
+                                    Row.ofKind(RowKind.INSERT, "6", "6"));
+                }
+        }
+    }
+
     @ParameterizedTest
     @CsvSource({"filesystem, true", "filesystem, false", "hive, true", "hive, false"})
     public void testSinkWithMultiTables(String metastore, boolean enableDeleteVector)
-            throws IOException, InterruptedException, Catalog.DatabaseNotEmptyException,
-                    Catalog.DatabaseNotExistException, SchemaEvolveException {
+            throws IOException,
+                    InterruptedException,
+                    Catalog.DatabaseNotEmptyException,
+                    Catalog.DatabaseNotExistException,
+                    SchemaEvolveException {
         initialize(metastore);
         PaimonSink<Event> paimonSink =
                 new PaimonSink<>(
                         catalogOptions, new PaimonRecordEventSerializer(ZoneId.systemDefault()));
         PaimonWriter<Event> writer = paimonSink.createWriter(new MockInitContext());
-        Committer<MultiTableCommittable> committer = paimonSink.createCommitter();
+        Committer<MultiTableCommittable> committer =
+                paimonSink.createCommitter(new MockCommitterInitContext());
         List<Event> testEvents = createTestEvents(enableDeleteVector);
         // create table
         Schema schema =
@@ -452,21 +756,38 @@ public class PaimonSinkITCase {
                 .containsExactlyInAnyOrder(Row.ofKind(RowKind.INSERT, "1", "1"));
     }
 
-    private static void commit(
-            PaimonWriter<Event> writer, Committer<MultiTableCommittable> committer)
+    private void commit(PaimonWriter<Event> writer, Committer<MultiTableCommittable> committer)
             throws IOException, InterruptedException {
         Collection<Committer.CommitRequest<MultiTableCommittable>> commitRequests =
                 writer.prepareCommit().stream()
-                        .map(PaimonSinkITCase::correctCheckpointId)
+                        .map(this::correctCheckpointId)
                         .map(MockCommitRequestImpl::new)
                         .collect(Collectors.toList());
         committer.commit(commitRequests);
     }
 
-    private static void writeAndCommit(
+    private void writeAndCommit(
             PaimonWriter<Event> writer, Committer<MultiTableCommittable> committer, Event... events)
             throws IOException, InterruptedException {
         for (Event event : events) {
+            writer.write(event, null);
+        }
+        writer.flush(false);
+        commit(writer, committer);
+    }
+
+    private void writeAndCommit(
+            BucketAssignOperator bucketAssignOperator,
+            PaimonWriter<Event> writer,
+            Committer<MultiTableCommittable> committer,
+            Event... events)
+            throws Exception {
+        for (Event event : events) {
+            if (event instanceof DataChangeEvent) {
+                event = bucketAssignOperator.convertDataChangeEvent((DataChangeEvent) event);
+            } else {
+                event = bucketAssignOperator.convertSchemaChangeEvent((SchemaChangeEvent) event);
+            }
             writer.write(event, null);
         }
         writer.flush(false);
@@ -526,14 +847,18 @@ public class PaimonSinkITCase {
     @ParameterizedTest
     @CsvSource({"filesystem, true", "filesystem, false", "hive, true", "hive, false"})
     public void testDuplicateCommitAfterRestore(String metastore, boolean enableDeleteVector)
-            throws IOException, InterruptedException, Catalog.DatabaseNotEmptyException,
-                    Catalog.DatabaseNotExistException, SchemaEvolveException {
+            throws IOException,
+                    InterruptedException,
+                    Catalog.DatabaseNotEmptyException,
+                    Catalog.DatabaseNotExistException,
+                    SchemaEvolveException {
         initialize(metastore);
         PaimonSink<Event> paimonSink =
                 new PaimonSink<>(
                         catalogOptions, new PaimonRecordEventSerializer(ZoneId.systemDefault()));
         PaimonWriter<Event> writer = paimonSink.createWriter(new MockInitContext());
-        Committer<MultiTableCommittable> committer = paimonSink.createCommitter();
+        Committer<MultiTableCommittable> committer =
+                paimonSink.createCommitter(new MockCommitterInitContext());
 
         // insert
         for (Event event : createTestEvents(enableDeleteVector)) {
@@ -542,7 +867,7 @@ public class PaimonSinkITCase {
         writer.flush(false);
         Collection<Committer.CommitRequest<MultiTableCommittable>> commitRequests =
                 writer.prepareCommit().stream()
-                        .map(PaimonSinkITCase::correctCheckpointId)
+                        .map(this::correctCheckpointId)
                         .map(MockCommitRequestImpl::new)
                         .collect(Collectors.toList());
         committer.commit(commitRequests);
@@ -574,7 +899,7 @@ public class PaimonSinkITCase {
             // Checkpoint id start from 1
             committer.commit(
                     writer.prepareCommit().stream()
-                            .map(PaimonSinkITCase::correctCheckpointId)
+                            .map(this::correctCheckpointId)
                             .map(MockCommitRequestImpl::new)
                             .collect(Collectors.toList()));
         }
@@ -713,7 +1038,7 @@ public class PaimonSinkITCase {
         env.execute("runJobWithEvents").getJobExecutionResult();
     }
 
-    private static MultiTableCommittable correctCheckpointId(MultiTableCommittable committable) {
+    private MultiTableCommittable correctCheckpointId(MultiTableCommittable committable) {
         // update the right checkpointId for MultiTableCommittable
         return new MultiTableCommittable(
                 committable.getDatabase(),
@@ -734,7 +1059,7 @@ public class PaimonSinkITCase {
     }
 
     private static class MockInitContext
-            implements Sink.InitContext, SerializationSchema.InitializationContext {
+            implements WriterInitContext, SerializationSchema.InitializationContext {
 
         private MockInitContext() {}
 
@@ -798,7 +1123,31 @@ public class PaimonSinkITCase {
 
         @Override
         public TaskInfo getTaskInfo() {
+            return new TaskInfoImpl("test-task", 1, 0, 1, 0);
+        }
+    }
+
+    private static class MockCommitterInitContext implements CommitterInitContext {
+
+        @Override
+        public SinkCommitterMetricGroup metricGroup() {
+            return InternalSinkCommitterMetricGroup.wrap(
+                    UnregisteredMetricsGroup.createOperatorMetricGroup());
+        }
+
+        @Override
+        public OptionalLong getRestoredCheckpointId() {
+            return OptionalLong.empty();
+        }
+
+        @Override
+        public JobInfo getJobInfo() {
             return null;
+        }
+
+        @Override
+        public TaskInfo getTaskInfo() {
+            return new TaskInfoImpl("test-task", 1, 0, 1, 0);
         }
     }
 }

@@ -80,10 +80,12 @@ public class PaimonRecordEventSerializer implements PaimonRecordSerializer<Event
             return new PaimonEvent(tableId, null, true);
         } else if (event instanceof DataChangeEvent) {
             DataChangeEvent dataChangeEvent = (DataChangeEvent) event;
+            TableSchemaInfo schemaInfo = schemaMaps.get(dataChangeEvent.tableId());
             List<GenericRow> genericRows =
                     PaimonWriterHelper.convertEventToFullGenericRows(
                             dataChangeEvent,
-                            schemaMaps.get(dataChangeEvent.tableId()).getFieldGetters());
+                            schemaInfo.getFieldGetters(),
+                            schemaInfo.hasPrimaryKey());
             return new PaimonEvent(tableId, genericRows, false, bucket);
         } else {
             throw new IllegalArgumentException(

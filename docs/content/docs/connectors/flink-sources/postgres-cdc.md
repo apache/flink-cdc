@@ -40,7 +40,7 @@ In order to setup the Postgres CDC connector, the following table provides depen
 
 ```Download link is available only for stable releases.```
 
-Download [flink-sql-connector-postgres-cdc-{{< param Version >}}.jar](https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-postgres-cdc/{{< param Version >}}/flink-sql-connector-postgres-cdc-{{< param Version >}}.jar) and put it under `<FLINK_HOME>/lib/`.
+Download [flink-sql-connector-postgres-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-postgres-cdc) and put it under `<FLINK_HOME>/lib/`.
 
 **Note:** Refer to [flink-sql-connector-postgres-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-postgres-cdc), more released versions will be available in the Maven central warehouse.
 
@@ -277,6 +277,18 @@ SELECT * FROM shipments;
           <li>false (default): All types of messages are sent as is.</li>
       </td>
     </tr>
+    <tr>
+      <td>scan.include-partitioned-tables.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        Whether to enable reading partitioned tables via partition root.<br>
+        If enabled:
+          (1) PUBLICATION must be created beforehand with parameter publish_via_partition_root=true
+          (2) Table list (regex or predefined list) should only match the parent table name, if table list matches both parent and child tables, snapshot data will be read twice.
+      </td>
+    </tr>
     </tbody>
     </table>
 </div>
@@ -498,6 +510,71 @@ The config option `scan.startup.mode` specifies the startup mode for PostgreSQL 
   the end of the replication which means only have the changes since the connector was started.
 - `committed-offset`: Skip snapshot phase and start reading events from a `confirmed_flush_lsn` offset of replication slot.
 - `snapshot`: Only the snapshot phase is performed and exits after the snapshot phase reading is completed.
+
+### Scan Newly Added Tables
+
+**Note:** This feature is available since Flink CDC 3.1.0.
+
+Scan Newly Added Tables feature enables you to add new tables to monitor for existing running pipeline. The newly added tables will read their snapshot data firstly and then read their WAL (Write-Ahead Log) or replication slot changes automatically.
+
+Imagine this scenario: At the beginning, a Flink job monitors tables `[product, user, address]`, but after some days we would like the job to also monitor tables `[order, custom]` which contain historical data, and we need the job to still reuse existing state of the job. This feature can resolve this case gracefully.
+
+The following operations show how to enable this feature to resolve above scenario. An existing Flink job which uses PostgreSQL CDC Source like:
+
+```java
+    JdbcIncrementalSource<String> postgresSource =
+            PostgresSourceBuilder.PostgresIncrementalSource.<String>builder()
+                .hostname("yourHostname")
+                .port(5432)
+                .database("postgres") // set captured database
+                .schemaList("inventory") // set captured schema
+                .tableList("inventory.product", "inventory.user", "inventory.address") // set captured tables
+                .username("yourUsername")
+                .password("yourPassword")
+                .slotName("flink")
+                .scanNewlyAddedTableEnabled(true) // enable scan newly added tables feature
+                .deserializer(new JsonDebeziumDeserializationSchema()) // converts SourceRecord to JSON String
+                .build();
+   // your business code
+```
+
+If we would like to add new tables `[inventory.order, inventory.custom]` to an existing Flink job, we just need to update the `tableList()` value of the job to include `[inventory.order, inventory.custom]` and restore the job from previous savepoint.
+
+_Step 1_: Stop the existing Flink job with savepoint.
+```shell
+$ ./bin/flink stop $Existing_Flink_JOB_ID
+```
+```shell
+Suspending job "cca7bc1061d61cf15238e92312c2fc20" with a savepoint.
+Savepoint completed. Path: file:/tmp/flink-savepoints/savepoint-cca7bc-bb1e257f0dab
+```
+_Step 2_: Update the table list option for the existing Flink job.
+1. update `tableList()` value.
+2. build the jar of updated job.
+```java
+    JdbcIncrementalSource<String> postgresSource =
+            PostgresSourceBuilder.PostgresIncrementalSource.<String>builder()
+                .hostname("yourHostname")
+                .port(5432)
+                .database("postgres")
+                .schemaList("inventory")
+                .tableList("inventory.product", "inventory.user", "inventory.address", "inventory.order", "inventory.custom") // set captured tables [product, user, address, order, custom]
+                .username("yourUsername")
+                .password("yourPassword")
+                .slotName("flink")
+                .scanNewlyAddedTableEnabled(true)
+                .deserializer(new JsonDebeziumDeserializationSchema()) // converts SourceRecord to JSON String
+                .build();
+   // your business code
+```
+_Step 3_: Restore the updated Flink job from savepoint.
+```shell
+$ ./bin/flink run \
+      --detached \
+      --from-savepoint /tmp/flink-savepoints/savepoint-cca7bc-bb1e257f0dab \
+      ./FlinkCDCExample.jar
+```
+**Note:** Please refer to the doc [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.17/docs/deployment/cli/#command-line-interface) for more details.
 
 ### DataStream Source
 
@@ -728,6 +805,7 @@ Since the order of processing these records cannot be guaranteed, the final valu
         CHARACTER(n)<br>
         VARCHAR(n)<br>
         CHARACTER VARYING(n)<br>
+        UUID<br>
         TEXT</td>
       <td>STRING</td>
     </tr>

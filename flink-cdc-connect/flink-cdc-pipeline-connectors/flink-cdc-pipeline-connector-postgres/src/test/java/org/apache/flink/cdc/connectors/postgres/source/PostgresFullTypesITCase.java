@@ -18,12 +18,13 @@
 package org.apache.flink.cdc.connectors.postgres.source;
 
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
-import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.data.ArrayData;
+import org.apache.flink.cdc.common.data.DateData;
 import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.RecordData;
+import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryMapData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
@@ -38,8 +39,10 @@ import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.connectors.postgres.PostgresTestBase;
 import org.apache.flink.cdc.connectors.postgres.factory.PostgresDataSourceFactory;
 import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfigFactory;
+import org.apache.flink.cdc.connectors.postgres.table.PostgreSQLReadableMetadata;
 import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.util.RestartStrategyUtils;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.table.types.logical.DecimalType;
 import org.apache.flink.util.CloseableIterator;
@@ -65,6 +68,7 @@ import java.sql.Statement;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -131,7 +135,7 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
         TestValuesTableFactory.clearAllData();
         env.setParallelism(4);
         env.enableCheckpointing(2000);
-        env.setRestartStrategy(RestartStrategies.noRestart());
+        RestartStrategyUtils.configureNoRestartStrategy(env);
         slotName = getSlotName();
     }
 
@@ -200,8 +204,8 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
                     TimestampData.fromLocalDateTime(LocalDateTime.parse("2020-07-17T18:00:22.123")),
                     TimestampData.fromLocalDateTime(
                             LocalDateTime.parse("2020-07-17T18:00:22.123456")),
-                    18460,
-                    64822000,
+                    DateData.fromEpochDay(18460),
+                    TimeData.fromMillisOfDay(64822000),
                     DecimalData.fromBigDecimal(new BigDecimal("500"), 10, 0),
                     BinaryStringData.fromString(
                             "{\"coordinates\":\"[[174.9479,-36.7208]]\",\"type\":\"Point\",\"srid\":3187}"),
@@ -286,14 +290,125 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
         Object[] expectedSnapshot =
                 new Object[] {
                     2,
-                    18460,
-                    64822000,
-                    64822123,
-                    64822123,
+                    DateData.fromEpochDay(18460),
+                    TimeData.fromLocalTime(LocalTime.parse("18:00:22")),
+                    TimeData.fromLocalTime(LocalTime.parse("18:00:22.123")),
+                    TimeData.fromLocalTime(LocalTime.parse("18:00:22.123456")),
                     TimestampData.fromLocalDateTime(LocalDateTime.parse("2020-07-17T18:00:22")),
                     TimestampData.fromLocalDateTime(LocalDateTime.parse("2020-07-17T18:00:22.123")),
                     TimestampData.fromLocalDateTime(
                             LocalDateTime.parse("2020-07-17T18:00:22.123456")),
+                    TimestampData.fromLocalDateTime(LocalDateTime.parse("2020-07-17T18:00:22")),
+                    LocalZonedTimestampData.fromInstant(toInstant("2020-07-17 18:00:22")),
+                };
+
+        List<Event> snapshotResults = fetchResultsAndCreateTableEvent(events, 1).f0;
+        RecordData snapshotRecord = ((DataChangeEvent) snapshotResults.get(0)).after();
+        Assertions.assertThat(recordFields(snapshotRecord, TIME_TYPES_WITH_ADAPTIVE))
+                .isEqualTo(expectedSnapshot);
+    }
+
+    @Test
+    public void testTimeTypesWithTemporalModeMicroSeconds() throws Exception {
+        initializePostgresTable(POSTGIS_CONTAINER, "column_type_test");
+
+        Properties debeziumProps = new Properties();
+        debeziumProps.setProperty("time.precision.mode", "adaptive_time_microseconds");
+
+        PostgresSourceConfigFactory configFactory =
+                (PostgresSourceConfigFactory)
+                        new PostgresSourceConfigFactory()
+                                .hostname(POSTGIS_CONTAINER.getHost())
+                                .port(POSTGIS_CONTAINER.getMappedPort(POSTGRESQL_PORT))
+                                .username(TEST_USER)
+                                .password(TEST_PASSWORD)
+                                .databaseList(POSTGRES_CONTAINER.getDatabaseName())
+                                .tableList("inventory.time_types")
+                                .startupOptions(StartupOptions.initial())
+                                .debeziumProperties(debeziumProps)
+                                .serverTimeZone("UTC");
+        configFactory.database(POSTGRES_CONTAINER.getDatabaseName());
+        configFactory.slotName(slotName);
+        configFactory.decodingPluginName("pgoutput");
+
+        FlinkSourceProvider sourceProvider =
+                (FlinkSourceProvider)
+                        new PostgresDataSource(configFactory).getEventSourceProvider();
+
+        CloseableIterator<Event> events =
+                env.fromSource(
+                                sourceProvider.getSource(),
+                                WatermarkStrategy.noWatermarks(),
+                                PostgresDataSourceFactory.IDENTIFIER,
+                                new EventTypeInfo())
+                        .executeAndCollect();
+
+        Object[] expectedSnapshot =
+                new Object[] {
+                    2,
+                    DateData.fromEpochDay(18460),
+                    TimeData.fromLocalTime(LocalTime.parse("18:00:22")),
+                    TimeData.fromLocalTime(LocalTime.parse("18:00:22.123")),
+                    TimeData.fromLocalTime(LocalTime.parse("18:00:22.123456")),
+                    TimestampData.fromLocalDateTime(LocalDateTime.parse("2020-07-17T18:00:22")),
+                    TimestampData.fromLocalDateTime(LocalDateTime.parse("2020-07-17T18:00:22.123")),
+                    TimestampData.fromLocalDateTime(
+                            LocalDateTime.parse("2020-07-17T18:00:22.123456")),
+                    TimestampData.fromLocalDateTime(LocalDateTime.parse("2020-07-17T18:00:22")),
+                    LocalZonedTimestampData.fromInstant(toInstant("2020-07-17 18:00:22")),
+                };
+
+        List<Event> snapshotResults = fetchResultsAndCreateTableEvent(events, 1).f0;
+        RecordData snapshotRecord = ((DataChangeEvent) snapshotResults.get(0)).after();
+        Assertions.assertThat(recordFields(snapshotRecord, TIME_TYPES_WITH_ADAPTIVE))
+                .isEqualTo(expectedSnapshot);
+    }
+
+    @Test
+    public void testTimeTypesWithTemporalModeConnect() throws Exception {
+        initializePostgresTable(POSTGIS_CONTAINER, "column_type_test");
+
+        Properties debeziumProps = new Properties();
+        debeziumProps.setProperty("time.precision.mode", "connect");
+
+        PostgresSourceConfigFactory configFactory =
+                (PostgresSourceConfigFactory)
+                        new PostgresSourceConfigFactory()
+                                .hostname(POSTGIS_CONTAINER.getHost())
+                                .port(POSTGIS_CONTAINER.getMappedPort(POSTGRESQL_PORT))
+                                .username(TEST_USER)
+                                .password(TEST_PASSWORD)
+                                .databaseList(POSTGRES_CONTAINER.getDatabaseName())
+                                .tableList("inventory.time_types")
+                                .startupOptions(StartupOptions.initial())
+                                .debeziumProperties(debeziumProps)
+                                .serverTimeZone("UTC");
+        configFactory.database(POSTGRES_CONTAINER.getDatabaseName());
+        configFactory.slotName(slotName);
+        configFactory.decodingPluginName("pgoutput");
+
+        FlinkSourceProvider sourceProvider =
+                (FlinkSourceProvider)
+                        new PostgresDataSource(configFactory).getEventSourceProvider();
+
+        CloseableIterator<Event> events =
+                env.fromSource(
+                                sourceProvider.getSource(),
+                                WatermarkStrategy.noWatermarks(),
+                                PostgresDataSourceFactory.IDENTIFIER,
+                                new EventTypeInfo())
+                        .executeAndCollect();
+
+        Object[] expectedSnapshot =
+                new Object[] {
+                    2,
+                    DateData.fromEpochDay(18460),
+                    TimeData.fromLocalTime(LocalTime.parse("18:00:22")),
+                    TimeData.fromLocalTime(LocalTime.parse("18:00:22.123")),
+                    TimeData.fromLocalTime(LocalTime.parse("18:00:22.123")),
+                    TimestampData.fromLocalDateTime(LocalDateTime.parse("2020-07-17T18:00:22")),
+                    TimestampData.fromLocalDateTime(LocalDateTime.parse("2020-07-17T18:00:22.123")),
+                    TimestampData.fromLocalDateTime(LocalDateTime.parse("2020-07-17T18:00:22.123")),
                     TimestampData.fromLocalDateTime(LocalDateTime.parse("2020-07-17T18:00:22")),
                     LocalZonedTimestampData.fromInstant(toInstant("2020-07-17 18:00:22")),
                 };
@@ -707,6 +822,111 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
     }
 
     @Test
+    public void testAllMetadataColumns() throws Exception {
+        initializePostgresTable(POSTGIS_CONTAINER, "column_type_test");
+        List<PostgreSQLReadableMetadata> metadataList = new ArrayList<>();
+        metadataList.add(PostgreSQLReadableMetadata.OP_TS);
+        metadataList.add(PostgreSQLReadableMetadata.DATABASE_NAME);
+        metadataList.add(PostgreSQLReadableMetadata.SCHEMA_NAME);
+        metadataList.add(PostgreSQLReadableMetadata.TABLE_NAME);
+        // Note: ROW_KIND is not included because it requires RowData and cannot be read from
+        // SourceRecord
+        PostgresSourceConfigFactory configFactory =
+                (PostgresSourceConfigFactory)
+                        new PostgresSourceConfigFactory()
+                                .hostname(POSTGIS_CONTAINER.getHost())
+                                .port(POSTGIS_CONTAINER.getMappedPort(POSTGRESQL_PORT))
+                                .username(TEST_USER)
+                                .password(TEST_PASSWORD)
+                                .databaseList(POSTGRES_CONTAINER.getDatabaseName())
+                                .tableList("inventory.full_types")
+                                .startupOptions(StartupOptions.initial())
+                                .serverTimeZone("UTC");
+        configFactory.database(POSTGRES_CONTAINER.getDatabaseName());
+        configFactory.slotName(slotName);
+        configFactory.decodingPluginName("pgoutput");
+
+        FlinkSourceProvider sourceProvider =
+                (FlinkSourceProvider)
+                        new PostgresDataSource(configFactory, metadataList)
+                                .getEventSourceProvider();
+
+        CloseableIterator<Event> events =
+                env.fromSource(
+                                sourceProvider.getSource(),
+                                WatermarkStrategy.noWatermarks(),
+                                PostgresDataSourceFactory.IDENTIFIER,
+                                new EventTypeInfo())
+                        .executeAndCollect();
+
+        List<Event> snapshotResults = fetchResultsAndCreateTableEvent(events, 1).f0;
+        DataChangeEvent snapshotEvent = (DataChangeEvent) snapshotResults.get(0);
+
+        // Verify all metadata columns exist in snapshot phase
+        Map<String, String> metadata = snapshotEvent.meta();
+
+        // Verify op_ts metadata
+        // According to PostgreSQLReadableMetadata.OP_TS documentation:
+        // "If the record is read from snapshot of the table instead of the change stream,
+        // the value is always 0."
+        Assertions.assertThat(metadata).containsKey("op_ts");
+        Long opTs = Long.parseLong(metadata.get("op_ts"));
+        Assertions.assertThat(opTs).isEqualTo(0L);
+
+        // Verify database_name metadata
+        Assertions.assertThat(metadata).containsKey("database_name");
+        Assertions.assertThat(metadata.get("database_name"))
+                .isEqualTo(POSTGRES_CONTAINER.getDatabaseName());
+
+        // Verify schema_name metadata
+        Assertions.assertThat(metadata).containsKey("schema_name");
+        Assertions.assertThat(metadata.get("schema_name")).isEqualTo("inventory");
+
+        // Verify table_name metadata
+        Assertions.assertThat(metadata).containsKey("table_name");
+        Assertions.assertThat(metadata.get("table_name")).isEqualTo("full_types");
+
+        // Insert a new row to test incremental phase
+        try (Connection connection =
+                        PostgresTestBase.getJdbcConnection(POSTGIS_CONTAINER, "postgres");
+                Statement statement = connection.createStatement()) {
+            // Use a simpler INSERT statement that only includes basic required columns
+            statement.execute(
+                    "INSERT INTO inventory.full_types (id, small_c, int_c, big_c, "
+                            + "real_c, double_precision, boolean_c, text_c, username, status) VALUES ("
+                            + "2, 100, 200, 300, 1.1, 2.2, true, 'test', 'testuser', 'pending')");
+        }
+
+        // Fetch the incremental event
+        List<Event> incrementalResults = fetchResultsAndCreateTableEvent(events, 1).f0;
+        DataChangeEvent incrementalEvent = (DataChangeEvent) incrementalResults.get(0);
+
+        // Verify all metadata columns in incremental phase
+        Map<String, String> incrementalMetadata = incrementalEvent.meta();
+
+        // Verify op_ts metadata in incremental phase
+        // In incremental phase (change stream), op_ts should be a valid timestamp > 0
+        Assertions.assertThat(incrementalMetadata).containsKey("op_ts");
+        Long incrementalOpTs = Long.parseLong(incrementalMetadata.get("op_ts"));
+        Assertions.assertThat(incrementalOpTs)
+                .as("op_ts in incremental phase should be greater than 0")
+                .isGreaterThan(0L);
+
+        // Verify database_name metadata in incremental phase
+        Assertions.assertThat(incrementalMetadata).containsKey("database_name");
+        Assertions.assertThat(incrementalMetadata.get("database_name"))
+                .isEqualTo(POSTGRES_CONTAINER.getDatabaseName());
+
+        // Verify schema_name metadata in incremental phase
+        Assertions.assertThat(incrementalMetadata).containsKey("schema_name");
+        Assertions.assertThat(incrementalMetadata.get("schema_name")).isEqualTo("inventory");
+
+        // Verify table_name metadata in incremental phase
+        Assertions.assertThat(incrementalMetadata).containsKey("table_name");
+        Assertions.assertThat(incrementalMetadata.get("table_name")).isEqualTo("full_types");
+    }
+
+    @Test
     public void testArrayTypes() throws Exception {
         initializePostgresTable(POSTGIS_CONTAINER, "column_type_test");
 
@@ -759,6 +979,12 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
 
         ArrayData actualIntArray = (ArrayData) actualSnapshotObjects[3];
         Assertions.assertThat(actualIntArray.getInt(0)).isEqualTo(42);
+
+        ArrayData actualUuidArray = (ArrayData) actualSnapshotObjects[4];
+        Assertions.assertThat(actualUuidArray.getString(0))
+                .isEqualTo(BinaryStringData.fromString("a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"));
+        Assertions.assertThat(actualUuidArray.getString(1))
+                .isEqualTo(BinaryStringData.fromString("b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22"));
     }
 
     @Test
@@ -796,8 +1022,63 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
         } catch (Exception e) {
             Assertions.assertThat(getRootCause(e))
                     .hasMessage(
-                            "Unable convert multidimensional array value '[null, null]' to a flat array.");
+                            "Unable to convert multidimensional array value '[null, null]' to a flat array.");
         }
+    }
+
+    @Test
+    public void testArrayTypesWithNull() throws Exception {
+        initializePostgresTable(POSTGIS_CONTAINER, "column_type_test");
+
+        PostgresSourceConfigFactory configFactory =
+                (PostgresSourceConfigFactory)
+                        new PostgresSourceConfigFactory()
+                                .hostname(POSTGIS_CONTAINER.getHost())
+                                .port(POSTGIS_CONTAINER.getMappedPort(POSTGRESQL_PORT))
+                                .username(TEST_USER)
+                                .password(TEST_PASSWORD)
+                                .databaseList(POSTGRES_CONTAINER.getDatabaseName())
+                                .tableList("inventory.array_types_with_null")
+                                .startupOptions(StartupOptions.initial())
+                                .serverTimeZone("UTC");
+        configFactory.database(POSTGRES_CONTAINER.getDatabaseName());
+        configFactory.slotName(slotName);
+        configFactory.decodingPluginName("pgoutput");
+
+        FlinkSourceProvider sourceProvider =
+                (FlinkSourceProvider)
+                        new PostgresDataSource(configFactory).getEventSourceProvider();
+
+        CloseableIterator<Event> events =
+                env.fromSource(
+                                sourceProvider.getSource(),
+                                WatermarkStrategy.noWatermarks(),
+                                PostgresDataSourceFactory.IDENTIFIER,
+                                new EventTypeInfo())
+                        .executeAndCollect();
+
+        List<Event> snapshotResults = fetchResultsAndCreateTableEvent(events, 1).f0;
+        RecordData snapshotRecord = ((DataChangeEvent) snapshotResults.get(0)).after();
+
+        Object[] actualSnapshotObjects = recordFields(snapshotRecord, ARRAY_TYPES_WITH_NULL);
+
+        Assertions.assertThat(actualSnapshotObjects[0]).isEqualTo(1); // id column
+
+        // Test text array with null element: ARRAY['hello', NULL, 'world']
+        ArrayData actualTextArray = (ArrayData) actualSnapshotObjects[1];
+        Assertions.assertThat(actualTextArray.size()).isEqualTo(3);
+        Assertions.assertThat(actualTextArray.getString(0))
+                .isEqualTo(BinaryStringData.fromString("hello"));
+        Assertions.assertThat(actualTextArray.isNullAt(1)).isTrue();
+        Assertions.assertThat(actualTextArray.getString(2))
+                .isEqualTo(BinaryStringData.fromString("world"));
+
+        // Test integer array with null element: ARRAY[1, NULL, 3]
+        ArrayData actualIntArray = (ArrayData) actualSnapshotObjects[2];
+        Assertions.assertThat(actualIntArray.size()).isEqualTo(3);
+        Assertions.assertThat(actualIntArray.getInt(0)).isEqualTo(1);
+        Assertions.assertThat(actualIntArray.isNullAt(1)).isTrue();
+        Assertions.assertThat(actualIntArray.getInt(2)).isEqualTo(3);
     }
 
     public Throwable getRootCause(Throwable throwable) {
@@ -921,9 +1202,9 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
             RowType.of(
                     DataTypes.INT(),
                     DataTypes.DATE(),
-                    DataTypes.INT(),
-                    DataTypes.INT(),
-                    DataTypes.INT(),
+                    DataTypes.TIME(0),
+                    DataTypes.TIME(3),
+                    DataTypes.TIME(6),
                     DataTypes.TIMESTAMP(0),
                     DataTypes.TIMESTAMP(3),
                     DataTypes.TIMESTAMP(6),
@@ -948,6 +1229,13 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
                     DataTypes.INT(),
                     DataTypes.ARRAY(DataTypes.STRING()),
                     DataTypes.ARRAY(DataTypes.INT()),
+                    DataTypes.ARRAY(DataTypes.INT()),
+                    DataTypes.ARRAY(DataTypes.STRING()));
+
+    private static final RowType ARRAY_TYPES_WITH_NULL =
+            RowType.of(
+                    DataTypes.INT(),
+                    DataTypes.ARRAY(DataTypes.STRING()),
                     DataTypes.ARRAY(DataTypes.INT()));
 
     private static final RowType ARRAY_TYPES_MATRIX =

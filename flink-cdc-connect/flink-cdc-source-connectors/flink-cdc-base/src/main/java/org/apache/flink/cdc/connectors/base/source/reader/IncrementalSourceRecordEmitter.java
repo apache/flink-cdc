@@ -21,6 +21,7 @@ import org.apache.flink.api.connector.source.SourceOutput;
 import org.apache.flink.cdc.connectors.base.source.meta.offset.Offset;
 import org.apache.flink.cdc.connectors.base.source.meta.offset.OffsetFactory;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceRecords;
+import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitState;
 import org.apache.flink.cdc.connectors.base.source.metrics.SourceReaderMetrics;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
@@ -35,6 +36,7 @@ import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -101,10 +103,7 @@ public class IncrementalSourceRecordEmitter<T>
             }
         } else if (isSchemaChangeEvent(element) && splitState.isStreamSplitState()) {
             LOG.trace("Process SchemaChangeEvent: {}; splitState = {}", element, splitState);
-            HistoryRecord historyRecord = getHistoryRecord(element);
-            Array tableChanges =
-                    historyRecord.document().getArray(HistoryRecord.Fields.TABLE_CHANGES);
-            TableChanges changes = TABLE_CHANGE_SERIALIZER.deserialize(tableChanges, true);
+            TableChanges changes = getTableChangeRecord(element);
             for (TableChanges.TableChange tableChange : changes) {
                 splitState.asStreamSplitState().recordSchema(tableChange.getId(), tableChange);
             }
@@ -125,6 +124,12 @@ public class IncrementalSourceRecordEmitter<T>
                     "Meet unknown element {} for splitState = {}, just skip.", element, splitState);
             sourceReaderMetrics.addNumRecordsInErrors(1L);
         }
+    }
+
+    protected TableChanges getTableChangeRecord(SourceRecord element) throws IOException {
+        HistoryRecord historyRecord = getHistoryRecord(element);
+        Array tableChanges = historyRecord.document().getArray(HistoryRecord.Fields.TABLE_CHANGES);
+        return TABLE_CHANGE_SERIALIZER.deserialize(tableChanges, true);
     }
 
     private void updateStreamSplitState(SourceSplitState splitState, SourceRecord element) {
@@ -159,6 +164,9 @@ public class IncrementalSourceRecordEmitter<T>
         outputCollector.currentMessageTimestamp = getMessageTimestamp(element);
         debeziumDeserializationSchema.deserialize(element, outputCollector);
     }
+
+    /** Called when a new split is assigned. Subclasses may override for split-specific setup. */
+    public void applySplit(SourceSplitBase split) {}
 
     protected void reportMetrics(SourceRecord element) {
         Long messageTimestamp = getMessageTimestamp(element);

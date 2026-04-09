@@ -115,7 +115,8 @@ public class SchemaUtils {
                 dropColumnEvent -> applyDropColumnEvent(dropColumnEvent, schema),
                 dropTableEvent -> schema,
                 renameColumnEvent -> applyRenameColumnEvent(renameColumnEvent, schema),
-                truncateTableEvent -> schema);
+                truncateTableEvent -> schema,
+                alterTableCommentEvent -> schema.copy(alterTableCommentEvent.getComment()));
     }
 
     private static Schema applyAddColumnEvent(AddColumnEvent event, Schema oldSchema) {
@@ -142,8 +143,10 @@ public class SchemaUtils {
                         int index = columnNames.indexOf(columnWithPosition.getExistedColumnName());
                         if (index < 0) {
                             throw new IllegalArgumentException(
-                                    columnWithPosition.getExistedColumnName()
-                                            + " of AddColumnEvent is not existed");
+                                    String.format(
+                                            "BEFORE type AddColumnEvent error: Column %s does not exist in table %s",
+                                            columnWithPosition.getExistedColumnName(),
+                                            event.tableId()));
                         }
                         columns.add(index, columnWithPosition.getAddColumn());
                         break;
@@ -158,8 +161,10 @@ public class SchemaUtils {
                         int index = columnNames.indexOf(columnWithPosition.getExistedColumnName());
                         if (index < 0) {
                             throw new IllegalArgumentException(
-                                    columnWithPosition.getExistedColumnName()
-                                            + " of AddColumnEvent is not existed");
+                                    String.format(
+                                            "AFTER type AddColumnEvent error: Column %s does not exist in table %s",
+                                            columnWithPosition.getExistedColumnName(),
+                                            event.tableId()));
                         }
                         columns.add(index + 1, columnWithPosition.getAddColumn());
                         break;
@@ -280,10 +285,18 @@ public class SchemaUtils {
                                 .filter(e -> referencedColumns.contains(e.getKey()))
                                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
                 if (!newDataTypeMap.isEmpty()) {
-                    evolvedSchemaChangeEvent =
-                            Optional.of(
-                                    new AlterColumnTypeEvent(
-                                            alterColumnTypeEvent.tableId(), newDataTypeMap));
+                    AlterColumnTypeEvent value =
+                            new AlterColumnTypeEvent(
+                                    alterColumnTypeEvent.tableId(), newDataTypeMap);
+                    alterColumnTypeEvent
+                            .getComments()
+                            .forEach(
+                                    (name, comment) -> {
+                                        if (referencedColumns.contains(name)) {
+                                            value.addColumnComment(name, comment);
+                                        }
+                                    });
+                    evolvedSchemaChangeEvent = Optional.of(value);
                 }
             }
         } else if (event instanceof RenameColumnEvent) {
@@ -386,6 +399,11 @@ public class SchemaUtils {
                         },
                         truncateTableEvent -> {
                             // We have no way to ensure if a TruncateTableEvent has been applied
+                            // before. Just assume it's not.
+                            return false;
+                        },
+                        tableCommentEvent -> {
+                            // We have no way to ensure if a AlterTableCommentEvent has been applied
                             // before. Just assume it's not.
                             return false;
                         }));

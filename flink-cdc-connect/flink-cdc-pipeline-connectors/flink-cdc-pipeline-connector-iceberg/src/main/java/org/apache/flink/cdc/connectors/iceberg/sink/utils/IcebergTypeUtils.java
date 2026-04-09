@@ -28,8 +28,13 @@ import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.connectors.iceberg.sink.IcebergDataSink;
 import org.apache.flink.table.data.TimestampData;
 
+import org.apache.iceberg.expressions.Literal;
 import org.apache.iceberg.types.Type;
 import org.apache.iceberg.types.Types;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import javax.annotation.Nullable;
 
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -41,6 +46,8 @@ import static org.apache.flink.cdc.common.types.DataTypeChecks.getPrecision;
 /** Util class for types in {@link IcebergDataSink}. */
 public class IcebergTypeUtils {
 
+    private static final Logger LOG = LoggerFactory.getLogger(IcebergTypeUtils.class);
+
     /** Convert column from Flink CDC to Iceberg format. */
     public static Types.NestedField convertCdcColumnToIcebergField(
             int index, PhysicalColumn column) {
@@ -51,6 +58,66 @@ public class IcebergTypeUtils {
                 column.getName(),
                 convertCDCTypeToIcebergType(dataType),
                 column.getComment());
+    }
+
+    /**
+     * Parse a CDC default value expression string into an Iceberg {@link Literal}.
+     *
+     * @return the parsed Literal, or null if the expression is null or cannot be parsed for the
+     *     given type.
+     */
+    @Nullable
+    public static Literal<?> parseDefaultValue(
+            @Nullable String defaultValueExpression, DataType cdcType) {
+        if (defaultValueExpression == null) {
+            return null;
+        }
+        try {
+            switch (cdcType.getTypeRoot()) {
+                case CHAR:
+                case VARCHAR:
+                    return Literal.of(defaultValueExpression);
+                case BOOLEAN:
+                    if ("true".equalsIgnoreCase(defaultValueExpression)) {
+                        return Literal.of(true);
+                    } else if ("false".equalsIgnoreCase(defaultValueExpression)) {
+                        return Literal.of(false);
+                    } else {
+                        LOG.warn(
+                                "Invalid boolean default value '{}', skipping default value.",
+                                defaultValueExpression);
+                        return null;
+                    }
+                case TINYINT:
+                case SMALLINT:
+                case INTEGER:
+                    return Literal.of(Integer.parseInt(defaultValueExpression));
+                case BIGINT:
+                    return Literal.of(Long.parseLong(defaultValueExpression));
+                case FLOAT:
+                    return Literal.of(Float.parseFloat(defaultValueExpression));
+                case DOUBLE:
+                    return Literal.of(Double.parseDouble(defaultValueExpression));
+                case DECIMAL:
+                    int scale = DataTypes.getScale(cdcType).orElse(0);
+                    return Literal.of(
+                            new java.math.BigDecimal(defaultValueExpression)
+                                    .setScale(scale, java.math.RoundingMode.HALF_UP));
+                default:
+                    LOG.debug(
+                            "Unsupported default value type {} for expression '{}', skipping default value.",
+                            cdcType.getTypeRoot(),
+                            defaultValueExpression);
+                    return null;
+            }
+        } catch (NumberFormatException e) {
+            LOG.warn(
+                    "Failed to parse default value '{}' for type {}, skipping default value.",
+                    defaultValueExpression,
+                    cdcType.getTypeRoot(),
+                    e);
+            return null;
+        }
     }
 
     /**
@@ -140,8 +207,10 @@ public class IcebergTypeUtils {
                         };
                 break;
             case TINYINT:
+                fieldGetter = row -> (int) row.getByte(fieldPos);
+                break;
             case SMALLINT:
-                fieldGetter = row -> row.getInt(fieldPos);
+                fieldGetter = row -> ((Short) row.getShort(fieldPos)).intValue();
                 break;
             case BIGINT:
                 fieldGetter = row -> row.getLong(fieldPos);
@@ -153,9 +222,13 @@ public class IcebergTypeUtils {
                 fieldGetter = row -> row.getDouble(fieldPos);
                 break;
             case INTEGER:
-            case DATE:
-            case TIME_WITHOUT_TIME_ZONE:
                 fieldGetter = (row) -> row.getInt(fieldPos);
+                break;
+            case DATE:
+                fieldGetter = (row) -> (int) row.getDate(fieldPos).toEpochDay();
+                break;
+            case TIME_WITHOUT_TIME_ZONE:
+                fieldGetter = (row) -> (int) row.getTime(fieldPos).toMillisOfDay();
                 break;
             case TIMESTAMP_WITHOUT_TIME_ZONE:
                 fieldGetter =

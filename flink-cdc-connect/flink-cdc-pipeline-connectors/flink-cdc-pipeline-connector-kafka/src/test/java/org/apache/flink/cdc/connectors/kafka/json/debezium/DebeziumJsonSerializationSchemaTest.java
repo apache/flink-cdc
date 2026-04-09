@@ -18,8 +18,10 @@
 package org.apache.flink.cdc.connectors.kafka.json.debezium;
 
 import org.apache.flink.api.common.serialization.SerializationSchema;
+import org.apache.flink.cdc.common.data.DateData;
 import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
+import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
@@ -226,9 +228,9 @@ class DebeziumJsonSerializationSchemaTest {
                                     BinaryStringData.fromString("test1"),
                                     BinaryStringData.fromString("test2"),
                                     BinaryStringData.fromString("test3"),
-                                    100,
-                                    200,
-                                    300,
+                                    DateData.fromEpochDay(100),
+                                    TimeData.fromNanoOfDay(200_000_000L),
+                                    TimeData.fromNanoOfDay(300_000_000L),
                                     TimestampData.fromTimestamp(
                                             java.sql.Timestamp.valueOf("2023-01-01 00:00:00.000")),
                                     TimestampData.fromTimestamp(
@@ -243,6 +245,196 @@ class DebeziumJsonSerializationSchemaTest {
                 mapper.readTree(
                         "{\"schema\":{\"type\":\"struct\",\"fields\":[{\"type\":\"struct\",\"fields\":[{\"type\":\"boolean\",\"optional\":true,\"doc\":\"_boolean comment\",\"field\":\"_boolean\"},{\"type\":\"bytes\",\"optional\":true,\"name\":\"io.debezium.data.Bits\",\"version\":1,\"parameters\":{\"length\":\"3\"},\"field\":\"_binary\"},{\"type\":\"bytes\",\"optional\":true,\"name\":\"io.debezium.data.Bits\",\"version\":1,\"parameters\":{\"length\":\"10\"},\"field\":\"_varbinary\"},{\"type\":\"bytes\",\"optional\":true,\"name\":\"io.debezium.data.Bits\",\"version\":1,\"parameters\":{\"length\":\"2147483647\"},\"field\":\"_bytes\"},{\"type\":\"int16\",\"optional\":true,\"field\":\"_tinyint\"},{\"type\":\"int16\",\"optional\":true,\"field\":\"_smallint\"},{\"type\":\"int32\",\"optional\":true,\"field\":\"_int\"},{\"type\":\"int64\",\"optional\":true,\"field\":\"_bigint\"},{\"type\":\"float\",\"optional\":true,\"field\":\"_float\"},{\"type\":\"double\",\"optional\":true,\"field\":\"_double\"},{\"type\":\"bytes\",\"optional\":true,\"name\":\"org.apache.kafka.connect.data.Decimal\",\"version\":1,\"parameters\":{\"scale\":\"3\",\"connect.decimal.precision\":\"6\"},\"field\":\"_decimal\"},{\"type\":\"string\",\"optional\":true,\"field\":\"_char\"},{\"type\":\"string\",\"optional\":true,\"field\":\"_varchar\"},{\"type\":\"string\",\"optional\":true,\"field\":\"_string\"},{\"type\":\"int32\",\"optional\":true,\"name\":\"io.debezium.time.Date\",\"version\":1,\"field\":\"_date\"},{\"type\":\"int64\",\"optional\":true,\"name\":\"io.debezium.time.MicroTime\",\"version\":1,\"field\":\"_time\"},{\"type\":\"int64\",\"optional\":true,\"name\":\"io.debezium.time.MicroTime\",\"version\":1,\"field\":\"_time_6\"},{\"type\":\"int64\",\"optional\":true,\"name\":\"io.debezium.time.MicroTimestamp\",\"version\":1,\"field\":\"_timestamp\"},{\"type\":\"int64\",\"optional\":true,\"name\":\"io.debezium.time.Timestamp\",\"version\":1,\"field\":\"_timestamp_3\"},{\"type\":\"string\",\"optional\":true,\"name\":\"io.debezium.time.ZonedTimestamp\",\"version\":1,\"field\":\"_timestamp_ltz\"},{\"type\":\"string\",\"optional\":true,\"name\":\"io.debezium.time.ZonedTimestamp\",\"version\":1,\"field\":\"_timestamp_ltz_3\"},{\"type\":\"string\",\"optional\":true,\"field\":\"pt\"}],\"optional\":true,\"field\":\"before\"},{\"type\":\"struct\",\"fields\":[{\"type\":\"boolean\",\"optional\":true,\"doc\":\"_boolean comment\",\"field\":\"_boolean\"},{\"type\":\"bytes\",\"optional\":true,\"name\":\"io.debezium.data.Bits\",\"version\":1,\"parameters\":{\"length\":\"3\"},\"field\":\"_binary\"},{\"type\":\"bytes\",\"optional\":true,\"name\":\"io.debezium.data.Bits\",\"version\":1,\"parameters\":{\"length\":\"10\"},\"field\":\"_varbinary\"},{\"type\":\"bytes\",\"optional\":true,\"name\":\"io.debezium.data.Bits\",\"version\":1,\"parameters\":{\"length\":\"2147483647\"},\"field\":\"_bytes\"},{\"type\":\"int16\",\"optional\":true,\"field\":\"_tinyint\"},{\"type\":\"int16\",\"optional\":true,\"field\":\"_smallint\"},{\"type\":\"int32\",\"optional\":true,\"field\":\"_int\"},{\"type\":\"int64\",\"optional\":true,\"field\":\"_bigint\"},{\"type\":\"float\",\"optional\":true,\"field\":\"_float\"},{\"type\":\"double\",\"optional\":true,\"field\":\"_double\"},{\"type\":\"bytes\",\"optional\":true,\"name\":\"org.apache.kafka.connect.data.Decimal\",\"version\":1,\"parameters\":{\"scale\":\"3\",\"connect.decimal.precision\":\"6\"},\"field\":\"_decimal\"},{\"type\":\"string\",\"optional\":true,\"field\":\"_char\"},{\"type\":\"string\",\"optional\":true,\"field\":\"_varchar\"},{\"type\":\"string\",\"optional\":true,\"field\":\"_string\"},{\"type\":\"int32\",\"optional\":true,\"name\":\"io.debezium.time.Date\",\"version\":1,\"field\":\"_date\"},{\"type\":\"int64\",\"optional\":true,\"name\":\"io.debezium.time.MicroTime\",\"version\":1,\"field\":\"_time\"},{\"type\":\"int64\",\"optional\":true,\"name\":\"io.debezium.time.MicroTime\",\"version\":1,\"field\":\"_time_6\"},{\"type\":\"int64\",\"optional\":true,\"name\":\"io.debezium.time.MicroTimestamp\",\"version\":1,\"field\":\"_timestamp\"},{\"type\":\"int64\",\"optional\":true,\"name\":\"io.debezium.time.Timestamp\",\"version\":1,\"field\":\"_timestamp_3\"},{\"type\":\"string\",\"optional\":true,\"name\":\"io.debezium.time.ZonedTimestamp\",\"version\":1,\"field\":\"_timestamp_ltz\"},{\"type\":\"string\",\"optional\":true,\"name\":\"io.debezium.time.ZonedTimestamp\",\"version\":1,\"field\":\"_timestamp_ltz_3\"},{\"type\":\"string\",\"optional\":true,\"field\":\"pt\"}],\"optional\":true,\"field\":\"after\"}],\"optional\":false},\"payload\":{\"before\":null,\"after\":{\"_boolean\":true,\"_binary\":\"AQI=\",\"_varbinary\":\"AwQ=\",\"_bytes\":\"BQYH\",\"_tinyint\":1,\"_smallint\":2,\"_int\":3,\"_bigint\":4,\"_float\":5.1,\"_double\":6.2,\"_decimal\":7.123,\"_char\":\"test1\",\"_varchar\":\"test2\",\"_string\":\"test3\",\"_date\":\"1970-04-11\",\"_time\":\"00:00:00\",\"_time_6\":\"00:00:00\",\"_timestamp\":\"2023-01-01 00:00:00\",\"_timestamp_3\":\"2023-01-01 00:00:00\",\"_timestamp_ltz\":\"2023-01-01 00:00:00Z\",\"_timestamp_ltz_3\":\"2023-01-01 00:00:00Z\",\"pt\":null},\"op\":\"c\",\"source\":{\"db\":\"default_schema\",\"table\":\"table1\"}}}");
         JsonNode actual = mapper.readTree(serializationSchema.serialize(insertEvent1));
+        assertThat(actual).isEqualTo(expected);
+    }
+
+    @Test
+    void testSerializeComplexTypes() throws Exception {
+        ObjectMapper mapper =
+                JacksonMapperFactory.createObjectMapper()
+                        .configure(JsonGenerator.Feature.WRITE_BIGDECIMAL_AS_PLAIN, false);
+        SerializationSchema<Event> serializationSchema =
+                ChangeLogJsonFormatFactory.createSerializationSchema(
+                        new Configuration(),
+                        JsonSerializationType.DEBEZIUM_JSON,
+                        ZoneId.systemDefault());
+        serializationSchema.open(new MockInitializationContext());
+
+        // create table with complex types
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("arr", DataTypes.ARRAY(DataTypes.STRING()))
+                        .physicalColumn("map", DataTypes.MAP(DataTypes.STRING(), DataTypes.INT()))
+                        .physicalColumn(
+                                "row",
+                                DataTypes.ROW(
+                                        DataTypes.FIELD("f1", DataTypes.STRING()),
+                                        DataTypes.FIELD("f2", DataTypes.INT())))
+                        .primaryKey("id")
+                        .build();
+
+        RowType rowType =
+                RowType.of(
+                        DataTypes.INT(),
+                        DataTypes.ARRAY(DataTypes.STRING()),
+                        DataTypes.MAP(DataTypes.STRING(), DataTypes.INT()),
+                        DataTypes.ROW(
+                                DataTypes.FIELD("f1", DataTypes.STRING()),
+                                DataTypes.FIELD("f2", DataTypes.INT())));
+
+        CreateTableEvent createTableEvent = new CreateTableEvent(TABLE_1, schema);
+        assertThat(serializationSchema.serialize(createTableEvent)).isNull();
+
+        BinaryRecordDataGenerator generator = new BinaryRecordDataGenerator(rowType);
+
+        // Create test data with complex types
+        org.apache.flink.cdc.common.data.GenericArrayData arrayData =
+                new org.apache.flink.cdc.common.data.GenericArrayData(
+                        new Object[] {
+                            BinaryStringData.fromString("item1"),
+                            BinaryStringData.fromString("item2")
+                        });
+
+        Map<Object, Object> mapValues = new HashMap<>();
+        mapValues.put(BinaryStringData.fromString("key1"), 100);
+        mapValues.put(BinaryStringData.fromString("key2"), 200);
+        org.apache.flink.cdc.common.data.GenericMapData mapData =
+                new org.apache.flink.cdc.common.data.GenericMapData(mapValues);
+
+        BinaryRecordDataGenerator nestedRowGenerator =
+                new BinaryRecordDataGenerator(RowType.of(DataTypes.STRING(), DataTypes.INT()));
+        org.apache.flink.cdc.common.data.RecordData nestedRow =
+                nestedRowGenerator.generate(
+                        new Object[] {BinaryStringData.fromString("nested"), 42});
+
+        // insert event with complex types
+        DataChangeEvent insertEvent =
+                DataChangeEvent.insertEvent(
+                        TABLE_1,
+                        generator.generate(new Object[] {1, arrayData, mapData, nestedRow}));
+
+        byte[] serialized = serializationSchema.serialize(insertEvent);
+        JsonNode actual = mapper.readTree(serialized);
+
+        // Verify the structure contains complex types
+        assertThat(actual.has("before")).isTrue();
+        assertThat(actual.has("after")).isTrue();
+        assertThat(actual.get("after").has("id")).isTrue();
+        assertThat(actual.get("after").has("arr")).isTrue();
+        assertThat(actual.get("after").has("map")).isTrue();
+        assertThat(actual.get("after").has("row")).isTrue();
+
+        // Verify array content
+        JsonNode arrNode = actual.get("after").get("arr");
+        assertThat(arrNode.isArray()).isTrue();
+        assertThat(arrNode.size()).isEqualTo(2);
+
+        // Verify map content
+        JsonNode mapNode = actual.get("after").get("map");
+        assertThat(mapNode.isObject()).isTrue();
+
+        // Verify row content
+        JsonNode rowNode = actual.get("after").get("row");
+        assertThat(rowNode.isObject()).isTrue();
+        assertThat(rowNode.has("f1")).isTrue();
+        assertThat(rowNode.has("f2")).isTrue();
+    }
+
+    @Test
+    void testSerializeWithSchemaComplexTypes() throws Exception {
+        ObjectMapper mapper =
+                JacksonMapperFactory.createObjectMapper()
+                        .configure(JsonGenerator.Feature.WRITE_BIGDECIMAL_AS_PLAIN, false);
+        Map<String, String> properties = new HashMap<>();
+        properties.put("include-schema.enabled", "true");
+        Configuration configuration = Configuration.fromMap(properties);
+        SerializationSchema<Event> serializationSchema =
+                ChangeLogJsonFormatFactory.createSerializationSchema(
+                        configuration, JsonSerializationType.DEBEZIUM_JSON, ZoneId.systemDefault());
+        serializationSchema.open(new MockInitializationContext());
+
+        // create table with complex types
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("arr", DataTypes.ARRAY(DataTypes.STRING()))
+                        .physicalColumn("map", DataTypes.MAP(DataTypes.STRING(), DataTypes.INT()))
+                        .physicalColumn(
+                                "row",
+                                DataTypes.ROW(
+                                        DataTypes.FIELD("f1", DataTypes.STRING()),
+                                        DataTypes.FIELD("f2", DataTypes.INT())))
+                        .primaryKey("id")
+                        .build();
+
+        RowType rowType =
+                RowType.of(
+                        DataTypes.INT(),
+                        DataTypes.ARRAY(DataTypes.STRING()),
+                        DataTypes.MAP(DataTypes.STRING(), DataTypes.INT()),
+                        DataTypes.ROW(
+                                DataTypes.FIELD("f1", DataTypes.STRING()),
+                                DataTypes.FIELD("f2", DataTypes.INT())));
+
+        CreateTableEvent createTableEvent = new CreateTableEvent(TABLE_1, schema);
+        assertThat(serializationSchema.serialize(createTableEvent)).isNull();
+
+        BinaryRecordDataGenerator generator = new BinaryRecordDataGenerator(rowType);
+
+        // Create test data with complex types
+        org.apache.flink.cdc.common.data.GenericArrayData arrayData =
+                new org.apache.flink.cdc.common.data.GenericArrayData(
+                        new Object[] {
+                            BinaryStringData.fromString("item1"),
+                            BinaryStringData.fromString("item2")
+                        });
+
+        Map<Object, Object> mapValues = new HashMap<>();
+        mapValues.put(BinaryStringData.fromString("key1"), 100);
+        mapValues.put(BinaryStringData.fromString("key2"), 200);
+        org.apache.flink.cdc.common.data.GenericMapData mapData =
+                new org.apache.flink.cdc.common.data.GenericMapData(mapValues);
+
+        BinaryRecordDataGenerator nestedRowGenerator =
+                new BinaryRecordDataGenerator(RowType.of(DataTypes.STRING(), DataTypes.INT()));
+        org.apache.flink.cdc.common.data.RecordData nestedRow =
+                nestedRowGenerator.generate(
+                        new Object[] {BinaryStringData.fromString("nested"), 42});
+
+        // insert event with complex types
+        DataChangeEvent insertEvent =
+                DataChangeEvent.insertEvent(
+                        TABLE_1,
+                        generator.generate(new Object[] {1, arrayData, mapData, nestedRow}));
+
+        byte[] serialized = serializationSchema.serialize(insertEvent);
+        JsonNode actual = mapper.readTree(serialized);
+
+        JsonNode expected =
+                mapper.readTree(
+                        "{\"schema\":{\"type\":\"struct\",\"fields\":["
+                                + "{\"type\":\"struct\",\"fields\":["
+                                + "{\"type\":\"int32\",\"optional\":true,\"field\":\"id\"},"
+                                + "{\"type\":\"array\",\"items\":{\"type\":\"string\",\"optional\":false},\"optional\":true,\"field\":\"arr\"},"
+                                + "{\"type\":\"map\",\"keys\":{\"type\":\"string\",\"optional\":false},\"values\":{\"type\":\"int32\",\"optional\":false},\"optional\":true,\"field\":\"map\"},"
+                                + "{\"type\":\"struct\",\"fields\":["
+                                + "{\"type\":\"string\",\"optional\":false,\"field\":\"f1\"},"
+                                + "{\"type\":\"int32\",\"optional\":false,\"field\":\"f2\"}"
+                                + "],\"optional\":true,\"field\":\"row\"}"
+                                + "],\"optional\":true,\"field\":\"before\"},"
+                                + "{\"type\":\"struct\",\"fields\":["
+                                + "{\"type\":\"int32\",\"optional\":true,\"field\":\"id\"},"
+                                + "{\"type\":\"array\",\"items\":{\"type\":\"string\",\"optional\":false},\"optional\":true,\"field\":\"arr\"},"
+                                + "{\"type\":\"map\",\"keys\":{\"type\":\"string\",\"optional\":false},\"values\":{\"type\":\"int32\",\"optional\":false},\"optional\":true,\"field\":\"map\"},"
+                                + "{\"type\":\"struct\",\"fields\":["
+                                + "{\"type\":\"string\",\"optional\":false,\"field\":\"f1\"},"
+                                + "{\"type\":\"int32\",\"optional\":false,\"field\":\"f2\"}"
+                                + "],\"optional\":true,\"field\":\"row\"}"
+                                + "],\"optional\":true,\"field\":\"after\"}"
+                                + "],\"optional\":false},"
+                                + "\"payload\":{\"before\":null,\"after\":{\"id\":1,\"arr\":[\"item1\",\"item2\"],\"map\":{\"key1\":100,\"key2\":200},\"row\":{\"f1\":\"nested\",\"f2\":42}},\"op\":\"c\",\"source\":{\"db\":\"default_schema\",\"table\":\"table1\"}}}");
+
         assertThat(actual).isEqualTo(expected);
     }
 }

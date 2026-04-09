@@ -66,8 +66,8 @@ public class OracleDeserializationConverterFactory {
                 return createFloatConverter();
             case DOUBLE:
                 return createDoubleConverter();
-                // Debezium use io.debezium.time.ZonedTimestamp to map Oracle TIMESTAMP WITH LOCAL
-                // TIME ZONE type, the value is a string representation of a timestamp in UTC.
+            // Debezium use io.debezium.time.ZonedTimestamp to map Oracle TIMESTAMP WITH LOCAL
+            // TIME ZONE type, the value is a string representation of a timestamp in UTC.
             case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
                 return convertToLocalTimeZoneTimestamp();
             default:

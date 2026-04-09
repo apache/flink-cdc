@@ -28,7 +28,7 @@ under the License.
 **Route** specifies the rule of matching a list of source-table and mapping to sink-table. The most typical scenario is the merge of sub-databases and sub-tables, routing multiple upstream source tables to the same sink table.
 
 # Parameters
-To describe a route, the follows are required:  
+To describe a route, the follows are required:
 
 | parameter      | meaning                                                                                     | optional/required |
 |----------------|---------------------------------------------------------------------------------------------|-------------------|
@@ -38,6 +38,29 @@ To describe a route, the follows are required:
 | description    | Routing rule description(a default value provided)                                          | optional          |
 
 A route module can contain a list of source-table/sink-table rules.
+
+# Route Mode
+By default, all matching route rules are applied to a table. You can configure the `route-mode` option in the pipeline configuration to change this behavior:
+
+| Value        | Description                                                            |
+|--------------|------------------------------------------------------------------------|
+| `ALL_MATCH`  | Apply all matching route rules to a table. This is the default mode.  |
+| `FIRST_MATCH`| Apply only the first matching route rule and stop evaluation.          |
+
+For example, to use `FIRST_MATCH` mode:
+
+```yaml
+pipeline:
+  name: Sync MySQL Database to Doris
+  parallelism: 2
+  route-mode: FIRST_MATCH
+```
+
+{{< hint info >}}
+
+When using `FIRST_MATCH` mode, route rules are evaluated in the order they are defined. The first rule that matches the source table will be applied, and subsequent rules will be skipped.
+
+{{< /hint >}}
 
 # Example
 ## Route one Data Source table to one Data Sink table
@@ -87,3 +110,24 @@ route:
 ```
 
 Then, all tables including `source_db.XXX` will be routed to `sink_db.XXX` without hassle.
+
+## Advanced: RegExp Capturing & Replacement Rules
+
+It is also possible to create capturing groups in `source-table` fields like this:
+
+```yaml
+route:
+  - source-table: db_(\.*).(\.*)_tbl
+    sink-table: sink_db_$1.sink_table_$2
+```
+
+Here we create two capturing groups matching database suffix and table prefix.
+
+For upstream table `db_foo.bar_tbl`, capturing group `(foo, bar)` will be extracted and bound to `$1` and `$2`.
+As a result, such table will be routed to downstream table `sink_db_foo.sink_table_bar`.
+
+{{< hint info >}}
+
+Standard RegExp capturing could not be used with `replace-symbol` options.
+
+{{< /hint >}}

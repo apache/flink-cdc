@@ -22,7 +22,9 @@ import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.factories.DataSinkFactory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.sink.DataSink;
+import org.apache.flink.cdc.common.sink.FlinkSinkProvider;
 import org.apache.flink.cdc.composer.utils.FactoryDiscoveryUtils;
+import org.apache.flink.cdc.connectors.paimon.sink.v2.PaimonEventSink;
 import org.apache.flink.table.api.ValidationException;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
@@ -30,6 +32,8 @@ import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.File;
 import java.util.HashMap;
@@ -37,6 +41,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+
+import static org.assertj.core.api.InstanceOfAssertFactories.type;
 
 /** Tests for {@link PaimonDataSinkFactory}. */
 class PaimonDataSinkFactoryTest {
@@ -163,5 +169,41 @@ class PaimonDataSinkFactoryTest {
                         new FactoryHelper.DefaultContext(
                                 conf, conf, Thread.currentThread().getContextClassLoader()));
         Assertions.assertThat(dataSink).isInstanceOf(PaimonDataSink.class);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = {"commit.user", "commit.user-prefix"})
+    void testSpecifyingCommitUser(String commitUserKey) {
+        DataSinkFactory sinkFactory =
+                FactoryDiscoveryUtils.getFactoryByIdentifier("paimon", DataSinkFactory.class);
+        Assertions.assertThat(sinkFactory).isInstanceOf(PaimonDataSinkFactory.class);
+        Configuration conf =
+                Configuration.fromMap(
+                        ImmutableMap.<String, String>builder()
+                                .put(PaimonDataSinkOptions.METASTORE.key(), "filesystem")
+                                .put(
+                                        PaimonDataSinkOptions.WAREHOUSE.key(),
+                                        new File(
+                                                        temporaryFolder.toFile(),
+                                                        UUID.randomUUID().toString())
+                                                .toString())
+                                .put(commitUserKey, "yux")
+                                .build());
+
+        DataSink dataSink =
+                sinkFactory.createDataSink(
+                        new FactoryHelper.DefaultContext(
+                                conf, conf, Thread.currentThread().getContextClassLoader()));
+        Assertions.assertThat(dataSink).isInstanceOf(PaimonDataSink.class);
+        Assertions.assertThat(dataSink).extracting("commitUser").isEqualTo("yux");
+        Assertions.assertThat(dataSink.getEventSinkProvider())
+                .isInstanceOf(FlinkSinkProvider.class)
+                .asInstanceOf(type(FlinkSinkProvider.class))
+                .extracting(FlinkSinkProvider::getSink)
+                .isExactlyInstanceOf(PaimonEventSink.class)
+                .extracting("commitUser")
+                .asString()
+                .hasSize(39) // 3 ("yux") + 36 (Random UUID)
+                .startsWith("yux");
     }
 }

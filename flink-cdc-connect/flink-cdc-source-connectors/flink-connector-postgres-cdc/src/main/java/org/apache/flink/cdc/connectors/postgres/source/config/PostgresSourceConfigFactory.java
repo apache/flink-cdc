@@ -52,6 +52,11 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
 
     private int lsnCommitCheckpointsDelay;
 
+    private boolean includePartitionedTables;
+
+    private boolean includeDatabaseInTableId =
+            PostgresSourceOptions.TABLE_ID_INCLUDE_DATABASE.defaultValue();
+
     /** Creates a new {@link PostgresSourceConfig} for the given subtask {@code subtaskId}. */
     @Override
     public PostgresSourceConfig create(int subtaskId) {
@@ -133,7 +138,9 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
                 skipSnapshotBackfill,
                 scanNewlyAddedTableEnabled,
                 lsnCommitCheckpointsDelay,
-                assignUnboundedChunkFirst);
+                assignUnboundedChunkFirst,
+                includePartitionedTables,
+                includeDatabaseInTableId);
     }
 
     /**
@@ -180,5 +187,15 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
     /** The lsn commit checkpoints delay for Postgres. */
     public void setLsnCommitCheckpointsDelay(int lsnCommitCheckpointsDelay) {
         this.lsnCommitCheckpointsDelay = lsnCommitCheckpointsDelay;
+    }
+
+    /** Enable include partitioned table. */
+    public void setIncludePartitionedTables(boolean includePartitionedTables) {
+        this.includePartitionedTables = includePartitionedTables;
+    }
+
+    /** Set whether to include database in the generated Table ID. */
+    public void setIncludeDatabaseInTableId(boolean includeDatabaseInTableId) {
+        this.includeDatabaseInTableId = includeDatabaseInTableId;
     }
 }

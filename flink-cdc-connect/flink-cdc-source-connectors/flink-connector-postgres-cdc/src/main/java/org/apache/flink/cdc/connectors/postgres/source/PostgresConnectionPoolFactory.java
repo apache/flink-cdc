@@ -47,7 +47,7 @@ public class PostgresConnectionPoolFactory extends JdbcConnectionPoolFactory {
         return new ConnectionPoolId(
                 config.getHostname(),
                 config.getPort(),
-                config.getHostname(),
+                config.getUser(),
                 config.getDatabase(),
                 dataSourcePoolFactoryIdentifier);
     }

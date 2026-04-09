@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.elasticsearch.sink;
 
 import org.apache.flink.api.connector.sink2.SinkWriter;
+import org.apache.flink.cdc.common.data.DateData;
 import org.apache.flink.cdc.common.data.ZonedTimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
@@ -89,6 +90,21 @@ public class ElasticsearchEventSerializerTest {
         assertThat(index).isEqualTo("test$2025-01-01");
     }
 
+    @Test
+    void testSchemaChangeEventReturnsNull() {
+        Schema tableSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT().notNull())
+                        .physicalColumn("name", DataTypes.VARCHAR(255).notNull())
+                        .primaryKey("id")
+                        .build();
+
+        ElasticsearchEventSerializer serializer =
+                new ElasticsearchEventSerializer(ZoneId.of("UTC"));
+        CreateTableEvent createTableEvent = new CreateTableEvent(tableId, tableSchema);
+        assertThat(serializer.apply(createTableEvent, new MockContext())).isNull();
+    }
+
     private String getShardingString(Map<TableId, String> shardingKey, String shardingSeparator) {
         RowType rowType =
                 RowType.of(
@@ -116,7 +132,7 @@ public class ElasticsearchEventSerializerTest {
                                     ZonedTimestampData.fromZonedDateTime(
                                             LocalDateTime.of(2023, 11, 11, 11, 11, 11, 11)
                                                     .atZone(ZoneId.systemDefault())),
-                                    (int) LocalDate.of(2025, 1, 1).toEpochDay()
+                                    DateData.fromLocalDate(LocalDate.of(2025, 1, 1))
                                 }));
         ElasticsearchEventSerializer serializer =
                 new ElasticsearchEventSerializer(ZoneId.of("UTC"), shardingKey, shardingSeparator);

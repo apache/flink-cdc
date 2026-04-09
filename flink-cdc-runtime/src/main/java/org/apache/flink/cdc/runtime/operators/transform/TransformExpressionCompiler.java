@@ -26,7 +26,10 @@ import org.apache.flink.shaded.guava31.com.google.common.cache.CacheBuilder;
 
 import org.codehaus.commons.compiler.CompileException;
 import org.codehaus.janino.ExpressionEvaluator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -34,6 +37,8 @@ import java.util.List;
  * filters.
  */
 public class TransformExpressionCompiler {
+
+    private static final Logger LOG = LoggerFactory.getLogger(TransformExpressionCompiler.class);
 
     static final Cache<TransformExpressionKey, ExpressionEvaluator> COMPILED_EXPRESSION_CACHE =
             CacheBuilder.newBuilder().softValues().build();
@@ -55,8 +60,8 @@ public class TransformExpressionCompiler {
                     () -> {
                         ExpressionEvaluator expressionEvaluator = new ExpressionEvaluator();
 
-                        List<String> argumentNames = key.getArgumentNames();
-                        List<Class<?>> argumentClasses = key.getArgumentClasses();
+                        List<String> argumentNames = new ArrayList<>(key.getArgumentNames());
+                        List<Class<?>> argumentClasses = new ArrayList<>(key.getArgumentClasses());
 
                         for (UserDefinedFunctionDescriptor udfFunction : udfDescriptors) {
                             argumentNames.add("__instanceOf" + udfFunction.getClassName());
@@ -70,14 +75,26 @@ public class TransformExpressionCompiler {
 
                         // Result type
                         expressionEvaluator.setExpressionType(key.getReturnClass());
+
+                        if (LOG.isDebugEnabled()) {
+                            LOG.debug("Going to evaluate expression: {}", key.getFullExpression());
+                            LOG.debug("  - Argument names: {}", argumentNames);
+                            LOG.debug("  - Argument types: {}", argumentClasses);
+                            LOG.debug("  - Returns: {}", key.getReturnClass());
+                        }
+
                         try {
                             // Compile
-                            expressionEvaluator.cook(key.getExpression());
+                            expressionEvaluator.cook(key.getFullExpression());
                         } catch (CompileException e) {
                             throw new InvalidProgramException(
                                     String.format(
-                                            "Expression cannot be compiled. This is a bug. Please file an issue.\n\tExpression: %s\n\tColumn name map: {%s}",
-                                            key.getExpression(),
+                                            "Expression cannot be compiled. This is a bug. Please file an issue.\n"
+                                                    + "\tOriginal expression: %s\n"
+                                                    + "\tCompiled expression: %s\n"
+                                                    + "\tColumn name map: {%s}",
+                                            key.getOriginalExpression(),
+                                            key.getCompiledExpression(),
                                             TransformException.prettyPrintColumnNameMap(
                                                     key.getColumnNameMap())),
                                     e);

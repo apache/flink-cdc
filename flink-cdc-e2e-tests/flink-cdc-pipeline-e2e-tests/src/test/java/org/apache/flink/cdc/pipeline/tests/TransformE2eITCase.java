@@ -17,12 +17,13 @@
 
 package org.apache.flink.cdc.pipeline.tests;
 
+import org.apache.flink.cdc.common.data.DateData;
+import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
 import org.apache.flink.cdc.runtime.operators.transform.PostTransformOperator;
 import org.apache.flink.cdc.runtime.operators.transform.PreTransformOperator;
 
-import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -46,6 +47,8 @@ import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 /** E2e tests for the {@link PreTransformOperator} and {@link PostTransformOperator}. */
 class TransformE2eITCase extends PipelineTestEnvironment {
@@ -180,14 +183,10 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                                 + "\n"
                                 + "sink:\n"
                                 + "  type: values\n"
-                                + "route:\n"
+                                + "\n"
                                 + "transform:\n"
                                 + "  - source-table: %s.\\.*\n"
-                                + "    projection: ID, VERSION, 'Type-A' AS CATEGORY\n"
-                                + "    filter: ID > 1008\n"
-                                + "  - source-table: %s.\\.*\n"
-                                + "    projection: ID, VERSION, 'Type-B' AS CATEGORY\n"
-                                + "    filter: ID <= 1008\n"
+                                + "    projection: ID, VERSION, CASE WHEN ID > 1008 THEN 'Type-A' WHEN ID <= 1008 THEN 'Type-B' END AS CATEGORY\n"
                                 + "\n"
                                 + "pipeline:\n"
                                 + "  execution.runtime-mode: %s\n"
@@ -196,7 +195,6 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
                         startupMode,
-                        transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
                         runtimeMode,
@@ -607,11 +605,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                                 + "  type: values\n"
                                 + "transform:\n"
                                 + "  - source-table: %s.TABLEALPHA\n"
-                                + "    projection: ID, VERSION, PRICEALPHA, AGEALPHA, 'Juvenile' AS ROLENAME\n"
-                                + "    filter: AGEALPHA < 18\n"
-                                + "  - source-table: %s.TABLEALPHA\n"
-                                + "    projection: ID, VERSION, PRICEALPHA, AGEALPHA, NAMEALPHA AS ROLENAME\n"
-                                + "    filter: AGEALPHA >= 18\n"
+                                + "    projection: ID, VERSION, PRICEALPHA, AGEALPHA, CASE WHEN AGEALPHA < 18 THEN 'Juvenile' WHEN AGEALPHA >= 18 THEN NAMEALPHA END AS ROLENAME\n"
                                 + "pipeline:\n"
                                 + "  execution.runtime-mode: %s\n"
                                 + "  parallelism: %d",
@@ -619,7 +613,6 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
                         startupMode,
-                        transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
                         runtimeMode,
@@ -979,7 +972,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                 dbNameFormatter,
                 "AddColumnEvent{tableId=%s.TABLEALPHA, addedColumns=[ColumnWithPosition{column=`LAST` VARCHAR(17), position=AFTER, existedColumnName=NAMEALPHA}]}",
                 "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[3008, 8, 8, 80, 17, Jazz, Last, id -> 3008], op=INSERT, meta=()}",
-                "AlterColumnTypeEvent{tableId=%s.TABLEALPHA, typeMapping={CODENAME=DOUBLE}, oldTypeMapping={CODENAME=TINYINT}}",
+                "AlterColumnTypeEvent{tableId=%s.TABLEALPHA, typeMapping={CODENAME=DOUBLE}, oldTypeMapping={CODENAME=TINYINT}, comments={}}",
                 "RenameColumnEvent{tableId=%s.TABLEALPHA, nameMapping={CODENAME=CODE_NAME}}",
                 "RenameColumnEvent{tableId=%s.TABLEALPHA, nameMapping={CODE_NAME=CODE_NAME_EX}}",
                 "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[3009, 9, 9.0, 90, 18, Keka, Finale, id -> 3009], op=INSERT, meta=()}",
@@ -1083,7 +1076,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                 "AddColumnEvent{tableId=%s.TABLEALPHA, addedColumns=[ColumnWithPosition{column=`CODENAME` TINYINT, position=AFTER, existedColumnName=VERSION}]}",
                 "AddColumnEvent{tableId=%s.TABLEALPHA, addedColumns=[ColumnWithPosition{column=`FIRST` VARCHAR(17), position=BEFORE, existedColumnName=ID}]}",
                 "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[3008 <- id, First, 3008, 8, 8, 80, 17, Jazz], op=INSERT, meta=()}",
-                "AlterColumnTypeEvent{tableId=%s.TABLEALPHA, typeMapping={CODENAME=DOUBLE}, oldTypeMapping={CODENAME=TINYINT}}",
+                "AlterColumnTypeEvent{tableId=%s.TABLEALPHA, typeMapping={CODENAME=DOUBLE}, oldTypeMapping={CODENAME=TINYINT}, comments={}}",
                 "RenameColumnEvent{tableId=%s.TABLEALPHA, nameMapping={CODENAME=CODE_NAME}}",
                 "RenameColumnEvent{tableId=%s.TABLEALPHA, nameMapping={CODE_NAME=CODE_NAME_EX}}",
                 "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[3009 <- id, 1st, 3009, 9, 9.0, 90, 18, Keka], op=INSERT, meta=()}",
@@ -1215,7 +1208,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                 "AddColumnEvent{tableId=%s.TABLEALPHA, addedColumns=[ColumnWithPosition{column=`CODENAME` TINYINT, position=AFTER, existedColumnName=VERSION}]}",
                 "AddColumnEvent{tableId=%s.TABLEALPHA, addedColumns=[ColumnWithPosition{column=`FIRST` VARCHAR(17), position=BEFORE, existedColumnName=ID}]}",
                 "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[First, 3008, 8, 8, 80, 17, Jazz, ascii test!?, 大五, 测试数据, ひびぴ, 죠주쥬, ÀÆÉ, ÓÔŐÖ, αβγδε, בבקשה, твой, ภาษาไทย, piedzimst brīvi], op=INSERT, meta=()}",
-                "AlterColumnTypeEvent{tableId=%s.TABLEALPHA, typeMapping={CODENAME=DOUBLE}, oldTypeMapping={CODENAME=TINYINT}}",
+                "AlterColumnTypeEvent{tableId=%s.TABLEALPHA, typeMapping={CODENAME=DOUBLE}, oldTypeMapping={CODENAME=TINYINT}, comments={}}",
                 "RenameColumnEvent{tableId=%s.TABLEALPHA, nameMapping={CODENAME=CODE_NAME}}",
                 "RenameColumnEvent{tableId=%s.TABLEALPHA, nameMapping={CODE_NAME=CODE_NAME_EX}}",
                 "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1st, 3009, 9, 9.0, 90, 18, Keka, ascii test!?, 大五, 测试数据, ひびぴ, 죠주쥬, ÀÆÉ, ÓÔŐÖ, αβγδε, בבקשה, твой, ภาษาไทย, piedzimst brīvi], op=INSERT, meta=()}",
@@ -1311,20 +1304,19 @@ class TransformE2eITCase extends PipelineTestEnvironment {
     }
 
     void verifyDataRecord(String recordLine) {
-        LOG.info("Verifying data line {}", recordLine);
         List<String> tokens = Arrays.asList(recordLine.split(", "));
-        Assertions.assertThat(tokens).hasSizeGreaterThanOrEqualTo(6);
+        assertThat(tokens).hasSizeGreaterThanOrEqualTo(6);
 
         tokens = tokens.subList(tokens.size() - 6, tokens.size());
 
         String localTime = tokens.get(0);
         String currentTime = tokens.get(1);
-        Assertions.assertThat(currentTime).isEqualTo(localTime);
+        assertThat(localTime).isEqualTo(currentTime);
 
         String currentTimestamp = tokens.get(2);
         String nowTimestamp = tokens.get(3);
         String localTimestamp = tokens.get(4);
-        Assertions.assertThat(currentTimestamp).isEqualTo(nowTimestamp).isEqualTo(localTimestamp);
+        assertThat(currentTimestamp).isEqualTo(nowTimestamp).isEqualTo(localTimestamp);
 
         // If timestamp millisecond part is .000, it will be truncated to yyyy-MM-dd'T'HH:mm:ss
         // format. Manually append this for the following checks.
@@ -1339,13 +1331,15 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                         .toInstant(ZoneOffset.UTC);
 
         long milliSecondsInOneDay = 24 * 60 * 60 * 1000;
+        assertThat(TimeData.fromIsoLocalTimeString(localTime))
+                .isEqualTo(
+                        TimeData.fromMillisOfDay(
+                                (int) (instant.toEpochMilli() % milliSecondsInOneDay)));
 
-        Assertions.assertThat(Long.parseLong(localTime))
-                .isEqualTo(instant.toEpochMilli() % milliSecondsInOneDay);
-
-        String currentDate = tokens.get(5);
-
-        Assertions.assertThat(Long.parseLong(currentDate))
-                .isEqualTo(instant.toEpochMilli() / milliSecondsInOneDay);
+        String localDate = tokens.get(5);
+        assertThat(DateData.fromIsoLocalDateString(localDate))
+                .isEqualTo(
+                        DateData.fromEpochDay(
+                                (int) (instant.toEpochMilli() / milliSecondsInOneDay)));
     }
 }

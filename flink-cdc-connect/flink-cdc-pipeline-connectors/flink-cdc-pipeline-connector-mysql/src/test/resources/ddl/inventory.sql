@@ -34,7 +34,27 @@ VALUES (default,"scooter","Small 2-wheel scooter",3.14),
        (default,"hammer","14oz carpenter's hammer",0.875),
        (default,"hammer","16oz carpenter's hammer",1.0),
        (default,"rocks","box of assorted rocks",5.3),
-       (default,"jacket","water resistent black wind breaker",0.1),
+       (default,"jacket","water resistant black wind breaker",0.1),
+       (default,"spare tire","24 inch spare tire",22.2);
+
+-- Create a table where all fields are in uppercase.
+CREATE TABLE uppercase_products (
+  ID INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  NAME VARCHAR(255) NOT NULL DEFAULT 'flink',
+  DESCRIPTION VARCHAR(512),
+  WEIGHT FLOAT(6)
+);
+ALTER TABLE uppercase_products AUTO_INCREMENT = 101;
+
+INSERT INTO uppercase_products
+VALUES (default,"scooter","Small 2-wheel scooter",3.14),
+       (default,"car battery","12V car battery",8.1),
+       (default,"12-pack drill bits","12-pack of drill bits with sizes ranging from #40 to #3",0.8),
+       (default,"hammer","12oz carpenter's hammer",0.75),
+       (default,"hammer","14oz carpenter's hammer",0.875),
+       (default,"hammer","16oz carpenter's hammer",1.0),
+       (default,"rocks","box of assorted rocks",5.3),
+       (default,"jacket","water resistant black wind breaker",0.1),
        (default,"spare tire","24 inch spare tire",22.2);
 
 -- Create some customers ...

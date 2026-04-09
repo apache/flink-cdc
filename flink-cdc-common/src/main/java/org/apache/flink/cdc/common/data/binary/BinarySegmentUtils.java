@@ -25,10 +25,12 @@ import org.apache.flink.cdc.common.data.MapData;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.StringData;
 import org.apache.flink.cdc.common.data.TimestampData;
+import org.apache.flink.cdc.common.types.variant.BinaryVariant;
 import org.apache.flink.core.memory.DataOutputView;
 import org.apache.flink.core.memory.MemorySegment;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
 import static org.apache.flink.cdc.common.data.binary.BinaryFormat.HIGHEST_FIRST_BIT;
@@ -1104,6 +1106,23 @@ public final class BinarySegmentUtils {
         BinaryRecordData recordData = new BinaryRecordData(numFields);
         recordData.pointTo(segments, offset + baseOffset, size);
         return recordData;
+    }
+
+    public static BinaryVariant readVariant(
+            MemorySegment[] segments, int baseOffset, long offsetAndSize) {
+        final int size = ((int) offsetAndSize);
+        int offset = (int) (offsetAndSize >> 32);
+        byte[] bytes = copyToBytes(segments, offset + baseOffset, size);
+        ByteBuffer buffer = ByteBuffer.wrap(bytes);
+        int metaLen = buffer.getInt();
+        int valueLen = bytes.length - 4 - metaLen;
+
+        byte[] meta = new byte[metaLen];
+        byte[] value = new byte[valueLen];
+        buffer.get(meta, 0, metaLen);
+        buffer.get(value, 0, valueLen);
+
+        return new BinaryVariant(value, meta);
     }
 
     /**

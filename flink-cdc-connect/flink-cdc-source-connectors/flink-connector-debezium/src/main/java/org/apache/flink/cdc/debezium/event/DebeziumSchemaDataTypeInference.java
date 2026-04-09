@@ -25,6 +25,7 @@ import org.apache.flink.cdc.common.types.DecimalType;
 
 import io.debezium.data.SpecialValueDecimal;
 import io.debezium.data.VariableScaleDecimal;
+import io.debezium.time.Date;
 import io.debezium.time.MicroTime;
 import io.debezium.time.MicroTimestamp;
 import io.debezium.time.NanoTime;
@@ -32,7 +33,6 @@ import io.debezium.time.NanoTimestamp;
 import io.debezium.time.Time;
 import io.debezium.time.Timestamp;
 import io.debezium.time.ZonedTimestamp;
-import org.apache.kafka.connect.data.Date;
 import org.apache.kafka.connect.data.Decimal;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
@@ -104,10 +104,14 @@ public class DebeziumSchemaDataTypeInference implements SchemaDataTypeInference,
     }
 
     protected DataType inferInt32(Object value, Schema schema) {
-        if (Date.LOGICAL_NAME.equals(schema.name())) {
+        if (Date.SCHEMA_NAME.equals(schema.name())
+                || org.apache.kafka.connect.data.Date.LOGICAL_NAME.equals(schema.name())) {
             return DataTypes.DATE();
         }
         if (Time.SCHEMA_NAME.equals(schema.name())) {
+            return DataTypes.TIME(3);
+        }
+        if (org.apache.kafka.connect.data.Time.LOGICAL_NAME.equals(schema.name())) {
             return DataTypes.TIME(3);
         }
         return DataTypes.INT();
@@ -120,7 +124,8 @@ public class DebeziumSchemaDataTypeInference implements SchemaDataTypeInference,
         if (NanoTime.SCHEMA_NAME.equals(schema.name())) {
             return DataTypes.TIME(9);
         }
-        if (Timestamp.SCHEMA_NAME.equals(schema.name())) {
+        if (Timestamp.SCHEMA_NAME.equals(schema.name())
+                || org.apache.kafka.connect.data.Timestamp.LOGICAL_NAME.equals(schema.name())) {
             return DataTypes.TIMESTAMP(3);
         }
         if (MicroTimestamp.SCHEMA_NAME.equals(schema.name())) {
@@ -178,6 +183,9 @@ public class DebeziumSchemaDataTypeInference implements SchemaDataTypeInference,
                             .orElse(DEFAULT_DECIMAL_PRECISION);
 
             if (precision > DecimalType.MAX_PRECISION) {
+                return DataTypes.STRING();
+            }
+            if (scale < 0 || scale > 36) {
                 return DataTypes.STRING();
             }
             return DataTypes.DECIMAL(precision, scale);

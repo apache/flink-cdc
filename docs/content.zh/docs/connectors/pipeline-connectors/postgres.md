@@ -27,34 +27,39 @@ under the License.
 # Postgres Connector
 
 Postgres CDC Pipeline 连接器允许从 Postgres 数据库读取快照数据和增量数据，并提供端到端的整库数据同步能力。 本文描述了如何设置 Postgres CDC Pipeline 连接器。
-注意：因为Postgres的wal log日志中展示没有办法解析表结构变更记录，因此Postgres CDC Pipeline Source暂时不支持同步表结构变更。
 
 ## 示例
 
-从 Postgres 读取数据同步到 Doris 的 Pipeline 可以定义如下：
+从 Postgres 读取数据同步到 Fluss 的 Pipeline 可以定义如下：
 
 ```yaml
 source:
-   type: posgtres
+   type: postgres
    name: Postgres Source
    hostname: 127.0.0.1
    port: 5432
    username: admin
    password: pass
-   tables: adb.\.*.\.*, bdb.user_schema_[0-9].user_table_[0-9]+, [app|web].schema_\.*.order_\.*
+   # 需要确保所有的表来自同一个database
+   tables: adb.\.*.\.*
    decoding.plugin.name:  pgoutput
    slot.name: pgtest
+   schema-change.enabled: true
 
 sink:
-  type: doris
-  name: Doris Sink
-  fenodes: 127.0.0.1:8030
-  username: root
-  password: pass
+  type: fluss
+  name: Fluss Sink
+  bootstrap.servers: localhost:9123
+  # Security-related properties for the Fluss client
+  properties.client.security.protocol: sasl
+  properties.client.security.sasl.mechanism: PLAIN
+  properties.client.security.sasl.username: developer
+  properties.client.security.sasl.password: developer-pass
 
 pipeline:
-   name: Postgres to Doris Pipeline
+   name: Postgres to Fluss Pipeline
    parallelism: 4
+   schema.change.behavior: lenient
 ```
 
 ## 连接器配置项
@@ -105,8 +110,9 @@ pipeline:
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>需要监视的 Postgres 数据库的表名。表名支持正则表达式，以监视满足正则表达式的多个表。<br>
-          需要注意的是，点号（.）被视为数据库和表名的分隔符。 如果需要在正则表达式中使用点（.）来匹配任何字符，必须使用反斜杠对点进行转义。<br>
-          例如，adb.\.*.\.*, bdb.user_schema_[0-9].user_table_[0-9]+, [app|web].schema_\.*.order_\.*</td>
+          需要确保所有的表来自同一个数据库。<br>
+          需要注意的是，点号（.）被视为数据库、模式和表名的分隔符。 如果需要在正则表达式中使用点（.）来匹配任何字符，必须使用反斜杠对点进行转义。<br>
+          例如，bdb.user_schema_[0-9].user_table_[0-9]+, bdb.schema_\.*.order_\.*</td>
     </tr>
     <tr>
       <td>slot.name</td>
@@ -248,10 +254,10 @@ pipeline:
     <tr>
       <td>metadata.list</td>
       <td>optional</td>
-      <td style="word-wrap: break-word;">false</td>
+      <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>
-        源记录中可读取的元数据列表，将传递给下游并在转换模块中使用，各字段以逗号分隔。可用的可读元数据包括：op_ts。
+        源记录中可读取的元数据列表，将传递给下游并在转换模块中使用，各字段以逗号分隔。可用的可读元数据包括：op_ts、table_name、database_name、schema_name。详见<a href="#支持的元数据列">支持的元数据列</a>。
       </td>
     </tr>
     <tr>
@@ -263,6 +269,29 @@ pipeline:
         在快照读取阶段，是否优先分配无界分块。<br>
         这有助于降低在对最大无界分块进行快照时，TaskManager 发生内存溢出（OOM）错误的风险。<br>
         此为实验性选项，默认值为 false。
+      </td>
+    </tr>
+    <tr>
+      <td>table-id.include-database</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        是否在生成的 Table ID 中包含数据库名称。<br>
+        如果设置为 true，Table ID 的格式为 (数据库, 模式, 表)。<br>
+        如果设置为 false，Table ID 的格式为 (模式, 表)。<br>
+        默认值为 false。
+      </td>
+    </tr>
+    <tr>
+      <td>schema-change.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        是否开启 Postgres 源的 Schema 变更推导。开启后，连接器会通过对比 pgoutput Relation 消息与缓存的 Schema 来推导 Schema 变更事件（新增列、删除列、重命名列、修改列类型）。<br>
+        需要将 <code>decoding.plugin.name</code> 设置为 <code>pgoutput</code>。<br>
+        默认值为 false。
       </td>
     </tr>
     </tbody>
@@ -298,6 +327,78 @@ pipeline:
 
 注意:
 1. Group 名称是 `namespace.schema.table`，这里的 `namespace` 是实际的数据库名称， `schema` 是实际的 schema 名称， `table` 是实际的表名称。
+
+## 支持的元数据列
+
+PostgreSQL CDC 连接器支持从源记录中读取元数据列。这些元数据列可以在转换操作中使用或传递给下游 Sink。
+
+**注意：** 部分元数据信息也可以通过 Transform 表达式获取（例如 `__namespace_name__`、`__schema_name__`、`__table_name__`）。主要区别如下：
+- **`op_ts`**：仅可通过 `metadata.list` 获取 - 提供数据库中实际的操作时间戳。
+- **`table_name`、`database_name`、`schema_name`**：可通过 `metadata.list` 或 Transform 表达式获取。使用 `metadata.list` 可以直接将这些值传递给下游 Sink，无需编写转换规则，对于基本用例更加简单。
+
+要启用元数据列，请使用逗号分隔的元数据列名称列表配置 `metadata.list` 选项：
+
+```yaml
+source:
+  type: postgres
+  # ... 其他配置
+  metadata.list: op_ts,table_name,database_name,schema_name
+```
+
+支持以下元数据列：
+
+<div class="wy-table-responsive">
+<table class="colwidths-auto docutils">
+    <thead>
+      <tr>
+        <th class="text-left" style="width: 20%">元数据列</th>
+        <th class="text-left" style="width: 15%">数据类型</th>
+        <th class="text-left" style="width: 65%">描述</th>
+      </tr>
+    </thead>
+    <tbody>
+    <tr>
+      <td>op_ts</td>
+      <td>BIGINT NOT NULL</td>
+      <td>数据变更事件在数据库中发生的时间戳（自纪元以来的毫秒数）。对于快照记录，此值为 0。</td>
+    </tr>
+    <tr>
+      <td>table_name</td>
+      <td>STRING NOT NULL</td>
+      <td>包含变更行的表名称。替代方案：在 Transform 表达式中使用 <code>__table_name__</code>。</td>
+    </tr>
+    <tr>
+      <td>database_name</td>
+      <td>STRING NOT NULL</td>
+      <td>包含变更行的数据库名称。替代方案：在 Transform 表达式中使用 <code>__namespace_name__</code>。</td>
+    </tr>
+    <tr>
+      <td>schema_name</td>
+      <td>STRING NOT NULL</td>
+      <td>包含变更行的 Schema 名称。这是 PostgreSQL 特有的。替代方案：在 Transform 表达式中使用 <code>__schema_name__</code>。</td>
+    </tr>
+    </tbody>
+</table>
+</div>
+
+**使用示例：**
+
+```yaml
+source:
+  type: postgres
+  hostname: localhost
+  port: 5432
+  username: postgres
+  password: postgres
+  tables: mydb.public.orders
+  slot.name: flink_slot
+  metadata.list: op_ts,table_name,schema_name
+
+transform:
+  - source-table: mydb.public.orders
+    projection: order_id, customer_id, op_ts, table_name, schema_name
+    description: 在输出中包含元数据列
+```
 
 ## 数据类型映射
 
@@ -417,11 +518,11 @@ pipeline:
 - debezium.time.precision.mode=adaptive_time_microseconds
 - debezium.time.precision.mode=connect
 
-注意： 受限当前CDC对时间类型的支持，<code>debezium.time.precision.mode</code>为adaptive或adaptive_time_microseconds或connect Time类型都转化为Integer类型，并精度为3，后续将进行完善。
+注意： 受限当前CDC对时间类型Time的精度为3，<code>debezium.time.precision.mode</code>为adaptive或adaptive_time_microseconds或connect Time类型都转化为Time(3)类型。
 
 <u>debezium.time.precision.mode=adaptive</u>
 
-当<code>debezium.time.precision.mode</code>属性设置为默认的 adaptive（自适应）时，连接器会根据列的数据类型定义来确定字面类型和语义类型。这可以确保事件能够精确地表示数据库中的值。
+当<code>debezium.time.precision.mode</code>属性设置为默认的 adaptive（自适应）时，TIME的精度为3，TIMESTAMP的精度为6。
 <div class="wy-table-responsive">
 <table class="colwidths-auto docutils">
     <thead>
@@ -440,13 +541,79 @@ pipeline:
         <td>
           TIME([P])
         </td>
-        <td>INTEGER</td>
+        <td>TIME(3)</td>
       </tr>
       <tr>
         <td>
           TIMESTAMP([P])
         </td>
         <td>TIMESTAMP([P])</td>
+      </tr>
+    </tbody>
+</table>
+</div>
+
+<u>debezium.time.precision.mode=adaptive_time_microseconds</u>
+
+当<code>debezium.time.precision.mode</code>属性设置为默认的 adaptive_time_microseconds时，TIME的精度为3，TIMESTAMP的精度为6。
+<div class="wy-table-responsive">
+<table class="colwidths-auto docutils">
+    <thead>
+      <tr>
+        <th class="text-left">PostgreSQL type<a href="https://www.postgresql.org/docs/12/datatype.html"></a></th>
+        <th class="text-left">CDC type<a href="{% link dev/table/types.md %}"></a></th>
+      </tr>
+    </thead>
+    <tbody>
+       <tr>
+        <td>
+          DATE
+        <td>DATE</td>
+      </tr>
+      <tr>
+        <td>
+          TIME([P])
+        </td>
+        <td>TIME(3)</td>
+      </tr>
+      <tr>
+        <td>
+          TIMESTAMP([P])
+        </td>
+        <td>TIMESTAMP([P])</td>
+      </tr>
+    </tbody>
+</table>
+</div>
+
+<u>debezium.time.precision.mode=connect</u>
+
+当<code>debezium.time.precision.mode</code>属性设置为默认的 connect时，TIME和TIMESTAMP的精度都为3。
+<div class="wy-table-responsive">
+<table class="colwidths-auto docutils">
+    <thead>
+      <tr>
+        <th class="text-left">PostgreSQL type<a href="https://www.postgresql.org/docs/12/datatype.html"></a></th>
+        <th class="text-left">CDC type<a href="{% link dev/table/types.md %}"></a></th>
+      </tr>
+    </thead>
+    <tbody>
+       <tr>
+        <td>
+          DATE
+        <td>DATE</td>
+      </tr>
+      <tr>
+        <td>
+          TIME([P])
+        </td>
+        <td>TIME(3)</td>
+      </tr>
+      <tr>
+        <td>
+          TIMESTAMP([P])
+        </td>
+        <td>TIMESTAMP(3)</td>
       </tr>
     </tbody>
 </table>

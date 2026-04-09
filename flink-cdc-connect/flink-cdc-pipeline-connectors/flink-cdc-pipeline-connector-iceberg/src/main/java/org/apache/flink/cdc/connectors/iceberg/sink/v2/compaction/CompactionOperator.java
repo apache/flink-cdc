@@ -18,12 +18,13 @@
 package org.apache.flink.cdc.connectors.iceberg.sink.v2.compaction;
 
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.connectors.iceberg.sink.utils.HadoopConfUtils;
 import org.apache.flink.cdc.connectors.iceberg.sink.v2.WriteResultWrapper;
+import org.apache.flink.cdc.runtime.operators.AbstractStreamOperatorAdapter;
 import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.connector.sink2.CommittableMessage;
 import org.apache.flink.streaming.api.connector.sink2.CommittableWithLineage;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.util.concurrent.ExecutorThreadFactory;
@@ -46,7 +47,7 @@ import java.util.concurrent.Executors;
 
 /** An Operator to trigger file compaction conditionally. */
 public class CompactionOperator
-        extends AbstractStreamOperator<CommittableMessage<WriteResultWrapper>>
+        extends AbstractStreamOperatorAdapter<CommittableMessage<WriteResultWrapper>>
         implements OneInputStreamOperator<
                 CommittableMessage<WriteResultWrapper>, CommittableMessage<WriteResultWrapper>> {
     protected static final Logger LOGGER = LoggerFactory.getLogger(CompactionOperator.class);
@@ -62,16 +63,21 @@ public class CompactionOperator
 
     private final CompactionOptions compactionOptions;
 
+    private final Map<String, String> hadoopConfOptions;
+
     private volatile Throwable throwable;
 
     private ExecutorService compactExecutor;
 
     public CompactionOperator(
-            Map<String, String> catalogOptions, CompactionOptions compactionOptions) {
+            Map<String, String> catalogOptions,
+            CompactionOptions compactionOptions,
+            Map<String, String> hadoopConfOptions) {
         this.tableCommitTimes = new HashMap<>();
         this.compactedTables = new HashSet<>();
         this.catalogOptions = catalogOptions;
         this.compactionOptions = compactionOptions;
+        this.hadoopConfOptions = hadoopConfOptions;
     }
 
     @Override
@@ -111,9 +117,10 @@ public class CompactionOperator
 
     private void compact(TableId tableId) {
         if (catalog == null) {
+            Configuration configuration = HadoopConfUtils.createConfiguration(hadoopConfOptions);
             catalog =
                     CatalogUtil.buildIcebergCatalog(
-                            this.getClass().getSimpleName(), catalogOptions, new Configuration());
+                            this.getClass().getSimpleName(), catalogOptions, configuration);
         }
         try {
             RewriteDataFilesActionResult rewriteResult =

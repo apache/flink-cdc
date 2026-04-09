@@ -43,13 +43,13 @@ import java.util.Map;
 /** Schema evolution utils for maxcompute. */
 public class SchemaEvolutionUtils {
     private static final Logger LOG = LoggerFactory.getLogger(SchemaEvolutionUtils.class);
-    private static final Map<String, String> unsupportSchemahints = new HashMap<>();
+    private static final Map<String, String> unsupportedSchemaHints = new HashMap<>();
     private static final Map<String, String> supportSchemaHints = new HashMap<>();
 
     static {
-        unsupportSchemahints.put("odps.sql.type.system.odps2", "true");
-        unsupportSchemahints.put("odps.sql.decimal.odps2", "true");
-        unsupportSchemahints.put("odps.sql.allow.schema.evolution", "true");
+        unsupportedSchemaHints.put("odps.sql.type.system.odps2", "true");
+        unsupportedSchemaHints.put("odps.sql.decimal.odps2", "true");
+        unsupportedSchemaHints.put("odps.sql.allow.schema.evolution", "true");
 
         supportSchemaHints.put("odps.sql.type.system.odps2", "true");
         supportSchemaHints.put("odps.sql.decimal.odps2", "true");
@@ -82,7 +82,7 @@ public class SchemaEvolutionUtils {
                 odps.tables()
                         .newTableCreator(
                                 odps.getDefaultProject(), tableId.getTableName(), tableSchema)
-                        .withHints(unsupportSchemahints)
+                        .withHints(unsupportedSchemaHints)
                         .ifNotExists()
                         .debug();
         if (!CollectionUtil.isNullOrEmpty(schema.primaryKeys())) {
@@ -122,10 +122,14 @@ public class SchemaEvolutionUtils {
                 sqlBuilder
                         .append(addColumn.getAddColumn().getName())
                         .append(" ")
-                        .append(string(addColumn.getAddColumn().getType()))
-                        .append(" comment '")
-                        .append(addColumn.getAddColumn().getType().asSummaryString())
-                        .append("',");
+                        .append(string(addColumn.getAddColumn().getType()));
+                // Add comment if available
+                if (addColumn.getAddColumn().getComment() != null) {
+                    String escapedComment =
+                            addColumn.getAddColumn().getComment().replace("'", "\\'");
+                    sqlBuilder.append(" comment '").append(escapedComment).append("'");
+                }
+                sqlBuilder.append(",");
             } else {
                 throw new UnsupportedOperationException(
                         "Not support position: "
@@ -143,7 +147,7 @@ public class SchemaEvolutionUtils {
                         odps,
                         odps.getDefaultProject(),
                         sqlBuilder.toString(),
-                        options.isSupportSchema() ? supportSchemaHints : unsupportSchemahints,
+                        options.isSupportSchema() ? supportSchemaHints : unsupportedSchemaHints,
                         null);
         LOG.info("execute add column task: `{}`, instanceId: {}", sqlBuilder, instance.getId());
         instance.waitForSuccess();
@@ -155,7 +159,10 @@ public class SchemaEvolutionUtils {
      * 'col_comment'';
      */
     public static void alterColumnType(
-            MaxComputeOptions options, TableId tableId, Map<String, DataType> typeMapping)
+            MaxComputeOptions options,
+            TableId tableId,
+            Map<String, DataType> typeMapping,
+            Map<String, String> comments)
             throws OdpsException {
         Odps odps = MaxComputeUtils.getOdps(options);
 
@@ -163,19 +170,20 @@ public class SchemaEvolutionUtils {
 
         for (Map.Entry<String, DataType> entry : typeMapping.entrySet()) {
             String alterColumnSql =
-                    prefix
-                            + entry.getKey()
-                            + " "
-                            + entry.getKey()
-                            + " "
-                            + string(entry.getValue())
-                            + ";";
+                    prefix + entry.getKey() + " " + entry.getKey() + " " + string(entry.getValue());
+            String comment = comments.get(entry.getKey());
+            if (comment == null) {
+                alterColumnSql += ";";
+            } else {
+                String escapedComment = comment.replace("'", "\\'");
+                alterColumnSql += " comment '" + escapedComment + "';";
+            }
             Instance instance =
                     SQLTask.run(
                             odps,
                             odps.getDefaultProject(),
                             alterColumnSql,
-                            options.isSupportSchema() ? supportSchemaHints : unsupportSchemahints,
+                            options.isSupportSchema() ? supportSchemaHints : unsupportedSchemaHints,
                             null);
             LOG.info(
                     "execute alter column task: `{}`, instanceId: {}",
@@ -206,7 +214,7 @@ public class SchemaEvolutionUtils {
                         odps,
                         odps.getDefaultProject(),
                         sqlBuilder.toString(),
-                        options.isSupportSchema() ? supportSchemaHints : unsupportSchemahints,
+                        options.isSupportSchema() ? supportSchemaHints : unsupportedSchemaHints,
                         null);
         LOG.info("execute drop column task: `{}`, instanceId: {}", sqlBuilder, instance.getId());
         instance.waitForSuccess();
@@ -228,7 +236,7 @@ public class SchemaEvolutionUtils {
                             odps,
                             odps.getDefaultProject(),
                             sql,
-                            options.isSupportSchema() ? supportSchemaHints : unsupportSchemahints,
+                            options.isSupportSchema() ? supportSchemaHints : unsupportedSchemaHints,
                             null);
             LOG.info("execute rename column task: `{}`, instanceId: {}", sql, instance.getId());
             instance.waitForSuccess();
@@ -245,6 +253,27 @@ public class SchemaEvolutionUtils {
             throws OdpsException {
         Table table = MaxComputeUtils.getTable(options, tableId);
         table.truncate();
+    }
+
+    public static void alterTableComment(MaxComputeOptions options, TableId tableId, String comment)
+            throws OdpsException {
+        Odps odps = MaxComputeUtils.getOdps(options);
+        String escapedComment = comment == null ? "" : comment.replace("'", "\\'");
+        String sql =
+                "alter table "
+                        + getFullTableName(options, tableId)
+                        + " set comment '"
+                        + escapedComment
+                        + "';";
+        Instance instance =
+                SQLTask.run(
+                        odps,
+                        odps.getDefaultProject(),
+                        sql,
+                        options.isSupportSchema() ? supportSchemaHints : unsupportedSchemaHints,
+                        null);
+        LOG.info("execute alter table comment task: `{}`, instanceId: {}", sql, instance.getId());
+        instance.waitForSuccess();
     }
 
     private static String getFullTableName(MaxComputeOptions options, TableId tableId) {

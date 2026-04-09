@@ -19,20 +19,23 @@ package org.apache.flink.cdc.connectors.postgres.source.fetch;
 
 import org.apache.flink.cdc.connectors.base.WatermarkDispatcher;
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
-import org.apache.flink.cdc.connectors.base.source.EmbeddedFlinkDatabaseHistory;
 import org.apache.flink.cdc.connectors.base.source.meta.offset.Offset;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
+import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
 import org.apache.flink.cdc.connectors.base.source.reader.external.JdbcSourceFetchTaskContext;
 import org.apache.flink.cdc.connectors.postgres.source.PostgresDialect;
 import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfig;
 import org.apache.flink.cdc.connectors.postgres.source.offset.PostgresOffset;
 import org.apache.flink.cdc.connectors.postgres.source.offset.PostgresOffsetFactory;
 import org.apache.flink.cdc.connectors.postgres.source.offset.PostgresOffsetUtils;
+import org.apache.flink.cdc.connectors.postgres.source.schema.PostgresSchemaRecord;
+import org.apache.flink.cdc.connectors.postgres.source.schema.RelationAwarePostgresSchema;
 import org.apache.flink.cdc.connectors.postgres.source.utils.ChunkUtils;
 import org.apache.flink.table.types.logical.RowType;
 
 import io.debezium.DebeziumException;
+import io.debezium.config.Configuration;
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.connector.postgresql.PostgresConnectorConfig;
 import io.debezium.connector.postgresql.PostgresErrorHandler;
@@ -90,7 +93,7 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
     private ReplicationConnection replicationConnection;
     private PostgresOffsetContext offsetContext;
     private PostgresPartition partition;
-    private PostgresSchema schema;
+    private RelationAwarePostgresSchema schema;
     private ErrorHandler errorHandler;
     private CDCPostgresDispatcher postgresDispatcher;
     private EventMetadataProvider metadataProvider;
@@ -130,9 +133,8 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                                     .edit()
                                     .with(
                                             "table.include.list",
-                                            ((SnapshotSplit) sourceSplitBase)
-                                                    .getTableId()
-                                                    .toString())
+                                            getTableList(
+                                                    ((SnapshotSplit) sourceSplitBase).getTableId()))
                                     .with(
                                             SLOT_NAME.name(),
                                             ((PostgresSourceConfig) sourceConfig)
@@ -143,17 +145,28 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                                     .with(Heartbeat.HEARTBEAT_INTERVAL, 0)
                                     .build());
         } else {
+
+            Configuration.Builder builder = dbzConfig.getConfig().edit();
+            if (isBackFillSplit(sourceSplitBase)) {
+                // when backfilled split, only current table schema should be scan
+                builder.with(
+                        "table.include.list",
+                        getTableList(
+                                sourceSplitBase
+                                        .asStreamSplit()
+                                        .getTableSchemas()
+                                        .keySet()
+                                        .iterator()
+                                        .next()));
+            }
+
             dbzConfig =
                     new PostgresConnectorConfig(
-                            dbzConfig
-                                    .getConfig()
-                                    .edit()
+                            builder
                                     // never drop slot for stream split, which is also global split
                                     .with(DROP_SLOT_ON_STOP.name(), false)
                                     .build());
         }
-
-        LOG.info("PostgresConnectorConfig is ", dbzConfig.getConfig().asProperties().toString());
         setDbzConnectorConfig(dbzConfig);
         PostgresConnectorConfig.SnapshotMode snapshotMode =
                 PostgresConnectorConfig.SnapshotMode.parse(
@@ -167,11 +180,6 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                         dbzConfig.getJdbcConfig(), valueConverterBuilder, CONNECTION_NAME);
 
         TopicSelector<TableId> topicSelector = PostgresTopicSelector.create(dbzConfig);
-        EmbeddedFlinkDatabaseHistory.registerHistory(
-                sourceConfig
-                        .getDbzConfiguration()
-                        .getString(EmbeddedFlinkDatabaseHistory.DATABASE_HISTORY_INSTANCE_NAME),
-                sourceSplitBase.getTableSchemas().values());
 
         try {
             this.schema =
@@ -180,7 +188,8 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                             dbzConfig,
                             jdbcConnection.getTypeRegistry(),
                             topicSelector,
-                            valueConverterBuilder.build(jdbcConnection.getTypeRegistry()));
+                            valueConverterBuilder.build(jdbcConnection.getTypeRegistry()),
+                            sourceSplitBase.getTableSchemas().values());
         } catch (SQLException e) {
             throw new RuntimeException("Failed to initialize PostgresSchema", e);
         }
@@ -259,6 +268,7 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                                     }
                                 }),
                         schemaNameAdjuster);
+        schema.setDispatcher(postgresDispatcher);
 
         ChangeEventSourceMetricsFactory<PostgresPartition> metricsFactory =
                 new DefaultChangeEventSourceMetricsFactory<>();
@@ -314,6 +324,9 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
 
     @Override
     public TableId getTableId(SourceRecord record) {
+        if (record instanceof PostgresSchemaRecord) {
+            return ((PostgresSchemaRecord) record).getTable().id();
+        }
         Struct value = (Struct) record.value();
         Struct source = value.getStruct(Envelope.FieldName.SOURCE);
         String schemaName = source.getString(SCHEMA_NAME_KEY);
@@ -365,5 +378,18 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
         return PostgresConnectorConfig.LogicalDecoder.parse(
                         sourceConfig.getDbzProperties().getProperty(PLUGIN_NAME.name()))
                 .getPostgresPluginName();
+    }
+
+    private boolean isBackFillSplit(SourceSplitBase sourceSplitBase) {
+        return sourceSplitBase.isStreamSplit()
+                && !StreamSplit.STREAM_SPLIT_ID.equalsIgnoreCase(
+                        sourceSplitBase.asStreamSplit().splitId());
+    }
+
+    private String getTableList(TableId tableId) {
+        if (tableId.schema() == null || tableId.schema().isEmpty()) {
+            return tableId.table();
+        }
+        return tableId.schema() + "." + tableId.table();
     }
 }

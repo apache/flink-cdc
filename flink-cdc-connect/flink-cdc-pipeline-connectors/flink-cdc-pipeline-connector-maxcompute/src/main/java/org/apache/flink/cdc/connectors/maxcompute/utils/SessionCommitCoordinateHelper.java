@@ -69,6 +69,7 @@ public class SessionCommitCoordinateHelper {
     private static final Logger LOG = LoggerFactory.getLogger(SessionCommitCoordinateHelper.class);
     private final Queue<String>[] toCommitSessionIds;
     private final Map<String, CompletableFuture<CoordinationResponse>> toCommitFutures;
+
     /**
      * If any string is {@link Constant#END_OF_SESSION}, it should be considered larger than any
      * other non-{@link Constant#END_OF_SESSION} string.

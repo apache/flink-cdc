@@ -137,7 +137,8 @@ class MySqlDataSourceFactoryTest extends MySqlSourceTestBase {
                         Arrays.asList(
                                 inventoryDatabase.getDatabaseName() + ".customers",
                                 inventoryDatabase.getDatabaseName() + ".multi_max_table",
-                                inventoryDatabase.getDatabaseName() + ".products"));
+                                inventoryDatabase.getDatabaseName() + ".products",
+                                inventoryDatabase.getDatabaseName() + ".uppercase_products"));
     }
 
     @Test

@@ -38,6 +38,7 @@ import org.apache.flink.cdc.connectors.mysql.source.assigners.state.BinlogPendin
 import org.apache.flink.cdc.connectors.mysql.source.assigners.state.HybridPendingSplitsState;
 import org.apache.flink.cdc.connectors.mysql.source.assigners.state.PendingSplitsState;
 import org.apache.flink.cdc.connectors.mysql.source.assigners.state.PendingSplitsStateSerializer;
+import org.apache.flink.cdc.connectors.mysql.source.assigners.state.SnapshotPendingSplitsState;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import org.apache.flink.cdc.connectors.mysql.source.enumerator.MySqlSourceEnumerator;
@@ -48,12 +49,9 @@ import org.apache.flink.cdc.connectors.mysql.source.reader.MySqlSourceReaderCont
 import org.apache.flink.cdc.connectors.mysql.source.reader.MySqlSplitReader;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplit;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplitSerializer;
-import org.apache.flink.cdc.connectors.mysql.source.split.SourceRecords;
 import org.apache.flink.cdc.connectors.mysql.source.utils.hooks.SnapshotPhaseHooks;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
-import org.apache.flink.connector.base.source.reader.RecordsWithSplitIds;
-import org.apache.flink.connector.base.source.reader.synchronization.FutureCompletingBlockingQueue;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
 import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.util.FlinkRuntimeException;
@@ -131,7 +129,9 @@ public class MySqlSource<T>
                         new MySqlRecordEmitter<>(
                                 deserializationSchema,
                                 sourceReaderMetrics,
-                                sourceConfig.isIncludeSchemaChanges()));
+                                sourceConfig.isIncludeSchemaChanges(),
+                                sourceConfig.isIncludeHeartbeatEvents(),
+                                sourceConfig.isIncludeTransactionMetadataEvents()));
     }
 
     MySqlSource(
@@ -163,8 +163,6 @@ public class MySqlSource<T>
         // create source config for the given subtask (e.g. unique server id)
         MySqlSourceConfig sourceConfig =
                 configFactory.createConfig(readerContext.getIndexOfSubtask());
-        FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecords>> elementsQueue =
-                new FutureCompletingBlockingQueue<>();
 
         final Method metricGroupMethod = readerContext.getClass().getMethod("metricGroup");
         metricGroupMethod.setAccessible(true);
@@ -183,7 +181,6 @@ public class MySqlSource<T>
                                 mySqlSourceReaderContext,
                                 snapshotHooks);
         return new MySqlSourceReader<>(
-                elementsQueue,
                 splitReaderSupplier,
                 recordEmitterSupplier.get(sourceReaderMetrics, sourceConfig),
                 readerContext.getConfiguration(),
@@ -250,6 +247,13 @@ public class MySqlSource<T>
                             sourceConfig,
                             enumContext.currentParallelism(),
                             (HybridPendingSplitsState) checkpoint,
+                            enumContext);
+        } else if (checkpoint instanceof SnapshotPendingSplitsState) {
+            splitAssigner =
+                    new MySqlSnapshotSplitAssigner(
+                            sourceConfig,
+                            enumContext.currentParallelism(),
+                            (SnapshotPendingSplitsState) checkpoint,
                             enumContext);
         } else if (checkpoint instanceof BinlogPendingSplitsState) {
             splitAssigner =

@@ -32,12 +32,14 @@ import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.PhysicalColumn;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.common.types.utils.DataTypeUtils;
+import org.apache.flink.cdc.connectors.iceberg.sink.utils.HadoopConfUtils;
 import org.apache.flink.cdc.connectors.iceberg.sink.utils.IcebergTypeUtils;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.Sets;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.iceberg.CatalogUtil;
+import org.apache.iceberg.HasTableOperations;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
@@ -46,6 +48,7 @@ import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.SupportsNamespaces;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.expressions.Literal;
 import org.apache.iceberg.flink.FlinkSchemaUtil;
 import org.apache.iceberg.types.Type;
 import org.apache.iceberg.types.Types;
@@ -58,11 +61,26 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.apache.flink.cdc.common.utils.Preconditions.checkNotNull;
 
 /** A {@link MetadataApplier} for Apache Iceberg. */
 public class IcebergMetadataApplier implements MetadataApplier {
+    private static final Pattern PARTITION_YEAR_PATTERN = Pattern.compile("^year\\((.*)\\)$");
+
+    private static final Pattern PARTITION_MONTH_PATTERN = Pattern.compile("^month\\((.*)\\)$");
+
+    private static final Pattern PARTITION_DAY_PATTERN = Pattern.compile("^day\\((.*)\\)$");
+
+    private static final Pattern PARTITION_HOUR_PATTERN = Pattern.compile("^hour\\((.*)\\)$");
+
+    private static final Pattern PARTITION_BUCKET_PATTERN =
+            Pattern.compile("^bucket\\[(\\d+)]\\((.*)\\)$");
+
+    private static final Pattern PARTITION_TRUNCATE_PATTERN =
+            Pattern.compile("^truncate\\[(\\d+)]\\((.*)\\)$");
 
     private static final Logger LOG = LoggerFactory.getLogger(IcebergMetadataApplier.class);
 
@@ -75,19 +93,30 @@ public class IcebergMetadataApplier implements MetadataApplier {
 
     private final Map<TableId, List<String>> partitionMaps;
 
+    private final Map<String, String> hadoopConfOptions;
+
     private Set<SchemaChangeEventType> enabledSchemaEvolutionTypes;
 
     public IcebergMetadataApplier(Map<String, String> catalogOptions) {
-        this(catalogOptions, new HashMap<>(), new HashMap<>());
+        this(catalogOptions, new HashMap<>(), new HashMap<>(), null);
     }
 
     public IcebergMetadataApplier(
             Map<String, String> catalogOptions,
             Map<String, String> tableOptions,
             Map<TableId, List<String>> partitionMaps) {
+        this(catalogOptions, tableOptions, partitionMaps, null);
+    }
+
+    public IcebergMetadataApplier(
+            Map<String, String> catalogOptions,
+            Map<String, String> tableOptions,
+            Map<TableId, List<String>> partitionMaps,
+            Map<String, String> hadoopConfOptions) {
         this.catalogOptions = catalogOptions;
         this.tableOptions = tableOptions;
         this.partitionMaps = partitionMaps;
+        this.hadoopConfOptions = hadoopConfOptions;
         this.enabledSchemaEvolutionTypes = getSupportedSchemaEvolutionTypes();
     }
 
@@ -95,9 +124,10 @@ public class IcebergMetadataApplier implements MetadataApplier {
     public void applySchemaChange(SchemaChangeEvent schemaChangeEvent)
             throws SchemaEvolveException {
         if (catalog == null) {
+            Configuration configuration = HadoopConfUtils.createConfiguration(hadoopConfOptions);
             catalog =
                     CatalogUtil.buildIcebergCatalog(
-                            this.getClass().getSimpleName(), catalogOptions, new Configuration());
+                            this.getClass().getSimpleName(), catalogOptions, configuration);
         }
         SchemaChangeEventVisitor.visit(
                 schemaChangeEvent,
@@ -126,6 +156,9 @@ public class IcebergMetadataApplier implements MetadataApplier {
                 },
                 truncateTableEvent -> {
                     throw new UnsupportedSchemaChangeEventException(truncateTableEvent);
+                },
+                alterTableEvent -> {
+                    throw new UnsupportedSchemaChangeEventException(alterTableEvent);
                 });
     }
 
@@ -161,15 +194,14 @@ public class IcebergMetadataApplier implements MetadataApplier {
             if (partitionMaps.containsKey(event.tableId())) {
                 partitionColumns = partitionMaps.get(event.tableId());
             }
-            PartitionSpec.Builder builder = PartitionSpec.builderFor(icebergSchema);
-            for (String name : partitionColumns) {
-                // TODO Add more partition transforms, see
-                // https://iceberg.apache.org/spec/#partition-transforms.
-                builder.identity(name);
-            }
-            PartitionSpec partitionSpec = builder.build();
+            PartitionSpec partitionSpec = generatePartitionSpec(icebergSchema, partitionColumns);
             if (!catalog.tableExists(tableIdentifier)) {
-                catalog.createTable(tableIdentifier, icebergSchema, partitionSpec, tableOptions);
+                Table table =
+                        catalog.createTable(
+                                tableIdentifier, icebergSchema, partitionSpec, tableOptions);
+
+                applyDefaultValues(table, cdcSchema);
+
                 LOG.info(
                         "Spend {} ms to create iceberg table {}",
                         System.currentTimeMillis() - startTimestamp,
@@ -177,6 +209,28 @@ public class IcebergMetadataApplier implements MetadataApplier {
             }
         } catch (Exception e) {
             throw new SchemaEvolveException(event, e.getMessage(), e);
+        }
+    }
+
+    private void applyDefaultValues(
+            Table table, org.apache.flink.cdc.common.schema.Schema cdcSchema) {
+        if (getFormatVersion(table) < 3) {
+            return;
+        }
+        UpdateSchema updateSchema = null;
+        for (Column column : cdcSchema.getColumns()) {
+            Literal<?> defaultValue =
+                    IcebergTypeUtils.parseDefaultValue(
+                            column.getDefaultValueExpression(), column.getType());
+            if (defaultValue != null) {
+                if (updateSchema == null) {
+                    updateSchema = table.updateSchema();
+                }
+                updateSchema.updateColumnDefault(column.getName(), defaultValue);
+            }
+        }
+        if (updateSchema != null) {
+            updateSchema.commit();
         }
     }
 
@@ -203,16 +257,25 @@ public class IcebergMetadataApplier implements MetadataApplier {
                         FlinkSchemaUtil.convert(
                                 DataTypeUtils.toFlinkDataType(addColumn.getType())
                                         .getLogicalType());
+                Literal<?> defaultValue =
+                        IcebergTypeUtils.parseDefaultValue(
+                                addColumn.getDefaultValueExpression(), addColumn.getType());
+                if (defaultValue != null && getFormatVersion(table) >= 3) {
+                    updateSchema.addColumn(columnName, icebergType, columnComment, defaultValue);
+                    updateSchema.updateColumnDefault(columnName, defaultValue);
+                } else {
+                    updateSchema.addColumn(columnName, icebergType, columnComment);
+                }
                 switch (columnWithPosition.getPosition()) {
                     case FIRST:
-                        updateSchema.addColumn(columnName, icebergType, columnComment);
-                        table.updateSchema().moveFirst(columnName);
+                        updateSchema.moveFirst(columnName);
                         break;
                     case LAST:
-                        updateSchema.addColumn(columnName, icebergType, columnComment);
                         break;
                     case BEFORE:
-                        updateSchema.addColumn(columnName, icebergType, columnComment);
+                        checkNotNull(
+                                columnWithPosition.getExistedColumnName(),
+                                "Existing column name must be provided for BEFORE position");
                         updateSchema.moveBefore(
                                 columnName, columnWithPosition.getExistedColumnName());
                         break;
@@ -220,7 +283,6 @@ public class IcebergMetadataApplier implements MetadataApplier {
                         checkNotNull(
                                 columnWithPosition.getExistedColumnName(),
                                 "Existing column name must be provided for AFTER position");
-                        updateSchema.addColumn(columnName, icebergType, columnComment);
                         updateSchema.moveAfter(
                                 columnName, columnWithPosition.getExistedColumnName());
                         break;
@@ -281,6 +343,58 @@ public class IcebergMetadataApplier implements MetadataApplier {
         }
     }
 
+    private PartitionSpec generatePartitionSpec(Schema schema, List<String> partitionColumns) {
+        PartitionSpec.Builder builder = PartitionSpec.builderFor(schema);
+        for (String name : partitionColumns) {
+            Matcher matcherYear = PARTITION_YEAR_PATTERN.matcher(name);
+            if (matcherYear.matches()) {
+                String matchedName = matcherYear.group(1);
+                builder.year(matchedName);
+                continue;
+            }
+
+            Matcher matcherMonth = PARTITION_MONTH_PATTERN.matcher(name);
+            if (matcherMonth.matches()) {
+                String matchedName = matcherMonth.group(1);
+                builder.month(matchedName);
+                continue;
+            }
+
+            Matcher matcherDay = PARTITION_DAY_PATTERN.matcher(name);
+            if (matcherDay.matches()) {
+                String matchedName = matcherDay.group(1);
+                builder.day(matchedName);
+                continue;
+            }
+
+            Matcher matcherHour = PARTITION_HOUR_PATTERN.matcher(name);
+            if (matcherHour.matches()) {
+                String matchedName = matcherHour.group(1);
+                builder.hour(matchedName);
+                continue;
+            }
+
+            Matcher matcherBucket = PARTITION_BUCKET_PATTERN.matcher(name);
+            if (matcherBucket.matches()) {
+                String matchedName = matcherBucket.group(2);
+                int numBuckets = Integer.parseInt(matcherBucket.group(1));
+                builder.bucket(matchedName, numBuckets);
+                continue;
+            }
+
+            Matcher matcherTruncate = PARTITION_TRUNCATE_PATTERN.matcher(name);
+            if (matcherTruncate.matches()) {
+                String matchedName = matcherTruncate.group(2);
+                int width = Integer.parseInt(matcherTruncate.group(1));
+                builder.truncate(matchedName, width);
+                continue;
+            }
+
+            builder.identity(name);
+        }
+        return builder.build();
+    }
+
     @Override
     public MetadataApplier setAcceptedSchemaEvolutionTypes(
             Set<SchemaChangeEventType> schemaEvolutionTypes) {
@@ -301,6 +415,13 @@ public class IcebergMetadataApplier implements MetadataApplier {
                 SchemaChangeEventType.DROP_COLUMN,
                 SchemaChangeEventType.RENAME_COLUMN,
                 SchemaChangeEventType.ALTER_COLUMN_TYPE);
+    }
+
+    private int getFormatVersion(Table table) {
+        if (table instanceof HasTableOperations) {
+            return ((HasTableOperations) table).operations().current().formatVersion();
+        }
+        return 2;
     }
 
     @Override

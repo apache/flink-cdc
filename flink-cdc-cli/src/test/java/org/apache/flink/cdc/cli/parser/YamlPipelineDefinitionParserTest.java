@@ -46,6 +46,7 @@ import java.util.Set;
 
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.ADD_COLUMN;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.ALTER_COLUMN_TYPE;
+import static org.apache.flink.cdc.common.event.SchemaChangeEventType.ALTER_TABLE_COMMENT;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.CREATE_TABLE;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.DROP_COLUMN;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.DROP_TABLE;
@@ -199,12 +200,31 @@ class YamlPipelineDefinitionParserTest {
     }
 
     @Test
+    void testUdfDefinitionWithOptions() throws Exception {
+        URL resource =
+                Resources.getResource("definitions/pipeline-definition-with-udf-options.yaml");
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+        PipelineDef pipelineDef = parser.parse(new Path(resource.toURI()), new Configuration());
+        assertThat(pipelineDef).isEqualTo(pipelineDefWithUdfOptions);
+    }
+
+    @Test
+    void testRouteMode() throws Exception {
+        URL resource =
+                Resources.getResource("definitions/pipeline-definition-with-route-mode.yaml");
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+        PipelineDef pipelineDef = parser.parse(new Path(resource.toURI()), new Configuration());
+        assertThat(pipelineDef).isEqualTo(pipelineDefWithRouteMode);
+    }
+
+    @Test
     void testSchemaEvolutionTypesConfiguration() throws Exception {
         testSchemaEvolutionTypesParsing(
                 "evolve",
                 null,
                 null,
                 ImmutableSet.of(
+                        ALTER_TABLE_COMMENT,
                         ADD_COLUMN,
                         ALTER_COLUMN_TYPE,
                         CREATE_TABLE,
@@ -217,6 +237,7 @@ class YamlPipelineDefinitionParserTest {
                 null,
                 null,
                 ImmutableSet.of(
+                        ALTER_TABLE_COMMENT,
                         ADD_COLUMN,
                         ALTER_COLUMN_TYPE,
                         CREATE_TABLE,
@@ -229,6 +250,7 @@ class YamlPipelineDefinitionParserTest {
                 "[column, table]",
                 "[drop]",
                 ImmutableSet.of(
+                        ALTER_TABLE_COMMENT,
                         ADD_COLUMN,
                         ALTER_COLUMN_TYPE,
                         CREATE_TABLE,
@@ -239,12 +261,18 @@ class YamlPipelineDefinitionParserTest {
                 null,
                 null,
                 ImmutableSet.of(
-                        ADD_COLUMN, ALTER_COLUMN_TYPE, CREATE_TABLE, DROP_COLUMN, RENAME_COLUMN));
+                        ALTER_TABLE_COMMENT,
+                        ADD_COLUMN,
+                        ALTER_COLUMN_TYPE,
+                        CREATE_TABLE,
+                        DROP_COLUMN,
+                        RENAME_COLUMN));
         testSchemaEvolutionTypesParsing(
                 "lenient",
                 null,
                 "[]",
                 ImmutableSet.of(
+                        ALTER_TABLE_COMMENT,
                         ADD_COLUMN,
                         ALTER_COLUMN_TYPE,
                         CREATE_TABLE,
@@ -252,6 +280,52 @@ class YamlPipelineDefinitionParserTest {
                         DROP_TABLE,
                         RENAME_COLUMN,
                         TRUNCATE_TABLE));
+    }
+
+    /**
+     * Test that CreateTableEvent is automatically added when user specifies include.schema.changes
+     * without create.table. This ensures the foundational CreateTableEvent is always included for
+     * proper schema handling. See FLINK-37837.
+     */
+    @Test
+    void testCreateTableAutoAddedToIncludedSchemaChanges() throws Exception {
+        // Test case 1: User specifies only add.column, create.table should be auto-added
+        testSchemaEvolutionTypesParsing(
+                "evolve", "[add.column]", null, ImmutableSet.of(ADD_COLUMN, CREATE_TABLE));
+
+        // Test case 2: User specifies column family, create.table should be auto-added
+        testSchemaEvolutionTypesParsing(
+                "evolve",
+                "[column]",
+                null,
+                ImmutableSet.of(
+                        ADD_COLUMN, ALTER_COLUMN_TYPE, DROP_COLUMN, RENAME_COLUMN, CREATE_TABLE));
+
+        // Test case 3: User explicitly excludes create.table, should NOT auto-add
+        testSchemaEvolutionTypesParsing(
+                "evolve", "[add.column]", "[create.table]", ImmutableSet.of(ADD_COLUMN));
+
+        // Test case 4: User excludes via "create" family tag, should NOT auto-add
+        testSchemaEvolutionTypesParsing(
+                "evolve", "[add.column]", "[create]", ImmutableSet.of(ADD_COLUMN));
+
+        // Test case 5: User excludes via "table" family tag, should NOT auto-add
+        testSchemaEvolutionTypesParsing(
+                "evolve",
+                "[add.column, alter.column.type]",
+                "[table]",
+                ImmutableSet.of(ADD_COLUMN, ALTER_COLUMN_TYPE));
+
+        // Test case 6: User already includes create.table, no duplicate should be added
+        testSchemaEvolutionTypesParsing(
+                "evolve",
+                "[add.column, create.table]",
+                null,
+                ImmutableSet.of(ADD_COLUMN, CREATE_TABLE));
+
+        // Test case 7: Lenient mode with specified include, create.table should be auto-added
+        testSchemaEvolutionTypesParsing(
+                "lenient", "[add.column]", null, ImmutableSet.of(ADD_COLUMN, CREATE_TABLE));
     }
 
     private void testSchemaEvolutionTypesParsing(
@@ -565,6 +639,7 @@ class YamlPipelineDefinitionParserTest {
                                             .put("bootstrap-servers", "localhost:9092")
                                             .build()),
                             ImmutableSet.of(
+                                    ALTER_TABLE_COMMENT,
                                     DROP_COLUMN,
                                     ALTER_COLUMN_TYPE,
                                     ADD_COLUMN,
@@ -591,6 +666,7 @@ class YamlPipelineDefinitionParserTest {
                             null,
                             new Configuration(),
                             ImmutableSet.of(
+                                    ALTER_TABLE_COMMENT,
                                     DROP_COLUMN,
                                     ALTER_COLUMN_TYPE,
                                     ADD_COLUMN,
@@ -677,6 +753,7 @@ class YamlPipelineDefinitionParserTest {
                             null,
                             new Configuration(),
                             ImmutableSet.of(
+                                    ALTER_TABLE_COMMENT,
                                     DROP_COLUMN,
                                     ALTER_COLUMN_TYPE,
                                     ADD_COLUMN,
@@ -703,5 +780,101 @@ class YamlPipelineDefinitionParserTest {
                     Configuration.fromMap(
                             ImmutableMap.<String, String>builder()
                                     .put("parallelism", "1")
+                                    .build()));
+
+    private final PipelineDef pipelineDefWithUdfOptions =
+            new PipelineDef(
+                    new SourceDef("values", null, new Configuration()),
+                    new SinkDef(
+                            "values",
+                            null,
+                            new Configuration(),
+                            ImmutableSet.of(
+                                    ALTER_TABLE_COMMENT,
+                                    DROP_COLUMN,
+                                    ALTER_COLUMN_TYPE,
+                                    ADD_COLUMN,
+                                    CREATE_TABLE,
+                                    RENAME_COLUMN)),
+                    Collections.emptyList(),
+                    Collections.singletonList(
+                            new TransformDef(
+                                    "mydb.web_order",
+                                    "*, query_redis(id) as redis_value",
+                                    "id > 0",
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                    null)),
+                    Collections.singletonList(
+                            new UdfDef(
+                                    "query_redis",
+                                    "org.apache.flink.cdc.udf.examples.java.RedisQueryFunction",
+                                    ImmutableMap.<String, String>builder()
+                                            .put("hostname", "localhost")
+                                            .put("port", "6379")
+                                            .put("cache.enabled", "true")
+                                            .build())),
+                    Configuration.fromMap(
+                            ImmutableMap.<String, String>builder()
+                                    .put("parallelism", "1")
+                                    .build()));
+
+    private final PipelineDef pipelineDefWithRouteMode =
+            new PipelineDef(
+                    new SourceDef(
+                            "mysql",
+                            null,
+                            Configuration.fromMap(
+                                    ImmutableMap.<String, String>builder()
+                                            .put("hostname", "localhost")
+                                            .put("port", "3306")
+                                            .put("username", "root")
+                                            .put("password", "123456")
+                                            .put("tables", "mydb.\\.*")
+                                            .put("server-id", "5400-5404")
+                                            .put("server-time-zone", "UTC")
+                                            .build())),
+                    new SinkDef(
+                            "doris",
+                            null,
+                            Configuration.fromMap(
+                                    ImmutableMap.<String, String>builder()
+                                            .put("fenodes", "127.0.0.1:8030")
+                                            .put("username", "root")
+                                            .put("password", "")
+                                            .build()),
+                            ImmutableSet.of(
+                                    ALTER_TABLE_COMMENT,
+                                    DROP_COLUMN,
+                                    ALTER_COLUMN_TYPE,
+                                    ADD_COLUMN,
+                                    CREATE_TABLE,
+                                    RENAME_COLUMN)),
+                    Arrays.asList(
+                            new RouteDef(
+                                    "mydb.order_.*",
+                                    "ods_db.ods_orders",
+                                    null,
+                                    "Merge all order sharded tables"),
+                            new RouteDef(
+                                    "mydb.product_.*",
+                                    "ods_db.ods_products",
+                                    null,
+                                    "Merge all product sharded tables"),
+                            new RouteDef(
+                                    "mydb.*",
+                                    "ods_db.ods_<>",
+                                    "<>",
+                                    "One-to-one mapping for other tables")),
+                    Collections.emptyList(),
+                    Collections.emptyList(),
+                    Collections.emptyList(),
+                    Configuration.fromMap(
+                            ImmutableMap.<String, String>builder()
+                                    .put("name", "mysql_to_doris_with_route_match_mode")
+                                    .put("parallelism", "2")
+                                    .put("route-mode", "FIRST_MATCH")
                                     .build()));
 }

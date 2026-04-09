@@ -117,6 +117,10 @@ public class TypeConvertUtils {
         if (!type.isNullable() || notNull) {
             columnBuilder.notNull();
         }
+        // Set column comment if available
+        if (flinkColumn.getComment() != null) {
+            columnBuilder.withComment(flinkColumn.getComment());
+        }
         return columnBuilder.build();
     }
 
@@ -257,11 +261,10 @@ public class TypeConvertUtils {
                 fieldGetter = record -> record.getInt(fieldPos);
                 break;
             case DATE:
-                fieldGetter = record -> LocalDate.ofEpochDay(record.getInt(fieldPos));
+                fieldGetter = record -> record.getDate(fieldPos).toLocalDate();
                 break;
             case TIME_WITHOUT_TIME_ZONE:
-                fieldGetter =
-                        record -> LocalTime.ofNanoOfDay(record.getInt(fieldPos) * 1000L).toString();
+                fieldGetter = record -> record.getTime(fieldPos).toString();
                 break;
             case BIGINT:
                 fieldGetter = record -> record.getLong(fieldPos);

@@ -19,25 +19,26 @@ package org.apache.flink.cdc.connectors.oracle.source;
 
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
-import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.connectors.base.source.utils.hooks.SnapshotPhaseHook;
 import org.apache.flink.cdc.connectors.base.source.utils.hooks.SnapshotPhaseHooks;
+import org.apache.flink.cdc.connectors.oracle.connection.OracleSourceConnection;
 import org.apache.flink.cdc.connectors.oracle.source.utils.OracleConnectionUtils;
 import org.apache.flink.cdc.connectors.oracle.testutils.OracleTestUtils.FailoverPhase;
 import org.apache.flink.cdc.connectors.oracle.testutils.OracleTestUtils.FailoverType;
 import org.apache.flink.cdc.connectors.oracle.testutils.TestTable;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.util.RestartStrategyUtils;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.catalog.UniqueConstraint;
 import org.apache.flink.table.data.RowData;
+import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 
-import io.debezium.connector.oracle.OracleConnection;
 import io.debezium.jdbc.JdbcConfiguration;
 import org.apache.commons.lang3.StringUtils;
 import org.junit.jupiter.api.Test;
@@ -46,6 +47,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.Connection;
+import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -58,6 +60,7 @@ import java.util.stream.Collectors;
 
 import static java.lang.String.format;
 import static org.apache.flink.cdc.connectors.oracle.testutils.OracleTestUtils.triggerFailover;
+import static org.apache.flink.cdc.connectors.oracle.testutils.OracleTestUtils.waitForSinkSize;
 import static org.apache.flink.table.api.DataTypes.BIGINT;
 import static org.apache.flink.table.api.DataTypes.STRING;
 import static org.apache.flink.table.catalog.Column.physical;
@@ -129,7 +132,7 @@ public class OracleSourceITCase extends OracleSourceTestBase {
                 FailoverPhase.SNAPSHOT,
                 new String[] {"CUSTOMERS"},
                 true,
-                RestartStrategies.fixedDelayRestart(1, 0),
+                true,
                 null);
     }
 
@@ -389,10 +392,100 @@ public class OracleSourceITCase extends OracleSourceTestBase {
                 FailoverPhase.NEVER,
                 new String[] {"CUSTOMERS"},
                 false,
-                RestartStrategies.noRestart(),
+                false,
                 chunkColumn);
 
         // since `scan.incremental.snapshot.chunk.key-column` is set, an exception should not occur.
+    }
+
+    @Test
+    public void testTableWithSpecificOffset() throws Exception {
+        createAndInitialize("customer.sql");
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
+        env.setParallelism(1);
+        env.enableCheckpointing(5000L);
+        RestartStrategyUtils.configureNoRestartStrategy(env);
+
+        long currentScn = 0L;
+        try (Connection connection = getJdbcConnectionAsDBA();
+                Statement statement = connection.createStatement()) {
+
+            // get current scn
+            ResultSet rs = statement.executeQuery("SELECT CURRENT_SCN FROM V$DATABASE");
+            while (rs.next()) {
+                currentScn = rs.getLong("CURRENT_SCN");
+            }
+            LOG.info("Current Scn is {}", currentScn);
+        }
+
+        try (Connection connection = getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            // mock incremental data
+            statement.execute(
+                    String.format(
+                            "INSERT INTO %s.%s VALUES (9999, 'user_offset', 'Shanghai', '123567891234')",
+                            ORACLE_SCHEMA, "CUSTOMERS"));
+            LOG.info("mock incremental data success");
+        }
+
+        String sourceDDL =
+                format(
+                        "CREATE TABLE customers ("
+                                + " ID INT NOT NULL,"
+                                + " NAME STRING,"
+                                + " ADDRESS STRING,"
+                                + " PHONE_NUMBER STRING,"
+                                + " primary key (ID) not enforced"
+                                + ") WITH ("
+                                + " 'connector' = 'oracle-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'schema-name' = '%s',"
+                                + " 'table-name' = 'CUSTOMERS',"
+                                + " 'scan.incremental.snapshot.enabled' = 'true',"
+                                + " 'debezium.log.mining.strategy' = 'online_catalog',"
+                                + " 'debezium.database.history.store.only.captured.tables.ddl' = 'true',"
+                                + " 'scan.startup.mode' = 'specific-offset',"
+                                + " 'scan.startup.specific-offset.scn' = '%s'"
+                                + ")",
+                        ORACLE_CONTAINER.getHost(),
+                        ORACLE_CONTAINER.getOraclePort(),
+                        ORACLE_CONTAINER.getUsername(),
+                        ORACLE_CONTAINER.getPassword(),
+                        ORACLE_DATABASE,
+                        ORACLE_SCHEMA,
+                        currentScn);
+
+        String sinkDDL =
+                "CREATE TABLE sink ("
+                        + " ID INT NOT NULL,"
+                        + " NAME STRING,"
+                        + " ADDRESS STRING,"
+                        + " PHONE_NUMBER STRING,"
+                        + " primary key (ID) not enforced"
+                        + ") WITH ("
+                        + " 'connector' = 'values',"
+                        + " 'sink-insert-only' = 'false',"
+                        + " 'sink-expected-messages-num' = '1'"
+                        + ")";
+
+        tEnv.executeSql(sourceDDL);
+        tEnv.executeSql(sinkDDL);
+        // async submit job
+        TableResult result =
+                tEnv.executeSql(
+                        "INSERT INTO sink SELECT ID,NAME, ADDRESS,PHONE_NUMBER FROM customers");
+        waitForSinkSize("sink", 1);
+
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
+
+        String[] expected = new String[] {"+I[9999, user_offset, Shanghai, 123567891234]"};
+        assertEqualsInAnyOrder(Arrays.asList(expected), actual);
+        result.getJobClient().get().cancel().get();
     }
 
     private List<String> testBackfillWhenWritingEvents(
@@ -456,7 +549,7 @@ public class OracleSourceITCase extends OracleSourceTestBase {
                                     .withUser("debezium")
                                     .withPassword("dbz")
                                     .build();
-                    try (OracleConnection oracleConnection =
+                    try (OracleSourceConnection oracleConnection =
                             OracleConnectionUtils.createOracleConnection(configuration)) {
                         oracleConnection.execute(statements);
                     }
@@ -499,13 +592,7 @@ public class OracleSourceITCase extends OracleSourceTestBase {
             String[] captureCustomerTables)
             throws Exception {
         testOracleParallelSource(
-                parallelism,
-                failoverType,
-                failoverPhase,
-                captureCustomerTables,
-                false,
-                RestartStrategies.fixedDelayRestart(1, 0),
-                null);
+                parallelism, failoverType, failoverPhase, captureCustomerTables, false, true, null);
     }
 
     private void testOracleParallelSource(
@@ -514,7 +601,7 @@ public class OracleSourceITCase extends OracleSourceTestBase {
             FailoverPhase failoverPhase,
             String[] captureCustomerTables,
             boolean skipSnapshotBackfill,
-            RestartStrategies.RestartStrategyConfiguration restartStrategyConfiguration,
+            boolean fixedDelayRestart,
             String chunkColumn)
             throws Exception {
         createAndInitialize("customer.sql");
@@ -523,7 +610,11 @@ public class OracleSourceITCase extends OracleSourceTestBase {
 
         env.setParallelism(parallelism);
         env.enableCheckpointing(200L);
-        env.setRestartStrategy(restartStrategyConfiguration);
+        if (fixedDelayRestart) {
+            RestartStrategyUtils.configureFixedDelayRestartStrategy(env, 1, 0);
+        } else {
+            RestartStrategyUtils.configureNoRestartStrategy(env);
+        }
 
         String sourceDDL =
                 format(

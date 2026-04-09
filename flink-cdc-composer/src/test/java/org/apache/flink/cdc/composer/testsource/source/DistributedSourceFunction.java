@@ -19,6 +19,7 @@ package org.apache.flink.cdc.composer.testsource.source;
 
 import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
+import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.ZonedTimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
@@ -78,8 +79,8 @@ public class DistributedSourceFunction extends RichParallelSourceFunction<Event>
     public void open(Configuration parameters) throws Exception {
         super.open(parameters);
         iotaCounter = 0;
-        subTaskId = getRuntimeContext().getIndexOfThisSubtask();
-        parallelism = getRuntimeContext().getNumberOfParallelSubtasks();
+        subTaskId = getRuntimeContext().getTaskInfo().getIndexOfThisSubtask();
+        parallelism = getRuntimeContext().getTaskInfo().getNumberOfParallelSubtasks();
         if (distributedTables) {
             tables =
                     IntStream.range(0, numOfTables)
@@ -116,7 +117,7 @@ public class DistributedSourceFunction extends RichParallelSourceFunction<Event>
         dummyDataTypes.put(DataTypes.VARCHAR(17), BinaryStringData.fromString("Bob"));
         dummyDataTypes.put(DataTypes.BINARY(17), "Cicada".getBytes());
         dummyDataTypes.put(DataTypes.VARBINARY(17), "Derrida".getBytes());
-        dummyDataTypes.put(DataTypes.TIME(9), 64800000);
+        dummyDataTypes.put(DataTypes.TIME(9), TimeData.fromMillisOfDay(64801000));
         dummyDataTypes.put(
                 DataTypes.TIMESTAMP(9),
                 TimestampData.fromTimestamp(Timestamp.valueOf("2020-07-17 18:00:00")));
@@ -142,7 +143,10 @@ public class DistributedSourceFunction extends RichParallelSourceFunction<Event>
     }
 
     @Override
-    public void run(SourceContext<Event> context) throws InterruptedException {
+    public void run(
+            org.apache.flink.streaming.api.functions.source.SourceFunction.SourceContext<Event>
+                    context)
+            throws InterruptedException {
         Schema initialSchema =
                 Schema.newBuilder()
                         .physicalColumn("id", DataTypes.STRING())
@@ -264,7 +268,10 @@ public class DistributedSourceFunction extends RichParallelSourceFunction<Event>
         return generator.generate(rowObjects);
     }
 
-    private void collect(SourceContext<Event> sourceContext, Event event) {
+    private void collect(
+            org.apache.flink.streaming.api.functions.source.SourceFunction.SourceContext<Event>
+                    sourceContext,
+            Event event) {
         LOG.info("{}> Emitting event {}", subTaskId, event);
         sourceContext.collect(event);
     }

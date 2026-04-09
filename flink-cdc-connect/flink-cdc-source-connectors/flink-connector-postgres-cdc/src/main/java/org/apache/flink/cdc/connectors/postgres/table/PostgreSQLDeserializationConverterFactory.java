@@ -19,7 +19,10 @@ package org.apache.flink.cdc.connectors.postgres.table;
 
 import org.apache.flink.cdc.debezium.table.DeserializationRuntimeConverter;
 import org.apache.flink.cdc.debezium.table.DeserializationRuntimeConverterFactory;
+import org.apache.flink.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
+import org.apache.flink.table.data.GenericArrayData;
 import org.apache.flink.table.data.StringData;
+import org.apache.flink.table.types.logical.ArrayType;
 import org.apache.flink.table.types.logical.LogicalType;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -32,6 +35,7 @@ import org.apache.kafka.connect.data.Struct;
 
 import java.time.ZoneId;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -52,6 +56,8 @@ public class PostgreSQLDeserializationConverterFactory {
                 switch (logicalType.getTypeRoot()) {
                     case VARCHAR:
                         return createStringConverter();
+                    case ARRAY:
+                        return createArrayConverter((ArrayType) logicalType, serverTimeZone, this);
                     default:
                         // fallback to default converter
                         return Optional.empty();
@@ -93,6 +99,74 @@ public class PostgreSQLDeserializationConverterFactory {
                         } else {
                             return StringData.fromString(dbzObj.toString());
                         }
+                    }
+                });
+    }
+
+    private static Optional<DeserializationRuntimeConverter> createArrayConverter(
+            ArrayType arrayType,
+            ZoneId serverTimeZone,
+            DeserializationRuntimeConverterFactory userDefinedConverterFactory) {
+        LogicalType elementType = arrayType.getElementType();
+        // Create element converter using the standard converter creation logic
+        DeserializationRuntimeConverter elementConverter =
+                RowDataDebeziumDeserializeSchema.createConverter(
+                        elementType, serverTimeZone, userDefinedConverterFactory);
+
+        return Optional.of(
+                new DeserializationRuntimeConverter() {
+                    private static final long serialVersionUID = 1L;
+
+                    @Override
+                    public Object convert(Object dbzObj, Schema schema) throws Exception {
+                        if (dbzObj == null) {
+                            return null;
+                        }
+
+                        Schema elementSchema = schema.valueSchema();
+                        // Multidimensional arrays are not supported
+                        if (elementSchema != null && elementSchema.type() == Schema.Type.ARRAY) {
+                            throw new IllegalArgumentException(
+                                    "Unable to convert multidimensional array value '"
+                                            + dbzObj
+                                            + "' to a flat array.");
+                        }
+
+                        if (dbzObj instanceof List) {
+                            List<?> list = (List<?>) dbzObj;
+                            Object[] array = new Object[list.size()];
+
+                            for (int i = 0; i < list.size(); i++) {
+                                Object element = list.get(i);
+                                if (element == null) {
+                                    array[i] = null;
+                                } else {
+                                    array[i] = elementConverter.convert(element, elementSchema);
+                                }
+                            }
+
+                            return new GenericArrayData(array);
+                        } else if (dbzObj instanceof Object[]) {
+                            Object[] inputArray = (Object[]) dbzObj;
+                            Object[] convertedArray = new Object[inputArray.length];
+
+                            for (int i = 0; i < inputArray.length; i++) {
+                                if (inputArray[i] == null) {
+                                    convertedArray[i] = null;
+                                } else {
+                                    convertedArray[i] =
+                                            elementConverter.convert(inputArray[i], elementSchema);
+                                }
+                            }
+
+                            return new GenericArrayData(convertedArray);
+                        }
+
+                        throw new IllegalArgumentException(
+                                "Unable to convert to Array from unexpected value '"
+                                        + dbzObj
+                                        + "' of type "
+                                        + dbzObj.getClass().getName());
                     }
                 });
     }

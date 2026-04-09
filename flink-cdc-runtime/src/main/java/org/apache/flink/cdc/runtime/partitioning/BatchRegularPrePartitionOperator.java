@@ -25,10 +25,10 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.function.HashFunction;
 import org.apache.flink.cdc.common.function.HashFunctionProvider;
 import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.runtime.operators.AbstractStreamOperatorAdapter;
 import org.apache.flink.cdc.runtime.operators.schema.regular.SchemaOperator;
 import org.apache.flink.cdc.runtime.serializer.event.EventSerializer;
 import org.apache.flink.runtime.state.StateSnapshotContext;
-import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
@@ -44,7 +44,8 @@ import java.util.Optional;
  * regular topology in batch mode.
  */
 @Internal
-public class BatchRegularPrePartitionOperator extends AbstractStreamOperator<PartitioningEvent>
+public class BatchRegularPrePartitionOperator
+        extends AbstractStreamOperatorAdapter<PartitioningEvent>
         implements OneInputStreamOperator<Event, PartitioningEvent>, Serializable {
 
     private static final long serialVersionUID = 1L;

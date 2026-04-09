@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.mongodb.source;
 
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.cdc.debezium.JsonDebeziumDeserializationSchema;
+import org.apache.flink.configuration.CheckpointingOptions;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
@@ -27,7 +28,6 @@ import org.junit.jupiter.api.Test;
 
 import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER;
 import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER_PASSWORD;
-import static org.apache.flink.streaming.api.environment.ExecutionCheckpointingOptions.ENABLE_CHECKPOINTS_AFTER_TASKS_FINISH;
 
 /** Example Tests for {@link MongoDBSource}. */
 class MongoDBParallelSourceExampleTest extends MongoDBSourceTestBase {
@@ -49,7 +49,7 @@ class MongoDBParallelSourceExampleTest extends MongoDBSourceTestBase {
                         .build();
 
         Configuration config = new Configuration();
-        config.set(ENABLE_CHECKPOINTS_AFTER_TASKS_FINISH, true);
+        config.set(CheckpointingOptions.ENABLE_CHECKPOINTS_AFTER_TASKS_FINISH, true);
 
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment(config);
         // enable checkpoint

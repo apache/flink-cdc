@@ -255,7 +255,7 @@ public final class RowDataDebeziumDeserializeSchema
     // -------------------------------------------------------------------------------------
 
     /** Creates a runtime converter which is null safe. */
-    private static DeserializationRuntimeConverter createConverter(
+    public static DeserializationRuntimeConverter createConverter(
             LogicalType type,
             ZoneId serverTimeZone,
             DeserializationRuntimeConverterFactory userDefinedConverterFactory) {
