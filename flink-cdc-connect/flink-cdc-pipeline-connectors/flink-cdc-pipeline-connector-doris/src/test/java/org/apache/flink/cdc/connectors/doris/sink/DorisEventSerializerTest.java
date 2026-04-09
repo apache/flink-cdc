@@ -59,6 +59,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.TABLE_CREATE_AUTO_PARTITION_PROPERTIES_DEFAULT_PARTITION_KEY;
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.TABLE_CREATE_AUTO_PARTITION_PROPERTIES_DEFAULT_PARTITION_UNIT;
@@ -1024,6 +1025,109 @@ public class DorisEventSerializerTest {
     }
 
     @Test
+    public void testJsonSerializationRetriesUntilDorisSchemaCatchesUp() throws IOException {
+        TableId tableId = TableId.parse("doris_database.json_schema_retry_table");
+        Schema baseSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+        AddColumnEvent addColumnEvent =
+                new AddColumnEvent(
+                        tableId,
+                        Arrays.asList(
+                                AddColumnEvent.last(
+                                        Column.physicalColumn("age", DataTypes.INT()))));
+        Schema evolvedSchema = SchemaUtils.applySchemaChangeEvent(baseSchema, addColumnEvent);
+        BinaryRecordDataGenerator evolvedGenerator =
+                new BinaryRecordDataGenerator(((RowType) evolvedSchema.toRowDataType()));
+        AtomicInteger fetchAttempts = new AtomicInteger();
+
+        DorisEventSerializer serializer =
+                new DorisEventSerializer(
+                        ZoneId.of("UTC"),
+                        new Configuration(),
+                        DorisExecutionOptions.defaults(),
+                        null,
+                        DorisEventSerializer.createJsonFieldMappingResolver(
+                                createDorisOptions(),
+                                (options, requestedTableId) -> {
+                                    int attempt = fetchAttempts.incrementAndGet();
+                                    return attempt < 3
+                                            ? createDorisSchema("id", "name")
+                                            : createDorisSchema("id", "name", "age");
+                                },
+                                3,
+                                0));
+        serializer.serialize(new CreateTableEvent(tableId, baseSchema));
+        serializer.serialize(addColumnEvent);
+
+        DorisRecord evolvedRecord =
+                serializer.serialize(
+                        DataChangeEvent.insertEvent(
+                                tableId,
+                                evolvedGenerator.generate(
+                                        new Object[] {2, BinaryStringData.fromString("Bob"), 18})));
+
+        JsonNode evolvedJsonNode = objectMapper.readTree(evolvedRecord.getRow());
+        Assertions.assertThat(fetchAttempts.get()).isEqualTo(3);
+        Assertions.assertThat(evolvedJsonNode.get("id").asInt()).isEqualTo(2);
+        Assertions.assertThat(evolvedJsonNode.get("name").asText()).isEqualTo("Bob");
+        Assertions.assertThat(evolvedJsonNode.get("age").asInt()).isEqualTo(18);
+    }
+
+    @Test
+    public void testJsonSerializationPropagatesDorisSchemaFetchFailure() throws IOException {
+        TableId tableId = TableId.parse("doris_database.json_schema_fetch_failure");
+        Schema baseSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+        AddColumnEvent addColumnEvent =
+                new AddColumnEvent(
+                        tableId,
+                        Arrays.asList(
+                                AddColumnEvent.last(
+                                        Column.physicalColumn("age", DataTypes.INT()))));
+        Schema evolvedSchema = SchemaUtils.applySchemaChangeEvent(baseSchema, addColumnEvent);
+        BinaryRecordDataGenerator evolvedGenerator =
+                new BinaryRecordDataGenerator(((RowType) evolvedSchema.toRowDataType()));
+
+        DorisEventSerializer serializer =
+                new DorisEventSerializer(
+                        ZoneId.of("UTC"),
+                        new Configuration(),
+                        DorisExecutionOptions.defaults(),
+                        null,
+                        DorisEventSerializer.createJsonFieldMappingResolver(
+                                createDorisOptions(),
+                                (options, requestedTableId) -> {
+                                    throw new IllegalStateException("schema fetch failed");
+                                },
+                                3,
+                                0));
+        serializer.serialize(new CreateTableEvent(tableId, baseSchema));
+        serializer.serialize(addColumnEvent);
+
+        Assertions.assertThatThrownBy(
+                        () ->
+                                serializer.serialize(
+                                        DataChangeEvent.insertEvent(
+                                                tableId,
+                                                evolvedGenerator.generate(
+                                                        new Object[] {
+                                                            2,
+                                                            BinaryStringData.fromString("Bob"),
+                                                            18
+                                                        }))))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("schema fetch failed");
+    }
+
+    @Test
     public void testCsvSerializationPreservesMixedCaseColumnValues() throws IOException {
         TableId mixedCaseTableId = TableId.parse("doris_database.mixed_case_orders_csv");
         Schema mixedCaseSchema =
@@ -1073,6 +1177,25 @@ public class DorisEventSerializerTest {
         streamLoadProps.setProperty("format", "csv");
         streamLoadProps.setProperty("column_separator", "|");
         return DorisExecutionOptions.builder().setStreamLoadProp(streamLoadProps).build();
+    }
+
+    private static DorisOptions createDorisOptions() {
+        return DorisOptions.builder()
+                .setFenodes("127.0.0.1:8030")
+                .setUsername("root")
+                .setPassword("")
+                .build();
+    }
+
+    private static org.apache.doris.flink.rest.models.Schema createDorisSchema(String... columns) {
+        org.apache.doris.flink.rest.models.Schema dorisSchema =
+                new org.apache.doris.flink.rest.models.Schema(columns.length);
+        for (String column : columns) {
+            dorisSchema.put(
+                    new org.apache.doris.flink.rest.models.Field(
+                            column, "VARCHAR", null, 0, 0, null));
+        }
+        return dorisSchema;
     }
 
     private static void serializeObject(Object object) throws IOException {

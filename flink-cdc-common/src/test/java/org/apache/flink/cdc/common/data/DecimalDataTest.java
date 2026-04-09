@@ -25,9 +25,16 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class DecimalDataTest {
 
     @Test
+    void testFromNullUnscaledBytesFailsFast() {
+        assertThatThrownBy(() -> DecimalData.fromUnscaledBytes(null, 20, 2))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Null or empty unscaled bytes for DECIMAL(20, 2)");
+    }
+
+    @Test
     void testFromEmptyUnscaledBytesFailsFast() {
         assertThatThrownBy(() -> DecimalData.fromUnscaledBytes(new byte[0], 20, 2))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Empty unscaled bytes for DECIMAL(20, 2)");
+                .hasMessageContaining("Null or empty unscaled bytes for DECIMAL(20, 2)");
     }
 }

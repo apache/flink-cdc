@@ -204,9 +204,9 @@ public final class DecimalData implements Comparable<DecimalData> {
      * precision and scale.
      */
     public static DecimalData fromUnscaledBytes(byte[] unscaledBytes, int precision, int scale) {
-        if (unscaledBytes.length == 0) {
+        if (unscaledBytes == null || unscaledBytes.length == 0) {
             throw new IllegalArgumentException(
-                    "Empty unscaled bytes for DECIMAL("
+                    "Null or empty unscaled bytes for DECIMAL("
                             + precision
                             + ", "
                             + scale

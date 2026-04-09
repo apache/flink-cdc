@@ -65,6 +65,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.StringJoiner;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.apache.doris.flink.sink.util.DeleteOperation.addDeleteSign;
 import static org.apache.doris.flink.sink.writer.LoadConstants.COLUMNS_KEY;
@@ -98,6 +100,11 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
         LinkedHashMap<String, String> resolve(TableId tableId, Schema inputSchema);
     }
 
+    @FunctionalInterface
+    interface DorisSchemaFetcher extends Serializable {
+        org.apache.doris.flink.rest.models.Schema fetch(DorisOptions dorisOptions, TableId tableId);
+    }
+
     /** Format DATE type data. */
     public static final DateTimeFormatter DATE_FORMATTER =
             DateTimeFormatter.ofPattern("yyyy-MM-dd");
@@ -109,6 +116,11 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
     private static final int MAX_SCHEMA_HISTORY_SIZE = 16;
     private static final int MAX_DORIS_SCHEMA_FETCH_ATTEMPTS = 25;
     private static final long DORIS_SCHEMA_FETCH_RETRY_MILLIS = 200L;
+    private static final AtomicBoolean JSON_FALLBACK_WARNING_LOGGED = new AtomicBoolean(false);
+    private static final DorisSchemaFetcher DEFAULT_DORIS_SCHEMA_FETCHER =
+            (dorisOptions, tableId) ->
+                    RestService.getSchema(
+                            dorisOptions, tableId.getSchemaName(), tableId.getTableName(), LOG);
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final Map<TableId, Schema> inputSchemaMaps = new HashMap<>();
@@ -180,6 +192,14 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
                                 FIELD_DELIMITER_KEY, FIELD_DELIMITER_DEFAULT));
         this.csvOutputSchemaResolver = csvOutputSchemaResolver;
         this.jsonFieldMappingResolver = jsonFieldMappingResolver;
+        if (JSON.equals(streamLoadFormat)
+                && jsonFieldMappingResolver == null
+                && JSON_FALLBACK_WARNING_LOGGED.compareAndSet(false, true)) {
+            LOG.warn(
+                    "DorisEventSerializer is running in JSON mode without Doris physical schema resolution. "
+                            + "Field names will fall back to lower-case input schema names. "
+                            + "This path is intended only for tests or serializer-only scenarios.");
+        }
     }
 
     @Override
@@ -474,13 +494,17 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
 
     private static CsvOutputSchemaResolver createDorisPhysicalSchemaResolver(
             DorisOptions dorisOptions) {
+        return createDorisPhysicalSchemaResolver(dorisOptions, DEFAULT_DORIS_SCHEMA_FETCHER);
+    }
+
+    static CsvOutputSchemaResolver createDorisPhysicalSchemaResolver(
+            DorisOptions dorisOptions, DorisSchemaFetcher dorisSchemaFetcher) {
         if (dorisOptions == null) {
             return null;
         }
         return (tableId, inputSchema) -> {
             org.apache.doris.flink.rest.models.Schema dorisSchema =
-                    RestService.getSchema(
-                            dorisOptions, tableId.getSchemaName(), tableId.getTableName(), LOG);
+                    dorisSchemaFetcher.fetch(dorisOptions, tableId);
             Preconditions.checkNotNull(
                     dorisSchema, "Failed to resolve Doris physical schema for " + tableId);
             Preconditions.checkNotNull(
@@ -507,12 +531,30 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
 
     private static JsonFieldMappingResolver createJsonFieldMappingResolver(
             DorisOptions dorisOptions) {
+        return createJsonFieldMappingResolver(
+                dorisOptions,
+                DEFAULT_DORIS_SCHEMA_FETCHER,
+                MAX_DORIS_SCHEMA_FETCH_ATTEMPTS,
+                DORIS_SCHEMA_FETCH_RETRY_MILLIS);
+    }
+
+    static JsonFieldMappingResolver createJsonFieldMappingResolver(
+            DorisOptions dorisOptions,
+            DorisSchemaFetcher dorisSchemaFetcher,
+            int maxSchemaFetchAttempts,
+            long schemaFetchRetryMillis) {
         if (dorisOptions == null) {
             return null;
         }
         return (tableId, inputSchema) -> {
             org.apache.doris.flink.rest.models.Schema dorisSchema =
-                    waitUntilDorisSchemaCoversInputSchema(dorisOptions, tableId, inputSchema);
+                    waitUntilDorisSchemaCoversInputSchema(
+                            dorisOptions,
+                            tableId,
+                            inputSchema,
+                            dorisSchemaFetcher,
+                            maxSchemaFetchAttempts,
+                            schemaFetchRetryMillis);
 
             LinkedHashMap<String, String> mapping = new LinkedHashMap<>();
             for (Field field : dorisSchema.getProperties()) {
@@ -528,33 +570,68 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
         };
     }
 
-    private static org.apache.doris.flink.rest.models.Schema waitUntilDorisSchemaCoversInputSchema(
-            DorisOptions dorisOptions, TableId tableId, Schema inputSchema) {
+    static org.apache.doris.flink.rest.models.Schema waitUntilDorisSchemaCoversInputSchema(
+            DorisOptions dorisOptions,
+            TableId tableId,
+            Schema inputSchema,
+            DorisSchemaFetcher dorisSchemaFetcher,
+            int maxSchemaFetchAttempts,
+            long schemaFetchRetryMillis) {
+        Preconditions.checkArgument(maxSchemaFetchAttempts > 0, "maxSchemaFetchAttempts > 0");
+        Preconditions.checkArgument(schemaFetchRetryMillis >= 0, "schemaFetchRetryMillis >= 0");
+
         org.apache.doris.flink.rest.models.Schema dorisSchema = null;
-        for (int attempt = 1; attempt <= MAX_DORIS_SCHEMA_FETCH_ATTEMPTS; attempt++) {
-            dorisSchema =
-                    RestService.getSchema(
-                            dorisOptions, tableId.getSchemaName(), tableId.getTableName(), LOG);
-            Preconditions.checkNotNull(
-                    dorisSchema, "Failed to resolve Doris physical schema for " + tableId);
-            Preconditions.checkNotNull(
-                    dorisSchema.getProperties(),
-                    "Failed to resolve Doris physical schema properties for " + tableId);
+        boolean waitingLogged = false;
+        long waitStartNanos = System.nanoTime();
+        for (int attempt = 1; attempt <= maxSchemaFetchAttempts; attempt++) {
+            try {
+                dorisSchema = dorisSchemaFetcher.fetch(dorisOptions, tableId);
+                Preconditions.checkNotNull(
+                        dorisSchema, "Failed to resolve Doris physical schema for " + tableId);
+                Preconditions.checkNotNull(
+                        dorisSchema.getProperties(),
+                        "Failed to resolve Doris physical schema properties for " + tableId);
+            } catch (RuntimeException e) {
+                long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - waitStartNanos);
+                LOG.warn(
+                        "Failed to resolve Doris physical schema for {} on attempt {}/{} after {} ms.",
+                        tableId,
+                        attempt,
+                        maxSchemaFetchAttempts,
+                        elapsedMs,
+                        e);
+                throw e;
+            }
 
             if (dorisSchemaCoversInputSchema(dorisSchema, inputSchema)) {
+                if (waitingLogged) {
+                    long elapsedMs =
+                            TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - waitStartNanos);
+                    LOG.info(
+                            "Doris physical schema for {} caught up after {} attempt(s) and {} ms. inputColumns={}, dorisColumns={}",
+                            tableId,
+                            attempt,
+                            elapsedMs,
+                            getInputColumnNames(inputSchema),
+                            getDorisPhysicalColumnNames(dorisSchema));
+                }
                 return dorisSchema;
             }
 
-            if (attempt < MAX_DORIS_SCHEMA_FETCH_ATTEMPTS) {
+            if (!waitingLogged) {
+                waitingLogged = true;
                 LOG.info(
-                        "Doris physical schema for {} has not caught up with input schema yet. inputColumns={}, dorisColumns={}, retry={}/{}",
+                        "Waiting for Doris physical schema of {} to catch up. inputColumns={}, dorisColumns={}, maxAttempts={}, retryIntervalMs={}",
                         tableId,
                         getInputColumnNames(inputSchema),
                         getDorisPhysicalColumnNames(dorisSchema),
-                        attempt,
-                        MAX_DORIS_SCHEMA_FETCH_ATTEMPTS);
+                        maxSchemaFetchAttempts,
+                        schemaFetchRetryMillis);
+            }
+
+            if (attempt < maxSchemaFetchAttempts) {
                 try {
-                    Thread.sleep(DORIS_SCHEMA_FETCH_RETRY_MILLIS);
+                    Thread.sleep(schemaFetchRetryMillis);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     throw new IllegalStateException(
@@ -562,6 +639,15 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
                 }
             }
         }
+
+        long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - waitStartNanos);
+        LOG.warn(
+                "Doris physical schema for {} did not catch up after {} attempt(s) and {} ms. inputColumns={}, dorisColumns={}",
+                tableId,
+                maxSchemaFetchAttempts,
+                elapsedMs,
+                getInputColumnNames(inputSchema),
+                getDorisPhysicalColumnNames(dorisSchema));
 
         throw new IllegalStateException(
                 String.format(
