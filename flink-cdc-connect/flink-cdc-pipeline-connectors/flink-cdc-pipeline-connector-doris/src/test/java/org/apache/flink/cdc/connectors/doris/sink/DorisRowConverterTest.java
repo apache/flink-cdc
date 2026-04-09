@@ -18,7 +18,11 @@
 package org.apache.flink.cdc.connectors.doris.sink;
 
 import org.apache.flink.cdc.common.data.DateData;
+import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
+import org.apache.flink.cdc.common.data.MapData;
+import org.apache.flink.cdc.common.data.RecordData;
+import org.apache.flink.cdc.common.data.StringData;
 import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
@@ -27,6 +31,7 @@ import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
+import org.apache.flink.cdc.common.types.variant.Variant;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 
 import org.assertj.core.api.Assertions;
@@ -43,6 +48,19 @@ import java.util.stream.Collectors;
 
 /** A test for {@link org.apache.flink.cdc.connectors.doris.sink.DorisRowConverter} . */
 class DorisRowConverterTest {
+
+    @Test
+    void testDecimalMismatchReportsClearError() {
+        RecordData recordData = new NullDecimalRecordData();
+
+        DorisRowConverter.SerializationConverter converter =
+                DorisRowConverter.createNullableExternalConverter(
+                        DataTypes.DECIMAL(38, 0), ZoneId.of("UTC"));
+
+        Assertions.assertThatThrownBy(() -> converter.serialize(0, recordData))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Failed to serialize DECIMAL field");
+    }
 
     @Test
     void testExternalConvert() {
@@ -125,5 +143,114 @@ class DorisRowConverterTest {
                         "[true, 1.2, 1.2345, 1, 32, 64, 128, 2021-01-01 08:00:00.000000, 2021-01-01, a, doris, 2021-01-01 "
                                 + "08:01:11.000000, 2021-01-01 08:01:11.123000, 2021-01-01 08:01:11.123456, 2021-01-01 "
                                 + "16:01:11.000000, 2021-01-01 16:01:11.123000, 2021-01-01 16:01:11.123456, 01:01:01, 01:01:01.123, 01:01:01.123]");
+    }
+
+    private static class NullDecimalRecordData implements RecordData {
+
+        @Override
+        public int getArity() {
+            return 1;
+        }
+
+        @Override
+        public boolean isNullAt(int pos) {
+            return false;
+        }
+
+        @Override
+        public boolean getBoolean(int pos) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public byte getByte(int pos) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public short getShort(int pos) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public int getInt(int pos) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public long getLong(int pos) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public float getFloat(int pos) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public double getDouble(int pos) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public byte[] getBinary(int pos) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public StringData getString(int pos) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public DecimalData getDecimal(int pos, int precision, int scale) {
+            return null;
+        }
+
+        @Override
+        public TimestampData getTimestamp(int pos, int precision) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public org.apache.flink.cdc.common.data.ZonedTimestampData getZonedTimestamp(
+                int pos, int precision) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public LocalZonedTimestampData getLocalZonedTimestampData(int pos, int precision) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public org.apache.flink.cdc.common.data.ArrayData getArray(int pos) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public MapData getMap(int pos) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public RecordData getRow(int pos, int numFields) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public DateData getDate(int pos) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public TimeData getTime(int pos) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Variant getVariant(int pos) {
+            throw new UnsupportedOperationException();
+        }
     }
 }

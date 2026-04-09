@@ -693,6 +693,372 @@ public class DorisEventSerializerTest {
                 .isEqualTo("1|morpheus|0");
     }
 
+    @Test
+    public void testJsonSerializationNormalizesUppercaseColumnNamesForDoris() throws IOException {
+        TableId uppercaseTableId = TableId.parse("doris_database.uppercase_table");
+        Schema uppercaseSchema =
+                Schema.newBuilder()
+                        .physicalColumn("ID", DataTypes.INT())
+                        .physicalColumn("NAME", DataTypes.STRING())
+                        .primaryKey("ID")
+                        .build();
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(((RowType) uppercaseSchema.toRowDataType()));
+
+        DorisEventSerializer serializer =
+                new DorisEventSerializer(ZoneId.of("UTC"), new Configuration());
+        serializer.serialize(new CreateTableEvent(uppercaseTableId, uppercaseSchema));
+
+        DorisRecord dorisRecord =
+                serializer.serialize(
+                        DataChangeEvent.insertEvent(
+                                uppercaseTableId,
+                                generator.generate(
+                                        new Object[] {1, BinaryStringData.fromString("flink")})));
+
+        JsonNode jsonNode = objectMapper.readTree(dorisRecord.getRow());
+        Assertions.assertThat(jsonNode.get("id").asInt()).isEqualTo(1);
+        Assertions.assertThat(jsonNode.get("name").asText()).isEqualTo("flink");
+        Assertions.assertThat(jsonNode.has("ID")).isFalse();
+        Assertions.assertThat(jsonNode.has("NAME")).isFalse();
+    }
+
+    @Test
+    public void testJsonSerializationNormalizesMixedCaseColumnNamesForDoris() throws IOException {
+        TableId mixedCaseTableId = TableId.parse("doris_database.mixed_case_orders");
+        Schema mixedCaseSchema =
+                Schema.newBuilder()
+                        .physicalColumn("ID", DataTypes.INT())
+                        .physicalColumn("park_id", DataTypes.INT())
+                        .physicalColumn("park_code", DataTypes.STRING())
+                        .physicalColumn("order_no", DataTypes.STRING())
+                        .physicalColumn("CARD_ID", DataTypes.STRING())
+                        .primaryKey("ID")
+                        .build();
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(((RowType) mixedCaseSchema.toRowDataType()));
+
+        DorisEventSerializer serializer =
+                new DorisEventSerializer(ZoneId.of("UTC"), new Configuration());
+        serializer.serialize(new CreateTableEvent(mixedCaseTableId, mixedCaseSchema));
+
+        DorisRecord dorisRecord =
+                serializer.serialize(
+                        DataChangeEvent.insertEvent(
+                                mixedCaseTableId,
+                                generator.generate(
+                                        new Object[] {
+                                            1,
+                                            101,
+                                            BinaryStringData.fromString("PARK-001"),
+                                            BinaryStringData.fromString("ORDER-001"),
+                                            BinaryStringData.fromString("CARD-001")
+                                        })));
+
+        JsonNode jsonNode = objectMapper.readTree(dorisRecord.getRow());
+        Assertions.assertThat(jsonNode.get("id").asInt()).isEqualTo(1);
+        Assertions.assertThat(jsonNode.get("park_id").asInt()).isEqualTo(101);
+        Assertions.assertThat(jsonNode.get("park_code").asText()).isEqualTo("PARK-001");
+        Assertions.assertThat(jsonNode.get("order_no").asText()).isEqualTo("ORDER-001");
+        Assertions.assertThat(jsonNode.get("card_id").asText()).isEqualTo("CARD-001");
+        Assertions.assertThat(jsonNode.has("ID")).isFalse();
+        Assertions.assertThat(jsonNode.has("CARD_ID")).isFalse();
+    }
+
+    @Test
+    public void testJsonSerializationMatchesAgreementProductColumnsReportedByDorisErrorLog()
+            throws IOException {
+        TableId tableId = TableId.parse("xxsc.agreement_product");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("ID", DataTypes.INT())
+                        .physicalColumn("AGREEMENT_CODE", DataTypes.STRING())
+                        .physicalColumn("PARENT_CODE", DataTypes.STRING())
+                        .physicalColumn("PARENT_NAME", DataTypes.STRING())
+                        .physicalColumn("PRODUCT_CODE", DataTypes.STRING())
+                        .physicalColumn("PRODUCT_NAME", DataTypes.STRING())
+                        .physicalColumn("PRODUCT_TYPE", DataTypes.STRING())
+                        .physicalColumn("ENABLED", DataTypes.STRING())
+                        .physicalColumn("STATUS", DataTypes.STRING())
+                        .physicalColumn("CREATE_TIME", DataTypes.STRING())
+                        .physicalColumn("CREATE_BY", DataTypes.STRING())
+                        .physicalColumn("MODIFY_TIME", DataTypes.STRING())
+                        .physicalColumn("MODIFY_BY", DataTypes.STRING())
+                        .physicalColumn("LAST_UPDATE_TIME", DataTypes.STRING())
+                        .physicalColumn("DELETED", DataTypes.STRING())
+                        .primaryKey("ID")
+                        .build();
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(((RowType) schema.toRowDataType()));
+
+        DorisEventSerializer serializer =
+                new DorisEventSerializer(ZoneId.of("UTC"), new Configuration());
+        serializer.serialize(new CreateTableEvent(tableId, schema));
+
+        DorisRecord dorisRecord =
+                serializer.serialize(
+                        DataChangeEvent.insertEvent(
+                                tableId,
+                                generator.generate(
+                                        new Object[] {
+                                            279,
+                                            BinaryStringData.fromString("AGCNC24053011045133891"),
+                                            BinaryStringData.fromString("park2024031513535177487"),
+                                            BinaryStringData.fromString("常州中华恐龙园旅游度假区"),
+                                            BinaryStringData.fromString("MP2024052915532228596"),
+                                            BinaryStringData.fromString(
+                                                    "旅订恐儿童二日二次免票+水一次票（1.2米-1.5米）"),
+                                            BinaryStringData.fromString("park"),
+                                            BinaryStringData.fromString("T"),
+                                            BinaryStringData.fromString("T"),
+                                            BinaryStringData.fromString(
+                                                    "2024-05-30 11:06:21.000000"),
+                                            BinaryStringData.fromString("liuerling"),
+                                            BinaryStringData.fromString(
+                                                    "2024-06-13 08:59:41.000000"),
+                                            BinaryStringData.fromString("liuerling"),
+                                            null,
+                                            BinaryStringData.fromString("T")
+                                        })));
+
+        JsonNode jsonNode = objectMapper.readTree(dorisRecord.getRow());
+        Assertions.assertThat(jsonNode.get("id").asInt()).isEqualTo(279);
+        Assertions.assertThat(jsonNode.get("agreement_code").asText())
+                .isEqualTo("AGCNC24053011045133891");
+        Assertions.assertThat(jsonNode.get("parent_code").asText())
+                .isEqualTo("park2024031513535177487");
+        Assertions.assertThat(jsonNode.get("product_code").asText())
+                .isEqualTo("MP2024052915532228596");
+        Assertions.assertThat(jsonNode.get("deleted").asText()).isEqualTo("T");
+        Assertions.assertThat(jsonNode.get("__DORIS_DELETE_SIGN__").asText()).isEqualTo("0");
+        Assertions.assertThat(jsonNode.has("ID")).isFalse();
+        Assertions.assertThat(jsonNode.has("AGREEMENT_CODE")).isFalse();
+        Assertions.assertThat(jsonNode.has("PRODUCT_CODE")).isFalse();
+    }
+
+    @Test
+    public void testJsonSerializationUsesDorisPhysicalColumnCaseForUppercasePrimaryKey()
+            throws IOException {
+        TableId tableId = TableId.parse("streampark.t_flink_app");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("ID", DataTypes.BIGINT())
+                        .physicalColumn("deploy_mode", DataTypes.TINYINT())
+                        .primaryKey("ID")
+                        .build();
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(((RowType) schema.toRowDataType()));
+
+        DorisEventSerializer serializer =
+                new DorisEventSerializer(
+                        ZoneId.of("UTC"),
+                        new Configuration(),
+                        DorisExecutionOptions.defaults(),
+                        null,
+                        (resolvedTableId, inputSchema) -> {
+                            LinkedHashMap<String, String> mapping = new LinkedHashMap<>();
+                            mapping.put("ID", "ID");
+                            mapping.put("deploy_mode", "deploy_mode");
+                            return mapping;
+                        });
+        serializer.serialize(new CreateTableEvent(tableId, schema));
+
+        DorisRecord dorisRecord =
+                serializer.serialize(
+                        DataChangeEvent.insertEvent(
+                                tableId, generator.generate(new Object[] {1L, (byte) 2})));
+
+        JsonNode jsonNode = objectMapper.readTree(dorisRecord.getRow());
+        Assertions.assertThat(jsonNode.get("ID").asLong()).isEqualTo(1L);
+        Assertions.assertThat(jsonNode.get("deploy_mode").asInt()).isEqualTo(2);
+        Assertions.assertThat(jsonNode.has("id")).isFalse();
+    }
+
+    @Test
+    public void testJsonSerializationUsesUppercaseDorisColumnsForUpperCaseFormattedSchema()
+            throws IOException {
+        TableId tableId = TableId.parse("streampark.t_flink_app_upper");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("ID", DataTypes.BIGINT())
+                        .physicalColumn("DEPLOY_MODE", DataTypes.TINYINT())
+                        .primaryKey("ID")
+                        .build();
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(((RowType) schema.toRowDataType()));
+
+        DorisEventSerializer serializer =
+                new DorisEventSerializer(
+                        ZoneId.of("UTC"),
+                        new Configuration(),
+                        DorisExecutionOptions.defaults(),
+                        null,
+                        (resolvedTableId, inputSchema) -> {
+                            LinkedHashMap<String, String> mapping = new LinkedHashMap<>();
+                            mapping.put("ID", "ID");
+                            mapping.put("DEPLOY_MODE", "DEPLOY_MODE");
+                            return mapping;
+                        });
+        serializer.serialize(new CreateTableEvent(tableId, schema));
+
+        DorisRecord dorisRecord =
+                serializer.serialize(
+                        DataChangeEvent.insertEvent(
+                                tableId, generator.generate(new Object[] {1L, (byte) 2})));
+
+        JsonNode jsonNode = objectMapper.readTree(dorisRecord.getRow());
+        Assertions.assertThat(jsonNode.get("ID").asLong()).isEqualTo(1L);
+        Assertions.assertThat(jsonNode.get("DEPLOY_MODE").asInt()).isEqualTo(2);
+        Assertions.assertThat(jsonNode.has("id")).isFalse();
+        Assertions.assertThat(jsonNode.has("deploy_mode")).isFalse();
+    }
+
+    @Test
+    public void testJsonSerializationUsesExistingLowercaseDorisColumnsForUppercaseSourceColumns()
+            throws IOException {
+        TableId tableId = TableId.parse("xxsc.agreement_product_existing");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("ID", DataTypes.INT())
+                        .physicalColumn("AGREEMENT_CODE", DataTypes.STRING())
+                        .primaryKey("ID")
+                        .build();
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(((RowType) schema.toRowDataType()));
+
+        DorisEventSerializer serializer =
+                new DorisEventSerializer(
+                        ZoneId.of("UTC"),
+                        new Configuration(),
+                        DorisExecutionOptions.defaults(),
+                        null,
+                        (resolvedTableId, inputSchema) -> {
+                            LinkedHashMap<String, String> mapping = new LinkedHashMap<>();
+                            mapping.put("id", "ID");
+                            mapping.put("agreement_code", "AGREEMENT_CODE");
+                            return mapping;
+                        });
+        serializer.serialize(new CreateTableEvent(tableId, schema));
+
+        DorisRecord dorisRecord =
+                serializer.serialize(
+                        DataChangeEvent.insertEvent(
+                                tableId,
+                                generator.generate(
+                                        new Object[] {
+                                            279,
+                                            BinaryStringData.fromString("AGCNC24053011045133891")
+                                        })));
+
+        JsonNode jsonNode = objectMapper.readTree(dorisRecord.getRow());
+        Assertions.assertThat(jsonNode.get("id").asInt()).isEqualTo(279);
+        Assertions.assertThat(jsonNode.get("agreement_code").asText())
+                .isEqualTo("AGCNC24053011045133891");
+        Assertions.assertThat(jsonNode.has("ID")).isFalse();
+        Assertions.assertThat(jsonNode.has("AGREEMENT_CODE")).isFalse();
+    }
+
+    @Test
+    public void testJsonSerializationHandlesLateEventsAfterAddColumn() throws IOException {
+        TableId tableId = TableId.parse("doris_database.json_schema_late_events");
+        Schema baseSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+        BinaryRecordDataGenerator baseGenerator =
+                new BinaryRecordDataGenerator(((RowType) baseSchema.toRowDataType()));
+
+        DorisEventSerializer serializer =
+                new DorisEventSerializer(
+                        ZoneId.of("UTC"),
+                        new Configuration(),
+                        DorisExecutionOptions.defaults(),
+                        null,
+                        (resolvedTableId, inputSchema) -> {
+                            LinkedHashMap<String, String> mapping = new LinkedHashMap<>();
+                            mapping.put("id", "id");
+                            mapping.put("name", "name");
+                            mapping.put(
+                                    "age",
+                                    inputSchema.getColumn("age").map(Column::getName).orElse(null));
+                            return mapping;
+                        });
+        serializer.serialize(new CreateTableEvent(tableId, baseSchema));
+
+        AddColumnEvent addColumnEvent =
+                new AddColumnEvent(
+                        tableId,
+                        Arrays.asList(
+                                AddColumnEvent.last(
+                                        Column.physicalColumn("age", DataTypes.INT()))));
+        serializer.serialize(addColumnEvent);
+
+        DorisRecord lateRecord =
+                serializer.serialize(
+                        DataChangeEvent.insertEvent(
+                                tableId,
+                                baseGenerator.generate(
+                                        new Object[] {1, BinaryStringData.fromString("Alice")})));
+
+        JsonNode lateJsonNode = objectMapper.readTree(lateRecord.getRow());
+        Assertions.assertThat(lateJsonNode.get("id").asInt()).isEqualTo(1);
+        Assertions.assertThat(lateJsonNode.get("name").asText()).isEqualTo("Alice");
+        Assertions.assertThat(lateJsonNode.get("age").isNull()).isTrue();
+
+        Schema evolvedSchema = SchemaUtils.applySchemaChangeEvent(baseSchema, addColumnEvent);
+        BinaryRecordDataGenerator evolvedGenerator =
+                new BinaryRecordDataGenerator(((RowType) evolvedSchema.toRowDataType()));
+        DorisRecord evolvedRecord =
+                serializer.serialize(
+                        DataChangeEvent.insertEvent(
+                                tableId,
+                                evolvedGenerator.generate(
+                                        new Object[] {2, BinaryStringData.fromString("Bob"), 18})));
+
+        JsonNode evolvedJsonNode = objectMapper.readTree(evolvedRecord.getRow());
+        Assertions.assertThat(evolvedJsonNode.get("id").asInt()).isEqualTo(2);
+        Assertions.assertThat(evolvedJsonNode.get("name").asText()).isEqualTo("Bob");
+        Assertions.assertThat(evolvedJsonNode.get("age").asInt()).isEqualTo(18);
+    }
+
+    @Test
+    public void testCsvSerializationPreservesMixedCaseColumnValues() throws IOException {
+        TableId mixedCaseTableId = TableId.parse("doris_database.mixed_case_orders_csv");
+        Schema mixedCaseSchema =
+                Schema.newBuilder()
+                        .physicalColumn("ID", DataTypes.INT())
+                        .physicalColumn("park_id", DataTypes.INT())
+                        .physicalColumn("park_code", DataTypes.STRING())
+                        .physicalColumn("order_no", DataTypes.STRING())
+                        .physicalColumn("CARD_ID", DataTypes.STRING())
+                        .primaryKey("ID")
+                        .build();
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(((RowType) mixedCaseSchema.toRowDataType()));
+
+        DorisEventSerializer serializer =
+                createCsvSerializer((tableId, inputSchema) -> inputSchema);
+        serializer.serialize(new CreateTableEvent(mixedCaseTableId, mixedCaseSchema));
+
+        DorisRecord dorisRecord =
+                serializer.serialize(
+                        DataChangeEvent.insertEvent(
+                                mixedCaseTableId,
+                                generator.generate(
+                                        new Object[] {
+                                            1,
+                                            101,
+                                            BinaryStringData.fromString("PARK-001"),
+                                            BinaryStringData.fromString("ORDER-001"),
+                                            BinaryStringData.fromString("CARD-001")
+                                        })));
+
+        Assertions.assertThat(new String(dorisRecord.getRow(), StandardCharsets.UTF_8))
+                .isEqualTo("1|101|PARK-001|ORDER-001|CARD-001|0");
+    }
+
     private static DorisEventSerializer createCsvSerializer(
             DorisEventSerializer.CsvOutputSchemaResolver csvOutputSchemaResolver) {
         return new DorisEventSerializer(

@@ -31,13 +31,16 @@ import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.ChangeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
+import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.types.DataField;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.DecimalType;
 import org.apache.flink.cdc.common.types.RowType;
+import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.cdc.debezium.table.DebeziumChangelogMode;
 import org.apache.flink.cdc.debezium.table.DeserializationRuntimeConverter;
@@ -49,6 +52,9 @@ import org.apache.flink.util.Collector;
 import io.debezium.data.Envelope;
 import io.debezium.data.SpecialValueDecimal;
 import io.debezium.data.VariableScaleDecimal;
+import io.debezium.data.geometry.Geography;
+import io.debezium.data.geometry.Geometry;
+import io.debezium.data.geometry.Point;
 import io.debezium.time.MicroTime;
 import io.debezium.time.MicroTimestamp;
 import io.debezium.time.NanoTime;
@@ -71,6 +77,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 /** Debezium event deserializer for {@link SourceRecord}. */
@@ -107,6 +114,17 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
     }
 
     @Override
+    public List<? extends Event> deserialize(SourceRecord record) throws Exception {
+        List<? extends Event> events = super.deserialize(record);
+        for (Event event : events) {
+            if (event instanceof SchemaChangeEvent) {
+                applyChangeEvent((SchemaChangeEvent) event);
+            }
+        }
+        return events;
+    }
+
+    @Override
     public List<DataChangeEvent> deserializeDataChangeRecord(SourceRecord record) throws Exception {
         Envelope.Operation op = Envelope.operationFor(record);
         TableId tableId = getTableId(record);
@@ -116,15 +134,15 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
         Map<String, String> meta = getMetadata(record);
 
         if (op == Envelope.Operation.CREATE || op == Envelope.Operation.READ) {
-            RecordData after = extractAfterDataRecord(value, valueSchema);
+            RecordData after = extractAfterDataRecord(tableId, value, valueSchema);
             return Collections.singletonList(DataChangeEvent.insertEvent(tableId, after, meta));
         } else if (op == Envelope.Operation.DELETE) {
-            RecordData before = extractBeforeDataRecord(value, valueSchema);
+            RecordData before = extractBeforeDataRecord(tableId, value, valueSchema);
             return Collections.singletonList(DataChangeEvent.deleteEvent(tableId, before, meta));
         } else if (op == Envelope.Operation.UPDATE) {
-            RecordData after = extractAfterDataRecord(value, valueSchema);
+            RecordData after = extractAfterDataRecord(tableId, value, valueSchema);
             if (changelogMode == DebeziumChangelogMode.ALL) {
-                RecordData before = extractBeforeDataRecord(value, valueSchema);
+                RecordData before = extractBeforeDataRecord(tableId, value, valueSchema);
                 return Collections.singletonList(
                         DataChangeEvent.updateEvent(tableId, before, after, meta));
             }
@@ -141,21 +159,47 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
         return new EventTypeInfo();
     }
 
-    private RecordData extractBeforeDataRecord(Struct value, Schema valueSchema) throws Exception {
+    private RecordData extractBeforeDataRecord(TableId tableId, Struct value, Schema valueSchema)
+            throws Exception {
         Schema beforeSchema = fieldSchema(valueSchema, Envelope.FieldName.BEFORE);
         Struct beforeValue = fieldStruct(value, Envelope.FieldName.BEFORE);
-        return extractDataRecord(beforeValue, beforeSchema);
+        return extractDataRecord(tableId, beforeValue, beforeSchema);
     }
 
-    private RecordData extractAfterDataRecord(Struct value, Schema valueSchema) throws Exception {
+    private RecordData extractAfterDataRecord(TableId tableId, Struct value, Schema valueSchema)
+            throws Exception {
         Schema afterSchema = fieldSchema(valueSchema, Envelope.FieldName.AFTER);
         Struct afterValue = fieldStruct(value, Envelope.FieldName.AFTER);
-        return extractDataRecord(afterValue, afterSchema);
+        return extractDataRecord(tableId, afterValue, afterSchema);
     }
 
-    private RecordData extractDataRecord(Struct value, Schema valueSchema) throws Exception {
+    private RecordData extractDataRecord(TableId tableId, Struct value, Schema valueSchema)
+            throws Exception {
+        if (value == null) {
+            return null;
+        }
+
+        CreateTableEvent createTableEvent =
+                getCreateTableEventCache().get(toDebeziumTableId(tableId));
+        if (createTableEvent != null) {
+            try {
+                DataType dataType = createTableEvent.getSchema().toRowDataType();
+                return (RecordData) getOrCreateConverter(dataType).convert(value, valueSchema);
+            } catch (CachedSchemaMismatchException e) {
+                LOG.info(
+                        "Cached schema for {} is incompatible with the current record schema, falling back to value inference: {}",
+                        tableId,
+                        e.getMessage());
+            }
+        }
+
         DataType dataType = schemaDataTypeInference.infer(value, valueSchema);
         return (RecordData) getOrCreateConverter(dataType).convert(value, valueSchema);
+    }
+
+    private io.debezium.relational.TableId toDebeziumTableId(TableId tableId) {
+        return new io.debezium.relational.TableId(
+                tableId.getNamespace(), tableId.getSchemaName(), tableId.getTableName());
     }
 
     private DeserializationRuntimeConverter getOrCreateConverter(DataType type) {
@@ -383,6 +427,22 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
     }
 
     protected Object convertToString(Object dbzObj, Schema schema) {
+        if (Decimal.LOGICAL_NAME.equals(schema.name())) {
+            if (dbzObj instanceof BigDecimal) {
+                return BinaryStringData.fromString(((BigDecimal) dbzObj).toPlainString());
+            }
+            if (dbzObj instanceof byte[]) {
+                return BinaryStringData.fromString(
+                        Decimal.toLogical(schema, (byte[]) dbzObj).toPlainString());
+            }
+            if (dbzObj instanceof ByteBuffer) {
+                ByteBuffer byteBuffer = ((ByteBuffer) dbzObj).duplicate();
+                byte[] bytes = new byte[byteBuffer.remaining()];
+                byteBuffer.get(bytes);
+                return BinaryStringData.fromString(
+                        Decimal.toLogical(schema, bytes).toPlainString());
+            }
+        }
         return BinaryStringData.fromString(dbzObj.toString());
     }
 
@@ -428,6 +488,24 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
 
     protected Object convertToRecord(RowType rowType, Object dbzObj, Schema schema)
             throws Exception {
+        if (!(dbzObj instanceof Struct)) {
+            throw new CachedSchemaMismatchException(
+                    "Expected STRUCT payload but got "
+                            + dbzObj.getClass().getName()
+                            + " for cached row type "
+                            + rowType);
+        }
+        if (schema.type() != Schema.Type.STRUCT) {
+            throw new CachedSchemaMismatchException(
+                    "Expected STRUCT schema but got "
+                            + schema.type()
+                            + " for cached row type "
+                            + rowType);
+        }
+        String unexpectedField = findUnexpectedActualField(null, rowType, schema);
+        if (unexpectedField != null) {
+            throw new CachedSchemaMismatchException(unexpectedField);
+        }
         DeserializationRuntimeConverter[] fieldConverters =
                 rowType.getFields().stream()
                         .map(DataField::getType)
@@ -443,15 +521,274 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
             String fieldName = fieldNames[i];
             Field field = schema.field(fieldName);
             if (field == null) {
-                fields[i] = null;
-            } else {
-                Object fieldValue = struct.getWithoutDefault(fieldName);
-                Schema fieldSchema = schema.field(fieldName).schema();
-                Object convertedField = convertField(fieldConverters[i], fieldValue, fieldSchema);
-                fields[i] = convertedField;
+                throw new CachedSchemaMismatchException(
+                        "Missing field '" + fieldName + "' in current record schema.");
             }
+            Object fieldValue = struct.getWithoutDefault(fieldName);
+            Schema fieldSchema = field.schema();
+            String incompatibility =
+                    findCachedFieldIncompatibility(fieldName, rowType.getTypeAt(i), fieldSchema);
+            if (incompatibility != null) {
+                throw new CachedSchemaMismatchException(incompatibility);
+            }
+            Object convertedField = convertField(fieldConverters[i], fieldValue, fieldSchema);
+            fields[i] = convertedField;
         }
         return generator.generate(fields);
+    }
+
+    private String findCachedFieldIncompatibility(
+            String fieldPath, DataType expectedType, Schema actualSchema) {
+        switch (expectedType.getTypeRoot()) {
+            case BOOLEAN:
+                return isBooleanSchemaCompatible(actualSchema)
+                        ? null
+                        : formatCachedFieldMismatch(fieldPath, expectedType, actualSchema);
+            case TINYINT:
+                return actualSchema.type() == Schema.Type.INT8
+                        ? null
+                        : formatCachedFieldMismatch(fieldPath, expectedType, actualSchema);
+            case SMALLINT:
+                return actualSchema.type() == Schema.Type.INT16
+                        ? null
+                        : formatCachedFieldMismatch(fieldPath, expectedType, actualSchema);
+            case INTEGER:
+                return actualSchema.type() == Schema.Type.INT32
+                        ? null
+                        : formatCachedFieldMismatch(fieldPath, expectedType, actualSchema);
+            case BIGINT:
+                return actualSchema.type() == Schema.Type.INT64
+                        ? null
+                        : formatCachedFieldMismatch(fieldPath, expectedType, actualSchema);
+            case FLOAT:
+                return actualSchema.type() == Schema.Type.FLOAT32
+                        ? null
+                        : formatCachedFieldMismatch(fieldPath, expectedType, actualSchema);
+            case DOUBLE:
+                return actualSchema.type() == Schema.Type.FLOAT64
+                        ? null
+                        : formatCachedFieldMismatch(fieldPath, expectedType, actualSchema);
+            case CHAR:
+            case VARCHAR:
+                return isStringSchemaCompatible(actualSchema)
+                        ? null
+                        : formatCachedFieldMismatch(fieldPath, expectedType, actualSchema);
+            case BINARY:
+            case VARBINARY:
+                return actualSchema.type() == Schema.Type.BYTES
+                        ? null
+                        : formatCachedFieldMismatch(fieldPath, expectedType, actualSchema);
+            case DECIMAL:
+                return isDecimalSchemaCompatible((DecimalType) expectedType, actualSchema)
+                        ? null
+                        : formatCachedFieldMismatch(fieldPath, expectedType, actualSchema);
+            case DATE:
+                return isDateSchemaCompatible(actualSchema)
+                        ? null
+                        : formatCachedFieldMismatch(fieldPath, expectedType, actualSchema);
+            case TIME_WITHOUT_TIME_ZONE:
+                return isTimeSchemaCompatible(actualSchema)
+                        ? null
+                        : formatCachedFieldMismatch(fieldPath, expectedType, actualSchema);
+            case TIMESTAMP_WITHOUT_TIME_ZONE:
+                return isTimestampSchemaCompatible(actualSchema)
+                        ? null
+                        : formatCachedFieldMismatch(fieldPath, expectedType, actualSchema);
+            case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
+                return isLocalTimeZoneTimestampSchemaCompatible(actualSchema)
+                        ? null
+                        : formatCachedFieldMismatch(fieldPath, expectedType, actualSchema);
+            case ARRAY:
+                if (actualSchema.type() != Schema.Type.ARRAY) {
+                    return formatCachedFieldMismatch(fieldPath, expectedType, actualSchema);
+                }
+                return findCachedFieldIncompatibility(
+                        fieldPath + "[]",
+                        expectedType.getChildren().get(0),
+                        actualSchema.valueSchema());
+            case MAP:
+                if (actualSchema.type() != Schema.Type.MAP) {
+                    return formatCachedFieldMismatch(fieldPath, expectedType, actualSchema);
+                }
+                String keyMismatch =
+                        findCachedFieldIncompatibility(
+                                fieldPath + "<key>",
+                                expectedType.getChildren().get(0),
+                                actualSchema.keySchema());
+                if (keyMismatch != null) {
+                    return keyMismatch;
+                }
+                return findCachedFieldIncompatibility(
+                        fieldPath + "<value>",
+                        expectedType.getChildren().get(1),
+                        actualSchema.valueSchema());
+            case ROW:
+                if (actualSchema.type() != Schema.Type.STRUCT) {
+                    return formatCachedFieldMismatch(fieldPath, expectedType, actualSchema);
+                }
+                RowType expectedRowType = (RowType) expectedType;
+                String unexpectedField =
+                        findUnexpectedActualField(fieldPath, expectedRowType, actualSchema);
+                if (unexpectedField != null) {
+                    return unexpectedField;
+                }
+                for (DataField nestedField : expectedRowType.getFields()) {
+                    Field actualField = actualSchema.field(nestedField.getName());
+                    if (actualField == null) {
+                        return "Missing field '"
+                                + fieldPath
+                                + "."
+                                + nestedField.getName()
+                                + "' in current record schema.";
+                    }
+                    String nestedMismatch =
+                            findCachedFieldIncompatibility(
+                                    fieldPath + "." + nestedField.getName(),
+                                    nestedField.getType(),
+                                    actualField.schema());
+                    if (nestedMismatch != null) {
+                        return nestedMismatch;
+                    }
+                }
+                return null;
+            default:
+                return null;
+        }
+    }
+
+    private String findUnexpectedActualField(
+            String fieldPath, RowType expectedRowType, Schema actualSchema) {
+        List<String> expectedFieldNames = expectedRowType.getFieldNames();
+        for (Field actualField : actualSchema.fields()) {
+            if (!expectedFieldNames.contains(actualField.name())) {
+                return "Unexpected field '"
+                        + qualifyFieldPath(fieldPath, actualField.name())
+                        + "' in current record schema.";
+            }
+        }
+        return null;
+    }
+
+    private static String qualifyFieldPath(String fieldPath, String fieldName) {
+        if (fieldPath == null || fieldPath.isEmpty()) {
+            return fieldName;
+        }
+        return fieldPath + "." + fieldName;
+    }
+
+    private static boolean isBooleanSchemaCompatible(Schema schema) {
+        return schema.type() == Schema.Type.BOOLEAN
+                || schema.type() == Schema.Type.INT8
+                || schema.type() == Schema.Type.INT16;
+    }
+
+    private static boolean isStringSchemaCompatible(Schema schema) {
+        if (schema.type() == Schema.Type.STRING) {
+            return !ZonedTimestamp.SCHEMA_NAME.equals(schema.name());
+        }
+        // Large-precision DECIMAL columns may be modeled as STRING in Flink CDC schema while
+        // Debezium still exposes them as Kafka Connect Decimal logical BYTES at runtime.
+        if (schema.type() == Schema.Type.BYTES && Decimal.LOGICAL_NAME.equals(schema.name())) {
+            Map<String, String> parameters = schema.parameters();
+            int scale =
+                    Optional.ofNullable(parameters)
+                            .map(p -> p.get(Decimal.SCALE_FIELD))
+                            .map(Integer::parseInt)
+                            .orElse(DecimalType.DEFAULT_SCALE);
+            int precision =
+                    Optional.ofNullable(parameters)
+                            .map(
+                                    p ->
+                                            p.get(
+                                                    DebeziumSchemaDataTypeInference
+                                                            .PRECISION_PARAMETER_KEY))
+                            .map(Integer::parseInt)
+                            .orElse(DebeziumSchemaDataTypeInference.DEFAULT_DECIMAL_PRECISION);
+            return precision > DecimalType.MAX_PRECISION || scale < 0 || scale > 36;
+        }
+        // Pipeline connectors may model geometry logical STRUCT payloads as STRING and render them
+        // to connector-specific JSON in their custom convertToString implementations.
+        return schema.type() == Schema.Type.STRUCT
+                && (Point.LOGICAL_NAME.equals(schema.name())
+                        || Geometry.LOGICAL_NAME.equals(schema.name())
+                        || Geography.LOGICAL_NAME.equals(schema.name()));
+    }
+
+    private static boolean isDecimalSchemaCompatible(DecimalType expectedType, Schema schema) {
+        if (schema.type() == Schema.Type.STRING || schema.type() == Schema.Type.FLOAT64) {
+            return true;
+        }
+        if (schema.type() == Schema.Type.STRUCT
+                && VariableScaleDecimal.LOGICAL_NAME.equals(schema.name())) {
+            return true;
+        }
+        if (schema.type() != Schema.Type.BYTES || !Decimal.LOGICAL_NAME.equals(schema.name())) {
+            return false;
+        }
+        Map<String, String> parameters = schema.parameters();
+        int scale =
+                Optional.ofNullable(parameters)
+                        .map(p -> p.get(Decimal.SCALE_FIELD))
+                        .map(Integer::parseInt)
+                        .orElse(DecimalType.DEFAULT_SCALE);
+        if (expectedType.getScale() != scale) {
+            return false;
+        }
+        String precision =
+                Optional.ofNullable(parameters)
+                        .map(p -> p.get(DebeziumSchemaDataTypeInference.PRECISION_PARAMETER_KEY))
+                        .orElse(null);
+        return precision == null || expectedType.getPrecision() == Integer.parseInt(precision);
+    }
+
+    private static boolean isDateSchemaCompatible(Schema schema) {
+        return schema.type() == Schema.Type.INT32
+                && (io.debezium.time.Date.SCHEMA_NAME.equals(schema.name())
+                        || org.apache.kafka.connect.data.Date.LOGICAL_NAME.equals(schema.name()));
+    }
+
+    private static boolean isTimeSchemaCompatible(Schema schema) {
+        if (schema.type() == Schema.Type.INT32) {
+            return io.debezium.time.Time.SCHEMA_NAME.equals(schema.name())
+                    || org.apache.kafka.connect.data.Time.LOGICAL_NAME.equals(schema.name());
+        }
+        if (schema.type() == Schema.Type.INT64) {
+            return MicroTime.SCHEMA_NAME.equals(schema.name())
+                    || NanoTime.SCHEMA_NAME.equals(schema.name());
+        }
+        return false;
+    }
+
+    private static boolean isTimestampSchemaCompatible(Schema schema) {
+        if (schema.type() != Schema.Type.INT64) {
+            return false;
+        }
+        return Timestamp.SCHEMA_NAME.equals(schema.name())
+                || MicroTimestamp.SCHEMA_NAME.equals(schema.name())
+                || NanoTimestamp.SCHEMA_NAME.equals(schema.name())
+                || org.apache.kafka.connect.data.Timestamp.LOGICAL_NAME.equals(schema.name());
+    }
+
+    private static boolean isLocalTimeZoneTimestampSchemaCompatible(Schema schema) {
+        return schema.type() == Schema.Type.STRING
+                && ZonedTimestamp.SCHEMA_NAME.equals(schema.name());
+    }
+
+    private static String formatCachedFieldMismatch(
+            String fieldPath, DataType expectedType, Schema actualSchema) {
+        return "Field '"
+                + fieldPath
+                + "' expects cached type "
+                + expectedType
+                + " but current record schema is "
+                + describeSchema(actualSchema)
+                + ".";
+    }
+
+    private static String describeSchema(Schema schema) {
+        return schema.name() == null
+                ? schema.type().name()
+                : schema.type().name() + "/" + schema.name();
     }
 
     private static Object convertField(
@@ -572,6 +909,9 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
     }
 
     public void applyChangeEvent(ChangeEvent changeEvent) {
+        if (!(changeEvent instanceof SchemaChangeEvent)) {
+            return;
+        }
         org.apache.flink.cdc.common.event.TableId flinkTableId = changeEvent.tableId();
 
         io.debezium.relational.TableId debeziumTableId =
@@ -580,6 +920,33 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
                         flinkTableId.getSchemaName(),
                         flinkTableId.getTableName());
 
-        createTableEventCache.put(debeziumTableId, (CreateTableEvent) changeEvent);
+        if (changeEvent instanceof DropTableEvent) {
+            createTableEventCache.remove(debeziumTableId);
+            return;
+        }
+
+        if (changeEvent instanceof CreateTableEvent) {
+            createTableEventCache.put(debeziumTableId, (CreateTableEvent) changeEvent);
+            return;
+        }
+
+        CreateTableEvent existing = createTableEventCache.get(debeziumTableId);
+        if (existing == null) {
+            return;
+        }
+
+        org.apache.flink.cdc.common.schema.Schema updatedSchema =
+                SchemaUtils.applySchemaChangeEvent(
+                        existing.getSchema(), (SchemaChangeEvent) changeEvent);
+        createTableEventCache.put(
+                debeziumTableId, new CreateTableEvent(existing.tableId(), updatedSchema));
+    }
+
+    private static final class CachedSchemaMismatchException extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+
+        private CachedSchemaMismatchException(String message) {
+            super(message);
+        }
     }
 }

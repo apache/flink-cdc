@@ -101,6 +101,8 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
                 BinlogOffset position = RecordUtils.getBinlogPosition(element);
                 splitState.asBinlogSplitState().setStartingOffset(position);
                 emitElement(element, output);
+            } else {
+                syncSchemaChangeToDeserializer(element);
             }
         } else if (RecordUtils.isDataChangeRecord(element)) {
             updateStartingOffsetForSplit(splitState, element);
@@ -133,6 +135,10 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
         outputCollector.output = output;
         outputCollector.currentMessageTimestamp = RecordUtils.getMessageTimestamp(element);
         debeziumDeserializationSchema.deserialize(element, outputCollector);
+    }
+
+    private void syncSchemaChangeToDeserializer(SourceRecord element) throws Exception {
+        debeziumDeserializationSchema.deserialize(element, new NoOpCollector<>());
     }
 
     public void applySplit(MySqlSplit split) {}
@@ -168,6 +174,18 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
                 // not be updated in the source operator in this case.
                 output.collect(record);
             }
+        }
+
+        @Override
+        public void close() {
+            // do nothing
+        }
+    }
+
+    private static class NoOpCollector<T> implements Collector<T> {
+        @Override
+        public void collect(T record) {
+            // Schema-change cache sync only; nothing to emit downstream.
         }
 
         @Override

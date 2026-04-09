@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.doris.sink;
 
 import org.apache.flink.cdc.common.data.ArrayData;
+import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.GenericArrayData;
 import org.apache.flink.cdc.common.data.GenericMapData;
 import org.apache.flink.cdc.common.data.MapData;
@@ -80,8 +81,17 @@ public class DorisRowConverter implements Serializable {
             case DECIMAL:
                 final int decimalPrecision = ((DecimalType) type).getPrecision();
                 final int decimalScale = ((DecimalType) type).getScale();
-                return (index, val) ->
-                        val.getDecimal(index, decimalPrecision, decimalScale).toBigDecimal();
+                return (index, val) -> {
+                    DecimalData decimal = val.getDecimal(index, decimalPrecision, decimalScale);
+                    if (decimal == null) {
+                        throw new IllegalStateException(
+                                String.format(
+                                        "Failed to serialize DECIMAL field at index %s with precision %s and scale %s. "
+                                                + "The internal decimal value is null, which usually indicates an upstream schema/value mismatch or decimal precision overflow.",
+                                        index, decimalPrecision, decimalScale));
+                    }
+                    return decimal.toBigDecimal();
+                };
             case TINYINT:
                 return (index, val) -> val.getByte(index);
             case SMALLINT:
@@ -117,9 +127,18 @@ public class DorisRowConverter implements Serializable {
                 final int zonedP = ((ZonedTimestampType) type).getPrecision();
                 return (index, val) -> val.getTimestamp(index, zonedP).toTimestamp();
             case TIME_WITHOUT_TIME_ZONE:
-                // Doris DDL maps TIME to STRING; JSON serialization also requires plain strings
-                // (Jackson's default ObjectMapper does not serialize java.time.LocalTime).
-                return (index, val) -> val.getTime(index).toLocalTime().toString();
+                return (index, val) -> {
+                    int precision = DataTypeChecks.getPrecision(type);
+                    if (precision == 0) {
+                        return val.getTime(index)
+                                .toLocalTime()
+                                .format(DorisEventSerializer.TIME_FORMATTER);
+                    } else {
+                        return val.getTime(index)
+                                .toLocalTime()
+                                .format(DorisEventSerializer.TIME_WITH_MILLISECOND_FORMATTER);
+                    }
+                };
             case ARRAY:
                 return (index, val) -> convertArrayData(val.getArray(index), type);
             case MAP:

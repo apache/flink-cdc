@@ -20,7 +20,10 @@ package org.apache.flink.cdc.connectors.oracle.source.reader;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.connector.source.SourceOutput;
 import org.apache.flink.api.connector.source.SourceReaderContext;
+import org.apache.flink.cdc.common.data.DecimalData;
+import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
+import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.connectors.base.source.meta.offset.Offset;
 import org.apache.flink.cdc.connectors.base.source.meta.offset.OffsetFactory;
@@ -28,11 +31,13 @@ import org.apache.flink.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SnapshotSplitState;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceRecords;
 import org.apache.flink.cdc.connectors.base.source.metrics.SourceReaderMetrics;
+import org.apache.flink.cdc.connectors.oracle.source.OracleEventDeserializer;
 import org.apache.flink.connector.testutils.source.reader.TestingReaderContext;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.Collector;
 
+import io.debezium.data.VariableScaleDecimal;
 import io.debezium.relational.TableId;
 import oracle.sql.ROWID;
 import org.apache.kafka.connect.data.Schema;
@@ -41,6 +46,7 @@ import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
 import java.sql.SQLException;
 import java.util.Collections;
 import java.util.HashMap;
@@ -99,6 +105,55 @@ class OraclePipelineRecordEmitterTest {
                 SourceRecords.fromSingleRecord(createDataChangeRecord(null)), output, splitState);
 
         assertThat(output.events).hasSize(1);
+    }
+
+    @Test
+    void testEmitterUsesCachedCreateTableSchemaForVariableScaleDecimal() throws Exception {
+        SourceReaderContext readerContext = new TestingReaderContext();
+        SourceReaderMetrics metrics = new SourceReaderMetrics(readerContext.metricGroup());
+        HashMap<TableId, CreateTableEvent> createTableEventCache = new HashMap<>();
+        createTableEventCache.put(
+                SOURCE_TABLE_ID,
+                new CreateTableEvent(
+                        org.apache.flink.cdc.common.event.TableId.tableId(
+                                SOURCE_TABLE_ID.schema(), SOURCE_TABLE_ID.table()),
+                        org.apache.flink.cdc.common.schema.Schema.newBuilder()
+                                .physicalColumn(
+                                        "ID",
+                                        org.apache.flink.cdc.common.types.DataTypes.DECIMAL(38, 0))
+                                .build()));
+
+        OraclePipelineRecordEmitter emitter =
+                new OraclePipelineRecordEmitter(
+                        new OracleEventDeserializer(
+                                org.apache.flink.cdc.debezium.table.DebeziumChangelogMode.ALL,
+                                false,
+                                Collections.emptyList()),
+                        metrics,
+                        false,
+                        new NoOpOffsetFactory(),
+                        null,
+                        createTableEventCache,
+                        new HashSet<>(Collections.singleton(SOURCE_TABLE_ID)),
+                        false);
+        SnapshotSplitState splitState = createSnapshotSplitState(null, null, false);
+        CollectingSourceOutput output = new CollectingSourceOutput();
+
+        emitter.emitRecord(
+                SourceRecords.fromSingleRecord(createVariableScaleDecimalRecord("1")),
+                output,
+                splitState);
+
+        assertThat(output.events).hasSize(1);
+        assertThat(output.events.get(0)).isInstanceOf(DataChangeEvent.class);
+
+        DataChangeEvent event = (DataChangeEvent) output.events.get(0);
+        RecordData.FieldGetter fieldGetter =
+                RecordData.createFieldGetter(
+                        org.apache.flink.cdc.common.types.DataTypes.DECIMAL(38, 0), 0);
+        DecimalData decimal = (DecimalData) fieldGetter.getFieldOrNull(event.after());
+
+        assertThat(decimal.toBigDecimal()).isEqualByComparingTo(BigDecimal.ONE);
     }
 
     @Test
@@ -222,6 +277,52 @@ class OraclePipelineRecordEmitterTest {
                 null,
                 valueSchema,
                 value);
+    }
+
+    private SourceRecord createVariableScaleDecimalRecord(String value) {
+        Schema sourceSchema =
+                SchemaBuilder.struct()
+                        .field(DATABASE_NAME_KEY, Schema.STRING_SCHEMA)
+                        .field(SCHEMA_NAME_KEY, Schema.STRING_SCHEMA)
+                        .field(TABLE_NAME_KEY, Schema.STRING_SCHEMA)
+                        .build();
+        Schema rowSchema =
+                SchemaBuilder.struct()
+                        .field("ID", VariableScaleDecimal.schema())
+                        .optional()
+                        .build();
+        Schema valueSchema =
+                SchemaBuilder.struct()
+                        .field("op", Schema.STRING_SCHEMA)
+                        .field("source", sourceSchema)
+                        .field("after", rowSchema)
+                        .build();
+
+        Struct row =
+                new Struct(rowSchema)
+                        .put(
+                                "ID",
+                                VariableScaleDecimal.fromLogical(
+                                        VariableScaleDecimal.schema(), new BigDecimal(value)));
+        Struct payload =
+                new Struct(valueSchema)
+                        .put("op", "r")
+                        .put(
+                                "source",
+                                new Struct(sourceSchema)
+                                        .put(DATABASE_NAME_KEY, SOURCE_TABLE_ID.catalog())
+                                        .put(SCHEMA_NAME_KEY, SOURCE_TABLE_ID.schema())
+                                        .put(TABLE_NAME_KEY, SOURCE_TABLE_ID.table()))
+                        .put("after", row);
+
+        return new SourceRecord(
+                Collections.singletonMap("server", "oracle"),
+                Collections.emptyMap(),
+                TABLE_TOPIC,
+                null,
+                null,
+                valueSchema,
+                payload);
     }
 
     private static class TestEventDeserializer

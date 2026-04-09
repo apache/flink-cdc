@@ -33,6 +33,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 
+import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -114,7 +115,7 @@ public class OracleSchemaUtils {
         final List<TableId> tableIds = new ArrayList<>();
         jdbc.query(
                 "SELECT table_name FROM all_tables WHERE owner ='" + schemaName.toUpperCase() + "'",
-                statementFactory -> statementFactory.createStatement(),
+                Connection::createStatement,
                 rs -> {
                     while (rs.next()) {
                         tableIds.add(
@@ -131,9 +132,9 @@ public class OracleSchemaUtils {
         try {
             // fetch table schemas
             JdbcConnection jdbc = createOracleConnection(sourceConfig);
-            OracleSchema oracleSchema = new OracleSchema();
+            OracleSchema schemaReader = new OracleSchema();
             TableChanges.TableChange tableSchema =
-                    oracleSchema.getTableSchema(jdbc, toDbzTableId(tableId));
+                    schemaReader.getTableSchema(jdbc, toDbzTableId(tableId));
             return toSchema(tableSchema.getTable());
         } catch (Exception e) {
             throw new RuntimeException("Error to get table schema: " + e.getMessage(), e);
@@ -174,17 +175,16 @@ public class OracleSchemaUtils {
 
     public static Schema getSchema(
             JdbcConnection jdbcConnection, io.debezium.relational.TableId tableId) {
-        OracleDialect dialect = new OracleDialect();
-        TableChanges.TableChange currentSchema = dialect.queryTableSchema(jdbcConnection, tableId);
+        OracleSchema schemaReader = new OracleSchema();
+        TableChanges.TableChange currentSchema =
+                schemaReader.getTableSchema(jdbcConnection, tableId);
         Table table = Objects.requireNonNull(currentSchema).getTable();
         List<io.debezium.relational.Column> columns = table.columns();
         List<String> pks = getTablePks(jdbcConnection, tableId);
-        List<org.apache.flink.cdc.common.schema.Column> list = new ArrayList<>();
+        List<Column> list = new ArrayList<>();
         for (io.debezium.relational.Column column : columns) {
             DataType dataType = OracleTypeUtils.fromDbzColumn(column);
-            org.apache.flink.cdc.common.schema.Column cdcColumn =
-                    org.apache.flink.cdc.common.schema.Column.physicalColumn(
-                            removeQuotes(column.name()), dataType);
+            Column cdcColumn = Column.physicalColumn(removeQuotes(column.name()), dataType);
             list.add(cdcColumn);
         }
         return Schema.newBuilder().setColumns(list).primaryKey(pks).build();

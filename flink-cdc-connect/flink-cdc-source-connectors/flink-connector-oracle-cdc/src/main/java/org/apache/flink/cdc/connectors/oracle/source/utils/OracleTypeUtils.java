@@ -24,6 +24,7 @@ import io.debezium.relational.Column;
 import oracle.jdbc.OracleTypes;
 
 import java.sql.Types;
+import java.util.Locale;
 
 /** Utilities for converting from oracle types to Flink types. */
 public class OracleTypeUtils {
@@ -43,11 +44,14 @@ public class OracleTypeUtils {
      * be true, copy from io.debezium.connector.oracle.OracleValueConverters#converte.
      */
     private static DataType convertFromColumn(Column column) {
+        String normalizedTypeName = normalizeTypeName(column.typeName());
+
         switch (column.jdbcType()) {
             case Types.CHAR:
             case Types.VARCHAR:
             case Types.NCHAR:
             case Types.NVARCHAR:
+            case Types.OTHER:
             case Types.STRUCT:
             case Types.CLOB:
                 return DataTypes.STRING();
@@ -66,16 +70,16 @@ public class OracleTypeUtils {
                 return DataTypes.DOUBLE();
             case Types.NUMERIC:
             case Types.DECIMAL:
-                return DataTypes.DECIMAL(column.length(), column.scale().orElse(0));
+                return mappingNumberType(column.length(), column.scale().orElse(0));
             case Types.DATE:
-                return DataTypes.DATE();
+                return DataTypes.TIMESTAMP();
             case Types.TIMESTAMP:
+                return mappingTimestampType(normalizedTypeName, column.length());
             case Types.TIMESTAMP_WITH_TIMEZONE:
             case OracleTypes.TIMESTAMPTZ:
+                return mappingTimestampWithTimeZoneType(normalizedTypeName, column.length());
             case OracleTypes.TIMESTAMPLTZ:
-                return column.length() >= 0
-                        ? DataTypes.TIMESTAMP(column.length())
-                        : DataTypes.TIMESTAMP();
+                return mappingTimestampLtzType(normalizedTypeName, column.length());
             case OracleTypes.INTERVALYM:
                 return DataTypes.INTERVAL(DataTypes.YEAR(), DataTypes.MONTH());
             case OracleTypes.INTERVALDS:
@@ -88,5 +92,101 @@ public class OracleTypeUtils {
                                 "Don't support Oracle type '%s' yet, jdbcType:'%s'.",
                                 column.typeName(), column.jdbcType()));
         }
+    }
+
+    private static DataType mappingNumberType(int precision, int scale) {
+        if (precision == 1 && scale == 0) {
+            return DataTypes.BOOLEAN();
+        }
+
+        if (precision <= 0) {
+            int normalizedScale = Math.max(0, scale);
+            return DataTypes.DECIMAL(38, Math.min(normalizedScale, 38));
+        }
+
+        if (scale <= 0) {
+            int integerDigits = precision - scale;
+            if (integerDigits <= 0) {
+                return DataTypes.DECIMAL(precision, 0);
+            }
+            if (integerDigits < 3) {
+                return DataTypes.TINYINT();
+            }
+            if (integerDigits < 5) {
+                return DataTypes.SMALLINT();
+            }
+            if (integerDigits < 10) {
+                return DataTypes.INT();
+            }
+            if (integerDigits < 19) {
+                return DataTypes.BIGINT();
+            }
+            if (integerDigits <= 38) {
+                return DataTypes.DECIMAL(integerDigits, 0);
+            }
+            return DataTypes.STRING();
+        }
+
+        if (precision > 38) {
+            return DataTypes.STRING();
+        }
+        if (scale > precision) {
+            return DataTypes.DECIMAL(precision, precision);
+        }
+        return DataTypes.DECIMAL(precision, scale);
+    }
+
+    private static DataType mappingTimestampType(String normalizedType, int fallbackPrecision) {
+        Integer precision = resolveTemporalPrecision(normalizedType, fallbackPrecision);
+        return precision == null ? DataTypes.TIMESTAMP() : DataTypes.TIMESTAMP(precision);
+    }
+
+    private static DataType mappingTimestampWithTimeZoneType(
+            String normalizedType, int fallbackPrecision) {
+        Integer precision = resolveTemporalPrecision(normalizedType, fallbackPrecision);
+        return precision == null
+                ? DataTypes.TIMESTAMP_WITH_TIME_ZONE()
+                : DataTypes.TIMESTAMP_WITH_TIME_ZONE(precision);
+    }
+
+    private static DataType mappingTimestampLtzType(String normalizedType, int fallbackPrecision) {
+        Integer precision = resolveTemporalPrecision(normalizedType, fallbackPrecision);
+        return precision == null ? DataTypes.TIMESTAMP_LTZ() : DataTypes.TIMESTAMP_LTZ(precision);
+    }
+
+    private static Integer resolveTemporalPrecision(String normalizedType, int fallbackPrecision) {
+        Integer precisionFromType = extractFirstBracketNumber(normalizedType);
+        if (precisionFromType != null && precisionFromType >= 0 && precisionFromType <= 9) {
+            return precisionFromType;
+        }
+        if (fallbackPrecision >= 0 && fallbackPrecision <= 9) {
+            return fallbackPrecision;
+        }
+        return null;
+    }
+
+    private static Integer extractFirstBracketNumber(String input) {
+        int start = input.indexOf("(");
+        int end = input.indexOf(")", start + 1);
+        if (start == -1 || end == -1 || end <= start + 1) {
+            return null;
+        }
+
+        String content = input.substring(start + 1, end).trim();
+        int comma = content.indexOf(',');
+        if (comma >= 0) {
+            content = content.substring(0, comma).trim();
+        }
+        if (!content.matches("\\d+")) {
+            return null;
+        }
+        return Integer.parseInt(content);
+    }
+
+    private static String normalizeTypeName(String typeName) {
+        if (typeName == null) {
+            return "";
+        }
+        return typeName.toUpperCase(Locale.ROOT).trim().replaceAll("\\s+", " ");
     }
 }

@@ -31,10 +31,15 @@ import org.apache.flink.util.Collector;
 
 import io.debezium.config.Configuration;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
+import io.debezium.document.DocumentWriter;
 import io.debezium.heartbeat.Heartbeat;
 import io.debezium.heartbeat.HeartbeatFactory;
 import io.debezium.jdbc.JdbcConfiguration;
+import io.debezium.relational.Column;
+import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
+import io.debezium.relational.history.HistoryRecord;
+import io.debezium.relational.history.TableChanges;
 import io.debezium.schema.TopicSelector;
 import io.debezium.util.SchemaNameAdjuster;
 import org.apache.kafka.connect.data.Schema;
@@ -51,9 +56,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static io.debezium.config.CommonConnectorConfig.TRANSACTION_TOPIC;
 import static io.debezium.connector.mysql.MySqlConnectorConfig.SERVER_NAME;
+import static java.sql.Types.INTEGER;
+import static org.apache.flink.cdc.connectors.mysql.debezium.dispatcher.EventDispatcherImpl.HISTORY_RECORD_FIELD;
 
 /** Unit test for {@link org.apache.flink.cdc.connectors.mysql.source.reader.MySqlRecordEmitter}. */
 class MySqlRecordEmitterTest {
+
+    private static final DocumentWriter DOCUMENT_WRITER = DocumentWriter.defaultWriter();
 
     @Test
     void testHeartbeatEventHandling() throws Exception {
@@ -337,6 +346,40 @@ class MySqlRecordEmitterTest {
         Assertions.assertThat(readerOutput.getEmittedRecords()).hasSize(1);
     }
 
+    @Test
+    void testSchemaChangeRecordsStillSyncDeserializerWhenEmissionDisabled() throws Exception {
+        AtomicInteger deserializeCalls = new AtomicInteger(0);
+        MySqlRecordEmitter<String> recordEmitter =
+                new MySqlRecordEmitter<>(
+                        new DebeziumDeserializationSchema<String>() {
+                            @Override
+                            public void deserialize(SourceRecord record, Collector<String> out) {
+                                deserializeCalls.incrementAndGet();
+                                out.collect("schema-change");
+                            }
+
+                            @Override
+                            public TypeInformation<String> getProducedType() {
+                                return TypeInformation.of(String.class);
+                            }
+                        },
+                        new MySqlSourceReaderMetrics(
+                                UnregisteredMetricGroups.createUnregisteredOperatorMetricGroup()),
+                        false,
+                        false,
+                        false);
+        MySqlBinlogSplitState splitState = createBinlogSplitState();
+        TestingReaderOutput<String> readerOutput = new TestingReaderOutput<>();
+
+        recordEmitter.emitRecord(
+                SourceRecords.fromSingleRecord(createSchemaChangeEvent(600L)),
+                readerOutput,
+                splitState);
+
+        Assertions.assertThat(deserializeCalls.get()).isEqualTo(1);
+        Assertions.assertThat(readerOutput.getEmittedRecords()).isEmpty();
+    }
+
     private MySqlBinlogSplitState createBinlogSplitState() {
         return new MySqlBinlogSplitState(
                 new MySqlBinlogSplit(
@@ -344,7 +387,7 @@ class MySqlRecordEmitterTest {
                         BinlogOffset.ofEarliest(),
                         BinlogOffset.ofNonStopping(),
                         Collections.emptyList(),
-                        Collections.emptyMap(),
+                        new HashMap<>(),
                         0));
     }
 
@@ -448,6 +491,61 @@ class MySqlRecordEmitterTest {
                 Collections.singletonMap("server", "mysql"),
                 offset,
                 topicName,
+                keySchema,
+                key,
+                valueSchema,
+                value);
+    }
+
+    private SourceRecord createSchemaChangeEvent(long position) throws Exception {
+        io.debezium.relational.TableId tableId =
+                new io.debezium.relational.TableId(null, "test_db", "customers");
+        Table table =
+                Table.editor()
+                        .tableId(tableId)
+                        .addColumn(
+                                Column.editor()
+                                        .name("id")
+                                        .jdbcType(INTEGER)
+                                        .type("INT", "INT")
+                                        .position(1)
+                                        .optional(false)
+                                        .create())
+                        .setPrimaryKeyNames(Collections.singletonList("id"))
+                        .create();
+        TableChanges tableChanges = new TableChanges();
+        tableChanges.create(table);
+
+        HistoryRecord historyRecord =
+                new HistoryRecord(
+                        Collections.singletonMap("file", "mysql-bin.000001"),
+                        Collections.singletonMap("file", "mysql-bin.000001"),
+                        "test_db",
+                        null,
+                        "CREATE TABLE customers (id INT PRIMARY KEY)",
+                        tableChanges);
+
+        Schema keySchema =
+                SchemaBuilder.struct()
+                        .name(RecordUtils.SCHEMA_CHANGE_EVENT_KEY_NAME)
+                        .field(HistoryRecord.Fields.DATABASE_NAME, Schema.STRING_SCHEMA)
+                        .build();
+        Struct key = new Struct(keySchema).put(HistoryRecord.Fields.DATABASE_NAME, "test_db");
+
+        Schema valueSchema =
+                SchemaBuilder.struct().field(HISTORY_RECORD_FIELD, Schema.STRING_SCHEMA).build();
+        Struct value =
+                new Struct(valueSchema)
+                        .put(HISTORY_RECORD_FIELD, DOCUMENT_WRITER.write(historyRecord.document()));
+
+        Map<String, Object> offset = new HashMap<>();
+        offset.put("file", "mysql-bin.000001");
+        offset.put("pos", position);
+
+        return new SourceRecord(
+                Collections.singletonMap("server", "mysql"),
+                offset,
+                "mysql.schema_change",
                 keySchema,
                 key,
                 valueSchema,

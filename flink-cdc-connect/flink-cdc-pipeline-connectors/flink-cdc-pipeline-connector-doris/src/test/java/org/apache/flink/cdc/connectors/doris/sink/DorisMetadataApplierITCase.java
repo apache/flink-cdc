@@ -37,6 +37,7 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
+import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.composer.definition.SinkDef;
 import org.apache.flink.cdc.composer.flink.coordination.OperatorIDGenerator;
 import org.apache.flink.cdc.composer.flink.translator.DataSinkTranslator;
@@ -686,7 +687,135 @@ class DorisMetadataApplierITCase extends DorisSinkTestBase {
         assertEqualsInOrder(expected, actual);
     }
 
+    @ParameterizedTest(name = "batchMode: {0}")
+    @ValueSource(booleans = {true, false})
+    void testDorisJsonFormatSyncsMixedCasePhysicalColumns(boolean batchMode) throws Exception {
+        TableId tableId =
+                TableId.tableId(DorisContainer.DORIS_DATABASE_NAME, "mixed_case_json_columns");
+
+        Schema schema =
+                Schema.newBuilder()
+                        .column(new PhysicalColumn("ID", DataTypes.INT().notNull(), null))
+                        .column(new PhysicalColumn("deploy_mode", DataTypes.TINYINT(), null))
+                        .primaryKey("ID")
+                        .build();
+
+        List<Event> events =
+                Arrays.asList(
+                        new CreateTableEvent(tableId, schema),
+                        DataChangeEvent.insertEvent(tableId, generate(schema, 1, (byte) 2)));
+
+        Configuration extraConfig =
+                Configuration.fromMap(Collections.singletonMap("sink.properties.format", "json"));
+        runJobWithEvents(events, batchMode, extraConfig);
+
+        List<String> actualSchema = inspectTableSchema(tableId);
+        List<String> expectedSchema =
+                Arrays.asList(
+                        "ID | INT | Yes | true | null",
+                        "deploy_mode | TINYINT | Yes | false | null");
+        assertEqualsInOrder(expectedSchema, actualSchema);
+
+        waitAndVerify(
+                tableId,
+                2,
+                Collections.singletonList("1 | 2"),
+                DATABASE_OPERATION_TIMEOUT_SECONDS * 1000L);
+    }
+
+    @ParameterizedTest(name = "batchMode: {0}")
+    @ValueSource(booleans = {true, false})
+    void testDorisJsonFormatSyncsUpperCaseColumns(boolean batchMode) throws Exception {
+        TableId tableId =
+                TableId.tableId(DorisContainer.DORIS_DATABASE_NAME, "upper_case_json_columns");
+
+        Schema schema =
+                Schema.newBuilder()
+                        .column(new PhysicalColumn("ID", DataTypes.INT().notNull(), null))
+                        .column(new PhysicalColumn("DEPLOY_MODE", DataTypes.TINYINT(), null))
+                        .primaryKey("ID")
+                        .build();
+
+        List<Event> events =
+                Arrays.asList(
+                        new CreateTableEvent(tableId, schema),
+                        DataChangeEvent.insertEvent(tableId, generate(schema, 1, (byte) 2)));
+
+        Configuration extraConfig =
+                Configuration.fromMap(Collections.singletonMap("sink.properties.format", "json"));
+        runJobWithEvents(events, batchMode, extraConfig);
+
+        List<String> actualSchema = inspectTableSchema(tableId);
+        List<String> expectedSchema =
+                Arrays.asList(
+                        "ID | INT | Yes | true | null",
+                        "DEPLOY_MODE | TINYINT | Yes | false | null");
+        assertEqualsInOrder(expectedSchema, actualSchema);
+
+        waitAndVerify(
+                tableId,
+                2,
+                Collections.singletonList("1 | 2"),
+                DATABASE_OPERATION_TIMEOUT_SECONDS * 1000L);
+    }
+
+    @ParameterizedTest(name = "batchMode: {0}")
+    @ValueSource(booleans = {true, false})
+    void testDorisJsonFormatHandlesLateEventsAfterAddColumn(boolean batchMode) throws Exception {
+        TableId tableId =
+                TableId.tableId(DorisContainer.DORIS_DATABASE_NAME, "json_late_schema_events");
+
+        Schema baseSchema =
+                Schema.newBuilder()
+                        .column(new PhysicalColumn("id", DataTypes.INT().notNull(), null))
+                        .column(new PhysicalColumn("name", DataTypes.VARCHAR(17), null))
+                        .primaryKey("id")
+                        .build();
+        BinaryRecordData baseRecord = generate(baseSchema, 1, "Alice");
+
+        AddColumnEvent addColumnEvent =
+                new AddColumnEvent(
+                        tableId,
+                        Collections.singletonList(
+                                AddColumnEvent.last(
+                                        new PhysicalColumn("age", DataTypes.INT(), null))));
+        Schema evolvedSchema = SchemaUtils.applySchemaChangeEvent(baseSchema, addColumnEvent);
+        BinaryRecordData evolvedRecord = generate(evolvedSchema, 2, "Bob", 18);
+
+        List<Event> events =
+                Arrays.asList(
+                        new CreateTableEvent(tableId, baseSchema),
+                        DataChangeEvent.insertEvent(tableId, baseRecord),
+                        addColumnEvent,
+                        // Simulate a late event that still uses the pre-add-column schema.
+                        DataChangeEvent.insertEvent(tableId, generate(baseSchema, 3, "Carol")),
+                        DataChangeEvent.insertEvent(tableId, evolvedRecord));
+
+        Configuration extraConfig =
+                Configuration.fromMap(Collections.singletonMap("sink.properties.format", "json"));
+        runJobWithEvents(events, batchMode, extraConfig);
+
+        List<String> actualSchema = inspectTableSchema(tableId);
+        List<String> expectedSchema =
+                Arrays.asList(
+                        "id | INT | Yes | true | null",
+                        "name | VARCHAR(51) | Yes | false | null",
+                        "age | INT | Yes | false | null");
+        assertEqualsInOrder(expectedSchema, actualSchema);
+
+        waitAndVerify(
+                tableId,
+                3,
+                Arrays.asList("1 | Alice | null", "2 | Bob | 18", "3 | Carol | null"),
+                DATABASE_OPERATION_TIMEOUT_SECONDS * 1000L);
+    }
+
     private void runJobWithEvents(List<Event> events, boolean batchMode) throws Exception {
+        runJobWithEvents(events, batchMode, new Configuration());
+    }
+
+    private void runJobWithEvents(List<Event> events, boolean batchMode, Configuration extraConfig)
+            throws Exception {
         DataStream<Event> stream = env.fromData(events, new EventTypeInfo()).setParallelism(1);
 
         Configuration config =
@@ -701,6 +830,7 @@ class DorisMetadataApplierITCase extends DorisSinkTestBase {
         config.addAll(
                 Configuration.fromMap(
                         Collections.singletonMap("table.create.properties.replication_num", "1")));
+        config.addAll(extraConfig);
 
         DataSink dorisSink = createDorisDataSink(config);
 
@@ -753,8 +883,10 @@ class DorisMetadataApplierITCase extends DorisSinkTestBase {
             TableId tableId, int numberOfColumns, List<String> expected, long timeoutMilliseconds)
             throws Exception {
         long timeout = System.currentTimeMillis() + timeoutMilliseconds;
+        List<String> lastActual = Collections.emptyList();
         while (System.currentTimeMillis() < timeout) {
             List<String> actual = fetchTableContent(tableId, numberOfColumns);
+            lastActual = actual;
             if (expected.stream()
                     .sorted()
                     .collect(Collectors.toList())
@@ -768,6 +900,9 @@ class DorisMetadataApplierITCase extends DorisSinkTestBase {
                     actual);
             Thread.sleep(1000L);
         }
-        Assertions.fail("Failed to verify content of {}.", tableId);
+        Assertions.fail(
+                String.format(
+                        "Failed to verify content of %s. Expected: %s Actual: %s",
+                        tableId, expected, lastActual));
     }
 }

@@ -252,10 +252,10 @@ public interface RecordData {
             default:
                 throw new IllegalArgumentException();
         }
-        if (!fieldType.isNullable()) {
-            return fieldGetter;
-        }
         return row -> {
+            // Actual row contents are the source of truth for nullability at runtime. Schema-level
+            // NOT NULL constraints are not sufficient to skip the null-bit check because legacy or
+            // malformed upstream rows may still contain nulls.
             if (row.isNullAt(fieldPos)) {
                 return null;
             }

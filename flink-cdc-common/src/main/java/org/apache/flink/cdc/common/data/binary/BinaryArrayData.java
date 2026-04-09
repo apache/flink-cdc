@@ -249,6 +249,9 @@ public final class BinaryArrayData extends BinarySection implements ArrayData {
     @Override
     public DecimalData getDecimal(int pos, int precision, int scale) {
         assertIndexIsValid(pos);
+        if (isNullAt(pos)) {
+            return null;
+        }
         if (DecimalData.isCompact(precision)) {
             return DecimalData.fromUnscaledLong(
                     BinarySegmentUtils.getLong(segments, getElementOffset(pos, 8)),

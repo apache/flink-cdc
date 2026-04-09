@@ -20,6 +20,7 @@ package org.apache.flink.cdc.connectors.doris.utils;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.types.DataType;
@@ -31,6 +32,7 @@ import org.apache.flink.cdc.common.utils.StringUtils;
 import org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions;
 
 import java.util.Map;
+import java.util.Optional;
 
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.TABLE_CREATE_AUTO_PARTITION_PROPERTIES_PREFIX;
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.TABLE_CREATE_DEFAULT_PARTITION_KEY;
@@ -77,7 +79,8 @@ public class DorisSchemaUtils {
                         tableId,
                         TABLE_CREATE_PARTITION_KEY,
                         TABLE_CREATE_DEFAULT_PARTITION_KEY);
-        if (partitionKey == null || !schema.getColumn(partitionKey).isPresent()) {
+        Optional<Column> partitionColumn = getColumnCaseInsensitive(schema, partitionKey);
+        if (!partitionColumn.isPresent()) {
             return null;
         }
 
@@ -91,8 +94,23 @@ public class DorisSchemaUtils {
             return null;
         }
 
-        DataType dataType = schema.getColumn(partitionKey).get().getType();
-        return isValidDataType(dataType) ? new Tuple2<>(partitionKey, partitionUnit) : null;
+        DataType dataType = partitionColumn.get().getType();
+        return isValidDataType(dataType)
+                ? new Tuple2<>(partitionColumn.get().getName(), partitionUnit)
+                : null;
+    }
+
+    public static Optional<Column> getColumnCaseInsensitive(Schema schema, String columnName) {
+        if (columnName == null) {
+            return Optional.empty();
+        }
+        Optional<Column> exactMatch = schema.getColumn(columnName);
+        if (exactMatch.isPresent()) {
+            return exactMatch;
+        }
+        return schema.getColumns().stream()
+                .filter(column -> column.getName().equalsIgnoreCase(columnName))
+                .findFirst();
     }
 
     private static boolean isExcluded(Map<String, String> properties, TableId tableId) {

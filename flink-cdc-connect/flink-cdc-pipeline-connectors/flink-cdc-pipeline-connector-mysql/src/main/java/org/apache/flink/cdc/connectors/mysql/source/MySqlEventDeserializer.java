@@ -23,6 +23,7 @@ import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.connectors.mysql.source.parser.CustomMySqlAntlrDdlParser;
 import org.apache.flink.cdc.connectors.mysql.table.MySqlReadableMetadata;
+import org.apache.flink.cdc.connectors.mysql.utils.MySqlSchemaUtils;
 import org.apache.flink.cdc.debezium.event.DebeziumEventDeserializationSchema;
 import org.apache.flink.cdc.debezium.table.DebeziumChangelogMode;
 import org.apache.flink.table.data.TimestampData;
@@ -42,7 +43,6 @@ import org.apache.kafka.connect.source.SourceRecord;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -104,29 +104,25 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
 
     @Override
     protected List<SchemaChangeEvent> deserializeSchemaChangeRecord(SourceRecord record) {
-        if (includeSchemaChanges) {
-            if (customParser == null) {
-                customParser =
-                        new CustomMySqlAntlrDdlParser(
-                                includeComments, tinyInt1isBit, isTableIdCaseInsensitive);
-                tables = new Tables();
-            }
-
-            try {
-                HistoryRecord historyRecord = getHistoryRecord(record);
-
-                String databaseName =
-                        historyRecord.document().getString(HistoryRecord.Fields.DATABASE_NAME);
-                String ddl =
-                        historyRecord.document().getString(HistoryRecord.Fields.DDL_STATEMENTS);
-                customParser.setCurrentDatabase(databaseName);
-                customParser.parse(ddl, tables);
-                return customParser.getAndClearParsedEvents();
-            } catch (IOException e) {
-                throw new IllegalStateException("Failed to parse the schema change : " + record, e);
-            }
+        if (customParser == null) {
+            customParser =
+                    new CustomMySqlAntlrDdlParser(
+                            includeComments, tinyInt1isBit, isTableIdCaseInsensitive);
+            tables = new Tables();
         }
-        return Collections.emptyList();
+
+        try {
+            HistoryRecord historyRecord = getHistoryRecord(record);
+
+            String databaseName =
+                    historyRecord.document().getString(HistoryRecord.Fields.DATABASE_NAME);
+            String ddl = historyRecord.document().getString(HistoryRecord.Fields.DDL_STATEMENTS);
+            customParser.setCurrentDatabase(databaseName);
+            customParser.parse(ddl, tables);
+            return customParser.getAndClearParsedEvents();
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to parse the schema change : " + record, e);
+        }
     }
 
     @Override
@@ -151,7 +147,7 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
         Struct source = value.getStruct(Envelope.FieldName.SOURCE);
         String dbName = source.getString(DATABASE_NAME_KEY);
         String tableName = source.getString(TABLE_NAME_KEY);
-        return TableId.tableId(dbName, tableName);
+        return MySqlSchemaUtils.toCdcTableId(dbName, tableName, isTableIdCaseInsensitive);
     }
 
     @Override
@@ -199,7 +195,7 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
                         String.format("Failed to convert %s to geometry JSON.", dbzObj), e);
             }
         } else {
-            return BinaryStringData.fromString(dbzObj.toString());
+            return super.convertToString(dbzObj, schema);
         }
     }
 }

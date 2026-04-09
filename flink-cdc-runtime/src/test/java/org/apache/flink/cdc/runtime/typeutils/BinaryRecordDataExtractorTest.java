@@ -190,4 +190,37 @@ public class BinaryRecordDataExtractorTest {
                         "{id: INT NOT NULL -> 0, bool_col: BOOLEAN -> null, tinyint_col: TINYINT -> null, smallint_col: SMALLINT -> null, int_col: INT -> null, bigint_col: BIGINT -> null, float_col: FLOAT -> null, double_col: DOUBLE -> null, decimal_col: DECIMAL(17, 10) -> null, char_col: CHAR(17) -> null, varchar_col: VARCHAR(17) -> null, bin_col: BINARY(17) -> null, varbin_col: VARBINARY(17) -> null, date_col: DATE -> null, time_col: TIME(9) -> null, ts_col: TIMESTAMP(3) -> null, ts_tz_col: TIMESTAMP(3) WITH TIME ZONE -> null, ts_ltz_col: TIMESTAMP_LTZ(3) -> null, array_col: ARRAY<STRING> -> null, map_col: MAP<INT, STRING> -> null, row_col: ROW<`f0` INT, `f1` DOUBLE> -> null}",
                         "null");
     }
+
+    @Test
+    void testConvertingUnexpectedRuntimeNullInNotNullDecimalColumn() {
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.DECIMAL(20, 0).notNull())
+                        .physicalColumn("payload", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(schema.getColumnDataTypes().toArray(new DataType[0]));
+
+        RecordData recordData =
+                generator.generate(new Object[] {null, BinaryStringData.fromString("payload")});
+
+        Assertions.assertThat(BinaryRecordDataExtractor.extractRecord(recordData, schema))
+                .isEqualTo("{id: DECIMAL(20, 0) NOT NULL -> null, payload: STRING -> payload}");
+    }
+
+    @Test
+    void testDirectDecimalAccessorReturnsNullForRuntimeNullField() {
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.DECIMAL(20, 0).notNull())
+                        .build();
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(schema.getColumnDataTypes().toArray(new DataType[0]));
+
+        RecordData recordData = generator.generate(new Object[] {null});
+
+        Assertions.assertThat(recordData.isNullAt(0)).isTrue();
+        Assertions.assertThat(recordData.getDecimal(0, 20, 0)).isNull();
+    }
 }

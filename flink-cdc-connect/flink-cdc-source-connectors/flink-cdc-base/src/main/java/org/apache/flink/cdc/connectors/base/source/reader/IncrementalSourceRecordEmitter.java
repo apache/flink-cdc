@@ -109,6 +109,8 @@ public class IncrementalSourceRecordEmitter<T>
             }
             if (includeSchemaChanges) {
                 emitElement(element, output);
+            } else {
+                syncSchemaChangeToDeserializer(element);
             }
         } else if (isDataChangeRecord(element)) {
             LOG.trace("Process DataChangeRecord: {}; splitState = {}", element, splitState);
@@ -165,6 +167,10 @@ public class IncrementalSourceRecordEmitter<T>
         debeziumDeserializationSchema.deserialize(element, outputCollector);
     }
 
+    protected void syncSchemaChangeToDeserializer(SourceRecord element) throws Exception {
+        debeziumDeserializationSchema.deserialize(element, new NoOpCollector<>());
+    }
+
     /** Called when a new split is assigned. Subclasses may override for split-specific setup. */
     public void applySplit(SourceSplitBase split) {}
 
@@ -198,6 +204,18 @@ public class IncrementalSourceRecordEmitter<T>
                 // not be updated in the source operator in this case.
                 output.collect(record);
             }
+        }
+
+        @Override
+        public void close() {
+            // do nothing
+        }
+    }
+
+    protected static class NoOpCollector<T> implements Collector<T> {
+        @Override
+        public void collect(T record) {
+            // Schema-change cache sync only; nothing to emit downstream.
         }
 
         @Override

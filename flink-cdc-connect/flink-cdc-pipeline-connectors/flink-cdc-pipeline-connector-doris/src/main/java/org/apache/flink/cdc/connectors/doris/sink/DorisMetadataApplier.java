@@ -417,12 +417,13 @@ public class DorisMetadataApplier implements MetadataApplier {
             throw new IllegalStateException(
                     "existedColumnName could not be null for " + columnWithPosition.getPosition());
         }
-        if (!currentSchema.getColumn(existedColumnName).isPresent()) {
-            throw new IllegalStateException(
-                    existedColumnName
-                            + " of AddColumnEvent is not existed in current Doris schema cache");
-        }
-        return existedColumnName;
+        return DorisSchemaUtils.getColumnCaseInsensitive(currentSchema, existedColumnName)
+                .map(Column::getName)
+                .orElseThrow(
+                        () ->
+                                new IllegalStateException(
+                                        existedColumnName
+                                                + " of AddColumnEvent is not existed in current Doris schema cache"));
     }
 
     private String convertInvalidTimestampDefaultValue(String defaultValue, DataType dataType) {

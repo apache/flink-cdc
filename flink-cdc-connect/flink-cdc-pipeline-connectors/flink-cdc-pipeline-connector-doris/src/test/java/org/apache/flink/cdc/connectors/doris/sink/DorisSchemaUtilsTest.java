@@ -180,6 +180,27 @@ public class DorisSchemaUtilsTest {
     }
 
     @Test
+    public void testPartitionInfoResolvesConfiguredColumnNameCaseInsensitively() {
+        Map<String, String> map = new HashMap<>();
+        map.put(TABLE_CREATE_AUTO_PARTITION_PROPERTIES_DEFAULT_PARTITION_KEY, "create_time");
+        map.put(TABLE_CREATE_AUTO_PARTITION_PROPERTIES_DEFAULT_PARTITION_UNIT, "year");
+
+        Configuration config = Configuration.fromMap(map);
+        Schema schema =
+                Schema.newBuilder()
+                        .column(new PhysicalColumn("ID", DataTypes.INT().notNull(), null))
+                        .column(
+                                new PhysicalColumn(
+                                        "CREATE_TIME", DataTypes.TIMESTAMP(), null, null))
+                        .primaryKey("ID")
+                        .build();
+
+        Tuple2<String, String> partitionInfo =
+                DorisSchemaUtils.getPartitionInfo(config, schema, TABLE_ID);
+        Assertions.assertThat(partitionInfo).isEqualTo(new Tuple2<>("CREATE_TIME", "year"));
+    }
+
+    @Test
     public void testPartitionInfoByIncludeAndExclude() {
         Map<String, String> map = new HashMap<>();
         map.put(TABLE_CREATE_AUTO_PARTITION_PROPERTIES_INCLUDE, "doris_database.p\\.*");

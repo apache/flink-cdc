@@ -204,6 +204,14 @@ public final class DecimalData implements Comparable<DecimalData> {
      * precision and scale.
      */
     public static DecimalData fromUnscaledBytes(byte[] unscaledBytes, int precision, int scale) {
+        if (unscaledBytes.length == 0) {
+            throw new IllegalArgumentException(
+                    "Empty unscaled bytes for DECIMAL("
+                            + precision
+                            + ", "
+                            + scale
+                            + "). This usually means the field is null or the binary row is corrupt.");
+        }
         BigDecimal bd = new BigDecimal(new BigInteger(unscaledBytes), scale);
         return fromBigDecimal(bd, precision, scale);
     }

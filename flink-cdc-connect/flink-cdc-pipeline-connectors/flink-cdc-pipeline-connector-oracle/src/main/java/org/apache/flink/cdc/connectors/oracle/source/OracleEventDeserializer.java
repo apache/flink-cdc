@@ -40,7 +40,6 @@ import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.io.WKBReader;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -78,28 +77,24 @@ public class OracleEventDeserializer extends DebeziumEventDeserializationSchema 
 
     @Override
     protected List<SchemaChangeEvent> deserializeSchemaChangeRecord(SourceRecord record) {
-        if (includeSchemaChanges) {
-            try {
-                HistoryRecord historyRecord = getHistoryRecord(record);
+        try {
+            HistoryRecord historyRecord = getHistoryRecord(record);
 
-                String databaseName =
-                        historyRecord.document().getString(HistoryRecord.Fields.DATABASE_NAME);
-                String schemaName =
-                        historyRecord.document().getString(HistoryRecord.Fields.SCHEMA_NAME);
-                if (customParser == null) {
-                    customParser = new OracleAntlrDdlParser(databaseName, schemaName);
-                    tables = new Tables();
-                }
-                String ddl =
-                        historyRecord.document().getString(HistoryRecord.Fields.DDL_STATEMENTS);
-                customParser.setCurrentDatabase(databaseName);
-                customParser.parse(ddl, tables);
-                return customParser.getAndClearParsedEvents();
-            } catch (Exception e) {
-                throw new IllegalStateException("Failed to parse the schema change : " + record, e);
+            String databaseName =
+                    historyRecord.document().getString(HistoryRecord.Fields.DATABASE_NAME);
+            String schemaName =
+                    historyRecord.document().getString(HistoryRecord.Fields.SCHEMA_NAME);
+            if (customParser == null) {
+                customParser = new OracleAntlrDdlParser(databaseName, schemaName);
+                tables = new Tables();
             }
+            String ddl = historyRecord.document().getString(HistoryRecord.Fields.DDL_STATEMENTS);
+            customParser.setCurrentDatabase(databaseName);
+            customParser.parse(ddl, tables);
+            return customParser.getAndClearParsedEvents();
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to parse the schema change : " + record, e);
         }
-        return Collections.emptyList();
     }
 
     @Override

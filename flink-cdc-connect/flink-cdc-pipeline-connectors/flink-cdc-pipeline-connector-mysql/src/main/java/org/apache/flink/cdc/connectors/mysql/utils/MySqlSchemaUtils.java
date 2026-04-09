@@ -58,12 +58,15 @@ public class MySqlSchemaUtils {
     public static List<TableId> listTables(
             MySqlSourceConfig sourceConfig, @Nullable String dbName) {
         try (MySqlConnection jdbc = createMySqlConnection(sourceConfig)) {
+            boolean isTableIdCaseInsensitive = !jdbc.isTableIdCaseSensitive();
             List<String> databases =
                     dbName != null ? Collections.singletonList(dbName) : listDatabases(jdbc);
 
             List<TableId> tableIds = new ArrayList<>();
             for (String database : databases) {
-                tableIds.addAll(listTables(jdbc, database));
+                listTables(jdbc, database).stream()
+                        .map(tableId -> normalizeTableIdCase(tableId, isTableIdCaseInsensitive))
+                        .forEach(tableIds::add);
             }
             return tableIds;
         } catch (SQLException e) {
@@ -158,9 +161,27 @@ public class MySqlSchemaUtils {
                 tableId.getSchemaName(), null, tableId.getTableName());
     }
 
+    public static TableId toCdcTableId(
+            String dbName, String tableName, boolean isTableIdCaseInsensitive) {
+        return normalizeTableIdCase(TableId.tableId(dbName, tableName), isTableIdCaseInsensitive);
+    }
+
+    public static TableId toCdcTableId(
+            io.debezium.relational.TableId dbzTableId, boolean isTableIdCaseInsensitive) {
+        return toCdcTableId(dbzTableId.catalog(), dbzTableId.table(), isTableIdCaseInsensitive);
+    }
+
+    public static TableId normalizeTableIdCase(TableId tableId, boolean isTableIdCaseInsensitive) {
+        if (!isTableIdCaseInsensitive) {
+            return tableId;
+        }
+        return TableId.tableId(
+                tableId.getSchemaName().toLowerCase(), tableId.getTableName().toLowerCase());
+    }
+
     public static boolean isTableIdCaseInsensitive(MySqlSourceConfig sourceConfig) {
         try (MySqlConnection jdbc = createMySqlConnection(sourceConfig)) {
-            return jdbc.isTableIdCaseSensitive();
+            return !jdbc.isTableIdCaseSensitive();
         } catch (Exception e) {
             throw new RuntimeException("Error to get table id caseSensitive: " + e.getMessage(), e);
         }

@@ -60,6 +60,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
@@ -80,9 +81,21 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
 
     private static final Logger LOG = LoggerFactory.getLogger(DorisEventSerializer.class);
 
+    /** Format TIME type data without precision. */
+    public static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss");
+
+    /** Format TIME type data with millisecond precision. */
+    public static final DateTimeFormatter TIME_WITH_MILLISECOND_FORMATTER =
+            DateTimeFormatter.ofPattern("HH:mm:ss.SSS");
+
     @FunctionalInterface
     interface CsvOutputSchemaResolver extends Serializable {
         Schema resolve(TableId tableId, Schema inputSchema);
+    }
+
+    @FunctionalInterface
+    interface JsonFieldMappingResolver extends Serializable {
+        LinkedHashMap<String, String> resolve(TableId tableId, Schema inputSchema);
     }
 
     /** Format DATE type data. */
@@ -94,12 +107,17 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSSSSS");
 
     private static final int MAX_SCHEMA_HISTORY_SIZE = 16;
+    private static final int MAX_DORIS_SCHEMA_FETCH_ATTEMPTS = 25;
+    private static final long DORIS_SCHEMA_FETCH_RETRY_MILLIS = 200L;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final Map<TableId, Schema> inputSchemaMaps = new HashMap<>();
     private final Map<TableId, List<Schema>> inputSchemaHistoryMaps = new HashMap<>();
     private final Map<TableId, Schema> csvOutputSchemaMaps = new HashMap<>();
+    private final Map<TableId, Map<Schema, LinkedHashMap<String, String>>> jsonFieldMappings =
+            new HashMap<>();
     private final CsvOutputSchemaResolver csvOutputSchemaResolver;
+    private final JsonFieldMappingResolver jsonFieldMappingResolver;
 
     /** ZoneId from pipeline config to support timestamp with local time zone. */
     public final ZoneId pipelineZoneId;
@@ -131,7 +149,8 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
                 config,
                 executionOptions,
                 createCsvOutputSchemaResolver(
-                        getStreamLoadProperties(executionOptions), dorisOptions));
+                        getStreamLoadProperties(executionOptions), dorisOptions),
+                createJsonFieldMappingResolver(dorisOptions));
     }
 
     DorisEventSerializer(
@@ -139,6 +158,15 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
             Configuration config,
             DorisExecutionOptions executionOptions,
             CsvOutputSchemaResolver csvOutputSchemaResolver) {
+        this(zoneId, config, executionOptions, csvOutputSchemaResolver, null);
+    }
+
+    DorisEventSerializer(
+            ZoneId zoneId,
+            Configuration config,
+            DorisExecutionOptions executionOptions,
+            CsvOutputSchemaResolver csvOutputSchemaResolver,
+            JsonFieldMappingResolver jsonFieldMappingResolver) {
         pipelineZoneId = zoneId;
         dorisConfig = config;
         Properties streamLoadProperties =
@@ -151,6 +179,7 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
                         streamLoadProperties.getProperty(
                                 FIELD_DELIMITER_KEY, FIELD_DELIMITER_DEFAULT));
         this.csvOutputSchemaResolver = csvOutputSchemaResolver;
+        this.jsonFieldMappingResolver = jsonFieldMappingResolver;
     }
 
     @Override
@@ -170,6 +199,7 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
             inputSchemaMaps.remove(tableId);
             inputSchemaHistoryMaps.remove(tableId);
             csvOutputSchemaMaps.remove(tableId);
+            jsonFieldMappings.remove(tableId);
             return;
         }
 
@@ -191,6 +221,7 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
             csvOutputSchemaMaps.put(tableId, resolveCsvOutputSchema(tableId, inputSchema));
         } else {
             csvOutputSchemaMaps.remove(tableId);
+            jsonFieldMappings.remove(tableId);
         }
     }
 
@@ -244,7 +275,8 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
             }
         }
 
-        byte[] serializedRow = serializeValue(valueMap, outputSchema, op == OperationType.DELETE);
+        byte[] serializedRow =
+                serializeValue(tableId, valueMap, outputSchema, op == OperationType.DELETE);
         return DorisRecord.of(tableId.getSchemaName(), tableId.getTableName(), serializedRow);
     }
 
@@ -265,13 +297,14 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
         return record;
     }
 
-    private byte[] serializeValue(Map<String, Object> valueMap, Schema schema, boolean deleted)
+    private byte[] serializeValue(
+            TableId tableId, Map<String, Object> valueMap, Schema schema, boolean deleted)
             throws JsonProcessingException {
         if (CSV.equals(streamLoadFormat)) {
             return serializeCsvRecord(valueMap, schema, deleted);
         }
         if (JSON.equals(streamLoadFormat)) {
-            Map<String, Object> outputRecord = projectRecord(valueMap, schema);
+            Map<String, Object> outputRecord = projectRecord(tableId, valueMap, schema);
             addDeleteSign(outputRecord, deleted);
             return objectMapper.writeValueAsString(outputRecord).getBytes(StandardCharsets.UTF_8);
         }
@@ -316,12 +349,31 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
                         tableId, recordData.getArity(), currentInputSchema.getColumnCount()));
     }
 
-    private Map<String, Object> projectRecord(Map<String, Object> valueMap, Schema schema) {
+    private Map<String, Object> projectRecord(
+            TableId tableId, Map<String, Object> valueMap, Schema schema) {
+        LinkedHashMap<String, String> jsonFieldMapping = getJsonFieldMapping(tableId, schema);
+        if (jsonFieldMapping != null && !jsonFieldMapping.isEmpty()) {
+            Map<String, Object> outputRecord = new LinkedHashMap<>();
+            for (Map.Entry<String, String> entry : jsonFieldMapping.entrySet()) {
+                String inputFieldName = entry.getValue();
+                outputRecord.put(
+                        entry.getKey(),
+                        inputFieldName == null ? null : valueMap.get(inputFieldName));
+            }
+            return outputRecord;
+        }
+
         Map<String, Object> outputRecord = new LinkedHashMap<>();
         for (Column column : schema.getColumns()) {
-            outputRecord.put(column.getName(), valueMap.get(column.getName()));
+            // Fallback for tests / serializers without Doris connection details.
+            outputRecord.put(
+                    normalizeJsonFieldName(column.getName()), valueMap.get(column.getName()));
         }
         return outputRecord;
+    }
+
+    private static String normalizeJsonFieldName(String fieldName) {
+        return fieldName.toLowerCase(Locale.ROOT);
     }
 
     private void rememberInputSchema(TableId tableId, Schema inputSchema) {
@@ -340,6 +392,23 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
     private Schema getCsvOutputSchema(TableId tableId, Schema inputSchema) {
         return csvOutputSchemaMaps.computeIfAbsent(
                 tableId, ignored -> resolveCsvOutputSchema(tableId, inputSchema));
+    }
+
+    private LinkedHashMap<String, String> getJsonFieldMapping(TableId tableId, Schema inputSchema) {
+        if (jsonFieldMappingResolver == null) {
+            return null;
+        }
+        Map<Schema, LinkedHashMap<String, String>> tableMappings =
+                jsonFieldMappings.computeIfAbsent(tableId, ignored -> new HashMap<>());
+        return tableMappings.computeIfAbsent(
+                inputSchema,
+                ignored -> {
+                    LinkedHashMap<String, String> mapping =
+                            jsonFieldMappingResolver.resolve(tableId, inputSchema);
+                    Preconditions.checkNotNull(
+                            mapping, "JSON field mapping resolver returned null for " + tableId);
+                    return mapping;
+                });
     }
 
     private Schema resolveCsvOutputSchema(TableId tableId, Schema inputSchema) {
@@ -380,8 +449,7 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
                         "CSV format in Flink CDC Doris pipeline does not support expressions in sink.properties.columns: "
                                 + columnsProperty);
                 outputColumns.add(
-                        inputSchema
-                                .getColumn(normalizedColumn)
+                        DorisSchemaUtils.getColumnCaseInsensitive(inputSchema, normalizedColumn)
                                 .orElseThrow(
                                         () ->
                                                 new IllegalStateException(
@@ -425,8 +493,7 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
                     continue;
                 }
                 outputColumns.add(
-                        inputSchema
-                                .getColumn(field.getName())
+                        DorisSchemaUtils.getColumnCaseInsensitive(inputSchema, field.getName())
                                 .orElseThrow(
                                         () ->
                                                 new IllegalStateException(
@@ -436,5 +503,111 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
             }
             return inputSchema.copy(outputColumns);
         };
+    }
+
+    private static JsonFieldMappingResolver createJsonFieldMappingResolver(
+            DorisOptions dorisOptions) {
+        if (dorisOptions == null) {
+            return null;
+        }
+        return (tableId, inputSchema) -> {
+            org.apache.doris.flink.rest.models.Schema dorisSchema =
+                    waitUntilDorisSchemaCoversInputSchema(dorisOptions, tableId, inputSchema);
+
+            LinkedHashMap<String, String> mapping = new LinkedHashMap<>();
+            for (Field field : dorisSchema.getProperties()) {
+                if (DORIS_DELETE_SIGN.equals(field.getName())) {
+                    continue;
+                }
+                Column inputColumn =
+                        DorisSchemaUtils.getColumnCaseInsensitive(inputSchema, field.getName())
+                                .orElse(null);
+                mapping.put(field.getName(), inputColumn == null ? null : inputColumn.getName());
+            }
+            return mapping;
+        };
+    }
+
+    private static org.apache.doris.flink.rest.models.Schema waitUntilDorisSchemaCoversInputSchema(
+            DorisOptions dorisOptions, TableId tableId, Schema inputSchema) {
+        org.apache.doris.flink.rest.models.Schema dorisSchema = null;
+        for (int attempt = 1; attempt <= MAX_DORIS_SCHEMA_FETCH_ATTEMPTS; attempt++) {
+            dorisSchema =
+                    RestService.getSchema(
+                            dorisOptions, tableId.getSchemaName(), tableId.getTableName(), LOG);
+            Preconditions.checkNotNull(
+                    dorisSchema, "Failed to resolve Doris physical schema for " + tableId);
+            Preconditions.checkNotNull(
+                    dorisSchema.getProperties(),
+                    "Failed to resolve Doris physical schema properties for " + tableId);
+
+            if (dorisSchemaCoversInputSchema(dorisSchema, inputSchema)) {
+                return dorisSchema;
+            }
+
+            if (attempt < MAX_DORIS_SCHEMA_FETCH_ATTEMPTS) {
+                LOG.info(
+                        "Doris physical schema for {} has not caught up with input schema yet. inputColumns={}, dorisColumns={}, retry={}/{}",
+                        tableId,
+                        getInputColumnNames(inputSchema),
+                        getDorisPhysicalColumnNames(dorisSchema),
+                        attempt,
+                        MAX_DORIS_SCHEMA_FETCH_ATTEMPTS);
+                try {
+                    Thread.sleep(DORIS_SCHEMA_FETCH_RETRY_MILLIS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException(
+                            "Interrupted while waiting for Doris physical schema of " + tableId, e);
+                }
+            }
+        }
+
+        throw new IllegalStateException(
+                String.format(
+                        "Doris physical schema for %s did not catch up with input schema. inputColumns=%s, dorisColumns=%s",
+                        tableId,
+                        getInputColumnNames(inputSchema),
+                        getDorisPhysicalColumnNames(dorisSchema)));
+    }
+
+    private static boolean dorisSchemaCoversInputSchema(
+            org.apache.doris.flink.rest.models.Schema dorisSchema, Schema inputSchema) {
+        List<String> dorisColumns = getDorisPhysicalColumnNames(dorisSchema);
+        for (Column inputColumn : inputSchema.getColumns()) {
+            boolean matched = false;
+            for (String dorisColumn : dorisColumns) {
+                if (dorisColumn.equalsIgnoreCase(inputColumn.getName())) {
+                    matched = true;
+                    break;
+                }
+            }
+            if (!matched) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static List<String> getInputColumnNames(Schema inputSchema) {
+        List<String> inputColumns = new ArrayList<>();
+        for (Column column : inputSchema.getColumns()) {
+            inputColumns.add(column.getName());
+        }
+        return inputColumns;
+    }
+
+    private static List<String> getDorisPhysicalColumnNames(
+            org.apache.doris.flink.rest.models.Schema dorisSchema) {
+        List<String> dorisColumns = new ArrayList<>();
+        if (dorisSchema == null || dorisSchema.getProperties() == null) {
+            return dorisColumns;
+        }
+        for (Field field : dorisSchema.getProperties()) {
+            if (!DORIS_DELETE_SIGN.equals(field.getName())) {
+                dorisColumns.add(field.getName());
+            }
+        }
+        return dorisColumns;
     }
 }

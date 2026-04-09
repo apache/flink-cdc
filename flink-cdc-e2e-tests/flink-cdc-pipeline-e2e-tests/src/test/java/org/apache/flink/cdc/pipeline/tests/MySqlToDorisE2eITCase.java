@@ -62,6 +62,9 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
     protected final UniqueDatabase complexDataTypesDatabase =
             new UniqueDatabase(MYSQL, "data_types_test", MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
 
+    protected final UniqueDatabase columnCaseDatabase =
+            new UniqueDatabase(MYSQL, "mysql_case_inventory", MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
+
     @BeforeAll
     public static void initializeContainers() {
         LOG.info("Starting containers...");
@@ -300,6 +303,407 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
         } catch (SQLException e) {
             LOG.error("Update table for CDC failed.", e);
             throw e;
+        }
+    }
+
+    @Test
+    void testSyncMysqlColumnCaseTablesWithJsonFormat() throws Exception {
+        columnCaseDatabase.createAndInitialize();
+        createDorisDatabase(columnCaseDatabase.getDatabaseName());
+        try {
+            String databaseName = columnCaseDatabase.getDatabaseName();
+            String pipelineJob =
+                    String.format(
+                            "source:\n"
+                                    + "  type: mysql\n"
+                                    + "  hostname: mysql\n"
+                                    + "  port: 3306\n"
+                                    + "  username: %s\n"
+                                    + "  password: %s\n"
+                                    + "  tables: %s.mixed_case_customer,%s.upper_case_customer,%s.lower_case_customer\n"
+                                    + "  server-id: 5400-5404\n"
+                                    + "  server-time-zone: UTC\n"
+                                    + "\n"
+                                    + "sink:\n"
+                                    + "  type: doris\n"
+                                    + "  fenodes: doris:8030\n"
+                                    + "  benodes: doris:8040\n"
+                                    + "  username: %s\n"
+                                    + "  password: \"%s\"\n"
+                                    + "  table.create.properties.replication_num: 1\n"
+                                    + "  sink.properties.format: json\n"
+                                    + "\n"
+                                    + "pipeline:\n"
+                                    + "  parallelism: %d",
+                            MYSQL_TEST_USER,
+                            MYSQL_TEST_PASSWORD,
+                            databaseName,
+                            databaseName,
+                            databaseName,
+                            DORIS.getUsername(),
+                            DORIS.getPassword(),
+                            parallelism);
+
+            submitMysqlToDorisJob(pipelineJob);
+
+            validateSinkSchema(
+                    databaseName,
+                    "mixed_case_customer",
+                    Arrays.asList(
+                            "ID | INT | Yes | true | null",
+                            "Name | VARCHAR(765) | Yes | false | null",
+                            "phone_Number | VARCHAR(765) | Yes | false | null"));
+            validateSinkResult(
+                    databaseName,
+                    "mixed_case_customer",
+                    3,
+                    Arrays.asList("101 | Alice | 13900000001", "102 | Bob | 13900000002"));
+
+            validateSinkSchema(
+                    databaseName,
+                    "upper_case_customer",
+                    Arrays.asList(
+                            "ID | INT | Yes | true | null",
+                            "NAME | VARCHAR(765) | Yes | false | null",
+                            "PHONE_NUMBER | VARCHAR(765) | Yes | false | null"));
+            validateSinkResult(
+                    databaseName,
+                    "upper_case_customer",
+                    3,
+                    Arrays.asList("201 | Carol | 13900000003", "202 | Dave | 13900000004"));
+
+            validateSinkSchema(
+                    databaseName,
+                    "lower_case_customer",
+                    Arrays.asList(
+                            "id | INT | Yes | true | null",
+                            "name | VARCHAR(765) | Yes | false | null",
+                            "phone_number | VARCHAR(765) | Yes | false | null"));
+            validateSinkResult(
+                    databaseName,
+                    "lower_case_customer",
+                    3,
+                    Arrays.asList("301 | Eve | 13900000005", "302 | Frank | 13900000006"));
+
+            insertColumnCaseIncrementalRows(databaseName);
+
+            validateSinkResult(
+                    databaseName,
+                    "mixed_case_customer",
+                    3,
+                    Arrays.asList(
+                            "101 | Alice | 13900000001",
+                            "102 | Bob | 13900000002",
+                            "103 | Cindy | 13900000007"));
+            validateSinkResult(
+                    databaseName,
+                    "upper_case_customer",
+                    3,
+                    Arrays.asList(
+                            "201 | Carol | 13900000003",
+                            "202 | Dave | 13900000004",
+                            "203 | Eric | 13900000008"));
+            validateSinkResult(
+                    databaseName,
+                    "lower_case_customer",
+                    3,
+                    Arrays.asList(
+                            "301 | Eve | 13900000005",
+                            "302 | Frank | 13900000006",
+                            "303 | Gina | 13900000009"));
+
+            updateAndDeleteColumnCaseRows(databaseName);
+
+            validateSinkResult(
+                    databaseName,
+                    "mixed_case_customer",
+                    3,
+                    Arrays.asList(
+                            "101 | Alice-Updated | 13900001001", "103 | Cindy | 13900000007"));
+            validateSinkResult(
+                    databaseName,
+                    "upper_case_customer",
+                    3,
+                    Arrays.asList("201 | Carol-Updated | 13900001002", "203 | Eric | 13900000008"));
+            validateSinkResult(
+                    databaseName,
+                    "lower_case_customer",
+                    3,
+                    Arrays.asList("301 | Eve-Updated | 13900001003", "303 | Gina | 13900000009"));
+        } finally {
+            columnCaseDatabase.dropDatabase();
+            dropDorisDatabase(columnCaseDatabase.getDatabaseName());
+        }
+    }
+
+    @Test
+    void testSyncMysqlColumnCaseTablesWithJsonFormatAndUpperColumnNameCase() throws Exception {
+        columnCaseDatabase.createAndInitialize();
+        createDorisDatabase(columnCaseDatabase.getDatabaseName());
+        try {
+            String databaseName = columnCaseDatabase.getDatabaseName();
+            String pipelineJob =
+                    String.format(
+                            "source:\n"
+                                    + "  type: mysql\n"
+                                    + "  hostname: mysql\n"
+                                    + "  port: 3306\n"
+                                    + "  username: %s\n"
+                                    + "  password: %s\n"
+                                    + "  tables: %s.mixed_case_customer,%s.upper_case_customer,%s.lower_case_customer\n"
+                                    + "  server-id: 5400-5404\n"
+                                    + "  server-time-zone: UTC\n"
+                                    + "\n"
+                                    + "sink:\n"
+                                    + "  type: doris\n"
+                                    + "  fenodes: doris:8030\n"
+                                    + "  benodes: doris:8040\n"
+                                    + "  username: %s\n"
+                                    + "  password: \"%s\"\n"
+                                    + "  table.create.properties.replication_num: 1\n"
+                                    + "  sink.properties.format: json\n"
+                                    + "\n"
+                                    + "pipeline:\n"
+                                    + "  parallelism: %d\n"
+                                    + "  column-name-case: UPPER",
+                            MYSQL_TEST_USER,
+                            MYSQL_TEST_PASSWORD,
+                            databaseName,
+                            databaseName,
+                            databaseName,
+                            DORIS.getUsername(),
+                            DORIS.getPassword(),
+                            parallelism);
+
+            submitMysqlToDorisJob(pipelineJob);
+
+            validateSinkSchema(
+                    databaseName,
+                    "mixed_case_customer",
+                    Arrays.asList(
+                            "ID | INT | Yes | true | null",
+                            "NAME | VARCHAR(765) | Yes | false | null",
+                            "PHONE_NUMBER | VARCHAR(765) | Yes | false | null"));
+            validateSinkResult(
+                    databaseName,
+                    "mixed_case_customer",
+                    3,
+                    Arrays.asList("101 | Alice | 13900000001", "102 | Bob | 13900000002"));
+
+            validateSinkSchema(
+                    databaseName,
+                    "upper_case_customer",
+                    Arrays.asList(
+                            "ID | INT | Yes | true | null",
+                            "NAME | VARCHAR(765) | Yes | false | null",
+                            "PHONE_NUMBER | VARCHAR(765) | Yes | false | null"));
+            validateSinkResult(
+                    databaseName,
+                    "upper_case_customer",
+                    3,
+                    Arrays.asList("201 | Carol | 13900000003", "202 | Dave | 13900000004"));
+
+            validateSinkSchema(
+                    databaseName,
+                    "lower_case_customer",
+                    Arrays.asList(
+                            "ID | INT | Yes | true | null",
+                            "NAME | VARCHAR(765) | Yes | false | null",
+                            "PHONE_NUMBER | VARCHAR(765) | Yes | false | null"));
+            validateSinkResult(
+                    databaseName,
+                    "lower_case_customer",
+                    3,
+                    Arrays.asList("301 | Eve | 13900000005", "302 | Frank | 13900000006"));
+
+            insertColumnCaseIncrementalRows(databaseName);
+
+            validateSinkResult(
+                    databaseName,
+                    "mixed_case_customer",
+                    3,
+                    Arrays.asList(
+                            "101 | Alice | 13900000001",
+                            "102 | Bob | 13900000002",
+                            "103 | Cindy | 13900000007"));
+            validateSinkResult(
+                    databaseName,
+                    "upper_case_customer",
+                    3,
+                    Arrays.asList(
+                            "201 | Carol | 13900000003",
+                            "202 | Dave | 13900000004",
+                            "203 | Eric | 13900000008"));
+            validateSinkResult(
+                    databaseName,
+                    "lower_case_customer",
+                    3,
+                    Arrays.asList(
+                            "301 | Eve | 13900000005",
+                            "302 | Frank | 13900000006",
+                            "303 | Gina | 13900000009"));
+
+            updateAndDeleteColumnCaseRows(databaseName);
+
+            validateSinkResult(
+                    databaseName,
+                    "mixed_case_customer",
+                    3,
+                    Arrays.asList(
+                            "101 | Alice-Updated | 13900001001", "103 | Cindy | 13900000007"));
+            validateSinkResult(
+                    databaseName,
+                    "upper_case_customer",
+                    3,
+                    Arrays.asList("201 | Carol-Updated | 13900001002", "203 | Eric | 13900000008"));
+            validateSinkResult(
+                    databaseName,
+                    "lower_case_customer",
+                    3,
+                    Arrays.asList("301 | Eve-Updated | 13900001003", "303 | Gina | 13900000009"));
+        } finally {
+            columnCaseDatabase.dropDatabase();
+            dropDorisDatabase(columnCaseDatabase.getDatabaseName());
+        }
+    }
+
+    @Test
+    void testSyncMysqlProjectionTransformToDorisWithJsonFormat() throws Exception {
+        columnCaseDatabase.createAndInitialize();
+        createDorisDatabase(columnCaseDatabase.getDatabaseName());
+        try {
+            String databaseName = columnCaseDatabase.getDatabaseName();
+            String pipelineJob =
+                    String.format(
+                            "source:\n"
+                                    + "  type: mysql\n"
+                                    + "  hostname: mysql\n"
+                                    + "  port: 3306\n"
+                                    + "  username: %s\n"
+                                    + "  password: %s\n"
+                                    + "  tables: %s.customer\n"
+                                    + "  server-id: 5400-5404\n"
+                                    + "  server-time-zone: UTC\n"
+                                    + "\n"
+                                    + "sink:\n"
+                                    + "  type: doris\n"
+                                    + "  fenodes: doris:8030\n"
+                                    + "  benodes: doris:8040\n"
+                                    + "  username: %s\n"
+                                    + "  password: \"%s\"\n"
+                                    + "  table.create.properties.replication_num: 1\n"
+                                    + "  sink.properties.format: json\n"
+                                    + "\n"
+                                    + "transform:\n"
+                                    + "  - source-table: %s.customer\n"
+                                    + "    projection: id as MY_ID, NAME as name, age as AGE\n"
+                                    + "\n"
+                                    + "pipeline:\n"
+                                    + "  parallelism: %d",
+                            MYSQL_TEST_USER,
+                            MYSQL_TEST_PASSWORD,
+                            databaseName,
+                            DORIS.getUsername(),
+                            DORIS.getPassword(),
+                            databaseName,
+                            parallelism);
+
+            submitMysqlToDorisJob(pipelineJob);
+
+            validateSinkSchema(
+                    databaseName,
+                    "customer",
+                    Arrays.asList(
+                            "MY_ID | INT | Yes | true | null",
+                            "name | VARCHAR(765) | Yes | false | null",
+                            "AGE | INT | Yes | false | null"));
+            validateSinkResult(
+                    databaseName,
+                    "customer",
+                    3,
+                    Arrays.asList("401 | Grace | 18", "402 | Heidi | 19"));
+
+            insertProjectionIncrementalRow(databaseName);
+
+            validateSinkResult(
+                    databaseName,
+                    "customer",
+                    3,
+                    Arrays.asList("401 | Grace | 18", "402 | Heidi | 19", "403 | Ivan | 20"));
+        } finally {
+            columnCaseDatabase.dropDatabase();
+            dropDorisDatabase(columnCaseDatabase.getDatabaseName());
+        }
+    }
+
+    @Test
+    void testSyncMysqlProjectionTransformToDorisWithJsonFormatAndUpperColumnNameCase()
+            throws Exception {
+        columnCaseDatabase.createAndInitialize();
+        createDorisDatabase(columnCaseDatabase.getDatabaseName());
+        try {
+            String databaseName = columnCaseDatabase.getDatabaseName();
+            String pipelineJob =
+                    String.format(
+                            "source:\n"
+                                    + "  type: mysql\n"
+                                    + "  hostname: mysql\n"
+                                    + "  port: 3306\n"
+                                    + "  username: %s\n"
+                                    + "  password: %s\n"
+                                    + "  tables: %s.customer\n"
+                                    + "  server-id: 5400-5404\n"
+                                    + "  server-time-zone: UTC\n"
+                                    + "\n"
+                                    + "sink:\n"
+                                    + "  type: doris\n"
+                                    + "  fenodes: doris:8030\n"
+                                    + "  benodes: doris:8040\n"
+                                    + "  username: %s\n"
+                                    + "  password: \"%s\"\n"
+                                    + "  table.create.properties.replication_num: 1\n"
+                                    + "  sink.properties.format: json\n"
+                                    + "\n"
+                                    + "transform:\n"
+                                    + "  - source-table: %s.customer\n"
+                                    + "    projection: id as my_id, NAME as name, age as AGE\n"
+                                    + "\n"
+                                    + "pipeline:\n"
+                                    + "  parallelism: %d\n"
+                                    + "  column-name-case: UPPER",
+                            MYSQL_TEST_USER,
+                            MYSQL_TEST_PASSWORD,
+                            databaseName,
+                            DORIS.getUsername(),
+                            DORIS.getPassword(),
+                            databaseName,
+                            parallelism);
+
+            submitMysqlToDorisJob(pipelineJob);
+
+            validateSinkSchema(
+                    databaseName,
+                    "customer",
+                    Arrays.asList(
+                            "my_id | INT | Yes | true | null",
+                            "name | VARCHAR(765) | Yes | false | null",
+                            "AGE | INT | Yes | false | null"));
+            validateSinkResult(
+                    databaseName,
+                    "customer",
+                    3,
+                    Arrays.asList("401 | Grace | 18", "402 | Heidi | 19"));
+
+            insertProjectionIncrementalRow(databaseName);
+
+            validateSinkResult(
+                    databaseName,
+                    "customer",
+                    3,
+                    Arrays.asList("401 | Grace | 18", "402 | Heidi | 19", "403 | Ivan | 20"));
+        } finally {
+            columnCaseDatabase.dropDatabase();
+            dropDorisDatabase(columnCaseDatabase.getDatabaseName());
         }
     }
 
@@ -1041,6 +1445,64 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
             Thread.sleep(1000L);
         }
         Assertions.fail("Failed to verify content of {}::{}.", databaseName, sql);
+    }
+
+    private void submitMysqlToDorisJob(String pipelineJob) throws Exception {
+        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
+        Path dorisCdcConnector = TestUtils.getResource("doris-cdc-pipeline-connector.jar");
+        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
+        submitPipelineJob(pipelineJob, mysqlCdcJar, dorisCdcConnector, mysqlDriverJar);
+        waitUntilJobRunning(Duration.ofSeconds(30));
+        LOG.info("Pipeline job is running");
+    }
+
+    private void insertColumnCaseIncrementalRows(String databaseName) throws SQLException {
+        try (Connection conn =
+                        DriverManager.getConnection(
+                                String.format(
+                                        "jdbc:mysql://%s:%s/%s",
+                                        MYSQL.getHost(), MYSQL.getDatabasePort(), databaseName),
+                                MYSQL_TEST_USER,
+                                MYSQL_TEST_PASSWORD);
+                Statement stat = conn.createStatement()) {
+            stat.execute("INSERT INTO mixed_case_customer VALUES (103, 'Cindy', '13900000007');");
+            stat.execute("INSERT INTO upper_case_customer VALUES (203, 'Eric', '13900000008');");
+            stat.execute("INSERT INTO lower_case_customer VALUES (303, 'Gina', '13900000009');");
+        }
+    }
+
+    private void insertProjectionIncrementalRow(String databaseName) throws SQLException {
+        try (Connection conn =
+                        DriverManager.getConnection(
+                                String.format(
+                                        "jdbc:mysql://%s:%s/%s",
+                                        MYSQL.getHost(), MYSQL.getDatabasePort(), databaseName),
+                                MYSQL_TEST_USER,
+                                MYSQL_TEST_PASSWORD);
+                Statement stat = conn.createStatement()) {
+            stat.execute("INSERT INTO customer VALUES (403, 'Ivan', 20, 'Hangzhou');");
+        }
+    }
+
+    private void updateAndDeleteColumnCaseRows(String databaseName) throws SQLException {
+        try (Connection conn =
+                        DriverManager.getConnection(
+                                String.format(
+                                        "jdbc:mysql://%s:%s/%s",
+                                        MYSQL.getHost(), MYSQL.getDatabasePort(), databaseName),
+                                MYSQL_TEST_USER,
+                                MYSQL_TEST_PASSWORD);
+                Statement stat = conn.createStatement()) {
+            stat.execute(
+                    "UPDATE mixed_case_customer SET `Name` = 'Alice-Updated', `phone_Number` = '13900001001' WHERE `ID` = 101;");
+            stat.execute("DELETE FROM mixed_case_customer WHERE `ID` = 102;");
+            stat.execute(
+                    "UPDATE upper_case_customer SET `NAME` = 'Carol-Updated', `PHONE_NUMBER` = '13900001002' WHERE `ID` = 201;");
+            stat.execute("DELETE FROM upper_case_customer WHERE `ID` = 202;");
+            stat.execute(
+                    "UPDATE lower_case_customer SET `name` = 'Eve-Updated', `phone_number` = '13900001003' WHERE `id` = 301;");
+            stat.execute("DELETE FROM lower_case_customer WHERE `id` = 302;");
+        }
     }
 
     private List<String> fetchTableContent(String databaseName, String sql, int columnCount)

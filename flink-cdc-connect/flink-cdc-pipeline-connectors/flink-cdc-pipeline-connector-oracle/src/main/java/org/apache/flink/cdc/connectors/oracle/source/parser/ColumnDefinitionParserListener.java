@@ -248,7 +248,7 @@ public class ColumnDefinitionParserListener extends BaseParserListener {
                 // Rowid is a string of length 18
                 columnEditor.jdbcType(Types.VARCHAR).type("ROWID").length(18);
             } else if (ctx.native_datatype_element().LONG() != null) {
-                columnEditor.jdbcType(Types.BIGINT).type("LONG");
+                columnEditor.jdbcType(Types.CLOB).type("LONG");
             } else if (ctx.native_datatype_element().BFILE() != null) {
                 columnEditor.jdbcType(OracleTypes.BFILE).type("BFILE");
             } else {

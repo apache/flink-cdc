@@ -135,6 +135,7 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
     @Test
     @Order(5)
     public void testAlterAddAllColumnTypeStatement() throws Exception {
+        createAndInitialize("product.sql");
         Map<String, String> options = new HashMap<>();
         options.put(HOSTNAME.key(), ORACLE_CONTAINER.getHost());
         options.put(PORT.key(), String.valueOf(ORACLE_CONTAINER.getOraclePort()));
@@ -298,7 +299,8 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
                             tableId,
                             Collections.singletonList(
                                     new AddColumnEvent.ColumnWithPosition(
-                                            Column.physicalColumn("COLS13", DataTypes.DATE())))));
+                                            Column.physicalColumn(
+                                                    "COLS13", DataTypes.TIMESTAMP())))));
             statement.execute(
                     String.format("ALTER TABLE %s.PRODUCTS ADD COLS14 TIMESTAMP", "DEBEZIUM"));
             expected.add(
@@ -404,7 +406,8 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
                             tableId,
                             Collections.singletonList(
                                     new AddColumnEvent.ColumnWithPosition(
-                                            Column.physicalColumn("COLS27", DataTypes.BIGINT())))));
+                                            Column.physicalColumn(
+                                                    "COLS27", DataTypes.DECIMAL(38, 0))))));
             statement.execute(
                     String.format("ALTER TABLE %s.PRODUCTS ADD COLS28 TIMESTAMP(2)", "DEBEZIUM"));
             expected.add(
@@ -462,7 +465,7 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
                             tableId,
                             Collections.singletonList(
                                     new AddColumnEvent.ColumnWithPosition(
-                                            Column.physicalColumn("COLS33", DataTypes.BIGINT())))));
+                                            Column.physicalColumn("COLS33", DataTypes.STRING())))));
             statement.execute(
                     String.format("ALTER TABLE %s.PRODUCTS ADD COLS34 SYS.XMLTYPE", "DEBEZIUM"));
             expected.add(
@@ -591,6 +594,7 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
     @Test
     @Order(6)
     public void testParseAlterStatement() throws Exception {
+        createAndInitialize("product.sql");
         Map<String, String> options = new HashMap<>();
         options.put(HOSTNAME.key(), ORACLE_CONTAINER.getHost());
         options.put(PORT.key(), String.valueOf(ORACLE_CONTAINER.getOraclePort()));
@@ -690,7 +694,7 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
                             tableId,
                             Collections.singletonList(
                                     new AddColumnEvent.ColumnWithPosition(
-                                            Column.physicalColumn("COLS5", DataTypes.BIGINT())))));
+                                            Column.physicalColumn("COLS5", DataTypes.STRING())))));
             statement.execute(
                     String.format("ALTER TABLE %s.PRODUCTS DROP COLUMN COLS1", "DEBEZIUM"));
             expected.add(new DropColumnEvent(tableId, Collections.singletonList("COLS1")));
@@ -1781,7 +1785,7 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
         return new CreateTableEvent(
                 tableId,
                 Schema.newBuilder()
-                        .physicalColumn("ID", DataTypes.BIGINT().notNull())
+                        .physicalColumn("ID", DataTypes.INT().notNull())
                         .physicalColumn("NAME", DataTypes.VARCHAR(255).notNull())
                         .physicalColumn("DESCRIPTION", DataTypes.VARCHAR(512))
                         .physicalColumn("WEIGHT", DataTypes.FLOAT())
@@ -1794,7 +1798,7 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
         RowType rowType =
                 RowType.of(
                         new DataType[] {
-                            DataTypes.BIGINT().notNull(),
+                            DataTypes.INT().notNull(),
                             DataTypes.VARCHAR(255).notNull(),
                             DataTypes.VARCHAR(512),
                             DataTypes.FLOAT()
@@ -1808,7 +1812,7 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
                         tableId,
                         generator.generate(
                                 new Object[] {
-                                    101L,
+                                    101,
                                     BinaryStringData.fromString("scooter"),
                                     BinaryStringData.fromString("Small 2-wheel scooter"),
                                     3.14f
@@ -1818,7 +1822,7 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
                         tableId,
                         generator.generate(
                                 new Object[] {
-                                    102L,
+                                    102,
                                     BinaryStringData.fromString("car battery"),
                                     BinaryStringData.fromString("12V car battery"),
                                     8.1f
@@ -1828,18 +1832,18 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
                         tableId,
                         generator.generate(
                                 new Object[] {
-                                    103L,
+                                    103,
                                     BinaryStringData.fromString("12-pack drill bits"),
                                     BinaryStringData.fromString(
                                             "12-pack of drill bits with sizes ranging from #40 to #3"),
-                                    0.8f
+                                    1.8f
                                 })));
         snapshotExpected.add(
                 DataChangeEvent.insertEvent(
                         tableId,
                         generator.generate(
                                 new Object[] {
-                                    104L,
+                                    104,
                                     BinaryStringData.fromString("hammer"),
                                     BinaryStringData.fromString("12oz carpenters hammer"),
                                     0.75f
@@ -1849,7 +1853,7 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
                         tableId,
                         generator.generate(
                                 new Object[] {
-                                    105L,
+                                    105,
                                     BinaryStringData.fromString("hammer"),
                                     BinaryStringData.fromString("14oz carpenters hammer"),
                                     0.875f
@@ -1859,7 +1863,7 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
                         tableId,
                         generator.generate(
                                 new Object[] {
-                                    106L,
+                                    106,
                                     BinaryStringData.fromString("hammer"),
                                     BinaryStringData.fromString("16oz carpenters hammer"),
                                     1.0f
@@ -1869,7 +1873,7 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
                         tableId,
                         generator.generate(
                                 new Object[] {
-                                    107L,
+                                    107,
                                     BinaryStringData.fromString("rocks"),
                                     BinaryStringData.fromString("box of assorted rocks"),
                                     5.3f
@@ -1879,7 +1883,7 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
                         tableId,
                         generator.generate(
                                 new Object[] {
-                                    108L,
+                                    108,
                                     BinaryStringData.fromString("jacket"),
                                     BinaryStringData.fromString(
                                             "water resistent black wind breaker"),
@@ -1890,7 +1894,7 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
                         tableId,
                         generator.generate(
                                 new Object[] {
-                                    109L,
+                                    109,
                                     BinaryStringData.fromString("spare tire"),
                                     BinaryStringData.fromString("24 inch spare tire"),
                                     22.2f

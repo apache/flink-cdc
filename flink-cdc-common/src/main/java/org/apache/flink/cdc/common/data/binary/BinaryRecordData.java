@@ -155,6 +155,9 @@ public final class BinaryRecordData extends BinarySection implements RecordData,
     @Override
     public DecimalData getDecimal(int pos, int precision, int scale) {
         assertIndexIsValid(pos);
+        if (isNullAt(pos)) {
+            return null;
+        }
 
         if (DecimalData.isCompact(precision)) {
             return DecimalData.fromUnscaledLong(

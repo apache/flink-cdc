@@ -28,6 +28,7 @@ import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataType;
+import org.apache.flink.cdc.connectors.mysql.utils.MySqlSchemaUtils;
 
 import io.debezium.connector.mysql.antlr.MySqlAntlrDdlParser;
 import io.debezium.connector.mysql.antlr.listener.AlterTableParserListener;
@@ -48,10 +49,10 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import static org.apache.flink.cdc.connectors.mysql.utils.MySqlSchemaUtils.toCdcTableId;
 import static org.apache.flink.cdc.connectors.mysql.utils.MySqlTypeUtils.fromDbzColumn;
 
 /** Copied from {@link AlterTableParserListener} in Debezium 1.9.8.Final. */
@@ -66,6 +67,7 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
     private final LinkedList<SchemaChangeEvent> changes;
     private final boolean tinyInt1isBit;
     private org.apache.flink.cdc.common.event.TableId currentTable;
+    private TableId currentDbzTable;
     private List<ColumnEditor> columnEditors;
     private CustomColumnDefinitionParserListener columnDefinitionListener;
     private TableEditor tableEditor;
@@ -220,7 +222,8 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
 
     @Override
     public void enterAlterTable(MySqlParser.AlterTableContext ctx) {
-        this.currentTable = toCdcTableId(parser.parseQualifiedTableId(ctx.tableName().fullId()));
+        this.currentDbzTable = parser.parseQualifiedTableId(ctx.tableName().fullId());
+        this.currentTable = toCdcTableId(currentDbzTable);
         super.enterAlterTable(ctx);
     }
 
@@ -229,6 +232,7 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
         listeners.remove(columnDefinitionListener);
         super.exitAlterTable(ctx);
         this.currentTable = null;
+        this.currentDbzTable = null;
     }
 
     @Override
@@ -257,10 +261,8 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
                                                         AddColumnEvent.ColumnPosition.FIRST,
                                                         null))));
                     } else if (ctx.AFTER() != null) {
-                        String afterColumn = parser.parseName(ctx.uid(1));
-                        if (isTableIdCaseInsensitive) {
-                            afterColumn = afterColumn.toLowerCase(Locale.ROOT);
-                        }
+                        String afterColumn =
+                                resolveExistingColumnName(parser.parseName(ctx.uid(1)));
                         changes.add(
                                 new AddColumnEvent(
                                         currentTable,
@@ -354,14 +356,8 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
         parser.runIfNotNull(
                 () -> {
                     Column column = columnDefinitionListener.getColumn();
-                    String oldColumnName =
-                            isTableIdCaseInsensitive
-                                    ? column.name().toLowerCase(Locale.ROOT)
-                                    : column.name();
+                    String oldColumnName = resolveExistingColumnName(column.name());
                     String newColumnName = parser.parseName(ctx.newColumn);
-                    if (isTableIdCaseInsensitive && newColumnName != null) {
-                        newColumnName = newColumnName.toLowerCase(Locale.ROOT);
-                    }
 
                     Map<String, DataType> typeMapping = new HashMap<>();
 
@@ -371,7 +367,7 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
                     alterColumnTypeEvent.addColumnComment(oldColumnName, column.comment());
                     changes.add(alterColumnTypeEvent);
 
-                    if (newColumnName != null && !oldColumnName.equalsIgnoreCase(newColumnName)) {
+                    if (newColumnName != null && !oldColumnName.equals(newColumnName)) {
                         Map<String, String> renameMap = new HashMap<>();
                         renameMap.put(oldColumnName, newColumnName);
                         changes.add(new RenameColumnEvent(currentTable, renameMap));
@@ -384,10 +380,7 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
 
     @Override
     public void enterAlterByDropColumn(MySqlParser.AlterByDropColumnContext ctx) {
-        String removedColName = parser.parseName(ctx.uid());
-        if (isTableIdCaseInsensitive && removedColName != null) {
-            removedColName = removedColName.toLowerCase(Locale.ROOT);
-        }
+        String removedColName = resolveExistingColumnName(parser.parseName(ctx.uid()));
         changes.add(new DropColumnEvent(currentTable, Collections.singletonList(removedColName)));
         super.enterAlterByDropColumn(ctx);
     }
@@ -421,10 +414,7 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
         parser.runIfNotNull(
                 () -> {
                     Column column = columnDefinitionListener.getColumn();
-                    String columnName =
-                            isTableIdCaseInsensitive
-                                    ? column.name().toLowerCase(Locale.ROOT)
-                                    : column.name();
+                    String columnName = resolveExistingColumnName(column.name());
                     Map<String, DataType> typeMapping = new HashMap<>();
                     typeMapping.put(columnName, fromDbzColumn(column, tinyInt1isBit));
                     AlterColumnTypeEvent alterColumnTypeEvent =
@@ -442,15 +432,9 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
         parser.runIfNotNull(
                 () -> {
                     Column column = columnDefinitionListener.getColumn();
-                    String oldColumnName =
-                            isTableIdCaseInsensitive
-                                    ? column.name().toLowerCase(Locale.ROOT)
-                                    : column.name();
+                    String oldColumnName = resolveExistingColumnName(column.name());
                     String newColumnName = parser.parseName(ctx.newColumn);
-                    if (isTableIdCaseInsensitive && newColumnName != null) {
-                        newColumnName = newColumnName.toLowerCase(Locale.ROOT);
-                    }
-                    if (newColumnName != null && !column.name().equalsIgnoreCase(newColumnName)) {
+                    if (newColumnName != null && !oldColumnName.equals(newColumnName)) {
                         Map<String, String> renameMap = new HashMap<>();
                         renameMap.put(oldColumnName, newColumnName);
                         changes.add(new RenameColumnEvent(currentTable, renameMap));
@@ -509,22 +493,70 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
 
     private org.apache.flink.cdc.common.schema.Column toCdcColumn(Column dbzColumn) {
         return org.apache.flink.cdc.common.schema.Column.physicalColumn(
-                isTableIdCaseInsensitive
-                        ? dbzColumn.name().toLowerCase(Locale.ROOT)
-                        : dbzColumn.name(),
+                dbzColumn.name(),
                 fromDbzColumn(dbzColumn, tinyInt1isBit),
                 dbzColumn.comment(),
                 dbzColumn.defaultValueExpression().orElse(null));
     }
 
-    private org.apache.flink.cdc.common.event.TableId toCdcTableId(TableId dbzTableId) {
-        if (isTableIdCaseInsensitive) {
-            return org.apache.flink.cdc.common.event.TableId.tableId(
-                    dbzTableId.catalog().toLowerCase(Locale.ROOT),
-                    dbzTableId.table().toLowerCase(Locale.ROOT));
-        } else {
-            return org.apache.flink.cdc.common.event.TableId.tableId(
-                    dbzTableId.catalog(), dbzTableId.table());
+    private String resolveExistingColumnName(String columnName) {
+        if (columnName == null || currentDbzTable == null) {
+            return columnName;
         }
+        Table currentDbzSchema = parser.databaseTables().forTable(currentDbzTable);
+        if (currentDbzSchema != null) {
+            String resolvedFromCurrentSchema =
+                    currentDbzSchema.columns().stream()
+                            .map(Column::name)
+                            .filter(
+                                    existingColumnName ->
+                                            existingColumnName.equalsIgnoreCase(columnName))
+                            .findFirst()
+                            .orElse(null);
+            if (resolvedFromCurrentSchema != null) {
+                return resolvedFromCurrentSchema;
+            }
+        }
+        for (int i = changes.size() - 1; i >= 0; i--) {
+            SchemaChangeEvent change = changes.get(i);
+            if (!currentTable.equals(change.tableId())) {
+                continue;
+            }
+            if (change instanceof AddColumnEvent) {
+                String resolvedFromAdd =
+                        ((AddColumnEvent) change)
+                                .getAddedColumns().stream()
+                                        .map(
+                                                columnWithPosition ->
+                                                        columnWithPosition.getAddColumn().getName())
+                                        .filter(
+                                                existingColumnName ->
+                                                        existingColumnName.equalsIgnoreCase(
+                                                                columnName))
+                                        .findFirst()
+                                        .orElse(null);
+                if (resolvedFromAdd != null) {
+                    return resolvedFromAdd;
+                }
+            } else if (change instanceof RenameColumnEvent) {
+                String resolvedFromRename =
+                        ((RenameColumnEvent) change)
+                                .getNameMapping().values().stream()
+                                        .filter(
+                                                existingColumnName ->
+                                                        existingColumnName.equalsIgnoreCase(
+                                                                columnName))
+                                        .findFirst()
+                                        .orElse(null);
+                if (resolvedFromRename != null) {
+                    return resolvedFromRename;
+                }
+            }
+        }
+        return columnName;
+    }
+
+    private org.apache.flink.cdc.common.event.TableId toCdcTableId(TableId dbzTableId) {
+        return MySqlSchemaUtils.toCdcTableId(dbzTableId, isTableIdCaseInsensitive);
     }
 }

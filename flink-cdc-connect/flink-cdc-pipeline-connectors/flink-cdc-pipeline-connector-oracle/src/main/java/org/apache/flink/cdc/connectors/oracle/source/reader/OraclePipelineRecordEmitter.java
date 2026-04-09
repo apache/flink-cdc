@@ -33,6 +33,7 @@ import org.apache.flink.cdc.connectors.oracle.source.config.OracleSourceConfig;
 import org.apache.flink.cdc.connectors.oracle.source.rowid.OracleRowIdExtractor;
 import org.apache.flink.cdc.connectors.oracle.utils.OracleSchemaUtils;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
+import org.apache.flink.cdc.debezium.event.DebeziumEventDeserializationSchema;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
 
 import io.debezium.jdbc.JdbcConnection;
@@ -106,6 +107,7 @@ public class OraclePipelineRecordEmitter extends IncrementalSourceRecordEmitter<
         this.createTableEventCache = createTableEventCache;
         this.alreadySendCreateTableTables = alreadySendCreateTableTables;
         this.isBounded = isBounded;
+        syncCreateTableEventsToDeserializer(createTableEventCache.values());
     }
 
     private static Map<TableId, CreateTableEvent> initializeCreateTableEventCache(
@@ -235,7 +237,21 @@ public class OraclePipelineRecordEmitter extends IncrementalSourceRecordEmitter<
                         org.apache.flink.cdc.common.event.TableId.tableId(
                                 tableId.schema(), tableId.table()),
                         schema);
+        syncCreateTableEventToDeserializer(createTableEvent);
         output.collect(createTableEvent);
         return createTableEvent;
+    }
+
+    private void syncCreateTableEventsToDeserializer(Iterable<CreateTableEvent> createTableEvents) {
+        for (CreateTableEvent createTableEvent : createTableEvents) {
+            syncCreateTableEventToDeserializer(createTableEvent);
+        }
+    }
+
+    private void syncCreateTableEventToDeserializer(CreateTableEvent createTableEvent) {
+        if (debeziumDeserializationSchema instanceof DebeziumEventDeserializationSchema) {
+            ((DebeziumEventDeserializationSchema) debeziumDeserializationSchema)
+                    .applyChangeEvent(createTableEvent);
+        }
     }
 }

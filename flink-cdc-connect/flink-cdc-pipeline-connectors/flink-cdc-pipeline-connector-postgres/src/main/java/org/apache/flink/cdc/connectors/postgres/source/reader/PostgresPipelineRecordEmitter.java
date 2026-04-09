@@ -96,7 +96,6 @@ public class PostgresPipelineRecordEmitter<T> extends PostgresSourceRecordEmitte
         this.createTableEventCache =
                 ((DebeziumEventDeserializationSchema) debeziumDeserializationSchema)
                         .getCreateTableEventCache();
-        generateCreateTableEvent(sourceConfig);
         this.isBounded = StartupOptions.snapshot().equals(sourceConfig.getStartupOptions());
     }
 
@@ -104,7 +103,7 @@ public class PostgresPipelineRecordEmitter<T> extends PostgresSourceRecordEmitte
     public void applySplit(SourceSplitBase split) {
         if ((isBounded) && createTableEventCache.isEmpty() && split instanceof SnapshotSplit) {
             // TableSchemas in SnapshotSplit only contains one table.
-            createTableEventCache.putAll(generateCreateTableEvent(sourceConfig));
+            createTableEventCache.putAll(generateCreateTableEvents());
         } else {
             for (Map.Entry<TableId, TableChanges.TableChange> entry :
                     split.getTableSchemas().entrySet()) {
@@ -135,7 +134,7 @@ public class PostgresPipelineRecordEmitter<T> extends PostgresSourceRecordEmitte
             maybeSendCreateTableEventFromCache(tableId, output);
         } else if (isDataChangeRecord(element)) {
             handleDataChangeRecord(element, output);
-        } else if (isSchemaChangeEvent(element) && sourceConfig.isIncludeSchemaChanges()) {
+        } else if (isSchemaChangeEvent(element)) {
             handleSchemaChangeRecord(element, output, splitState);
         }
         super.processElement(element, output, splitState);
@@ -143,12 +142,16 @@ public class PostgresPipelineRecordEmitter<T> extends PostgresSourceRecordEmitte
 
     private void handleDataChangeRecord(SourceRecord element, SourceOutput<T> output) {
         TableId tableId = getTableId(element);
+        boolean shouldEmitCreateTable = !alreadySendCreateTableTables.contains(tableId);
         maybeSendCreateTableEventFromCache(tableId, output);
         // In rare case, we may miss some CreateTableEvents before DataChangeEvents.
         // Don't send CreateTableEvent for SchemaChangeEvents as it's the latest schema.
         if (!createTableEventCache.containsKey(tableId)) {
-            CreateTableEvent createTableEvent = getCreateTableEvent(sourceConfig, tableId);
-            sendCreateTableEvent(createTableEvent, output);
+            CreateTableEvent createTableEvent = getCreateTableEvent(tableId);
+            syncSchemaChangeEventToDeserializer(createTableEvent);
+            if (shouldEmitCreateTable) {
+                sendCreateTableEvent(createTableEvent, output);
+            }
             createTableEventCache.put(tableId, createTableEvent);
         }
     }
@@ -165,16 +168,25 @@ public class PostgresPipelineRecordEmitter<T> extends PostgresSourceRecordEmitte
                 splitState.toSourceSplit().getTableSchemas();
         PostgresSchemaRecord schemaRecord = (PostgresSchemaRecord) element;
         Table schemaAfter = schemaRecord.getTable();
+        if (!sourceConfig.isIncludeSchemaChanges()) {
+            createTableEventCache.remove(schemaAfter.id());
+            return;
+        }
         maybeSendCreateTableEventFromCache(schemaAfter.id(), output);
         Table schemaBefore = null;
         if (existedTableSchemas.containsKey(schemaAfter.id())) {
             schemaBefore = existedTableSchemas.get(schemaAfter.id()).getTable();
         }
         List<SchemaChangeEvent> schemaChangeEvents =
-                inferSchemaChangeEvent(
-                        schemaAfter.id(), schemaBefore, schemaAfter, sourceConfig, postgresDialect);
+                inferSchemaChangeEvents(schemaAfter.id(), schemaBefore, schemaAfter);
         LOG.info("Inferred Schema change events: {}", schemaChangeEvents);
-        schemaChangeEvents.forEach(schemaChangeEvent -> output.collect((T) schemaChangeEvent));
+        schemaChangeEvents.forEach(
+                schemaChangeEvent -> {
+                    syncSchemaChangeEventToDeserializer(schemaChangeEvent);
+                    if (sourceConfig.isIncludeSchemaChanges()) {
+                        output.collect((T) schemaChangeEvent);
+                    }
+                });
     }
 
     private void maybeSendCreateTableEventFromCache(TableId tableId, SourceOutput<T> output) {
@@ -191,8 +203,21 @@ public class PostgresPipelineRecordEmitter<T> extends PostgresSourceRecordEmitte
         output.collect((T) createTableEvent);
     }
 
-    private CreateTableEvent getCreateTableEvent(
-            PostgresSourceConfig sourceConfig, TableId tableId) {
+    private void syncSchemaChangeEventToDeserializer(
+            org.apache.flink.cdc.common.event.ChangeEvent changeEvent) {
+        if (debeziumDeserializationSchema instanceof DebeziumEventDeserializationSchema) {
+            ((DebeziumEventDeserializationSchema) debeziumDeserializationSchema)
+                    .applyChangeEvent(changeEvent);
+        }
+    }
+
+    protected List<SchemaChangeEvent> inferSchemaChangeEvents(
+            TableId tableId, Table schemaBefore, Table schemaAfter) {
+        return inferSchemaChangeEvent(
+                tableId, schemaBefore, schemaAfter, sourceConfig, postgresDialect);
+    }
+
+    protected CreateTableEvent getCreateTableEvent(TableId tableId) {
         try (PostgresConnection jdbc = postgresDialect.openJdbcConnection()) {
             Schema schema = PostgresSchemaUtils.getTableSchema(tableId, sourceConfig, jdbc);
             return new CreateTableEvent(
@@ -216,8 +241,7 @@ public class PostgresPipelineRecordEmitter<T> extends PostgresSourceRecordEmitte
         return new TableId(null, schemaName, tableName);
     }
 
-    private Map<TableId, CreateTableEvent> generateCreateTableEvent(
-            PostgresSourceConfig sourceConfig) {
+    protected Map<TableId, CreateTableEvent> generateCreateTableEvents() {
         try (PostgresConnection jdbc = postgresDialect.openJdbcConnection()) {
             Map<TableId, CreateTableEvent> createTableEventCache = new HashMap<>();
             List<TableId> capturedTableIds =

@@ -31,6 +31,7 @@ import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplit;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplitState;
 import org.apache.flink.cdc.connectors.mysql.source.utils.StatementUtils;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
+import org.apache.flink.cdc.connectors.mysql.utils.MySqlSchemaUtils;
 import org.apache.flink.cdc.connectors.mysql.utils.MySqlTypeUtils;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.cdc.debezium.event.DebeziumEventDeserializationSchema;
@@ -55,11 +56,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils.openJdbcConnection;
 import static org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils.getTableId;
@@ -165,10 +164,7 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
                     try (JdbcConnection jdbc = openJdbcConnection(sourceConfig)) {
                         Schema schema = getSchema(jdbc, tableId);
                         CreateTableEvent createTableEvent =
-                                new CreateTableEvent(
-                                        org.apache.flink.cdc.common.event.TableId.tableId(
-                                                tableId.catalog(), tableId.table()),
-                                        schema);
+                                new CreateTableEvent(toCdcTableId(tableId), schema);
                         output.collect(createTableEvent);
                         createTableEventCache.put(tableId, createTableEvent);
                     }
@@ -179,18 +175,13 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
     }
 
     private org.apache.flink.cdc.common.event.TableId toCdcTableId(TableId dbzTableId) {
-        return org.apache.flink.cdc.common.event.TableId.tableId(
-                dbzTableId.catalog(), dbzTableId.table());
+        return MySqlSchemaUtils.toCdcTableId(dbzTableId, isTableIdCaseInsensitive);
     }
 
     private void sendCreateTableEvent(
             JdbcConnection jdbc, TableId tableId, SourceOutput<Event> output) {
         Schema schema = getSchema(jdbc, tableId);
-        output.collect(
-                new CreateTableEvent(
-                        org.apache.flink.cdc.common.event.TableId.tableId(
-                                tableId.catalog(), tableId.table()),
-                        schema));
+        output.collect(new CreateTableEvent(toCdcTableId(tableId), schema));
     }
 
     private Schema getSchema(JdbcConnection jdbc, TableId tableId) {
@@ -266,10 +257,7 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
         for (int i = 0; i < columns.size(); i++) {
             Column column = columns.get(i);
 
-            String colName =
-                    this.isTableIdCaseInsensitive
-                            ? column.name().toLowerCase(Locale.ROOT)
-                            : column.name();
+            String colName = column.name();
             DataType dataType =
                     MySqlTypeUtils.fromDbzColumn(column, sourceConfig.isTreatTinyInt1AsBoolean());
             if (!column.isOptional()) {
@@ -285,12 +273,6 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
 
         List<String> primaryKey = table.primaryKeyColumnNames();
         if (Objects.nonNull(primaryKey) && !primaryKey.isEmpty()) {
-            if (this.isTableIdCaseInsensitive) {
-                primaryKey =
-                        primaryKey.stream()
-                                .map(key -> key.toLowerCase(Locale.ROOT))
-                                .collect(Collectors.toList());
-            }
             tableBuilder.primaryKey(primaryKey);
         }
         return tableBuilder.build();
@@ -330,11 +312,7 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
             for (TableId tableId : capturedTableIds) {
                 Schema schema = getSchema(jdbc, tableId);
                 createTableEventCache.put(
-                        tableId,
-                        new CreateTableEvent(
-                                org.apache.flink.cdc.common.event.TableId.tableId(
-                                        tableId.catalog(), tableId.table()),
-                                schema));
+                        tableId, new CreateTableEvent(toCdcTableId(tableId), schema));
             }
             return createTableEventCache;
         } catch (SQLException e) {

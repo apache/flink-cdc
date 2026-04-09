@@ -201,6 +201,15 @@ class PreTransformOperatorTest {
                     .physicalColumn("class", DataTypes.INT())
                     .build();
 
+    private static final TableId DECIMAL_RUNTIME_NULL_TABLEID =
+            TableId.tableId("my_company", "my_branch", "decimal_runtime_nulls");
+    private static final Schema DECIMAL_RUNTIME_NULL_SCHEMA =
+            Schema.newBuilder()
+                    .physicalColumn("id", DataTypes.DECIMAL(20, 0).notNull())
+                    .physicalColumn("payload", DataTypes.STRING())
+                    .primaryKey("id")
+                    .build();
+
     @Test
     void testEventTransform() throws Exception {
         PreTransformOperator transform =
@@ -728,5 +737,44 @@ class PreTransformOperatorTest {
                                 new CreateTableEvent(
                                         CUSTOMERS_TABLEID, EXPECTED_COL_NAME_MAPPING_SCHEMA)));
         transformFunctionEventEventOperatorTestHarness.close();
+    }
+
+    @Test
+    void testUnexpectedRuntimeNullInNotNullDecimalColumn() throws Exception {
+        PreTransformOperator transform =
+                PreTransformOperator.newBuilder()
+                        .addTransform(
+                                DECIMAL_RUNTIME_NULL_TABLEID.identifier(),
+                                "id, payload",
+                                null,
+                                "id",
+                                null,
+                                null,
+                                null,
+                                new SupportedMetadataColumn[0])
+                        .build();
+        RegularEventOperatorTestHarness<PreTransformOperator, Event> harness =
+                RegularEventOperatorTestHarness.with(transform, 1);
+        harness.open();
+
+        CreateTableEvent createTableEvent =
+                new CreateTableEvent(DECIMAL_RUNTIME_NULL_TABLEID, DECIMAL_RUNTIME_NULL_SCHEMA);
+        transform.processElement(new StreamRecord<>(createTableEvent));
+        Assertions.assertThat(harness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(createTableEvent));
+
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(
+                        ((RowType) DECIMAL_RUNTIME_NULL_SCHEMA.toRowDataType()));
+
+        DataChangeEvent insertEvent =
+                DataChangeEvent.insertEvent(
+                        DECIMAL_RUNTIME_NULL_TABLEID,
+                        generator.generate(new Object[] {null, new BinaryStringData("payload")}));
+
+        transform.processElement(new StreamRecord<>(insertEvent));
+        Assertions.assertThat(harness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(insertEvent));
+        harness.close();
     }
 }

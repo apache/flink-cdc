@@ -17,8 +17,10 @@
 
 package org.apache.flink.cdc.runtime.operators.transform;
 
+import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
+import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
@@ -26,7 +28,9 @@ import org.apache.flink.cdc.common.pipeline.SchemaColumnCaseFormat;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.common.types.DataTypes;
+import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.runtime.testutils.operators.RegularEventOperatorTestHarness;
+import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 
 import org.assertj.core.api.Assertions;
@@ -417,6 +421,69 @@ class PostTransformOperatorProjectionKeysRegressionTest {
                                 new AlterColumnTypeEvent(
                                         tableId,
                                         Collections.singletonMap("NAME", DataTypes.VARCHAR(17)))));
+        harness.close();
+    }
+
+    @Test
+    void testProjectionAliasesKeepAuthoredCaseWhenPipelineUpperCaseIsEnabled() throws Exception {
+        TableId tableId = TableId.tableId("testdb", "customer");
+        Schema sourceSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.BIGINT().notNull())
+                        .physicalColumn("NAME", DataTypes.STRING())
+                        .physicalColumn("age", DataTypes.INT())
+                        .primaryKey("id")
+                        .build();
+
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
+                        .addTransform(
+                                tableId.identifier(),
+                                "id AS my_id, NAME AS name, age AS AGE",
+                                null,
+                                "id",
+                                "",
+                                "",
+                                ",",
+                                "",
+                                new SupportedMetadataColumn[0],
+                                SchemaColumnCaseFormat.UPPER)
+                        .build();
+        RegularEventOperatorTestHarness<PostTransformOperator, Event> harness =
+                RegularEventOperatorTestHarness.with(transform, 1);
+        harness.open();
+
+        Schema expectedSchema =
+                Schema.newBuilder()
+                        .physicalColumn("my_id", DataTypes.BIGINT().notNull())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .physicalColumn("AGE", DataTypes.INT())
+                        .primaryKey("my_id")
+                        .build();
+
+        transform.processElement(new StreamRecord<>(new CreateTableEvent(tableId, sourceSchema)));
+        Assertions.assertThat(harness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(new CreateTableEvent(tableId, expectedSchema)));
+
+        BinaryRecordDataGenerator sourceGenerator =
+                new BinaryRecordDataGenerator(((RowType) sourceSchema.toRowDataType()));
+        BinaryRecordDataGenerator expectedGenerator =
+                new BinaryRecordDataGenerator(((RowType) expectedSchema.toRowDataType()));
+
+        DataChangeEvent insertEvent =
+                DataChangeEvent.insertEvent(
+                        tableId,
+                        sourceGenerator.generate(
+                                new Object[] {1L, BinaryStringData.fromString("Alice"), 18}));
+        DataChangeEvent expectedInsertEvent =
+                DataChangeEvent.insertEvent(
+                        tableId,
+                        expectedGenerator.generate(
+                                new Object[] {1L, BinaryStringData.fromString("Alice"), 18}));
+
+        transform.processElement(new StreamRecord<>(insertEvent));
+        Assertions.assertThat(harness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(expectedInsertEvent));
         harness.close();
     }
 }
