@@ -49,7 +49,6 @@ import java.util.stream.Collectors;
 @Internal
 public abstract class JdbcSourceFetchTaskContext implements FetchTask.Context {
 
-
     protected final JdbcSourceConfig sourceConfig;
     protected final JdbcDataSourceDialect dataSourceDialect;
     protected CommonConnectorConfig dbzConnectorConfig;
