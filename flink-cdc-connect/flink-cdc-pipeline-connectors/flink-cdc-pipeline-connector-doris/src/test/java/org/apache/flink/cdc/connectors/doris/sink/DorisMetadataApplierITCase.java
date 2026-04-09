@@ -400,9 +400,9 @@ class DorisMetadataApplierITCase extends DorisSinkTestBase {
 
         List<String> expected =
                 Arrays.asList(
-                        "extra_first | TEXT | Yes | false | null",
                         "id | INT | Yes | true | null",
                         "extra_after_id | BIGINT | Yes | false | null",
+                        "extra_first | TEXT | Yes | false | null",
                         "number | DOUBLE | Yes | false | null",
                         "extra_before_name | BOOLEAN | Yes | false | null",
                         "name | VARCHAR(51) | Yes | false | null");

@@ -382,32 +382,59 @@ public class DorisMetadataApplier implements MetadataApplier {
 
     private AddColumnPosition resolveAddColumnPosition(
             AddColumnEvent.ColumnWithPosition columnWithPosition, Schema currentSchema) {
+        List<String> columnNames = currentSchema.getColumnNames();
+        int targetIndex = resolveTargetIndex(columnWithPosition, currentSchema, columnNames);
+
+        // Doris requires key columns to stay at the front of the schema. When a source-side
+        // add-column position points into the key prefix, clamp the new non-key column to the
+        // first valid non-key position instead of forwarding an invalid DDL like ADD COLUMN FIRST.
+        int lastPrimaryKeyIndex = resolveLastPrimaryKeyIndex(currentSchema, columnNames);
+        if (lastPrimaryKeyIndex >= 0 && targetIndex <= lastPrimaryKeyIndex) {
+            targetIndex = lastPrimaryKeyIndex + 1;
+        }
+
+        if (targetIndex <= 0) {
+            return AddColumnPosition.first();
+        }
+        if (targetIndex >= columnNames.size()) {
+            return AddColumnPosition.last();
+        }
+        return AddColumnPosition.after(columnNames.get(targetIndex - 1));
+    }
+
+    private int resolveTargetIndex(
+            AddColumnEvent.ColumnWithPosition columnWithPosition,
+            Schema currentSchema,
+            List<String> columnNames) {
         switch (columnWithPosition.getPosition()) {
             case FIRST:
-                return AddColumnPosition.first();
+                return 0;
             case LAST:
-                return AddColumnPosition.last();
+                return columnNames.size();
             case AFTER:
-                return AddColumnPosition.after(
-                        requireExistingColumnName(columnWithPosition, currentSchema));
+                return columnNames.indexOf(
+                                requireExistingColumnName(columnWithPosition, currentSchema))
+                        + 1;
             case BEFORE:
-                String existedColumnName =
-                        requireExistingColumnName(columnWithPosition, currentSchema);
-                List<String> columnNames = currentSchema.getColumnNames();
-                int index = columnNames.indexOf(existedColumnName);
-                if (index < 0) {
-                    throw new IllegalStateException(
-                            existedColumnName
-                                    + " of AddColumnEvent is not existed in current Doris schema cache");
-                }
-                if (index == 0) {
-                    return AddColumnPosition.first();
-                }
-                return AddColumnPosition.after(columnNames.get(index - 1));
+                return columnNames.indexOf(
+                        requireExistingColumnName(columnWithPosition, currentSchema));
             default:
                 throw new IllegalStateException(
                         "Unsupported add column position " + columnWithPosition.getPosition());
         }
+    }
+
+    private int resolveLastPrimaryKeyIndex(Schema currentSchema, List<String> columnNames) {
+        int lastPrimaryKeyIndex = -1;
+        for (String primaryKey : currentSchema.primaryKeys()) {
+            int primaryKeyIndex = columnNames.indexOf(primaryKey);
+            if (primaryKeyIndex < 0) {
+                throw new IllegalStateException(
+                        primaryKey + " of current Doris schema cache is not existed.");
+            }
+            lastPrimaryKeyIndex = Math.max(lastPrimaryKeyIndex, primaryKeyIndex);
+        }
+        return lastPrimaryKeyIndex;
     }
 
     private String requireExistingColumnName(

@@ -21,6 +21,7 @@ import org.apache.flink.cdc.common.test.utils.TestUtils;
 import org.apache.flink.cdc.connectors.doris.sink.utils.DorisContainer;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
+import org.apache.flink.runtime.client.JobStatusMessage;
 
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
@@ -44,13 +45,16 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /** End-to-end tests for mysql cdc to Doris pipeline job. */
 class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
     private static final Logger LOG = LoggerFactory.getLogger(MySqlToDorisE2eITCase.class);
+    private static final int DIAGNOSTIC_LOG_TAIL_LINES = 200;
 
     @Container
     protected static final DorisContainer DORIS =
@@ -797,6 +801,7 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
     @Test
     void testComplexDataTypes() throws Exception {
         String databaseName = complexDataTypesDatabase.getDatabaseName();
+        String sinkTableName = "data_types_table";
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -836,10 +841,12 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
         submitPipelineJob(pipelineJob, mysqlCdcJar, dorisCdcConnector, mysqlDriverJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
 
-        LOG.info("Verifying snapshot stage of DATA_TYPES_TABLE...");
+        LOG.info(
+                "Verifying snapshot stage of {} mapped from source DATA_TYPES_TABLE...",
+                sinkTableName);
         validateSinkSchema(
                 databaseName,
-                "DATA_TYPES_TABLE",
+                sinkTableName,
                 Arrays.asList(
                         "id | INT | Yes | true | null",
                         "tiny_c | TINYINT | Yes | false | null",
@@ -897,12 +904,14 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                         "FINE | TEXT | Yes | false | null"));
         validateSinkResult(
                 databaseName,
-                "DATA_TYPES_TABLE",
+                sinkTableName,
                 54,
                 Collections.singletonList(
                         "1 | 127 | 255 | 255 | 32767 | 65535 | 65535 | 8388607 | 16777215 | 16777215 | 2147483647 | 4294967295 | 4294967295 | 2147483647 | 9223372036854775807 | Hello World | abc | 123.102 | 123.102 | 123.103 | 123.104 | 404.4443 | 404.4444 | 404.4445 | 123.4567 | 123.4568 | 123.4569 | 346 | 34567892.1 | 0 | 1 | 1 | 2020-07-17 | 2020-07-17 18:00:22.0 | 2020-07-17 18:00:22.0 | 2020-07-17 18:00:22 | 14:38:07 | 21:49:13.123 | text | EA== | EA== | EA== | EA== | 2021 | red | {\"coordinates\":[1,1],\"type\":\"Point\",\"srid\":0} | {\"coordinates\":[[[1,1],[2,1],[2,2],[1,2],[1,1]]],\"type\":\"Polygon\",\"srid\":0} | {\"coordinates\":[[3,0],[3,3],[3,5]],\"type\":\"LineString\",\"srid\":0} | {\"coordinates\":[[[1,1],[2,1],[2,2],[1,2],[1,1]]],\"type\":\"Polygon\",\"srid\":0} | {\"coordinates\":[[1,1],[2,2]],\"type\":\"MultiPoint\",\"srid\":0} | {\"coordinates\":[[[1,1],[2,2],[3,3]],[[4,4],[5,5]]],\"type\":\"MultiLineString\",\"srid\":0} | {\"coordinates\":[[[[0,0],[10,0],[10,10],[0,10],[0,0]]],[[[5,5],[7,5],[7,7],[5,7],[5,5]]]],\"type\":\"MultiPolygon\",\"srid\":0} | {\"geometries\":[{\"type\":\"Point\",\"coordinates\":[10,10]},{\"type\":\"Point\",\"coordinates\":[30,30]},{\"type\":\"LineString\",\"coordinates\":[[15,15],[20,20]]}],\"type\":\"GeometryCollection\",\"srid\":0} | fine"));
 
-        LOG.info("Verifying streaming stage of DATA_TYPES_TABLE...");
+        LOG.info(
+                "Verifying streaming stage of {} mapped from source DATA_TYPES_TABLE...",
+                sinkTableName);
         // generate binlogs
         String mysqlJdbcUrl =
                 String.format(
@@ -938,7 +947,7 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
 
             validateSinkResult(
                     databaseName,
-                    "DATA_TYPES_TABLE",
+                    sinkTableName,
                     54,
                     Arrays.asList(
                             "1 | 127 | 255 | 255 | 32767 | 65535 | 65535 | 8388607 | 16777215 | 16777215 | 2147483647 | 4294967295 | 4294967295 | 2147483647 | 9223372036854775807 | Hello World | abc | 123.102 | 123.102 | 123.103 | 123.104 | 404.4443 | 404.4444 | 404.4445 | 123.4567 | 123.4568 | 123.4569 | 346 | 34567892.1 | 0 | 1 | 1 | 2020-07-17 | 2020-07-17 18:00:22.0 | 2020-07-17 18:00:22.0 | 2020-07-17 18:00:22 | 14:38:07 | 21:49:13.123 | text | EA== | EA== | EA== | EA== | 2021 | red | {\"coordinates\":[1,1],\"type\":\"Point\",\"srid\":0} | {\"coordinates\":[[[1,1],[2,1],[2,2],[1,2],[1,1]]],\"type\":\"Polygon\",\"srid\":0} | {\"coordinates\":[[3,0],[3,3],[3,5]],\"type\":\"LineString\",\"srid\":0} | {\"coordinates\":[[[1,1],[2,1],[2,2],[1,2],[1,1]]],\"type\":\"Polygon\",\"srid\":0} | {\"coordinates\":[[1,1],[2,2]],\"type\":\"MultiPoint\",\"srid\":0} | {\"coordinates\":[[[1,1],[2,2],[3,3]],[[4,4],[5,5]]],\"type\":\"MultiLineString\",\"srid\":0} | {\"coordinates\":[[[[0,0],[10,0],[10,10],[0,10],[0,0]]],[[[5,5],[7,5],[7,7],[5,7],[5,5]]]],\"type\":\"MultiPolygon\",\"srid\":0} | {\"geometries\":[{\"type\":\"Point\",\"coordinates\":[10,10]},{\"type\":\"Point\",\"coordinates\":[30,30]},{\"type\":\"LineString\",\"coordinates\":[[15,15],[20,20]]}],\"type\":\"GeometryCollection\",\"srid\":0} | fine",
@@ -953,6 +962,7 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
     @Test
     public void testComplexDataTypesInBatchMode() throws Exception {
         String databaseName = complexDataTypesDatabase.getDatabaseName();
+        String sinkTableName = "data_types_table";
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -994,10 +1004,12 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
         submitPipelineJob(pipelineJob, mysqlCdcJar, dorisCdcConnector, mysqlDriverJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
 
-        LOG.info("Verifying snapshot stage of DATA_TYPES_TABLE...");
+        LOG.info(
+                "Verifying snapshot stage of {} mapped from source DATA_TYPES_TABLE...",
+                sinkTableName);
         validateSinkSchema(
                 databaseName,
-                "DATA_TYPES_TABLE",
+                sinkTableName,
                 Arrays.asList(
                         "id | INT | Yes | true | null",
                         "tiny_c | TINYINT | Yes | false | null",
@@ -1055,7 +1067,7 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                         "FINE | TEXT | Yes | false | null"));
         validateSinkResult(
                 databaseName,
-                "DATA_TYPES_TABLE",
+                sinkTableName,
                 54,
                 Collections.singletonList(
                         "1 | 127 | 255 | 255 | 32767 | 65535 | 65535 | 8388607 | 16777215 | 16777215 | 2147483647 | 4294967295 | 4294967295 | 2147483647 | 9223372036854775807 | Hello World | abc | 123.102 | 123.102 | 123.103 | 123.104 | 404.4443 | 404.4444 | 404.4445 | 123.4567 | 123.4568 | 123.4569 | 346 | 34567892.1 | 0 | 1 | 1 | 2020-07-17 | 2020-07-17 18:00:22.0 | 2020-07-17 18:00:22.0 | 2020-07-17 18:00:22 | 14:38:07 | 21:49:13.123 | text | EA== | EA== | EA== | EA== | 2021 | red | {\"coordinates\":[1,1],\"type\":\"Point\",\"srid\":0} | {\"coordinates\":[[[1,1],[2,1],[2,2],[1,2],[1,1]]],\"type\":\"Polygon\",\"srid\":0} | {\"coordinates\":[[3,0],[3,3],[3,5]],\"type\":\"LineString\",\"srid\":0} | {\"coordinates\":[[[1,1],[2,1],[2,2],[1,2],[1,1]]],\"type\":\"Polygon\",\"srid\":0} | {\"coordinates\":[[1,1],[2,2]],\"type\":\"MultiPoint\",\"srid\":0} | {\"coordinates\":[[[1,1],[2,2],[3,3]],[[4,4],[5,5]]],\"type\":\"MultiLineString\",\"srid\":0} | {\"coordinates\":[[[[0,0],[10,0],[10,10],[0,10],[0,0]]],[[[5,5],[7,5],[7,7],[5,7],[5,5]]]],\"type\":\"MultiPolygon\",\"srid\":0} | {\"geometries\":[{\"type\":\"Point\",\"coordinates\":[10,10]},{\"type\":\"Point\",\"coordinates\":[30,30]},{\"type\":\"LineString\",\"coordinates\":[[15,15],[20,20]]}],\"type\":\"GeometryCollection\",\"srid\":0} | fine"));
@@ -1418,6 +1430,7 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
             boolean inAnyOrder)
             throws Exception {
         long deadline = System.currentTimeMillis() + timeoutMilliseconds;
+        SQLSyntaxErrorException lastSqlSyntaxException = null;
         while (System.currentTimeMillis() < deadline) {
             try {
                 List<String> actual = fetchTableContent(databaseName, sql, numberOfColumns);
@@ -1440,11 +1453,118 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                         expected,
                         actual);
             } catch (SQLSyntaxErrorException t) {
+                lastSqlSyntaxException = t;
                 LOG.info("Database {} isn't ready yet. Waiting for the next loop...", databaseName);
             }
             Thread.sleep(1000L);
         }
-        Assertions.fail("Failed to verify content of {}::{}.", databaseName, sql);
+        logVerificationDiagnostics(databaseName, sql, lastSqlSyntaxException);
+        AssertionError assertionError =
+                new AssertionError(
+                        String.format("Failed to verify content of %s::%s.", databaseName, sql));
+        if (lastSqlSyntaxException != null) {
+            assertionError.initCause(lastSqlSyntaxException);
+        }
+        throw assertionError;
+    }
+
+    private void logVerificationDiagnostics(
+            String databaseName, String sql, SQLSyntaxErrorException sqlSyntaxException) {
+        if (sqlSyntaxException != null) {
+            LOG.error(
+                    "Verification timeout for {}::{} with the latest SQL syntax exception.",
+                    databaseName,
+                    sql,
+                    sqlSyntaxException);
+        } else {
+            LOG.error("Verification timeout for {}::{}.", databaseName, sql);
+        }
+        logCurrentJobStatuses();
+        logContainerDiagnostics("JobManager", jobManagerConsumer.toUtf8String());
+        logContainerDiagnostics("TaskManager", taskManagerConsumer.toUtf8String());
+    }
+
+    private void logCurrentJobStatuses() {
+        try {
+            List<JobStatusMessage> jobs = new ArrayList<>(getRestClusterClient().listJobs().get());
+            jobs.sort(Comparator.comparing(JobStatusMessage::getStartTime));
+            if (jobs.isEmpty()) {
+                LOG.error("No Flink jobs are visible from the REST client.");
+                return;
+            }
+            for (JobStatusMessage job : jobs) {
+                LOG.error(
+                        "Flink job status: name={}, id={}, state={}",
+                        job.getJobName(),
+                        job.getJobId(),
+                        job.getJobState());
+            }
+        } catch (Exception e) {
+            LOG.error("Failed to fetch Flink job statuses for diagnostics.", e);
+        }
+    }
+
+    private void logContainerDiagnostics(String component, String rawLogs) {
+        LOG.error(
+                "{} focused diagnostic log:\n{}",
+                component,
+                summarizeFocusedDiagnosticLogs(rawLogs));
+        LOG.error("{} diagnostic log tail:\n{}", component, summarizeDiagnosticLogs(rawLogs));
+    }
+
+    private String summarizeFocusedDiagnosticLogs(String rawLogs) {
+        if (rawLogs == null || rawLogs.isEmpty()) {
+            return "<empty>";
+        }
+
+        List<String> focusedLines =
+                Arrays.stream(rawLogs.split("\\R"))
+                        .filter(this::isFocusedDiagnosticLine)
+                        .collect(Collectors.toList());
+        if (focusedLines.isEmpty()) {
+            return "<empty>";
+        }
+        return String.join("\n", focusedLines);
+    }
+
+    private String summarizeDiagnosticLogs(String rawLogs) {
+        if (rawLogs == null || rawLogs.isEmpty()) {
+            return "<empty>";
+        }
+        List<String> lines = Arrays.asList(rawLogs.split("\\R"));
+        List<String> diagnosticLines =
+                lines.stream().filter(this::isDiagnosticLine).collect(Collectors.toList());
+        List<String> source = diagnosticLines.isEmpty() ? lines : diagnosticLines;
+        int fromIndex = Math.max(0, source.size() - DIAGNOSTIC_LOG_TAIL_LINES);
+        return String.join("\n", source.subList(fromIndex, source.size()));
+    }
+
+    private boolean isDiagnosticLine(String line) {
+        String normalized = line.toLowerCase(Locale.ROOT);
+        return normalized.contains("error")
+                || normalized.contains("exception")
+                || normalized.contains("failed")
+                || normalized.contains("caused by")
+                || normalized.contains("schema")
+                || normalized.contains("stream load")
+                || normalized.contains("create table")
+                || normalized.contains("data_types_table")
+                || normalized.contains("doris");
+    }
+
+    private boolean isFocusedDiagnosticLine(String line) {
+        String normalized = line.toLowerCase(Locale.ROOT);
+        return normalized.contains("cdc-doris-diag")
+                || normalized.contains("create table")
+                || normalized.contains("schemachangerequest")
+                || normalized.contains("finished schema change events")
+                || normalized.contains("sending the flushevent")
+                || normalized.contains("going to request schema change")
+                || normalized.contains("successfully applied schema change event")
+                || normalized.contains("execute sql:")
+                || normalized.contains("stream load started")
+                || normalized.contains("load success")
+                || normalized.contains("unknown table");
     }
 
     private void submitMysqlToDorisJob(String pipelineJob) throws Exception {
