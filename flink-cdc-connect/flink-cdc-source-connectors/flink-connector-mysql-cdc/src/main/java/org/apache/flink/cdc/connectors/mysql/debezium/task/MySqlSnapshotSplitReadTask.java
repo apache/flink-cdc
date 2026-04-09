@@ -84,6 +84,7 @@ public class MySqlSnapshotSplitReadTask
 
     private final SnapshotPhaseHooks hooks;
     private final boolean isBackfillSkipped;
+    private final String snapshotFilter;
 
     public MySqlSnapshotSplitReadTask(
             MySqlSourceConfig sourceConfig,
@@ -110,6 +111,9 @@ public class MySqlSnapshotSplitReadTask
         this.snapshotChangeEventSourceMetrics = snapshotChangeEventSourceMetrics;
         this.hooks = hooks;
         this.isBackfillSkipped = isBackfillSkipped;
+        this.snapshotFilter =
+                SnapshotFilterUtils.getSnapshotFilter(
+                        sourceConfig.getSnapshotFilters(), snapshotSplit.getTableId());
     }
 
     @Override
@@ -243,15 +247,12 @@ public class MySqlSnapshotSplitReadTask
         long exportStart = clock.currentTimeInMillis();
         LOG.info("Exporting data from split '{}' of table {}", snapshotSplit.splitId(), table.id());
 
-        String filter =
-                SnapshotFilterUtils.getSnapshotFilter(
-                        sourceConfig.getSnapshotFilters(), table.id());
-        if (filter != null) {
+        if (snapshotFilter != null) {
             LOG.info(
                     "Filter for split '{}' of table {} is: {}",
                     snapshotSplit.splitId(),
                     table.id(),
-                    filter);
+                    snapshotFilter);
         }
 
         final String selectSql =
@@ -260,7 +261,7 @@ public class MySqlSnapshotSplitReadTask
                         snapshotSplit.getSplitKeyType(),
                         snapshotSplit.getSplitStart() == null,
                         snapshotSplit.getSplitEnd() == null,
-                        filter);
+                        snapshotFilter);
         LOG.info(
                 "For split '{}' of table {} using select statement: '{}'",
                 snapshotSplit.splitId(),
