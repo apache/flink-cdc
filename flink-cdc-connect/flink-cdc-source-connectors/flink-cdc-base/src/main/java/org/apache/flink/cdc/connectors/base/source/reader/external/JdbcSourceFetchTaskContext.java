@@ -38,8 +38,6 @@ import io.debezium.relational.TableId;
 import io.debezium.util.SchemaNameAdjuster;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
 import java.util.Collection;
@@ -51,7 +49,6 @@ import java.util.stream.Collectors;
 @Internal
 public abstract class JdbcSourceFetchTaskContext implements FetchTask.Context {
 
-    private static final Logger LOG = LoggerFactory.getLogger(JdbcSourceFetchTaskContext.class);
 
     protected final JdbcSourceConfig sourceConfig;
     protected final JdbcDataSourceDialect dataSourceDialect;
@@ -138,7 +135,7 @@ public abstract class JdbcSourceFetchTaskContext implements FetchTask.Context {
                 case READ:
                     throw new IllegalStateException(
                             String.format(
-                                    "Data change record shouldn't use READ operation, the the record is %s.",
+                                    "Data change record shouldn't use READ operation, the record is %s.",
                                     changeRecord));
             }
         }

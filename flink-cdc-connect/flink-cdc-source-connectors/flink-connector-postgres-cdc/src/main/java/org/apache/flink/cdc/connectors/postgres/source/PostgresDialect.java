@@ -242,19 +242,27 @@ public class PostgresDialect implements JdbcDataSourceDialect {
 
     private String queryReplicaIdentity(JdbcConnection jdbc, TableId tableId) throws SQLException {
         String query =
-                String.format(
-                        "SELECT relreplident FROM pg_class c "
-                                + "JOIN pg_namespace n ON c.relnamespace = n.oid "
-                                + "WHERE n.nspname = '%s' AND c.relname = '%s'",
-                        tableId.schema(), tableId.table());
+                "SELECT relreplident FROM pg_class c "
+                        + "JOIN pg_namespace n ON c.relnamespace = n.oid "
+                        + "WHERE n.nspname = ? AND c.relname = ?";
         final String[] result = new String[1];
-        jdbc.query(
+        jdbc.prepareQuery(
                 query,
+                ps -> {
+                    ps.setString(1, tableId.schema());
+                    ps.setString(2, tableId.table());
+                },
                 rs -> {
                     if (rs.next()) {
                         result[0] = rs.getString(1);
                     }
                 });
+        if (result[0] == null) {
+            throw new FlinkRuntimeException(
+                    String.format(
+                            "Failed to query replica identity for table '%s.%s': table was not found.",
+                            tableId.schema(), tableId.table()));
+        }
         return result[0];
     }
 

@@ -32,5 +32,5 @@ VALUES (101,'scooter','Small 2-wheel scooter',3.14),
        (105,'hammer','14oz carpenter''s hammer',0.875),
        (106,'hammer','16oz carpenter''s hammer',1.0),
        (107,'rocks','box of assorted rocks',5.3),
-       (108,'jacket','water resistent black wind breaker',0.1),
+       (108,'jacket','water resistant black wind breaker',0.1),
        (109,'spare tire','24 inch spare tire',22.2);

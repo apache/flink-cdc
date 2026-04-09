@@ -253,7 +253,7 @@ public class SplitKeyUtils {
      * Instead, extract it from the value's after struct (for CREATE/READ) or before struct (for
      * UPDATE/DELETE).
      */
-    public static Struct getStructContainingChunkKey(SourceRecord record) {
+    static Struct getStructContainingChunkKey(SourceRecord record) {
         Struct value = (Struct) record.value();
         Envelope.Operation op =
                 Envelope.Operation.forCode(value.getString(Envelope.FieldName.OPERATION));
