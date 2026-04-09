@@ -34,7 +34,9 @@ import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.common.types.utils.DataTypeUtils;
 import org.apache.flink.cdc.connectors.iceberg.sink.utils.HadoopConfUtils;
 import org.apache.flink.cdc.connectors.iceberg.sink.utils.IcebergTypeUtils;
+
 import org.apache.flink.shaded.guava31.com.google.common.collect.Sets;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.iceberg.CatalogUtil;
 import org.apache.iceberg.HasTableOperations;
@@ -52,6 +54,7 @@ import org.apache.iceberg.types.Type;
 import org.apache.iceberg.types.Types;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -60,11 +63,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
 import static org.apache.flink.cdc.common.utils.Preconditions.checkNotNull;
 
-/**
- * A {@link MetadataApplier} for Apache Iceberg.
- */
+/** A {@link MetadataApplier} for Apache Iceberg. */
 public class IcebergMetadataApplier implements MetadataApplier {
     private static final Pattern PARTITION_YEAR_PATTERN = Pattern.compile("^year\\((.*)\\)$");
 
