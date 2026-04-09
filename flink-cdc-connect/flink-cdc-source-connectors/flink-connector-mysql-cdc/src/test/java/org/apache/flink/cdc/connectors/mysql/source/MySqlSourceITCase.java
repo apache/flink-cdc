@@ -504,7 +504,7 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.setParallelism(DEFAULT_PARALLELISM);
         env.enableCheckpointing(5000L);
-        env.setRestartStrategy(RestartStrategies.fixedDelayRestart(1, 0));
+        RestartStrategyUtils.configureFixedDelayRestartStrategy(env, 1, 0);
 
         // Filter user with `id > 200`
         // The sleeping source will sleep awhile after send per record
@@ -572,7 +572,7 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.setParallelism(DEFAULT_PARALLELISM);
         env.enableCheckpointing(5000L);
-        env.setRestartStrategy(RestartStrategies.fixedDelayRestart(1, 0));
+        RestartStrategyUtils.configureFixedDelayRestartStrategy(env, 1, 0);
 
         ResolvedSchema physicalSchema =
                 new ResolvedSchema(
