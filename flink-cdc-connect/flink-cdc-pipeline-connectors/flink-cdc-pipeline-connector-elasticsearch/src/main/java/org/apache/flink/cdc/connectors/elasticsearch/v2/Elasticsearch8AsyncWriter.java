@@ -166,7 +166,8 @@ public class Elasticsearch8AsyncWriter<InputT> extends AsyncSinkWriterAdapter<In
         LOG.debug("The BulkRequest has failed", error);
         numRecordsOutErrorsCounter.inc(requestEntries.size());
 
-        if (isRetryable(error.getCause())) {
+        Throwable retryableError = error.getCause() != null ? error.getCause() : error;
+        if (isRetryable(retryableError)) {
             resultHandler.retryForEntries(requestEntries);
         }
     }
