@@ -27,6 +27,7 @@ import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
+import org.apache.flink.cdc.common.data.ZonedTimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.ChangeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
@@ -199,6 +200,8 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
                 return this::convertToTimestamp;
             case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
                 return this::convertToLocalTimeZoneTimestamp;
+            case TIMESTAMP_WITH_TIME_ZONE:
+                return this::convertToZonedTimestamp;
             case FLOAT:
                 return this::convertToFloat;
             case DOUBLE:
@@ -377,6 +380,33 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
         }
         throw new IllegalArgumentException(
                 "Unable to convert to TIMESTAMP_LTZ from unexpected value '"
+                        + dbzObj
+                        + "' of type "
+                        + dbzObj.getClass().getName());
+    }
+
+    /**
+     * Converts a Debezium TIMESTAMPTZ value to a {@link ZonedTimestampData}.
+     *
+     * <p>Debezium's pgoutput plugin sends TIMESTAMPTZ as an ISO-8601 string with offset (e.g.
+     * "2026-03-31T12:03:46.125062+00:00"). We parse this to extract milliseconds, sub-millisecond
+     * nanos, and the zone offset.
+     */
+    protected Object convertToZonedTimestamp(Object dbzObj, Schema schema) {
+        if (dbzObj instanceof String) {
+            String str = (String) dbzObj;
+            java.time.OffsetDateTime odt =
+                    ZonedTimestamp.FORMATTER.parse(str, java.time.OffsetDateTime::from);
+            Instant instant = odt.toInstant();
+            long millisecond = instant.toEpochMilli();
+            int nanoOfMillisecond = instant.getNano() % 1_000_000;
+            String zoneId = odt.getOffset().getId();
+            ZonedTimestampData result =
+                    ZonedTimestampData.of(millisecond, nanoOfMillisecond, zoneId);
+            return result;
+        }
+        throw new IllegalArgumentException(
+                "Unable to convert to TIMESTAMP_TZ from unexpected value '"
                         + dbzObj
                         + "' of type "
                         + dbzObj.getClass().getName());
