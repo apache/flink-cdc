@@ -224,8 +224,8 @@ public class PostgresDialect implements JdbcDataSourceDialect {
                     throw new FlinkRuntimeException(
                             String.format(
                                     "Table '%s.%s' has no primary key. "
-                                            + "To use incremental snapshot for tables without primary key, "
-                                            + "REPLICA IDENTITY FULL must be set. "
+                                            + "REPLICA IDENTITY FULL must be set for tables without primary key, "
+                                            + "otherwise UPDATE and DELETE events will not be captured. "
                                             + "Please execute: ALTER TABLE %s.%s REPLICA IDENTITY FULL",
                                     tableId.schema(),
                                     tableId.table(),
