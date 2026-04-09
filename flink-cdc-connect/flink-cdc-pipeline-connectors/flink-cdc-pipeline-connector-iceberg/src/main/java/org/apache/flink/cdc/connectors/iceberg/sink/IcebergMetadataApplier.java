@@ -34,9 +34,7 @@ import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.common.types.utils.DataTypeUtils;
 import org.apache.flink.cdc.connectors.iceberg.sink.utils.HadoopConfUtils;
 import org.apache.flink.cdc.connectors.iceberg.sink.utils.IcebergTypeUtils;
-
 import org.apache.flink.shaded.guava31.com.google.common.collect.Sets;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.iceberg.CatalogUtil;
 import org.apache.iceberg.HasTableOperations;
@@ -54,7 +52,6 @@ import org.apache.iceberg.types.Type;
 import org.apache.iceberg.types.Types;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -63,10 +60,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
 import static org.apache.flink.cdc.common.utils.Preconditions.checkNotNull;
 
-/** A {@link MetadataApplier} for Apache Iceberg. */
+/**
+ * A {@link MetadataApplier} for Apache Iceberg.
+ */
 public class IcebergMetadataApplier implements MetadataApplier {
     private static final Pattern PARTITION_YEAR_PATTERN = Pattern.compile("^year\\((.*)\\)$");
 
@@ -83,18 +81,12 @@ public class IcebergMetadataApplier implements MetadataApplier {
             Pattern.compile("^truncate\\[(\\d+)]\\((.*)\\)$");
 
     private static final Logger LOG = LoggerFactory.getLogger(IcebergMetadataApplier.class);
-
-    private transient Catalog catalog;
-
     private final Map<String, String> catalogOptions;
-
     // currently, we set table options for all tables using the same options.
     private final Map<String, String> tableOptions;
-
     private final Map<TableId, List<String>> partitionMaps;
-
     private final Map<String, String> hadoopConfOptions;
-
+    private transient Catalog catalog;
     private Set<SchemaChangeEventType> enabledSchemaEvolutionTypes;
 
     public IcebergMetadataApplier(Map<String, String> catalogOptions) {
@@ -167,8 +159,7 @@ public class IcebergMetadataApplier implements MetadataApplier {
             long startTimestamp = System.currentTimeMillis();
             TableIdentifier tableIdentifier = TableIdentifier.parse(event.tableId().identifier());
             // Step 0: Create namespace if not exists.
-            if (catalog instanceof SupportsNamespaces) {
-                SupportsNamespaces namespaceCatalog = (SupportsNamespaces) catalog;
+            if (catalog instanceof SupportsNamespaces namespaceCatalog) {
                 Namespace namespace = Namespace.of(tableIdentifier.namespace().levels());
                 if (!namespaceCatalog.namespaceExists(namespace)) {
                     namespaceCatalog.createNamespace(namespace);
@@ -336,6 +327,11 @@ public class IcebergMetadataApplier implements MetadataApplier {
                                                                 .getLogicalType())
                                                 .asPrimitiveType();
                                 updateSchema.updateColumn(name, type);
+                                if (newType.isNullable()) {
+                                    updateSchema.makeColumnOptional(name);
+                                } else {
+                                    updateSchema.requireColumn(name);
+                                }
                             });
             updateSchema.commit();
         } catch (Exception e) {
