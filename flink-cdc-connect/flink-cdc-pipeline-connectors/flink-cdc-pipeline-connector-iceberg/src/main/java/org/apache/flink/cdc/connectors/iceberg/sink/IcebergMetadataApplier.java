@@ -83,12 +83,18 @@ public class IcebergMetadataApplier implements MetadataApplier {
             Pattern.compile("^truncate\\[(\\d+)]\\((.*)\\)$");
 
     private static final Logger LOG = LoggerFactory.getLogger(IcebergMetadataApplier.class);
+
+    private transient Catalog catalog;
+
     private final Map<String, String> catalogOptions;
+
     // currently, we set table options for all tables using the same options.
     private final Map<String, String> tableOptions;
+
     private final Map<TableId, List<String>> partitionMaps;
+
     private final Map<String, String> hadoopConfOptions;
-    private transient Catalog catalog;
+
     private Set<SchemaChangeEventType> enabledSchemaEvolutionTypes;
 
     public IcebergMetadataApplier(Map<String, String> catalogOptions) {
@@ -161,7 +167,8 @@ public class IcebergMetadataApplier implements MetadataApplier {
             long startTimestamp = System.currentTimeMillis();
             TableIdentifier tableIdentifier = TableIdentifier.parse(event.tableId().identifier());
             // Step 0: Create namespace if not exists.
-            if (catalog instanceof SupportsNamespaces namespaceCatalog) {
+            if (catalog instanceof SupportsNamespaces) {
+                SupportsNamespaces namespaceCatalog = (SupportsNamespaces) catalog;
                 Namespace namespace = Namespace.of(tableIdentifier.namespace().levels());
                 if (!namespaceCatalog.namespaceExists(namespace)) {
                     namespaceCatalog.createNamespace(namespace);
