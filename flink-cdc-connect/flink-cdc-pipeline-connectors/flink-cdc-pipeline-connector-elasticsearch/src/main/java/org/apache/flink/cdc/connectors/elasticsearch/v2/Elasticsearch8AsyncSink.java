@@ -79,7 +79,7 @@ public class Elasticsearch8AsyncSink<InputT> extends AsyncSinkBaseAdapter<InputT
     }
 
     /**
-     * Creates a new {@link StatefulSinkWriter} for writing elements to Elasticsearch.
+     * Creates a new {@link SinkWriter} for writing elements to Elasticsearch.
      *
      * @param context the initialization context.
      * @return a new instance of {@link Elasticsearch8AsyncWriter}.
@@ -100,7 +100,7 @@ public class Elasticsearch8AsyncSink<InputT> extends AsyncSinkBaseAdapter<InputT
     }
 
     /**
-     * Restores a {@link StatefulSinkWriter} from a previously saved state.
+     * Restores a {@link StatefulSinkWriterAdapter} from a previously saved state.
      *
      * @param context the initialization context.
      * @param recoveredState the recovered state.
