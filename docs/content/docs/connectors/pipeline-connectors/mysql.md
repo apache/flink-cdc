@@ -408,6 +408,38 @@ source:
   # ...
 ```
 
+## Snapshot Filters
+
+The `scan.snapshot.filters` option allows you to apply per-table SQL WHERE clauses during snapshot reading, so that only matching rows are synchronized. This is useful when you want to perform a partial initial load (e.g. migrating only recent data) without modifying the source tables.
+
+Each entry in the list specifies a `table` pattern (using the same format as the `tables` option) and a `filter` expression. Rows that do not satisfy the expression are skipped during snapshot reading. Binlog events are still captured for all rows after the snapshot phase, regardless of the filter.
+
+For example, to read only orders placed after 2024-01-01 from `mydb.orders` and only active users from `mydb.users`:
+
+```yaml
+source:
+  type: mysql
+  hostname: 127.0.0.1
+  port: 3306
+  username: admin
+  password: pass
+  tables: mydb\..*
+  server-id: 5401-5404
+  scan.snapshot.filters:
+    - table: mydb.orders
+      filter: order_date >= '2024-01-01'
+    - table: mydb.users
+      filter: status = 'active'
+
+sink:
+  type: doris
+  # ...
+
+pipeline:
+  name: Filtered MySQL to Doris Pipeline
+  parallelism: 4
+```
+
 ## Available Source metrics
 
 Metrics can help understand the progress of assignments, and the following are the supported [Flink metrics](https://nightlies.apache.org/flink/flink-docs-master/docs/ops/metrics/):
