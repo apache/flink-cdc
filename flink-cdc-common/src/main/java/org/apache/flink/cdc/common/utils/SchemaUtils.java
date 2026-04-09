@@ -121,7 +121,16 @@ public class SchemaUtils {
 
     private static Schema applyAddColumnEvent(AddColumnEvent event, Schema oldSchema) {
         LinkedList<Column> columns = new LinkedList<>(oldSchema.getColumns());
+        Set<String> existingColumnNames =
+                columns.stream()
+                        .map(Column::getName)
+                        .collect(Collectors.toCollection(HashSet::new));
         for (AddColumnEvent.ColumnWithPosition columnWithPosition : event.getAddedColumns()) {
+            // Skip adding the column if it already exists in the schema to ensure idempotency.
+            // This can happen when schema change events are replayed after a failover recovery.
+            if (existingColumnNames.contains(columnWithPosition.getAddColumn().getName())) {
+                continue;
+            }
             switch (columnWithPosition.getPosition()) {
                 case FIRST:
                     {
@@ -170,6 +179,7 @@ public class SchemaUtils {
                         break;
                     }
             }
+            existingColumnNames.add(columnWithPosition.getAddColumn().getName());
         }
         return oldSchema.copy(columns);
     }
