@@ -281,14 +281,6 @@ public class GenericRecordDataSerializer {
                 serializeField(element, target);
             }
         } else {
-            // For BinaryArrayData or other implementations, convert to object array via getters
-            int size = arrayData.size();
-            target.writeInt(size);
-            // We serialize each element as a generic object; since we don't know element types,
-            // we attempt to read them generically. For binary array data, the safest approach is
-            // to serialize the raw binary data.
-            // However, we don't have direct access to the underlying binary data in a generic way.
-            // So we fall back to reading elements as objects.
             throw new IOException(
                     "Serialization of non-generic ArrayData is not supported in GenericRecordDataSerializer. "
                             + "Actual type: "
@@ -312,18 +304,18 @@ public class GenericRecordDataSerializer {
         if (mapData instanceof GenericMapData) {
             ArrayData keyArray = mapData.keyArray();
             ArrayData valueArray = mapData.valueArray();
-            int size = mapData.size();
-            target.writeInt(size);
-            if (keyArray instanceof GenericArrayData && valueArray instanceof GenericArrayData) {
-                Object[] keys = ((GenericArrayData) keyArray).toObjectArray();
-                Object[] values = ((GenericArrayData) valueArray).toObjectArray();
-                for (int i = 0; i < size; i++) {
-                    serializeField(keys[i], target);
-                    serializeField(values[i], target);
-                }
-            } else {
+            if (!(keyArray instanceof GenericArrayData)
+                    || !(valueArray instanceof GenericArrayData)) {
                 throw new IOException(
                         "MapData with non-generic key/value arrays is not supported in GenericRecordDataSerializer.");
+            }
+            int size = mapData.size();
+            target.writeInt(size);
+            Object[] keys = ((GenericArrayData) keyArray).toObjectArray();
+            Object[] values = ((GenericArrayData) valueArray).toObjectArray();
+            for (int i = 0; i < size; i++) {
+                serializeField(keys[i], target);
+                serializeField(values[i], target);
             }
         } else {
             throw new IOException(
