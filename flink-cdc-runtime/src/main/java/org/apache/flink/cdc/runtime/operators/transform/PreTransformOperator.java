@@ -19,6 +19,7 @@ package org.apache.flink.cdc.runtime.operators.transform;
 
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
+import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
 import org.apache.flink.cdc.common.event.ChangeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
@@ -391,8 +392,8 @@ public class PreTransformOperator extends AbstractStreamOperatorAdapter<Event>
                             + "This is likely a bug, please consider filing an issue.",
                     tableId);
 
-            BinaryRecordData before = (BinaryRecordData) dataChangeEvent.before();
-            BinaryRecordData after = (BinaryRecordData) dataChangeEvent.after();
+            RecordData before = dataChangeEvent.before();
+            RecordData after = dataChangeEvent.after();
             if (before != null) {
                 BinaryRecordData projectedBefore = processor.processFillDataField(before);
                 dataChangeEvent = DataChangeEvent.projectBefore(dataChangeEvent, projectedBefore);

@@ -422,7 +422,11 @@ public class ValuesDatabase {
         private String buildPrimaryKeyStr(RecordData recordData) {
             StringBuilder stringBuilder = new StringBuilder();
             for (Integer primaryKeyIndex : primaryKeyIndexes) {
-                stringBuilder.append(recordData.getString(primaryKeyIndex).toString()).append(",");
+                RecordData.FieldGetter fieldGetter =
+                        RecordData.createFieldGetter(
+                                columns.get(primaryKeyIndex).getType(), primaryKeyIndex);
+                Object value = fieldGetter.getFieldOrNull(recordData);
+                stringBuilder.append(value != null ? value.toString() : "null").append(",");
             }
             stringBuilder.deleteCharAt(stringBuilder.length() - 1);
             return stringBuilder.toString();

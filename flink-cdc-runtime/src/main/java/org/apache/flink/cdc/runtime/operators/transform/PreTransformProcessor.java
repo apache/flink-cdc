@@ -59,7 +59,7 @@ public class PreTransformProcessor {
         return new CreateTableEvent(createTableEvent.tableId(), schema);
     }
 
-    public BinaryRecordData processFillDataField(BinaryRecordData data) {
+    public BinaryRecordData processFillDataField(RecordData data) {
         List<Object> valueList = new ArrayList<>();
         List<Column> columns = tableChangeInfo.getPreTransformedSchema().getColumns();
         Map<String, RecordData.FieldGetter> sourceFieldGettersMap =
