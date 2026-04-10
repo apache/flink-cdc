@@ -109,7 +109,7 @@ mysql> FLUSH PRIVILEGES;
 ### 为每个 Reader 设置不同的 Server id
 
 每个用于读取 binlog 的 MySQL 数据库客户端都应该有一个唯一的 id，称为 Server id。 MySQL 服务器将使用此 id 来维护网络连接和 binlog 位置。 因此，如果不同的作业共享相同的 Server id， 则可能导致从错误的 binlog 位置读取数据。
-因此，建议通过为每个 Reader 设置不同的 Server id  [SQL Hints](https://ci.apache.org/projects/flink/flink-docs-release-1.11/dev/table/sql/hints.html),
+因此，建议通过为每个 Reader 设置不同的 Server id  [SQL Hints](https://nightlies.apache.org/flink/flink-docs-release-2.2/zh/docs/dev/table/sql/queries/hints/),
 假设 Source 并行度为 4, 我们可以使用 `SELECT * FROM source_table /*+ OPTIONS('server-id'='5401-5404') */ ;` 来为 4 个 Source readers 中的每一个分配唯一的 Server id。
 
 
@@ -246,7 +246,7 @@ Flink SQL> SELECT * FROM orders;
               （3）在快照读取之前，Source 不需要数据库锁权限。
               如果希望 Source 并行运行，则每个并行 Readers 都应该具有唯一的 Server id，所以
               Server id 必须是类似 `5400-6400` 的范围，并且该范围必须大于并行度。
-              请查阅 <a href="#a-name-id-001-a">增量快照读取</a> 章节了解更多详细信息。
+              请查阅 <a href="#增量快照读取">增量快照读取</a> 章节了解更多详细信息。
           </td>
     </tr>
     <tr>
@@ -281,7 +281,7 @@ Flink SQL> SELECT * FROM orders;
       <td>String</td>
       <td> MySQL CDC 消费者可选的启动模式，
          合法的模式为 "initial"，"earliest-offset"，"latest-offset"，"specific-offset"，"timestamp" 和 "snapshot"。
-           请查阅 <a href="#a-name-id-002-a">启动模式</a> 章节了解更多详细信息。</td>
+           请查阅 <a href="#启动模式">启动模式</a> 章节了解更多详细信息。</td>
     </tr>
     <tr>
       <td>scan.startup.specific-offset.file</td>
@@ -578,7 +578,7 @@ CREATE TABLE products (
 支持的特性
 --------
 
-### 增量快照读取<a name="增量快照读取" id="001" ></a>
+### 增量快照读取
 
 增量快照读取是一种读取表快照的新机制。与旧的快照机制相比，增量快照具有许多优点，包括：
 * （1）在快照读取期间，Source 支持并发读取，
@@ -637,7 +637,7 @@ MySQL 集群中你监控的服务器出现故障后, 你只需将受监视的服
 当 MySQL CDC Source 启动时，它并行读取表的快照，然后以单并行度的方式读取表的 binlog。
 
 在快照阶段，快照会根据表的分块键和表行的大小切割成多个快照块。
-快照块被分配给多个快照读取器。每个快照读取器使用 [区块读取算法](#snapshot-chunk-reading) 并将读取的数据发送到下游。
+快照块被分配给多个快照读取器。每个快照读取器使用 [区块读取算法](#区块读取算法) 并将读取的数据发送到下游。
 Source 会管理块的进程状态（完成或未完成），因此快照阶段的 Source 可以支持块级别的 checkpoint。
 如果发生故障，可以恢复 Source 并继续从最后完成的块中读取块。
 
@@ -678,7 +678,7 @@ MySQL CDC Source 使用主键列将表划分为多个分片（chunk）。 默认
  [uuid-def, +∞).
 ```
 
-##### Chunk 读取算法
+##### 区块读取算法
 
 对于上面的示例`MyTable`，如果 MySQL CDC Source 并行度设置为 4，MySQL CDC Source 将在每一个 executes 运行 4 个 Readers **通过偏移信号算法**
 获取快照区块的最终一致输出。 **偏移信号算法**简单描述如下：
@@ -699,7 +699,7 @@ MySQL CDC Source 使用主键列将表划分为多个分片（chunk）。 默认
 MySQL CDC 连接器是一个 Flink Source 连接器，它将首先读取表快照块，然后继续读取 binlog，
 无论是在快照阶段还是读取 binlog 阶段，MySQL CDC 连接器都会在处理时**准确读取数据**，即使任务出现了故障。
 
-### 启动模式<a name="启动模式" id="002" ></a>
+### 启动模式
 
 配置选项```scan.startup.mode```指定 MySQL CDC 使用者的启动模式。有效枚举包括：
 
@@ -837,7 +837,7 @@ $ ./bin/flink run \
       --from-savepoint /tmp/flink-savepoints/savepoint-cca7bc-bb1e257f0dab \
       ./FlinkCDCExample.jar
 ```
-**注意:** 请参考文档 [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.17/docs/deployment/cli/#command-line-interface) 了解更多详细信息。
+**注意:** 请参考文档 [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.20/docs/deployment/cli/#command-line-interface) 了解更多详细信息。
 
 ### 关于无主键表
 
@@ -1136,14 +1136,14 @@ $ ./bin/flink run \
       </td>
       <td>
       MySQL 中的空间数据类型将转换为具有固定 Json 格式的字符串。
-      请参考 MySQL <a href="#a-name-id-003-a">空间数据类型映射</a> 章节了解更多详细信息。
+      请参考 MySQL <a href="#空间数据类型映射">空间数据类型映射</a> 章节了解更多详细信息。
       </td>
     </tr>
     </tbody>
 </table>
 </div>
 
-### 空间数据类型映射<a name="空间数据类型映射" id="003"></a>
+### 空间数据类型映射
 
 MySQL中除`GEOMETRYCOLLECTION`之外的空间数据类型都会转换为 Json 字符串，格式固定，如：<br>
 ```json

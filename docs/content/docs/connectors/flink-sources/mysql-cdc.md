@@ -103,7 +103,7 @@ Notes
 ### Set a different SERVER ID for each reader
 
 Every MySQL database client for reading binlog should have a unique id, called server id. MySQL server will use this id to maintain network connection and the binlog position. Therefore, if different jobs share a same server id, it may result to read from wrong binlog position. 
-Thus, it is recommended to set different server id for each reader via the [SQL Hints](https://ci.apache.org/projects/flink/flink-docs-release-1.11/dev/table/sql/hints.html), 
+Thus, it is recommended to set different server id for each reader via the [SQL Hints](https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/dev/table/sql/queries/hints/), 
 e.g.  assuming the source parallelism is 4, then we can use `SELECT * FROM source_table /*+ OPTIONS('server-id'='5401-5404') */ ;` to assign unique server id for each of the 4 source readers. 
 
 
@@ -658,7 +658,7 @@ The CDC job may restart fails in this case. So the heartbeat event will help upd
 When the MySQL CDC source is started, it reads snapshot of table parallelly and then reads binlog of table with single parallelism.
 
 In snapshot phase, the snapshot is cut into multiple snapshot chunks according to chunk key of table and the size of table rows.
-Snapshot chunks is assigned to multiple snapshot readers. Each snapshot reader reads its received chunks with [chunk reading algorithm](#snapshot-chunk-reading) and send the read data to downstream.
+Snapshot chunks is assigned to multiple snapshot readers. Each snapshot reader reads its received chunks with [chunk reading algorithm](#Chunk-Reading-Algorithm) and send the read data to downstream.
 The source manages the process status (finished or not) of chunks, thus the source of snapshot phase can support checkpoint in chunk level.
 If a failure happens, the source can be restored and continue to read chunks from last finished chunks.
 
@@ -862,7 +862,7 @@ $ ./bin/flink run \
       --from-savepoint /tmp/flink-savepoints/savepoint-cca7bc-bb1e257f0dab \
       ./FlinkCDCExample.jar
 ```
-**Note:** Please refer the doc [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.17/docs/deployment/cli/#command-line-interface) for more details.
+**Note:** Please refer the doc [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.20/docs/deployment/cli/#command-line-interface) for more details.
 
 ### Tables Without primary keys
 
