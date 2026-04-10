@@ -133,7 +133,7 @@ public class GenericRecordDataSerializer {
             target.writeDouble((Double) field);
         } else if (field instanceof StringData) {
             target.writeByte(TAG_STRING);
-            byte[] bytes = field.toString().getBytes(StandardCharsets.UTF_8);
+            byte[] bytes = ((StringData) field).toBytes();
             target.writeInt(bytes.length);
             target.write(bytes);
         } else if (field instanceof byte[]) {
@@ -219,7 +219,7 @@ public class GenericRecordDataSerializer {
                     int len = source.readInt();
                     byte[] bytes = new byte[len];
                     source.readFully(bytes);
-                    return BinaryStringData.fromString(new String(bytes, StandardCharsets.UTF_8));
+                    return BinaryStringData.fromBytes(bytes);
                 }
             case TAG_BINARY:
                 {
