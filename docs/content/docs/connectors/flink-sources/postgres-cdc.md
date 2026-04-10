@@ -219,7 +219,7 @@ SELECT * FROM shipments;
                 (1) source can be parallel during snapshot reading,
                 (2) source can perform checkpoints in the chunk granularity during snapshot reading,
                 (3) source doesn't need to acquire global read lock (FLUSH TABLES WITH READ LOCK) before snapshot reading.
-              Please see <a href="#incremental-snapshot-reading ">Incremental Snapshot Reading</a>section for more detailed information.
+              Please see <a href="#incremental-snapshot-reading-experimental ">Incremental Snapshot Reading</a>section for more detailed information.
           </td>
     </tr>
     <tr>
@@ -574,7 +574,7 @@ $ ./bin/flink run \
       --from-savepoint /tmp/flink-savepoints/savepoint-cca7bc-bb1e257f0dab \
       ./FlinkCDCExample.jar
 ```
-**Note:** Please refer to the doc [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.17/docs/deployment/cli/#command-line-interface) for more details.
+**Note:** Please refer to the doc [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.20/docs/deployment/cli/#command-line-interface) for more details.
 
 ### DataStream Source
 

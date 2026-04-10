@@ -617,7 +617,7 @@ $ ./bin/flink run \
       --from-savepoint /tmp/flink-savepoints/savepoint-cca7bc-bb1e257f0dab \
       ./FlinkCDCExample.jar
 ```
-**注意:** 请参考文档 [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.17/docs/deployment/cli/#command-line-interface) 了解更多详细信息。
+**注意:** 请参考文档 [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.20/docs/deployment/cli/#command-line-interface) 了解更多详细信息。
 
 ### DataStream Source
 

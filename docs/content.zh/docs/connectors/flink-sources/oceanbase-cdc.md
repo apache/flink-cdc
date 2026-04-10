@@ -831,14 +831,14 @@ CREATE TABLE products (
       </td>
       <td>
       空间数据类型将转换为具有固定 Json 格式的字符串。
-      请参考 <a href="#a-name-id-003-a">空间数据类型映射</a> 章节了解更多详细信息。
+      请参考 <a href="#空间数据类型映射">空间数据类型映射</a> 章节了解更多详细信息。
       </td>
     </tr>
     </tbody>
 </table>
 </div>
 
-### 空间数据类型映射<a name="空间数据类型映射" id="003"></a>
+### 空间数据类型映射
 
 除`GEOMETRYCOLLECTION`之外的空间数据类型都会转换为 Json 字符串，格式固定，如：<br>
 ```json
