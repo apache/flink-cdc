@@ -38,6 +38,7 @@ import org.apache.flink.cdc.common.types.TimeType;
 import org.apache.flink.cdc.common.types.TimestampType;
 import org.apache.flink.cdc.common.types.ZonedTimestampType;
 import org.apache.flink.cdc.common.types.variant.Variant;
+import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.runtime.serializer.NullableSerializerWrapper;
 import org.apache.flink.cdc.runtime.serializer.data.ArrayDataSerializer;
 import org.apache.flink.cdc.runtime.serializer.data.MapDataSerializer;
@@ -180,8 +181,14 @@ public interface BinaryWriter {
                 if (!(recordData instanceof BinaryRecordData)) {
                     RowType rowType = (RowType) type;
                     List<DataType> childTypes = rowType.getChildren();
-                    Object[] fields = new Object[recordData.getArity()];
-                    for (int i = 0; i < fields.length; i++) {
+                    int arity = recordData.getArity();
+                    Preconditions.checkArgument(
+                            arity == childTypes.size(),
+                            "RecordData arity (%s) does not match row type field count (%s)",
+                            arity,
+                            childTypes.size());
+                    Object[] fields = new Object[arity];
+                    for (int i = 0; i < arity; i++) {
                         fields[i] =
                                 RecordData.createFieldGetter(childTypes.get(i), i)
                                         .getFieldOrNull(recordData);
