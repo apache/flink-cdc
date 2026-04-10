@@ -854,7 +854,7 @@ Data Type Mapping
       </td>
       <td>
       The spatial data types will be converted into STRING with a fixed Json format.
-      Please see <a href="#Spatial-Data-Types-Mapping ">Spatial Data Types Mapping</a> section for more detailed information.
+      Please see <a href="#spatial-data-types-mapping">Spatial Data Types Mapping</a> section for more detailed information.
       </td>
     </tr>
     </tbody>
