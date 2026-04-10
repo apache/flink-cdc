@@ -39,8 +39,6 @@ import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataOutputView;
 
 import java.io.IOException;
-import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -146,10 +144,10 @@ public class GenericRecordDataSerializer {
         } else if (field instanceof DecimalData) {
             target.writeByte(TAG_DECIMAL);
             DecimalData decimal = (DecimalData) field;
-            BigDecimal bd = decimal.toBigDecimal();
-            target.writeInt(bd.precision());
-            target.writeInt(bd.scale());
-            byte[] unscaled = bd.unscaledValue().toByteArray();
+            // Use DecimalData's precision/scale (SQL DECIMAL(p,s)) instead of BigDecimal's
+            target.writeInt(decimal.precision());
+            target.writeInt(decimal.scale());
+            byte[] unscaled = decimal.toUnscaledBytes();
             target.writeInt(unscaled.length);
             target.write(unscaled);
         } else if (field instanceof TimestampData) {
@@ -237,8 +235,7 @@ public class GenericRecordDataSerializer {
                     int len = source.readInt();
                     byte[] unscaled = new byte[len];
                     source.readFully(unscaled);
-                    return DecimalData.fromBigDecimal(
-                            new BigDecimal(new BigInteger(unscaled), scale), precision, scale);
+                    return DecimalData.fromUnscaledBytes(unscaled, precision, scale);
                 }
             case TAG_TIMESTAMP:
                 return TimestampData.fromMillis(source.readLong(), source.readInt());

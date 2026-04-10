@@ -325,4 +325,39 @@ class RecordDataSerializerTest extends SerializerTestBase<RecordData> {
         assertThat(copied.getBinary(2)).isEqualTo(new byte[] {9, 8, 7});
         assertThat(copied.getBinary(2)).isNotSameAs(record.getBinary(2));
     }
+
+    @Test
+    void testDecimalDataPreservesPrecisionAndScale() throws Exception {
+        RecordDataSerializer serializer = RecordDataSerializer.INSTANCE;
+
+        DecimalData decimal1 = DecimalData.fromBigDecimal(new BigDecimal("1.23"), 20, 4);
+        DecimalData decimal2 = DecimalData.fromBigDecimal(new BigDecimal("42"), 15, 0);
+        DecimalData decimal3 = DecimalData.fromBigDecimal(new BigDecimal("0.0010"), 10, 4);
+
+        GenericRecordData record = GenericRecordData.of(decimal1, decimal2, decimal3);
+
+        DataOutputSerializer out = new DataOutputSerializer(256);
+        serializer.serialize(record, out);
+        DataInputDeserializer in = new DataInputDeserializer(out.getCopyOfBuffer());
+        RecordData deserialized = serializer.deserialize(in);
+
+        assertThat(deserialized).isInstanceOf(GenericRecordData.class);
+
+        DecimalData dDecimal1 = deserialized.getDecimal(0, 20, 4);
+        assertThat(dDecimal1.precision()).isEqualTo(20);
+        assertThat(dDecimal1.scale()).isEqualTo(4);
+        assertThat(dDecimal1.toBigDecimal()).isEqualByComparingTo(new BigDecimal("1.23"));
+
+        DecimalData dDecimal2 = deserialized.getDecimal(1, 15, 0);
+        assertThat(dDecimal2.precision()).isEqualTo(15);
+        assertThat(dDecimal2.scale()).isEqualTo(0);
+        assertThat(dDecimal2.toBigDecimal()).isEqualByComparingTo(new BigDecimal("42"));
+
+        DecimalData dDecimal3 = deserialized.getDecimal(2, 10, 4);
+        assertThat(dDecimal3.precision()).isEqualTo(10);
+        assertThat(dDecimal3.scale()).isEqualTo(4);
+        assertThat(dDecimal3.toBigDecimal()).isEqualByComparingTo(new BigDecimal("0.0010"));
+
+        assertThat(dDecimal2.isCompact()).isTrue();
+    }
 }
