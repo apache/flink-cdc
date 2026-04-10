@@ -658,7 +658,7 @@ The CDC job may restart fails in this case. So the heartbeat event will help upd
 When the MySQL CDC source is started, it reads snapshot of table parallelly and then reads binlog of table with single parallelism.
 
 In snapshot phase, the snapshot is cut into multiple snapshot chunks according to chunk key of table and the size of table rows.
-Snapshot chunks is assigned to multiple snapshot readers. Each snapshot reader reads its received chunks with [chunk reading algorithm](#Chunk-Reading-Algorithm) and send the read data to downstream.
+Snapshot chunks is assigned to multiple snapshot readers. Each snapshot reader reads its received chunks with [chunk reading algorithm](#chunk-reading-algorithm) and send the read data to downstream.
 The source manages the process status (finished or not) of chunks, thus the source of snapshot phase can support checkpoint in chunk level.
 If a failure happens, the source can be restored and continue to read chunks from last finished chunks.
 

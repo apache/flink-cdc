@@ -219,7 +219,7 @@ SELECT * FROM shipments;
                 (1) source can be parallel during snapshot reading,
                 (2) source can perform checkpoints in the chunk granularity during snapshot reading,
                 (3) source doesn't need to acquire global read lock (FLUSH TABLES WITH READ LOCK) before snapshot reading.
-              Please see <a href="#incremental-snapshot-reading-experimental ">Incremental Snapshot Reading</a>section for more detailed information.
+              Please see <a href="#incremental-snapshot-reading-experimental">Incremental Snapshot Reading</a>section for more detailed information.
           </td>
     </tr>
     <tr>
