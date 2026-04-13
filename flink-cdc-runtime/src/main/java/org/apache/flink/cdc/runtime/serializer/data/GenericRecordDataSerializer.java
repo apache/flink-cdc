@@ -387,16 +387,21 @@ public class GenericRecordDataSerializer {
             GenericMapData mapData = (GenericMapData) field;
             ArrayData keyArray = mapData.keyArray();
             ArrayData valueArray = mapData.valueArray();
-            if (keyArray instanceof GenericArrayData && valueArray instanceof GenericArrayData) {
-                Object[] keys = ((GenericArrayData) keyArray).toObjectArray();
-                Object[] values = ((GenericArrayData) valueArray).toObjectArray();
-                Map<Object, Object> newMap = new LinkedHashMap<>(keys.length);
-                for (int i = 0; i < keys.length; i++) {
-                    newMap.put(copyField(keys[i]), copyField(values[i]));
-                }
-                return new GenericMapData(newMap);
+            if (!(keyArray instanceof GenericArrayData)
+                    || !(valueArray instanceof GenericArrayData)) {
+                throw new IllegalArgumentException(
+                        "Expected GenericArrayData for key and value arrays in GenericMapData, but got: keyArray="
+                                + keyArray.getClass().getName()
+                                + ", valueArray="
+                                + valueArray.getClass().getName());
             }
-            return field;
+            Object[] keys = ((GenericArrayData) keyArray).toObjectArray();
+            Object[] values = ((GenericArrayData) valueArray).toObjectArray();
+            Map<Object, Object> newMap = new LinkedHashMap<>(keys.length);
+            for (int i = 0; i < keys.length; i++) {
+                newMap.put(copyField(keys[i]), copyField(values[i]));
+            }
+            return new GenericMapData(newMap);
         }
         // Immutable types: Boolean, Byte, Short, Integer, Long, Float, Double,
         // StringData, DecimalData, TimestampData, ZonedTimestampData,
