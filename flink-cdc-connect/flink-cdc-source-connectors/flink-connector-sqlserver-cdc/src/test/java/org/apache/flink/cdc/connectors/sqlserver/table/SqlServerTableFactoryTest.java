@@ -257,6 +257,7 @@ class SqlServerTableFactoryTest {
         Map<String, String> properties = getAllOptions();
         properties.put("scan.startup.mode", "timestamp");
         properties.put("scan.startup.timestamp-millis", "1667232000000");
+        properties.put("scan.incremental.snapshot.enabled", "true");
 
         DynamicTableSource actualSource = createTableSource(SCHEMA, properties);
         SqlServerTableSource expectedSource =
@@ -271,7 +272,7 @@ class SqlServerTableFactoryTest {
                         MY_PASSWORD,
                         PROPERTIES,
                         StartupOptions.timestamp(1667232000000L),
-                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED.defaultValue(),
+                        true,
                         SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
                         SourceOptions.CHUNK_META_GROUP_SIZE.defaultValue(),
                         SourceOptions.SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
@@ -291,13 +292,30 @@ class SqlServerTableFactoryTest {
     }
 
     @Test
-    void testTimestampStartupRequiresTimestampMillis() {
+    void testTimestampStartupRequiresIncrementalSnapshot() {
         Map<String, String> properties = getAllOptions();
         properties.put("scan.startup.mode", "timestamp");
+        properties.put("scan.startup.timestamp-millis", "1667232000000");
+        properties.put("scan.incremental.snapshot.enabled", "false");
 
         Assertions.assertThatThrownBy(() -> createTableSource(SCHEMA, properties))
                 .isInstanceOf(ValidationException.class)
-                .hasMessageContaining("scan.startup.timestamp-millis");
+                .hasMessageContaining("scan.startup.mode")
+                .hasMessageContaining("timestamp")
+                .hasMessageContaining("scan.incremental.snapshot.enabled");
+    }
+
+    @Test
+    void testTimestampStartupRequiresTimestampMillis() {
+        Map<String, String> properties = getAllOptions();
+        properties.put("scan.startup.mode", "timestamp");
+        properties.put("scan.incremental.snapshot.enabled", "true");
+
+        Assertions.assertThatThrownBy(() -> createTableSource(SCHEMA, properties))
+                .isInstanceOf(ValidationException.class)
+                .hasRootCauseMessage(
+                        "To use timestamp startup mode, the startup timestamp millis "
+                                + "'scan.startup.timestamp-millis' must be set.");
     }
 
     private Map<String, String> getAllOptions() {

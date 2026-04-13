@@ -33,8 +33,10 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.Calendar;
 import java.util.List;
 import java.util.Map;
+import java.util.TimeZone;
 
 /** A factory to create {@link LsnOffset}. */
 public class LsnFactory extends OffsetFactory {
@@ -96,13 +98,15 @@ public class LsnFactory extends OffsetFactory {
                                 .toLocalDateTime());
         final String mapTimeToLsnQuery =
                 String.format(MAP_TIME_TO_LSN_QUERY, SqlServerUtils.quote(databaseName));
+        final Calendar serverCalendar = Calendar.getInstance(TimeZone.getTimeZone(serverZoneId));
         try (SqlServerConnection connection =
                 SqlServerConnectionUtils.createSqlServerConnection(
                         sourceConfig.getDbzConnectorConfig())) {
             Lsn mappedLsn =
                     connection.prepareQueryAndMap(
                             mapTimeToLsnQuery,
-                            statement -> statement.setTimestamp(1, startupTimestamp),
+                            statement ->
+                                    statement.setTimestamp(1, startupTimestamp, serverCalendar),
                             rs -> {
                                 if (!rs.next()) {
                                     throw new SQLException(

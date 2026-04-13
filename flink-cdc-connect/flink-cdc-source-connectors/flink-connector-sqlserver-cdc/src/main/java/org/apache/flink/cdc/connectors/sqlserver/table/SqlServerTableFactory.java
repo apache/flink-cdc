@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.sqlserver.table;
 
+import org.apache.flink.cdc.connectors.base.options.StartupMode;
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.connectors.base.utils.OptionUtils;
 import org.apache.flink.configuration.ConfigOption;
@@ -130,10 +131,11 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
         ZoneId serverTimeZone = ZoneId.of(config.get(SERVER_TIME_ZONE));
         int port = config.get(PORT);
         StartupOptions startupOptions = getStartupOptions(config);
+        boolean enableParallelRead = config.get(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
+        validateStartupOptions(startupOptions, enableParallelRead);
         ResolvedSchema physicalSchema =
                 getPhysicalSchema(context.getCatalogTable().getResolvedSchema());
 
-        boolean enableParallelRead = config.get(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
         int splitSize = config.get(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE);
         int splitMetaGroupSize = config.get(CHUNK_META_GROUP_SIZE);
         int fetchSize = config.get(SCAN_SNAPSHOT_FETCH_SIZE);
@@ -259,6 +261,20 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
                                 SCAN_STARTUP_MODE_VALUE_LATEST,
                                 SCAN_STARTUP_MODE_VALUE_TIMESTAMP,
                                 modeString));
+        }
+    }
+
+    private static void validateStartupOptions(
+            StartupOptions startupOptions, boolean enableParallelRead) {
+        if (startupOptions.startupMode == StartupMode.TIMESTAMP && !enableParallelRead) {
+            throw new ValidationException(
+                    String.format(
+                            "Option '%s'='%s' requires '%s'='true' because timestamp startup "
+                                    + "is only supported by the incremental SQL Server source; "
+                                    + "the legacy non-parallel source does not support it.",
+                            SCAN_STARTUP_MODE.key(),
+                            SCAN_STARTUP_MODE_VALUE_TIMESTAMP,
+                            SCAN_INCREMENTAL_SNAPSHOT_ENABLED.key()));
         }
     }
 
