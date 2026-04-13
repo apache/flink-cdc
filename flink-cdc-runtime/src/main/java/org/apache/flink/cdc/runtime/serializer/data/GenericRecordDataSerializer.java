@@ -51,27 +51,27 @@ import java.util.Map;
 public class GenericRecordDataSerializer {
 
     // Type tags for self-describing format
-    static final byte TAG_NULL = 0;
-    static final byte TAG_BOOLEAN = 1;
-    static final byte TAG_BYTE = 2;
-    static final byte TAG_SHORT = 3;
-    static final byte TAG_INT = 4;
-    static final byte TAG_LONG = 5;
-    static final byte TAG_FLOAT = 6;
-    static final byte TAG_DOUBLE = 7;
-    static final byte TAG_STRING = 8;
-    static final byte TAG_BINARY = 9;
-    static final byte TAG_DECIMAL = 10;
-    static final byte TAG_TIMESTAMP = 11;
-    static final byte TAG_ZONED_TIMESTAMP = 12;
-    static final byte TAG_LOCAL_ZONED_TIMESTAMP = 13;
-    static final byte TAG_DATE = 14;
-    static final byte TAG_TIME = 15;
-    static final byte TAG_GENERIC_RECORD = 16;
-    static final byte TAG_BINARY_RECORD = 17;
-    static final byte TAG_ARRAY = 18;
-    static final byte TAG_MAP = 19;
-    static final byte TAG_VARIANT = 20;
+    private static final byte TAG_NULL = 0;
+    private static final byte TAG_BOOLEAN = 1;
+    private static final byte TAG_BYTE = 2;
+    private static final byte TAG_SHORT = 3;
+    private static final byte TAG_INT = 4;
+    private static final byte TAG_LONG = 5;
+    private static final byte TAG_FLOAT = 6;
+    private static final byte TAG_DOUBLE = 7;
+    private static final byte TAG_STRING = 8;
+    private static final byte TAG_BINARY = 9;
+    private static final byte TAG_DECIMAL = 10;
+    private static final byte TAG_TIMESTAMP = 11;
+    private static final byte TAG_ZONED_TIMESTAMP = 12;
+    private static final byte TAG_LOCAL_ZONED_TIMESTAMP = 13;
+    private static final byte TAG_DATE = 14;
+    private static final byte TAG_TIME = 15;
+    private static final byte TAG_GENERIC_RECORD = 16;
+    private static final byte TAG_BINARY_RECORD = 17;
+    private static final byte TAG_ARRAY = 18;
+    private static final byte TAG_MAP = 19;
+    private static final byte TAG_VARIANT = 20;
 
     private GenericRecordDataSerializer() {}
 
