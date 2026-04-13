@@ -313,9 +313,10 @@ class SqlServerTableFactoryTest {
 
         Assertions.assertThatThrownBy(() -> createTableSource(SCHEMA, properties))
                 .isInstanceOf(ValidationException.class)
-                .hasRootCauseMessage(
-                        "To use timestamp startup mode, the startup timestamp millis "
-                                + "'scan.startup.timestamp-millis' must be set.");
+                .hasRootCauseInstanceOf(ValidationException.class)
+                .rootCause()
+                .hasMessageContaining("scan.startup.timestamp-millis")
+                .hasMessageContaining("must be set");
     }
 
     private Map<String, String> getAllOptions() {

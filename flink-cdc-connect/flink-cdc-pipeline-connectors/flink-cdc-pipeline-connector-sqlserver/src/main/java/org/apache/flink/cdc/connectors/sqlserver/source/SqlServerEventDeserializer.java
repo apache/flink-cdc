@@ -51,6 +51,7 @@ public class SqlServerEventDeserializer extends DebeziumEventDeserializationSche
     private static final long serialVersionUID = 1L;
     private final boolean includeSchemaChanges;
     private final List<SqlServerReadableMetadata> readableMetadataList;
+
     /**
      * Cache to compute schema differences for ALTER events.
      *
