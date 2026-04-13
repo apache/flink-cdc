@@ -94,6 +94,9 @@ class RecordDataSerializerTest extends SerializerTestBase<RecordData> {
                         DecimalData.fromBigDecimal(new BigDecimal("12345.6789"), 10, 4),
                         TimestampData.fromMillis(1609459200000L, 123456),
                         LocalZonedTimestampData.fromEpochMillis(1609459200000L, 654321),
+                        ZonedTimestampData.of(1609459200000L, 789012, "UTC"),
+                        DateData.fromEpochDay(18628),
+                        TimeData.fromMillisOfDay(43200000),
                         null);
 
         DataOutputSerializer out = new DataOutputSerializer(256);
@@ -118,7 +121,13 @@ class RecordDataSerializerTest extends SerializerTestBase<RecordData> {
         assertThat(deserialized.getTimestamp(10, 6).getNanoOfMillisecond()).isEqualTo(123456);
         assertThat(deserialized.getLocalZonedTimestampData(11, 6).getEpochMillisecond())
                 .isEqualTo(1609459200000L);
-        assertThat(deserialized.isNullAt(12)).isTrue();
+        assertThat(deserialized.getZonedTimestamp(12, 6).getMillisecond())
+                .isEqualTo(1609459200000L);
+        assertThat(deserialized.getZonedTimestamp(12, 6).getNanoOfMillisecond()).isEqualTo(789012);
+        assertThat(deserialized.getZonedTimestamp(12, 6).getZoneId()).isEqualTo("UTC");
+        assertThat(deserialized.getDate(13).toEpochDay()).isEqualTo(18628);
+        assertThat(deserialized.getTime(14).toMillisOfDay()).isEqualTo(43200000);
+        assertThat(deserialized.isNullAt(15)).isTrue();
     }
 
     @Test
