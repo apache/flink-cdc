@@ -110,7 +110,11 @@ public class RecordDataSerializer extends TypeSerializerSingleton<RecordData> {
                             : new BinaryRecordData(from.getArity());
             return ((BinaryRecordData) from).copy(reuseRecord);
         } else if (from instanceof GenericRecordData) {
-            return GenericRecordDataSerializer.copy((GenericRecordData) from);
+            GenericRecordData reuseRecord =
+                    (reuse instanceof GenericRecordData)
+                            ? (GenericRecordData) reuse
+                            : new GenericRecordData(from.getArity());
+            return GenericRecordDataSerializer.copy((GenericRecordData) from, reuseRecord);
         } else {
             throw new RuntimeException("Unsupported RecordData type: " + from.getClass().getName());
         }

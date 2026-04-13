@@ -97,12 +97,17 @@ public class GenericRecordDataSerializer {
 
     /** Creates a deep copy of the given {@link GenericRecordData}. */
     public static GenericRecordData copy(GenericRecordData from) {
+        return copy(from, new GenericRecordData(from.getArity()));
+    }
+
+    public static GenericRecordData copy(GenericRecordData from, GenericRecordData reuse) {
         int arity = from.getArity();
-        GenericRecordData copy = new GenericRecordData(arity);
+        GenericRecordData target =
+                (reuse.getArity() == arity) ? reuse : new GenericRecordData(arity);
         for (int i = 0; i < arity; i++) {
-            copy.setField(i, copyField(from.getField(i)));
+            target.setField(i, copyField(from.getField(i)));
         }
-        return copy;
+        return target;
     }
 
     // ---- Field-level serialization ----
