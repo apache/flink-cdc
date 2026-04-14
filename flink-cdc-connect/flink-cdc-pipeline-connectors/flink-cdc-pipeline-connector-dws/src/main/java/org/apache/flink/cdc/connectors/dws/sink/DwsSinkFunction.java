@@ -367,7 +367,7 @@ public class DwsSinkFunction extends RichSinkFunction<Event>
     }
 
     private static void validateClient(DwsClient client) {
-        if (Objects.isNull(client)) {
+        if (client == null) {
             throw new IllegalStateException("DwsClient is null. Check the DWS sink configuration.");
         }
     }
