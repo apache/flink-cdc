@@ -50,6 +50,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
 
@@ -83,7 +84,7 @@ class DwsPipelineITCase extends DwsSinkTestBase {
                 DwsContainer.DWS_TABLE_NAME,
                 "id",
                 new ArrayList<>(
-                        List.of(
+                        Arrays.asList(
                                 "id INT NOT NULL",
                                 "id1 TINYINT NOT NULL",
                                 "id2 SMALLINT NOT NULL",
@@ -176,7 +177,7 @@ class DwsPipelineITCase extends DwsSinkTestBase {
                                 DataTypes.TIMESTAMP(6)));
 
         return new ArrayList<>(
-                List.of(
+                Arrays.asList(
                         new CreateTableEvent(tableId, schema),
                         DataChangeEvent.insertEvent(
                                 tableId,
@@ -393,7 +394,7 @@ class DwsPipelineITCase extends DwsSinkTestBase {
 
         List<String> expected =
                 new ArrayList<>(
-                        List.of(
+                        Arrays.asList(
                                 // JDBC returns REAL columns with IEEE-754 precision expansion.
                                 "17 | 104 | 14 | 24 | 1005 | 10005 | 10005 | 10005 | 3.18000007 | 3.1800 | 3.1800 | 3.1900 | f | GAUSS Day,\t\n | GAUSS Day 1 | GAUSS Day 2 | GAUSS Day 3 | 2023-01-05 10:00:00+08 | 01:01:01.123 | 2021-01-01 08:00:00",
                                 "21 | 102 | 12 | 22 | 1003 | 10003 | 10003 | 10003 | 3.17000008 | 3.1700 | 3.1700 | 3.1800 | t | Disenchanted | Disenchant1 | Disenchant2 | Disenchant3 | 2023-01-03 00:00:00+08 | 01:01:01.123 | 2021-01-01 08:00:00"));
