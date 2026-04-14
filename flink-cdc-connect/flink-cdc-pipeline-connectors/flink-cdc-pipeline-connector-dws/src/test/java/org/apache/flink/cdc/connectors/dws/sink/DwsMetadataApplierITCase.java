@@ -222,7 +222,7 @@ class DwsMetadataApplierITCase extends DwsSinkTestBase {
                         .primaryKey("id")
                         .build();
 
-        runJobWithEvents(List.of(new CreateTableEvent(tableId, schema)));
+        runJobWithEvents(Collections.singletonList(new CreateTableEvent(tableId, schema)));
 
         List<String> actual = inspectTableSchema(tableId);
         List<String> expected =
