@@ -54,7 +54,6 @@ import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
 /** SinkFunction wrapper around the Huawei DWS sink implementation. */
 public class DwsSinkFunction extends RichSinkFunction<Event>
@@ -333,8 +332,9 @@ public class DwsSinkFunction extends RichSinkFunction<Event>
     private static WriteMode resolveWriteMode(WriteMode requestedWriteMode, boolean caseSensitive) {
         // TODO: COPY_MERGE is not supported when case-sensitive field handling is enabled,
         // because the generated SQL cannot be executed. Fall back to AUTO instead.
-        return Objects.requireNonNullElse(
-                requestedWriteMode, caseSensitive ? WriteMode.AUTO : WriteMode.COPY_MERGE);
+        return requestedWriteMode != null
+                ? requestedWriteMode
+                : (caseSensitive ? WriteMode.AUTO : WriteMode.COPY_MERGE);
     }
 
     private static RichSinkFunction<Event> asRichSinkFunction(SinkFunction<Event> sinkFunction) {
