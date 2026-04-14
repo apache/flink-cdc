@@ -357,8 +357,12 @@ public class SchemaUtils {
                             return true;
                         },
                         createTableEvent -> {
-                            // It has been applied if such table already exists
-                            return latestSchema.isPresent();
+                            // CreateTableEvent is redundant only when the table already exists
+                            // with the exact same schema. This matters for stateful restarts
+                            // after transform changes, where the table is known but the desired
+                            // schema may have gained computed columns.
+                            return latestSchema.isPresent()
+                                    && latestSchema.get().equals(createTableEvent.getSchema());
                         },
                         dropColumnEvent -> {
                             // It has not been applied if schema does not even exist

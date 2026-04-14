@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.runtime.operators.schema.regular;
 
+import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
@@ -52,6 +53,7 @@ import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -349,6 +351,85 @@ class SchemaEvolveTest {
 
             harness.clearOutputRecords();
         }
+        harness.close();
+    }
+
+    @Test
+    void testRestoredCreateTableEventWithExpandedSchemaIsNotSkipped() throws Exception {
+        TableId tableId = CUSTOMERS_TABLE_ID;
+        Schema restoredSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", INT)
+                        .physicalColumn("name", STRING)
+                        .physicalColumn("age", SMALLINT)
+                        .primaryKey("id")
+                        .build();
+        Schema expandedSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", INT)
+                        .physicalColumn("name", STRING)
+                        .physicalColumn("age", SMALLINT)
+                        .physicalColumn("CONFLUENT__LAST_UPDATED", DataTypes.TIMESTAMP_LTZ(3))
+                        .primaryKey("id")
+                        .build();
+
+        SchemaOperator schemaOperator =
+                new SchemaOperator(
+                        new ArrayList<>(),
+                        RouteMode.ALL_MATCH,
+                        Duration.ofSeconds(30),
+                        SchemaChangeBehavior.EVOLVE);
+        RegularEventOperatorTestHarness<SchemaOperator, Event> harness =
+                RegularEventOperatorTestHarness.withDurationAndBehavior(
+                        schemaOperator, 17, Duration.ofSeconds(3), SchemaChangeBehavior.EVOLVE);
+        harness.open();
+
+        // Simulate restoring an old checkpoint/savepoint whose schema state predates the new
+        // computed transform column.
+        harness.registerOriginalSchema(tableId, restoredSchema);
+        harness.registerEvolvedSchema(tableId, restoredSchema);
+
+        schemaOperator.processElement(
+                new StreamRecord<>(new CreateTableEvent(tableId, expandedSchema)));
+
+        Assertions.assertThat(
+                        harness.getOutputRecords().stream()
+                                .map(StreamRecord::getValue)
+                                .collect(Collectors.toList()))
+                .containsExactly(
+                        new FlushEvent(
+                                0,
+                                Collections.singletonList(tableId),
+                                SchemaChangeEventType.CREATE_TABLE),
+                        new CreateTableEvent(tableId, expandedSchema));
+        Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(expandedSchema);
+        Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(expandedSchema);
+
+        harness.clearOutputRecords();
+
+        schemaOperator.processElement(
+                new StreamRecord<>(
+                        DataChangeEvent.insertEvent(
+                                tableId,
+                                buildRecord(
+                                        INT,
+                                        1,
+                                        STRING,
+                                        "Alice",
+                                        SMALLINT,
+                                        (short) 17,
+                                        DataTypes.TIMESTAMP_LTZ(3),
+                                        LocalZonedTimestampData.fromEpochMillis(
+                                                Instant.parse("2025-01-16T08:00:00Z")
+                                                        .toEpochMilli())))));
+
+        Assertions.assertThat(harness.getOutputRecords()).hasSize(1);
+        Assertions.assertThat(harness.getOutputRecords().get(0).getValue())
+                .isInstanceOf(DataChangeEvent.class);
+        DataChangeEvent outputEvent =
+                (DataChangeEvent) harness.getOutputRecords().get(0).getValue();
+        Assertions.assertThat(outputEvent.after().getArity()).isEqualTo(4);
+
         harness.close();
     }
 

@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.doris.sink;
 
 import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
@@ -61,6 +62,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.sql.SQLSyntaxErrorException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -385,6 +387,91 @@ class DorisMetadataApplierITCase extends DorisSinkTestBase {
                         "extra_decimal | DECIMAL(17, 0) | Yes | false | null");
 
         assertEqualsInOrder(expected, actual);
+    }
+
+    @ParameterizedTest(name = "batchMode: {0}")
+    @ValueSource(booleans = {true, false})
+    void testDorisExistingTableReconcilesMissingComputedTimestampColumn(boolean batchMode)
+            throws Exception {
+        TableId tableId =
+                TableId.tableId(
+                        DorisContainer.DORIS_DATABASE_NAME,
+                        "existing_table_missing_computed_timestamp");
+
+        createTable(
+                tableId.getSchemaName(),
+                tableId.getTableName(),
+                "ID",
+                Arrays.asList(
+                        "ID INT NOT NULL",
+                        "DEPLOY_MODE TINYINT",
+                        "project_id BIGINT",
+                        "job_name VARCHAR(51)"));
+        DORIS_CONTAINER.waitForLog(
+                String.format(".*successfully create table\\[%s;.*\\s", tableId.getTableName()),
+                1,
+                DATABASE_OPERATION_TIMEOUT_SECONDS);
+
+        runJobWithEvents(generateComputedTimestampEvents(tableId), batchMode, jsonFormatConfig());
+
+        List<String> actualSchema = inspectTableSchema(tableId);
+        List<String> expectedSchema =
+                Arrays.asList(
+                        "ID | INT | No | true | null",
+                        "DEPLOY_MODE | TINYINT | Yes | false | null",
+                        "project_id | BIGINT | Yes | false | null",
+                        "job_name | VARCHAR(51) | Yes | false | null",
+                        "CONFLUENT__LAST_UPDATED | DATETIME(3) | Yes | false | null");
+        assertEqualsInOrder(expectedSchema, actualSchema);
+
+        waitAndVerify(
+                tableId,
+                5,
+                Collections.singletonList("1 | 2 | 1001 | demo_job | 2025-01-16 08:00:00"),
+                DATABASE_OPERATION_TIMEOUT_SECONDS * 1000L);
+    }
+
+    @ParameterizedTest(name = "batchMode: {0}")
+    @ValueSource(booleans = {true, false})
+    void testDorisExistingTableWritesComputedTimestampWhenColumnAlreadyExists(boolean batchMode)
+            throws Exception {
+        TableId tableId =
+                TableId.tableId(
+                        DorisContainer.DORIS_DATABASE_NAME,
+                        "existing_table_with_computed_timestamp");
+
+        createTable(
+                tableId.getSchemaName(),
+                tableId.getTableName(),
+                "ID",
+                Arrays.asList(
+                        "ID INT NOT NULL",
+                        "DEPLOY_MODE TINYINT",
+                        "project_id BIGINT",
+                        "job_name VARCHAR(51)",
+                        "CONFLUENT__LAST_UPDATED DATETIMEV2(3)"));
+        DORIS_CONTAINER.waitForLog(
+                String.format(".*successfully create table\\[%s;.*\\s", tableId.getTableName()),
+                1,
+                DATABASE_OPERATION_TIMEOUT_SECONDS);
+
+        runJobWithEvents(generateComputedTimestampEvents(tableId), batchMode, jsonFormatConfig());
+
+        List<String> actualSchema = inspectTableSchema(tableId);
+        List<String> expectedSchema =
+                Arrays.asList(
+                        "ID | INT | No | true | null",
+                        "DEPLOY_MODE | TINYINT | Yes | false | null",
+                        "project_id | BIGINT | Yes | false | null",
+                        "job_name | VARCHAR(51) | Yes | false | null",
+                        "CONFLUENT__LAST_UPDATED | DATETIME(3) | Yes | false | null");
+        assertEqualsInOrder(expectedSchema, actualSchema);
+
+        waitAndVerify(
+                tableId,
+                5,
+                Collections.singletonList("1 | 2 | 1001 | demo_job | 2025-01-16 08:00:00"),
+                DATABASE_OPERATION_TIMEOUT_SECONDS * 1000L);
     }
 
     @ParameterizedTest(name = "batchMode: {0}")
@@ -877,6 +964,39 @@ class DorisMetadataApplierITCase extends DorisSinkTestBase {
                                                         ? BinaryStringData.fromString((String) e)
                                                         : e)
                                 .toArray());
+    }
+
+    private List<Event> generateComputedTimestampEvents(TableId tableId) {
+        Schema schema =
+                Schema.newBuilder()
+                        .column(new PhysicalColumn("ID", DataTypes.INT().notNull(), null))
+                        .column(new PhysicalColumn("DEPLOY_MODE", DataTypes.TINYINT(), null))
+                        .column(new PhysicalColumn("project_id", DataTypes.BIGINT(), null))
+                        .column(new PhysicalColumn("job_name", DataTypes.VARCHAR(17), null))
+                        .column(
+                                new PhysicalColumn(
+                                        "CONFLUENT__LAST_UPDATED",
+                                        DataTypes.TIMESTAMP_LTZ(3),
+                                        null))
+                        .primaryKey("ID")
+                        .build();
+
+        return Arrays.asList(
+                new CreateTableEvent(tableId, schema),
+                DataChangeEvent.insertEvent(
+                        tableId,
+                        generate(
+                                schema,
+                                1,
+                                (byte) 2,
+                                1001L,
+                                "demo_job",
+                                LocalZonedTimestampData.fromInstant(
+                                        Instant.parse("2025-01-16T08:00:00.000Z")))));
+    }
+
+    private Configuration jsonFormatConfig() {
+        return Configuration.fromMap(Collections.singletonMap("sink.properties.format", "json"));
     }
 
     private void waitAndVerify(

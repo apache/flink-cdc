@@ -55,10 +55,13 @@ import org.apache.doris.flink.catalog.doris.DorisSchemaFactory;
 import org.apache.doris.flink.catalog.doris.FieldSchema;
 import org.apache.doris.flink.catalog.doris.TableSchema;
 import org.apache.doris.flink.cfg.DorisOptions;
+import org.apache.doris.flink.rest.RestService;
+import org.apache.doris.flink.rest.models.Field;
 import org.apache.doris.flink.sink.schema.AddColumnPosition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -80,21 +83,44 @@ import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.TA
 /** Supports {@link DorisDataSink} to schema evolution. */
 public class DorisMetadataApplier implements MetadataApplier {
     private static final Logger LOG = LoggerFactory.getLogger(DorisMetadataApplier.class);
+    private static final DorisSchemaFetcher DEFAULT_DORIS_SCHEMA_FETCHER =
+            (dorisOptions, tableId) ->
+                    RestService.getSchema(
+                            dorisOptions, tableId.getSchemaName(), tableId.getTableName(), LOG);
+
+    @FunctionalInterface
+    interface DorisSchemaFetcher extends Serializable {
+        org.apache.doris.flink.rest.models.Schema fetch(DorisOptions dorisOptions, TableId tableId);
+    }
+
     private DorisOptions dorisOptions;
     private DorisSchemaChangeManager schemaChangeManager;
     private Configuration config;
     private Set<SchemaChangeEventType> enabledSchemaEvolutionTypes;
     private Map<String, Integer> tableBucketsMap;
     private Map<TableId, Schema> schemaCache;
+    private final DorisSchemaFetcher dorisSchemaFetcher;
 
     public DorisMetadataApplier(DorisOptions dorisOptions, Configuration config) {
+        this(
+                dorisOptions,
+                config,
+                new DorisSchemaChangeManager(dorisOptions, config.get(CHARSET_ENCODING)),
+                DEFAULT_DORIS_SCHEMA_FETCHER);
+    }
+
+    DorisMetadataApplier(
+            DorisOptions dorisOptions,
+            Configuration config,
+            DorisSchemaChangeManager schemaChangeManager,
+            DorisSchemaFetcher dorisSchemaFetcher) {
         this.dorisOptions = dorisOptions;
-        this.schemaChangeManager =
-                new DorisSchemaChangeManager(dorisOptions, config.get(CHARSET_ENCODING));
+        this.schemaChangeManager = schemaChangeManager;
         this.config = config;
         this.enabledSchemaEvolutionTypes = getSupportedSchemaEvolutionTypes();
         this.tableBucketsMap = parseTableBuckets(config);
         this.schemaCache = new HashMap<>();
+        this.dorisSchemaFetcher = dorisSchemaFetcher;
     }
 
     @VisibleForTesting
@@ -177,37 +203,225 @@ public class DorisMetadataApplier implements MetadataApplier {
         try {
             Schema schema = event.getSchema();
             TableId tableId = event.tableId();
-            TableSchema tableSchema = new TableSchema();
-            tableSchema.setTable(tableId.getTableName());
-            tableSchema.setDatabase(tableId.getSchemaName());
-            tableSchema.setModel(
-                    CollectionUtils.isEmpty(schema.primaryKeys())
-                            ? DataModel.DUPLICATE
-                            : DataModel.UNIQUE);
-            tableSchema.setFields(buildFields(schema));
-            tableSchema.setKeys(buildKeys(schema));
-            tableSchema.setDistributeKeys(buildDistributeKeys(schema));
-            tableSchema.setTableComment(schema.comment());
-
-            Map<String, String> tableProperties =
-                    DorisDataSinkOptions.getPropertiesByPrefix(
-                            config, TABLE_CREATE_PROPERTIES_PREFIX);
-            tableSchema.setProperties(tableProperties);
-            tableSchema.setTableBuckets(
-                    DorisSchemaFactory.parseTableSchemaBuckets(
-                            tableBucketsMap, tableId.getTableName()));
-
-            Tuple2<String, String> partitionInfo =
-                    DorisSchemaUtils.getPartitionInfo(config, schema, tableId);
-            if (partitionInfo != null) {
-                LOG.info("Partition info of {} is: {}.", tableId.identifier(), partitionInfo);
-                tableSchema.setPartitionInfo(partitionInfo);
+            org.apache.doris.flink.rest.models.Schema existingDorisSchema =
+                    fetchExistingDorisSchema(tableId);
+            if (existingDorisSchema == null) {
+                schemaChangeManager.createTable(buildTableSchema(tableId, schema));
+            } else {
+                reconcileExistingTable(tableId, schema, existingDorisSchema);
             }
-            schemaChangeManager.createTable(tableSchema);
             schemaCache.put(tableId, schema);
         } catch (Exception e) {
             throw new SchemaEvolveException(event, e.getMessage(), e);
         }
+    }
+
+    private TableSchema buildTableSchema(TableId tableId, Schema schema) {
+        TableSchema tableSchema = new TableSchema();
+        tableSchema.setTable(tableId.getTableName());
+        tableSchema.setDatabase(tableId.getSchemaName());
+        tableSchema.setModel(
+                CollectionUtils.isEmpty(schema.primaryKeys())
+                        ? DataModel.DUPLICATE
+                        : DataModel.UNIQUE);
+        tableSchema.setFields(buildFields(schema));
+        tableSchema.setKeys(buildKeys(schema));
+        tableSchema.setDistributeKeys(buildDistributeKeys(schema));
+        tableSchema.setTableComment(schema.comment());
+
+        Map<String, String> tableProperties =
+                DorisDataSinkOptions.getPropertiesByPrefix(config, TABLE_CREATE_PROPERTIES_PREFIX);
+        tableSchema.setProperties(tableProperties);
+        tableSchema.setTableBuckets(
+                DorisSchemaFactory.parseTableSchemaBuckets(
+                        tableBucketsMap, tableId.getTableName()));
+
+        Tuple2<String, String> partitionInfo =
+                DorisSchemaUtils.getPartitionInfo(config, schema, tableId);
+        if (partitionInfo != null) {
+            LOG.info("Partition info of {} is: {}.", tableId.identifier(), partitionInfo);
+            tableSchema.setPartitionInfo(partitionInfo);
+        }
+        return tableSchema;
+    }
+
+    private org.apache.doris.flink.rest.models.Schema fetchExistingDorisSchema(TableId tableId) {
+        try {
+            return dorisSchemaFetcher.fetch(dorisOptions, tableId);
+        } catch (Exception e) {
+            LOG.info(
+                    "Could not resolve existing Doris schema for {} before create-table handling. "
+                            + "Will treat it as absent and try CREATE TABLE first.",
+                    tableId.identifier(),
+                    e);
+            return null;
+        }
+    }
+
+    private void reconcileExistingTable(
+            TableId tableId,
+            Schema desiredSchema,
+            org.apache.doris.flink.rest.models.Schema existingDorisSchema)
+            throws Exception {
+        if (existingDorisSchema.getProperties() == null) {
+            throw new IllegalStateException(
+                    "Failed to resolve Doris physical schema properties for " + tableId);
+        }
+
+        Schema currentSchema =
+                buildCurrentSchemaFromExistingTable(desiredSchema, existingDorisSchema);
+        List<AddColumnEvent.ColumnWithPosition> missingColumns =
+                resolveMissingColumns(tableId, desiredSchema, existingDorisSchema, currentSchema);
+
+        if (missingColumns.isEmpty()) {
+            LOG.info(
+                    "Doris table {} already exists and covers all columns in the incoming CreateTableEvent.",
+                    tableId.identifier());
+            return;
+        }
+
+        LOG.info(
+                "Doris table {} already exists but is missing columns {} from the incoming CreateTableEvent. "
+                        + "Applying ADD COLUMN reconciliation.",
+                tableId.identifier(),
+                missingColumns);
+
+        for (AddColumnEvent.ColumnWithPosition missingColumn : missingColumns) {
+            Column column = missingColumn.getAddColumn();
+            FieldSchema addFieldSchema =
+                    new FieldSchema(
+                            column.getName(),
+                            buildTypeString(column.getType()),
+                            convertInvalidTimestampDefaultValue(
+                                    column.getDefaultValueExpression(), column.getType()),
+                            column.getComment());
+            schemaChangeManager.addColumn(
+                    tableId.getSchemaName(),
+                    tableId.getTableName(),
+                    addFieldSchema,
+                    resolveAddColumnPosition(missingColumn, currentSchema));
+            currentSchema =
+                    SchemaUtils.applySchemaChangeEvent(
+                            currentSchema,
+                            new AddColumnEvent(tableId, Collections.singletonList(missingColumn)));
+        }
+    }
+
+    private Schema buildCurrentSchemaFromExistingTable(
+            Schema desiredSchema, org.apache.doris.flink.rest.models.Schema existingDorisSchema) {
+        Map<String, String> existingColumnsByLowerCase = new LinkedHashMap<>();
+        for (Field field : existingDorisSchema.getProperties()) {
+            existingColumnsByLowerCase.putIfAbsent(
+                    field.getName().toLowerCase(java.util.Locale.ROOT), field.getName());
+        }
+
+        List<Column> currentColumns = new ArrayList<>();
+        for (Column desiredColumn : desiredSchema.getColumns()) {
+            String physicalName =
+                    existingColumnsByLowerCase.get(
+                            desiredColumn.getName().toLowerCase(java.util.Locale.ROOT));
+            if (physicalName != null) {
+                currentColumns.add(desiredColumn.copy(physicalName));
+            }
+        }
+
+        List<String> currentPrimaryKeys =
+                desiredSchema.primaryKeys().stream()
+                        .map(
+                                key ->
+                                        existingColumnsByLowerCase.get(
+                                                key.toLowerCase(java.util.Locale.ROOT)))
+                        .filter(java.util.Objects::nonNull)
+                        .collect(java.util.stream.Collectors.toList());
+
+        List<String> currentPartitionKeys =
+                desiredSchema.partitionKeys().stream()
+                        .map(
+                                key ->
+                                        existingColumnsByLowerCase.get(
+                                                key.toLowerCase(java.util.Locale.ROOT)))
+                        .filter(java.util.Objects::nonNull)
+                        .collect(java.util.stream.Collectors.toList());
+
+        return Schema.newBuilder()
+                .setColumns(currentColumns)
+                .primaryKey(currentPrimaryKeys)
+                .partitionKey(currentPartitionKeys)
+                .options(desiredSchema.options())
+                .comment(desiredSchema.comment())
+                .build();
+    }
+
+    private List<AddColumnEvent.ColumnWithPosition> resolveMissingColumns(
+            TableId tableId,
+            Schema desiredSchema,
+            org.apache.doris.flink.rest.models.Schema existingDorisSchema,
+            Schema currentSchema) {
+        Set<String> existingPhysicalColumns =
+                existingDorisSchema.getProperties().stream()
+                        .map(field -> field.getName().toLowerCase(java.util.Locale.ROOT))
+                        .collect(java.util.stream.Collectors.toSet());
+
+        List<AddColumnEvent.ColumnWithPosition> missingColumns = new ArrayList<>();
+        List<Column> desiredColumns = desiredSchema.getColumns();
+        for (int i = 0; i < desiredColumns.size(); i++) {
+            Column desiredColumn = desiredColumns.get(i);
+            String normalizedDesiredName =
+                    desiredColumn.getName().toLowerCase(java.util.Locale.ROOT);
+            if (existingPhysicalColumns.contains(normalizedDesiredName)) {
+                continue;
+            }
+
+            AddColumnEvent.ColumnWithPosition position =
+                    resolveCreateTableReconcilePosition(
+                            desiredColumn, desiredColumns, i, currentSchema);
+            missingColumns.add(position);
+            currentSchema =
+                    SchemaUtils.applySchemaChangeEvent(
+                            currentSchema,
+                            new AddColumnEvent(tableId, Collections.singletonList(position)));
+            existingPhysicalColumns.add(normalizedDesiredName);
+        }
+        return missingColumns;
+    }
+
+    private AddColumnEvent.ColumnWithPosition resolveCreateTableReconcilePosition(
+            Column desiredColumn,
+            List<Column> desiredColumns,
+            int targetIndex,
+            Schema currentSchema) {
+        Set<String> currentColumnNamesLowerCase =
+                currentSchema.getColumnNames().stream()
+                        .map(name -> name.toLowerCase(java.util.Locale.ROOT))
+                        .collect(java.util.stream.Collectors.toSet());
+
+        for (int i = targetIndex - 1; i >= 0; i--) {
+            Column previousColumn = desiredColumns.get(i);
+            if (currentColumnNamesLowerCase.contains(
+                    previousColumn.getName().toLowerCase(java.util.Locale.ROOT))) {
+                String currentColumnName =
+                        DorisSchemaUtils.getColumnCaseInsensitive(
+                                        currentSchema, previousColumn.getName())
+                                .map(Column::getName)
+                                .orElse(previousColumn.getName());
+                return AddColumnEvent.after(desiredColumn, currentColumnName);
+            }
+        }
+
+        for (int i = targetIndex + 1; i < desiredColumns.size(); i++) {
+            Column nextColumn = desiredColumns.get(i);
+            if (currentColumnNamesLowerCase.contains(
+                    nextColumn.getName().toLowerCase(java.util.Locale.ROOT))) {
+                String currentColumnName =
+                        DorisSchemaUtils.getColumnCaseInsensitive(
+                                        currentSchema, nextColumn.getName())
+                                .map(Column::getName)
+                                .orElse(nextColumn.getName());
+                return AddColumnEvent.before(desiredColumn, currentColumnName);
+            }
+        }
+
+        return AddColumnEvent.last(desiredColumn);
     }
 
     private Map<String, FieldSchema> buildFields(Schema schema) {
@@ -380,6 +594,11 @@ public class DorisMetadataApplier implements MetadataApplier {
         return schema;
     }
 
+    @VisibleForTesting
+    Schema getCachedSchema(TableId tableId) {
+        return schemaCache.get(tableId);
+    }
+
     private AddColumnPosition resolveAddColumnPosition(
             AddColumnEvent.ColumnWithPosition columnWithPosition, Schema currentSchema) {
         List<String> columnNames = currentSchema.getColumnNames();
@@ -427,7 +646,7 @@ public class DorisMetadataApplier implements MetadataApplier {
     private int resolveLastPrimaryKeyIndex(Schema currentSchema, List<String> columnNames) {
         int lastPrimaryKeyIndex = -1;
         for (String primaryKey : currentSchema.primaryKeys()) {
-            int primaryKeyIndex = columnNames.indexOf(primaryKey);
+            int primaryKeyIndex = indexOfColumnCaseInsensitive(columnNames, primaryKey);
             if (primaryKeyIndex < 0) {
                 throw new IllegalStateException(
                         primaryKey + " of current Doris schema cache is not existed.");
@@ -435,6 +654,15 @@ public class DorisMetadataApplier implements MetadataApplier {
             lastPrimaryKeyIndex = Math.max(lastPrimaryKeyIndex, primaryKeyIndex);
         }
         return lastPrimaryKeyIndex;
+    }
+
+    private int indexOfColumnCaseInsensitive(List<String> columnNames, String targetColumn) {
+        for (int i = 0; i < columnNames.size(); i++) {
+            if (columnNames.get(i).equalsIgnoreCase(targetColumn)) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     private String requireExistingColumnName(

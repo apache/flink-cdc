@@ -553,11 +553,11 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
                         ? null
                         : formatCachedFieldMismatch(fieldPath, expectedType, actualSchema);
             case INTEGER:
-                return actualSchema.type() == Schema.Type.INT32
+                return isPlainSchemaCompatible(actualSchema, Schema.Type.INT32)
                         ? null
                         : formatCachedFieldMismatch(fieldPath, expectedType, actualSchema);
             case BIGINT:
-                return actualSchema.type() == Schema.Type.INT64
+                return isPlainSchemaCompatible(actualSchema, Schema.Type.INT64)
                         ? null
                         : formatCachedFieldMismatch(fieldPath, expectedType, actualSchema);
             case FLOAT:
@@ -575,7 +575,7 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
                         : formatCachedFieldMismatch(fieldPath, expectedType, actualSchema);
             case BINARY:
             case VARBINARY:
-                return actualSchema.type() == Schema.Type.BYTES
+                return isPlainSchemaCompatible(actualSchema, Schema.Type.BYTES)
                         ? null
                         : formatCachedFieldMismatch(fieldPath, expectedType, actualSchema);
             case DECIMAL:
@@ -652,7 +652,7 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
                 }
                 return null;
             default:
-                return null;
+                return formatCachedFieldMismatch(fieldPath, expectedType, actualSchema);
         }
     }
 
@@ -680,6 +680,10 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
         return schema.type() == Schema.Type.BOOLEAN
                 || schema.type() == Schema.Type.INT8
                 || schema.type() == Schema.Type.INT16;
+    }
+
+    private static boolean isPlainSchemaCompatible(Schema schema, Schema.Type expectedType) {
+        return schema.type() == expectedType && schema.name() == null;
     }
 
     private static boolean isStringSchemaCompatible(Schema schema) {

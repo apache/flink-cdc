@@ -18,17 +18,28 @@
 package org.apache.flink.cdc.connectors.doris.sink;
 
 import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.cdc.common.event.CreateTableEvent;
+import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.common.types.DataTypes;
 
 import org.apache.doris.flink.catalog.doris.DorisSchemaFactory;
+import org.apache.doris.flink.catalog.doris.FieldSchema;
+import org.apache.doris.flink.cfg.DorisOptions;
+import org.apache.doris.flink.sink.schema.AddColumnPosition;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /** Unit tests for table-buckets parsing in {@link DorisMetadataApplier}. */
 public class DorisMetadataApplierTest {
+
+    private static final TableId TABLE_ID = TableId.parse("streampark.t_flink_app");
 
     @Test
     public void testParseTableBucketsNotConfigured() {
@@ -164,5 +175,119 @@ public class DorisMetadataApplierTest {
                 .isEqualTo(20);
         Assertions.assertThat(DorisSchemaFactory.parseTableSchemaBuckets(bucketsMap, "products"))
                 .isEqualTo(6);
+    }
+
+    @Test
+    public void testCreateTableEventReconcilesMissingColumnsForExistingTable() {
+        RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
+        DorisMetadataApplier applier =
+                new DorisMetadataApplier(
+                        createDorisOptions(),
+                        Configuration.fromMap(Collections.emptyMap()),
+                        schemaChangeManager,
+                        (dorisOptions, tableId) ->
+                                createDorisSchema("DEPLOY_MODE", "project_id", "job_name"));
+
+        Schema targetSchema =
+                Schema.newBuilder()
+                        .physicalColumn("DEPLOY_MODE", DataTypes.INT())
+                        .physicalColumn("project_id", DataTypes.BIGINT())
+                        .physicalColumn("job_name", DataTypes.STRING())
+                        .physicalColumn("CONFLUENT__LAST_UPDATED", DataTypes.TIMESTAMP_LTZ(3))
+                        .build();
+
+        applier.applySchemaChange(new CreateTableEvent(TABLE_ID, targetSchema));
+
+        Assertions.assertThat(schemaChangeManager.createTableInvocations).isZero();
+        Assertions.assertThat(schemaChangeManager.addedColumns).hasSize(1);
+        Assertions.assertThat(schemaChangeManager.addedColumns.get(0).columnName)
+                .isEqualTo("CONFLUENT__LAST_UPDATED");
+        Assertions.assertThat(schemaChangeManager.addedColumns.get(0).columnType)
+                .isEqualTo("DATETIMEV2(3)");
+        Assertions.assertThat(applier.getCachedSchema(TABLE_ID)).isEqualTo(targetSchema);
+    }
+
+    @Test
+    public void testCreateTableEventAcceptsExistingPhysicalColumnAlreadyPresent() {
+        RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
+        DorisMetadataApplier applier =
+                new DorisMetadataApplier(
+                        createDorisOptions(),
+                        Configuration.fromMap(Collections.emptyMap()),
+                        schemaChangeManager,
+                        (dorisOptions, tableId) ->
+                                createDorisSchema(
+                                        "DEPLOY_MODE",
+                                        "project_id",
+                                        "job_name",
+                                        "CONFLUENT__LAST_UPDATED"));
+
+        Schema targetSchema =
+                Schema.newBuilder()
+                        .physicalColumn("DEPLOY_MODE", DataTypes.INT())
+                        .physicalColumn("project_id", DataTypes.BIGINT())
+                        .physicalColumn("job_name", DataTypes.STRING())
+                        .physicalColumn("CONFLUENT__LAST_UPDATED", DataTypes.TIMESTAMP_LTZ(3))
+                        .build();
+
+        applier.applySchemaChange(new CreateTableEvent(TABLE_ID, targetSchema));
+
+        Assertions.assertThat(schemaChangeManager.createTableInvocations).isZero();
+        Assertions.assertThat(schemaChangeManager.addedColumns).isEmpty();
+        Assertions.assertThat(applier.getCachedSchema(TABLE_ID)).isEqualTo(targetSchema);
+    }
+
+    private static DorisOptions createDorisOptions() {
+        return DorisOptions.builder()
+                .setFenodes("127.0.0.1:8030")
+                .setUsername("root")
+                .setPassword("")
+                .build();
+    }
+
+    private static org.apache.doris.flink.rest.models.Schema createDorisSchema(String... columns) {
+        org.apache.doris.flink.rest.models.Schema dorisSchema =
+                new org.apache.doris.flink.rest.models.Schema(columns.length);
+        for (String column : columns) {
+            dorisSchema.put(
+                    new org.apache.doris.flink.rest.models.Field(
+                            column, "VARCHAR", null, 0, 0, null));
+        }
+        return dorisSchema;
+    }
+
+    private static class RecordingSchemaChangeManager extends DorisSchemaChangeManager {
+        private int createTableInvocations;
+        private final List<AddedColumn> addedColumns = new ArrayList<>();
+
+        private RecordingSchemaChangeManager() {
+            super(createDorisOptions(), null);
+        }
+
+        @Override
+        public boolean createTable(org.apache.doris.flink.catalog.doris.TableSchema tableSchema) {
+            createTableInvocations++;
+            return true;
+        }
+
+        @Override
+        public boolean addColumn(
+                String databaseName,
+                String tableName,
+                FieldSchema addFieldSchema,
+                AddColumnPosition addColumnPosition) {
+            addedColumns.add(new AddedColumn(addFieldSchema));
+            return true;
+        }
+    }
+
+    private static class AddedColumn {
+        private final String columnName;
+        private final String columnType;
+
+        private AddedColumn(FieldSchema fieldSchema) {
+            this.columnName = fieldSchema.getName();
+            this.columnType = fieldSchema.getTypeString();
+        }
     }
 }

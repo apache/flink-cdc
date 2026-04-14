@@ -114,8 +114,8 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSSSSS");
 
     private static final int MAX_SCHEMA_HISTORY_SIZE = 16;
-    private static final int MAX_DORIS_SCHEMA_FETCH_ATTEMPTS = 25;
-    private static final long DORIS_SCHEMA_FETCH_RETRY_MILLIS = 200L;
+    private static final long DORIS_SCHEMA_CATCH_UP_MAX_WAIT_MILLIS = TimeUnit.MINUTES.toMillis(1);
+    private static final long DORIS_SCHEMA_FETCH_RETRY_MILLIS = 500L;
     private static final AtomicBoolean JSON_FALLBACK_WARNING_LOGGED = new AtomicBoolean(false);
     private static final DorisSchemaFetcher DEFAULT_DORIS_SCHEMA_FETCHER =
             (dorisOptions, tableId) ->
@@ -530,18 +530,23 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
     }
 
     private static JsonFieldMappingResolver createJsonFieldMappingResolver(
-            DorisOptions dorisOptions) {
+            DorisOptions dorisOptions, DorisSchemaFetcher dorisSchemaFetcher) {
         return createJsonFieldMappingResolver(
                 dorisOptions,
-                DEFAULT_DORIS_SCHEMA_FETCHER,
-                MAX_DORIS_SCHEMA_FETCH_ATTEMPTS,
+                dorisSchemaFetcher,
+                DORIS_SCHEMA_CATCH_UP_MAX_WAIT_MILLIS,
                 DORIS_SCHEMA_FETCH_RETRY_MILLIS);
+    }
+
+    private static JsonFieldMappingResolver createJsonFieldMappingResolver(
+            DorisOptions dorisOptions) {
+        return createJsonFieldMappingResolver(dorisOptions, DEFAULT_DORIS_SCHEMA_FETCHER);
     }
 
     static JsonFieldMappingResolver createJsonFieldMappingResolver(
             DorisOptions dorisOptions,
             DorisSchemaFetcher dorisSchemaFetcher,
-            int maxSchemaFetchAttempts,
+            long maxWaitMillis,
             long schemaFetchRetryMillis) {
         if (dorisOptions == null) {
             return null;
@@ -553,7 +558,7 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
                             tableId,
                             inputSchema,
                             dorisSchemaFetcher,
-                            maxSchemaFetchAttempts,
+                            maxWaitMillis,
                             schemaFetchRetryMillis);
 
             LinkedHashMap<String, String> mapping = new LinkedHashMap<>();
@@ -570,20 +575,33 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
         };
     }
 
+    /**
+     * Waits for Doris FE physical schema to cover the input schema before serializing JSON rows.
+     *
+     * <p>This runs on the sink writer data path, so waiting here can temporarily block {@code
+     * processElement} and delay downstream checkpoint alignment when Doris metadata is catching up.
+     * The sink keeps this strict wait instead of degrading to stale schema writes, because
+     * correctness is more important than short-term throughput during schema transitions.
+     */
     static org.apache.doris.flink.rest.models.Schema waitUntilDorisSchemaCoversInputSchema(
             DorisOptions dorisOptions,
             TableId tableId,
             Schema inputSchema,
             DorisSchemaFetcher dorisSchemaFetcher,
-            int maxSchemaFetchAttempts,
+            long maxWaitMillis,
             long schemaFetchRetryMillis) {
-        Preconditions.checkArgument(maxSchemaFetchAttempts > 0, "maxSchemaFetchAttempts > 0");
-        Preconditions.checkArgument(schemaFetchRetryMillis >= 0, "schemaFetchRetryMillis >= 0");
+        Preconditions.checkArgument(maxWaitMillis >= 0, "maxWaitMillis >= 0");
+        Preconditions.checkArgument(schemaFetchRetryMillis > 0, "schemaFetchRetryMillis > 0");
 
         org.apache.doris.flink.rest.models.Schema dorisSchema = null;
+        RuntimeException lastFetchException = null;
         boolean waitingLogged = false;
         long waitStartNanos = System.nanoTime();
-        for (int attempt = 1; attempt <= maxSchemaFetchAttempts; attempt++) {
+        long deadlineNanos = waitStartNanos + TimeUnit.MILLISECONDS.toNanos(maxWaitMillis);
+        int attempt = 0;
+
+        while (true) {
+            attempt++;
             try {
                 dorisSchema = dorisSchemaFetcher.fetch(dorisOptions, tableId);
                 Preconditions.checkNotNull(
@@ -591,16 +609,31 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
                 Preconditions.checkNotNull(
                         dorisSchema.getProperties(),
                         "Failed to resolve Doris physical schema properties for " + tableId);
+                lastFetchException = null;
             } catch (RuntimeException e) {
+                lastFetchException = e;
                 long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - waitStartNanos);
                 LOG.warn(
-                        "Failed to resolve Doris physical schema for {} on attempt {}/{} after {} ms.",
+                        "Failed to resolve Doris physical schema for {} on attempt {} after {} ms. Will keep retrying until the {} ms schema catch-up budget is exhausted.",
                         tableId,
                         attempt,
-                        maxSchemaFetchAttempts,
                         elapsedMs,
+                        maxWaitMillis,
                         e);
-                throw e;
+                if (!waitingLogged) {
+                    waitingLogged = true;
+                    LOG.info(
+                            "Waiting for Doris physical schema of {} to catch up after schema change. inputColumns={}, maxWaitMs={}, retryIntervalMs={}",
+                            tableId,
+                            getInputColumnNames(inputSchema),
+                            maxWaitMillis,
+                            schemaFetchRetryMillis);
+                }
+                if (System.nanoTime() >= deadlineNanos) {
+                    break;
+                }
+                sleepBeforeRetry(tableId, deadlineNanos, schemaFetchRetryMillis);
+                continue;
             }
 
             if (dorisSchemaCoversInputSchema(dorisSchema, inputSchema)) {
@@ -621,30 +654,44 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
             if (!waitingLogged) {
                 waitingLogged = true;
                 LOG.info(
-                        "Waiting for Doris physical schema of {} to catch up. inputColumns={}, dorisColumns={}, maxAttempts={}, retryIntervalMs={}",
+                        "Waiting for Doris physical schema of {} to catch up. inputColumns={}, dorisColumns={}, maxWaitMs={}, retryIntervalMs={}",
                         tableId,
                         getInputColumnNames(inputSchema),
                         getDorisPhysicalColumnNames(dorisSchema),
-                        maxSchemaFetchAttempts,
+                        maxWaitMillis,
                         schemaFetchRetryMillis);
             }
 
-            if (attempt < maxSchemaFetchAttempts) {
-                try {
-                    Thread.sleep(schemaFetchRetryMillis);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    throw new IllegalStateException(
-                            "Interrupted while waiting for Doris physical schema of " + tableId, e);
-                }
+            if (System.nanoTime() >= deadlineNanos) {
+                break;
             }
+
+            sleepBeforeRetry(tableId, deadlineNanos, schemaFetchRetryMillis);
         }
 
         long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - waitStartNanos);
+        if (lastFetchException != null) {
+            LOG.warn(
+                    "Failed to resolve Doris physical schema for {} after {} attempt(s) and {} ms while waiting for schema catch-up. inputColumns={}, latestDorisColumns={}",
+                    tableId,
+                    attempt,
+                    elapsedMs,
+                    getInputColumnNames(inputSchema),
+                    getDorisPhysicalColumnNames(dorisSchema),
+                    lastFetchException);
+            throw new IllegalStateException(
+                    String.format(
+                            "Failed to resolve Doris physical schema for %s while waiting for schema catch-up. inputColumns=%s, latestDorisColumns=%s",
+                            tableId,
+                            getInputColumnNames(inputSchema),
+                            getDorisPhysicalColumnNames(dorisSchema)),
+                    lastFetchException);
+        }
+
         LOG.warn(
                 "Doris physical schema for {} did not catch up after {} attempt(s) and {} ms. inputColumns={}, dorisColumns={}",
                 tableId,
-                maxSchemaFetchAttempts,
+                attempt,
                 elapsedMs,
                 getInputColumnNames(inputSchema),
                 getDorisPhysicalColumnNames(dorisSchema));
@@ -655,6 +702,20 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
                         tableId,
                         getInputColumnNames(inputSchema),
                         getDorisPhysicalColumnNames(dorisSchema)));
+    }
+
+    private static void sleepBeforeRetry(
+            TableId tableId, long deadlineNanos, long schemaFetchRetryMillis) {
+        long remainingMillis =
+                TimeUnit.NANOSECONDS.toMillis(Math.max(0L, deadlineNanos - System.nanoTime()));
+        long sleepMillis = Math.min(schemaFetchRetryMillis, Math.max(1L, remainingMillis));
+        try {
+            Thread.sleep(sleepMillis);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(
+                    "Interrupted while waiting for Doris physical schema of " + tableId, e);
+        }
     }
 
     private static boolean dorisSchemaCoversInputSchema(

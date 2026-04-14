@@ -19,6 +19,7 @@ package org.apache.flink.cdc.common.utils;
 
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
+import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.TableId;
@@ -483,5 +484,30 @@ class SchemaUtilsTest {
                                                 .option("Key2", "Value2")
                                                 .build()))
                 .isExactlyInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void testCreateTableEventRedundancyRequiresSchemaEquality() {
+        TableId tableId = TableId.parse("default.default.redundancy_table");
+        Schema originalSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.BIGINT())
+                        .physicalColumn("job_name", DataTypes.STRING())
+                        .build();
+        Schema changedSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.BIGINT())
+                        .physicalColumn("job_name", DataTypes.STRING())
+                        .physicalColumn("CONFLUENT__LAST_UPDATED", DataTypes.TIMESTAMP_LTZ(3))
+                        .build();
+
+        Assertions.assertThat(
+                        SchemaUtils.isSchemaChangeEventRedundant(
+                                originalSchema, new CreateTableEvent(tableId, originalSchema)))
+                .isTrue();
+        Assertions.assertThat(
+                        SchemaUtils.isSchemaChangeEventRedundant(
+                                originalSchema, new CreateTableEvent(tableId, changedSchema)))
+                .isFalse();
     }
 }

@@ -218,9 +218,6 @@ public interface ArrayData {
             default:
                 throw new IllegalArgumentException();
         }
-        if (!elementType.isNullable()) {
-            return elementGetter;
-        }
         return (array, pos) -> {
             if (array.isNullAt(pos)) {
                 return null;

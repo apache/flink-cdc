@@ -41,6 +41,9 @@ import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -218,6 +221,101 @@ class DebeziumEventDeserializationSchemaTest {
                         insertRecord(
                                 SchemaBuilder.struct().field("left_value", decimalSchema).build(),
                                 Collections.singletonMap("left_value", new BigDecimal("12345.6"))));
+
+        DataChangeEvent event = (DataChangeEvent) events.get(0);
+        RecordData after = event.after();
+
+        assertThat(after.getArity()).isEqualTo(1);
+        assertThat(after.getDecimal(0, 10, 1).toBigDecimal()).isEqualByComparingTo("12345.6");
+    }
+
+    @Test
+    void testLogicalDateSchemaIncompatibleWithCachedIntegerFallsBackToValueInference()
+            throws Exception {
+        TestingDebeziumEventDeserializationSchema deserializer =
+                new TestingDebeziumEventDeserializationSchema();
+        deserializer.applyChangeEvent(
+                new CreateTableEvent(
+                        TABLE_ID,
+                        Schema.newBuilder()
+                                .physicalColumn("created_on", DataTypes.INT().notNull())
+                                .build()));
+
+        org.apache.kafka.connect.data.Schema dateSchema =
+                org.apache.kafka.connect.data.Date.builder().build();
+        LocalDate expectedDate = LocalDate.of(2026, 4, 10);
+        List<? extends Event> events =
+                deserializer.deserialize(
+                        insertRecord(
+                                SchemaBuilder.struct().field("created_on", dateSchema).build(),
+                                Collections.singletonMap(
+                                        "created_on",
+                                        org.apache.kafka.connect.data.Date.toLogical(
+                                                dateSchema,
+                                                Math.toIntExact(expectedDate.toEpochDay())))));
+
+        DataChangeEvent event = (DataChangeEvent) events.get(0);
+        RecordData after = event.after();
+
+        assertThat(after.getArity()).isEqualTo(1);
+        assertThat(after.getDate(0).toLocalDate()).isEqualTo(expectedDate);
+    }
+
+    @Test
+    void testLogicalTimestampSchemaIncompatibleWithCachedBigintFallsBackToValueInference()
+            throws Exception {
+        TestingDebeziumEventDeserializationSchema deserializer =
+                new TestingDebeziumEventDeserializationSchema();
+        deserializer.applyChangeEvent(
+                new CreateTableEvent(
+                        TABLE_ID,
+                        Schema.newBuilder()
+                                .physicalColumn("created_at", DataTypes.BIGINT().notNull())
+                                .build()));
+
+        org.apache.kafka.connect.data.Schema timestampSchema =
+                org.apache.kafka.connect.data.Timestamp.builder().build();
+        LocalDateTime expectedTimestamp = LocalDateTime.of(2026, 4, 10, 10, 5, 6, 789_000_000);
+        List<? extends Event> events =
+                deserializer.deserialize(
+                        insertRecord(
+                                SchemaBuilder.struct().field("created_at", timestampSchema).build(),
+                                Collections.singletonMap(
+                                        "created_at",
+                                        org.apache.kafka.connect.data.Timestamp.toLogical(
+                                                timestampSchema,
+                                                expectedTimestamp
+                                                        .toInstant(ZoneOffset.UTC)
+                                                        .toEpochMilli()))));
+
+        DataChangeEvent event = (DataChangeEvent) events.get(0);
+        RecordData after = event.after();
+
+        assertThat(after.getArity()).isEqualTo(1);
+        assertThat(after.getTimestamp(0, 3).toLocalDateTime()).isEqualTo(expectedTimestamp);
+    }
+
+    @Test
+    void testDecimalLogicalBytesSchemaIncompatibleWithCachedBinaryFallsBackToValueInference()
+            throws Exception {
+        TestingDebeziumEventDeserializationSchema deserializer =
+                new TestingDebeziumEventDeserializationSchema();
+        deserializer.applyChangeEvent(
+                new CreateTableEvent(
+                        TABLE_ID,
+                        Schema.newBuilder()
+                                .physicalColumn("amount", DataTypes.BYTES().notNull())
+                                .build()));
+
+        org.apache.kafka.connect.data.Schema decimalSchema =
+                org.apache.kafka.connect.data.Decimal.builder(1)
+                        .parameter(DebeziumSchemaDataTypeInference.PRECISION_PARAMETER_KEY, "10")
+                        .build();
+        List<? extends Event> events =
+                deserializer.deserialize(
+                        insertRecord(
+                                SchemaBuilder.struct().field("amount", decimalSchema).build(),
+                                Collections.singletonMap("amount", new BigDecimal("12345.6"))));
 
         DataChangeEvent event = (DataChangeEvent) events.get(0);
         RecordData after = event.after();

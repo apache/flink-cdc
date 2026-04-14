@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.doris.sink;
 
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.data.DateData;
+import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
@@ -466,6 +467,56 @@ public class DorisEventSerializerTest {
                                         })));
         Assertions.assertThat(new String(evolvedInsertRecord.getRow(), StandardCharsets.UTF_8))
                 .isEqualTo("2|stream|18|0");
+    }
+
+    @Test
+    public void testCreateTableEventRefreshesJsonSchemaAfterRestoreWithComputedTimestampColumn()
+            throws IOException {
+        TableId restoreTableId = TableId.parse("doris_database.restore_timestamp_table");
+        Schema restoredSchema =
+                Schema.newBuilder()
+                        .physicalColumn("DEPLOY_MODE", DataTypes.INT())
+                        .physicalColumn("project_id", DataTypes.BIGINT())
+                        .physicalColumn("job_name", DataTypes.STRING())
+                        .build();
+        Schema expandedSchema =
+                Schema.newBuilder()
+                        .physicalColumn("DEPLOY_MODE", DataTypes.INT())
+                        .physicalColumn("project_id", DataTypes.BIGINT())
+                        .physicalColumn("job_name", DataTypes.STRING())
+                        .physicalColumn("CONFLUENT__LAST_UPDATED", DataTypes.TIMESTAMP_LTZ(3))
+                        .build();
+        BinaryRecordDataGenerator recordDataGenerator =
+                new BinaryRecordDataGenerator(((RowType) expandedSchema.toRowDataType()));
+
+        DorisEventSerializer serializer =
+                new DorisEventSerializer(ZoneId.of("UTC"), new Configuration());
+
+        // Simulate restoring the serializer state with an old schema, then receiving the new
+        // CreateTableEvent produced by an updated transform.
+        serializer.serialize(new CreateTableEvent(restoreTableId, restoredSchema));
+        serializer.serialize(new CreateTableEvent(restoreTableId, expandedSchema));
+
+        DorisRecord dorisRecord =
+                serializer.serialize(
+                        DataChangeEvent.insertEvent(
+                                restoreTableId,
+                                recordDataGenerator.generate(
+                                        new Object[] {
+                                            1,
+                                            1001L,
+                                            BinaryStringData.fromString("demo_job"),
+                                            LocalZonedTimestampData.fromEpochMillis(
+                                                    Instant.parse("2025-01-16T08:00:00Z")
+                                                            .toEpochMilli())
+                                        })));
+
+        JsonNode jsonNode = objectMapper.readTree(dorisRecord.getRow());
+        Assertions.assertThat(jsonNode.get("deploy_mode").asInt()).isEqualTo(1);
+        Assertions.assertThat(jsonNode.get("project_id").asLong()).isEqualTo(1001L);
+        Assertions.assertThat(jsonNode.get("job_name").asText()).isEqualTo("demo_job");
+        Assertions.assertThat(jsonNode.get("confluent__last_updated").asText())
+                .isEqualTo("2025-01-16 08:00:00.000000");
     }
 
     @Test
@@ -1058,8 +1109,8 @@ public class DorisEventSerializerTest {
                                             ? createDorisSchema("id", "name")
                                             : createDorisSchema("id", "name", "age");
                                 },
-                                3,
-                                0));
+                                100L,
+                                1L));
         serializer.serialize(new CreateTableEvent(tableId, baseSchema));
         serializer.serialize(addColumnEvent);
 
@@ -1075,6 +1126,147 @@ public class DorisEventSerializerTest {
         Assertions.assertThat(evolvedJsonNode.get("id").asInt()).isEqualTo(2);
         Assertions.assertThat(evolvedJsonNode.get("name").asText()).isEqualTo("Bob");
         Assertions.assertThat(evolvedJsonNode.get("age").asInt()).isEqualTo(18);
+    }
+
+    @Test
+    public void testWaitUntilDorisSchemaCoversInputSchemaWithinTimeBudget() {
+        TableId tableId = TableId.parse("doris_database.json_schema_time_budget_table");
+        Schema baseSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+        AddColumnEvent addColumnEvent =
+                new AddColumnEvent(
+                        tableId,
+                        Arrays.asList(
+                                AddColumnEvent.last(
+                                        Column.physicalColumn("age", DataTypes.INT()))));
+        Schema evolvedSchema = SchemaUtils.applySchemaChangeEvent(baseSchema, addColumnEvent);
+        AtomicInteger fetchAttempts = new AtomicInteger();
+
+        org.apache.doris.flink.rest.models.Schema dorisSchema =
+                DorisEventSerializer.waitUntilDorisSchemaCoversInputSchema(
+                        createDorisOptions(),
+                        tableId,
+                        evolvedSchema,
+                        (options, requestedTableId) -> {
+                            int attempt = fetchAttempts.incrementAndGet();
+                            return attempt < 6
+                                    ? createDorisSchema("id", "name")
+                                    : createDorisSchema("id", "name", "age");
+                        },
+                        100L,
+                        1L);
+
+        Assertions.assertThat(fetchAttempts.get()).isEqualTo(6);
+        Assertions.assertThat(dorisSchema.getProperties())
+                .extracting(org.apache.doris.flink.rest.models.Field::getName)
+                .containsExactly("id", "name", "age");
+    }
+
+    @Test
+    public void testWaitUntilDorisSchemaCoversInputSchemaTimesOut() {
+        TableId tableId = TableId.parse("doris_database.json_schema_timeout_table");
+        Schema baseSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+        AddColumnEvent addColumnEvent =
+                new AddColumnEvent(
+                        tableId,
+                        Arrays.asList(
+                                AddColumnEvent.last(
+                                        Column.physicalColumn("age", DataTypes.INT()))));
+        Schema evolvedSchema = SchemaUtils.applySchemaChangeEvent(baseSchema, addColumnEvent);
+
+        Assertions.assertThatThrownBy(
+                        () ->
+                                DorisEventSerializer.waitUntilDorisSchemaCoversInputSchema(
+                                        createDorisOptions(),
+                                        tableId,
+                                        evolvedSchema,
+                                        (options, requestedTableId) ->
+                                                createDorisSchema("id", "name"),
+                                        10L,
+                                        1L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("did not catch up with input schema");
+    }
+
+    @Test
+    public void testWaitUntilDorisSchemaCoversInputSchemaRetriesFetchFailuresWithinTimeBudget() {
+        TableId tableId = TableId.parse("doris_database.json_schema_fetch_retry_table");
+        Schema baseSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+        AddColumnEvent addColumnEvent =
+                new AddColumnEvent(
+                        tableId,
+                        Arrays.asList(
+                                AddColumnEvent.last(
+                                        Column.physicalColumn("age", DataTypes.INT()))));
+        Schema evolvedSchema = SchemaUtils.applySchemaChangeEvent(baseSchema, addColumnEvent);
+        AtomicInteger fetchAttempts = new AtomicInteger();
+
+        org.apache.doris.flink.rest.models.Schema dorisSchema =
+                DorisEventSerializer.waitUntilDorisSchemaCoversInputSchema(
+                        createDorisOptions(),
+                        tableId,
+                        evolvedSchema,
+                        (options, requestedTableId) -> {
+                            int attempt = fetchAttempts.incrementAndGet();
+                            if (attempt < 3) {
+                                throw new IllegalStateException("schema fetch failed");
+                            }
+                            return createDorisSchema("id", "name", "age");
+                        },
+                        100L,
+                        1L);
+
+        Assertions.assertThat(fetchAttempts.get()).isEqualTo(3);
+        Assertions.assertThat(dorisSchema.getProperties())
+                .extracting(org.apache.doris.flink.rest.models.Field::getName)
+                .containsExactly("id", "name", "age");
+    }
+
+    @Test
+    public void testWaitUntilDorisSchemaCoversInputSchemaFailsAfterRepeatedFetchFailures() {
+        TableId tableId = TableId.parse("doris_database.json_schema_fetch_timeout_table");
+        Schema baseSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+        AddColumnEvent addColumnEvent =
+                new AddColumnEvent(
+                        tableId,
+                        Arrays.asList(
+                                AddColumnEvent.last(
+                                        Column.physicalColumn("age", DataTypes.INT()))));
+        Schema evolvedSchema = SchemaUtils.applySchemaChangeEvent(baseSchema, addColumnEvent);
+
+        Assertions.assertThatThrownBy(
+                        () ->
+                                DorisEventSerializer.waitUntilDorisSchemaCoversInputSchema(
+                                        createDorisOptions(),
+                                        tableId,
+                                        evolvedSchema,
+                                        (options, requestedTableId) -> {
+                                            throw new IllegalStateException("schema fetch failed");
+                                        },
+                                        10L,
+                                        1L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Failed to resolve Doris physical schema")
+                .hasRootCauseMessage("schema fetch failed");
     }
 
     @Test
@@ -1107,8 +1299,8 @@ public class DorisEventSerializerTest {
                                 (options, requestedTableId) -> {
                                     throw new IllegalStateException("schema fetch failed");
                                 },
-                                3,
-                                0));
+                                10L,
+                                1L));
         serializer.serialize(new CreateTableEvent(tableId, baseSchema));
         serializer.serialize(addColumnEvent);
 
@@ -1124,7 +1316,8 @@ public class DorisEventSerializerTest {
                                                             18
                                                         }))))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("schema fetch failed");
+                .hasMessageContaining("Failed to resolve Doris physical schema")
+                .hasRootCauseMessage("schema fetch failed");
     }
 
     @Test

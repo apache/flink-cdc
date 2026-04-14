@@ -36,6 +36,9 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
+import java.time.temporal.ChronoField;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -127,18 +130,9 @@ public class DorisRowConverter implements Serializable {
                 final int zonedP = ((ZonedTimestampType) type).getPrecision();
                 return (index, val) -> val.getTimestamp(index, zonedP).toTimestamp();
             case TIME_WITHOUT_TIME_ZONE:
-                return (index, val) -> {
-                    int precision = DataTypeChecks.getPrecision(type);
-                    if (precision == 0) {
-                        return val.getTime(index)
-                                .toLocalTime()
-                                .format(DorisEventSerializer.TIME_FORMATTER);
-                    } else {
-                        return val.getTime(index)
-                                .toLocalTime()
-                                .format(DorisEventSerializer.TIME_WITH_MILLISECOND_FORMATTER);
-                    }
-                };
+                final DateTimeFormatter timeFormatter =
+                        createTimeFormatter(DataTypeChecks.getPrecision(type));
+                return (index, val) -> val.getTime(index).toLocalTime().format(timeFormatter);
             case ARRAY:
                 return (index, val) -> convertArrayData(val.getArray(index), type);
             case MAP:
@@ -149,6 +143,19 @@ public class DorisRowConverter implements Serializable {
             default:
                 throw new UnsupportedOperationException("Unsupported type:" + type);
         }
+    }
+
+    private static DateTimeFormatter createTimeFormatter(int precision) {
+        if (precision == 0) {
+            return DorisEventSerializer.TIME_FORMATTER;
+        }
+        if (precision < 0 || precision > 9) {
+            throw new IllegalArgumentException("Unsupported TIME precision: " + precision);
+        }
+        return new DateTimeFormatterBuilder()
+                .appendPattern("HH:mm:ss")
+                .appendFraction(ChronoField.NANO_OF_SECOND, precision, precision, true)
+                .toFormatter();
     }
 
     private static List<Object> convertArrayData(ArrayData array, DataType type) {
