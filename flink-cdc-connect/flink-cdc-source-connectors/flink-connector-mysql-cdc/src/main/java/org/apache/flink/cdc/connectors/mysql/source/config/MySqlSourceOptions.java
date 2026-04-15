@@ -292,4 +292,13 @@ public class MySqlSourceOptions {
                     .defaultValue(true)
                     .withDescription(
                             "Whether to assign the unbounded chunks first during snapshot reading phase. This might help reduce the risk of the TaskManager experiencing an out-of-memory (OOM) error when taking a snapshot of the largest unbounded chunk.");
+
+    @Experimental
+    public static final ConfigOption<Long> SCAN_RATE_LIMIT_RECORDS_PER_SECOND =
+            ConfigOptions.key("scan.rate-limit.records-per-second")
+                    .longType()
+                    .defaultValue(-1L)
+                    .withDescription(
+                            "Rate limit for source reading (both snapshot and binlog phases), "
+                                    + "in records per second. A value of -1 (default) means no rate limit is applied.");
 }
