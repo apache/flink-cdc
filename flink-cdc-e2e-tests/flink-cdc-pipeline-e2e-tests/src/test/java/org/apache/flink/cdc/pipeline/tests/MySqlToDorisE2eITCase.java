@@ -17,11 +17,14 @@
 
 package org.apache.flink.cdc.pipeline.tests;
 
+import org.apache.flink.api.common.JobID;
+import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.cdc.common.test.utils.TestUtils;
 import org.apache.flink.cdc.connectors.doris.sink.utils.DorisContainer;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
 import org.apache.flink.runtime.client.JobStatusMessage;
+import org.apache.flink.table.api.ValidationException;
 
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
@@ -44,10 +47,13 @@ import java.sql.Statement;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -705,6 +711,214 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                     "customer",
                     3,
                     Arrays.asList("401 | Grace | 18", "402 | Heidi | 19", "403 | Ivan | 20"));
+        } finally {
+            columnCaseDatabase.dropDatabase();
+            dropDorisDatabase(columnCaseDatabase.getDatabaseName());
+        }
+    }
+
+    @Test
+    void testSchemaEvolutionWithWildcardProjectionAndComputedTimestampColumnUsingRegexSelector()
+            throws Exception {
+        columnCaseDatabase.createAndInitialize();
+        createDorisDatabase(columnCaseDatabase.getDatabaseName());
+        try {
+            String databaseName = columnCaseDatabase.getDatabaseName();
+            String pipelineJob =
+                    String.format(
+                            "source:\n"
+                                    + "  type: mysql\n"
+                                    + "  hostname: mysql\n"
+                                    + "  port: 3306\n"
+                                    + "  username: %s\n"
+                                    + "  password: %s\n"
+                                    + "  tables: %s.\\.*\n"
+                                    + "  server-id: 5400-5404\n"
+                                    + "  server-time-zone: UTC\n"
+                                    + "\n"
+                                    + "sink:\n"
+                                    + "  type: doris\n"
+                                    + "  fenodes: doris:8030\n"
+                                    + "  benodes: doris:8040\n"
+                                    + "  username: %s\n"
+                                    + "  password: \"%s\"\n"
+                                    + "  table.create.properties.replication_num: 1\n"
+                                    + "  sink.properties.format: json\n"
+                                    + "\n"
+                                    + "transform:\n"
+                                    + "  - source-table: %s.(?!(mixed_case_customer|upper_case_customer|lower_case_customer)$)\\.*\n"
+                                    + "    projection: \\*, CURRENT_TIMESTAMP AS confluent__last_updated\n"
+                                    + "    converter-after-transform: SOFT_DELETE\n"
+                                    + "\n"
+                                    + "pipeline:\n"
+                                    + "  schema.change.behavior: evolve\n"
+                                    + "  parallelism: %d",
+                            MYSQL_TEST_USER,
+                            MYSQL_TEST_PASSWORD,
+                            databaseName,
+                            DORIS.getUsername(),
+                            DORIS.getPassword(),
+                            databaseName,
+                            parallelism);
+
+            submitMysqlToDorisJob(pipelineJob);
+
+            validateSinkSchema(
+                    databaseName,
+                    "lower_case_customer",
+                    Arrays.asList(
+                            "id | INT | Yes | true | null",
+                            "name | VARCHAR(765) | Yes | false | null",
+                            "phone_number | VARCHAR(765) | Yes | false | null"));
+            validateSinkSchema(
+                    databaseName,
+                    "customer",
+                    Arrays.asList(
+                            "id | INT | Yes | true | null",
+                            "NAME | VARCHAR(765) | Yes | false | null",
+                            "age | INT | Yes | false | null",
+                            "address | VARCHAR(765) | Yes | false | null",
+                            "confluent__last_updated | DATETIME(3) | Yes | false | null"));
+            waitAndVerify(
+                    databaseName,
+                    "SELECT id, NAME, age, IF(confluent__last_updated IS NULL, 'N', 'Y') "
+                            + "FROM customer ORDER BY id",
+                    4,
+                    Arrays.asList("401 | Grace | 18 | Y", "402 | Heidi | 19 | Y"),
+                    EVENT_WAITING_TIMEOUT.toMillis(),
+                    false);
+
+            try (Connection conn =
+                            DriverManager.getConnection(
+                                    String.format(
+                                            "jdbc:mysql://%s:%s/%s",
+                                            MYSQL.getHost(), MYSQL.getDatabasePort(), databaseName),
+                                    MYSQL_TEST_USER,
+                                    MYSQL_TEST_PASSWORD);
+                    Statement stat = conn.createStatement()) {
+                stat.execute("ALTER TABLE customer ADD COLUMN city VARCHAR(255) AFTER address;");
+
+                validateSinkSchema(
+                        databaseName,
+                        "customer",
+                        Arrays.asList(
+                                "id | INT | Yes | true | null",
+                                "NAME | VARCHAR(765) | Yes | false | null",
+                                "age | INT | Yes | false | null",
+                                "address | VARCHAR(765) | Yes | false | null",
+                                "city | VARCHAR(765) | Yes | false | null",
+                                "confluent__last_updated | DATETIME(3) | Yes | false | null"));
+
+                stat.execute("UPDATE customer SET city = 'Pudong' WHERE id = 401;");
+                stat.execute("UPDATE customer SET city = 'Haidian' WHERE id = 402;");
+                stat.execute(
+                        "INSERT INTO customer VALUES (403, 'Ivan', 20, 'Hangzhou', 'Yuhang');");
+
+                waitAndVerify(
+                        databaseName,
+                        "SELECT id, NAME, age, city, IF(confluent__last_updated IS NULL, 'N', 'Y') "
+                                + "FROM customer ORDER BY id",
+                        5,
+                        Arrays.asList(
+                                "401 | Grace | 18 | Pudong | Y",
+                                "402 | Heidi | 19 | Haidian | Y",
+                                "403 | Ivan | 20 | Yuhang | Y"),
+                        EVENT_WAITING_TIMEOUT.toMillis(),
+                        false);
+            }
+        } finally {
+            columnCaseDatabase.dropDatabase();
+            dropDorisDatabase(columnCaseDatabase.getDatabaseName());
+        }
+    }
+
+    @Test
+    void testSavepointRestoreRefreshesComputedTimestampColumnInWildcardProjection()
+            throws Exception {
+        columnCaseDatabase.createAndInitialize();
+        createDorisDatabase(columnCaseDatabase.getDatabaseName());
+        try {
+            String databaseName = columnCaseDatabase.getDatabaseName();
+            Path dorisCdcConnector = TestUtils.getResource("doris-cdc-pipeline-connector.jar");
+
+            JobID initialJobId =
+                    submitPipelineJob(
+                            createWildcardProjectionPipelineJob(databaseName, "\\*"),
+                            dorisCdcConnector);
+            waitUntilJobRunning(initialJobId, Duration.ofSeconds(60));
+
+            validateSinkSchema(
+                    databaseName,
+                    "customer",
+                    Arrays.asList(
+                            "id | INT | Yes | true | null",
+                            "NAME | VARCHAR(765) | Yes | false | null",
+                            "age | INT | Yes | false | null",
+                            "address | VARCHAR(765) | Yes | false | null"));
+            validateSinkResult(
+                    databaseName,
+                    "customer",
+                    4,
+                    Arrays.asList("401 | Grace | 18 | Shanghai", "402 | Heidi | 19 | Beijing"));
+
+            String savepointPath = stopJobWithSavepoint(initialJobId);
+            LOG.info("Stopped job {} with savepoint {}", initialJobId, savepointPath);
+
+            JobID restoredJobId =
+                    submitPipelineJob(
+                            createWildcardProjectionPipelineJob(
+                                    databaseName,
+                                    "\\*, CURRENT_TIMESTAMP AS confluent__last_updated"),
+                            savepointPath,
+                            false,
+                            dorisCdcConnector);
+            waitUntilJobRunning(restoredJobId, Duration.ofSeconds(60));
+
+            validateSinkSchema(
+                    databaseName,
+                    "customer",
+                    Arrays.asList(
+                            "id | INT | Yes | true | null",
+                            "NAME | VARCHAR(765) | Yes | false | null",
+                            "age | INT | Yes | false | null",
+                            "address | VARCHAR(765) | Yes | false | null",
+                            "confluent__last_updated | DATETIME(3) | Yes | false | null"));
+            waitAndVerify(
+                    databaseName,
+                    "SELECT id, NAME, age, address, "
+                            + "IF(confluent__last_updated IS NULL, 'N', 'Y') "
+                            + "FROM customer ORDER BY id",
+                    5,
+                    Arrays.asList(
+                            "401 | Grace | 18 | Shanghai | N", "402 | Heidi | 19 | Beijing | N"),
+                    EVENT_WAITING_TIMEOUT.toMillis(),
+                    false);
+
+            try (Connection conn =
+                            DriverManager.getConnection(
+                                    String.format(
+                                            "jdbc:mysql://%s:%s/%s",
+                                            MYSQL.getHost(), MYSQL.getDatabasePort(), databaseName),
+                                    MYSQL_TEST_USER,
+                                    MYSQL_TEST_PASSWORD);
+                    Statement stat = conn.createStatement()) {
+                stat.execute("UPDATE customer SET address = 'Shanghai-Updated' WHERE id = 401;");
+                stat.execute("UPDATE customer SET age = 20 WHERE id = 402;");
+                stat.execute("INSERT INTO customer VALUES (403, 'Ivan', 20, 'Hangzhou');");
+            }
+
+            waitAndVerify(
+                    databaseName,
+                    "SELECT id, NAME, age, address, "
+                            + "IF(confluent__last_updated IS NULL, 'N', 'Y') "
+                            + "FROM customer ORDER BY id",
+                    5,
+                    Arrays.asList(
+                            "401 | Grace | 18 | Shanghai-Updated | Y",
+                            "402 | Heidi | 20 | Beijing | Y",
+                            "403 | Ivan | 20 | Hangzhou | Y"),
+                    EVENT_WAITING_TIMEOUT.toMillis(),
+                    false);
         } finally {
             columnCaseDatabase.dropDatabase();
             dropDorisDatabase(columnCaseDatabase.getDatabaseName());
@@ -1574,6 +1788,82 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
         submitPipelineJob(pipelineJob, mysqlCdcJar, dorisCdcConnector, mysqlDriverJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
+    }
+
+    private String createWildcardProjectionPipelineJob(String databaseName, String projection) {
+        return String.format(
+                "source:\n"
+                        + "  type: mysql\n"
+                        + "  hostname: mysql\n"
+                        + "  port: 3306\n"
+                        + "  username: %s\n"
+                        + "  password: %s\n"
+                        + "  tables: %s.customer\n"
+                        + "  server-id: 5400-5404\n"
+                        + "  server-time-zone: UTC\n"
+                        + "\n"
+                        + "sink:\n"
+                        + "  type: doris\n"
+                        + "  fenodes: doris:8030\n"
+                        + "  benodes: doris:8040\n"
+                        + "  username: %s\n"
+                        + "  password: \"%s\"\n"
+                        + "  table.create.properties.replication_num: 1\n"
+                        + "  sink.properties.format: json\n"
+                        + "\n"
+                        + "transform:\n"
+                        + "  - source-table: %s.customer\n"
+                        + "    projection: %s\n"
+                        + "    converter-after-transform: SOFT_DELETE\n"
+                        + "\n"
+                        + "pipeline:\n"
+                        + "  schema.change.behavior: evolve\n"
+                        + "  parallelism: %d",
+                MYSQL_TEST_USER,
+                MYSQL_TEST_PASSWORD,
+                databaseName,
+                DORIS.getUsername(),
+                DORIS.getPassword(),
+                databaseName,
+                projection,
+                parallelism);
+    }
+
+    private void waitUntilJobRunning(JobID jobId, Duration timeout) {
+        long deadline = System.currentTimeMillis() + timeout.toMillis();
+        while (System.currentTimeMillis() < deadline) {
+            Collection<JobStatusMessage> jobStatusMessages;
+            try {
+                jobStatusMessages = getRestClusterClient().listJobs().get(10, TimeUnit.SECONDS);
+            } catch (Exception e) {
+                LOG.warn("Error when fetching job status.", e);
+                continue;
+            }
+
+            Optional<JobStatusMessage> optMessage =
+                    jobStatusMessages.stream().filter(j -> j.getJobId().equals(jobId)).findFirst();
+            if (!optMessage.isPresent()) {
+                LOG.warn("Job {} is not visible yet, waiting for the next loop...", jobId);
+                continue;
+            }
+
+            JobStatusMessage message = optMessage.get();
+            JobStatus jobStatus = message.getJobState();
+            if (jobStatus.isTerminalState()) {
+                throw new ValidationException(
+                        String.format(
+                                "Job has been terminated! JobName: %s, JobID: %s, Status: %s",
+                                message.getJobName(), message.getJobId(), message.getJobState()));
+            }
+            if (jobStatus == JobStatus.RUNNING) {
+                return;
+            }
+        }
+
+        throw new AssertionError(
+                String.format(
+                        "Job %s did not reach RUNNING state within %d ms.",
+                        jobId, timeout.toMillis()));
     }
 
     private void insertColumnCaseIncrementalRows(String databaseName) throws SQLException {

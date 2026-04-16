@@ -221,6 +221,49 @@ class SelectorsTest {
         assertThat(threePartDots).containsExactly("[\\s\\S]*", "[\\s\\S]*", "[\\s\\S]*");
     }
 
+    @Test
+    void testNegativeLookaheadWithoutWildcardDoesNotMatchRealTableNames() {
+        Selectors selectors =
+                new Selectors.SelectorsBuilder()
+                        .includeTables(
+                                "xxsc.(?!order_info|yearcard_team_detail|order_detail_model)")
+                        .build();
+
+        // The table segment is only a zero-width assertion. Since Selectors uses matches() for the
+        // whole table name, no actual table name can match this pattern.
+        assertNotAllowed(selectors, null, "xxsc", "customer");
+        assertNotAllowed(selectors, null, "xxsc", "member_profile");
+        assertNotAllowed(selectors, null, "xxsc", "order_info");
+    }
+
+    @Test
+    void testNegativeLookaheadWildcardNeedsEscapedDotToSurviveSelectorParsing() {
+        assertThatThrownBy(
+                        () ->
+                                new Selectors.SelectorsBuilder()
+                                        .includeTables(
+                                                "xxsc.(?!(order_info|yearcard_team_detail|order_detail_model)$).*")
+                                        .build())
+                .isInstanceOf(PatternSyntaxException.class)
+                .hasMessageContaining("Dangling meta character '*'");
+    }
+
+    @Test
+    void testEscapedNegativeLookaheadWildcardMatchesExpectedTables() {
+        Selectors selectors =
+                new Selectors.SelectorsBuilder()
+                        .includeTables(
+                                "xxsc.(?!(order_info|yearcard_team_detail|order_detail_model)$)\\.*")
+                        .build();
+
+        assertAllowed(selectors, null, "xxsc", "customer");
+        assertAllowed(selectors, null, "xxsc", "member_profile");
+        assertAllowed(selectors, null, "xxsc", "order_info_backup");
+        assertNotAllowed(selectors, null, "xxsc", "order_info");
+        assertNotAllowed(selectors, null, "xxsc", "yearcard_team_detail");
+        assertNotAllowed(selectors, null, "xxsc", "order_detail_model");
+    }
+
     protected void assertAllowed(
             Selectors filter, String nameSpace, String schemaName, String tableName) {
 
