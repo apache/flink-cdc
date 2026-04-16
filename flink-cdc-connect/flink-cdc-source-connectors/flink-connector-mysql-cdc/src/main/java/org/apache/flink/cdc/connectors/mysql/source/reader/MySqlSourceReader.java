@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.mysql.source.reader;
 
+import org.apache.flink.api.connector.source.ReaderOutput;
 import org.apache.flink.api.connector.source.SourceEvent;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils;
@@ -45,6 +46,7 @@ import org.apache.flink.cdc.connectors.mysql.source.utils.TableDiscoveryUtils;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.connector.base.source.reader.SingleThreadMultiplexSourceReaderBase;
 import org.apache.flink.connector.base.source.reader.fetcher.SingleThreadFetcherManager;
+import org.apache.flink.core.io.InputStatus;
 import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.Preconditions;
 
@@ -59,8 +61,11 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -80,6 +85,8 @@ public class MySqlSourceReader<T>
     private volatile MySqlBinlogSplit suspendedBinlogSplit;
     private final MySqlRecordEmitter<T> recordEmitter;
     private final MySqlPartition partition;
+    private boolean started;
+    private final Set<String> restoredBinlogSplitsToReplay;
 
     public MySqlSourceReader(
             Supplier<MySqlSplitReader> splitReaderSupplier,
@@ -101,10 +108,13 @@ public class MySqlSourceReader<T>
         this.suspendedBinlogSplit = null;
         this.partition =
                 new MySqlPartition(sourceConfig.getMySqlConnectorConfig().getLogicalName());
+        this.started = false;
+        this.restoredBinlogSplitsToReplay = new HashSet<>();
     }
 
     @Override
     public void start() {
+        started = true;
         if (getNumberOfCurrentlyAssignedSplits() <= 1) {
             context.sendSplitRequest();
         }
@@ -112,12 +122,30 @@ public class MySqlSourceReader<T>
 
     @Override
     protected MySqlSplitState initializedState(MySqlSplit split) {
-        recordEmitter.applySplit(split);
+        recordEmitter.applySplit(split, restoredBinlogSplitsToReplay.remove(split.splitId()));
         if (split.isSnapshotSplit()) {
             return new MySqlSnapshotSplitState(split.asSnapshotSplit());
         } else {
             return new MySqlBinlogSplitState(split.asBinlogSplit());
         }
+    }
+
+    @Override
+    public InputStatus pollNext(ReaderOutput<T> output) throws Exception {
+        T pendingOutput = recordEmitter.pollPendingOutput();
+        if (pendingOutput != null) {
+            output.collect(pendingOutput);
+            return InputStatus.MORE_AVAILABLE;
+        }
+        return super.pollNext(output);
+    }
+
+    @Override
+    public CompletableFuture<Void> isAvailable() {
+        if (recordEmitter.hasPendingOutput()) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return super.isAvailable();
     }
 
     @Override
@@ -214,6 +242,12 @@ public class MySqlSourceReader<T>
 
     @Override
     public void addSplits(List<MySqlSplit> splits) {
+        if (!started) {
+            splits.stream()
+                    .filter(MySqlSplit::isBinlogSplit)
+                    .map(MySqlSplit::splitId)
+                    .forEach(restoredBinlogSplitsToReplay::add);
+        }
         addSplits(splits, true);
     }
 

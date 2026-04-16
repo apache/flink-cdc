@@ -78,9 +78,12 @@ import java.util.Optional;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import static java.lang.String.format;
@@ -307,6 +310,117 @@ class MysqlPipelineNewlyAddedTableITCase extends MySqlSourceTestBase {
         testAddNewTable(testParam, DEFAULT_PARALLELISM);
     }
 
+    @Test
+    void testSavepointRestoreReplaysCreateTableEventBeforeNewBinlog() throws Exception {
+        String tableName = "address_hangzhou";
+        initialAddressTables(getConnection(), Collections.singletonList(tableName));
+
+        Path savepointDir = Files.createTempDirectory("restore-create-table-test");
+        String savepointDirectory = savepointDir.toAbsolutePath().toString();
+
+        StreamExecutionEnvironment env = getStreamExecutionEnvironment(null, 1);
+        FlinkSourceProvider sourceProvider =
+                getFlinkSourceProvider(
+                        Collections.singletonList(tableName), 1, new HashMap<>(), false, false);
+        DataStreamSource<Event> source =
+                env.fromSource(
+                        sourceProvider.getSource(),
+                        WatermarkStrategy.noWatermarks(),
+                        MySqlDataSourceFactory.IDENTIFIER,
+                        new EventTypeInfo());
+
+        TypeSerializer<Event> serializer =
+                source.getTransformation()
+                        .getOutputType()
+                        .createSerializer(env.getConfig().getSerializerConfig());
+        CheckpointedCollectResultBuffer<Event> resultBuffer =
+                new CheckpointedCollectResultBuffer<>(serializer);
+        String accumulatorName = "dataStreamCollect_" + UUID.randomUUID();
+        CollectResultIterator<Event> iterator =
+                addCollector(env, source, resultBuffer, serializer, accumulatorName);
+        JobClient jobClient = env.executeAsync("BeforeRestoreReplayCreateTable");
+        iterator.setJobClient(jobClient);
+
+        List<Event> initialEvents = fetchResults(iterator, 4);
+        multiAssert(initialEvents, Collections.singletonList(tableName));
+
+        try (MySqlConnection connection = getConnection()) {
+            connection.setAutoCommit(false);
+            connection.execute(
+                    format(
+                            "INSERT INTO %s.%s VALUES "
+                                    + "(417122095255614379, 'China', 'hangzhou', 'hangzhou West Town address 4');",
+                            customDatabase.getDatabaseName(), tableName));
+            connection.commit();
+        }
+        assertThat(fetchResults(iterator, 1).get(0)).isInstanceOf(DataChangeEvent.class);
+
+        String savepointPath = triggerSavepointWithRetry(jobClient, savepointDirectory);
+        jobClient.cancel().get();
+        iterator.close();
+
+        StreamExecutionEnvironment restoredEnv = getStreamExecutionEnvironment(savepointPath, 1);
+        FlinkSourceProvider restoredSourceProvider =
+                getFlinkSourceProvider(
+                        Collections.singletonList(tableName), 1, new HashMap<>(), false, false);
+        DataStreamSource<Event> restoredSource =
+                restoredEnv.fromSource(
+                        restoredSourceProvider.getSource(),
+                        WatermarkStrategy.noWatermarks(),
+                        MySqlDataSourceFactory.IDENTIFIER,
+                        new EventTypeInfo());
+        CollectResultIterator<Event> restoredIterator =
+                addCollector(
+                        restoredEnv, restoredSource, resultBuffer, serializer, accumulatorName);
+        JobClient restoredClient = restoredEnv.executeAsync("AfterRestoreReplayCreateTable");
+        restoredIterator.setJobClient(restoredClient);
+
+        try {
+            assertThat(fetchResultsWithTimeout(restoredIterator, 1, 30, TimeUnit.SECONDS))
+                    .containsExactly(
+                            getCreateTableEvent(
+                                    TableId.tableId(customDatabase.getDatabaseName(), tableName)));
+
+            try (MySqlConnection connection = getConnection()) {
+                connection.setAutoCommit(false);
+                connection.execute(
+                        format(
+                                "INSERT INTO %s.%s VALUES "
+                                        + "(417122095255614380, 'China', 'hangzhou', 'hangzhou West Town address 5');",
+                                customDatabase.getDatabaseName(), tableName));
+                connection.commit();
+            }
+
+            assertThat(fetchResultsWithTimeout(restoredIterator, 1, 30, TimeUnit.SECONDS).get(0))
+                    .isInstanceOf(DataChangeEvent.class);
+        } finally {
+            restoredClient.cancel().get();
+            restoredIterator.close();
+        }
+    }
+
+    private <T> List<T> fetchResultsWithTimeout(
+            CollectResultIterator<T> iterator, int size, long timeout, TimeUnit unit)
+            throws Exception {
+        ExecutorService executor =
+                Executors.newSingleThreadExecutor(
+                        runnable -> {
+                            Thread thread = new Thread(runnable, "mysql-pipeline-fetch-results");
+                            thread.setDaemon(true);
+                            return thread;
+                        });
+        Future<List<T>> future = executor.submit(() -> fetchResults(iterator, size));
+        try {
+            return future.get(timeout, unit);
+        } catch (TimeoutException e) {
+            iterator.close();
+            future.cancel(true);
+            throw e;
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
     private void testAddNewTable(TestParam testParam, int parallelism) throws Exception {
         // step 1: create mysql tables
         if (CollectionUtils.isNotEmpty(testParam.getFirstRoundInitTables())) {
@@ -382,6 +496,7 @@ class MysqlPipelineNewlyAddedTableITCase extends MySqlSourceTestBase {
         CollectResultIterator<Event> restoredIterator =
                 addCollector(restoredEnv, restoreSource, resultBuffer, serializer, accumulatorName);
         JobClient restoreClient = restoredEnv.executeAsync("AfterAddNewTable");
+        restoredIterator.setJobClient(restoreClient);
 
         List<String> newlyAddTables =
                 listenTablesSecondRound.stream()

@@ -36,6 +36,8 @@ import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
+
 import java.util.Iterator;
 
 /**
@@ -141,6 +143,28 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
         debeziumDeserializationSchema.deserialize(element, new NoOpCollector<>());
     }
 
+    @Nullable
+    public T pollPendingOutput() {
+        return null;
+    }
+
+    public boolean hasPendingOutput() {
+        return false;
+    }
+
+    /**
+     * Called when a split is assigned. Override this method when split initialization needs to
+     * distinguish between a freshly assigned split and one restored from savepoint/checkpoint.
+     */
+    public void applySplit(MySqlSplit split, boolean restoredFromSavepointOrCheckpoint) {
+        applySplit(split);
+    }
+
+    /**
+     * @deprecated Override {@link #applySplit(MySqlSplit, boolean)} so implementations can handle
+     *     restore-specific initialization in one place.
+     */
+    @Deprecated
     public void applySplit(MySqlSplit split) {}
 
     private void reportMetrics(SourceRecord element) {

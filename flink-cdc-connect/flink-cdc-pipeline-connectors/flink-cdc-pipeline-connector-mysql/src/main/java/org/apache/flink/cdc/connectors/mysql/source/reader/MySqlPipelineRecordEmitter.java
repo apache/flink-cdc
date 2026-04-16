@@ -52,7 +52,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.SQLException;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -69,6 +72,14 @@ import static org.apache.flink.cdc.connectors.mysql.source.utils.TableDiscoveryU
 
 /** The {@link RecordEmitter} implementation for pipeline mysql connector. */
 public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
+    private static final Comparator<TableChanges.TableChange> TABLE_CHANGE_COMPARATOR =
+            Comparator.comparing(
+                            (TableChanges.TableChange tableChange) -> tableChange.getId().catalog(),
+                            Comparator.nullsFirst(String::compareTo))
+                    .thenComparing(
+                            tableChange -> tableChange.getId().schema(),
+                            Comparator.nullsFirst(String::compareTo))
+                    .thenComparing(tableChange -> tableChange.getId().table());
 
     private static final Logger LOG = LoggerFactory.getLogger(MySqlPipelineRecordEmitter.class);
 
@@ -86,6 +97,7 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
     private final DebeziumDeserializationSchema<Event> debeziumDeserializationSchema;
 
     private final Map<TableId, CreateTableEvent> createTableEventCache;
+    private final Deque<Event> pendingOutputs;
 
     public MySqlPipelineRecordEmitter(
             DebeziumDeserializationSchema<Event> debeziumDeserializationSchema,
@@ -106,23 +118,45 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
                         .getCreateTableEventCache();
         this.isBounded = StartupOptions.snapshot().equals(sourceConfig.getStartupOptions());
         this.isTableIdCaseInsensitive = isTableIdCaseInsensitive;
+        this.pendingOutputs = new ArrayDeque<>();
     }
 
     @Override
-    public void applySplit(MySqlSplit split) {
+    public void applySplit(MySqlSplit split, boolean restoredFromSavepointOrCheckpoint) {
         if ((isBounded) && createTableEventCache.isEmpty() && split instanceof MySqlSnapshotSplit) {
             // TableSchemas in MySqlSnapshotSplit only contains one table.
             createTableEventCache.putAll(generateCreateTableEvent(sourceConfig));
         } else {
-            for (TableChanges.TableChange tableChange : split.getTableSchemas().values()) {
+            List<TableChanges.TableChange> tableChanges =
+                    new ArrayList<>(split.getTableSchemas().values());
+            tableChanges.sort(TABLE_CHANGE_COMPARATOR);
+            for (TableChanges.TableChange tableChange : tableChanges) {
                 CreateTableEvent createTableEvent =
                         new CreateTableEvent(
                                 toCdcTableId(tableChange.getId()),
                                 buildSchemaFromTable(tableChange.getTable()));
                 ((DebeziumEventDeserializationSchema) debeziumDeserializationSchema)
                         .applyChangeEvent(createTableEvent);
+                // Replay output is only populated for the restored binlog split. It is
+                // intentionally append-only here because clearing would risk dropping replayed
+                // schema events
+                // before the reader drains them via pollNext().
+                if (restoredFromSavepointOrCheckpoint && split.isBinlogSplit()) {
+                    pendingOutputs.add(createTableEvent);
+                    alreadySendCreateTableTables.add(tableChange.getId());
+                }
             }
         }
+    }
+
+    @Override
+    public Event pollPendingOutput() {
+        return pendingOutputs.pollFirst();
+    }
+
+    @Override
+    public boolean hasPendingOutput() {
+        return !pendingOutputs.isEmpty();
     }
 
     @Override

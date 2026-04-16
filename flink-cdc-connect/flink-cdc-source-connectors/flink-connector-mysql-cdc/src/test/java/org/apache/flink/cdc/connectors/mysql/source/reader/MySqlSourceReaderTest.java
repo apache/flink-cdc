@@ -77,9 +77,11 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.ZoneId;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -380,6 +382,100 @@ class MySqlSourceReaderTest extends MySqlSourceTestBase {
     }
 
     @Test
+    void testRestoreSplitAssignedBeforeStartCanReplayPendingOutput() throws Exception {
+        customerDatabase.createAndInitialize();
+        final MySqlSourceConfig sourceConfig = getConfig(new String[] {"customers"});
+        final MySqlSplit binlogSplit;
+        try (MySqlConnection jdbc = DebeziumUtils.createMySqlConnection(sourceConfig)) {
+            Map<TableId, TableChanges.TableChange> tableSchemas =
+                    TableDiscoveryUtils.discoverSchemaForCapturedTables(
+                            new MySqlPartition(
+                                    sourceConfig.getMySqlConnectorConfig().getLogicalName()),
+                            sourceConfig,
+                            jdbc);
+            binlogSplit =
+                    MySqlBinlogSplit.fillTableSchemas(
+                            createBinlogSplit(sourceConfig).asBinlogSplit(), tableSchemas);
+        }
+
+        TestingReaderContext readerContext = new TestingReaderContext();
+        RestoreAwareRecordEmitter recordEmitter =
+                new RestoreAwareRecordEmitter(
+                        new MySqlSourceReaderMetrics(readerContext.metricGroup()));
+        MySqlSourceReader<String> reader =
+                createReader(
+                        sourceConfig, readerContext, recordEmitter, SnapshotPhaseHooks.empty());
+        try {
+            reader.addSplits(Collections.singletonList(binlogSplit));
+            reader.start();
+
+            TestingReaderOutput<String> output = new TestingReaderOutput<>();
+            Assertions.assertThat(reader.isAvailable().isDone()).isTrue();
+            Assertions.assertThat(reader.pollNext(output)).isEqualTo(MORE_AVAILABLE);
+            Assertions.assertThat(output.getEmittedRecords())
+                    .containsExactly("restored-" + binlogSplit.splitId());
+        } finally {
+            reader.close();
+        }
+    }
+
+    @Test
+    void testBinlogSplitAssignedAfterStartDoesNotReplayPendingOutput() throws Exception {
+        customerDatabase.createAndInitialize();
+        final MySqlSourceConfig sourceConfig = getConfig(new String[] {"customers"});
+        final MySqlSplit binlogSplit;
+        try (MySqlConnection jdbc = DebeziumUtils.createMySqlConnection(sourceConfig)) {
+            Map<TableId, TableChanges.TableChange> tableSchemas =
+                    TableDiscoveryUtils.discoverSchemaForCapturedTables(
+                            new MySqlPartition(
+                                    sourceConfig.getMySqlConnectorConfig().getLogicalName()),
+                            sourceConfig,
+                            jdbc);
+            binlogSplit =
+                    MySqlBinlogSplit.fillTableSchemas(
+                            createBinlogSplit(sourceConfig).asBinlogSplit(), tableSchemas);
+        }
+
+        TestingReaderContext readerContext = new TestingReaderContext();
+        RestoreAwareRecordEmitter recordEmitter =
+                new RestoreAwareRecordEmitter(
+                        new MySqlSourceReaderMetrics(readerContext.metricGroup()));
+        MySqlSourceReader<String> reader =
+                createReader(
+                        sourceConfig, readerContext, recordEmitter, SnapshotPhaseHooks.empty());
+        try {
+            reader.start();
+            reader.addSplits(Collections.singletonList(binlogSplit));
+            Assertions.assertThat(recordEmitter.hasPendingOutput()).isFalse();
+        } finally {
+            reader.close();
+        }
+    }
+
+    @Test
+    void testSnapshotSplitAssignedBeforeStartDoesNotReplayPendingOutput() throws Exception {
+        customerDatabase.createAndInitialize();
+        final MySqlSourceConfig sourceConfig = getInitialSnapshotConfig("customers");
+        final MySqlSnapshotSplit snapshotSplit =
+                createSingleSnapshotSplit(sourceConfig, "customers");
+
+        TestingReaderContext readerContext = new TestingReaderContext();
+        RestoreAwareRecordEmitter recordEmitter =
+                new RestoreAwareRecordEmitter(
+                        new MySqlSourceReaderMetrics(readerContext.metricGroup()));
+        MySqlSourceReader<String> reader =
+                createReader(
+                        sourceConfig, readerContext, recordEmitter, SnapshotPhaseHooks.empty());
+        try {
+            reader.addSplits(Collections.singletonList(snapshotSplit));
+            reader.start();
+            Assertions.assertThat(recordEmitter.hasPendingOutput()).isFalse();
+        } finally {
+            reader.close();
+        }
+    }
+
+    @Test
     void testRemoveSplitAccordingToNewFilter() throws Exception {
         inventoryDatabase.createAndInitialize();
         List<String> tableNames =
@@ -582,6 +678,21 @@ class MySqlSourceReaderTest extends MySqlSourceTestBase {
                 configuration);
     }
 
+    private <T> MySqlSourceReader<T> createReader(
+            MySqlSourceConfig configuration,
+            SourceReaderContext readerContext,
+            MySqlRecordEmitter<T> recordEmitter,
+            SnapshotPhaseHooks snapshotHooks) {
+        final MySqlSourceReaderContext mySqlSourceReaderContext =
+                new MySqlSourceReaderContext(readerContext);
+        return new MySqlSourceReader<>(
+                () -> createSplitReader(configuration, mySqlSourceReaderContext, snapshotHooks),
+                recordEmitter,
+                readerContext.getConfiguration(),
+                mySqlSourceReaderContext,
+                configuration);
+    }
+
     private MySqlSplitReader createSplitReader(
             MySqlSourceConfig configuration,
             MySqlSourceReaderContext readerContext,
@@ -609,6 +720,24 @@ class MySqlSourceReaderTest extends MySqlSourceTestBase {
         return binlogSplitAssigner.getNext().get();
     }
 
+    private MySqlSnapshotSplit createSingleSnapshotSplit(
+            MySqlSourceConfig sourceConfig, String tableName) {
+        String tableId = customerDatabase.getDatabaseName() + "." + tableName;
+        final MySqlSnapshotSplitAssigner assigner =
+                new MySqlSnapshotSplitAssigner(
+                        sourceConfig,
+                        DEFAULT_PARALLELISM,
+                        Collections.singletonList(TableId.parse(tableId)),
+                        false,
+                        getMySqlSplitEnumeratorContext());
+        assigner.open();
+        try {
+            return (MySqlSnapshotSplit) assigner.getNext().get();
+        } finally {
+            assigner.close();
+        }
+    }
+
     private MySqlSourceConfig getConfig(String[] captureTables) {
         return getConfig(captureTables, false);
     }
@@ -632,6 +761,27 @@ class MySqlSourceReaderTest extends MySqlSourceTestBase {
                 .password(customerDatabase.getPassword())
                 .serverTimeZone(ZoneId.of("UTC").toString())
                 .skipSnapshotBackfill(skipBackFill)
+                .createConfig(0);
+    }
+
+    private MySqlSourceConfig getInitialSnapshotConfig(String... captureTables) {
+        String[] captureTableIds =
+                Arrays.stream(captureTables)
+                        .map(tableName -> customerDatabase.getDatabaseName() + "." + tableName)
+                        .toArray(String[]::new);
+
+        return new MySqlSourceConfigFactory()
+                .startupOptions(StartupOptions.initial())
+                .databaseList(customerDatabase.getDatabaseName())
+                .tableList(captureTableIds)
+                .includeSchemaChanges(false)
+                .hostname(MYSQL_CONTAINER.getHost())
+                .port(MYSQL_CONTAINER.getDatabasePort())
+                .splitSize(10)
+                .fetchSize(2)
+                .username(customerDatabase.getUsername())
+                .password(customerDatabase.getPassword())
+                .serverTimeZone(ZoneId.of("UTC").toString())
                 .createConfig(0);
     }
 
@@ -713,6 +863,49 @@ class MySqlSourceReaderTest extends MySqlSourceTestBase {
         @Override
         public TypeInformation<SourceRecord> getProducedType() {
             return TypeInformation.of(SourceRecord.class);
+        }
+    }
+
+    private static class NoOpStringDeserializeSchema
+            implements DebeziumDeserializationSchema<String> {
+
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public void deserialize(SourceRecord record, Collector<String> out) {
+            throw new UnsupportedOperationException(
+                    "This test schema should not deserialize data.");
+        }
+
+        @Override
+        public TypeInformation<String> getProducedType() {
+            return TypeInformation.of(String.class);
+        }
+    }
+
+    private static class RestoreAwareRecordEmitter extends MySqlRecordEmitter<String> {
+
+        private final Deque<String> pendingOutputs = new ArrayDeque<>();
+
+        private RestoreAwareRecordEmitter(MySqlSourceReaderMetrics sourceReaderMetrics) {
+            super(new NoOpStringDeserializeSchema(), sourceReaderMetrics, false, false, false);
+        }
+
+        @Override
+        public void applySplit(MySqlSplit split, boolean restoredFromSavepointOrCheckpoint) {
+            if (restoredFromSavepointOrCheckpoint && split.isBinlogSplit()) {
+                pendingOutputs.add("restored-" + split.splitId());
+            }
+        }
+
+        @Override
+        public String pollPendingOutput() {
+            return pendingOutputs.pollFirst();
+        }
+
+        @Override
+        public boolean hasPendingOutput() {
+            return !pendingOutputs.isEmpty();
         }
     }
 
