@@ -234,8 +234,7 @@ public class TransformParser {
                         // wildcard star character matches all columns
                         return columns;
                     }
-                    referencedColumnNames.add(
-                            sqlIdentifier.names.get(sqlIdentifier.names.size() - 1));
+                    referencedColumnNames.add(getLastIdentifierName(sqlIdentifier));
                 }
             }
         }
@@ -317,7 +316,7 @@ public class TransformParser {
 
                 // It's the identifier node for aliased column.
                 SqlIdentifier aliasNode = (SqlIdentifier) operandList.get(1);
-                String columnName = aliasNode.names.get(aliasNode.names.size() - 1);
+                String columnName = getLastIdentifierName(aliasNode);
 
                 Preconditions.checkArgument(
                         !isMetadataColumn(columnName, supportedMetadataColumns),
@@ -331,8 +330,7 @@ public class TransformParser {
                     // This is a simple column rename like col_a AS col_b. Simply forward it to
                     // avoid losing metadata info like comments and default expressions.
                     SqlIdentifier identifierExprNode = (SqlIdentifier) exprNode;
-                    String originalName =
-                            identifierExprNode.names.get(identifierExprNode.names.size() - 1);
+                    String originalName = getLastIdentifierName(identifierExprNode);
                     projectionColumn =
                             resolveProjectionColumnFromIdentifier(
                                     relDataType,
@@ -376,7 +374,7 @@ public class TransformParser {
             // ... or an existing column's name identifier.
             else if (sqlNode instanceof SqlIdentifier) {
                 SqlIdentifier sqlIdentifier = (SqlIdentifier) sqlNode;
-                String columnName = sqlIdentifier.names.get(sqlIdentifier.names.size() - 1);
+                String columnName = getLastIdentifierName(sqlIdentifier);
                 projectionColumn =
                         resolveProjectionColumnFromIdentifier(
                                 relDataType,
@@ -506,7 +504,7 @@ public class TransformParser {
             return null;
         }
         SqlIdentifier id = (SqlIdentifier) castValue;
-        String originalName = id.names.get(id.names.size() - 1);
+        String originalName = getLastIdentifierName(id);
         if (isMetadataColumn(originalName, supportedMetadataColumns)) {
             return null;
         }
@@ -684,7 +682,7 @@ public class TransformParser {
                     for (SqlNode operand : operandList) {
                         if (operand instanceof SqlIdentifier) {
                             SqlIdentifier sqlIdentifier = (SqlIdentifier) operand;
-                            columnName = sqlIdentifier.names.get(sqlIdentifier.names.size() - 1);
+                            columnName = getLastIdentifierName(sqlIdentifier);
                         }
                     }
                     if (columnNames.contains(columnName)) {
@@ -723,7 +721,7 @@ public class TransformParser {
         List<String> columnNameList = new ArrayList<>();
         if (sqlNode instanceof SqlIdentifier) {
             SqlIdentifier sqlIdentifier = (SqlIdentifier) sqlNode;
-            String columnName = sqlIdentifier.names.get(sqlIdentifier.names.size() - 1);
+            String columnName = getLastIdentifierName(sqlIdentifier);
             columnNameList.add(columnName);
         } else if (sqlNode instanceof SqlCall) {
             SqlCall sqlCall = (SqlCall) sqlNode;
@@ -739,7 +737,7 @@ public class TransformParser {
         for (SqlNode sqlNode : sqlNodes) {
             if (sqlNode instanceof SqlIdentifier) {
                 SqlIdentifier sqlIdentifier = (SqlIdentifier) sqlNode;
-                String columnName = sqlIdentifier.names.get(sqlIdentifier.names.size() - 1);
+                String columnName = getLastIdentifierName(sqlIdentifier);
                 columnNameList.add(columnName);
             } else if (sqlNode instanceof SqlCall) {
                 SqlCall sqlCall = (SqlCall) sqlNode;
@@ -812,6 +810,26 @@ public class TransformParser {
         } else {
             return false;
         }
+    }
+
+    private static String getLastIdentifierName(SqlIdentifier sqlIdentifier) {
+        try {
+            Object names = sqlIdentifier.getClass().getField("names").get(sqlIdentifier);
+            if (names instanceof List && !((List<?>) names).isEmpty()) {
+                List<?> parts = (List<?>) names;
+                return String.valueOf(parts.get(parts.size() - 1));
+            }
+        } catch (ReflectiveOperationException ignored) {
+            // Fall through to a string-based fallback for Calcite variants whose identifier
+            // internals are not exposed as a public `names` field.
+        }
+
+        String identifier = sqlIdentifier.toString();
+        int lastDot = identifier.lastIndexOf('.');
+        if (lastDot >= 0 && lastDot + 1 < identifier.length()) {
+            return identifier.substring(lastDot + 1);
+        }
+        return identifier;
     }
 
     public static Map<String, String> generateColumnNameMap(List<String> originalColumnNames) {

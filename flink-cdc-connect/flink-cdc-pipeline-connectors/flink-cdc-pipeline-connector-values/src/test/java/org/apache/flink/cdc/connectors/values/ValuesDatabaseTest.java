@@ -302,4 +302,27 @@ class ValuesDatabaseTest {
         results.add("default.default.table1:col1=3;newCol3=");
         Assertions.assertThat(ValuesDatabase.getResults(table1)).isEqualTo(results);
     }
+
+    @Test
+    void testApplyDataChangeEventWithNonStringPrimaryKey() throws SchemaEvolveException {
+        TableId bigintPkTable = TableId.parse("default.default.bigint_pk_table");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.BIGINT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+        metadataApplier.applySchemaChange(new CreateTableEvent(bigintPkTable, schema));
+
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(RowType.of(DataTypes.BIGINT(), DataTypes.STRING()));
+        ValuesDatabase.applyDataChangeEvent(
+                DataChangeEvent.insertEvent(
+                        bigintPkTable,
+                        generator.generate(
+                                new Object[] {42L, BinaryStringData.fromString("alice")})));
+
+        Assertions.assertThat(ValuesDatabase.getResults(bigintPkTable))
+                .containsExactly("default.default.bigint_pk_table:id=42;name=alice");
+    }
 }

@@ -1,23 +1,27 @@
-# MySQL pipeline restore 后 CreateTableEvent 未重放问题评估
+# MySQL Restore 后计算列未生效问题评估
 
 ## 一、文档目的
 
-本文用于沉淀本次 `MySQL pipeline source` 在 `savepoint/checkpoint restore` 场景下，未能重新产出当前 `projection` 对应 `CreateTableEvent` 的问题分析、修复方案与影响评估。
+本文用于沉淀以下真实场景的最终结论：
 
-本文重点回答 4 个问题：
+- 旧作业 yaml 中没有 `CURRENT_TIMESTAMP AS confluent__last_updated`
+- 旧 savepoint/checkpoint 里恢复出的 schema 也没有该列
+- 新 yaml 新增了 `CURRENT_TIMESTAMP AS confluent__last_updated`
+- 作业从旧 savepoint/checkpoint 恢复后，实测下游未自动补列，也未写入该列
+- 同样的新 yaml 如果全新启动，不从 savepoint/checkpoint 恢复，则下游会自动补列并写入数据
 
-- 这次问题应定性为 `MySQL source bug`，还是特意做的增强
-- 为什么 fresh start 能自动补字段，而从 `savepoint` 恢复时不能
-- 为什么最终选择在 `source` 侧做最小风险修复，而不是继续改 `runtime/schema restore` 语义
-- 其他 source 是否需要同步适配，影响范围和风险在哪里
+本文重点回答 6 个问题：
 
-本文是对已有文档 `issue/MYSQL_DORIS_TRANSFORM_CREATE_TABLE_RESTORE_DESIGN_2026-04-14.md` 的后续补充。
-
-前一篇文档偏向早期的 `runtime + Doris sink` 方案讨论；本文记录的是进一步深挖后，最终落地到 `MySQL source` 侧的最小风险实现与定性结论。
+1. 这是不是单纯的 `MySQL source bug`
+2. 为什么此前“source 侧 replay CreateTableEvent”测试通过，但现场仍可能不闭环
+3. `restore` 后新增计算列真正要经过哪几段链路
+4. 当前分支是否已经覆盖并验证了用户真实场景
+5. “只覆盖 MySQL restored binlog split”是本次带来的新问题，还是历史边界
+6. 风险、收益、稳定性、可用性如何评估
 
 ## 二、现场背景
 
-客户现场 transform 配置形态如下：
+客户 transform 配置形态如下：
 
 ```yaml
 transform:
@@ -33,657 +37,565 @@ transform:
 
 客户实际观察到的现象是：
 
-1. 作业全新启动时，下游能自动新增 `confluent__last_updated`
-2. 作业从 savepoint 恢复时，下游不会自动新增 `confluent__last_updated`
-3. 如果 restore 后 source 端暂时没有新的 binlog 变更，下游会一直停留在旧 4 列 schema
+1. 全新启动时，下游能自动新增 `confluent__last_updated`
+2. 从旧 savepoint/checkpoint 恢复时，下游不会自动新增 `confluent__last_updated`
+3. 恢复后新数据也可能继续按旧 4 列处理，看起来像“新增计算列完全没生效”
 
-这说明问题不是：
+这说明问题不能只看 source 是否 replay 了旧 schema，还必须看 end-to-end 链路是否真正把“新 projection 对应的新 schema”落到了下游。
 
-- transform 自身不会生成新增列
-- 下游 sink 完全不支持补列
+## 三、修正后的问题本质
 
-而是：
+最初把问题近似理解为：
 
-- restore 后，当前 projection 对应的新 schema 没有被重新送到下游
+- `MySQL pipeline source restore 后没有 replay 当前 CreateTableEvent`
 
-## 三、问题本质
+这个判断只覆盖了问题的一部分，不能单独证明用户真实场景已经闭环。
 
-经过深挖，这次问题更准确的本质是：
+结合现场复盘和当前代码，真实问题应拆成 3 段：
 
-- `MySQL pipeline source` 在 restore 场景下，没有主动 replay 当前 split 中已经持久化的 schema
-- 因此下游只能继续沿用 savepoint 里恢复出的旧 schema
-- 只有等到 restore 之后再出现新的 binlog DML 或 schema change，`CreateTableEvent` 才可能被懒触发补发
+### 3.1 source 侧
 
-所以它不是一个“fresh start 也不正确”的普遍语义缺陷，而是一个 restore 语义缺口：
+`MySQL source` 在 `savepoint/checkpoint restore` 后，必须先把 split state 中的当前 schema replay 出来。
 
-- fresh start 时，通常后面很快会有 snapshot watermark 或新的 binlog event，因此当前 schema 能继续下发
-- restore 时，如果没有新的 binlog，schema 就不会被重新产出
+如果这里没有 replay：
 
-这也解释了为什么用户会看到：
+- `PreTransformOperator` 恢复后拿不到新的 `CreateTableEvent`
+- 它也就无法按新的 projection 重新生成带 `confluent__last_updated` 的 schema
 
-- 不 restore 时自动加字段
-- restore 时不自动加字段
+这部分确实是 `MySQL source` 的历史缺陷。
 
-## 四、为什么 fresh start 可以，restore 不行
+### 3.2 transform / schema 侧
 
-`MySQL pipeline` 原有逻辑对 `CreateTableEvent` 的发送时机是偏懒加载的。
+即使 source replay 了 `CreateTableEvent`，也还要看 restore 后：
 
-关键代码在：
+- `PreTransformOperator` 是否会按新 yaml 重新产出带计算列的 schema
+- `SchemaOperator / SchemaCoordinator` 是否会把这个“扩展后的 CreateTableEvent”继续放行，而不是因为旧 state 存在就跳过
 
-- `flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-mysql/src/main/java/org/apache/flink/cdc/connectors/mysql/source/reader/MySqlPipelineRecordEmitter.java`
+这部分不是 source 自己能单独证明的。
 
-原有行为大致是：
+### 3.3 sink 侧
 
-1. split 初始化时，只把 schema 同步进 `DebeziumEventDeserializationSchema` 的内部 cache
-2. 真正往下游 `output.collect(createTableEvent)`，主要发生在两类时机：
-   - snapshot low watermark 到来时
-   - 首条 DML / schema change 到来且该表尚未发过 `CreateTableEvent` 时
+即使 source 和 transform 都正确，仍然要看 sink 如何处理：
 
-也就是：
+- 下游表在 restore 前往往已经存在
+- runtime/schema 层对一对一路由下的“扩展 schema”仍可能继续以 `CreateTableEvent` 形式往后传
+- 如果 sink 在“表已存在 + 收到扩展 CreateTableEvent”时不会做 reconcile/add column，那么列仍然不会真正补到下游
 
-- source 内部“知道当前 schema”
-- 不等于下游已经“收到当前 schema 事件”
+所以最终结论是：
 
-在 fresh start 下，这个设计通常没问题，因为后续很快会有事件触发补发。
+- `source replay` 是必要条件
+- 但不是 end-to-end 闭环的充分条件
 
-但在 restore 下，如果：
+## 四、为什么 fresh start 能成功，而 restore 可能失败
 
-- savepoint 恢复后马上进入 binlog 读取
-- 且恢复后没有新的 binlog 事件
+这是现场最容易误判的地方。
 
-那么：
+### 4.1 fresh start 路径
 
-- source 内部虽然已经恢复出 split 和 table schema
-- 但没有任何事件触发 `CreateTableEvent` 重新发送
-- 下游只能继续沿用旧状态里的 4 列 schema
+全新启动时：
 
-这正是 `projection: \*, current_timestamp AS confluent__last_updated` 在 restore 后无法触发下游补列的直接原因。
+- source 正常发送 `CreateTableEvent`
+- transform 直接按当前 yaml 生成最新 projection schema
+- sink 侧通常面对的是“首次建表”场景
 
-## 五、为什么最终定性为 MySQL source BUG，而不是通用增强
+因此 `confluent__last_updated` 能自然出现在下游表中。
 
-本次更合理的定性是：
+### 4.2 restore 路径
 
-- 这是 `MySQL pipeline source` 在 restore 语义下的缺陷修复
-- 不是通用 runtime/schema restore 增强
+从旧 savepoint/checkpoint 恢复时：
 
-原因有 4 个：
+- source / schema state 先恢复出旧 4 列视图
+- 新 yaml 虽然已经变成 `*, CURRENT_TIMESTAMP AS confluent__last_updated`
+- 但如果 source 不 replay 当前 schema，transform 根本拿不到重新推导新 schema 的触发点
+- 即使 replay 了，sink 也面对“表已存在”的场景，而不是 fresh start 的首次建表
 
-1. 用户当前 projection 已经定义了“当前表应该长什么样”
-2. fresh start 本来就能把这个 projection 对应的 schema 送到下游
-3. restore 后继续沿用旧 4 列 schema，只是因为 source 没有重放当前 schema，不符合当前作业定义
-4. 问题并不在于“系统要不要支持一项新能力”，而在于“restore 后是否还能恢复到当前作业语义”
+因此 restore 场景比 fresh start 多了两个额外要求：
 
-因此从产品语义上，它更接近：
+1. source 必须 replay
+2. sink 必须能处理“已存在表上的扩展 CreateTableEvent”
 
-- `restore 后未恢复当前 schema contract`
+## 五、当前分支上的实现与职责划分
 
-而不是：
+### 5.1 MySQL source 侧修复了什么
 
-- `新增了 restore 后主动发 schema 的新特性`
+当前分支里的 MySQL 修复点是：
 
-## 六、为什么最终选择 source 侧最小风险修复
+- 在 restored `binlog split` 上 replay split state 中已持久化的 `tableSchemas`
+- 让 reader 在没有新 binlog 的情况下也能先把 `CreateTableEvent` 吐给下游
 
-一开始可考虑的方向有两类：
+这解决的是：
 
-1. 改 `runtime/schema restore` 语义，让 restore 后统一重新产出当前 `projection` 对应的 `CreateTableEvent`
-2. 改 `MySQL source` restore 行为，让它在 restore 后把 split 中已持久化的当前 schema replay 出来
+- `restore 后无新 binlog 时，transform/schema 根本没有机会重新看到当前 schema`
 
-最终选择第 2 类，原因是风险更小、边界更清楚。
+因此这部分应定性为：
 
-### 6.1 runtime 方案的问题
+- `MySQL source` 的历史 bugfix
 
-如果把这次问题定性成 runtime 通用语义问题，意味着要改：
+### 5.2 transform / schema 侧现在是什么语义
 
-- 公共 schema restore 语义
-- 公共 `CreateTableEvent` 传播逻辑
-- 甚至可能影响所有 source / sink 的恢复链路
+当前代码说明两点：
 
-这样虽然“理论上更统一”，但代价很大：
+1. `PreTransformOperator` 已不再依赖自身持久化 state 恢复 schema，而是显式依赖 source 重新发出正确的 `CreateTableEvent`
+2. restore 后如果收到扩展后的 `CreateTableEvent`，schema/runtime 侧不应把它误判成冗余并跳过
 
-- 很难证明其他 connector 都需要这个变化
-- 很难保证不会把其他 source / sink 的历史边界一次性放大
-- 很难把风险收敛在用户当前反馈的 MySQL restore 主链路上
+因此：
 
-### 6.2 source 方案的优势
+- source replay 是 transform restore 正确性的前提
+- 但 transform/schema 本身也需要有针对性测试来证明不会吃掉这个扩展 schema
 
-MySQL 当前 restore 场景本身已经具备 replay 所需数据：
+### 5.3 Doris sink 侧现在是什么语义
 
-- `MySqlBinlogSplit` 中持久化了 `tableSchemas`
-- savepoint/checkpoint 恢复时，这些 schema 会一起恢复出来
+当前 Doris 侧实现已经支持：
 
-关键代码在：
+- 当表已存在且收到一个包含更多列的 `CreateTableEvent` 时
+- 不直接忽略，也不盲目报“表已存在”
+- 而是把缺失列识别出来并执行 reconcile / add column
 
-- `flink-cdc-connect/flink-cdc-source-connectors/flink-connector-mysql-cdc/src/main/java/org/apache/flink/cdc/connectors/mysql/source/split/MySqlSplitSerializer.java`
+这部分不是 source bug，而是：
 
-这里 `snapshot split` 和 `binlog split` 都会序列化 `tableSchemas`。
+- sink 对 restore 后扩展 `CreateTableEvent` 的兼容能力
 
-因此 source 侧可以直接利用 restore 出来的 split state：
+如果没有这部分，即使 source replay 修复存在，用户场景依然可能不闭环。
 
-- 不需要重新去数据库做 schema 探测
-- 不需要改公共 runtime 语义
-- 不需要引入新的 state 格式
+## 六、这次到底是 bugfix 还是增强
 
-这就是最小风险实现的核心依据。
+需要分开定性，不能一句话打平。
 
-## 七、最终实现
+### 6.1 对 MySQL source 而言
 
-本次最终实现只动了 MySQL 相关的 5 个文件，总体规模为：
+这是 bugfix。
 
-- `5 files changed`
-- `403 insertions`
-- `3 deletions`
+理由：
 
-改动范围收敛在：
+- 当前作业定义已经变化，restore 后理应恢复到当前作业语义
+- source restore 后只恢复 cache、不重放当前 schema，不符合 restore 语义
+- fresh start 与 restore 行为不一致，本质是历史缺陷
 
-- MySQL source reader
-- MySQL record emitter 扩展 hook
-- MySQL pipeline record emitter
-- 2 个针对性 testcase
+### 6.2 对 Doris sink 兼容而言
 
-### 7.1 `MySqlSourceReader` 增加 restore split 的 pending replay 语义
+更准确的说法是：
 
-文件：
+- 这是为 restore 场景补齐“已存在表 + 扩展 CreateTableEvent”处理能力的必要修复
 
-- `flink-cdc-connect/flink-cdc-source-connectors/flink-connector-mysql-cdc/src/main/java/org/apache/flink/cdc/connectors/mysql/source/reader/MySqlSourceReader.java`
+它不是这次 MySQL source 修复“带出来的新 bug”，而是此前链路上一直存在、但没有被这组场景完全打透的历史缺口。
 
-核心逻辑：
+### 6.3 对其他 source / sink 而言
 
-1. 不再依赖外部 `SAVEPOINT_PATH` 等配置猜测 restore
-2. 按 Flink 实际 reader 生命周期处理：
-   - `start()` 前注入到 reader 的 split，视为 restore split
-3. 对 restore 的 binlog split 做标记
-4. `initializedState()` 时把这个 restore 标记传给 emitter
-5. `pollNext()` 优先消费 emitter 的 pending outputs
-6. `isAvailable()` 在有 pending outputs 时立即就绪
+当前不应直接上升为：
 
-这意味着 restore 后即使没有新的 binlog：
+- “所有 source 都必须跟着改”
+- “所有 sink 都已经天然兼容”
 
-- reader 也可以先把 schema replay 事件吐给下游
+更稳妥的结论是：
 
-### 7.2 `MySqlRecordEmitter` 增加通用 hook
+- MySQL source replay gap 是 MySQL 的历史缺陷
+- 其他 source 是否存在相同 restore-no-new-log 缺口，要靠同类 testcase 验证
+- 其他 sink 是否支持“已存在表 + 扩展 CreateTableEvent”的 reconcile，也要按 sink 各自评估
 
-文件：
+## 七、当前分支的证明链条
 
-- `flink-cdc-connect/flink-cdc-source-connectors/flink-connector-mysql-cdc/src/main/java/org/apache/flink/cdc/connectors/mysql/source/reader/MySqlRecordEmitter.java`
+要证明用户真实场景闭环，至少要有下面几层证据。
 
-新增 3 个扩展点：
+### 7.1 source reader 级
 
-- `pollPendingOutput()`
-- `hasPendingOutput()`
-- `applySplit(split, restoredFromSavepointOrCheckpoint)`
-
-默认实现都是 no-op，因此：
-
-- 非 pipeline MySQL emitter 行为不变
-- 只有需要 restore replay 的 pipeline emitter 才会使用这些 hook
-- 旧的 `applySplit(split)` 保留但标记为 `@Deprecated`，避免后续新实现继续挂在旧入口上
-
-这也是本次“局部改动、不扩大公共语义”的关键。
-
-### 7.3 `MySqlPipelineRecordEmitter` 在 restored binlog split 上 replay 当前 schema
-
-文件：
-
-- `flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-mysql/src/main/java/org/apache/flink/cdc/connectors/mysql/source/reader/MySqlPipelineRecordEmitter.java`
-
-核心逻辑：
-
-1. `applySplit(split, restored)` 时，先把 split 里的 `tableSchemas` 同步进 deserializer cache
-2. 如果当前是 `restoredFromSavepointOrCheckpoint && split.isBinlogSplit()`：
-   - 把当前 schema 转成 `CreateTableEvent`
-   - 放入 `pendingOutputs`
-   - 同时加入 `alreadySendCreateTableTables`
-3. `pollPendingOutput()` 按顺序把这些 replay 事件吐出去
-
-这里额外做了两个控制：
-
-- 对 `tableChanges` 按 `tableId` 排序，保证 restore replay 输出稳定
-- replay 时先标记 `alreadySendCreateTableTables`，避免首条 DML 再重复补发
-
-### 7.4 为什么只覆盖 restored binlog split
-
-当前实现只对：
-
-- `restore 后的 binlog split`
-
-做主动 replay。
-
-没有扩展到：
-
-- 所有 snapshot split restore
-- 所有公共 incremental source restore
-
-这是有意的最小风险取舍。
-
-原因是：
-
-- 用户问题发生在 savepoint 后继续 binlog 读取的主链路
-- MySQL 的 `CreateTableEvent` 缺口也主要体现在 restore 后没有新 binlog 时
-- snapshot 阶段本来就有 low watermark 触发 schema 下发的路径
-
-这里需要特别强调的是：
-
-- “只覆盖 restored binlog split” 不是本次修复新引入的缺口
-- 它是历史上一直存在、但此前没有被单独修复和验证的边界
-
-也就是说，本次做的是：
-
-- 把用户当前命中的主链路缺陷补齐
-
-而不是：
-
-- 把所有 restore 场景统一重构为完全一致的 schema replay 语义
-
-## 八、测试覆盖与验证
-
-本次补了两层 testcase。
-
-### 8.1 reader 级 restore 语义验证
-
-文件：
-
-- `flink-cdc-connect/flink-cdc-source-connectors/flink-connector-mysql-cdc/src/test/java/org/apache/flink/cdc/connectors/mysql/source/reader/MySqlSourceReaderTest.java`
-
-新增用例：
+`MySqlSourceReaderTest` 已覆盖：
 
 - `testRestoreSplitAssignedBeforeStartCanReplayPendingOutput`
 - `testBinlogSplitAssignedAfterStartDoesNotReplayPendingOutput`
 - `testSnapshotSplitAssignedBeforeStartDoesNotReplayPendingOutput`
 
-这些用例分别验证：
+它们证明：
 
-- `start()` 前 addSplits 的 binlog split 会被识别为 restore split
-- reader 在没有真实 binlog 输入时，也能先消费 emitter 的 pending output
-- `start()` 后再分配的 binlog split 不会误判成 restore replay
-- snapshot split 即使在 `start()` 前分配，也不会触发本次新增的 replay 语义
+- restored binlog split 会被识别并 replay pending output
+- 非 restore 误判不会发生
+- snapshot split 不会被错误纳入本次最小风险逻辑
 
-### 8.2 pipeline 级 savepoint restore 回归
+### 7.2 source pipeline 级
 
-文件：
-
-- `flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-mysql/src/test/java/org/apache/flink/cdc/connectors/mysql/source/MysqlPipelineNewlyAddedTableITCase.java`
-
-新增用例：
+`MysqlPipelineNewlyAddedTableITCase` 已覆盖：
 
 - `testSavepointRestoreReplaysCreateTableEventBeforeNewBinlog`
 
-该用例验证：
+它证明：
 
-1. 作业先正常启动
-2. 消费一条真实 binlog `DataChangeEvent`
-3. 触发 savepoint
-4. 从 savepoint 恢复
-5. restore 后在没有新 binlog 的情况下，第一条事件就是对应表的 `CreateTableEvent`
-6. 随后再写入一条新数据，断言收到的是 `DataChangeEvent`，而不是重复的 `CreateTableEvent`
+- restore 后即使没有新 binlog，也能先收到 source replay 的 `CreateTableEvent`
 
-这个用例直接覆盖了用户当前最关心的问题：
+但这一层只证明 source replay，不足以直接证明“旧 savepoint + 新 projection 计算列”已经闭环。
 
-- restore 后不依赖新 binlog，也要能重新把当前 schema 送到下游
+### 7.3 MySQL restore + transform 级
 
-### 8.3 已有验证记录
+当前分支新增：
 
-本次改动已有针对性验证记录：
+- `MysqlPipelineNewlyAddedTableITCase#testSavepointRestoreReplaysTransformedCreateTableEventForComputedColumnProjectionChange`
 
-```bash
-mvn -pl flink-cdc-connect/flink-cdc-source-connectors/flink-connector-mysql-cdc \
-  -am \
-  -Dtest=MySqlSourceReaderTest#testRestoreSplitAssignedBeforeStartCanReplayPendingOutput,MySqlSourceReaderTest#testBinlogSplitAssignedAfterStartDoesNotReplayPendingOutput,MySqlSourceReaderTest#testSnapshotSplitAssignedBeforeStartDoesNotReplayPendingOutput \
-  -DfailIfNoTests=false test
-```
+它直接模拟真实用户场景：
 
-```bash
-mvn -pl flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-mysql -am \
-  -Dtest=MysqlPipelineNewlyAddedTableITCase#testSavepointRestoreReplaysCreateTableEventBeforeNewBinlog \
-  -DfailIfNoTests=false integration-test
-```
+1. 首次作业 projection 是 `*`
+2. 打 savepoint
+3. restore 后 projection 改为 `*, CURRENT_TIMESTAMP AS confluent__last_updated`
+4. 在 `PreTransform + PostTransform` 之后取数
+5. 断言 restore 后第一条就是扩展过的 `CreateTableEvent`
+6. 再写一条新数据，断言新的 `DataChangeEvent` 已经带 5 列，且计算列非空
 
-```bash
-mvn -pl flink-cdc-connect/flink-cdc-source-connectors/flink-connector-mysql-cdc,flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-mysql -am \
-  -DskipTests -DskipITs test-compile
-```
+这条测试非常关键，因为它第一次把“旧 savepoint + 新 projection”本身证明出来了。
 
-实际验证结果为：
+### 7.4 schema / runtime 级
 
-- `MySqlSourceReaderTest` 中 3 个 restore 相关 reader 用例均通过
-- `MysqlPipelineNewlyAddedTableITCase#testSavepointRestoreReplaysCreateTableEventBeforeNewBinlog` 真实 Docker/Testcontainers IT 通过
-- 当前验证结论支持：本次修复已覆盖 MySQL savepoint restore + binlog split + 无新 binlog 的用户主诉场景
+当前代码里已有：
 
-## 九、影响范围评估
+- `SchemaEvolveTest#testRestoredCreateTableEventWithExpandedSchemaIsNotSkipped`
 
-### 9.1 直接影响范围
+它证明：
 
-本次代码影响范围明确收敛为：
+- runtime/schema 层面对“restore 后收到扩展 CreateTableEvent”时不会错误跳过
+- 随后的 `DataChangeEvent` 会按新 schema 继续透传
 
-- MySQL source reader
-- MySQL pipeline emitter
-- MySQL pipeline restore 主链路
+此外当前分支新增：
 
-不会直接影响：
+- `DataSinkOperatorWithSchemaEvolveTest#testCreateTableEventWithExpandedSchemaAfterFailover`
 
-- runtime 公共 schema restore 语义
-- 其他 sink 的 metadata apply 逻辑
-- 非 pipeline 的 MySQL emitter 主路径
+它补充证明：
 
-### 9.2 行为变化范围
+- sink wrapper 在 failover 后收到扩展 `CreateTableEvent` 和随后的扩展 `DataChangeEvent` 时，不会把新 schema 吞掉
 
-restore 后的行为变化只有一条核心差异：
+### 7.5 Doris sink 级
 
-- 对 restored binlog split，会在首条新 binlog 到来前，主动 replay 当前 schema 对应的 `CreateTableEvent`
+当前代码里已有两条直接相关用例：
 
-这是一次性行为，不是持续性开销。
+- `DorisMetadataApplierITCase#testDorisExistingTableReconcilesMissingComputedTimestampColumn`
+- `DorisEventSerializerTest#testCreateTableEventRefreshesJsonSchemaAfterRestoreWithComputedTimestampColumn`
 
-对 fresh start、普通运行态的影响非常小：
+它们分别证明：
 
-- fresh start 行为不变
-- 非 restore 路径不变
-- 后续 DML 处理逻辑不变
+- Doris 已存在表收到扩展 `CreateTableEvent` 时会补缺失列
+- Doris serializer 在 restore 后先看到旧 schema，再看到新 `CreateTableEvent` 时，会刷新写出 schema，并能正确写出 `confluent__last_updated`
 
-### 9.3 状态兼容性
+## 八、对“当前分支是否彻底解决用户场景”的结论
 
-这次实现没有引入新的 state 格式，也没有改 split 序列化协议。
+结论需要分成两个层次。
 
-依赖的是已有 state 中已经持久化的：
+### 8.1 如果只看最早那部分 MySQL source 修复
 
-- `tableSchemas`
+不能宣称已经彻底解决用户真实场景。
 
-因此从状态兼容性看，风险较低：
+因为 source 修复只证明：
 
-- 不需要 state migration
-- 不需要 savepoint 升级转换
-- 不会破坏已有 split 反序列化逻辑
+- `CreateTableEvent` 能 replay 回来
 
-## 十、风险评估
+它没有单独证明：
 
-### 10.1 可接受风险
+- transform 是否按新 yaml 重新产出扩展 schema
+- schema/runtime 是否会保留该扩展 schema
+- sink 在表已存在时是否会补列
 
-本次改动存在的主要风险有：
+### 8.2 结合当前分支已有和新增测试后
 
-1. restore 后会比以前更早看到 `CreateTableEvent`
-2. 多表 binlog split restore 时，会一次性 replay 多个表的 schema
-3. 某些下游如果历史上隐含依赖“restore 后没有 schema event”，现在可能更早暴露其兼容性边界
+对 `MySQL -> transform -> runtime/schema -> Doris` 这条用户主链路，可以给出更强结论：
 
-但这些风险整体可控，原因是：
+- 当前分支已经有足够的证据链说明该场景被覆盖
+- 尤其是 “旧 savepoint + 新 projection 计算列” 这条此前缺失的 restore+transform 用例，现在已经补上
+- Doris 对“已存在表 + 扩展 CreateTableEvent”的 reconcile 也已有直接测试
 
-- `CreateTableEvent` 本身就是合法 schema 事件
-- replay 使用的是 split 中已持久化的当前 schema，不是推断出来的新语义
-- `alreadySendCreateTableTables` 已避免 restore 后首条 DML 再重复补发
-- replay 只发生一次，且仅限 restored binlog split
-- reader 回放路径沿用 `output.collect(...)` 计数，未引入额外的 `numRecordsIn` 手工累加
+因此，当前更准确的结论是：
 
-### 10.2 已规避的高风险点
+- 这条用户主链路在当前分支上已经基本闭环
+- 但这个结论依赖的不只是 source 修复，还依赖 transform/schema 与 Doris sink 侧现有能力
 
-本次特意没有做以下事情：
+## 九、剩余边界与影响范围
 
-- 没有修改 runtime 公共 schema 恢复语义
-- 没有修改 base incremental source 公共 reader
-- 没有为所有 source 一次性引入 restore replay
-- 没有引入重新探测 DB schema 的额外逻辑
-- 没有改变 savepoint/state 格式
+### 9.1 只覆盖 MySQL restored binlog split
 
-这些都是为了把风险严格收敛在 MySQL 当前问题面上。
+当前 source 侧主动 replay 只覆盖：
 
-### 10.3 本轮 review 已消除的实现风险
+- MySQL restored `binlog split`
 
-在 PR 二轮 review 后，本次实现还额外收敛了几项工程风险：
+没有扩展到：
 
-- 已移除无关的 `PostTransformOperator` cosmetic diff，确保改动面仍然只落在 MySQL 相关文件
-- 已补 `@Deprecated` 标记，引导后续扩展优先使用 `applySplit(split, restored)`
-- IT 中的超时获取逻辑已补 `iterator.close()` 与 `future.cancel(true)`，降低 Testcontainers 阻塞导致的卡死风险
+- snapshot restore
+- 其他 source 的 restore
 
-### 10.4 仍然保留的边界
+这条边界不是本次带来的新 bug，而是历史一直存在的实现边界。
 
-当前实现并不等价于“所有 restore 场景都已完全统一”。
+准确口径应是：
 
-仍然保留的边界包括：
+- 本次补齐了当前客户命中的主链路
+- 没有顺带把所有 restore 场景统一重构
 
-- 只对 restored `binlog split` 主动 replay
-- snapshot restore 不刻意扩展
-- 其他 source 尚未统一拥有这套 pending replay 机制
+### 9.2 其他 source 的风险
 
-这不是遗漏，而是最小风险实现的明确边界。
+对 Postgres / Oracle 等其他 source：
 
-这条边界的风险需要分开看：
+- 目前不能直接说都需要照搬 MySQL
+- 也不能直接说都没有这个问题
 
-1. 对当前 MySQL 用户问题的风险较低
-2. 对跨 source 语义一致性的风险中等
-
-原因是：
-
-- 当前客户问题就是 `savepoint/checkpoint restore + binlog split + restore 后无新 binlog`
-- 这条主链路已经被本次修复直接覆盖
-- 未覆盖的 `snapshot restore` 和其他 source restore，更接近“历史仍保持原行为”，而不是“本次修复造成新的行为退化”
-
-因此，这里的准确结论应是：
-
-- 它是历史存在的边界，不是本次带来的新 bug
-- 它不是当前 PR 的 blocker，但应在后续 source 级评估中继续跟进
-
-## 十一、其他 source 是否都需要适配
-
-当前不建议直接下结论：
-
-- “所有 source 都必须跟着改”
-
-更稳妥的结论是：
-
-- 本次应先定性为 `MySQL 特有缺陷修复`
-- 其他 source 需要按实现机制和 restore testcase 逐个核验
-- 没有证据前，不建议直接上升为公共框架改动
-- 现阶段不能把 “其他 source 还未适配” 解释为本次修复引入的新问题
-
-### 11.1 Postgres 的初步判断
-
-相关代码：
-
-- `flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-postgres/src/main/java/org/apache/flink/cdc/connectors/postgres/source/reader/PostgresPipelineRecordEmitter.java`
-- `flink-cdc-connect/flink-cdc-source-connectors/flink-connector-postgres-cdc/src/main/java/org/apache/flink/cdc/connectors/postgres/source/reader/PostgresSourceReader.java`
-
-初步观察到：
-
-- Postgres 在 `applySplit(split)` 时也会把 schema 同步到 deserializer
-- 但真正的 `CreateTableEvent` 发送仍主要依赖 low watermark 或后续 DML/schema change
-- 现有 restore testcase 是“restore 后再插入新数据，再验证出现 `CreateTableEvent`”
-
-也就是说，Postgres 现有用例并没有证明：
-
-- `restore 后无新 WAL` 时，当前 schema 会不会主动 replay
-
-因此对 Postgres 的正确动作不是立刻照搬 MySQL 实现，而是先补同类 testcase：
-
-- `restore 后不写任何新数据，直接断言是否先收到当前 CreateTableEvent`
-
-### 11.2 Oracle 的初步判断
-
-相关代码：
-
-- `flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-oracle/src/main/java/org/apache/flink/cdc/connectors/oracle/source/reader/OraclePipelineRecordEmitter.java`
-- `flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-oracle/src/main/java/org/apache/flink/cdc/connectors/oracle/source/reader/OracleTableSourceReader.java`
-
-Oracle 的特点是：
-
-- 启动时会初始化 `createTableEventCache`
-- 并同步到 deserializer
-
-但从事件输出路径看，它真正往下游发 `CreateTableEvent`，仍主要发生在：
-
-- snapshot 全量发
-- low watermark
-- 后续 DML/schema change 到来时
-
-现有 Oracle restore 用例同样是：
-
-- restore 后先写新数据
-- 再断言后面能看到 `CreateTableEvent`
-
-所以 Oracle 也不能直接证明：
-
-- `restore 后无新 redo log` 时，当前 schema 会主动 replay
-
-### 11.3 为什么现在不直接改公共 base
-
-Postgres / Oracle 当前都建立在 base incremental reader 体系上：
-
-- `IncrementalSourceReader`
-- `IncrementalSourceRecordEmitter`
-
-这个公共 base 目前只有：
-
-- `applySplit(split)`
-
-并没有：
-
-- restore pending output replay
-- pre-start addSplits 视为 restore split 的专用 hook
-
-如果现在直接把 MySQL 这套逻辑上提到 base：
-
-- 影响面会一下子扩大到所有基于 incremental source 的 connector
-- 风险明显高于本次 MySQL 局部修复
-
-因此当前更合理的策略是：
-
-1. 先把 MySQL 问题按 source bug 修掉
-2. 再给 Postgres / Oracle 补相同 restore-no-new-data testcase
-3. 只有当多个 source 都表现出同类缺陷时，再评估是否上提公共抽象
-
-从风险归因上也应注意：
-
-- 如果后续 Postgres / Oracle 被验证在 `restore 后无新日志` 场景下同样不主动 replay schema，应定性为各自历史实现边界
-- 不应定性为 “MySQL 本次修复带来了新的跨 source 不一致 bug”
-
-## 十二、可用性评估
-
-从当前实现和验证情况看，本次修复的可用性判断如下。
-
-### 12.1 对当前用户问题可用
-
-它能直接解决的核心问题是：
-
-- transform projection 修改后
-- 作业从旧 savepoint/checkpoint 恢复
-- restore 后 source 暂时没有新的 binlog
-- 但下游仍需要立即感知当前 schema
-
-这正对应客户当前场景：
-
-- `projection: \*, current_timestamp AS confluent__last_updated`
-
-restore 后，下游能够重新收到当前 projection 对应的 `CreateTableEvent`，从而触发自动补列。
-
-### 12.2 对 fresh start 不构成回归
-
-fresh start 下：
-
-- 原有 schema 发送逻辑仍然保留
-- 没有 restore replay 这条支路
-
-因此不预期引入新的主路径行为变化。
-
-### 12.3 对下游的预期变化是正向的
-
-对于依赖 `CreateTableEvent` 做 schema 收敛的下游来说：
-
-- restore 后能更早拿到当前 schema
-- 不再依赖“必须等一条新 binlog 才能补 schema”
-
-这和用户直觉是一致的，也是 restore 语义更合理的表现。
-
-### 12.4 剩余边界对可用性的实际影响
-
-当前剩余边界对可用性的影响可总结为：
-
-- 对 MySQL 当前用户主场景：影响已消除
-- 对 MySQL snapshot restore：暂未扩大语义，但未观察到当前客户问题
-- 对其他 source：仍需单独验证，当前只能说“未知是否同类存在”，不能说“被本次改动引入”
-
-因此从上线视角看：
-
-- 本次修复对当前问题的收益是确定的
-- 剩余边界主要影响后续能力一致性评估，不构成当前修复方案的阻塞
-
-## 十三、建议的对外口径
-
-如果需要在 PR、issue 或 release note 中描述这次变更，建议采用以下口径：
-
-- 修复 `MySQL pipeline source` 在 savepoint/checkpoint restore 后无法主动重放当前 schema 的问题
-- 该问题会导致 transform projection 已变化时，下游在无新 binlog 的情况下继续沿用旧 schema
-- 本次修复在 restore 的 binlog split 上 replay 已持久化的 `CreateTableEvent`
-- 改动范围收敛在 MySQL source，不是通用 schema restore 框架改造
-
-不建议使用的口径是：
-
-- 所有 source 的通用 schema restore 增强
-- 统一重构了公共恢复语义
-
-因为这会扩大这次改动的真实范围，也不符合当前最小风险实现。
-
-## 十四、后续建议
-
-### 14.1 先补 testcase，再决定其他 source 是否需要适配
-
-建议对 Postgres / Oracle 至少补一条共同模式的 testcase：
+正确做法是先补一条同类 testcase：
 
 1. 启动作业
 2. 进入流式阶段
 3. 打 savepoint
 4. restore
-5. restore 后不写任何新数据
+5. restore 后不写任何新日志
 6. 直接断言是否先收到当前 `CreateTableEvent`
 
-如果这些 source 也失败，再讨论：
+如果失败，再定性为各自 source 的历史缺陷。
 
-- source 侧各自补 replay
-- 还是抽到 base incremental source 公共能力
+### 9.3 其他 sink 的风险
 
-### 14.2 暂不扩大到公共框架
+即使 source replay 能工作，也不代表所有 sink 都已经闭环。
 
-在没有更多 source 证据前，不建议现在就把：
+任何 sink 只要采用类似语义：
 
-- restore split 识别
-- pending replay
-- schema replay
+- 表已存在
+- 收到扩展 `CreateTableEvent`
 
-统一上提到公共 base。
+就必须回答一个问题：
 
-当前最合理的推进顺序是：
+- 是忽略、报错，还是 reconcile/add column
 
-- 先合入 MySQL 局部 bugfix
-- 再做其他 source 的针对性验证
+因此本次真正已经被证明的 end-to-end 场景应收敛为：
 
-## 十五、最终结论
+- MySQL source
+- transform/runtime 当前语义
+- Doris sink
 
-本次问题最终应定性为：
+对其他 sink，仍建议按各自 metadata applier / serializer 行为再做验证。
 
-- `MySQL pipeline source` 在 restore 场景下的缺陷修复
+## 十、风险、收益、稳定性、可用性评分
 
-不是：
+基于当前代码与测试覆盖，建议评分如下：
 
-- 通用 runtime/schema restore 增强
+| 维度 | 评分 | 结论 |
+| --- | --- | --- |
+| 收益 | 9.5 / 10 | 直接命中客户主诉：旧 savepoint 恢复到新 projection 后，计算列需要立即生效 |
+| 风险 | 3 / 10 | source 侧变更仍收敛在 MySQL restored binlog split，未扩大公共 base 语义 |
+| 稳定性 | 8.5 / 10 | 证明链条已经覆盖 source、transform/schema、Doris sink；仍需持续观察真实 IT/CI 运行情况 |
+| 可用性 | 9 / 10 | 对 MySQL + Doris 主场景可用性高；对其他 source/sink 不应过度承诺 |
+| 综合 | 9 / 10 | 当前是边界清晰、收益明确、风险可控的实现 |
 
-根因是：
+## 十一、建议的对外口径
 
-- MySQL source 在 restore 后只恢复了 split 中的 schema cache
-- 但没有在“无新 binlog”时主动 replay 当前 schema 对应的 `CreateTableEvent`
-- 导致下游继续沿用旧 4 列 schema
+建议 PR / issue / release note 采用下面的描述：
 
-本次实现选择在 MySQL source 侧完成修复，利用 split 中已持久化的 `tableSchemas`，在 restored binlog split 上主动 replay 当前 schema，做到：
+- 修复 MySQL pipeline source 在 savepoint/checkpoint restore 后无法主动 replay 当前 schema 的问题
+- 补齐 restore 后 transform projection 变更场景下的 CreateTableEvent 回放验证
+- 对 Doris，支持在表已存在时处理扩展 CreateTableEvent，并 reconcile 缺失列
+- 当前闭环场景为 MySQL + transform/runtime + Doris，不应表述为“所有 source/sink 的统一 restore 增强”
 
-- 只改 MySQL
-- 不改公共 runtime
-- 不改 state 格式
-- 不依赖新 binlog
-- 不引入额外 DB schema 探测
+不建议继续使用的口径：
 
-从影响范围、状态兼容性和行为变化看，这是一种边界清晰、风险可控、可用性较高的最小风险实现。
+- “source 一处修复后，所有 restore 新增列问题都已解决”
+- “这是所有 source 的统一语义修复”
 
-对其他 source 的结论则应保持克制：
+## 十二、最终结论
 
-- 目前不能直接说“都需要适配”
-- 也不能直接说“都没有这个问题”
-- 正确做法是按 restore-no-new-data testcase 逐个核验，再决定是否扩展
+最终结论如下：
 
-对当前仍保留的“只覆盖 MySQL restored binlog split”边界，则应明确写成：
+1. `MySQL source restore 后不 replay 当前 schema`，这是 MySQL 的历史 bug。
+2. 但用户真实场景不是一个 source 单点问题，而是一条 end-to-end 链路问题。
+3. 仅有 source 修复，不能单独证明“旧 savepoint + 新计算列 projection”一定已经闭环。
+4. 当前分支之所以可以较有把握地说问题已被覆盖，是因为同时具备：
+   - MySQL source replay 修复
+   - restore + transform 的直接 testcase
+   - schema/runtime 不跳过扩展 CreateTableEvent 的验证
+   - Doris 对已存在表 reconcile 缺失列的验证
+5. “只覆盖 MySQL restored binlog split”不是本次带来的新 bug，而是历史边界；它不是当前 PR 的 blocker，但后续仍应对其他 source 按同类 testcase 继续评估。
 
-- 它是历史存在的实现边界，不是本次修复引入的新 bug
-- 它的主要影响是跨 source / 跨 restore 场景语义尚未完全统一
-- 它不影响本次 PR 解决当前 MySQL 用户主诉问题的有效性
+因此，对当前用户主链路的最准确结论是：
+
+- 当前分支已经基本覆盖并验证了 `old savepoint/checkpoint + new projection(computed column) + MySQL + Doris` 这一真实场景
+- 但这个结论不应被夸大成“source 一处修复后，全平台所有 restore 新增列问题都已彻底解决”
+
+## 十三、2026-04-17 最终复核更新
+
+这一节用于覆盖本文前面仍残留的旧口径。最新代码和真实 IT 结果表明，最终闭环点并不只是在 `Doris sink`。
+
+### 13.1 最新根因收敛
+
+最终根因已经收敛为两段缺口，而不是单一 source 问题：
+
+1. `MySQL source` 在 `restore` 后没有 replay 当前 `CreateTableEvent`
+2. 即使 source replay 了扩展后的 `CreateTableEvent`，`regular SchemaCoordinator` 在“外部表已存在”场景下，如果仍把它只当成幂等 `CREATE TABLE` 处理，很多 metadata applier 都不会自动转成 `ADD COLUMN`
+
+这意味着：
+
+- `source replay` 只解决“事件重新出现”
+- `schema coordinator external reconcile` 才解决“已存在下游表真正补列”
+
+### 13.2 最新实现语义
+
+当前分支的最终实现不是“继续扩大 MySQL source replay 范围”，而是两层修复配合：
+
+1. `MySQL source`
+   - 仅对 restored `binlog split` replay split state 中已持久化的 schema
+   - 保持最小风险，不改 state 格式，不扩散到 snapshot split / 其他 source
+2. `flink-cdc-runtime` 的 `regular SchemaCoordinator`
+   - 当收到 restore 后扩展过的 `CreateTableEvent`
+   - 且 `SchemaChangeBehavior` 为 `EVOLVE / TRY_EVOLVE / LENIENT`
+   - 且 external table 已存在、当前 evolved schema 与新 schema 不一致
+   - 则对 external metadata applier 实际应用的是 `SchemaMergingUtils.getSchemaDifference(...)` 推导出的差异事件，例如 `AddColumnEvent`
+   - 但对下游 writer / response event，仍保留原始扩展后的 `CreateTableEvent`
+
+这个语义很关键：
+
+- external metadata 真正做补列
+- downstream writer 仍看到完整新 schema
+- 不破坏原有 restore 后 writer 依赖 `CreateTableEvent` 刷新本地 schema 的路径
+
+### 13.3 最新验证结果
+
+截至 `2026-04-17`，已经完成以下验证：
+
+1. runtime 回归测试通过
+   - `SchemaEvolveTest#testRestoredCreateTableEventWithExpandedSchemaReconcilesExistingMetadata`
+   - `DataSinkOperatorWithSchemaEvolveTest#testCreateTableEventWithExpandedSchemaAfterFailover`
+   - `PostTransformOperatorRestoreTest#testRestoreWithUpdatedComputedProjectionStillExpandsCreateTableEvent`
+2. MySQL source + transform restore 用例通过
+   - `MysqlPipelineNewlyAddedTableITCase#testSavepointRestoreReplaysTransformedCreateTableEventForComputedColumnProjectionChange`
+3. 真实 MySQL full pipeline restore IT 通过
+   - `MysqlPipelineNewlyAddedTableITCase#testFullPipelineRestorePropagatesComputedColumnProjectionChangeToSink`
+   - 实测日志显示：
+     - 初始作业先产出 4 列 `CreateTableEvent`
+     - restore 后先产出带 `confluent__last_updated` 的 5 列 `CreateTableEvent`
+     - restore 后新插入数据带非空 `confluent__last_updated`
+
+因此，针对“旧 savepoint/checkpoint 恢复到新 projection 计算列后，下游不补列、不写该列”的主诉，当前分支已经有真实 end-to-end 证据证明问题被打通。
+
+### 13.4 本次验证过程中额外暴露的历史问题
+
+在搭建 full pipeline IT 时，还额外发现了一个与本次业务修复无关、但会干扰验证的历史问题：
+
+- `ValuesDatabase` 构造主键字符串时写死使用 `recordData.getString(primaryKeyIndex)`
+- 当 values sink 表的主键是 `BIGINT` 时，会抛 `IndexOutOfBoundsException`
+
+这个问题不是此次 restore 语义问题的根因，但会让 values sink 的 materialized-in-memory IT 提前失败，从而掩盖真正 restore 行为。
+
+当前已补：
+
+- `ValuesDatabase` 改为按列类型通用读取主键值
+- `ValuesDatabaseTest#testApplyDataChangeEventWithNonStringPrimaryKey` 回归测试已通过
+
+这项修复属于测试辅助 sink 的历史缺陷修复，不改变本次 production 语义判断。
+
+### 13.5 对“是否彻底解决”的最终口径
+
+最终可以给出的准确口径是：
+
+- 对 `MySQL restored binlog split + transform projection 新增计算列 + regular schema operator + existing sink table` 这条主链路，问题已被修复并完成真实 IT 验证
+- 这次不应再表述为“只是 Doris 兼容修复”；更准确地说，是 `regular SchemaCoordinator` 补齐了 existing table 上的 external reconcile 语义
+- “只覆盖 MySQL restored binlog split”不是这次引入的新 bug，而是本来就存在的历史边界；当前 PR 只是选择最小风险先闭环用户命中的主路径
+- snapshot restore、Postgres、Oracle 等其他 source 是否存在同类 restore-no-new-log 缺口，仍需用同类 testcase 分别验证
+
+## 十四、2026-04-17 当前 PR 最终评估更新
+
+这一节用于回答一个更直接的问题：
+
+- 当前 PR 是否已经解决本次提到的问题和需求
+- 当前 PR 的影响范围、剩余风险和可用性评分如何
+
+### 14.1 当前结论
+
+按本次真实主诉链路评估，当前 PR 结论是：
+
+- 已解决
+
+这里的“已解决”指的是以下完整链路已经闭环，而不是单点 source 修复：
+
+1. 旧 savepoint/checkpoint 对应旧 YAML，没有 `CURRENT_TIMESTAMP AS confluent__last_updated`
+2. 新 YAML 新增了 computed column projection
+3. 作业从旧 savepoint/checkpoint 恢复
+4. 下游表仍以旧 4 列存在
+5. restore 后需要自动补列，并让后续写入带上新列值
+
+当前 PR 能解决这一链路，依赖的是两段修复同时成立：
+
+1. `MySQL source` 在 restore 后重新 replay 当前 `CreateTableEvent`
+2. `regular SchemaCoordinator` 对“已存在下游表 + 扩展后的 CreateTableEvent”执行 external reconcile，把幂等 create 转成真实 schema diff，例如 `AddColumnEvent`
+
+如果缺少第 2 段，那么即使 source replay 了 5 列 `CreateTableEvent`，很多已存在的下游表仍不会真正补列；这也是前面现场验证和最早 IT 结论不一致的根本原因。
+
+### 14.2 代码与测试证据
+
+当前 PR 的证据链已经完整覆盖 source、transform、runtime 和 full pipeline：
+
+1. source restore replay
+   - `MySqlSourceReader`
+   - `MySqlPipelineRecordEmitter`
+   - `MySqlSourceReaderTest#testRestoreSplitAssignedBeforeStartCanReplayPendingOutput`
+2. transform restore 后仍按当前 projection 扩展 schema
+   - `PostTransformOperatorRestoreTest#testRestoreWithUpdatedComputedProjectionStillExpandsCreateTableEvent`
+3. runtime 对 existing table 做 external reconcile
+   - `SchemaCoordinator#getSchemaChangesToApplyExternally(...)`
+   - `SchemaEvolveTest#testRestoredCreateTableEventWithExpandedSchemaReconcilesExistingMetadata`
+4. sink/writer 在 failover 后继续按扩展 schema 工作
+   - `DataSinkOperatorWithSchemaEvolveTest#testCreateTableEventWithExpandedSchemaAfterFailover`
+5. 真实 MySQL full pipeline savepoint IT
+   - `MysqlPipelineNewlyAddedTableITCase#testFullPipelineRestorePropagatesComputedColumnProjectionChangeToSink`
+
+真实 IT 的最终结果已经证明：
+
+- 初始作业先产出旧 4 列 `CreateTableEvent`
+- restore 后会先产出带 `confluent__last_updated` 的 5 列 `CreateTableEvent`
+- restore 后新插入的数据能够带上非空 `confluent__last_updated`
+
+这说明当前 PR 已经不只是“restore 后重新发事件”，而是已经覆盖“下游补列 + 后续数据写值”这两个用户真正关心的结果。
+
+### 14.3 影响范围
+
+当前 PR 的影响范围可以分成两层：
+
+1. source 侧影响
+   - 仅限 `MySQL restored binlog split`
+   - fresh start 不变
+   - snapshot restore 不变
+   - 其他 source 不变
+2. runtime 侧影响
+   - 位于 `flink-cdc-runtime` 的 regular schema evolve 公共路径
+   - 但只在以下条件同时满足时触发：
+     - `SchemaChangeBehavior` 为 `EVOLVE / TRY_EVOLVE / LENIENT`
+     - 收到的是扩展后的 `CreateTableEvent`
+     - 当前 evolved schema 已存在
+     - 当前 evolved schema 与 incoming schema 不一致
+
+因此，它不是一个“广泛修改所有 source 行为”的高扩散改动，但也不是纯粹的 MySQL 私有修复。真正的 production 语义变化，落在 runtime 对 existing table 的 reconcile 行为上。
+
+### 14.4 风险评估
+
+当前剩余风险主要有三类：
+
+1. 公共 runtime 路径风险
+   - `SchemaCoordinator` 属于 regular schema evolve 公共路径
+   - 理论上会影响所有走这条路径、并且会收到扩展 `CreateTableEvent` 的 sink
+   - 但触发条件窄，且行为方向是把历史缺口显式化并补齐，不是放大 source 输入
+2. 历史边界仍在
+   - 本次仍只覆盖 `MySQL restored binlog split`
+   - snapshot restore、Postgres、Oracle 等其他 source 是否存在同类问题，仍需分别验证
+   - 这不是本次新引入的 bug，而是历史上就存在、此前未被完整覆盖的边界
+3. 当前工作区混入无关改动
+   - `TransformParser`
+   - `TransformSqlOperatorTable`
+   - `PostTransformOperator` 中未参与主修复语义的 logger 改动
+   - 这些改动不改变本次主结论，但如果与主修复一起进入同一个 PR，会扩大 reviewer 的审阅范围并抬高合入风险
+
+因此，对主修复链路本身的风险判断是“低到中低”；对“当前整个工作区改动集合”的风险判断则高于主修复本身。
+
+### 14.5 可用性与评分
+
+基于当前代码、测试覆盖和真实 IT 结果，建议将当前 PR 评分更新为：
+
+| 维度 | 评分 | 结论 |
+| --- | --- | --- |
+| 解决度 | 9.5 / 10 | 已命中并解决“旧 savepoint/checkpoint 恢复到新 computed projection 后，下游不补列也不写值”的真实主诉 |
+| 影响可控性 | 8.5 / 10 | source 侧收敛在 MySQL restored binlog split；runtime 侧虽是公共路径，但触发条件明确且收敛 |
+| 风险 | 4 / 10 | 主修复风险较低；若将无关 parser/兼容性改动混入同一 PR，则 review 风险上升 |
+| 稳定性 | 8.5 / 10 | 已有 source、runtime、transform、full pipeline 四层验证；仍需持续观察更多真实 sink 场景 |
+| 可用性 | 9 / 10 | 对当前用户主链路可用性高；对其他 source/sink 不应过度承诺 |
+| 综合 | 9 / 10 | 当前 PR 已经解决主问题，收益明确，风险总体可控 |
+
+### 14.6 最终评审结论
+
+对当前 PR 最准确的评审结论是：
+
+- 它已经解决了本次提到的问题和需求，但解决方式不是单点 `MySQL source` 修复，而是 `MySQL restore replay + runtime existing-table reconcile` 的组合修复
+- “只覆盖 MySQL restored binlog split”不是本次带来的新 bug，而是历史边界仍未扩展；这不是当前 PR 的 blocker
+- 如果 PR 最终只保留主修复链路相关改动，则这是一个收益明确、影响可控、可以合入的修复
+- 如果 parser/VARIANT/logger 等无关改动继续混在同一 PR，需要在合入前拆分或明确说明，否则会徒增 review 风险，但不改变主修复结论

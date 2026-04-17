@@ -27,6 +27,7 @@ import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.pipeline.RouteMode;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.runtime.operators.AbstractStreamOperatorAdapter;
 import org.apache.flink.cdc.runtime.operators.schema.common.CoordinationResponseUtils;
 import org.apache.flink.cdc.runtime.operators.schema.common.event.FlushSuccessEvent;
@@ -107,11 +108,9 @@ public class RegularEventOperatorTestHarness<
     private RegularEventOperatorTestHarness(
             OP operator,
             int numOutputs,
-            Duration schemaEvolveDuration,
+            MetadataApplier metadataApplier,
             Duration rpcTimeout,
-            SchemaChangeBehavior behavior,
-            Set<SchemaChangeEventType> enabledEventTypes,
-            Set<SchemaChangeEventType> errorsOnEventTypes) {
+            SchemaChangeBehavior behavior) {
         this.operator = operator;
         this.numOutputs = numOutputs;
         this.mockedContext =
@@ -122,13 +121,29 @@ public class RegularEventOperatorTestHarness<
                         "SchemaOperator",
                         mockedContext,
                         Executors.newFixedThreadPool(1),
-                        new CollectingMetadataApplier(
-                                schemaEvolveDuration, enabledEventTypes, errorsOnEventTypes),
+                        metadataApplier,
                         new ArrayList<>(),
                         RouteMode.ALL_MATCH,
                         behavior,
                         rpcTimeout);
         schemaRegistryGateway = new TestingSchemaRegistryGateway(schemaRegistry);
+    }
+
+    private RegularEventOperatorTestHarness(
+            OP operator,
+            int numOutputs,
+            Duration schemaEvolveDuration,
+            Duration rpcTimeout,
+            SchemaChangeBehavior behavior,
+            Set<SchemaChangeEventType> enabledEventTypes,
+            Set<SchemaChangeEventType> errorsOnEventTypes) {
+        this(
+                operator,
+                numOutputs,
+                new CollectingMetadataApplier(
+                        schemaEvolveDuration, enabledEventTypes, errorsOnEventTypes),
+                rpcTimeout,
+                behavior);
     }
 
     public static <OP extends AbstractStreamOperatorAdapter<E>, E extends Event>
@@ -206,6 +221,16 @@ public class RegularEventOperatorTestHarness<
                 behavior,
                 enabledEventTypes,
                 errorOnEventTypes);
+    }
+
+    public static <OP extends AbstractStreamOperatorAdapter<E>, E extends Event>
+            RegularEventOperatorTestHarness<OP, E> withMetadataApplier(
+                    OP operator,
+                    int numOutputs,
+                    MetadataApplier metadataApplier,
+                    SchemaChangeBehavior behavior) {
+        return new RegularEventOperatorTestHarness<>(
+                operator, numOutputs, metadataApplier, DEFAULT_RPC_TIMEOUT, behavior);
     }
 
     public void open() throws Exception {

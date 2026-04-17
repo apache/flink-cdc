@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.mysql.source;
 
+import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
@@ -27,23 +28,40 @@ import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.factories.Factory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
+import org.apache.flink.cdc.common.pipeline.PipelineOptions;
+import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.source.FlinkSourceProvider;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
+import org.apache.flink.cdc.composer.definition.PipelineDef;
+import org.apache.flink.cdc.composer.definition.SinkDef;
+import org.apache.flink.cdc.composer.definition.SourceDef;
+import org.apache.flink.cdc.composer.definition.TransformDef;
+import org.apache.flink.cdc.composer.flink.FlinkPipelineComposer;
 import org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils;
 import org.apache.flink.cdc.connectors.mysql.factory.MySqlDataSourceFactory;
+import org.apache.flink.cdc.connectors.mysql.testutils.RecordDataTestUtils;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
+import org.apache.flink.cdc.connectors.values.ValuesDatabase;
+import org.apache.flink.cdc.connectors.values.factory.ValuesDataFactory;
+import org.apache.flink.cdc.connectors.values.sink.ValuesDataSink;
+import org.apache.flink.cdc.connectors.values.sink.ValuesDataSinkOptions;
+import org.apache.flink.cdc.runtime.operators.transform.PostTransformOperator;
+import org.apache.flink.cdc.runtime.operators.transform.PreTransformOperator;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.configuration.CoreOptions;
 import org.apache.flink.configuration.StateRecoveryOptions;
 import org.apache.flink.core.execution.JobClient;
 import org.apache.flink.core.execution.SavepointFormatType;
 import org.apache.flink.runtime.checkpoint.CheckpointException;
+import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.functions.sink.RichSinkFunction;
 import org.apache.flink.streaming.api.operators.collect.AbstractCollectResultBuffer;
 import org.apache.flink.streaming.api.operators.collect.CheckpointedCollectResultBuffer;
 import org.apache.flink.streaming.api.operators.collect.CollectResultIterator;
@@ -64,9 +82,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.shaded.com.google.common.collect.Lists;
 
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.sql.SQLException;
+import java.time.Duration;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -102,6 +125,7 @@ import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOption
 import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.TEST_PASSWORD;
 import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.TEST_USER;
 import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.fetchResults;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.loopCheck;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** IT tests to cover various newly added tables during capture process in pipeline mode. */
@@ -399,6 +423,234 @@ class MysqlPipelineNewlyAddedTableITCase extends MySqlSourceTestBase {
         }
     }
 
+    @Test
+    void testFullPipelineRestorePropagatesComputedColumnProjectionChangeToSink() throws Exception {
+        String tableName = "address_hangzhou";
+        String tableSelector = customDatabase.getDatabaseName() + ".address_\\.*";
+        String initialProjection = "*";
+        String updatedProjection = "*, CURRENT_TIMESTAMP AS confluent__last_updated";
+        String pipelineUidPrefix = "mysql-computed-column-restore";
+        String initialJobName = "mysql-values-before-restore";
+        String restoredJobName = "mysql-values-after-restore";
+        TableId tableId = TableId.tableId(customDatabase.getDatabaseName(), tableName);
+
+        initialAddressTables(getConnection(), Collections.singletonList(tableName));
+        ValuesDatabase.clear();
+
+        Path savepointDir = Files.createTempDirectory("restore-full-pipeline-transform-test");
+        String savepointDirectory = savepointDir.toAbsolutePath().toString();
+
+        try {
+            StreamExecutionEnvironment initialEnv = getStreamExecutionEnvironment(null, 1);
+            RestartStrategyUtils.configureNoRestartStrategy(initialEnv);
+            composePipeline(
+                    initialEnv,
+                    buildPipelineDef(
+                            tableName,
+                            tableSelector,
+                            initialProjection,
+                            pipelineUidPrefix,
+                            initialJobName));
+            JobClient initialClient = initialEnv.executeAsync(initialJobName);
+            try {
+                waitForJobRunning(initialClient, 30, TimeUnit.SECONDS);
+                waitForValuesSchema(
+                        tableId, Collections.singletonList("confluent__last_updated"), false, 30);
+
+                try (MySqlConnection connection = getConnection()) {
+                    connection.setAutoCommit(false);
+                    connection.execute(
+                            format(
+                                    "INSERT INTO %s.%s VALUES "
+                                            + "(417122095255614382, 'China', 'hangzhou', 'hangzhou West Town address 6');",
+                                    customDatabase.getDatabaseName(), tableName));
+                    connection.commit();
+                }
+
+                waitForValuesResultContains(
+                        tableId, 30, "417122095255614382", "hangzhou West Town address 6");
+
+                String savepointPath = triggerSavepointWithRetry(initialClient, savepointDirectory);
+                initialClient.cancel().get();
+
+                StreamExecutionEnvironment restoredEnv =
+                        getStreamExecutionEnvironment(savepointPath, 1);
+                RestartStrategyUtils.configureNoRestartStrategy(restoredEnv);
+                composePipeline(
+                        restoredEnv,
+                        buildPipelineDef(
+                                tableName,
+                                tableSelector,
+                                updatedProjection,
+                                pipelineUidPrefix,
+                                restoredJobName));
+                JobClient restoredClient = restoredEnv.executeAsync(restoredJobName);
+                try {
+                    waitForJobRunning(restoredClient, 30, TimeUnit.SECONDS);
+                    waitForValuesSchema(
+                            tableId,
+                            Collections.singletonList("confluent__last_updated"),
+                            true,
+                            30);
+
+                    try (MySqlConnection connection = getConnection()) {
+                        connection.setAutoCommit(false);
+                        connection.execute(
+                                format(
+                                        "INSERT INTO %s.%s VALUES "
+                                                + "(417122095255614383, 'China', 'hangzhou', 'hangzhou West Town address 7');",
+                                        customDatabase.getDatabaseName(), tableName));
+                        connection.commit();
+                    }
+
+                    waitForValuesResultContains(
+                            tableId,
+                            30,
+                            "417122095255614383",
+                            "hangzhou West Town address 7",
+                            "confluent__last_updated=");
+                    assertThat(findValuesResult(tableId, "417122095255614383"))
+                            .contains("confluent__last_updated=")
+                            .doesNotContain("confluent__last_updated=;");
+                } finally {
+                    cancelJobOrThrowFailure(restoredClient);
+                }
+            } finally {
+                cancelJobOrThrowFailure(initialClient);
+            }
+        } finally {
+            ValuesDatabase.clear();
+        }
+    }
+
+    @Test
+    void testSavepointRestoreReplaysTransformedCreateTableEventForComputedColumnProjectionChange()
+            throws Exception {
+        String tableName = "address_hangzhou";
+        String initialProjection = "*";
+        String updatedProjection = "*, CURRENT_TIMESTAMP AS confluent__last_updated";
+        initialAddressTables(getConnection(), Collections.singletonList(tableName));
+
+        Path savepointDir = Files.createTempDirectory("restore-transform-create-table-test");
+        String savepointDirectory = savepointDir.toAbsolutePath().toString();
+        Path initialOutputPath = Files.createTempFile("restore-transform-initial-", ".log");
+        Path restoredOutputPath = Files.createTempFile("restore-transform-restored-", ".log");
+        TableId tableId = TableId.tableId(customDatabase.getDatabaseName(), tableName);
+        String tableIdString = tableId.toString();
+
+        StreamExecutionEnvironment env = getStreamExecutionEnvironment(null, 1);
+        FlinkSourceProvider sourceProvider =
+                getFlinkSourceProvider(
+                        Collections.singletonList(tableName), 1, new HashMap<>(), false, false);
+        DataStream<Event> initialPostTransformStream =
+                createPostTransformStream(env, sourceProvider, tableName, initialProjection);
+        addEventFileSink(initialPostTransformStream, initialOutputPath);
+        JobClient jobClient = env.executeAsync("BeforeRestoreReplayTransformedCreateTable");
+
+        waitForLineCount(initialOutputPath, 4, 30, TimeUnit.SECONDS);
+        List<String> initialLines = readOutputLines(initialOutputPath);
+        assertThat(initialLines.get(0))
+                .contains("CREATE|" + tableIdString)
+                .doesNotContain("confluent__last_updated");
+
+        try (MySqlConnection connection = getConnection()) {
+            connection.setAutoCommit(false);
+            connection.execute(
+                    format(
+                            "INSERT INTO %s.%s VALUES "
+                                    + "(417122095255614380, 'China', 'hangzhou', 'hangzhou West Town address 4');",
+                            customDatabase.getDatabaseName(), tableName));
+            connection.commit();
+        }
+        waitForLineCount(initialOutputPath, 5, 30, TimeUnit.SECONDS);
+        assertThat(readOutputLines(initialOutputPath).get(4))
+                .contains(
+                        "DATA|"
+                                + tableIdString
+                                + "|INSERT|before=null|after=[417122095255614380, China, hangzhou, hangzhou West Town address 4]");
+
+        String savepointPath = triggerSavepointWithRetry(jobClient, savepointDirectory);
+        jobClient.cancel().get();
+
+        StreamExecutionEnvironment restoredEnv = getStreamExecutionEnvironment(savepointPath, 1);
+        FlinkSourceProvider restoredSourceProvider =
+                getFlinkSourceProvider(
+                        Collections.singletonList(tableName), 1, new HashMap<>(), false, false);
+        DataStream<Event> restoredPostTransformStream =
+                createPostTransformStream(
+                        restoredEnv, restoredSourceProvider, tableName, updatedProjection);
+        addEventFileSink(restoredPostTransformStream, restoredOutputPath);
+        JobClient restoredClient =
+                restoredEnv.executeAsync("AfterRestoreReplayTransformedCreateTable");
+
+        try {
+            waitForLineCount(restoredOutputPath, 1, 30, TimeUnit.SECONDS);
+            List<String> restoredLines = readOutputLines(restoredOutputPath);
+            assertThat(restoredLines.get(0))
+                    .contains("CREATE|" + tableIdString)
+                    .contains("confluent__last_updated");
+
+            try (MySqlConnection connection = getConnection()) {
+                connection.setAutoCommit(false);
+                connection.execute(
+                        format(
+                                "INSERT INTO %s.%s VALUES "
+                                        + "(417122095255614381, 'China', 'hangzhou', 'hangzhou West Town address 5');",
+                                customDatabase.getDatabaseName(), tableName));
+                connection.commit();
+            }
+
+            waitForLineCount(restoredOutputPath, 2, 30, TimeUnit.SECONDS);
+            String restoredDataLine = readOutputLines(restoredOutputPath).get(1);
+            assertThat(restoredDataLine)
+                    .contains(
+                            "DATA|"
+                                    + tableIdString
+                                    + "|INSERT|before=null|after=[417122095255614381, China, hangzhou, hangzhou West Town address 5, ")
+                    .doesNotContain(", null]");
+        } finally {
+            restoredClient.cancel().get();
+        }
+    }
+
+    private DataStream<Event> createPostTransformStream(
+            StreamExecutionEnvironment env,
+            FlinkSourceProvider sourceProvider,
+            String tableName,
+            String projection) {
+        String tablePattern = customDatabase.getDatabaseName() + "." + tableName;
+        DataStream<Event> sourceStream =
+                env.fromSource(
+                                sourceProvider.getSource(),
+                                WatermarkStrategy.noWatermarks(),
+                                MySqlDataSourceFactory.IDENTIFIER,
+                                new EventTypeInfo())
+                        .uid("mysql-source");
+
+        DataStream<Event> preTransformStream =
+                sourceStream
+                        .transform(
+                                "Transform:Schema",
+                                new EventTypeInfo(),
+                                PreTransformOperator.newBuilder()
+                                        .addTransform(tablePattern, projection, null)
+                                        .build())
+                        .uid("mysql-pre-transform");
+
+        DataStream<Event> postTransformStream =
+                preTransformStream
+                        .transform(
+                                "Transform:Data",
+                                new EventTypeInfo(),
+                                PostTransformOperator.newBuilder()
+                                        .addTransform(tablePattern, projection, null)
+                                        .addTimezone("UTC")
+                                        .build())
+                        .uid("mysql-post-transform");
+
+        return postTransformStream;
+    }
+
     private <T> List<T> fetchResultsWithTimeout(
             CollectResultIterator<T> iterator, int size, long timeout, TimeUnit unit)
             throws Exception {
@@ -419,6 +671,166 @@ class MysqlPipelineNewlyAddedTableITCase extends MySqlSourceTestBase {
         } finally {
             executor.shutdownNow();
         }
+    }
+
+    private void composePipeline(StreamExecutionEnvironment env, PipelineDef pipelineDef) {
+        FlinkPipelineComposer.ofApplicationCluster(env).compose(pipelineDef);
+    }
+
+    private void addEventFileSink(DataStream<Event> stream, Path outputPath) {
+        stream.addSink(new EventFileSink(outputPath.toString()))
+                .name("mysql-event-file-sink")
+                .uid("mysql-event-file-sink");
+    }
+
+    private List<String> readOutputLines(Path outputPath) throws IOException {
+        if (!Files.exists(outputPath)) {
+            return Collections.emptyList();
+        }
+        return Files.readAllLines(outputPath, StandardCharsets.UTF_8).stream()
+                .filter(StringUtils::isNotBlank)
+                .collect(Collectors.toList());
+    }
+
+    private void waitForLineCount(
+            Path outputPath, int expectedLineCount, long timeout, TimeUnit unit) throws Exception {
+        loopCheck(
+                () -> {
+                    try {
+                        return readOutputLines(outputPath).size() >= expectedLineCount;
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                },
+                "collect " + expectedLineCount + " events from " + outputPath,
+                Duration.ofMillis(unit.toMillis(timeout)),
+                Duration.ofMillis(200));
+    }
+
+    private void waitForJobRunning(JobClient client, long timeout, TimeUnit unit) throws Exception {
+        long deadline = System.currentTimeMillis() + unit.toMillis(timeout);
+        while (System.currentTimeMillis() < deadline) {
+            JobStatus status = client.getJobStatus().get();
+            if (status == JobStatus.RUNNING) {
+                return;
+            }
+            if (status.isTerminalState()) {
+                try {
+                    client.getJobExecutionResult().get();
+                } catch (Exception e) {
+                    throw new IllegalStateException(
+                            "Job terminated before RUNNING with status " + status, e);
+                }
+                throw new IllegalStateException(
+                        "Job terminated before RUNNING with status " + status);
+            }
+            Thread.sleep(200L);
+        }
+        throw new TimeoutException("Timed out waiting for job to enter RUNNING.");
+    }
+
+    private void cancelJobOrThrowFailure(JobClient client) throws Exception {
+        JobStatus status = client.getJobStatus().get();
+        if (status == JobStatus.CANCELED || status == JobStatus.FINISHED) {
+            return;
+        }
+        if (status == JobStatus.FAILED) {
+            client.getJobExecutionResult().get();
+            return;
+        }
+        client.cancel().get();
+    }
+
+    private void waitForValuesSchema(
+            TableId tableId,
+            List<String> expectedColumns,
+            boolean shouldContain,
+            long timeoutSeconds)
+            throws Exception {
+        loopCheck(
+                () -> {
+                    try {
+                        List<String> columnNames =
+                                ValuesDatabase.getTableSchema(tableId).getColumnNames();
+                        return shouldContain
+                                ? columnNames.containsAll(expectedColumns)
+                                : expectedColumns.stream().noneMatch(columnNames::contains);
+                    } catch (Throwable t) {
+                        return false;
+                    }
+                },
+                "values schema update for " + tableId,
+                Duration.ofSeconds(timeoutSeconds),
+                Duration.ofMillis(200));
+    }
+
+    private void waitForValuesResultContains(TableId tableId, long timeoutSeconds, String... parts)
+            throws Exception {
+        loopCheck(
+                () -> {
+                    try {
+                        return findValuesResult(tableId, parts) != null;
+                    } catch (Throwable t) {
+                        return false;
+                    }
+                },
+                "values sink row for " + tableId,
+                Duration.ofSeconds(timeoutSeconds),
+                Duration.ofMillis(200));
+    }
+
+    private String findValuesResult(TableId tableId, String... parts) {
+        return ValuesDatabase.getResults(tableId).stream()
+                .filter(row -> Arrays.stream(parts).allMatch(part -> row.contains(part)))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private PipelineDef buildPipelineDef(
+            String tableName,
+            String tableSelector,
+            String projection,
+            String pipelineUidPrefix,
+            String pipelineName) {
+        org.apache.flink.cdc.common.configuration.Configuration sourceConfig =
+                new org.apache.flink.cdc.common.configuration.Configuration();
+        sourceConfig.set(HOSTNAME, MYSQL_CONTAINER.getHost());
+        sourceConfig.set(PORT, MYSQL_CONTAINER.getDatabasePort());
+        sourceConfig.set(USERNAME, TEST_USER);
+        sourceConfig.set(PASSWORD, TEST_PASSWORD);
+        sourceConfig.set(SERVER_TIME_ZONE, "UTC");
+        sourceConfig.set(TABLES, customDatabase.getDatabaseName() + "." + tableName);
+        sourceConfig.set(SERVER_ID, getServerId(1));
+
+        SourceDef sourceDef =
+                new SourceDef(MySqlDataSourceFactory.IDENTIFIER, "MySQL Source", sourceConfig);
+
+        org.apache.flink.cdc.common.configuration.Configuration sinkConfig =
+                new org.apache.flink.cdc.common.configuration.Configuration();
+        sinkConfig.set(ValuesDataSinkOptions.MATERIALIZED_IN_MEMORY, true);
+        sinkConfig.set(ValuesDataSinkOptions.PRINT_ENABLED, true);
+        sinkConfig.set(ValuesDataSinkOptions.SINK_API, ValuesDataSink.SinkApi.SINK_V2);
+        SinkDef sinkDef = new SinkDef(ValuesDataFactory.IDENTIFIER, "Values Sink", sinkConfig);
+
+        TransformDef transformDef =
+                new TransformDef(
+                        tableSelector, projection, null, "", "", "", ",", "", "SOFT_DELETE");
+
+        org.apache.flink.cdc.common.configuration.Configuration pipelineConfig =
+                new org.apache.flink.cdc.common.configuration.Configuration();
+        pipelineConfig.set(PipelineOptions.PIPELINE_NAME, pipelineName);
+        pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
+        pipelineConfig.set(PipelineOptions.PIPELINE_OPERATOR_UID_PREFIX, pipelineUidPrefix);
+        pipelineConfig.set(
+                PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
+
+        return new PipelineDef(
+                sourceDef,
+                sinkDef,
+                Collections.emptyList(),
+                Collections.singletonList(transformDef),
+                Collections.emptyList(),
+                pipelineConfig);
     }
 
     private void testAddNewTable(TestParam testParam, int parallelism) throws Exception {
@@ -540,15 +952,21 @@ class MysqlPipelineNewlyAddedTableITCase extends MySqlSourceTestBase {
     }
 
     private CreateTableEvent getCreateTableEvent(TableId tableId) {
-        Schema schema =
+        return getCreateTableEvent(tableId, false);
+    }
+
+    private CreateTableEvent getCreateTableEvent(TableId tableId, boolean withComputedTimestamp) {
+        Schema.Builder schemaBuilder =
                 Schema.newBuilder()
                         .physicalColumn("id", DataTypes.BIGINT().notNull())
                         .physicalColumn("country", DataTypes.VARCHAR(255).notNull())
                         .physicalColumn("city", DataTypes.VARCHAR(255).notNull())
-                        .physicalColumn("detail_address", DataTypes.VARCHAR(1024))
-                        .primaryKey(Collections.singletonList("id"))
-                        .build();
-        return new CreateTableEvent(tableId, schema);
+                        .physicalColumn("detail_address", DataTypes.VARCHAR(1024));
+        if (withComputedTimestamp) {
+            schemaBuilder.physicalColumn("confluent__last_updated", DataTypes.TIMESTAMP_LTZ(3));
+        }
+        return new CreateTableEvent(
+                tableId, schemaBuilder.primaryKey(Collections.singletonList("id")).build());
     }
 
     private List<Event> getSnapshotExpected(TableId tableId) {
@@ -688,7 +1106,7 @@ class MysqlPipelineNewlyAddedTableITCase extends MySqlSourceTestBase {
 
     private <T> CollectResultIterator<T> addCollector(
             StreamExecutionEnvironment env,
-            DataStreamSource<T> source,
+            DataStream<T> source,
             AbstractCollectResultBuffer<T> buffer,
             TypeSerializer<T> serializer,
             String accumulatorName) {
@@ -715,6 +1133,9 @@ class MysqlPipelineNewlyAddedTableITCase extends MySqlSourceTestBase {
         if (finishedSavePointPath != null) {
             configuration.set(StateRecoveryOptions.SAVEPOINT_PATH, finishedSavePointPath);
         }
+        configuration.set(
+                CoreOptions.ALWAYS_PARENT_FIRST_LOADER_PATTERNS_ADDITIONAL,
+                Collections.singletonList("org.apache.flink.cdc"));
         StreamExecutionEnvironment env =
                 StreamExecutionEnvironment.getExecutionEnvironment(configuration);
         env.setParallelism(parallelism);
@@ -809,6 +1230,81 @@ class MysqlPipelineNewlyAddedTableITCase extends MySqlSourceTestBase {
 
         public Integer getSecondRoundFetchSize() {
             return secondRoundFetchSize;
+        }
+    }
+
+    private static class EventFileSink extends RichSinkFunction<Event> {
+        private final String outputFilePath;
+
+        private transient BufferedWriter writer;
+        private transient Map<TableId, Schema> schemaMap;
+
+        private EventFileSink(String outputFilePath) {
+            this.outputFilePath = outputFilePath;
+        }
+
+        @Override
+        public void open(Configuration parameters) throws Exception {
+            Path outputPath = Path.of(outputFilePath);
+            Files.createDirectories(outputPath.getParent());
+            writer =
+                    Files.newBufferedWriter(
+                            outputPath,
+                            StandardCharsets.UTF_8,
+                            StandardOpenOption.CREATE,
+                            StandardOpenOption.APPEND);
+            schemaMap = new HashMap<>();
+        }
+
+        @Override
+        public void invoke(Event event, Context context) throws Exception {
+            if (event instanceof CreateTableEvent) {
+                CreateTableEvent createTableEvent = (CreateTableEvent) event;
+                schemaMap.put(createTableEvent.tableId(), createTableEvent.getSchema());
+            }
+            writer.write(formatEvent(event));
+            writer.newLine();
+            writer.flush();
+        }
+
+        @Override
+        public void close() throws Exception {
+            if (writer != null) {
+                writer.close();
+            }
+        }
+
+        private String formatEvent(Event event) {
+            if (event instanceof CreateTableEvent) {
+                CreateTableEvent createTableEvent = (CreateTableEvent) event;
+                return "CREATE|" + createTableEvent.tableId() + "|" + createTableEvent.getSchema();
+            }
+            if (event instanceof DataChangeEvent) {
+                DataChangeEvent dataChangeEvent = (DataChangeEvent) event;
+                Schema schema = schemaMap.get(dataChangeEvent.tableId());
+                return "DATA|"
+                        + dataChangeEvent.tableId()
+                        + "|"
+                        + dataChangeEvent.op()
+                        + "|before="
+                        + formatRecord(dataChangeEvent.before(), schema)
+                        + "|after="
+                        + formatRecord(dataChangeEvent.after(), schema);
+            }
+            return event.toString();
+        }
+
+        private String formatRecord(
+                org.apache.flink.cdc.common.data.RecordData recordData, Schema schema) {
+            if (recordData == null) {
+                return "null";
+            }
+            if (schema == null) {
+                return recordData.toString();
+            }
+            Object[] fields =
+                    RecordDataTestUtils.recordFields(recordData, (RowType) schema.toRowDataType());
+            return Arrays.toString(fields);
         }
     }
 }

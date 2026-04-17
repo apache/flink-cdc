@@ -420,9 +420,12 @@ public class ValuesDatabase {
         }
 
         private String buildPrimaryKeyStr(RecordData recordData) {
+            List<RecordData.FieldGetter> fieldGetters = SchemaUtils.createFieldGetters(columns);
             StringBuilder stringBuilder = new StringBuilder();
             for (Integer primaryKeyIndex : primaryKeyIndexes) {
-                stringBuilder.append(recordData.getString(primaryKeyIndex).toString()).append(",");
+                stringBuilder
+                        .append(fieldGetters.get(primaryKeyIndex).getFieldOrNull(recordData))
+                        .append(",");
             }
             stringBuilder.deleteCharAt(stringBuilder.length() - 1);
             return stringBuilder.toString();

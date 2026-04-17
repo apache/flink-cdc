@@ -37,9 +37,11 @@ import org.apache.flink.cdc.common.pipeline.RouteMode;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
+import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.runtime.testutils.operators.RegularEventOperatorTestHarness;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
@@ -58,6 +60,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
@@ -431,6 +434,59 @@ class SchemaEvolveTest {
         Assertions.assertThat(outputEvent.after().getArity()).isEqualTo(4);
 
         harness.close();
+    }
+
+    @Test
+    void testRestoredCreateTableEventWithExpandedSchemaReconcilesExistingMetadata()
+            throws Exception {
+        TableId tableId = CUSTOMERS_TABLE_ID;
+        Schema restoredSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", INT)
+                        .physicalColumn("name", STRING)
+                        .physicalColumn("age", SMALLINT)
+                        .primaryKey("id")
+                        .build();
+        Schema expandedSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", INT)
+                        .physicalColumn("name", STRING)
+                        .physicalColumn("age", SMALLINT)
+                        .physicalColumn("CONFLUENT__LAST_UPDATED", DataTypes.TIMESTAMP_LTZ(3))
+                        .primaryKey("id")
+                        .build();
+
+        NoOpCreateTableMetadataApplier metadataApplier =
+                new NoOpCreateTableMetadataApplier(restoredSchema);
+
+        SchemaOperator schemaOperator =
+                new SchemaOperator(
+                        new ArrayList<>(),
+                        RouteMode.ALL_MATCH,
+                        Duration.ofSeconds(30),
+                        SchemaChangeBehavior.EVOLVE);
+        try (RegularEventOperatorTestHarness<SchemaOperator, Event> harness =
+                RegularEventOperatorTestHarness.withMetadataApplier(
+                        schemaOperator, 17, metadataApplier, SchemaChangeBehavior.EVOLVE)) {
+            harness.open();
+            harness.registerOriginalSchema(tableId, restoredSchema);
+            harness.registerEvolvedSchema(tableId, restoredSchema);
+
+            schemaOperator.processElement(
+                    new StreamRecord<>(new CreateTableEvent(tableId, expandedSchema)));
+
+            Assertions.assertThat(
+                            harness.getOutputRecords().stream()
+                                    .map(StreamRecord::getValue)
+                                    .collect(Collectors.toList()))
+                    .containsExactly(
+                            new FlushEvent(
+                                    0,
+                                    Collections.singletonList(tableId),
+                                    SchemaChangeEventType.CREATE_TABLE),
+                            new CreateTableEvent(tableId, expandedSchema));
+            Assertions.assertThat(metadataApplier.getCurrentSchema()).isEqualTo(expandedSchema);
+        }
     }
 
     /** Tests try-evolve behavior without exceptions. */
@@ -2672,6 +2728,45 @@ class SchemaEvolveTest {
     private void processEvent(SchemaOperator operator, List<Event> events) throws Exception {
         for (Event event : events) {
             operator.processElement(new StreamRecord<>(event));
+        }
+    }
+
+    private static final class NoOpCreateTableMetadataApplier implements MetadataApplier {
+        private Schema currentSchema;
+
+        private NoOpCreateTableMetadataApplier(Schema currentSchema) {
+            this.currentSchema = currentSchema;
+        }
+
+        @Override
+        public MetadataApplier setAcceptedSchemaEvolutionTypes(
+                Set<SchemaChangeEventType> schemaEvolutionTypes) {
+            return this;
+        }
+
+        @Override
+        public boolean acceptsSchemaEvolutionType(SchemaChangeEventType schemaChangeEventType) {
+            return true;
+        }
+
+        @Override
+        public Set<SchemaChangeEventType> getSupportedSchemaEvolutionTypes() {
+            return Sets.newHashSet(SchemaChangeEventTypeFamily.ALL);
+        }
+
+        @Override
+        public void applySchemaChange(org.apache.flink.cdc.common.event.SchemaChangeEvent event) {
+            if (event instanceof CreateTableEvent) {
+                if (currentSchema == null) {
+                    currentSchema = ((CreateTableEvent) event).getSchema();
+                }
+                return;
+            }
+            currentSchema = SchemaUtils.applySchemaChangeEvent(currentSchema, event);
+        }
+
+        private Schema getCurrentSchema() {
+            return currentSchema;
         }
     }
 }

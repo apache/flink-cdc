@@ -440,25 +440,32 @@ public class TransformSqlOperatorTable extends ReflectiveSqlOperatorTable {
     // Variant functions
     // --------------------------------------------------------------------------------------------
 
-    public static final SqlFunction PARSE_JSON =
-            new SqlFunction(
-                    "PARSE_JSON",
-                    SqlKind.OTHER_FUNCTION,
-                    ReturnTypes.explicit(SqlTypeName.VARIANT),
-                    null,
-                    OperandTypes.or(
-                            OperandTypes.family(SqlTypeFamily.STRING),
-                            OperandTypes.family(SqlTypeFamily.STRING, SqlTypeFamily.BOOLEAN)),
-                    SqlFunctionCategory.USER_DEFINED_FUNCTION);
+    private static final @Nullable SqlTypeName VARIANT_TYPE_NAME = lookupVariantTypeName();
 
-    public static final SqlFunction TRY_PARSE_JSON =
-            new SqlFunction(
-                    "TRY_PARSE_JSON",
-                    SqlKind.OTHER_FUNCTION,
-                    ReturnTypes.explicit(SqlTypeName.VARIANT),
-                    null,
-                    OperandTypes.or(
-                            OperandTypes.family(SqlTypeFamily.STRING),
-                            OperandTypes.family(SqlTypeFamily.STRING, SqlTypeFamily.BOOLEAN)),
-                    SqlFunctionCategory.USER_DEFINED_FUNCTION);
+    public static final SqlFunction PARSE_JSON = createVariantFunction("PARSE_JSON");
+
+    public static final SqlFunction TRY_PARSE_JSON = createVariantFunction("TRY_PARSE_JSON");
+
+    private static @Nullable SqlTypeName lookupVariantTypeName() {
+        try {
+            return SqlTypeName.valueOf("VARIANT");
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+    }
+
+    private static @Nullable SqlFunction createVariantFunction(String name) {
+        if (VARIANT_TYPE_NAME == null) {
+            return null;
+        }
+        return new SqlFunction(
+                name,
+                SqlKind.OTHER_FUNCTION,
+                ReturnTypes.explicit(VARIANT_TYPE_NAME),
+                null,
+                OperandTypes.or(
+                        OperandTypes.family(SqlTypeFamily.STRING),
+                        OperandTypes.family(SqlTypeFamily.STRING, SqlTypeFamily.BOOLEAN)),
+                SqlFunctionCategory.USER_DEFINED_FUNCTION);
+    }
 }

@@ -340,6 +340,32 @@ public class SchemaCoordinator extends SchemaRegistry {
         return deducedSchemaChangeEvents;
     }
 
+    private List<SchemaChangeEvent> getSchemaChangesToApplyExternally(
+            SchemaChangeEvent schemaChangeEvent) {
+        if (schemaChangeEvent instanceof CreateTableEvent
+                && shouldReconcileExistingTable((CreateTableEvent) schemaChangeEvent)) {
+            CreateTableEvent createTableEvent = (CreateTableEvent) schemaChangeEvent;
+            Schema currentEvolvedSchema =
+                    schemaManager.getLatestEvolvedSchema(createTableEvent.tableId()).orElse(null);
+            return SchemaMergingUtils.getSchemaDifference(
+                    createTableEvent.tableId(), currentEvolvedSchema, createTableEvent.getSchema());
+        }
+        return Collections.singletonList(schemaChangeEvent);
+    }
+
+    private boolean shouldReconcileExistingTable(CreateTableEvent createTableEvent) {
+        if (!(SchemaChangeBehavior.EVOLVE.equals(behavior)
+                || SchemaChangeBehavior.TRY_EVOLVE.equals(behavior)
+                || SchemaChangeBehavior.LENIENT.equals(behavior))) {
+            return false;
+        }
+
+        Schema currentEvolvedSchema =
+                schemaManager.getLatestEvolvedSchema(createTableEvent.tableId()).orElse(null);
+        return currentEvolvedSchema != null
+                && !currentEvolvedSchema.equals(createTableEvent.getSchema());
+    }
+
     /** Applies the schema change to the external system. */
     private void applySchemaChange(int sourceSubTaskId) {
         try {
@@ -406,7 +432,23 @@ public class SchemaCoordinator extends SchemaRegistry {
         // Tries to apply it to external system
         List<SchemaChangeEvent> appliedSchemaChangeEvents = new ArrayList<>();
         for (SchemaChangeEvent event : deducedSchemaChangeEvents) {
-            if (applyAndUpdateEvolvedSchemaChange(event)) {
+            List<SchemaChangeEvent> schemaChangesToApply = getSchemaChangesToApplyExternally(event);
+            if (!schemaChangesToApply.equals(Collections.singletonList(event))) {
+                LOG.info(
+                        "Reconciling existing sink table for {}. Downstream event remains {}, "
+                                + "while metadata applier will receive {}.",
+                        event.tableId(),
+                        event,
+                        schemaChangesToApply);
+            }
+
+            boolean appliedCompletely = true;
+            for (SchemaChangeEvent schemaChangeToApply : schemaChangesToApply) {
+                if (!applyAndUpdateEvolvedSchemaChange(schemaChangeToApply)) {
+                    appliedCompletely = false;
+                }
+            }
+            if (appliedCompletely && !schemaChangesToApply.isEmpty()) {
                 appliedSchemaChangeEvents.add(event);
             }
         }

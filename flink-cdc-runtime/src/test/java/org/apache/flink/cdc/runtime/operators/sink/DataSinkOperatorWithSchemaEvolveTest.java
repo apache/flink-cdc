@@ -244,6 +244,49 @@ class DataSinkOperatorWithSchemaEvolveTest {
         }
     }
 
+    @Test
+    void testCreateTableEventWithExpandedSchemaAfterFailover() throws Exception {
+        DataSinkOperatorAdapter dataSinkWriterOperator = new DataSinkOperatorAdapter();
+        try (RegularEventOperatorTestHarness<DataSinkOperatorAdapter, Event>
+                dataSinkWriterOperatorHarness = setupHarness(dataSinkWriterOperator)) {
+            dataSinkWriterOperatorHarness.registerOriginalSchema(
+                    CUSTOMERS_TABLEID, CUSTOMERS_SCHEMA);
+            dataSinkWriterOperatorHarness.registerEvolvedSchema(
+                    CUSTOMERS_TABLEID, CUSTOMERS_SCHEMA);
+
+            CreateTableEvent expandedCreateTableEvent =
+                    new CreateTableEvent(CUSTOMERS_TABLEID, CUSTOMERS_LATEST_SCHEMA);
+
+            processSchemaChangeEvent(
+                    dataSinkWriterOperator,
+                    dataSinkWriterOperatorHarness,
+                    CUSTOMERS_TABLEID,
+                    expandedCreateTableEvent);
+            assertOutputEvents(
+                    dataSinkWriterOperatorHarness,
+                    Collections.singletonList(expandedCreateTableEvent));
+            dataSinkWriterOperatorHarness.clearOutputRecords();
+
+            BinaryRecordDataGenerator recordDataGenerator =
+                    new BinaryRecordDataGenerator(
+                            ((RowType) CUSTOMERS_LATEST_SCHEMA.toRowDataType()));
+            DataChangeEvent insertEvent =
+                    DataChangeEvent.insertEvent(
+                            CUSTOMERS_TABLEID,
+                            recordDataGenerator.generate(
+                                    new Object[] {
+                                        new BinaryStringData("1"),
+                                        new BinaryStringData("2"),
+                                        new BinaryStringData("3"),
+                                    }));
+
+            processDataChangeEvent(dataSinkWriterOperator, insertEvent);
+            assertOutputEvents(
+                    dataSinkWriterOperatorHarness, Collections.singletonList(insertEvent));
+            dataSinkWriterOperatorHarness.clearOutputRecords();
+        }
+    }
+
     /**
      * This case tests the schema evolution process for handling data change events by a sink
      * operator under normal conditions.
