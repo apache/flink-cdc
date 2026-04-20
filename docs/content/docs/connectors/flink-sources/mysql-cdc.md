@@ -103,7 +103,7 @@ Notes
 ### Set a different SERVER ID for each reader
 
 Every MySQL database client for reading binlog should have a unique id, called server id. MySQL server will use this id to maintain network connection and the binlog position. Therefore, if different jobs share a same server id, it may result to read from wrong binlog position. 
-Thus, it is recommended to set different server id for each reader via the [SQL Hints](https://nightlies.apache.org/flink/flink-docs-release-2.2/docs/dev/table/sql/queries/hints/), 
+Thus, it is recommended to set different server id for each reader via the [SQL Hints](https://nightlies.apache.org/flink/flink-docs-release-1.20/docs/dev/table/sql/queries/hints/), 
 e.g.  assuming the source parallelism is 4, then we can use `SELECT * FROM source_table /*+ OPTIONS('server-id'='5401-5404') */ ;` to assign unique server id for each of the 4 source readers. 
 
 
