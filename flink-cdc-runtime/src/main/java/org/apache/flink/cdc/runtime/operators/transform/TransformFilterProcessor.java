@@ -19,6 +19,7 @@ package org.apache.flink.cdc.runtime.operators.transform;
 
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.converter.JavaClassConverter;
+import org.apache.flink.cdc.common.pipeline.DecimalPrecisionMode;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.runtime.parser.JaninoCompiler;
@@ -45,6 +46,7 @@ public class TransformFilterProcessor {
     private final PostTransformChangeInfo tableInfo;
     private final TransformFilter transformFilter;
     private final String timezone;
+    private final DecimalPrecisionMode decimalPrecisionMode;
     private final List<Object> udfFunctionInstances;
     private final Map<String, SupportedMetadataColumn> supportedMetadataColumns;
 
@@ -56,6 +58,7 @@ public class TransformFilterProcessor {
             PostTransformChangeInfo tableInfo,
             TransformFilter transformFilter,
             String timezone,
+            DecimalPrecisionMode decimalPrecisionMode,
             List<UserDefinedFunctionDescriptor> udfDescriptors,
             List<Object> udfFunctionInstances,
             Map<String, SupportedMetadataColumn> supportedMetadataColumns) {
@@ -63,6 +66,7 @@ public class TransformFilterProcessor {
         this.tableInfo = tableInfo;
         this.transformFilter = transformFilter;
         this.timezone = timezone;
+        this.decimalPrecisionMode = decimalPrecisionMode;
         this.udfFunctionInstances = udfFunctionInstances;
         this.supportedMetadataColumns = supportedMetadataColumns;
 
@@ -83,14 +87,16 @@ public class TransformFilterProcessor {
         }
     }
 
-    public static TransformFilterProcessor ofNoOp() {
-        return new TransformFilterProcessor(true, null, null, null, null, null, null);
+    public static TransformFilterProcessor ofNoOp(DecimalPrecisionMode decimalPrecisionMode) {
+        return new TransformFilterProcessor(
+                true, null, null, null, decimalPrecisionMode, null, null, null);
     }
 
     public static TransformFilterProcessor of(
             PostTransformChangeInfo tableInfo,
             TransformFilter transformFilter,
             String timezone,
+            DecimalPrecisionMode decimalPrecisionMode,
             List<UserDefinedFunctionDescriptor> udfDescriptors,
             List<Object> udfFunctionInstances,
             SupportedMetadataColumn[] supportedMetadataColumns) {
@@ -104,6 +110,7 @@ public class TransformFilterProcessor {
                 tableInfo,
                 transformFilter,
                 timezone,
+                decimalPrecisionMode,
                 udfDescriptors,
                 udfFunctionInstances,
                 supportedMetadataColumnsMap);
@@ -228,7 +235,8 @@ public class TransformFilterProcessor {
                         columns,
                         udfDescriptors,
                         supportedMetadataColumns,
-                        transformFilter.getColumnNameMap());
+                        transformFilter.getColumnNameMap(),
+                        decimalPrecisionMode);
 
         return TransformExpressionKey.of(
                 transformFilter.getExpression(),

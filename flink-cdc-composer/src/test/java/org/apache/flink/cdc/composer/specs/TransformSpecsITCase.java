@@ -32,6 +32,7 @@ import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.pipeline.DecimalPrecisionMode;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.Schema;
@@ -342,7 +343,6 @@ class TransformSpecsITCase {
 
     private static final ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
 
-    @SuppressWarnings("unchecked")
     private static Stream<TestSpec> loadTestSpec(Path specPath) {
         List<TestSpec> specs = new ArrayList<>();
         try {
@@ -355,6 +355,11 @@ class TransformSpecsITCase {
                 spec.ignore = asTextOrNull(specNode.get("ignore"));
                 if (specNode.has("time-zone")) {
                     spec.timeZone = asTextOrNull(specNode.get("time-zone"));
+                }
+                if (specNode.has("decimal-precision-mode")) {
+                    spec.decimalPrecisionMode =
+                            DecimalPrecisionMode.valueOf(
+                                    specNode.get("decimal-precision-mode").asText().toUpperCase());
                 }
                 if (specNode.has("projection")) {
                     spec.projectionRules =
@@ -399,6 +404,7 @@ class TransformSpecsITCase {
         public String name;
         public String ignore;
         public String timeZone = "UTC";
+        public DecimalPrecisionMode decimalPrecisionMode = DecimalPrecisionMode.UP_TO_19;
         public List<String> projectionRules = new ArrayList<>();
         public @Nullable String filterRule;
         public @Nullable String primaryKey;
@@ -474,6 +480,9 @@ class TransformSpecsITCase {
         pipelineConfig.set(PipelineOptions.PIPELINE_LOCAL_TIME_ZONE, spec.timeZone);
         pipelineConfig.set(
                 PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
+        pipelineConfig.set(
+                PipelineOptions.PIPELINE_TRANSFORM_DECIMAL_PRECISION_MODE,
+                spec.decimalPrecisionMode);
         PipelineDef pipelineDef =
                 new PipelineDef(
                         sourceDef,

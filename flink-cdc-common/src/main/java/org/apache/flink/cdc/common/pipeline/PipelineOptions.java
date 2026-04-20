@@ -136,5 +136,24 @@ public class PipelineOptions {
                     .withDescription(
                             "The timeout time for SchemaOperator to wait downstream SchemaChangeEvent applying finished, the default value is 3 minutes.");
 
+    public static final ConfigOption<DecimalPrecisionMode>
+            PIPELINE_TRANSFORM_DECIMAL_PRECISION_MODE =
+                    ConfigOptions.key("transform.decimal.precision.mode")
+                            .enumType(DecimalPrecisionMode.class)
+                            .defaultValue(DecimalPrecisionMode.UP_TO_19)
+                            .withDescription(
+                                    Description.builder()
+                                            .text(
+                                                    "Maximum precision mode for DECIMAL type in transform expression evaluation. ")
+                                            .linebreak()
+                                            .add(
+                                                    ListElement.list(
+                                                            text(
+                                                                    "UP_TO_19: Limits DECIMAL precision to 19 digits, matching Calcite's default type system. "
+                                                                            + "This is the default behavior for all versions."),
+                                                            text(
+                                                                    "UP_TO_38: Allows DECIMAL precision up to 38 digits, matching Flink CDC's extended type system.")))
+                                            .build());
+
     private PipelineOptions() {}
 }
