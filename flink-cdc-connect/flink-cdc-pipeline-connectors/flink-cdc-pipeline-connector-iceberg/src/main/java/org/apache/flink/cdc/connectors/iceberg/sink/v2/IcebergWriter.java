@@ -72,7 +72,9 @@ public class IcebergWriter
 
     private final List<WriteResultWrapper> temporaryWriteResult;
 
-    /** Per-table batch index; incremented on each schema-change flush, even when no writer exists. */
+    /**
+     * Per-table batch index; incremented on each schema-change flush, even when no writer exists.
+     */
     private Map<TableId, Integer> tableBatchIndexMap;
 
     private Catalog catalog;
