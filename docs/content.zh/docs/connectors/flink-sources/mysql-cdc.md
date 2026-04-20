@@ -109,7 +109,7 @@ mysql> FLUSH PRIVILEGES;
 ### 为每个 Reader 设置不同的 Server id
 
 每个用于读取 binlog 的 MySQL 数据库客户端都应该有一个唯一的 id，称为 Server id。 MySQL 服务器将使用此 id 来维护网络连接和 binlog 位置。 因此，如果不同的作业共享相同的 Server id， 则可能导致从错误的 binlog 位置读取数据。
-因此，建议通过为每个 Reader 设置不同的 Server id  [SQL Hints](https://nightlies.apache.org/flink/flink-docs-release-2.2/zh/docs/dev/table/sql/queries/hints/),
+因此，建议通过为每个 Reader 设置不同的 Server id  [SQL Hints](https://nightlies.apache.org/flink/flink-docs-release-1.20/zh/docs/dev/table/sql/queries/hints/),
 假设 Source 并行度为 4, 我们可以使用 `SELECT * FROM source_table /*+ OPTIONS('server-id'='5401-5404') */ ;` 来为 4 个 Source readers 中的每一个分配唯一的 Server id。
 
 
