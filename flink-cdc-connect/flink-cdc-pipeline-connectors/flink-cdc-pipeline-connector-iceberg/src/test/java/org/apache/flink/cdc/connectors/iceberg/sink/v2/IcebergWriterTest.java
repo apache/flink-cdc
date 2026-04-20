@@ -1118,8 +1118,7 @@ public class IcebergWriterTest {
         writer1.write(createEvent, null);
 
         BinaryRecordDataGenerator gen =
-                new BinaryRecordDataGenerator(
-                        schema.getColumnDataTypes().toArray(new DataType[0]));
+                new BinaryRecordDataGenerator(schema.getColumnDataTypes().toArray(new DataType[0]));
 
         // Only subtask 0 has data before the schema change.
         writer0.write(
@@ -1166,7 +1165,8 @@ public class IcebergWriterTest {
 
     /**
      * Verifies no duplicates when parallel subtasks share a table and one subtask has no data
-     * before the schema-change flush while the other has an UPDATE that produces an equality-delete.
+     * before the schema-change flush while the other has an UPDATE that produces an
+     * equality-delete.
      */
     @Test
     public void testNoDuplicateWithParallelSubtasksMissingPreSchemaChangeData() throws Exception {
@@ -1245,9 +1245,7 @@ public class IcebergWriterTest {
 
         IcebergCommitter committer = new IcebergCommitter(catalogOptions);
         committer.commit(
-                allResults.stream()
-                        .map(MockCommitRequestImpl::new)
-                        .collect(Collectors.toList()));
+                allResults.stream().map(MockCommitRequestImpl::new).collect(Collectors.toList()));
 
         // Only the updated value must survive; "old" must be deleted by the equality-delete in
         // batch 1 (higher sequence number). Without the fix both rows appear.
@@ -1295,8 +1293,7 @@ public class IcebergWriterTest {
         writer1.write(createEvent, null);
 
         BinaryRecordDataGenerator gen =
-                new BinaryRecordDataGenerator(
-                        schema.getColumnDataTypes().toArray(new DataType[0]));
+                new BinaryRecordDataGenerator(schema.getColumnDataTypes().toArray(new DataType[0]));
 
         // Both subtasks write data with no schema change, so both produce batchIndex=0.
         writer0.write(
@@ -1314,7 +1311,11 @@ public class IcebergWriterTest {
 
         // Both wrappers carry batchIndex=0.
         Assertions.assertThat(allResults).hasSize(2);
-        Assertions.assertThat(allResults.stream().mapToInt(WriteResultWrapper::getBatchIndex).distinct().count())
+        Assertions.assertThat(
+                        allResults.stream()
+                                .mapToInt(WriteResultWrapper::getBatchIndex)
+                                .distinct()
+                                .count())
                 .isEqualTo(1);
 
         Table table =
@@ -1324,9 +1325,7 @@ public class IcebergWriterTest {
 
         IcebergCommitter committer = new IcebergCommitter(catalogOptions);
         committer.commit(
-                allResults.stream()
-                        .map(MockCommitRequestImpl::new)
-                        .collect(Collectors.toList()));
+                allResults.stream().map(MockCommitRequestImpl::new).collect(Collectors.toList()));
 
         table.refresh();
         long snapshotsAfter = countSnapshots(table);
@@ -1387,7 +1386,8 @@ public class IcebergWriterTest {
         // Batch 0: only subtask 0 has data before SC1.
         writer0.write(
                 DataChangeEvent.insertEvent(
-                        tableId, gen0.generate(new Object[] {1L, BinaryStringData.fromString("a")})),
+                        tableId,
+                        gen0.generate(new Object[] {1L, BinaryStringData.fromString("a")})),
                 null);
         // Subtask 1 has no data before SC1.
 
@@ -1438,14 +1438,16 @@ public class IcebergWriterTest {
         writer0.write(
                 DataChangeEvent.updateEvent(
                         tableId,
-                        gen2.generate(new Object[] {1L, BinaryStringData.fromString("a"), null, null}),
+                        gen2.generate(
+                                new Object[] {1L, BinaryStringData.fromString("a"), null, null}),
                         gen2.generate(
                                 new Object[] {1L, BinaryStringData.fromString("c"), null, null})),
                 null);
         writer1.write(
                 DataChangeEvent.updateEvent(
                         tableId,
-                        gen2.generate(new Object[] {2L, BinaryStringData.fromString("b"), null, null}),
+                        gen2.generate(
+                                new Object[] {2L, BinaryStringData.fromString("b"), null, null}),
                         gen2.generate(
                                 new Object[] {2L, BinaryStringData.fromString("d"), null, null})),
                 null);
@@ -1456,17 +1458,12 @@ public class IcebergWriterTest {
 
         // Expect 3 batches: {0: sub0}, {1: sub1}, {2: sub0+sub1}
         long distinctBatchIndices =
-                allResults.stream()
-                        .mapToInt(WriteResultWrapper::getBatchIndex)
-                        .distinct()
-                        .count();
+                allResults.stream().mapToInt(WriteResultWrapper::getBatchIndex).distinct().count();
         Assertions.assertThat(distinctBatchIndices).isEqualTo(3);
 
         IcebergCommitter committer = new IcebergCommitter(catalogOptions);
         committer.commit(
-                allResults.stream()
-                        .map(MockCommitRequestImpl::new)
-                        .collect(Collectors.toList()));
+                allResults.stream().map(MockCommitRequestImpl::new).collect(Collectors.toList()));
 
         // Only the final values must survive. Equality-deletes in batch 2 (seq N+2) must suppress
         // the stale inserts in batch 0 (seq N) and batch 1 (seq N+1).
