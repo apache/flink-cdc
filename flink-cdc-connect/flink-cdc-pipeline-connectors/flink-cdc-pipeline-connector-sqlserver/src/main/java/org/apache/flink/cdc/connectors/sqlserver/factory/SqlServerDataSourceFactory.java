@@ -49,7 +49,6 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Properties;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -274,7 +273,9 @@ public class SqlServerDataSourceFactory implements DataSourceFactory {
 
     private static List<String> getTableList(
             @Nullable List<TableId> tableIdList, Selectors selectors) {
-        return Objects.requireNonNullElse(tableIdList, Collections.<TableId>emptyList()).stream()
+        List<TableId> resolvedTableIdList =
+                tableIdList == null ? Collections.emptyList() : tableIdList;
+        return resolvedTableIdList.stream()
                 .filter(selectors::isMatch)
                 // SQL Server tableList format: schemaName.tableName (without database prefix)
                 // See SqlServerSourceBuilder: "Each identifier is of the form

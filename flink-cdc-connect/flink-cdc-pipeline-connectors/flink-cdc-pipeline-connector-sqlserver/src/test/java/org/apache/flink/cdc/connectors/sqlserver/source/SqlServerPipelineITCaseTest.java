@@ -438,7 +438,7 @@ public class SqlServerPipelineITCaseTest extends SqlServerTestBase {
                                     108,
                                     BinaryStringData.fromString("jacket"),
                                     BinaryStringData.fromString(
-                                            "water resistent black wind breaker"),
+                                            "water resistant black wind breaker"),
                                     0.1d
                                 })));
         snapshotExpected.add(

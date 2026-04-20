@@ -53,7 +53,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -187,7 +186,7 @@ class SqlServerOnlineSchemaMigrationITCase extends SqlServerTestBase {
                         new AlterColumnTypeEvent(
                                 tableId,
                                 Collections.singletonMap("ext", DataTypes.DOUBLE()),
-                                Map.of("ext", DataTypes.INT())),
+                                Collections.singletonMap("ext", DataTypes.INT())),
                         DataChangeEvent.insertEvent(
                                 tableId,
                                 generate(

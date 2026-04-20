@@ -33,9 +33,10 @@ import org.testcontainers.containers.MSSQLServerContainer;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.lifecycle.Startables;
 
-import java.net.URL;
-import java.nio.file.Files;
-import java.nio.file.Paths;
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -92,7 +93,7 @@ public class SqlServerTestBase extends AbstractTestBase {
                 MSSQL_SERVER_CONTAINER.getPassword());
     }
 
-    private static void dropTestDatabase(Connection connection, String databaseName)
+    protected static void dropTestDatabase(Connection connection, String databaseName)
             throws SQLException {
         try {
             Awaitility.await("Disabling CDC")
@@ -175,14 +176,19 @@ public class SqlServerTestBase extends AbstractTestBase {
      */
     protected void initializeSqlServerTable(String sqlFile) {
         final String ddlFile = String.format("ddl/%s.sql", sqlFile);
-        final URL ddlTestFile = SqlServerTestBase.class.getClassLoader().getResource(ddlFile);
+        final InputStream ddlTestFile =
+                SqlServerTestBase.class.getClassLoader().getResourceAsStream(ddlFile);
         Assertions.assertThat(ddlTestFile).withFailMessage("Cannot locate " + ddlFile).isNotNull();
-        try (Connection connection = getJdbcConnection();
+        try (InputStream inputStream = ddlTestFile;
+                BufferedReader reader =
+                        new BufferedReader(
+                                new InputStreamReader(inputStream, StandardCharsets.UTF_8));
+                Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
             dropTestDatabase(connection, sqlFile);
             final List<String> statements =
                     Arrays.stream(
-                                    Files.readAllLines(Paths.get(ddlTestFile.toURI())).stream()
+                                    reader.lines()
                                             .map(String::trim)
                                             .filter(x -> !x.startsWith("--") && !x.isEmpty())
                                             .map(

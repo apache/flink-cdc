@@ -55,17 +55,11 @@ public class SqlServerTablePatternMatchingTest extends SqlServerTestBase {
     private void initializePatternTestDatabase() {
         try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
-            // Drop database if exists
-            statement.execute(
-                    String.format(
-                            "IF EXISTS(select 1 from sys.databases where name = '%s') "
-                                    + "BEGIN ALTER DATABASE [%s] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; "
-                                    + "DROP DATABASE [%s]; END",
-                            DATABASE_NAME, DATABASE_NAME, DATABASE_NAME));
+            dropTestDatabase(connection, DATABASE_NAME);
 
             // Create database
-            statement.execute(String.format("CREATE DATABASE %s;", DATABASE_NAME));
-            statement.execute(String.format("USE %s;", DATABASE_NAME));
+            statement.execute(String.format("CREATE DATABASE [%s];", DATABASE_NAME));
+            statement.execute(String.format("USE [%s];", DATABASE_NAME));
 
             // Wait for SQL Server Agent
             statement.execute("WAITFOR DELAY '00:00:03';");
