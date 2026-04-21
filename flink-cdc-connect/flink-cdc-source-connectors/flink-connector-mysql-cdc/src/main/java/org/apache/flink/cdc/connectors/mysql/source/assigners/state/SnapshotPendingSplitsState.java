@@ -27,6 +27,8 @@ import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSchemalessSnapsho
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges.TableChange;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -84,15 +86,17 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
             boolean isTableIdCaseSensitive,
             boolean isRemainingTablesCheckpointed,
             ChunkSplitterState chunkSplitterState) {
-        this.alreadyProcessedTables = alreadyProcessedTables;
-        this.remainingSplits = remainingSplits;
-        this.assignedSplits = assignedSplits;
-        this.splitFinishedOffsets = splitFinishedOffsets;
+        // FLINK-38061: make defensive copy to avoid potential concurrent modification of the
+        // collections.
+        this.alreadyProcessedTables = new ArrayList<>(alreadyProcessedTables);
+        this.remainingSplits = new ArrayList<>(remainingSplits);
+        this.assignedSplits = new LinkedHashMap<>(assignedSplits);
+        this.splitFinishedOffsets = new HashMap<>(splitFinishedOffsets);
         this.assignerStatus = assignerStatus;
-        this.remainingTables = remainingTables;
+        this.remainingTables = new ArrayList<>(remainingTables);
         this.isTableIdCaseSensitive = isTableIdCaseSensitive;
         this.isRemainingTablesCheckpointed = isRemainingTablesCheckpointed;
-        this.tableSchemas = tableSchemas;
+        this.tableSchemas = new HashMap<>(tableSchemas);
         this.chunkSplitterState = chunkSplitterState;
     }
 
