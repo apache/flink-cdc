@@ -1270,6 +1270,43 @@ public class DorisEventSerializerTest {
     }
 
     @Test
+    public void testWaitUntilDorisSchemaCoversInputSchemaPreservesInterrupt() {
+        TableId tableId = TableId.parse("doris_database.json_schema_interrupt_table");
+        Schema baseSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+        AddColumnEvent addColumnEvent =
+                new AddColumnEvent(
+                        tableId,
+                        Arrays.asList(
+                                AddColumnEvent.last(
+                                        Column.physicalColumn("age", DataTypes.INT()))));
+        Schema evolvedSchema = SchemaUtils.applySchemaChangeEvent(baseSchema, addColumnEvent);
+
+        Thread.currentThread().interrupt();
+        try {
+            Assertions.assertThatThrownBy(
+                            () ->
+                                    DorisEventSerializer.waitUntilDorisSchemaCoversInputSchema(
+                                            createDorisOptions(),
+                                            tableId,
+                                            evolvedSchema,
+                                            (options, requestedTableId) ->
+                                                    createDorisSchema("id", "name"),
+                                            100L,
+                                            50L))
+                    .isInstanceOf(org.apache.flink.util.FlinkRuntimeException.class)
+                    .hasMessageContaining("Interrupted while waiting for Doris physical schema");
+            Assertions.assertThat(Thread.currentThread().isInterrupted()).isTrue();
+        } finally {
+            Thread.interrupted();
+        }
+    }
+
+    @Test
     public void testJsonSerializationPropagatesDorisSchemaFetchFailure() throws IOException {
         TableId tableId = TableId.parse("doris_database.json_schema_fetch_failure");
         Schema baseSchema =

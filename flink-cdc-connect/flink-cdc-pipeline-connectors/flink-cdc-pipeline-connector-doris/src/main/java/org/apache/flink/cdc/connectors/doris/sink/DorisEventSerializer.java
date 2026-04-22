@@ -37,6 +37,7 @@ import org.apache.flink.cdc.common.types.ZonedTimestampType;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.connectors.doris.utils.DorisSchemaUtils;
+import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonProcessingException;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
@@ -713,7 +714,7 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
             Thread.sleep(sleepMillis);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new IllegalStateException(
+            throw new FlinkRuntimeException(
                     "Interrupted while waiting for Doris physical schema of " + tableId, e);
         }
     }

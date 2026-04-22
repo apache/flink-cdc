@@ -49,6 +49,7 @@ import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.util.Collector;
 
+import io.debezium.data.Bits;
 import io.debezium.data.Envelope;
 import io.debezium.data.SpecialValueDecimal;
 import io.debezium.data.VariableScaleDecimal;
@@ -60,6 +61,7 @@ import io.debezium.time.MicroTimestamp;
 import io.debezium.time.NanoTime;
 import io.debezium.time.NanoTimestamp;
 import io.debezium.time.Timestamp;
+import io.debezium.time.Year;
 import io.debezium.time.ZonedTimestamp;
 import org.apache.kafka.connect.data.Decimal;
 import org.apache.kafka.connect.data.Field;
@@ -194,7 +196,21 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
         }
 
         DataType dataType = schemaDataTypeInference.infer(value, valueSchema);
-        return (RecordData) getOrCreateConverter(dataType).convert(value, valueSchema);
+        try {
+            return (RecordData) getOrCreateConverter(dataType).convert(value, valueSchema);
+        } catch (CachedSchemaMismatchException e) {
+            // The fallback path inferred the row type directly from the runtime schema, so the
+            // validator rejecting it signals a gap in the validator itself (missing logical-name
+            // handling for some Debezium type), not data drift. Surface the root cause clearly
+            // instead of propagating the cache-speak wording that confuses operators.
+            throw new IllegalStateException(
+                    "Debezium cached-schema validator rejected a freshly-inferred runtime schema for "
+                            + tableId
+                            + ". This indicates a validator gap (new/unhandled Debezium logical name), "
+                            + "not schema drift. Mismatch: "
+                            + e.getMessage(),
+                    e);
+        }
     }
 
     private io.debezium.relational.TableId toDebeziumTableId(TableId tableId) {
@@ -553,7 +569,7 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
                         ? null
                         : formatCachedFieldMismatch(fieldPath, expectedType, actualSchema);
             case INTEGER:
-                return isPlainSchemaCompatible(actualSchema, Schema.Type.INT32)
+                return isIntegerSchemaCompatible(actualSchema)
                         ? null
                         : formatCachedFieldMismatch(fieldPath, expectedType, actualSchema);
             case BIGINT:
@@ -575,7 +591,7 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
                         : formatCachedFieldMismatch(fieldPath, expectedType, actualSchema);
             case BINARY:
             case VARBINARY:
-                return isPlainSchemaCompatible(actualSchema, Schema.Type.BYTES)
+                return isBinarySchemaCompatible(actualSchema)
                         ? null
                         : formatCachedFieldMismatch(fieldPath, expectedType, actualSchema);
             case DECIMAL:
@@ -652,7 +668,10 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
                 }
                 return null;
             default:
-                return formatCachedFieldMismatch(fieldPath, expectedType, actualSchema);
+                // Unknown/exotic typeRoots (INTERVAL, MULTISET, DISTINCT_TYPE, ...) have no
+                // structural invariant we can validate here. Trust the runtime schema and let
+                // the converter layer handle it, same as pre-regression behavior.
+                return null;
         }
     }
 
@@ -684,6 +703,30 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
 
     private static boolean isPlainSchemaCompatible(Schema schema, Schema.Type expectedType) {
         return schema.type() == expectedType && schema.name() == null;
+    }
+
+    private static boolean isBinarySchemaCompatible(Schema schema) {
+        if (schema.type() != Schema.Type.BYTES) {
+            return false;
+        }
+        // MySQL `bit(N)` with N>1 is modeled as BINARY/VARBINARY in the Flink CDC cached schema,
+        // but Debezium emits the runtime value with logical name io.debezium.data.Bits.
+        // The payload is still a plain byte[]/ByteBuffer, so convertToBinary handles it
+        // identically.
+        return schema.name() == null || Bits.LOGICAL_NAME.equals(schema.name());
+    }
+
+    private static boolean isIntegerSchemaCompatible(Schema schema) {
+        if (schema.type() != Schema.Type.INT32) {
+            return false;
+        }
+        // MySQL `YEAR` is mapped to DataTypes.INT() in the cached schema, but Debezium emits
+        // the runtime value with logical name io.debezium.time.Year. The payload is still a
+        // plain int, so convertToInt handles it identically. Other INT32 logical names
+        // (io.debezium.time.Date, Kafka Connect Date, io.debezium.time.Time, Kafka Connect Time)
+        // are inferred to DATE/TIME by DebeziumSchemaDataTypeInference and therefore never
+        // reach this branch with a cached INTEGER typeRoot.
+        return schema.name() == null || Year.SCHEMA_NAME.equals(schema.name());
     }
 
     private static boolean isStringSchemaCompatible(Schema schema) {

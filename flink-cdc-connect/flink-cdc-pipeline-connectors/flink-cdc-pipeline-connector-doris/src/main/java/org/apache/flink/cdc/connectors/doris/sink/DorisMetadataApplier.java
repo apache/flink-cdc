@@ -57,7 +57,6 @@ import org.apache.doris.flink.catalog.doris.TableSchema;
 import org.apache.doris.flink.cfg.DorisOptions;
 import org.apache.doris.flink.rest.RestService;
 import org.apache.doris.flink.rest.models.Field;
-import org.apache.doris.flink.sink.schema.AddColumnPosition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,6 +66,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -249,12 +249,21 @@ public class DorisMetadataApplier implements MetadataApplier {
         try {
             return dorisSchemaFetcher.fetch(dorisOptions, tableId);
         } catch (Exception e) {
-            LOG.info(
-                    "Could not resolve existing Doris schema for {} before create-table handling. "
-                            + "Will treat it as absent and try CREATE TABLE first.",
+            if (isLikelyMissingTableSchema(e)) {
+                LOG.info(
+                        "Doris schema for {} is absent before create-table handling. "
+                                + "Will treat it as a new table and try CREATE TABLE first.",
+                        tableId.identifier(),
+                        e);
+                return null;
+            }
+            LOG.warn(
+                    "Failed to resolve existing Doris schema for {} before create-table handling. "
+                            + "Aborting instead of assuming the table is absent.",
                     tableId.identifier(),
                     e);
-            return null;
+            throw new IllegalStateException(
+                    "Failed to resolve existing Doris schema for " + tableId.identifier(), e);
         }
     }
 
@@ -267,6 +276,8 @@ public class DorisMetadataApplier implements MetadataApplier {
             throw new IllegalStateException(
                     "Failed to resolve Doris physical schema properties for " + tableId);
         }
+
+        validateExistingColumnCompatibility(tableId, desiredSchema, existingDorisSchema);
 
         Schema currentSchema =
                 buildCurrentSchemaFromExistingTable(desiredSchema, existingDorisSchema);
@@ -296,14 +307,45 @@ public class DorisMetadataApplier implements MetadataApplier {
                                     column.getDefaultValueExpression(), column.getType()),
                             column.getComment());
             schemaChangeManager.addColumn(
-                    tableId.getSchemaName(),
-                    tableId.getTableName(),
-                    addFieldSchema,
-                    resolveAddColumnPosition(missingColumn, currentSchema));
+                    tableId.getSchemaName(), tableId.getTableName(), addFieldSchema);
             currentSchema =
                     SchemaUtils.applySchemaChangeEvent(
                             currentSchema,
                             new AddColumnEvent(tableId, Collections.singletonList(missingColumn)));
+        }
+    }
+
+    private void validateExistingColumnCompatibility(
+            TableId tableId,
+            Schema desiredSchema,
+            org.apache.doris.flink.rest.models.Schema existingDorisSchema) {
+        Map<String, Field> existingFieldsByLowerCase = new LinkedHashMap<>();
+        for (Field field : existingDorisSchema.getProperties()) {
+            existingFieldsByLowerCase.putIfAbsent(field.getName().toLowerCase(Locale.ROOT), field);
+        }
+
+        for (Column desiredColumn : desiredSchema.getColumns()) {
+            Field existingField =
+                    existingFieldsByLowerCase.get(desiredColumn.getName().toLowerCase(Locale.ROOT));
+            if (existingField == null) {
+                continue;
+            }
+
+            String desiredType =
+                    normalizeDorisTypeDefinition(buildTypeString(desiredColumn.getType()));
+            String existingType =
+                    normalizeDorisTypeDefinition(buildExistingFieldType(existingField));
+            if (!desiredType.equals(existingType)) {
+                throw new IllegalStateException(
+                        String.format(
+                                "Doris table %s already has column %s with incompatible type. "
+                                        + "desired=%s, actual=%s. Existing-table reconcile only "
+                                        + "supports additive missing columns.",
+                                tableId.identifier(),
+                                existingField.getName(),
+                                desiredType,
+                                existingType));
+            }
         }
     }
 
@@ -494,10 +536,7 @@ public class DorisMetadataApplier implements MetadataApplier {
                                         column.getDefaultValueExpression(), column.getType()),
                                 column.getComment());
                 schemaChangeManager.addColumn(
-                        tableId.getSchemaName(),
-                        tableId.getTableName(),
-                        addFieldSchema,
-                        resolveAddColumnPosition(col, currentSchema));
+                        tableId.getSchemaName(), tableId.getTableName(), addFieldSchema);
                 currentSchema =
                         SchemaUtils.applySchemaChangeEvent(
                                 currentSchema,
@@ -599,88 +638,6 @@ public class DorisMetadataApplier implements MetadataApplier {
         return schemaCache.get(tableId);
     }
 
-    private AddColumnPosition resolveAddColumnPosition(
-            AddColumnEvent.ColumnWithPosition columnWithPosition, Schema currentSchema) {
-        List<String> columnNames = currentSchema.getColumnNames();
-        int targetIndex = resolveTargetIndex(columnWithPosition, currentSchema, columnNames);
-
-        // Doris requires key columns to stay at the front of the schema. When a source-side
-        // add-column position points into the key prefix, clamp the new non-key column to the
-        // first valid non-key position instead of forwarding an invalid DDL like ADD COLUMN FIRST.
-        int lastPrimaryKeyIndex = resolveLastPrimaryKeyIndex(currentSchema, columnNames);
-        if (lastPrimaryKeyIndex >= 0 && targetIndex <= lastPrimaryKeyIndex) {
-            targetIndex = lastPrimaryKeyIndex + 1;
-        }
-
-        if (targetIndex <= 0) {
-            return AddColumnPosition.first();
-        }
-        if (targetIndex >= columnNames.size()) {
-            return AddColumnPosition.last();
-        }
-        return AddColumnPosition.after(columnNames.get(targetIndex - 1));
-    }
-
-    private int resolveTargetIndex(
-            AddColumnEvent.ColumnWithPosition columnWithPosition,
-            Schema currentSchema,
-            List<String> columnNames) {
-        switch (columnWithPosition.getPosition()) {
-            case FIRST:
-                return 0;
-            case LAST:
-                return columnNames.size();
-            case AFTER:
-                return columnNames.indexOf(
-                                requireExistingColumnName(columnWithPosition, currentSchema))
-                        + 1;
-            case BEFORE:
-                return columnNames.indexOf(
-                        requireExistingColumnName(columnWithPosition, currentSchema));
-            default:
-                throw new IllegalStateException(
-                        "Unsupported add column position " + columnWithPosition.getPosition());
-        }
-    }
-
-    private int resolveLastPrimaryKeyIndex(Schema currentSchema, List<String> columnNames) {
-        int lastPrimaryKeyIndex = -1;
-        for (String primaryKey : currentSchema.primaryKeys()) {
-            int primaryKeyIndex = indexOfColumnCaseInsensitive(columnNames, primaryKey);
-            if (primaryKeyIndex < 0) {
-                throw new IllegalStateException(
-                        primaryKey + " of current Doris schema cache is not existed.");
-            }
-            lastPrimaryKeyIndex = Math.max(lastPrimaryKeyIndex, primaryKeyIndex);
-        }
-        return lastPrimaryKeyIndex;
-    }
-
-    private int indexOfColumnCaseInsensitive(List<String> columnNames, String targetColumn) {
-        for (int i = 0; i < columnNames.size(); i++) {
-            if (columnNames.get(i).equalsIgnoreCase(targetColumn)) {
-                return i;
-            }
-        }
-        return -1;
-    }
-
-    private String requireExistingColumnName(
-            AddColumnEvent.ColumnWithPosition columnWithPosition, Schema currentSchema) {
-        String existedColumnName = columnWithPosition.getExistedColumnName();
-        if (existedColumnName == null) {
-            throw new IllegalStateException(
-                    "existedColumnName could not be null for " + columnWithPosition.getPosition());
-        }
-        return DorisSchemaUtils.getColumnCaseInsensitive(currentSchema, existedColumnName)
-                .map(Column::getName)
-                .orElseThrow(
-                        () ->
-                                new IllegalStateException(
-                                        existedColumnName
-                                                + " of AddColumnEvent is not existed in current Doris schema cache"));
-    }
-
     private String convertInvalidTimestampDefaultValue(String defaultValue, DataType dataType) {
         if (defaultValue == null) {
             return null;
@@ -696,6 +653,79 @@ public class DorisMetadataApplier implements MetadataApplier {
         }
 
         return defaultValue;
+    }
+
+    private boolean isLikelyMissingTableSchema(Exception e) {
+        StringBuilder message = new StringBuilder();
+        Throwable current = e;
+        while (current != null) {
+            if (current.getMessage() != null) {
+                if (message.length() > 0) {
+                    message.append(" | ");
+                }
+                message.append(current.getMessage());
+            }
+            current = current.getCause();
+        }
+        String normalizedMessage = message.toString().toLowerCase(Locale.ROOT);
+        return normalizedMessage.contains("status: 404")
+                || normalizedMessage.contains("reason: not found")
+                || normalizedMessage.contains("unknown table")
+                || normalizedMessage.contains("table does not exist")
+                || normalizedMessage.contains("table not exist");
+    }
+
+    private String buildExistingFieldType(Field field) {
+        String type = field.getType();
+        if (type == null || type.trim().isEmpty()) {
+            return "";
+        }
+
+        String trimmedType = type.trim();
+        if (trimmedType.contains("(")) {
+            return trimmedType;
+        }
+
+        String upperType = trimmedType.toUpperCase(Locale.ROOT);
+        switch (upperType) {
+            case "CHAR":
+            case "VARCHAR":
+                return field.getPrecision() > 0
+                        ? String.format("%s(%s)", upperType, field.getPrecision())
+                        : upperType;
+            case "DECIMAL":
+            case "DECIMALV2":
+            case "DECIMALV3":
+                return field.getPrecision() > 0
+                        ? String.format(
+                                "%s(%s,%s)", upperType, field.getPrecision(), field.getScale())
+                        : upperType;
+            case "DATETIME":
+            case "DATETIMEV2":
+                return String.format("%s(%s)", upperType, Math.max(field.getScale(), 0));
+            default:
+                return upperType;
+        }
+    }
+
+    private String normalizeDorisTypeDefinition(String typeDefinition) {
+        if (typeDefinition == null || typeDefinition.trim().isEmpty()) {
+            return "";
+        }
+
+        String normalized =
+                typeDefinition
+                        .toUpperCase(Locale.ROOT)
+                        .replaceAll("\\s*,\\s*", ",")
+                        .replaceAll("\\(\\s*", "(")
+                        .replaceAll("\\s*\\)", ")")
+                        .replaceAll("\\s+", " ")
+                        .trim();
+        normalized = normalized.replace("DATETIMEV2", "DATETIME");
+        normalized = normalized.replace("DATEV2", "DATE");
+        normalized = normalized.replace("DECIMALV3", "DECIMAL");
+        normalized = normalized.replace("DECIMALV2", "DECIMAL");
+        return normalized;
     }
 
     private void applyAlterTableCommentEvent(AlterTableCommentEvent alterTableCommentEvent)

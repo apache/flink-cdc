@@ -26,7 +26,6 @@ import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.doris.flink.catalog.doris.DorisSchemaFactory;
 import org.apache.doris.flink.catalog.doris.FieldSchema;
 import org.apache.doris.flink.cfg.DorisOptions;
-import org.apache.doris.flink.sink.schema.AddColumnPosition;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -186,13 +185,16 @@ public class DorisMetadataApplierTest {
                         Configuration.fromMap(Collections.emptyMap()),
                         schemaChangeManager,
                         (dorisOptions, tableId) ->
-                                createDorisSchema("DEPLOY_MODE", "project_id", "job_name"));
+                                createDorisSchema(
+                                        dorisField("DEPLOY_MODE", "INT"),
+                                        dorisField("project_id", "BIGINT"),
+                                        dorisVarcharField("job_name", 51)));
 
         Schema targetSchema =
                 Schema.newBuilder()
                         .physicalColumn("DEPLOY_MODE", DataTypes.INT())
                         .physicalColumn("project_id", DataTypes.BIGINT())
-                        .physicalColumn("job_name", DataTypes.STRING())
+                        .physicalColumn("job_name", DataTypes.VARCHAR(17))
                         .physicalColumn("CONFLUENT__LAST_UPDATED", DataTypes.TIMESTAMP_LTZ(3))
                         .build();
 
@@ -217,16 +219,16 @@ public class DorisMetadataApplierTest {
                         schemaChangeManager,
                         (dorisOptions, tableId) ->
                                 createDorisSchema(
-                                        "DEPLOY_MODE",
-                                        "project_id",
-                                        "job_name",
-                                        "CONFLUENT__LAST_UPDATED"));
+                                        dorisField("DEPLOY_MODE", "INT"),
+                                        dorisField("project_id", "BIGINT"),
+                                        dorisVarcharField("job_name", 51),
+                                        dorisDateTimeField("CONFLUENT__LAST_UPDATED", 3)));
 
         Schema targetSchema =
                 Schema.newBuilder()
                         .physicalColumn("DEPLOY_MODE", DataTypes.INT())
                         .physicalColumn("project_id", DataTypes.BIGINT())
-                        .physicalColumn("job_name", DataTypes.STRING())
+                        .physicalColumn("job_name", DataTypes.VARCHAR(17))
                         .physicalColumn("CONFLUENT__LAST_UPDATED", DataTypes.TIMESTAMP_LTZ(3))
                         .build();
 
@@ -237,6 +239,119 @@ public class DorisMetadataApplierTest {
         Assertions.assertThat(applier.getCachedSchema(TABLE_ID)).isEqualTo(targetSchema);
     }
 
+    @Test
+    public void testCreateTableEventCreatesTableWhenExistingSchemaIsAbsent() {
+        RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
+        DorisMetadataApplier applier =
+                new DorisMetadataApplier(
+                        createDorisOptions(),
+                        Configuration.fromMap(Collections.emptyMap()),
+                        schemaChangeManager,
+                        (dorisOptions, tableId) -> null);
+
+        Schema targetSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.VARCHAR(17))
+                        .build();
+
+        applier.applySchemaChange(new CreateTableEvent(TABLE_ID, targetSchema));
+
+        Assertions.assertThat(schemaChangeManager.createTableInvocations).isEqualTo(1);
+        Assertions.assertThat(schemaChangeManager.addedColumns).isEmpty();
+        Assertions.assertThat(applier.getCachedSchema(TABLE_ID)).isEqualTo(targetSchema);
+    }
+
+    @Test
+    public void testCreateTableEventTreats404SchemaLookupAsAbsentTable() {
+        RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
+        DorisMetadataApplier applier =
+                new DorisMetadataApplier(
+                        createDorisOptions(),
+                        Configuration.fromMap(Collections.emptyMap()),
+                        schemaChangeManager,
+                        (dorisOptions, tableId) -> {
+                            throw new RuntimeException(
+                                    "Failed to parse response, status: 404, reason: Not Found");
+                        });
+
+        Schema targetSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.VARCHAR(17))
+                        .build();
+
+        applier.applySchemaChange(new CreateTableEvent(TABLE_ID, targetSchema));
+
+        Assertions.assertThat(schemaChangeManager.createTableInvocations).isEqualTo(1);
+        Assertions.assertThat(schemaChangeManager.addedColumns).isEmpty();
+        Assertions.assertThat(applier.getCachedSchema(TABLE_ID)).isEqualTo(targetSchema);
+    }
+
+    @Test
+    public void testCreateTableEventFailsWhenExistingSchemaLookupThrowsUnexpectedException() {
+        RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
+        DorisMetadataApplier applier =
+                new DorisMetadataApplier(
+                        createDorisOptions(),
+                        Configuration.fromMap(Collections.emptyMap()),
+                        schemaChangeManager,
+                        (dorisOptions, tableId) -> {
+                            throw new RuntimeException("connection refused");
+                        });
+
+        Schema targetSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.VARCHAR(17))
+                        .build();
+
+        Assertions.assertThatThrownBy(
+                        () ->
+                                applier.applySchemaChange(
+                                        new CreateTableEvent(TABLE_ID, targetSchema)))
+                .isInstanceOf(org.apache.flink.cdc.common.exceptions.SchemaEvolveException.class)
+                .hasMessageContaining("Failed to resolve existing Doris schema")
+                .hasRootCauseMessage("connection refused");
+        Assertions.assertThat(schemaChangeManager.createTableInvocations).isZero();
+    }
+
+    @Test
+    public void testCreateTableEventRejectsExistingColumnTypeDrift() {
+        RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
+        DorisMetadataApplier applier =
+                new DorisMetadataApplier(
+                        createDorisOptions(),
+                        Configuration.fromMap(Collections.emptyMap()),
+                        schemaChangeManager,
+                        (dorisOptions, tableId) ->
+                                createDorisSchema(
+                                        dorisField("DEPLOY_MODE", "INT"),
+                                        dorisField("project_id", "BIGINT"),
+                                        dorisVarcharField("job_name", 51),
+                                        dorisVarcharField("CONFLUENT__LAST_UPDATED", 64)));
+
+        Schema targetSchema =
+                Schema.newBuilder()
+                        .physicalColumn("DEPLOY_MODE", DataTypes.INT())
+                        .physicalColumn("project_id", DataTypes.BIGINT())
+                        .physicalColumn("job_name", DataTypes.VARCHAR(17))
+                        .physicalColumn("CONFLUENT__LAST_UPDATED", DataTypes.TIMESTAMP_LTZ(3))
+                        .build();
+
+        Assertions.assertThatThrownBy(
+                        () ->
+                                applier.applySchemaChange(
+                                        new CreateTableEvent(TABLE_ID, targetSchema)))
+                .isInstanceOf(org.apache.flink.cdc.common.exceptions.SchemaEvolveException.class)
+                .hasMessageContaining("incompatible type")
+                .hasMessageContaining("CONFLUENT__LAST_UPDATED")
+                .hasMessageContaining("desired=DATETIME(3)")
+                .hasMessageContaining("actual=VARCHAR(64)");
+        Assertions.assertThat(schemaChangeManager.createTableInvocations).isZero();
+        Assertions.assertThat(schemaChangeManager.addedColumns).isEmpty();
+    }
+
     private static DorisOptions createDorisOptions() {
         return DorisOptions.builder()
                 .setFenodes("127.0.0.1:8030")
@@ -245,15 +360,29 @@ public class DorisMetadataApplierTest {
                 .build();
     }
 
-    private static org.apache.doris.flink.rest.models.Schema createDorisSchema(String... columns) {
+    private static org.apache.doris.flink.rest.models.Schema createDorisSchema(
+            org.apache.doris.flink.rest.models.Field... fields) {
         org.apache.doris.flink.rest.models.Schema dorisSchema =
-                new org.apache.doris.flink.rest.models.Schema(columns.length);
-        for (String column : columns) {
-            dorisSchema.put(
-                    new org.apache.doris.flink.rest.models.Field(
-                            column, "VARCHAR", null, 0, 0, null));
+                new org.apache.doris.flink.rest.models.Schema(fields.length);
+        for (org.apache.doris.flink.rest.models.Field field : fields) {
+            dorisSchema.put(field);
         }
         return dorisSchema;
+    }
+
+    private static org.apache.doris.flink.rest.models.Field dorisField(String name, String type) {
+        return new org.apache.doris.flink.rest.models.Field(name, type, null, 0, 0, null);
+    }
+
+    private static org.apache.doris.flink.rest.models.Field dorisVarcharField(
+            String name, int precision) {
+        return new org.apache.doris.flink.rest.models.Field(
+                name, "VARCHAR", null, precision, 0, null);
+    }
+
+    private static org.apache.doris.flink.rest.models.Field dorisDateTimeField(
+            String name, int scale) {
+        return new org.apache.doris.flink.rest.models.Field(name, "DATETIME", null, 0, scale, null);
     }
 
     private static class RecordingSchemaChangeManager extends DorisSchemaChangeManager {
@@ -272,10 +401,7 @@ public class DorisMetadataApplierTest {
 
         @Override
         public boolean addColumn(
-                String databaseName,
-                String tableName,
-                FieldSchema addFieldSchema,
-                AddColumnPosition addColumnPosition) {
+                String databaseName, String tableName, FieldSchema addFieldSchema) {
             addedColumns.add(new AddedColumn(addFieldSchema));
             return true;
         }

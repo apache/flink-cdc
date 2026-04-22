@@ -31,10 +31,12 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.debezium.table.DebeziumChangelogMode;
 
+import io.debezium.data.Bits;
 import io.debezium.data.Envelope;
 import io.debezium.data.geometry.Geography;
 import io.debezium.data.geometry.Geometry;
 import io.debezium.data.geometry.Point;
+import io.debezium.time.Year;
 import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
@@ -49,6 +51,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Tests for {@link DebeziumEventDeserializationSchema}. */
 class DebeziumEventDeserializationSchemaTest {
@@ -422,6 +425,201 @@ class DebeziumEventDeserializationSchemaTest {
         assertThat(nested.getArity()).isEqualTo(2);
         assertThat(nested.getInt(0)).isEqualTo(1);
         assertThat(nested.getString(1)).isEqualTo(BinaryStringData.fromString("alice"));
+    }
+
+    @Test
+    void testMySqlYearColumnWithCachedIntSchemaIsAccepted() throws Exception {
+        // MySQL `YEAR` is mapped to DataTypes.INT() by MySqlTypeUtils.
+        // At runtime, Debezium emits INT32 with logical name io.debezium.time.Year.
+        // The cached-schema validator must treat this as compatible, not throw a mismatch.
+        TestingDebeziumEventDeserializationSchema deserializer =
+                new TestingDebeziumEventDeserializationSchema();
+        deserializer.applyChangeEvent(
+                new CreateTableEvent(
+                        TABLE_ID,
+                        Schema.newBuilder()
+                                .physicalColumn("birth_year", DataTypes.INT().notNull())
+                                .build()));
+
+        org.apache.kafka.connect.data.Schema yearSchema = Year.builder().build();
+        List<? extends Event> events =
+                deserializer.deserialize(
+                        insertRecord(
+                                SchemaBuilder.struct().field("birth_year", yearSchema).build(),
+                                Collections.singletonMap("birth_year", 1990)));
+
+        DataChangeEvent event = (DataChangeEvent) events.get(0);
+        RecordData after = event.after();
+
+        assertThat(after.getArity()).isEqualTo(1);
+        assertThat(after.getInt(0)).isEqualTo(1990);
+    }
+
+    @Test
+    void testMySqlYearColumnWithoutCachedSchemaFallsBackToValueInference() throws Exception {
+        // Fallback path: no CreateTableEvent cached. Runtime INT32/io.debezium.time.Year must
+        // also be accepted by the validator (otherwise the fallback re-throws the same
+        // exception and escapes the operator uncaught).
+        TestingDebeziumEventDeserializationSchema deserializer =
+                new TestingDebeziumEventDeserializationSchema();
+
+        org.apache.kafka.connect.data.Schema yearSchema = Year.builder().build();
+        List<? extends Event> events =
+                deserializer.deserialize(
+                        insertRecord(
+                                SchemaBuilder.struct().field("birth_year", yearSchema).build(),
+                                Collections.singletonMap("birth_year", 2026)));
+
+        DataChangeEvent event = (DataChangeEvent) events.get(0);
+        RecordData after = event.after();
+
+        assertThat(after.getArity()).isEqualTo(1);
+        assertThat(after.getInt(0)).isEqualTo(2026);
+    }
+
+    @Test
+    void testFallbackPathDoubleMismatchIsWrappedWithClearMessage() throws Exception {
+        // If a future Debezium logical name makes the validator reject BOTH the cached type
+        // and the freshly-inferred type, the second exception used to escape the operator
+        // uncaught with confusing "cached type" wording. The fallback is now wrapped so the
+        // underlying validator gap surfaces clearly instead.
+        TestingDebeziumEventDeserializationSchema deserializer =
+                new TestingDebeziumEventDeserializationSchema(
+                        new DebeziumSchemaDataTypeInference() {
+                            private static final long serialVersionUID = 1L;
+
+                            @Override
+                            protected org.apache.flink.cdc.common.types.DataType inferInt32(
+                                    Object value, org.apache.kafka.connect.data.Schema schema) {
+                                // Deliberately infer a type that will not match the cached check
+                                // to simulate a "validator gap" scenario.
+                                return DataTypes.STRING();
+                            }
+                        });
+        org.apache.kafka.connect.data.Schema pretendYearLikeSchema =
+                SchemaBuilder.int32().name("io.acme.futurelogical.Gadget").build();
+
+        assertThatThrownBy(
+                        () ->
+                                deserializer.deserialize(
+                                        insertRecord(
+                                                SchemaBuilder.struct()
+                                                        .field("col", pretendYearLikeSchema)
+                                                        .build(),
+                                                Collections.singletonMap("col", 42))))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("validator gap")
+                .hasMessageContaining("io.acme.futurelogical.Gadget");
+    }
+
+    @Test
+    void testMySqlBitColumnWithCachedBinarySchemaIsAccepted() throws Exception {
+        // MySQL `bit(3)` is parsed to DataTypes.BINARY(1) by MySqlTypeUtils.
+        // At runtime, Debezium emits the value as BYTES with logical name io.debezium.data.Bits.
+        // The cached-schema validator must treat this as compatible, not throw a mismatch.
+        TestingDebeziumEventDeserializationSchema deserializer =
+                new TestingDebeziumEventDeserializationSchema();
+        deserializer.applyChangeEvent(
+                new CreateTableEvent(
+                        TABLE_ID,
+                        Schema.newBuilder()
+                                .physicalColumn(
+                                        "check_medium_limit_detail", DataTypes.BINARY(1).notNull())
+                                .build()));
+
+        org.apache.kafka.connect.data.Schema bitSchema = Bits.builder(3).build();
+        byte[] rawBits = new byte[] {0b101};
+        List<? extends Event> events =
+                deserializer.deserialize(
+                        insertRecord(
+                                SchemaBuilder.struct()
+                                        .field("check_medium_limit_detail", bitSchema)
+                                        .build(),
+                                Collections.singletonMap("check_medium_limit_detail", rawBits)));
+
+        DataChangeEvent event = (DataChangeEvent) events.get(0);
+        RecordData after = event.after();
+
+        assertThat(after.getArity()).isEqualTo(1);
+        assertThat(after.getBinary(0)).containsExactly(rawBits);
+    }
+
+    @Test
+    void testMySqlBit8ColumnWithCachedBinarySchemaIsAccepted() throws Exception {
+        // MySQL `bit(8)` → DataTypes.BINARY(1).
+        TestingDebeziumEventDeserializationSchema deserializer =
+                new TestingDebeziumEventDeserializationSchema();
+        deserializer.applyChangeEvent(
+                new CreateTableEvent(
+                        TABLE_ID,
+                        Schema.newBuilder()
+                                .physicalColumn("flags", DataTypes.BINARY(1).notNull())
+                                .build()));
+
+        org.apache.kafka.connect.data.Schema bitSchema = Bits.builder(8).build();
+        byte[] rawBits = new byte[] {(byte) 0xFF};
+        List<? extends Event> events =
+                deserializer.deserialize(
+                        insertRecord(
+                                SchemaBuilder.struct().field("flags", bitSchema).build(),
+                                Collections.singletonMap("flags", rawBits)));
+
+        DataChangeEvent event = (DataChangeEvent) events.get(0);
+        RecordData after = event.after();
+
+        assertThat(after.getArity()).isEqualTo(1);
+        assertThat(after.getBinary(0)).containsExactly(rawBits);
+    }
+
+    @Test
+    void testMySqlBit17ColumnWithCachedBinarySchemaIsAccepted() throws Exception {
+        // MySQL `bit(17)` → DataTypes.BINARY(3). Debezium still emits BYTES/io.debezium.data.Bits.
+        TestingDebeziumEventDeserializationSchema deserializer =
+                new TestingDebeziumEventDeserializationSchema();
+        deserializer.applyChangeEvent(
+                new CreateTableEvent(
+                        TABLE_ID,
+                        Schema.newBuilder()
+                                .physicalColumn("wide_flags", DataTypes.BINARY(3).notNull())
+                                .build()));
+
+        org.apache.kafka.connect.data.Schema bitSchema = Bits.builder(17).build();
+        byte[] rawBits = new byte[] {0x01, 0x02, 0x03};
+        List<? extends Event> events =
+                deserializer.deserialize(
+                        insertRecord(
+                                SchemaBuilder.struct().field("wide_flags", bitSchema).build(),
+                                Collections.singletonMap("wide_flags", rawBits)));
+
+        DataChangeEvent event = (DataChangeEvent) events.get(0);
+        RecordData after = event.after();
+
+        assertThat(after.getArity()).isEqualTo(1);
+        assertThat(after.getBinary(0)).containsExactly(rawBits);
+    }
+
+    @Test
+    void testMySqlBitColumnWithoutCachedSchemaFallsBackToValueInference() throws Exception {
+        // When there is no CreateTableEvent cache, the fallback path must also accept
+        // BYTES/io.debezium.data.Bits without throwing a CachedSchemaMismatchException.
+        TestingDebeziumEventDeserializationSchema deserializer =
+                new TestingDebeziumEventDeserializationSchema();
+
+        org.apache.kafka.connect.data.Schema bitSchema = Bits.builder(3).build();
+        byte[] rawBits = new byte[] {0b010};
+        List<? extends Event> events =
+                deserializer.deserialize(
+                        insertRecord(
+                                SchemaBuilder.struct()
+                                        .field("check_medium_limit_detail", bitSchema)
+                                        .build(),
+                                Collections.singletonMap("check_medium_limit_detail", rawBits)));
+
+        DataChangeEvent event = (DataChangeEvent) events.get(0);
+        RecordData after = event.after();
+
+        assertThat(after.getArity()).isEqualTo(1);
+        assertThat(after.getBinary(0)).containsExactly(rawBits);
     }
 
     @Test
