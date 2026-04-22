@@ -103,6 +103,8 @@ public class OracleSourceConfigFactory extends JdbcSourceConfigFactory {
             props.setProperty("table.include.list", String.join(",", tableList));
         }
 
+        props.setProperty("query.fetch.size", String.valueOf(fetchSize));
+
         // override the user-defined debezium properties
         if (dbzProperties != null) {
             props.putAll(dbzProperties);
