@@ -353,6 +353,255 @@ class YamlJobMigrationITCase extends PipelineTestEnvironment {
         LOG.info("Snapshot stage finished successfully.");
     }
 
+    @Test
+    void testProjectionChangeAfterSavepointRestart() throws Exception {
+        runInContainerAsRoot(jobManager, "chmod", "0777", "-R", "/tmp/cdc/");
+
+        // Phase 1: Start with narrow projection (id, name only)
+        String contentV1 = buildCustomersProjectionPipeline("id, name");
+        JobID jobID = submitPipelineJob(contentV1);
+        Assertions.assertThat(jobID).isNotNull();
+        LOG.info("Submitted Job ID is {} ", jobID);
+
+        // Phase 2: Validate snapshot with narrow projection
+        validateResult(
+                dbNameFormatter,
+                "CreateTableEvent{tableId=%s.customers, schema=columns={`id` INT NOT NULL,`name` VARCHAR(255) NOT NULL 'flink'}, primaryKeys=id, options=()}",
+                "DataChangeEvent{tableId=%s.customers, before=[], after=[101, user_1], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.customers, before=[], after=[102, user_2], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.customers, before=[], after=[103, user_3], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.customers, before=[], after=[104, user_4], op=INSERT, meta=()}");
+        LOG.info("Snapshot stage finished successfully.");
+
+        // Phase 3: Validate incremental with narrow projection
+        executeMySqlStatements(
+                mysqlInventoryDatabase,
+                "INSERT INTO customers VALUES (105, 'user_5', 'Beijing', '123567891235');");
+        validateResult(
+                dbNameFormatter,
+                "DataChangeEvent{tableId=%s.customers, before=[], after=[105, user_5], op=INSERT, meta=()}");
+        LOG.info("Incremental stage 1 finished successfully.");
+
+        // Phase 4: Stop with savepoint
+        String savepointPath = stopJobWithSavepoint(jobID);
+        LOG.info("Stopped Job {} and created a savepoint at {}.", jobID, savepointPath);
+
+        // Phase 5: Restart with expanded projection (id, name, address)
+        String contentV2 = buildCustomersProjectionPipeline("id, name, address");
+        JobID newJobID = submitPipelineJob(contentV2, savepointPath, true);
+        LOG.info("Reincarnated Job {} has been submitted successfully.", newJobID);
+
+        // Phase 6: Validate schema evolution - AddColumnEvent for address
+        validateResult(
+                dbNameFormatter,
+                "AddColumnEvent{tableId=%s.customers, addedColumns=[ColumnWithPosition{column=`address` VARCHAR(1024), position=LAST, existedColumnName=null}]}");
+        LOG.info("Schema evolution (AddColumn) validated successfully.");
+
+        // Phase 7: Validate new data includes address
+        executeMySqlStatements(
+                mysqlInventoryDatabase,
+                "INSERT INTO customers VALUES (106, 'user_6', 'Shenzhen', '123567891236');");
+        validateResult(
+                dbNameFormatter,
+                "DataChangeEvent{tableId=%s.customers, before=[], after=[106, user_6, Shenzhen], op=INSERT, meta=()}");
+        LOG.info("Incremental stage 2 with expanded projection finished successfully.");
+
+        // Cleanup
+        cancelJob(newJobID);
+    }
+
+    @Test
+    void testProjectionShrinkAfterSavepointRestart() throws Exception {
+        runInContainerAsRoot(jobManager, "chmod", "0777", "-R", "/tmp/cdc/");
+
+        // Phase 1: Start with wider projection (id, name, address)
+        String contentV1 = buildCustomersProjectionPipeline("id, name, address");
+        JobID jobID = submitPipelineJob(contentV1);
+        Assertions.assertThat(jobID).isNotNull();
+        LOG.info("Submitted Job ID is {} ", jobID);
+
+        // Phase 2: Validate snapshot with wider projection
+        validateResult(
+                dbNameFormatter,
+                "CreateTableEvent{tableId=%s.customers, schema=columns={`id` INT NOT NULL,`name` VARCHAR(255) NOT NULL 'flink',`address` VARCHAR(1024)}, primaryKeys=id, options=()}",
+                "DataChangeEvent{tableId=%s.customers, before=[], after=[101, user_1, Shanghai], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.customers, before=[], after=[102, user_2, Shanghai], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.customers, before=[], after=[103, user_3, Shanghai], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.customers, before=[], after=[104, user_4, Shanghai], op=INSERT, meta=()}");
+        LOG.info("Snapshot stage finished successfully.");
+
+        // Phase 3: Validate incremental with wider projection
+        executeMySqlStatements(
+                mysqlInventoryDatabase,
+                "INSERT INTO customers VALUES (105, 'user_5', 'Beijing', '123567891235');");
+        validateResult(
+                dbNameFormatter,
+                "DataChangeEvent{tableId=%s.customers, before=[], after=[105, user_5, Beijing], op=INSERT, meta=()}");
+        LOG.info("Incremental stage 1 finished successfully.");
+
+        // Phase 4: Stop with savepoint
+        String savepointPath = stopJobWithSavepoint(jobID);
+        LOG.info("Stopped Job {} and created a savepoint at {}.", jobID, savepointPath);
+
+        // Phase 5: Restart with narrower projection (id, name only)
+        String contentV2 = buildCustomersProjectionPipeline("id, name");
+        JobID newJobID = submitPipelineJob(contentV2, savepointPath, true);
+        LOG.info("Reincarnated Job {} has been submitted successfully.", newJobID);
+
+        // Phase 6: Validate schema evolution - DropColumnEvent for address
+        validateResult(
+                dbNameFormatter,
+                "DropColumnEvent{tableId=%s.customers, droppedColumnNames=[address]}");
+        LOG.info("Schema evolution (DropColumn) validated successfully.");
+
+        // Phase 7: Validate new data has only id and name
+        executeMySqlStatements(
+                mysqlInventoryDatabase,
+                "INSERT INTO customers VALUES (106, 'user_6', 'Shenzhen', '123567891236');");
+        validateResult(
+                dbNameFormatter,
+                "DataChangeEvent{tableId=%s.customers, before=[], after=[106, user_6], op=INSERT, meta=()}");
+        LOG.info("Incremental stage 2 with narrowed projection finished successfully.");
+
+        // Cleanup
+        cancelJob(newJobID);
+    }
+
+    @Test
+    void testProjectionColumnTypeChangeAfterSavepointRestart() throws Exception {
+        runInContainerAsRoot(jobManager, "chmod", "0777", "-R", "/tmp/cdc/");
+
+        // Phase 1: Start with projection (id, name) where name is VARCHAR(255) NOT NULL
+        String contentV1 = buildCustomersProjectionPipeline("id, name");
+        JobID jobID = submitPipelineJob(contentV1);
+        Assertions.assertThat(jobID).isNotNull();
+        LOG.info("Submitted Job ID is {} ", jobID);
+
+        // Phase 2: Validate snapshot with {id INT, name VARCHAR(255)} schema
+        validateResult(
+                dbNameFormatter,
+                "CreateTableEvent{tableId=%s.customers, schema=columns={`id` INT NOT NULL,`name` VARCHAR(255) NOT NULL 'flink'}, primaryKeys=id, options=()}",
+                "DataChangeEvent{tableId=%s.customers, before=[], after=[101, user_1], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.customers, before=[], after=[102, user_2], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.customers, before=[], after=[103, user_3], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.customers, before=[], after=[104, user_4], op=INSERT, meta=()}");
+        LOG.info("Snapshot stage finished successfully.");
+
+        // Phase 3: Stop with savepoint
+        String savepointPath = stopJobWithSavepoint(jobID);
+        LOG.info("Stopped Job {} and created a savepoint at {}.", jobID, savepointPath);
+
+        // Phase 4: Restart with type-changed projection (CAST name to VARCHAR(100))
+        String contentV2 =
+                buildCustomersProjectionPipeline("id, CAST(name AS VARCHAR(100)) AS name");
+        JobID newJobID = submitPipelineJob(contentV2, savepointPath, true);
+        LOG.info("Reincarnated Job {} has been submitted successfully.", newJobID);
+
+        // Phase 5: Validate schema evolution - AlterColumnTypeEvent for name column
+        validateResult(
+                dbNameFormatter,
+                "AlterColumnTypeEvent{tableId=%s.customers, typeMapping={name=VARCHAR(100)}, oldTypeMapping={name=VARCHAR(255) NOT NULL}}");
+        LOG.info("Schema evolution (AlterColumnType) validated successfully.");
+
+        // Phase 6: Validate new data flows correctly with changed type
+        executeMySqlStatements(
+                mysqlInventoryDatabase,
+                "INSERT INTO customers VALUES (105, 'user_5', 'Beijing', '123567891235');");
+        validateResult(
+                dbNameFormatter,
+                "DataChangeEvent{tableId=%s.customers, before=[], after=[105, user_5], op=INSERT, meta=()}");
+        LOG.info("Incremental stage with type-changed projection finished successfully.");
+
+        // Cleanup
+        cancelJob(newJobID);
+    }
+
+    @Test
+    void testIdenticalProjectionAfterSavepointRestart() throws Exception {
+        runInContainerAsRoot(jobManager, "chmod", "0777", "-R", "/tmp/cdc/");
+
+        // Phase 1: Start with projection (id, name)
+        String contentV1 = buildCustomersProjectionPipeline("id, name");
+        JobID jobID = submitPipelineJob(contentV1);
+        Assertions.assertThat(jobID).isNotNull();
+        LOG.info("Submitted Job ID is {} ", jobID);
+
+        // Phase 2: Validate snapshot with {id INT, name VARCHAR(255)} schema and data
+        validateResult(
+                dbNameFormatter,
+                "CreateTableEvent{tableId=%s.customers, schema=columns={`id` INT NOT NULL,`name` VARCHAR(255) NOT NULL 'flink'}, primaryKeys=id, options=()}",
+                "DataChangeEvent{tableId=%s.customers, before=[], after=[101, user_1], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.customers, before=[], after=[102, user_2], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.customers, before=[], after=[103, user_3], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.customers, before=[], after=[104, user_4], op=INSERT, meta=()}");
+        LOG.info("Snapshot stage finished successfully.");
+
+        // Phase 3: Validate incremental mode works before savepoint
+        executeMySqlStatements(
+                mysqlInventoryDatabase,
+                "INSERT INTO customers VALUES (105, 'user_5', 'Beijing', '123567891235');");
+        validateResult(
+                dbNameFormatter,
+                "DataChangeEvent{tableId=%s.customers, before=[], after=[105, user_5], op=INSERT, meta=()}");
+        LOG.info("Incremental stage 1 finished successfully.");
+
+        // Phase 4: Stop with savepoint
+        String savepointPath = stopJobWithSavepoint(jobID);
+        LOG.info("Stopped Job {} and created a savepoint at {}.", jobID, savepointPath);
+
+        // Phase 5: Restart with the exact same projection (id, name)
+        String contentV2 = buildCustomersProjectionPipeline("id, name");
+        JobID newJobID = submitPipelineJob(contentV2, savepointPath, true);
+        LOG.info("Reincarnated Job {} has been submitted successfully.", newJobID);
+
+        // Phase 6: Insert a new row and validate only the DataChangeEvent appears
+        // No AddColumnEvent, DropColumnEvent, or AlterColumnTypeEvent should be emitted
+        // because the projection is identical — isSchemaChangeEventRedundant() suppresses them
+        executeMySqlStatements(
+                mysqlInventoryDatabase,
+                "INSERT INTO customers VALUES (106, 'user_6', 'Shenzhen', '123567891236');");
+        validateResult(
+                dbNameFormatter,
+                "DataChangeEvent{tableId=%s.customers, before=[], after=[106, user_6], op=INSERT, meta=()}");
+        LOG.info(
+                "Incremental stage 2 with identical projection finished successfully - no schema change events emitted.");
+
+        // Cleanup
+        cancelJob(newJobID);
+    }
+
+    private String buildCustomersProjectionPipeline(String projection) {
+        return String.format(
+                "source:\n"
+                        + "  type: mysql\n"
+                        + "  hostname: %s\n"
+                        + "  port: %d\n"
+                        + "  username: %s\n"
+                        + "  password: %s\n"
+                        + "  tables: %s.customers\n"
+                        + "  server-id: 5400-5404\n"
+                        + "  server-time-zone: UTC\n"
+                        + "\n"
+                        + "sink:\n"
+                        + "  type: values\n"
+                        + "\n"
+                        + "transform:\n"
+                        + "  - source-table: %s.customers\n"
+                        + "    projection: %s\n"
+                        + "\n"
+                        + "pipeline:\n"
+                        + "  parallelism: %d\n"
+                        + "  schema.change.behavior: evolve\n",
+                INTER_CONTAINER_MYSQL_ALIAS,
+                MySqlContainer.MYSQL_PORT,
+                MYSQL_TEST_USER,
+                MYSQL_TEST_PASSWORD,
+                mysqlInventoryDatabase.getDatabaseName(),
+                mysqlInventoryDatabase.getDatabaseName(),
+                projection,
+                parallelism);
+    }
+
     private void generateIncrementalEventsPhaseOne() {
         executeMySqlStatements(
                 mysqlInventoryDatabase,
