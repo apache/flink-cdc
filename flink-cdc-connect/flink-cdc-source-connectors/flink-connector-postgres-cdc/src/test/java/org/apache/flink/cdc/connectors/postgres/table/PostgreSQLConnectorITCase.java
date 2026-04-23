@@ -177,11 +177,11 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
                     "UPDATE inventory.products SET description='18oz carpenter hammer' WHERE id=106;");
             statement.execute("UPDATE inventory.products SET weight='5.1' WHERE id=107;");
             statement.execute(
-                    "INSERT INTO inventory.products VALUES (default,'jacket','water resistent white wind breaker',0.2);"); // 110
+                    "INSERT INTO inventory.products VALUES (default,'jacket','water resistant white wind breaker',0.2);"); // 110
             statement.execute(
                     "INSERT INTO inventory.products VALUES (default,'scooter','Big 2-wheel scooter ',5.18);");
             statement.execute(
-                    "UPDATE inventory.products SET description='new water resistent white wind breaker', weight='0.5' WHERE id=110;");
+                    "UPDATE inventory.products SET description='new water resistant white wind breaker', weight='0.5' WHERE id=110;");
             statement.execute("UPDATE inventory.products SET weight='5.17' WHERE id=111;");
             statement.execute("DELETE FROM inventory.products WHERE id=111;");
         }
@@ -221,7 +221,7 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
          * | 107 | rocks | box of assorted rocks | 5.1 |
          * | 108 | jacket | water resistent black wind breaker | 0.1 |
          * | 109 | spare tire | 24 inch spare tire | 22.2 |
-         * | 110 | jacket | new water resistent white wind breaker | 0.5 |
+         * | 110 | jacket | new water resistant white wind breaker | 0.5 |
          * +-----+--------------------+-------------------------------------------------
          * --------+--------+
          * </pre>
@@ -317,7 +317,7 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
         try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
                 Statement statement = connection.createStatement()) {
             statement.execute(
-                    "INSERT INTO inventory_partitioned.products VALUES (default,'jacket','water resistent white wind breaker',0.2, 'us');"); // 110
+                    "INSERT INTO inventory_partitioned.products VALUES (default,'jacket','water resistant white wind breaker',0.2, 'us');"); // 110
             statement.execute(
                     "INSERT INTO inventory_partitioned.products VALUES (default,'scooter','Big 2-wheel scooter ',5.18, 'uk');");
             statement.execute(
@@ -340,7 +340,7 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
                     "107,rocks,box of assorted rocks,5.300,uk",
                     "108,jacket,water resistent black wind breaker,0.100,uk",
                     "109,spare tire,24 inch spare tire,22.200,uk",
-                    "110,jacket,water resistent white wind breaker,0.200,us",
+                    "110,jacket,water resistant white wind breaker,0.200,us",
                     "111,scooter,Big 2-wheel scooter ,5.180,uk",
                     "112,bike,Big 2-wheel bycicle ,6.180,china"
                 };
@@ -407,11 +407,11 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
         try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
                 Statement statement = connection.createStatement()) {
             statement.execute(
-                    "INSERT INTO inventory.products VALUES (default,'jacket','water resistent white wind breaker',0.2);"); // 110
+                    "INSERT INTO inventory.products VALUES (default,'jacket','water resistant white wind breaker',0.2);"); // 110
             statement.execute(
                     "INSERT INTO inventory.products VALUES (default,'scooter','Big 2-wheel scooter ',5.18);");
             statement.execute(
-                    "UPDATE inventory.products SET description='new water resistent white wind breaker', weight='0.5' WHERE id=110;");
+                    "UPDATE inventory.products SET description='new water resistant white wind breaker', weight='0.5' WHERE id=110;");
             statement.execute("UPDATE inventory.products SET weight='5.17' WHERE id=111;");
             statement.execute("DELETE FROM inventory.products WHERE id=111;");
         }
@@ -419,7 +419,7 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
         // Note: We use waitForSinkResult instead of waitForSinkSize because Flink 2.x
         // optimizations may reduce the number of intermediate changelog messages
         String[] expected =
-                new String[] {"110,jacket,new water resistent white wind breaker,0.500"};
+                new String[] {"110,jacket,new water resistant white wind breaker,0.500"};
 
         waitForSinkResult("sink", Arrays.asList(expected));
 
@@ -589,11 +589,11 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
                     "UPDATE inventory.products SET description='18oz carpenter hammer' WHERE id=106;");
             statement.execute("UPDATE inventory.products SET weight='5.1' WHERE id=107;");
             statement.execute(
-                    "INSERT INTO inventory.products VALUES (default,'jacket','water resistent white wind breaker',0.2);"); // 110
+                    "INSERT INTO inventory.products VALUES (default,'jacket','water resistant white wind breaker',0.2);"); // 110
             statement.execute(
                     "INSERT INTO inventory.products VALUES (default,'scooter','Big 2-wheel scooter ',5.18);");
             statement.execute(
-                    "UPDATE inventory.products SET description='new water resistent white wind breaker', weight='0.5' WHERE id=110;");
+                    "UPDATE inventory.products SET description='new water resistant white wind breaker', weight='0.5' WHERE id=110;");
             statement.execute("UPDATE inventory.products SET weight='5.17' WHERE id=111;");
             statement.execute("DELETE FROM inventory.products WHERE id=111;");
         }
@@ -787,11 +787,11 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
                     "UPDATE inventory.products SET description='18oz carpenter hammer' WHERE id=106;");
             statement.execute("UPDATE inventory.products SET weight='5.1' WHERE id=107;");
             statement.execute(
-                    "INSERT INTO inventory.products VALUES (default,'jacket','water resistent white wind breaker',0.2);"); // 110
+                    "INSERT INTO inventory.products VALUES (default,'jacket','water resistant white wind breaker',0.2);"); // 110
             statement.execute(
                     "INSERT INTO inventory.products VALUES (default,'scooter','Big 2-wheel scooter ',5.18);");
             statement.execute(
-                    "UPDATE inventory.products SET description='new water resistent white wind breaker', weight='0.5' WHERE id=110;");
+                    "UPDATE inventory.products SET description='new water resistant white wind breaker', weight='0.5' WHERE id=110;");
             statement.execute("UPDATE inventory.products SET weight='5.17' WHERE id=111;");
             statement.execute("DELETE FROM inventory.products WHERE id=111;");
         }
@@ -831,7 +831,7 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
                                 + ",inventory,products,+I,109,spare tire,24 inch spare tire,22.200)",
                         "+I("
                                 + databaseName
-                                + ",inventory,products,+I,110,jacket,water resistent white wind breaker,0.200)",
+                                + ",inventory,products,+I,110,jacket,water resistant white wind breaker,0.200)",
                         "+I("
                                 + databaseName
                                 + ",inventory,products,+I,111,scooter,Big 2-wheel scooter ,5.180)",
@@ -843,7 +843,7 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
                                 + ",inventory,products,+U,107,rocks,box of assorted rocks,5.100)",
                         "+U("
                                 + databaseName
-                                + ",inventory,products,+U,110,jacket,new water resistent white wind breaker,0.500)",
+                                + ",inventory,products,+U,110,jacket,new water resistant white wind breaker,0.500)",
                         "+U("
                                 + databaseName
                                 + ",inventory,products,+U,111,scooter,Big 2-wheel scooter ,5.170)",
@@ -921,11 +921,11 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
                     "UPDATE inventory.products SET description='18oz carpenter hammer' WHERE id=106;");
             statement.execute("UPDATE inventory.products SET weight='5.1' WHERE id=107;");
             statement.execute(
-                    "INSERT INTO inventory.products VALUES (default,'jacket','water resistent white wind breaker',0.2);"); // 110
+                    "INSERT INTO inventory.products VALUES (default,'jacket','water resistant white wind breaker',0.2);"); // 110
             statement.execute(
                     "INSERT INTO inventory.products VALUES (default,'scooter','Big 2-wheel scooter ',5.18);");
             statement.execute(
-                    "UPDATE inventory.products SET description='new water resistent white wind breaker', weight='0.5' WHERE id=110;");
+                    "UPDATE inventory.products SET description='new water resistant white wind breaker', weight='0.5' WHERE id=110;");
             statement.execute("UPDATE inventory.products SET weight='5.17' WHERE id=111;");
             statement.execute("DELETE FROM inventory.products WHERE id=111;");
         }
@@ -965,7 +965,7 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
          * | 107 | rocks | box of assorted rocks | 5.1 |
          * | 108 | jacket | water resistent black wind breaker | 0.1 |
          * | 109 | spare tire | 24 inch spare tire | 22.2 |
-         * | 110 | jacket | new water resistent white wind breaker | 0.5 |
+         * | 110 | jacket | new water resistant white wind breaker | 0.5 |
          * +-----+--------------------+-------------------------------------------------
          * --------+--------+
          * </pre>
@@ -1159,5 +1159,149 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
         assertEqualsInAnyOrder(expected, fetchRows(iterator, expected.size()));
         tableResult.getJobClient().get().cancel().get();
         RowUtils.USE_LEGACY_TO_STRING = true;
+    }
+
+    @Test
+    void testNoPKTableWithChunkKey() throws SQLException, ExecutionException, InterruptedException {
+        setup(true);
+        initializePostgresTable(POSTGRES_CONTAINER, "inventory");
+        initializePostgresTable(POSTGRES_CONTAINER, "inventory_no_pk");
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE no_pk_source ("
+                                + " id INT NOT NULL,"
+                                + " name STRING,"
+                                + " description STRING,"
+                                + " weight DECIMAL(10,3)"
+                                + ") WITH ("
+                                + " 'connector' = 'postgres-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'schema-name' = '%s',"
+                                + " 'table-name' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = 'true',"
+                                + " 'scan.incremental.snapshot.chunk.key-column' = 'id',"
+                                + " 'scan.incremental.snapshot.chunk.size' = '4',"
+                                + " 'decoding.plugin.name' = 'pgoutput', "
+                                + " 'slot.name' = '%s'"
+                                + ")",
+                        POSTGRES_CONTAINER.getHost(),
+                        POSTGRES_CONTAINER.getMappedPort(POSTGRESQL_PORT),
+                        POSTGRES_CONTAINER.getUsername(),
+                        POSTGRES_CONTAINER.getPassword(),
+                        POSTGRES_CONTAINER.getDatabaseName(),
+                        "inventory",
+                        "products_no_pk",
+                        getSlotName());
+        String sinkDDL =
+                "CREATE TABLE sink ("
+                        + " name STRING,"
+                        + " weightSum DECIMAL(10,3),"
+                        + " PRIMARY KEY (name) NOT ENFORCED"
+                        + ") WITH ("
+                        + " 'connector' = 'values',"
+                        + " 'sink-insert-only' = 'false'"
+                        + ")";
+        tEnv.executeSql(sourceDDL);
+        tEnv.executeSql(sinkDDL);
+
+        // async submit job
+        TableResult result =
+                tEnv.executeSql(
+                        "INSERT INTO sink SELECT name, SUM(weight) FROM no_pk_source GROUP BY name");
+
+        waitForSnapshotStarted("sink");
+
+        // wait a bit to make sure the replication slot is ready
+        Thread.sleep(5000);
+
+        // generate WAL
+        try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "UPDATE inventory.products_no_pk SET description='18oz carpenter hammer' WHERE id=106;");
+            statement.execute("UPDATE inventory.products_no_pk SET weight='5.1' WHERE id=107;");
+            statement.execute(
+                    "INSERT INTO inventory.products_no_pk VALUES (110,'jacket','water resistant white wind breaker',0.2);");
+            statement.execute(
+                    "INSERT INTO inventory.products_no_pk VALUES (111,'scooter','Big 2-wheel scooter',5.18);");
+            statement.execute(
+                    "UPDATE inventory.products_no_pk SET description='new water resistant white wind breaker', weight='0.5' WHERE id=110;");
+            statement.execute("UPDATE inventory.products_no_pk SET weight='5.17' WHERE id=111;");
+            statement.execute("DELETE FROM inventory.products_no_pk WHERE id=111;");
+        }
+
+        String[] expected =
+                new String[] {
+                    "scooter,3.140",
+                    "car battery,8.100",
+                    "12-pack drill bits,0.800",
+                    "hammer,2.625",
+                    "rocks,5.100",
+                    "jacket,0.600",
+                    "spare tire,22.200"
+                };
+        waitForSinkResult("sink", Arrays.asList(expected));
+
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
+        Assertions.assertThat(actual).containsExactlyInAnyOrder(expected);
+
+        result.getJobClient().get().cancel().get();
+    }
+
+    @Test
+    void testNoPKTableWithoutChunkKey()
+            throws SQLException, ExecutionException, InterruptedException {
+        setup(true);
+        initializePostgresTable(POSTGRES_CONTAINER, "inventory");
+        initializePostgresTable(POSTGRES_CONTAINER, "inventory_no_pk");
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE no_pk_source_fail ("
+                                + " id INT NOT NULL,"
+                                + " name STRING,"
+                                + " description STRING,"
+                                + " weight DECIMAL(10,3)"
+                                + ") WITH ("
+                                + " 'connector' = 'postgres-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'schema-name' = '%s',"
+                                + " 'table-name' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = 'true',"
+                                + " 'decoding.plugin.name' = 'pgoutput', "
+                                + " 'slot.name' = '%s'"
+                                + ")",
+                        POSTGRES_CONTAINER.getHost(),
+                        POSTGRES_CONTAINER.getMappedPort(POSTGRESQL_PORT),
+                        POSTGRES_CONTAINER.getUsername(),
+                        POSTGRES_CONTAINER.getPassword(),
+                        POSTGRES_CONTAINER.getDatabaseName(),
+                        "inventory",
+                        "products_no_pk",
+                        getSlotName());
+        tEnv.executeSql(sourceDDL);
+
+        // async submit job
+        TableResult result = tEnv.executeSql("SELECT * FROM no_pk_source_fail");
+
+        Assertions.assertThatThrownBy(result::await)
+                .hasStackTraceContaining("scan.incremental.snapshot.chunk.key-column");
+
+        result.getJobClient()
+                .ifPresent(
+                        client -> {
+                            try {
+                                client.cancel().get();
+                            } catch (Exception e) {
+                                // ignore
+                            }
+                        });
     }
 }

@@ -20,6 +20,7 @@ package org.apache.flink.cdc.connectors.base.utils;
 import org.apache.flink.cdc.connectors.base.source.meta.split.FinishedSnapshotSplitInfo;
 import org.apache.flink.table.types.logical.RowType;
 
+import io.debezium.data.Envelope;
 import io.debezium.util.SchemaNameAdjuster;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
@@ -237,7 +238,29 @@ public class SplitKeyUtils {
             RowType splitBoundaryType, SourceRecord dataRecord, SchemaNameAdjuster nameAdjuster) {
         // the split key field contains single field now
         String splitFieldName = nameAdjuster.adjust(splitBoundaryType.getFieldNames().get(0));
-        Struct key = (Struct) dataRecord.key();
-        return new Object[] {key.get(splitFieldName)};
+        Struct target;
+        if (dataRecord.key() != null) {
+            target = (Struct) dataRecord.key();
+        } else {
+            // For tables without primary key, extract chunk key from value struct
+            target = getStructContainingChunkKey(dataRecord);
+        }
+        return new Object[] {target.get(splitFieldName)};
+    }
+
+    /**
+     * For tables without primary key, the chunk key is not in the record key (which is null).
+     * Instead, extract it from the value's after struct (for CREATE/READ) or before struct (for
+     * UPDATE/DELETE).
+     */
+    static Struct getStructContainingChunkKey(SourceRecord record) {
+        Struct value = (Struct) record.value();
+        Envelope.Operation op =
+                Envelope.Operation.forCode(value.getString(Envelope.FieldName.OPERATION));
+        if (op == Envelope.Operation.CREATE || op == Envelope.Operation.READ) {
+            return value.getStruct(Envelope.FieldName.AFTER);
+        } else {
+            return value.getStruct(Envelope.FieldName.BEFORE);
+        }
     }
 }

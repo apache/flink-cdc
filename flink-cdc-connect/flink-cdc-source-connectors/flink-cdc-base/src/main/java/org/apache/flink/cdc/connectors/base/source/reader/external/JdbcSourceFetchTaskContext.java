@@ -92,41 +92,69 @@ public abstract class JdbcSourceFetchTaskContext implements FetchTask.Context {
     @Override
     public void rewriteOutputBuffer(
             Map<Struct, SourceRecord> outputBuffer, SourceRecord changeRecord) {
-        Struct key = (Struct) changeRecord.key();
+        boolean hasPrimaryKey = changeRecord.key() != null;
         Struct value = (Struct) changeRecord.value();
         if (value != null) {
             Envelope.Operation operation =
                     Envelope.Operation.forCode(value.getString(Envelope.FieldName.OPERATION));
             switch (operation) {
                 case CREATE:
+                    if (hasPrimaryKey) {
+                        outputBuffer.put(
+                                (Struct) changeRecord.key(), buildReadRecord(changeRecord));
+                    } else {
+                        Struct after = value.getStruct(Envelope.FieldName.AFTER);
+                        outputBuffer.put(after, buildReadRecord(changeRecord));
+                    }
+                    break;
                 case UPDATE:
-                    Envelope envelope = Envelope.fromSchema(changeRecord.valueSchema());
-                    Struct source = value.getStruct(Envelope.FieldName.SOURCE);
-                    Struct after = value.getStruct(Envelope.FieldName.AFTER);
-                    Instant fetchTs =
-                            Instant.ofEpochMilli((Long) source.get(Envelope.FieldName.TIMESTAMP));
-                    SourceRecord record =
-                            new SourceRecord(
-                                    changeRecord.sourcePartition(),
-                                    changeRecord.sourceOffset(),
-                                    changeRecord.topic(),
-                                    changeRecord.kafkaPartition(),
-                                    changeRecord.keySchema(),
-                                    changeRecord.key(),
-                                    changeRecord.valueSchema(),
-                                    envelope.read(after, source, fetchTs));
-                    outputBuffer.put(key, record);
+                    if (hasPrimaryKey) {
+                        outputBuffer.put(
+                                (Struct) changeRecord.key(), buildReadRecord(changeRecord));
+                    } else {
+                        // For no-PK table: remove the before image, insert the after image
+                        Struct before = value.getStruct(Envelope.FieldName.BEFORE);
+                        Struct after = value.getStruct(Envelope.FieldName.AFTER);
+                        if (before != null) {
+                            outputBuffer.remove(before);
+                        }
+                        outputBuffer.put(after, buildReadRecord(changeRecord));
+                    }
                     break;
                 case DELETE:
-                    outputBuffer.remove(key);
+                    if (hasPrimaryKey) {
+                        outputBuffer.remove((Struct) changeRecord.key());
+                    } else {
+                        Struct before = value.getStruct(Envelope.FieldName.BEFORE);
+                        if (before != null) {
+                            outputBuffer.remove(before);
+                        }
+                    }
                     break;
                 case READ:
                     throw new IllegalStateException(
                             String.format(
-                                    "Data change record shouldn't use READ operation, the the record is %s.",
+                                    "Data change record shouldn't use READ operation, the record is %s.",
                                     changeRecord));
             }
         }
+    }
+
+    private SourceRecord buildReadRecord(SourceRecord changeRecord) {
+        Struct value = (Struct) changeRecord.value();
+        Envelope envelope = Envelope.fromSchema(changeRecord.valueSchema());
+        Struct source = value.getStruct(Envelope.FieldName.SOURCE);
+        Struct after = value.getStruct(Envelope.FieldName.AFTER);
+        Instant fetchTs = Instant.ofEpochMilli((Long) source.get(Envelope.FieldName.TIMESTAMP));
+        return new SourceRecord(
+                changeRecord.sourcePartition(),
+                changeRecord.sourceOffset(),
+                changeRecord.topic(),
+                changeRecord.kafkaPartition(),
+                changeRecord.keySchema(),
+                changeRecord.key(),
+                changeRecord.valueSchema(),
+                envelope.read(after, source, fetchTs));
     }
 
     @Override
