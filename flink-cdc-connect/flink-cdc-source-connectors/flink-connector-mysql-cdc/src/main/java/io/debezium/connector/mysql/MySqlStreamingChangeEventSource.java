@@ -99,6 +99,10 @@ import static io.debezium.util.Strings.isNullOrEmpty;
  *
  * <p>Line 951-963 : Use iterator instead of index-based loop to avoid O(n²) complexity when
  * processing LinkedList rows in handleChange method. See FLINK-38846.
+ *
+ * <p>Line 106-109, 631, 641-646, 1578-1583 : Add REPLACE INTO filtering in handleQueryEvent to
+ * prevent pt-table-checksum STATEMENT-format DML from being parsed as DDL. Sync from Debezium PR
+ * #7004 (DBZ-9428).
  */
 public class MySqlStreamingChangeEventSource
         implements StreamingChangeEventSource<MySqlPartition, MySqlOffsetContext> {
@@ -107,6 +111,11 @@ public class MySqlStreamingChangeEventSource
             LoggerFactory.getLogger(MySqlStreamingChangeEventSource.class);
 
     private static final String KEEPALIVE_THREAD_NAME = "blc-keepalive";
+
+    private static final String DML_INSERT_PREFIX = "INSERT ";
+    private static final String DML_UPDATE_PREFIX = "UPDATE ";
+    private static final String DML_DELETE_PREFIX = "DELETE ";
+    private static final String DML_REPLACE_PREFIX = "REPLACE ";
 
     private final EnumMap<EventType, BlockingConsumer<Event>> eventHandlers =
             new EnumMap<>(EventType.class);
@@ -628,7 +637,7 @@ public class MySqlStreamingChangeEventSource
             return;
         }
 
-        String upperCasedStatementBegin = Strings.getBegin(sql, 7).toUpperCase();
+        String upperCasedStatementBegin = Strings.getBegin(sql, 8).toUpperCase();
 
         if (upperCasedStatementBegin.startsWith("XA ")) {
             // This is an XA transaction, and we currently ignore these and do nothing ...
@@ -638,13 +647,10 @@ public class MySqlStreamingChangeEventSource
             LOGGER.debug("DDL '{}' was filtered out of processing", sql);
             return;
         }
-        if (upperCasedStatementBegin.equals("INSERT ")
-                || upperCasedStatementBegin.equals("UPDATE ")
-                || upperCasedStatementBegin.equals("DELETE ")) {
+        if (isDmlStatement(upperCasedStatementBegin)) {
             LOGGER.warn(
-                    "Received DML '"
-                            + sql
-                            + "' for processing, binlog probably contains events generated with statement or mixed based replication format");
+                    "Received DML '{}' for processing, binlog probably contains events generated with statement or mixed based replication format",
+                    sql);
             return;
         }
         if (sql.equalsIgnoreCase("ROLLBACK")) {
@@ -1577,6 +1583,13 @@ public class MySqlStreamingChangeEventSource
                 logStreamingSourceState(Level.DEBUG);
             }
         }
+    }
+
+    private static boolean isDmlStatement(String upperCasedStatementBegin) {
+        return upperCasedStatementBegin.startsWith(DML_INSERT_PREFIX)
+                || upperCasedStatementBegin.startsWith(DML_UPDATE_PREFIX)
+                || upperCasedStatementBegin.startsWith(DML_DELETE_PREFIX)
+                || upperCasedStatementBegin.startsWith(DML_REPLACE_PREFIX);
     }
 
     @FunctionalInterface
