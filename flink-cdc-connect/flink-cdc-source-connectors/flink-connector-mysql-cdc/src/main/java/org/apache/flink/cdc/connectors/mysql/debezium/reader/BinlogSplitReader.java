@@ -22,6 +22,7 @@ import org.apache.flink.cdc.connectors.mysql.debezium.task.MySqlBinlogSplitReadT
 import org.apache.flink.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
+import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffsetKind;
 import org.apache.flink.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplit;
@@ -137,7 +138,9 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
                         (MySqlStreamingChangeEventSourceMetrics)
                                 statefulTaskContext.getStreamingChangeEventSourceMetrics(),
                         currentBinlogSplit,
-                        createEventFilter());
+                        createEventFilterWithTimestamp(
+                                currentBinlogSplit.getStartingOffset().getTimestampSec(),
+                                currentBinlogSplit.getStartingOffset().getOffsetKind()));
 
         executorService.submit(
                 () -> {
@@ -419,6 +422,36 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
             };
         }
         return event -> true;
+    }
+
+    private Predicate<Event> createEventFilterWithTimestamp(
+            long startTimestampSec, BinlogOffsetKind offsetKind) {
+        StartupOptions startupOptions = statefulTaskContext.getSourceConfig().getStartupOptions();
+        // If startup mode is not TIMESTAMP, no filtering needed
+        if (!startupOptions.startupMode.equals(StartupMode.TIMESTAMP)) {
+            return event -> true;
+        }
+        if (startupOptions.binlogOffset == null) {
+            throw new NullPointerException(
+                    "The startup option was set to TIMESTAMP "
+                            + "but unable to find starting binlog offset. Please check if the timestamp is specified in "
+                            + "configuration. ");
+        }
+        if (offsetKind == BinlogOffsetKind.TIMESTAMP) {
+            return createEventFilter();
+        }
+        // If the offset kind is SPECIFIC, that means the job is restored from a savepoint which has
+        // a specific offset.
+        LOG.info(
+                "Creating an event filter that drops row mutation events occurring before the destination"
+                        + " timestamp in seconds {}",
+                startTimestampSec);
+        return event -> {
+            if (!EventType.isRowMutation(getEventType(event))) {
+                return true;
+            }
+            return event.getHeader().getTimestamp() >= startTimestampSec * 1000;
+        };
     }
 
     public void stopBinlogReadTask() {
