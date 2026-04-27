@@ -617,7 +617,14 @@ public class IcebergWriterTest {
         String operatorId = UUID.randomUUID().toString();
         IcebergWriter icebergWriter =
                 new IcebergWriter(
-                        catalogOptions, 1, 1, ZoneId.systemDefault(), 0, jobId, operatorId);
+                        catalogOptions,
+                        1,
+                        1,
+                        ZoneId.systemDefault(),
+                        0,
+                        jobId,
+                        operatorId,
+                        new HashMap<>());
         IcebergMetadataApplier icebergMetadataApplier = new IcebergMetadataApplier(catalogOptions);
 
         TableId tableId = TableId.parse("test.iceberg_table");
@@ -648,7 +655,7 @@ public class IcebergWriterTest {
         icebergWriter.write(DataChangeEvent.updateEvent(tableId, recordA, recordB), null);
 
         Collection<WriteResultWrapper> writeResults = icebergWriter.prepareCommit();
-        IcebergCommitter icebergCommitter = new IcebergCommitter(catalogOptions);
+        IcebergCommitter icebergCommitter = new IcebergCommitter(catalogOptions, new HashMap<>());
         Collection<Committer.CommitRequest<WriteResultWrapper>> collection =
                 writeResults.stream().map(MockCommitRequestImpl::new).collect(Collectors.toList());
         icebergCommitter.commit(collection);
@@ -685,7 +692,14 @@ public class IcebergWriterTest {
         String operatorId = UUID.randomUUID().toString();
         IcebergWriter icebergWriter =
                 new IcebergWriter(
-                        catalogOptions, 1, 1, ZoneId.systemDefault(), 0, jobId, operatorId);
+                        catalogOptions,
+                        1,
+                        1,
+                        ZoneId.systemDefault(),
+                        0,
+                        jobId,
+                        operatorId,
+                        new HashMap<>());
         IcebergMetadataApplier icebergMetadataApplier = new IcebergMetadataApplier(catalogOptions);
 
         TableId tableId = TableId.parse("test.iceberg_table");
@@ -731,7 +745,7 @@ public class IcebergWriterTest {
         icebergWriter.write(DataChangeEvent.updateEvent(tableId, recordANew, recordB), null);
 
         Collection<WriteResultWrapper> writeResults = icebergWriter.prepareCommit();
-        IcebergCommitter icebergCommitter = new IcebergCommitter(catalogOptions);
+        IcebergCommitter icebergCommitter = new IcebergCommitter(catalogOptions, new HashMap<>());
         Collection<Committer.CommitRequest<WriteResultWrapper>> collection =
                 writeResults.stream().map(MockCommitRequestImpl::new).collect(Collectors.toList());
         icebergCommitter.commit(collection);
@@ -767,7 +781,14 @@ public class IcebergWriterTest {
         String operatorId = UUID.randomUUID().toString();
         IcebergWriter icebergWriter =
                 new IcebergWriter(
-                        catalogOptions, 1, 1, ZoneId.systemDefault(), 0, jobId, operatorId);
+                        catalogOptions,
+                        1,
+                        1,
+                        ZoneId.systemDefault(),
+                        0,
+                        jobId,
+                        operatorId,
+                        new HashMap<>());
         IcebergMetadataApplier icebergMetadataApplier = new IcebergMetadataApplier(catalogOptions);
 
         TableId tableId = TableId.parse("test.iceberg_table");
@@ -844,7 +865,7 @@ public class IcebergWriterTest {
         partialDelta.commit();
 
         // Retry: Flink re-delivers all committables for the checkpoint.
-        IcebergCommitter icebergCommitter = new IcebergCommitter(catalogOptions);
+        IcebergCommitter icebergCommitter = new IcebergCommitter(catalogOptions, new HashMap<>());
         Collection<Committer.CommitRequest<WriteResultWrapper>> collection =
                 writeResults.stream().map(MockCommitRequestImpl::new).collect(Collectors.toList());
         icebergCommitter.commit(collection);
@@ -888,7 +909,14 @@ public class IcebergWriterTest {
         String operatorId = UUID.randomUUID().toString();
         IcebergWriter icebergWriter =
                 new IcebergWriter(
-                        catalogOptions, 1, 1, ZoneId.systemDefault(), 0, jobId, operatorId);
+                        catalogOptions,
+                        1,
+                        1,
+                        ZoneId.systemDefault(),
+                        0,
+                        jobId,
+                        operatorId,
+                        new HashMap<>());
         IcebergMetadataApplier icebergMetadataApplier = new IcebergMetadataApplier(catalogOptions);
 
         TableId tableId = TableId.parse("test.iceberg_table");
@@ -962,7 +990,7 @@ public class IcebergWriterTest {
         Assertions.assertThat(sortedBatches.get(1).getBatchIndex()).isEqualTo(1);
         Assertions.assertThat(sortedBatches.get(2).getBatchIndex()).isEqualTo(2);
 
-        IcebergCommitter icebergCommitter = new IcebergCommitter(catalogOptions);
+        IcebergCommitter icebergCommitter = new IcebergCommitter(catalogOptions, new HashMap<>());
         Collection<Committer.CommitRequest<WriteResultWrapper>> collection =
                 writeResults.stream().map(MockCommitRequestImpl::new).collect(Collectors.toList());
         icebergCommitter.commit(collection);
@@ -993,7 +1021,14 @@ public class IcebergWriterTest {
         String operatorId = UUID.randomUUID().toString();
         IcebergWriter icebergWriter =
                 new IcebergWriter(
-                        catalogOptions, 1, 1, ZoneId.systemDefault(), 0, jobId, operatorId);
+                        catalogOptions,
+                        1,
+                        1,
+                        ZoneId.systemDefault(),
+                        0,
+                        jobId,
+                        operatorId,
+                        new HashMap<>());
         IcebergMetadataApplier icebergMetadataApplier = new IcebergMetadataApplier(catalogOptions);
 
         TableId tableA = TableId.parse("test.table_a");
@@ -1066,7 +1101,7 @@ public class IcebergWriterTest {
         Assertions.assertThat(batchCountByTable.get(tableA)).isEqualTo(2);
         Assertions.assertThat(batchCountByTable.get(tableB)).isEqualTo(1);
 
-        IcebergCommitter icebergCommitter = new IcebergCommitter(catalogOptions);
+        IcebergCommitter icebergCommitter = new IcebergCommitter(catalogOptions, new HashMap<>());
         Collection<Committer.CommitRequest<WriteResultWrapper>> collection =
                 writeResults.stream().map(MockCommitRequestImpl::new).collect(Collectors.toList());
         icebergCommitter.commit(collection);
@@ -1100,10 +1135,24 @@ public class IcebergWriterTest {
         // Two subtask writers sharing the same catalog and table.
         IcebergWriter writer0 =
                 new IcebergWriter(
-                        catalogOptions, 0, 1, ZoneId.systemDefault(), 0, jobId, operatorId);
+                        catalogOptions,
+                        0,
+                        1,
+                        ZoneId.systemDefault(),
+                        0,
+                        jobId,
+                        operatorId,
+                        new HashMap<>());
         IcebergWriter writer1 =
                 new IcebergWriter(
-                        catalogOptions, 1, 1, ZoneId.systemDefault(), 0, jobId, operatorId);
+                        catalogOptions,
+                        1,
+                        1,
+                        ZoneId.systemDefault(),
+                        0,
+                        jobId,
+                        operatorId,
+                        new HashMap<>());
 
         TableId tableId = TableId.parse("test.iceberg_table");
         Schema schema =
@@ -1186,10 +1235,24 @@ public class IcebergWriterTest {
 
         IcebergWriter writer0 =
                 new IcebergWriter(
-                        catalogOptions, 0, 1, ZoneId.systemDefault(), 0, jobId, operatorId);
+                        catalogOptions,
+                        0,
+                        1,
+                        ZoneId.systemDefault(),
+                        0,
+                        jobId,
+                        operatorId,
+                        new HashMap<>());
         IcebergWriter writer1 =
                 new IcebergWriter(
-                        catalogOptions, 1, 1, ZoneId.systemDefault(), 0, jobId, operatorId);
+                        catalogOptions,
+                        1,
+                        1,
+                        ZoneId.systemDefault(),
+                        0,
+                        jobId,
+                        operatorId,
+                        new HashMap<>());
 
         TableId tableId = TableId.parse("test.iceberg_table");
         Schema initialSchema =
@@ -1243,7 +1306,7 @@ public class IcebergWriterTest {
         allResults.addAll(writer0.prepareCommit());
         allResults.addAll(writer1.prepareCommit());
 
-        IcebergCommitter committer = new IcebergCommitter(catalogOptions);
+        IcebergCommitter committer = new IcebergCommitter(catalogOptions, new HashMap<>());
         committer.commit(
                 allResults.stream().map(MockCommitRequestImpl::new).collect(Collectors.toList()));
 
@@ -1275,10 +1338,24 @@ public class IcebergWriterTest {
 
         IcebergWriter writer0 =
                 new IcebergWriter(
-                        catalogOptions, 0, 1, ZoneId.systemDefault(), 0, jobId, operatorId);
+                        catalogOptions,
+                        0,
+                        1,
+                        ZoneId.systemDefault(),
+                        0,
+                        jobId,
+                        operatorId,
+                        new HashMap<>());
         IcebergWriter writer1 =
                 new IcebergWriter(
-                        catalogOptions, 1, 1, ZoneId.systemDefault(), 0, jobId, operatorId);
+                        catalogOptions,
+                        1,
+                        1,
+                        ZoneId.systemDefault(),
+                        0,
+                        jobId,
+                        operatorId,
+                        new HashMap<>());
 
         TableId tableId = TableId.parse("test.iceberg_table");
         Schema schema =
@@ -1323,7 +1400,7 @@ public class IcebergWriterTest {
                         TableIdentifier.of(tableId.getSchemaName(), tableId.getTableName()));
         long snapshotsBefore = countSnapshots(table);
 
-        IcebergCommitter committer = new IcebergCommitter(catalogOptions);
+        IcebergCommitter committer = new IcebergCommitter(catalogOptions, new HashMap<>());
         committer.commit(
                 allResults.stream().map(MockCommitRequestImpl::new).collect(Collectors.toList()));
 
@@ -1362,10 +1439,24 @@ public class IcebergWriterTest {
 
         IcebergWriter writer0 =
                 new IcebergWriter(
-                        catalogOptions, 0, 1, ZoneId.systemDefault(), 0, jobId, operatorId);
+                        catalogOptions,
+                        0,
+                        1,
+                        ZoneId.systemDefault(),
+                        0,
+                        jobId,
+                        operatorId,
+                        new HashMap<>());
         IcebergWriter writer1 =
                 new IcebergWriter(
-                        catalogOptions, 1, 1, ZoneId.systemDefault(), 0, jobId, operatorId);
+                        catalogOptions,
+                        1,
+                        1,
+                        ZoneId.systemDefault(),
+                        0,
+                        jobId,
+                        operatorId,
+                        new HashMap<>());
 
         TableId tableId = TableId.parse("test.iceberg_table");
         Schema schema0 =
@@ -1461,7 +1552,7 @@ public class IcebergWriterTest {
                 allResults.stream().mapToInt(WriteResultWrapper::getBatchIndex).distinct().count();
         Assertions.assertThat(distinctBatchIndices).isEqualTo(3);
 
-        IcebergCommitter committer = new IcebergCommitter(catalogOptions);
+        IcebergCommitter committer = new IcebergCommitter(catalogOptions, new HashMap<>());
         committer.commit(
                 allResults.stream().map(MockCommitRequestImpl::new).collect(Collectors.toList()));
 
