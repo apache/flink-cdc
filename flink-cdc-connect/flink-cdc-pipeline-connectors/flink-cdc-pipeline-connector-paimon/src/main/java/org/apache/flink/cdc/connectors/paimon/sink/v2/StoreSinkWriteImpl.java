@@ -130,13 +130,13 @@ public class StoreSinkWriteImpl implements StoreSinkWrite {
         if (memoryPoolFactory != null) {
             return tableWrite.withMemoryPoolFactory(memoryPoolFactory);
         } else {
-            return (TableWriteImpl<?>)
-                    tableWrite.withMemoryPool(
+            return tableWrite.withMemoryPoolFactory(
+                    new MemoryPoolFactory(
                             memoryPool != null
                                     ? memoryPool
                                     : new HeapMemorySegmentPool(
                                             table.coreOptions().writeBufferSize(),
-                                            table.coreOptions().pageSize()));
+                                            table.coreOptions().pageSize())));
         }
     }
 
@@ -157,11 +157,6 @@ public class StoreSinkWriteImpl implements StoreSinkWrite {
     @Override
     public SinkRecord write(InternalRow internalRow, int i) throws Exception {
         return write.writeAndReturn(internalRow, i);
-    }
-
-    @Override
-    public SinkRecord toLogRecord(SinkRecord record) {
-        return write.toLogRecord(record);
     }
 
     @Override
@@ -191,8 +186,7 @@ public class StoreSinkWriteImpl implements StoreSinkWrite {
             try {
                 for (CommitMessage committable :
                         write.prepareCommit(this.waitCompaction || waitCompaction, checkpointId)) {
-                    committables.add(
-                            new Committable(checkpointId, Committable.Kind.FILE, committable));
+                    committables.add(new Committable(checkpointId, committable));
                 }
             } catch (Exception e) {
                 throw new IOException(e);

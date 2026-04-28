@@ -39,18 +39,18 @@ public class TestMultiTableCommittableChannelComputer {
         computer.setup(4);
         List<MultiTableCommittable> commits =
                 Arrays.asList(
-                        new MultiTableCommittable("database", "table1", 1L, null, null),
-                        new MultiTableCommittable("database", "table2", 1L, null, null),
-                        new MultiTableCommittable("database", "table1", 1L, null, null),
-                        new MultiTableCommittable("database", "table5", 1L, null, null),
-                        new MultiTableCommittable("database", "table3", 1L, null, null),
-                        new MultiTableCommittable("database", "table8", 1L, null, null),
-                        new MultiTableCommittable("database", "table5", 1L, null, null),
-                        new MultiTableCommittable("database", "table1", 1L, null, null),
-                        new MultiTableCommittable("database", "table9", 1L, null, null),
-                        new MultiTableCommittable("database", "table5", 1L, null, null),
-                        new MultiTableCommittable("database", "table3", 1L, null, null),
-                        new MultiTableCommittable("database", "table8", 1L, null, null));
+                        new MultiTableCommittable("database", "table1", 1L, null),
+                        new MultiTableCommittable("database", "table2", 1L, null),
+                        new MultiTableCommittable("database", "table1", 1L, null),
+                        new MultiTableCommittable("database", "table5", 1L, null),
+                        new MultiTableCommittable("database", "table3", 1L, null),
+                        new MultiTableCommittable("database", "table8", 1L, null),
+                        new MultiTableCommittable("database", "table5", 1L, null),
+                        new MultiTableCommittable("database", "table1", 1L, null),
+                        new MultiTableCommittable("database", "table9", 1L, null),
+                        new MultiTableCommittable("database", "table5", 1L, null),
+                        new MultiTableCommittable("database", "table3", 1L, null),
+                        new MultiTableCommittable("database", "table8", 1L, null));
         Map<Integer, Set<String>> map = new HashMap<>();
         commits.forEach(
                 (commit) -> {
