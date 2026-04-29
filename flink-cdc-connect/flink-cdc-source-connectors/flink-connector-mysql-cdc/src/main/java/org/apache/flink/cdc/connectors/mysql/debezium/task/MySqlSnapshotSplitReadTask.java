@@ -24,6 +24,7 @@ import org.apache.flink.cdc.connectors.mysql.debezium.reader.SnapshotSplitReader
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
+import org.apache.flink.cdc.connectors.mysql.source.utils.SnapshotFilterUtils;
 import org.apache.flink.cdc.connectors.mysql.source.utils.StatementUtils;
 import org.apache.flink.cdc.connectors.mysql.source.utils.hooks.SnapshotPhaseHooks;
 
@@ -83,6 +84,7 @@ public class MySqlSnapshotSplitReadTask
 
     private final SnapshotPhaseHooks hooks;
     private final boolean isBackfillSkipped;
+    private final String snapshotFilter;
 
     public MySqlSnapshotSplitReadTask(
             MySqlSourceConfig sourceConfig,
@@ -109,6 +111,9 @@ public class MySqlSnapshotSplitReadTask
         this.snapshotChangeEventSourceMetrics = snapshotChangeEventSourceMetrics;
         this.hooks = hooks;
         this.isBackfillSkipped = isBackfillSkipped;
+        this.snapshotFilter =
+                SnapshotFilterUtils.getSnapshotFilter(
+                        sourceConfig.getSnapshotFilters(), snapshotSplit.getTableId());
     }
 
     @Override
@@ -242,12 +247,21 @@ public class MySqlSnapshotSplitReadTask
         long exportStart = clock.currentTimeInMillis();
         LOG.info("Exporting data from split '{}' of table {}", snapshotSplit.splitId(), table.id());
 
+        if (snapshotFilter != null) {
+            LOG.info(
+                    "Filter for split '{}' of table {} is: {}",
+                    snapshotSplit.splitId(),
+                    table.id(),
+                    snapshotFilter);
+        }
+
         final String selectSql =
                 StatementUtils.buildSplitScanQuery(
                         snapshotSplit.getTableId(),
                         snapshotSplit.getSplitKeyType(),
                         snapshotSplit.getSplitStart() == null,
-                        snapshotSplit.getSplitEnd() == null);
+                        snapshotSplit.getSplitEnd() == null,
+                        snapshotFilter);
         LOG.info(
                 "For split '{}' of table {} using select statement: '{}'",
                 snapshotSplit.splitId(),

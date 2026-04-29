@@ -371,6 +371,16 @@ pipeline:
         List of readable metadata from SourceRecord to be passed to downstream and could be used in transform module, split by `,`. Available readable metadata are: op_ts.
       </td>
     </tr>
+    <tr>
+      <td>scan.snapshot.filters</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>List&lt;Map&lt;String, String&gt;&gt;</td>
+      <td>When reading a table snapshot, the rows of captured tables will be filtered using the specified filter expressions (SQL WHERE clauses). <br>
+          This option is configured as a list of filter specifications, where each specification is represented as a map of string key-value pairs (as shown in the example configuration below). <br>
+          By default, no filter is applied, meaning the entire table will be synchronized.
+      </td>
+    </tr>
     </tbody>
 </table>
 </div>
@@ -403,6 +413,38 @@ source:
   scan.startup.specific-offset.gtid-set: 24DA167-...    # GTID set under specific offset startup mode
   scan.startup.timestamp-millis: 1667232000000          # Timestamp under timestamp startup mode
   # ...
+```
+
+## Snapshot Filters
+
+The `scan.snapshot.filters` option allows you to apply per-table SQL WHERE clauses during snapshot reading, so that only matching rows are synchronized. This is useful when you want to perform a partial initial load (e.g. migrating only recent data) without modifying the source tables.
+
+Each entry in the list specifies a `table` pattern (using the same format as the `tables` option) and a `filter` expression. Rows that do not satisfy the expression are skipped during snapshot reading. Binlog events are still captured for all rows after the snapshot phase, regardless of the filter.
+
+For example, to read only orders placed after 2024-01-01 from `mydb.orders` and only active users from `mydb.users`:
+
+```yaml
+source:
+  type: mysql
+  hostname: 127.0.0.1
+  port: 3306
+  username: admin
+  password: pass
+  tables: mydb\..*
+  server-id: 5401-5404
+  scan.snapshot.filters:
+    - table: mydb.orders
+      filter: order_date >= '2024-01-01'
+    - table: mydb.users
+      filter: status = 'active'
+
+sink:
+  type: doris
+  # ...
+
+pipeline:
+  name: Filtered MySQL to Doris Pipeline
+  parallelism: 4
 ```
 
 ## Available Source metrics
