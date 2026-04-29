@@ -1044,8 +1044,7 @@ public class PaimonSinkITCase {
                 committable.getDatabase(),
                 committable.getTable(),
                 checkpointId++,
-                committable.kind(),
-                committable.wrappedCommittable());
+                committable.commitMessage());
     }
 
     private static class MockCommitRequestImpl<CommT> extends CommitRequestImpl<CommT> {

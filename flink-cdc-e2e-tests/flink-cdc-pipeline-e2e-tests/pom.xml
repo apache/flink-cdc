@@ -32,7 +32,7 @@ limitations under the License.
         <flink-major-1.20>1.20</flink-major-1.20>
         <mysql.driver.version>8.0.27</mysql.driver.version>
         <starrocks.connector.version>1.2.14_flink-${flink-major-1.20}</starrocks.connector.version>
-        <paimon.version>1.3.1</paimon.version>
+        <paimon.version>1.4.1</paimon.version>
         <flink.release.download.skip>false</flink.release.download.skip>
         <flink.release.name>flink-${flink.version}-bin-scala_${scala.binary.version}.tgz</flink.release.name>
         <flink.release.mirror>https://dlcdn.apache.org/flink/flink-${flink.version}</flink.release.mirror>

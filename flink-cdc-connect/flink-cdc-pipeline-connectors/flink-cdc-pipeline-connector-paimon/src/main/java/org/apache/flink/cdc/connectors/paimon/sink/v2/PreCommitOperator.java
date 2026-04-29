@@ -115,8 +115,7 @@ public class PreCommitOperator
                             multiTableCommittable.getDatabase(),
                             multiTableCommittable.getTable(),
                             checkpointId,
-                            multiTableCommittable.kind(),
-                            multiTableCommittable.wrappedCommittable()));
+                            multiTableCommittable.commitMessage()));
         }
     }
 
