@@ -336,6 +336,9 @@ public class IcebergMetadataApplier implements MetadataApplier {
                                                                 .getLogicalType())
                                                 .asPrimitiveType();
                                 updateSchema.updateColumn(name, type);
+                                if (newType.isNullable()) {
+                                    updateSchema.makeColumnOptional(name);
+                                }
                             });
             updateSchema.commit();
         } catch (Exception e) {
