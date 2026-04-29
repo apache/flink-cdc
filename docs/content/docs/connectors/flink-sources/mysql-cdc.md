@@ -462,10 +462,20 @@ Only valid for cdc 1.x version. During a snapshot operation, the connector will 
       <td style="word-wrap: break-word;">false</td>
       <td>Boolean</td>
       <td>
-        Whether to skip backfill in snapshot reading phase.<br> 
+        Whether to skip backfill in snapshot reading phase.<br>
         If backfill is skipped, changes on captured tables during snapshot phase will be consumed later in change log reading phase instead of being merged into the snapshot.<br>
         WARNING: Skipping backfill might lead to data inconsistency because some change log events happened within the snapshot phase might be replayed (only at-least-once semantic is promised).
         For example updating an already updated value in snapshot, or deleting an already deleted entry in snapshot. These replayed change log events should be handled specially.
+      </td>
+    </tr>
+    <tr>
+      <td>scan.rate-limit.records-per-second</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">-1</td>
+      <td>Long</td>
+      <td>
+        Rate limit for source reading (both snapshot and binlog phases), in records per second.<br>
+        A value of -1 (default) means no rate limit is applied.
       </td>
     </tr>
     </tbody>
