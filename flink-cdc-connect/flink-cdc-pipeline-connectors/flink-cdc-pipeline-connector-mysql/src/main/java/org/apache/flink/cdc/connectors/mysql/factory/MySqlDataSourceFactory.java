@@ -83,6 +83,7 @@ import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOption
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
+import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_SNAPSHOT_HOSTNAME;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_STARTUP_MODE;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_FILE;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_GTID_SET;
@@ -120,6 +121,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
 
         final Configuration config = context.getFactoryConfiguration();
         String hostname = config.get(HOSTNAME);
+        String scanSnapshotHostname = config.getOptional(SCAN_SNAPSHOT_HOSTNAME).orElse(null);
         int port = config.get(PORT);
 
         String username = config.get(USERNAME);
@@ -194,6 +196,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         MySqlSourceConfigFactory configFactory =
                 new MySqlSourceConfigFactory()
                         .hostname(hostname)
+                        .snapshotHostname(scanSnapshotHostname)
                         .port(port)
                         .username(username)
                         .password(password)
@@ -326,6 +329,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
     @Override
     public Set<ConfigOption<?>> optionalOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
+        options.add(SCAN_SNAPSHOT_HOSTNAME);
         options.add(PORT);
         options.add(TABLES_EXCLUDE);
         options.add(SCHEMA_CHANGE_ENABLED);
