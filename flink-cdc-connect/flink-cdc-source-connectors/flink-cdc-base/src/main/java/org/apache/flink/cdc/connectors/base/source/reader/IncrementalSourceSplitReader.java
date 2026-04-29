@@ -268,7 +268,7 @@ public class IncrementalSourceSplitReader<C extends SourceConfig>
     private IncrementalSourceStreamFetcher getStreamFetcher() {
         if (reusedStreamFetcher == null) {
             reusedStreamFetcher =
-                    new IncrementalSourceStreamFetcher(
+                    dataSourceDialect.createStreamFetcher(
                             dataSourceDialect.createFetchTaskContext(sourceConfig), subtaskId);
         }
         return reusedStreamFetcher;

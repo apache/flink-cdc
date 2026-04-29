@@ -315,6 +315,12 @@ public class PostgresSourceBuilder<T> {
         return this;
     }
 
+    /** Whether to emit Postgres logical decoding messages to the deserializer. */
+    public PostgresSourceBuilder<T> includeLogicalMessages(boolean includeLogicalMessages) {
+        this.configFactory.setIncludeLogicalMessages(includeLogicalMessages);
+        return this;
+    }
+
     /** Whether to infer schema change event on relation message. */
     public PostgresSourceBuilder<T> includeSchemaChanges(boolean includeSchemaChanges) {
         this.configFactory.includeSchemaChanges(includeSchemaChanges);

@@ -24,6 +24,7 @@ import org.apache.flink.cdc.connectors.base.source.assigner.state.ChunkSplitterS
 import org.apache.flink.cdc.connectors.base.source.meta.offset.Offset;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.reader.external.FetchTask;
+import org.apache.flink.cdc.connectors.base.source.reader.external.IncrementalSourceStreamFetcher;
 
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges;
@@ -80,6 +81,15 @@ public interface DataSourceDialect<C extends SourceConfig> extends Serializable,
 
     /** The task context used for fetch task to fetch data from external systems. */
     FetchTask.Context createFetchTaskContext(C sourceConfig);
+
+    /**
+     * The stream fetcher used to fetch data of a stream split. Dialects may override this to
+     * provide connector-specific filtering or routing behavior.
+     */
+    default IncrementalSourceStreamFetcher createStreamFetcher(
+            FetchTask.Context taskContext, int subtaskId) {
+        return new IncrementalSourceStreamFetcher(taskContext, subtaskId);
+    }
 
     /**
      * We may need the offset corresponding to the checkpointId. For example, we should commit LSN
