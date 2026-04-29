@@ -36,6 +36,7 @@ import org.apache.paimon.flink.sink.StoreSinkWrite;
 import org.apache.paimon.memory.HeapMemorySegmentPool;
 import org.apache.paimon.memory.MemoryPoolFactory;
 import org.apache.paimon.options.Options;
+import org.apache.paimon.table.BucketMode;
 import org.apache.paimon.table.FileStoreTable;
 import org.apache.paimon.utils.ExecutorThreadFactory;
 import org.slf4j.Logger;
@@ -190,8 +191,12 @@ public class PaimonWriter<InputT>
                                 return storeSinkWrite;
                             });
             try {
+                int bucket =
+                        table.bucketMode() == BucketMode.POSTPONE_MODE
+                                ? BucketMode.POSTPONE_BUCKET
+                                : paimonEvent.getBucket();
                 for (GenericRow genericRow : paimonEvent.getGenericRows()) {
-                    write.write(genericRow, paimonEvent.getBucket());
+                    write.write(genericRow, bucket);
                 }
             } catch (Exception e) {
                 throw new IOException(e);

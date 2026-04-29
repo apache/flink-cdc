@@ -190,11 +190,13 @@ public class BucketAssignOperator extends AbstractStreamOperatorAdapter<Event>
                     }
                 case POSTPONE_MODE:
                     {
-                        // Postpone bucket tables (bucket = -2): bucket assignment is deferred
-                        // to a downstream compaction job, so we just emit -2 here.
-                        // The partition is still hashed so events of the same partition land on
-                        // the same writer task.
-                        bucket = BucketMode.POSTPONE_BUCKET;
+                        // Postpone bucket tables: the actual bucket written to Paimon is -2
+                        // (assigned by a downstream compaction job). However, using -2 as the
+                        // shuffle key here would route all postpone events to the same writer
+                        // subtask and cause severe data skew. Use currentTaskNumber so events
+                        // are evenly spread across writer subtasks; PaimonWriter will rewrite
+                        // the bucket back to POSTPONE_BUCKET (-2) when persisting records.
+                        bucket = currentTaskNumber;
                         partition = tuple4.f3.partition(genericRow).hashCode();
                         break;
                     }
