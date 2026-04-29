@@ -496,7 +496,7 @@ pipeline:
 ```
 注意：
 * `model-name` 是一个通用的必填参数，用于所有支持的模型，表示在 `projection` 或 `filter` 中调用的函数名称。
-* `class-name` 是一个通用的必填参数，用于所有支持的模型，可用值可以在[所有支持的模型](#all-support-models)中找到。
+* `class-name` 是一个通用的必填参数，用于所有支持的模型，可用值可以在[所有支持的模型](#所有支持的模型)中找到。
 * `openai.model`，`openai.host`，`openai.apiKey` 和 `openai.chat.prompt` 是在各个模型中特别的可选参数。
 
 如何使用一个 Embedding AI 模型：
