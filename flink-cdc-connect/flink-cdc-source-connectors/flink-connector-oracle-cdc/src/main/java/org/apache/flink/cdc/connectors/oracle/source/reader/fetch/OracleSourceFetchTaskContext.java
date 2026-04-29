@@ -70,8 +70,10 @@ import org.slf4j.LoggerFactory;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.util.Map;
+import java.util.function.Function;
 
 import static org.apache.flink.cdc.connectors.oracle.source.utils.OracleConnectionUtils.createOracleConnection;
+import static org.apache.flink.cdc.connectors.oracle.source.utils.OracleConnectionUtils.resolveRedoLogOffsetByTimestamp;
 import static org.apache.flink.cdc.connectors.oracle.util.ChunkUtils.getChunkKeyColumn;
 
 /** The context for fetch task that fetching data of snapshot split from Oracle data source. */
@@ -86,6 +88,7 @@ public class OracleSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
     private OracleTaskContext taskContext;
     private OracleOffsetContext offsetContext;
     private OraclePartition partition;
+    private Long startupTimestampMillis;
 
     private SnapshotChangeEventSourceMetrics<OraclePartition> snapshotChangeEventSourceMetrics;
     private OracleStreamingChangeEventSourceMetrics streamingChangeEventSourceMetrics;
@@ -272,12 +275,54 @@ public class OracleSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
     /** Loads the connector's persistent offset (if present) via the given loader. */
     private OracleOffsetContext loadStartingOffsetState(
             OffsetContext.Loader<OracleOffsetContext> loader, SourceSplitBase oracleSplit) {
-        Offset offset =
-                oracleSplit.isSnapshotSplit()
-                        ? RedoLogOffset.INITIAL_OFFSET
-                        : oracleSplit.asStreamSplit().getStartingOffset();
+        StartingOffsetResolution resolution =
+                resolveStartingOffset(
+                        oracleSplit,
+                        timestampMillis ->
+                                resolveRedoLogOffsetByTimestamp(connection, timestampMillis));
+        startupTimestampMillis = resolution.startupTimestampMillis;
+        return loader.load(resolution.offset.getOffset());
+    }
 
-        return loader.load(offset.getOffset());
+    public Long getStartupTimestampMillis() {
+        return startupTimestampMillis;
+    }
+
+    static StartingOffsetResolution resolveStartingOffset(
+            SourceSplitBase oracleSplit, Function<Long, Offset> timestampOffsetResolver) {
+        Offset offset = RedoLogOffset.INITIAL_OFFSET;
+        Long resolvedStartupTimestampMillis = null;
+        if (!oracleSplit.isSnapshotSplit()) {
+            offset = oracleSplit.asStreamSplit().getStartingOffset();
+            if (offset instanceof RedoLogOffset) {
+                final Long splitStartupTimestampMillis =
+                        ((RedoLogOffset) offset).getStartupTimestampMillis();
+                if (splitStartupTimestampMillis != null) {
+                    resolvedStartupTimestampMillis = splitStartupTimestampMillis;
+                    offset = timestampOffsetResolver.apply(splitStartupTimestampMillis);
+                }
+            }
+        }
+
+        return new StartingOffsetResolution(offset, resolvedStartupTimestampMillis);
+    }
+
+    static class StartingOffsetResolution {
+        private final Offset offset;
+        private final Long startupTimestampMillis;
+
+        private StartingOffsetResolution(Offset offset, Long startupTimestampMillis) {
+            this.offset = offset;
+            this.startupTimestampMillis = startupTimestampMillis;
+        }
+
+        Offset getOffset() {
+            return offset;
+        }
+
+        Long getStartupTimestampMillis() {
+            return startupTimestampMillis;
+        }
     }
 
     private void validateAndLoadDatabaseHistory(

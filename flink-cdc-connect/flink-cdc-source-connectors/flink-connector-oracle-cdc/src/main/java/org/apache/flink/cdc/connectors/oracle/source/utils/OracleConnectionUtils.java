@@ -22,6 +22,7 @@ import org.apache.flink.cdc.connectors.oracle.source.meta.offset.RedoLogOffset;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import io.debezium.config.Configuration;
+import io.debezium.connector.oracle.OracleConnection;
 import io.debezium.connector.oracle.Scn;
 import io.debezium.jdbc.JdbcConfiguration;
 import io.debezium.jdbc.JdbcConnection;
@@ -31,6 +32,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -46,8 +49,19 @@ public class OracleConnectionUtils {
     /** Returned by column metadata in Oracle if no scale is set. */
     private static final int ORACLE_UNSET_SCALE = -127;
 
+    private static final int ORA_TIMESTAMP_TO_SCN_OUT_OF_RANGE = 8181;
+    private static final int ORA_TIMESTAMP_TO_SCN_INVALID_TIMESTAMP = 8186;
+
     /** show current scn sql in oracle. */
     private static final String SHOW_CURRENT_SCN = "SELECT CURRENT_SCN FROM V$DATABASE";
+
+    private static final String SHOW_SCN_BY_TIMESTAMP = "SELECT timestamp_to_scn(?) FROM DUAL";
+    private static final String SHOW_OLDEST_AVAILABLE_SCN =
+            "SELECT MIN(FIRST_CHANGE#) FROM ("
+                    + "SELECT MIN(FIRST_CHANGE#) AS FIRST_CHANGE# FROM V$LOG "
+                    + "UNION "
+                    + "SELECT MIN(FIRST_CHANGE#) AS FIRST_CHANGE# FROM V$ARCHIVED_LOG WHERE STATUS='A'"
+                    + ")";
 
     /** Creates a new {@link OracleSourceConnection}, but not open the connection. */
     public static OracleSourceConnection createOracleConnection(Configuration configuration) {
@@ -86,6 +100,103 @@ public class OracleConnectionUtils {
                             + "'. Make sure your server is correctly configured",
                     e);
         }
+    }
+
+    @FunctionalInterface
+    interface ScnSupplier {
+        Scn get() throws SQLException;
+    }
+
+    /** Resolve the startup timestamp to a readable redo-log offset. */
+    public static RedoLogOffset resolveRedoLogOffsetByTimestamp(
+            OracleConnection connection, long startupTimestampMillis) {
+        return resolveRedoLogOffsetByTimestamp(
+                startupTimestampMillis,
+                () ->
+                        connection.prepareQueryAndMap(
+                                SHOW_SCN_BY_TIMESTAMP,
+                                statement ->
+                                        statement.setTimestamp(
+                                                1,
+                                                Timestamp.from(
+                                                        Instant.ofEpochMilli(
+                                                                startupTimestampMillis))),
+                                rs -> {
+                                    if (rs.next()) {
+                                        final String value = rs.getString(1);
+                                        return value == null ? null : Scn.valueOf(value);
+                                    }
+                                    return null;
+                                }),
+                () ->
+                        connection.queryAndMap(
+                                SHOW_OLDEST_AVAILABLE_SCN,
+                                rs -> {
+                                    if (rs.next()) {
+                                        final String value = rs.getString(1);
+                                        return value == null ? Scn.NULL : Scn.valueOf(value);
+                                    }
+                                    return Scn.NULL;
+                                }));
+    }
+
+    static RedoLogOffset resolveRedoLogOffsetByTimestamp(
+            long startupTimestampMillis,
+            ScnSupplier timestampScnSupplier,
+            ScnSupplier oldestScnSupplier) {
+        try {
+            final Scn timestampScn = timestampScnSupplier.get();
+
+            if (timestampScn != null && !timestampScn.isNull()) {
+                LOG.info(
+                        "Resolved startup timestamp {} to Oracle SCN {}.",
+                        startupTimestampMillis,
+                        timestampScn);
+                return new RedoLogOffset(timestampScn.subtract(Scn.ONE).longValue());
+            }
+        } catch (SQLException e) {
+            if (isTimestampToScnFallbackError(e)) {
+                LOG.warn(
+                        "Cannot resolve startup timestamp {} to SCN due to {}, fallback to oldest available SCN.",
+                        startupTimestampMillis,
+                        e.getMessage());
+            } else {
+                throw new FlinkRuntimeException(
+                        "Cannot resolve startup timestamp "
+                                + startupTimestampMillis
+                                + " to Oracle SCN.",
+                        e);
+            }
+        }
+
+        try {
+            final Scn oldestScn = oldestScnSupplier.get();
+            if (oldestScn == null || oldestScn.isNull()) {
+                throw new FlinkRuntimeException(
+                        "Cannot resolve oldest available Oracle SCN for startup timestamp "
+                                + startupTimestampMillis);
+            }
+            LOG.warn(
+                    "Fallback startup timestamp {} to oldest available Oracle SCN {}.",
+                    startupTimestampMillis,
+                    oldestScn);
+            return new RedoLogOffset(oldestScn.subtract(Scn.ONE).longValue());
+        } catch (SQLException e) {
+            throw new FlinkRuntimeException(
+                    "Cannot query oldest available Oracle SCN for startup timestamp "
+                            + startupTimestampMillis,
+                    e);
+        }
+    }
+
+    private static boolean isTimestampToScnFallbackError(SQLException e) {
+        if (e.getErrorCode() == ORA_TIMESTAMP_TO_SCN_OUT_OF_RANGE
+                || e.getErrorCode() == ORA_TIMESTAMP_TO_SCN_INVALID_TIMESTAMP) {
+            return true;
+        }
+        String message = e.getMessage();
+        return message != null
+                && (message.startsWith("ORA-08181") || message.startsWith("ORA-08186"));
     }
 
     public static List<TableId> listTables(

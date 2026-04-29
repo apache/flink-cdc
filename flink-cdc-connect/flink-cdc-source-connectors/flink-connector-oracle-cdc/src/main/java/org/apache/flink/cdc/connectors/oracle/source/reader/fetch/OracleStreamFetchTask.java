@@ -64,7 +64,8 @@ public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
                         sourceFetchContext.getDatabaseSchema(),
                         sourceFetchContext.getSourceConfig().getOriginDbzConnectorConfig(),
                         sourceFetchContext.getStreamingChangeEventSourceMetrics(),
-                        split);
+                        split,
+                        sourceFetchContext.getStartupTimestampMillis());
         StoppableChangeEventSourceContext changeEventSourceContext =
                 new StoppableChangeEventSourceContext();
         redoLogSplitReadTask.execute(
@@ -105,6 +106,7 @@ public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
         private final OracleDatabaseSchema schema;
 
         private final OracleStreamingChangeEventSourceMetrics metrics;
+        private final Long startupTimestampMillis;
 
         public RedoLogSplitReadTask(
                 OracleConnectorConfig connectorConfig,
@@ -115,7 +117,8 @@ public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
                 OracleDatabaseSchema schema,
                 Configuration jdbcConfig,
                 OracleStreamingChangeEventSourceMetrics metrics,
-                StreamSplit redoLogSplit) {
+                StreamSplit redoLogSplit,
+                Long startupTimestampMillis) {
             super(
                     connectorConfig,
                     connection,
@@ -133,6 +136,7 @@ public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
             this.connection = connection;
             this.metrics = metrics;
             this.schema = schema;
+            this.startupTimestampMillis = startupTimestampMillis;
         }
 
         @Override
@@ -163,7 +167,8 @@ public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
                     schema,
                     metrics,
                     errorHandler,
-                    redoLogSplit);
+                    redoLogSplit,
+                    startupTimestampMillis);
         }
     }
 }
