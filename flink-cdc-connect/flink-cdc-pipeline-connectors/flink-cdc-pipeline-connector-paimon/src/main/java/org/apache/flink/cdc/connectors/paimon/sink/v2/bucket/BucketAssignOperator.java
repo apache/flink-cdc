@@ -188,6 +188,16 @@ public class BucketAssignOperator extends AbstractStreamOperatorAdapter<Event>
                         partition = 0;
                         break;
                     }
+                case POSTPONE_MODE:
+                    {
+                        // Postpone bucket tables (bucket = -2): bucket assignment is deferred
+                        // to a downstream compaction job, so we just emit -2 here.
+                        // The partition is still hashed so events of the same partition land on
+                        // the same writer task.
+                        bucket = BucketMode.POSTPONE_BUCKET;
+                        partition = tuple4.f3.partition(genericRow).hashCode();
+                        break;
+                    }
                 case KEY_DYNAMIC:
                 default:
                     {
