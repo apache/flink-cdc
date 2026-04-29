@@ -33,6 +33,7 @@ import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.pipeline.DecimalPrecisionMode;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.Column;
@@ -2179,7 +2180,8 @@ class FlinkPipelineTransformITCase {
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[4, Derrida, 25, student, Derrida, 26, extras], after=[], op=DELETE, meta=()}");
     }
 
-    String[] runNumericCastingWith(String expression) throws Exception {
+    String[] runNumericCastingWith(DecimalPrecisionMode decimalPrecisionMode, String expression)
+            throws Exception {
         try {
             FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
 
@@ -2207,6 +2209,9 @@ class FlinkPipelineTransformITCase {
             pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
             pipelineConfig.set(
                     PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
+            pipelineConfig.set(
+                    PipelineOptions.PIPELINE_TRANSFORM_DECIMAL_PRECISION_MODE,
+                    decimalPrecisionMode);
             PipelineDef pipelineDef =
                     new PipelineDef(
                             sourceDef,
@@ -2253,9 +2258,10 @@ class FlinkPipelineTransformITCase {
                         .collect(Collectors.joining(", "));
     }
 
-    @Test
-    void testNumericCastingsWithTruncation() throws Exception {
-        assertThat(runNumericCastingWith("*"))
+    @ParameterizedTest(name = "Decimal mode: {0}")
+    @EnumSource
+    void testNumericCastingsWithTruncation(DecimalPrecisionMode mode) throws Exception {
+        assertThat(runNumericCastingWith(mode, "*"))
                 .containsExactly(
                         "CreateTableEvent{tableId=ns.scm.tbl, schema=columns={`id` BIGINT NOT NULL,`tiny_c` TINYINT,`small_c` SMALLINT,`int_c` INT,`bigint_c` BIGINT,`float_c` FLOAT,`double_c` DOUBLE,`decimal_c` DECIMAL(10, 2),`valid_char_c` VARCHAR(17),`invalid_char_c` VARCHAR(17)}, primaryKeys=id, options=()}",
                         "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[-1, -2, -3, -4, -5, -6.7, -8.9, -10.11, -12.13, foo], op=INSERT, meta=()}",
@@ -2263,7 +2269,7 @@ class FlinkPipelineTransformITCase {
                         "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[1, 2, 3, 4, 5, 6.7, 8.9, 10.11, 12.13, baz], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[2, null, null, null, null, null, null, null, null, null], op=INSERT, meta=()}");
 
-        assertThat(runNumericCastingWith(generateCastTo("BOOLEAN")))
+        assertThat(runNumericCastingWith(mode, generateCastTo("BOOLEAN")))
                 .containsExactly(
                         "CreateTableEvent{tableId=ns.scm.tbl, schema=columns={`id` BIGINT NOT NULL,`tiny_c` BOOLEAN,`small_c` BOOLEAN,`int_c` BOOLEAN,`bigint_c` BOOLEAN,`float_c` BOOLEAN,`double_c` BOOLEAN,`decimal_c` BOOLEAN,`valid_char_c` BOOLEAN,`invalid_char_c` BOOLEAN}, primaryKeys=id, options=()}",
                         "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[-1, true, true, true, true, true, true, true, false, false], op=INSERT, meta=()}",
@@ -2271,7 +2277,7 @@ class FlinkPipelineTransformITCase {
                         "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[1, true, true, true, true, true, true, true, false, false], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[2, null, null, null, null, null, null, null, null, null], op=INSERT, meta=()}");
 
-        assertThat(runNumericCastingWith(generateCastTo("TINYINT")))
+        assertThat(runNumericCastingWith(mode, generateCastTo("TINYINT")))
                 .containsExactly(
                         "CreateTableEvent{tableId=ns.scm.tbl, schema=columns={`id` BIGINT NOT NULL,`tiny_c` TINYINT,`small_c` TINYINT,`int_c` TINYINT,`bigint_c` TINYINT,`float_c` TINYINT,`double_c` TINYINT,`decimal_c` TINYINT,`valid_char_c` TINYINT,`invalid_char_c` TINYINT}, primaryKeys=id, options=()}",
                         "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[-1, -2, -3, -4, -5, -6, -8, -10, -12, null], op=INSERT, meta=()}",
@@ -2279,7 +2285,7 @@ class FlinkPipelineTransformITCase {
                         "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[1, 2, 3, 4, 5, 6, 8, 10, 12, null], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[2, null, null, null, null, null, null, null, null, null], op=INSERT, meta=()}");
 
-        assertThat(runNumericCastingWith(generateCastTo("SMALLINT")))
+        assertThat(runNumericCastingWith(mode, generateCastTo("SMALLINT")))
                 .containsExactly(
                         "CreateTableEvent{tableId=ns.scm.tbl, schema=columns={`id` BIGINT NOT NULL,`tiny_c` SMALLINT,`small_c` SMALLINT,`int_c` SMALLINT,`bigint_c` SMALLINT,`float_c` SMALLINT,`double_c` SMALLINT,`decimal_c` SMALLINT,`valid_char_c` SMALLINT,`invalid_char_c` SMALLINT}, primaryKeys=id, options=()}",
                         "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[-1, -2, -3, -4, -5, -6, -8, -10, -12, null], op=INSERT, meta=()}",
@@ -2287,7 +2293,7 @@ class FlinkPipelineTransformITCase {
                         "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[1, 2, 3, 4, 5, 6, 8, 10, 12, null], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[2, null, null, null, null, null, null, null, null, null], op=INSERT, meta=()}");
 
-        assertThat(runNumericCastingWith(generateCastTo("INT")))
+        assertThat(runNumericCastingWith(mode, generateCastTo("INT")))
                 .containsExactly(
                         "CreateTableEvent{tableId=ns.scm.tbl, schema=columns={`id` BIGINT NOT NULL,`tiny_c` INT,`small_c` INT,`int_c` INT,`bigint_c` INT,`float_c` INT,`double_c` INT,`decimal_c` INT,`valid_char_c` INT,`invalid_char_c` INT}, primaryKeys=id, options=()}",
                         "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[-1, -2, -3, -4, -5, -6, -8, -10, -12, null], op=INSERT, meta=()}",
@@ -2295,7 +2301,7 @@ class FlinkPipelineTransformITCase {
                         "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[1, 2, 3, 4, 5, 6, 8, 10, 12, null], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[2, null, null, null, null, null, null, null, null, null], op=INSERT, meta=()}");
 
-        assertThat(runNumericCastingWith(generateCastTo("BIGINT")))
+        assertThat(runNumericCastingWith(mode, generateCastTo("BIGINT")))
                 .containsExactly(
                         "CreateTableEvent{tableId=ns.scm.tbl, schema=columns={`id` BIGINT NOT NULL,`tiny_c` BIGINT,`small_c` BIGINT,`int_c` BIGINT,`bigint_c` BIGINT,`float_c` BIGINT,`double_c` BIGINT,`decimal_c` BIGINT,`valid_char_c` BIGINT,`invalid_char_c` BIGINT}, primaryKeys=id, options=()}",
                         "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[-1, -2, -3, -4, -5, -6, -8, -10, -12, null], op=INSERT, meta=()}",
@@ -2303,7 +2309,7 @@ class FlinkPipelineTransformITCase {
                         "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[1, 2, 3, 4, 5, 6, 8, 10, 12, null], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[2, null, null, null, null, null, null, null, null, null], op=INSERT, meta=()}");
 
-        assertThat(runNumericCastingWith(generateCastTo("FLOAT")))
+        assertThat(runNumericCastingWith(mode, generateCastTo("FLOAT")))
                 .containsExactly(
                         "CreateTableEvent{tableId=ns.scm.tbl, schema=columns={`id` BIGINT NOT NULL,`tiny_c` FLOAT,`small_c` FLOAT,`int_c` FLOAT,`bigint_c` FLOAT,`float_c` FLOAT,`double_c` FLOAT,`decimal_c` FLOAT,`valid_char_c` FLOAT,`invalid_char_c` FLOAT}, primaryKeys=id, options=()}",
                         "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[-1, -2.0, -3.0, -4.0, -5.0, -6.7, -8.9, -10.11, -12.13, null], op=INSERT, meta=()}",
@@ -2311,7 +2317,7 @@ class FlinkPipelineTransformITCase {
                         "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[1, 2.0, 3.0, 4.0, 5.0, 6.7, 8.9, 10.11, 12.13, null], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[2, null, null, null, null, null, null, null, null, null], op=INSERT, meta=()}");
 
-        assertThat(runNumericCastingWith(generateCastTo("DOUBLE")))
+        assertThat(runNumericCastingWith(mode, generateCastTo("DOUBLE")))
                 .containsExactly(
                         "CreateTableEvent{tableId=ns.scm.tbl, schema=columns={`id` BIGINT NOT NULL,`tiny_c` DOUBLE,`small_c` DOUBLE,`int_c` DOUBLE,`bigint_c` DOUBLE,`float_c` DOUBLE,`double_c` DOUBLE,`decimal_c` DOUBLE,`valid_char_c` DOUBLE,`invalid_char_c` DOUBLE}, primaryKeys=id, options=()}",
                         "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[-1, -2.0, -3.0, -4.0, -5.0, -6.699999809265137, -8.9, -10.11, -12.13, null], op=INSERT, meta=()}",
@@ -2319,7 +2325,7 @@ class FlinkPipelineTransformITCase {
                         "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[1, 2.0, 3.0, 4.0, 5.0, 6.699999809265137, 8.9, 10.11, 12.13, null], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[2, null, null, null, null, null, null, null, null, null], op=INSERT, meta=()}");
 
-        assertThat(runNumericCastingWith(generateCastTo("DECIMAL(1, 0)")))
+        assertThat(runNumericCastingWith(mode, generateCastTo("DECIMAL(1, 0)")))
                 .containsExactly(
                         "CreateTableEvent{tableId=ns.scm.tbl, schema=columns={`id` BIGINT NOT NULL,`tiny_c` DECIMAL(1, 0),`small_c` DECIMAL(1, 0),`int_c` DECIMAL(1, 0),`bigint_c` DECIMAL(1, 0),`float_c` DECIMAL(1, 0),`double_c` DECIMAL(1, 0),`decimal_c` DECIMAL(1, 0),`valid_char_c` DECIMAL(1, 0),`invalid_char_c` DECIMAL(1, 0)}, primaryKeys=id, options=()}",
                         "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[-1, -2, -3, -4, -5, -7, -9, null, null, null], op=INSERT, meta=()}",
@@ -2327,7 +2333,7 @@ class FlinkPipelineTransformITCase {
                         "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[1, 2, 3, 4, 5, 7, 9, null, null, null], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[2, null, null, null, null, null, null, null, null, null], op=INSERT, meta=()}");
 
-        assertThat(runNumericCastingWith(generateCastTo("DECIMAL(2, 0)")))
+        assertThat(runNumericCastingWith(mode, generateCastTo("DECIMAL(2, 0)")))
                 .containsExactly(
                         "CreateTableEvent{tableId=ns.scm.tbl, schema=columns={`id` BIGINT NOT NULL,`tiny_c` DECIMAL(2, 0),`small_c` DECIMAL(2, 0),`int_c` DECIMAL(2, 0),`bigint_c` DECIMAL(2, 0),`float_c` DECIMAL(2, 0),`double_c` DECIMAL(2, 0),`decimal_c` DECIMAL(2, 0),`valid_char_c` DECIMAL(2, 0),`invalid_char_c` DECIMAL(2, 0)}, primaryKeys=id, options=()}",
                         "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[-1, -2, -3, -4, -5, -7, -9, -10, -12, null], op=INSERT, meta=()}",
@@ -2335,7 +2341,7 @@ class FlinkPipelineTransformITCase {
                         "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[1, 2, 3, 4, 5, 7, 9, 10, 12, null], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[2, null, null, null, null, null, null, null, null, null], op=INSERT, meta=()}");
 
-        assertThat(runNumericCastingWith(generateCastTo("DECIMAL(3, 1)")))
+        assertThat(runNumericCastingWith(mode, generateCastTo("DECIMAL(3, 1)")))
                 .containsExactly(
                         "CreateTableEvent{tableId=ns.scm.tbl, schema=columns={`id` BIGINT NOT NULL,`tiny_c` DECIMAL(3, 1),`small_c` DECIMAL(3, 1),`int_c` DECIMAL(3, 1),`bigint_c` DECIMAL(3, 1),`float_c` DECIMAL(3, 1),`double_c` DECIMAL(3, 1),`decimal_c` DECIMAL(3, 1),`valid_char_c` DECIMAL(3, 1),`invalid_char_c` DECIMAL(3, 1)}, primaryKeys=id, options=()}",
                         "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[-1, -2.0, -3.0, -4.0, -5.0, -6.7, -8.9, -10.1, -12.1, null], op=INSERT, meta=()}",
@@ -2343,13 +2349,67 @@ class FlinkPipelineTransformITCase {
                         "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[1, 2.0, 3.0, 4.0, 5.0, 6.7, 8.9, 10.1, 12.1, null], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[2, null, null, null, null, null, null, null, null, null], op=INSERT, meta=()}");
 
-        assertThat(runNumericCastingWith(generateCastTo("DECIMAL(19, 10)")))
+        assertThat(runNumericCastingWith(mode, generateCastTo("DECIMAL(19, 10)")))
                 .containsExactly(
                         "CreateTableEvent{tableId=ns.scm.tbl, schema=columns={`id` BIGINT NOT NULL,`tiny_c` DECIMAL(19, 10),`small_c` DECIMAL(19, 10),`int_c` DECIMAL(19, 10),`bigint_c` DECIMAL(19, 10),`float_c` DECIMAL(19, 10),`double_c` DECIMAL(19, 10),`decimal_c` DECIMAL(19, 10),`valid_char_c` DECIMAL(19, 10),`invalid_char_c` DECIMAL(19, 10)}, primaryKeys=id, options=()}",
                         "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[-1, -2.0000000000, -3.0000000000, -4.0000000000, -5.0000000000, -6.7000000000, -8.9000000000, -10.1100000000, -12.1300000000, null], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[0, 0.0000000000, 0.0000000000, 0.0000000000, 0.0000000000, 0.0000000000, 0.0000000000, 0.0000000000, 0.0000000000, null], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[1, 2.0000000000, 3.0000000000, 4.0000000000, 5.0000000000, 6.7000000000, 8.9000000000, 10.1100000000, 12.1300000000, null], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[2, null, null, null, null, null, null, null, null, null], op=INSERT, meta=()}");
+
+        // Test DECIMAL with maximum precision (38)
+
+        if (mode.equals(DecimalPrecisionMode.UP_TO_38)) {
+            assertThat(runNumericCastingWith(mode, generateCastTo("DECIMAL(38, 0)")))
+                    .containsExactly(
+                            "CreateTableEvent{tableId=ns.scm.tbl, schema=columns={`id` BIGINT NOT NULL,`tiny_c` DECIMAL(38, 0),`small_c` DECIMAL(38, 0),`int_c` DECIMAL(38, 0),`bigint_c` DECIMAL(38, 0),`float_c` DECIMAL(38, 0),`double_c` DECIMAL(38, 0),`decimal_c` DECIMAL(38, 0),`valid_char_c` DECIMAL(38, 0),`invalid_char_c` DECIMAL(38, 0)}, primaryKeys=id, options=()}",
+                            "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[-1, -2, -3, -4, -5, -7, -9, -10, -12, null], op=INSERT, meta=()}",
+                            "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[0, 0, 0, 0, 0, 0, 0, 0, 0, null], op=INSERT, meta=()}",
+                            "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[1, 2, 3, 4, 5, 7, 9, 10, 12, null], op=INSERT, meta=()}",
+                            "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[2, null, null, null, null, null, null, null, null, null], op=INSERT, meta=()}");
+
+            assertThat(runNumericCastingWith(mode, generateCastTo("DECIMAL(38, 10)")))
+                    .containsExactly(
+                            "CreateTableEvent{tableId=ns.scm.tbl, schema=columns={`id` BIGINT NOT NULL,`tiny_c` DECIMAL(38, 10),`small_c` DECIMAL(38, 10),`int_c` DECIMAL(38, 10),`bigint_c` DECIMAL(38, 10),`float_c` DECIMAL(38, 10),`double_c` DECIMAL(38, 10),`decimal_c` DECIMAL(38, 10),`valid_char_c` DECIMAL(38, 10),`invalid_char_c` DECIMAL(38, 10)}, primaryKeys=id, options=()}",
+                            "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[-1, -2.0000000000, -3.0000000000, -4.0000000000, -5.0000000000, -6.7000000000, -8.9000000000, -10.1100000000, -12.1300000000, null], op=INSERT, meta=()}",
+                            "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[0, 0.0000000000, 0.0000000000, 0.0000000000, 0.0000000000, 0.0000000000, 0.0000000000, 0.0000000000, 0.0000000000, null], op=INSERT, meta=()}",
+                            "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[1, 2.0000000000, 3.0000000000, 4.0000000000, 5.0000000000, 6.7000000000, 8.9000000000, 10.1100000000, 12.1300000000, null], op=INSERT, meta=()}",
+                            "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[2, null, null, null, null, null, null, null, null, null], op=INSERT, meta=()}");
+
+            assertThat(runNumericCastingWith(mode, generateCastTo("DECIMAL(38, 18)")))
+                    .containsExactly(
+                            "CreateTableEvent{tableId=ns.scm.tbl, schema=columns={`id` BIGINT NOT NULL,`tiny_c` DECIMAL(38, 18),`small_c` DECIMAL(38, 18),`int_c` DECIMAL(38, 18),`bigint_c` DECIMAL(38, 18),`float_c` DECIMAL(38, 18),`double_c` DECIMAL(38, 18),`decimal_c` DECIMAL(38, 18),`valid_char_c` DECIMAL(38, 18),`invalid_char_c` DECIMAL(38, 18)}, primaryKeys=id, options=()}",
+                            "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[-1, -2.000000000000000000, -3.000000000000000000, -4.000000000000000000, -5.000000000000000000, -6.700000000000000000, -8.900000000000000000, -10.110000000000000000, -12.130000000000000000, null], op=INSERT, meta=()}",
+                            "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[0, 0.000000000000000000, 0.000000000000000000, 0.000000000000000000, 0.000000000000000000, 0.000000000000000000, 0.000000000000000000, 0.000000000000000000, 0.000000000000000000, null], op=INSERT, meta=()}",
+                            "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[1, 2.000000000000000000, 3.000000000000000000, 4.000000000000000000, 5.000000000000000000, 6.700000000000000000, 8.900000000000000000, 10.110000000000000000, 12.130000000000000000, null], op=INSERT, meta=()}",
+                            "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[2, null, null, null, null, null, null, null, null, null], op=INSERT, meta=()}");
+        } else if (mode.equals(DecimalPrecisionMode.UP_TO_19)) {
+            assertThat(runNumericCastingWith(mode, generateCastTo("DECIMAL(38, 0)")))
+                    .containsExactly(
+                            "CreateTableEvent{tableId=ns.scm.tbl, schema=columns={`id` BIGINT NOT NULL,`tiny_c` DECIMAL(19, 0),`small_c` DECIMAL(19, 0),`int_c` DECIMAL(19, 0),`bigint_c` DECIMAL(19, 0),`float_c` DECIMAL(19, 0),`double_c` DECIMAL(19, 0),`decimal_c` DECIMAL(19, 0),`valid_char_c` DECIMAL(19, 0),`invalid_char_c` DECIMAL(19, 0)}, primaryKeys=id, options=()}",
+                            "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[-1, -2, -3, -4, -5, -7, -9, -10, -12, null], op=INSERT, meta=()}",
+                            "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[0, 0, 0, 0, 0, 0, 0, 0, 0, null], op=INSERT, meta=()}",
+                            "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[1, 2, 3, 4, 5, 7, 9, 10, 12, null], op=INSERT, meta=()}",
+                            "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[2, null, null, null, null, null, null, null, null, null], op=INSERT, meta=()}");
+
+            assertThat(runNumericCastingWith(mode, generateCastTo("DECIMAL(38, 10)")))
+                    .containsExactly(
+                            "CreateTableEvent{tableId=ns.scm.tbl, schema=columns={`id` BIGINT NOT NULL,`tiny_c` DECIMAL(19, 10),`small_c` DECIMAL(19, 10),`int_c` DECIMAL(19, 10),`bigint_c` DECIMAL(19, 10),`float_c` DECIMAL(19, 10),`double_c` DECIMAL(19, 10),`decimal_c` DECIMAL(19, 10),`valid_char_c` DECIMAL(19, 10),`invalid_char_c` DECIMAL(19, 10)}, primaryKeys=id, options=()}",
+                            "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[-1, -2.0000000000, -3.0000000000, -4.0000000000, -5.0000000000, -6.7000000000, -8.9000000000, -10.1100000000, -12.1300000000, null], op=INSERT, meta=()}",
+                            "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[0, 0.0000000000, 0.0000000000, 0.0000000000, 0.0000000000, 0.0000000000, 0.0000000000, 0.0000000000, 0.0000000000, null], op=INSERT, meta=()}",
+                            "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[1, 2.0000000000, 3.0000000000, 4.0000000000, 5.0000000000, 6.7000000000, 8.9000000000, 10.1100000000, 12.1300000000, null], op=INSERT, meta=()}",
+                            "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[2, null, null, null, null, null, null, null, null, null], op=INSERT, meta=()}");
+
+            assertThat(runNumericCastingWith(mode, generateCastTo("DECIMAL(38, 18)")))
+                    .containsExactly(
+                            "CreateTableEvent{tableId=ns.scm.tbl, schema=columns={`id` BIGINT NOT NULL,`tiny_c` DECIMAL(19, 18),`small_c` DECIMAL(19, 18),`int_c` DECIMAL(19, 18),`bigint_c` DECIMAL(19, 18),`float_c` DECIMAL(19, 18),`double_c` DECIMAL(19, 18),`decimal_c` DECIMAL(19, 18),`valid_char_c` DECIMAL(19, 18),`invalid_char_c` DECIMAL(19, 18)}, primaryKeys=id, options=()}",
+                            "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[-1, -2.000000000000000000, -3.000000000000000000, -4.000000000000000000, -5.000000000000000000, -6.700000000000000000, -8.900000000000000000, null, null, null], op=INSERT, meta=()}",
+                            "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[0, 0.000000000000000000, 0.000000000000000000, 0.000000000000000000, 0.000000000000000000, 0.000000000000000000, 0.000000000000000000, 0.000000000000000000, 0.000000000000000000, null], op=INSERT, meta=()}",
+                            "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[1, 2.000000000000000000, 3.000000000000000000, 4.000000000000000000, 5.000000000000000000, 6.700000000000000000, 8.900000000000000000, null, null, null], op=INSERT, meta=()}",
+                            "DataChangeEvent{tableId=ns.scm.tbl, before=[], after=[2, null, null, null, null, null, null, null, null, null], op=INSERT, meta=()}");
+        } else {
+            Assertions.fail("Unexpected decimal precision mode: " + mode);
+        }
     }
 
     @Test

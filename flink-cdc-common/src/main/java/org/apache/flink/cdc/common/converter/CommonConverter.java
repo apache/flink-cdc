@@ -33,6 +33,7 @@ import org.apache.flink.cdc.common.data.ZonedTimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.types.ArrayType;
 import org.apache.flink.cdc.common.types.DataType;
+import org.apache.flink.cdc.common.types.DecimalType;
 import org.apache.flink.cdc.common.types.MapType;
 import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.common.types.VariantType;
@@ -153,13 +154,21 @@ public class CommonConverter {
                 "Cannot convert " + obj + " of type " + obj.getClass() + " to STRING DATA.");
     }
 
-    static DecimalData convertToDecimalData(Object obj) {
+    static DecimalData convertToDecimalData(Object obj, DecimalType decimalType) {
         if (obj instanceof DecimalData) {
-            return (DecimalData) obj;
+            DecimalData dd = (DecimalData) obj;
+            // Re-convert to target precision and scale if different
+            if (dd.precision() == decimalType.getPrecision()
+                    && dd.scale() == decimalType.getScale()) {
+                return dd;
+            }
+            return DecimalData.fromBigDecimal(
+                    dd.toBigDecimal(), decimalType.getPrecision(), decimalType.getScale());
         }
         if (obj instanceof BigDecimal) {
             BigDecimal bd = (BigDecimal) obj;
-            return DecimalData.fromBigDecimal(bd, bd.precision(), bd.scale());
+            return DecimalData.fromBigDecimal(
+                    bd, decimalType.getPrecision(), decimalType.getScale());
         }
         throw new RuntimeException(
                 "Cannot convert " + obj + " of type " + obj.getClass() + " to DECIMAL DATA.");

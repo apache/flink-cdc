@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.runtime.parser;
 
 import org.apache.flink.api.common.io.ParseException;
+import org.apache.flink.cdc.common.pipeline.DecimalPrecisionMode;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
@@ -31,7 +32,6 @@ import org.apache.flink.cdc.runtime.parser.metadata.TransformSqlOperatorTable;
 import org.apache.calcite.config.CalciteConnectionConfigImpl;
 import org.apache.calcite.jdbc.CalciteSchema;
 import org.apache.calcite.prepare.CalciteCatalogReader;
-import org.apache.calcite.rel.type.RelDataTypeSystem;
 import org.apache.calcite.runtime.CalciteContextException;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlSelect;
@@ -40,6 +40,8 @@ import org.apache.calcite.sql.validate.SqlValidator;
 import org.apache.calcite.sql.validate.SqlValidatorUtil;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -69,8 +71,9 @@ class TransformParserTest {
         Assertions.assertThat(parse.getWhere()).hasToString("`uniq_id` > 10 AND `id` IS NOT NULL");
     }
 
-    @Test
-    void testTransformCalciteValidate() {
+    @ParameterizedTest(name = "Decimal mode: {0}")
+    @EnumSource
+    void testTransformCalciteValidate(DecimalPrecisionMode mode) {
         SqlSelect parse =
                 TransformParser.parseSelect(
                         "select SUBSTR(id, 1) as uniq_id, * from tb where id is not null");
@@ -83,7 +86,7 @@ class TransformParserTest {
                 TransformSchemaFactory.INSTANCE.create(
                         rootSchema.plus(), "default_schema", operand);
         rootSchema.add("default_schema", schema);
-        SqlTypeFactoryImpl factory = new SqlTypeFactoryImpl(RelDataTypeSystem.DEFAULT);
+        SqlTypeFactoryImpl factory = new SqlTypeFactoryImpl(FlinkCdcTypeSystem.of(mode));
         CalciteCatalogReader calciteCatalogReader =
                 new CalciteCatalogReader(
                         rootSchema,
@@ -111,8 +114,9 @@ class TransformParserTest {
                                 + "WHERE `tb`.`id` IS NOT NULL");
     }
 
-    @Test
-    void testCalciteRelNode() {
+    @ParameterizedTest(name = "Decimal mode: {0}")
+    @EnumSource
+    void testCalciteRelNode(DecimalPrecisionMode mode) {
         SqlSelect parse =
                 TransformParser.parseSelect(
                         "select SUBSTR(id, 1) as uniq_id, * from tb where id is not null");
@@ -125,7 +129,7 @@ class TransformParserTest {
                 TransformSchemaFactory.INSTANCE.create(
                         rootSchema.plus(), "default_schema", operand);
         rootSchema.add("default_schema", schema);
-        SqlTypeFactoryImpl factory = new SqlTypeFactoryImpl(RelDataTypeSystem.DEFAULT);
+        SqlTypeFactoryImpl factory = new SqlTypeFactoryImpl(FlinkCdcTypeSystem.of(mode));
         CalciteCatalogReader calciteCatalogReader =
                 new CalciteCatalogReader(
                         rootSchema,
@@ -170,229 +174,294 @@ class TransformParserTest {
                 .isEqualTo(new String[] {"uniq_id", "id"});
     }
 
-    @Test
-    void testTranslateFilterToJaninoExpression() {
-        testFilterExpression("id is not null", "null != id");
-        testFilterExpression("id is null", "null == id");
-        testFilterExpression("id = 1 and uid = 2", "valueEquals(id, 1) && valueEquals(uid, 2)");
-        testFilterExpression("id = 1 or id = 2", "valueEquals(id, 1) || valueEquals(id, 2)");
-        testFilterExpression("not (id = 1)", "!valueEquals(id, 1)");
-        testFilterExpression("id = '1'", "valueEquals(id, \"1\")");
-        testFilterExpression("id <> '1'", "!valueEquals(id, \"1\")");
-        testFilterExpression("d between d1 and d2", "betweenAsymmetric(d, d1, d2)");
-        testFilterExpression("d not between d1 and d2", "notBetweenAsymmetric(d, d1, d2)");
-        testFilterExpression("d in (d1, d2)", "in(d, d1, d2)");
-        testFilterExpression("d not in (d1, d2)", "notIn(d, d1, d2)");
-        testFilterExpression("id is false", "false == id");
-        testFilterExpression("id is not false", "true == id");
-        testFilterExpression("id is true", "true == id");
-        testFilterExpression("id is not true", "false == id");
-        testFilterExpression("a || b", "concat(a, b)");
-        testFilterExpression("CHAR_LENGTH(id)", "charLength(id)");
-        testFilterExpression("trim(id)", "trim(\"BOTH\", \" \", id)");
+    @ParameterizedTest(name = "precision mode: {0}")
+    @EnumSource
+    void testTranslateFilterToJaninoExpression(DecimalPrecisionMode mode) {
+        testFilterExpression(mode, "id is not null", "null != id");
+        testFilterExpression(mode, "id is null", "null == id");
         testFilterExpression(
-                "REGEXP_REPLACE(id, '[a-zA-Z]', '')", "regexpReplace(id, \"[a-zA-Z]\", \"\")");
-        testFilterExpression("upper(id)", "upper(id)");
-        testFilterExpression("lower(id)", "lower(id)");
-        testFilterExpression("concat(a,b)", "concat(a, b)");
-        testFilterExpression("SUBSTR(a,1)", "substr(a, 1)");
-        testFilterExpression("id like '^[a-zA-Z]'", "like(id, \"^[a-zA-Z]\")");
-        testFilterExpression("id not like '^[a-zA-Z]'", "notLike(id, \"^[a-zA-Z]\")");
-        testFilterExpression("abs(2)", "abs(2)");
-        testFilterExpression("ceil(2)", "ceil(2)");
-        testFilterExpression("ceiling(2)", "ceil(2)");
-        testFilterExpression("floor(2)", "floor(2)");
-        testFilterExpression("round(2,2)", "round(2, 2)");
-        testFilterExpression("uuid()", "uuid()");
+                mode, "id = 1 and uid = 2", "valueEquals(id, 1) && valueEquals(uid, 2)");
+        testFilterExpression(mode, "id = 1 or id = 2", "valueEquals(id, 1) || valueEquals(id, 2)");
+        testFilterExpression(mode, "not (id = 1)", "!valueEquals(id, 1)");
+        testFilterExpression(mode, "id = '1'", "valueEquals(id, \"1\")");
+        testFilterExpression(mode, "id <> '1'", "!valueEquals(id, \"1\")");
+        testFilterExpression(mode, "d between d1 and d2", "betweenAsymmetric(d, d1, d2)");
+        testFilterExpression(mode, "d not between d1 and d2", "notBetweenAsymmetric(d, d1, d2)");
+        testFilterExpression(mode, "d in (d1, d2)", "in(d, d1, d2)");
+        testFilterExpression(mode, "d not in (d1, d2)", "notIn(d, d1, d2)");
+        testFilterExpression(mode, "id is false", "false == id");
+        testFilterExpression(mode, "id is not false", "true == id");
+        testFilterExpression(mode, "id is true", "true == id");
+        testFilterExpression(mode, "id is not true", "false == id");
+        testFilterExpression(mode, "a || b", "concat(a, b)");
+        testFilterExpression(mode, "CHAR_LENGTH(id)", "charLength(id)");
+        testFilterExpression(mode, "trim(id)", "trim(\"BOTH\", \" \", id)");
         testFilterExpression(
-                "id = LOCALTIME", "valueEquals(id, localtime(__epoch_time__, __time_zone__))");
+                mode,
+                "REGEXP_REPLACE(id, '[a-zA-Z]', '')",
+                "regexpReplace(id, \"[a-zA-Z]\", \"\")");
+        testFilterExpression(mode, "upper(id)", "upper(id)");
+        testFilterExpression(mode, "lower(id)", "lower(id)");
+        testFilterExpression(mode, "concat(a,b)", "concat(a, b)");
+        testFilterExpression(mode, "SUBSTR(a,1)", "substr(a, 1)");
+        testFilterExpression(mode, "id like '^[a-zA-Z]'", "like(id, \"^[a-zA-Z]\")");
+        testFilterExpression(mode, "id not like '^[a-zA-Z]'", "notLike(id, \"^[a-zA-Z]\")");
+        testFilterExpression(mode, "abs(2)", "abs(2)");
+        testFilterExpression(mode, "ceil(2)", "ceil(2)");
+        testFilterExpression(mode, "ceiling(2)", "ceil(2)");
+        testFilterExpression(mode, "floor(2)", "floor(2)");
+        testFilterExpression(mode, "round(2,2)", "round(2, 2)");
+        testFilterExpression(mode, "uuid()", "uuid()");
         testFilterExpression(
+                mode,
+                "id = LOCALTIME",
+                "valueEquals(id, localtime(__epoch_time__, __time_zone__))");
+        testFilterExpression(
+                mode,
                 "id = LOCALTIMESTAMP",
                 "valueEquals(id, localtimestamp(__epoch_time__, __time_zone__))");
         testFilterExpression(
-                "id = CURRENT_TIME", "valueEquals(id, currentTime(__epoch_time__, __time_zone__))");
+                mode,
+                "id = CURRENT_TIME",
+                "valueEquals(id, currentTime(__epoch_time__, __time_zone__))");
         testFilterExpression(
-                "id = CURRENT_DATE", "valueEquals(id, currentDate(__epoch_time__, __time_zone__))");
+                mode,
+                "id = CURRENT_DATE",
+                "valueEquals(id, currentDate(__epoch_time__, __time_zone__))");
         testFilterExpression(
-                "id = CURRENT_TIMESTAMP", "valueEquals(id, currentTimestamp(__epoch_time__))");
-        testFilterExpression("NOW()", "now(__epoch_time__)");
-        testFilterExpression("FROM_UNIXTIME(44)", "fromUnixtime(44, __time_zone__)");
+                mode,
+                "id = CURRENT_TIMESTAMP",
+                "valueEquals(id, currentTimestamp(__epoch_time__))");
+        testFilterExpression(mode, "NOW()", "now(__epoch_time__)");
+        testFilterExpression(mode, "FROM_UNIXTIME(44)", "fromUnixtime(44, __time_zone__)");
         testFilterExpression(
+                mode,
                 "FROM_UNIXTIME(44, 'yyyy/MM/dd HH:mm:ss')",
                 "fromUnixtime(44, \"yyyy/MM/dd HH:mm:ss\", __time_zone__)");
-        testFilterExpression("UNIX_TIMESTAMP()", "unixTimestamp(__epoch_time__, __time_zone__)");
         testFilterExpression(
+                mode, "UNIX_TIMESTAMP()", "unixTimestamp(__epoch_time__, __time_zone__)");
+        testFilterExpression(
+                mode,
                 "UNIX_TIMESTAMP('1970-01-01 08:00:01')",
                 "unixTimestamp(\"1970-01-01 08:00:01\", __epoch_time__, __time_zone__)");
         testFilterExpression(
+                mode,
                 "UNIX_TIMESTAMP('1970-01-01 08:00:01.001 +0800', 'yyyy-MM-dd HH:mm:ss.SSS X')",
                 "unixTimestamp(\"1970-01-01 08:00:01.001 +0800\", \"yyyy-MM-dd HH:mm:ss.SSS X\", __epoch_time__, __time_zone__)");
-        testFilterExpression("YEAR(dt)", "year(dt)");
-        testFilterExpression("QUARTER(dt)", "quarter(dt)");
-        testFilterExpression("MONTH(dt)", "month(dt)");
-        testFilterExpression("WEEK(dt)", "week(dt)");
+        testFilterExpression(mode, "YEAR(dt)", "year(dt)");
+        testFilterExpression(mode, "QUARTER(dt)", "quarter(dt)");
+        testFilterExpression(mode, "MONTH(dt)", "month(dt)");
+        testFilterExpression(mode, "WEEK(dt)", "week(dt)");
         testFilterExpression(
-                "DATE_FORMAT(dt,'yyyy-MM-dd')", "dateFormat(dt, \"yyyy-MM-dd\", __time_zone__)");
-        testFilterExpression("TO_DATE(dt, 'yyyy-MM-dd')", "toDate(dt, \"yyyy-MM-dd\")");
-        testFilterExpression("TO_TIMESTAMP(dt)", "toTimestamp(dt, __time_zone__)");
+                mode,
+                "DATE_FORMAT(dt,'yyyy-MM-dd')",
+                "dateFormat(dt, \"yyyy-MM-dd\", __time_zone__)");
+        testFilterExpression(mode, "TO_DATE(dt, 'yyyy-MM-dd')", "toDate(dt, \"yyyy-MM-dd\")");
+        testFilterExpression(mode, "TO_TIMESTAMP(dt)", "toTimestamp(dt, __time_zone__)");
         testFilterExpression(
+                mode,
                 "TIMESTAMP_DIFF('SECOND', dt1, dt2)",
                 "timestampDiff(\"SECOND\", dt1, dt2, __time_zone__)");
         testFilterExpression(
+                mode,
                 "timestamp_diff('second', dt1, dt2)",
                 "timestampDiff(\"second\", dt1, dt2, __time_zone__)");
         testFilterExpression(
+                mode,
                 "TIMESTAMP_DIFF('MINUTE', dt1, dt2)",
                 "timestampDiff(\"MINUTE\", dt1, dt2, __time_zone__)");
         testFilterExpression(
+                mode,
                 "timestamp_diff('minute', dt1, dt2)",
                 "timestampDiff(\"minute\", dt1, dt2, __time_zone__)");
         testFilterExpression(
+                mode,
                 "TIMESTAMP_DIFF('HOUR', dt1, dt2)",
                 "timestampDiff(\"HOUR\", dt1, dt2, __time_zone__)");
         testFilterExpression(
+                mode,
                 "timestamp_diff('hour', dt1, dt2)",
                 "timestampDiff(\"hour\", dt1, dt2, __time_zone__)");
         testFilterExpression(
+                mode,
                 "TIMESTAMP_DIFF('DAY', dt1, dt2)",
                 "timestampDiff(\"DAY\", dt1, dt2, __time_zone__)");
         testFilterExpression(
+                mode,
                 "timestamp_diff('day', dt1, dt2)",
                 "timestampDiff(\"day\", dt1, dt2, __time_zone__)");
         testFilterExpression(
+                mode,
                 "TIMESTAMP_DIFF('MONTH', dt1, dt2)",
                 "timestampDiff(\"MONTH\", dt1, dt2, __time_zone__)");
         testFilterExpression(
+                mode,
                 "timestamp_diff('month', dt1, dt2)",
                 "timestampDiff(\"month\", dt1, dt2, __time_zone__)");
         testFilterExpression(
+                mode,
                 "TIMESTAMP_DIFF('YEAR', dt1, dt2)",
                 "timestampDiff(\"YEAR\", dt1, dt2, __time_zone__)");
         testFilterExpression(
+                mode,
                 "timestamp_diff('year', dt1, dt2)",
                 "timestampDiff(\"year\", dt1, dt2, __time_zone__)");
         testFilterExpression(
+                mode,
                 "TIMESTAMPDIFF(SECOND, dt1, dt2)",
                 "timestampdiff(\"SECOND\", dt1, dt2, __time_zone__)");
         testFilterExpression(
+                mode,
                 "timestampdiff(second, dt1, dt2)",
                 "timestampdiff(\"SECOND\", dt1, dt2, __time_zone__)");
         testFilterExpression(
+                mode,
                 "TIMESTAMPDIFF(MINUTE, dt1, dt2)",
                 "timestampdiff(\"MINUTE\", dt1, dt2, __time_zone__)");
         testFilterExpression(
+                mode,
                 "timestampdiff(minute, dt1, dt2)",
                 "timestampdiff(\"MINUTE\", dt1, dt2, __time_zone__)");
         testFilterExpression(
+                mode,
                 "TIMESTAMPDIFF(HOUR, dt1, dt2)",
                 "timestampdiff(\"HOUR\", dt1, dt2, __time_zone__)");
         testFilterExpression(
+                mode,
                 "timestampdiff(hour, dt1, dt2)",
                 "timestampdiff(\"HOUR\", dt1, dt2, __time_zone__)");
         testFilterExpression(
-                "TIMESTAMPDIFF(DAY, dt1, dt2)", "timestampdiff(\"DAY\", dt1, dt2, __time_zone__)");
+                mode,
+                "TIMESTAMPDIFF(DAY, dt1, dt2)",
+                "timestampdiff(\"DAY\", dt1, dt2, __time_zone__)");
         testFilterExpression(
-                "timestampdiff(day, dt1, dt2)", "timestampdiff(\"DAY\", dt1, dt2, __time_zone__)");
+                mode,
+                "timestampdiff(day, dt1, dt2)",
+                "timestampdiff(\"DAY\", dt1, dt2, __time_zone__)");
         testFilterExpression(
+                mode,
                 "TIMESTAMPDIFF(MONTH, dt1, dt2)",
                 "timestampdiff(\"MONTH\", dt1, dt2, __time_zone__)");
         testFilterExpression(
+                mode,
                 "timestampdiff(month, dt1, dt2)",
                 "timestampdiff(\"MONTH\", dt1, dt2, __time_zone__)");
         testFilterExpression(
+                mode,
                 "TIMESTAMPDIFF(YEAR, dt1, dt2)",
                 "timestampdiff(\"YEAR\", dt1, dt2, __time_zone__)");
         testFilterExpression(
+                mode,
                 "timestampdiff(year, dt1, dt2)",
                 "timestampdiff(\"YEAR\", dt1, dt2, __time_zone__)");
         testFilterExpression(
-                "TIMESTAMPADD(SECOND, 1, dt)", "timestampadd(\"SECOND\", 1, dt, __time_zone__)");
+                mode,
+                "TIMESTAMPADD(SECOND, 1, dt)",
+                "timestampadd(\"SECOND\", 1, dt, __time_zone__)");
         testFilterExpression(
-                "timestampadd(second, 1, dt)", "timestampadd(\"SECOND\", 1, dt, __time_zone__)");
+                mode,
+                "timestampadd(second, 1, dt)",
+                "timestampadd(\"SECOND\", 1, dt, __time_zone__)");
         testFilterExpression(
-                "TIMESTAMPADD(MINUTE, 1, dt)", "timestampadd(\"MINUTE\", 1, dt, __time_zone__)");
+                mode,
+                "TIMESTAMPADD(MINUTE, 1, dt)",
+                "timestampadd(\"MINUTE\", 1, dt, __time_zone__)");
         testFilterExpression(
-                "timestampadd(minute, 1, dt)", "timestampadd(\"MINUTE\", 1, dt, __time_zone__)");
+                mode,
+                "timestampadd(minute, 1, dt)",
+                "timestampadd(\"MINUTE\", 1, dt, __time_zone__)");
         testFilterExpression(
-                "TIMESTAMPADD(HOUR, 1, dt)", "timestampadd(\"HOUR\", 1, dt, __time_zone__)");
+                mode, "TIMESTAMPADD(HOUR, 1, dt)", "timestampadd(\"HOUR\", 1, dt, __time_zone__)");
         testFilterExpression(
-                "timestampadd(hour, 1, dt)", "timestampadd(\"HOUR\", 1, dt, __time_zone__)");
+                mode, "timestampadd(hour, 1, dt)", "timestampadd(\"HOUR\", 1, dt, __time_zone__)");
         testFilterExpression(
-                "TIMESTAMPADD(DAY, 1, dt)", "timestampadd(\"DAY\", 1, dt, __time_zone__)");
+                mode, "TIMESTAMPADD(DAY, 1, dt)", "timestampadd(\"DAY\", 1, dt, __time_zone__)");
         testFilterExpression(
-                "timestampadd(day, 1, dt)", "timestampadd(\"DAY\", 1, dt, __time_zone__)");
+                mode, "timestampadd(day, 1, dt)", "timestampadd(\"DAY\", 1, dt, __time_zone__)");
         testFilterExpression(
-                "TIMESTAMPADD(MONTH, 1, dt)", "timestampadd(\"MONTH\", 1, dt, __time_zone__)");
+                mode,
+                "TIMESTAMPADD(MONTH, 1, dt)",
+                "timestampadd(\"MONTH\", 1, dt, __time_zone__)");
         testFilterExpression(
-                "timestampadd(month, 1, dt)", "timestampadd(\"MONTH\", 1, dt, __time_zone__)");
+                mode,
+                "timestampadd(month, 1, dt)",
+                "timestampadd(\"MONTH\", 1, dt, __time_zone__)");
         testFilterExpression(
-                "TIMESTAMPADD(YEAR, 1, dt)", "timestampadd(\"YEAR\", 1, dt, __time_zone__)");
+                mode, "TIMESTAMPADD(YEAR, 1, dt)", "timestampadd(\"YEAR\", 1, dt, __time_zone__)");
         testFilterExpression(
-                "timestampadd(year, 1, dt)", "timestampadd(\"YEAR\", 1, dt, __time_zone__)");
-        testFilterExpression("IF(a>b,a,b)", "greaterThan(a, b) ? a : b");
-        testFilterExpression("NULLIF(a,b)", "nullif(a, b)");
-        testFilterExpression("COALESCE(a,b,c)", "coalesce(a, b, c)");
-        testFilterExpression("id + 2", "id + 2");
-        testFilterExpression("id - 2", "id - 2");
-        testFilterExpression("id * 2", "id * 2");
-        testFilterExpression("id / 2", "id / 2");
-        testFilterExpression("id % 2", "id % 2");
-        testFilterExpression("a < b", "lessThan(a, b)");
-        testFilterExpression("a <= b", "lessThanOrEqual(a, b)");
-        testFilterExpression("a > b", "greaterThan(a, b)");
-        testFilterExpression("a >= b", "greaterThanOrEqual(a, b)");
-        testFilterExpression("__table_name__ = 'tb'", "valueEquals(__table_name__, \"tb\")");
-        testFilterExpression("__schema_name__ = 'tb'", "valueEquals(__schema_name__, \"tb\")");
+                mode, "timestampadd(year, 1, dt)", "timestampadd(\"YEAR\", 1, dt, __time_zone__)");
+        testFilterExpression(mode, "IF(a>b,a,b)", "greaterThan(a, b) ? a : b");
+        testFilterExpression(mode, "NULLIF(a,b)", "nullif(a, b)");
+        testFilterExpression(mode, "COALESCE(a,b,c)", "coalesce(a, b, c)");
+        testFilterExpression(mode, "id + 2", "id + 2");
+        testFilterExpression(mode, "id - 2", "id - 2");
+        testFilterExpression(mode, "id * 2", "id * 2");
+        testFilterExpression(mode, "id / 2", "id / 2");
+        testFilterExpression(mode, "id % 2", "id % 2");
+        testFilterExpression(mode, "a < b", "lessThan(a, b)");
+        testFilterExpression(mode, "a <= b", "lessThanOrEqual(a, b)");
+        testFilterExpression(mode, "a > b", "greaterThan(a, b)");
+        testFilterExpression(mode, "a >= b", "greaterThanOrEqual(a, b)");
+        testFilterExpression(mode, "__table_name__ = 'tb'", "valueEquals(__table_name__, \"tb\")");
         testFilterExpression(
-                "__namespace_name__ = 'tb'", "valueEquals(__namespace_name__, \"tb\")");
-        testFilterExpression("upper(lower(id))", "upper(lower(id))");
+                mode, "__schema_name__ = 'tb'", "valueEquals(__schema_name__, \"tb\")");
         testFilterExpression(
+                mode, "__namespace_name__ = 'tb'", "valueEquals(__namespace_name__, \"tb\")");
+        testFilterExpression(mode, "upper(lower(id))", "upper(lower(id))");
+        testFilterExpression(
+                mode,
                 "abs(uniq_id) > 10 and id is not null",
                 "greaterThan(abs(uniq_id), 10) && null != id");
         testFilterExpression(
+                mode,
                 "case id when 1 then 'a' when 2 then 'b' else 'c' end",
                 "(valueEquals(id, 1) ? \"a\" : valueEquals(id, 2) ? \"b\" : \"c\")");
         testFilterExpression(
+                mode,
                 "case when id = 1 then 'a' when id = 2 then 'b' else 'c' end",
                 "(valueEquals(id, 1) ? \"a\" : valueEquals(id, 2) ? \"b\" : \"c\")");
         testFilterExpression(
+                mode,
                 "case id when 1 then 'a' when 2 then 'b' else 'c' end",
                 "(valueEquals(id, 1) ? \"a\" : valueEquals(id, 2) ? \"b\" : \"c\")");
         testFilterExpression(
+                mode,
                 "case when id = 1 then 'a' when id = 2 then 'b' else 'c' end",
                 "(valueEquals(id, 1) ? \"a\" : valueEquals(id, 2) ? \"b\" : \"c\")");
-        testFilterExpression("cast(id||'0' as int)", "castToInteger(concat(id, \"0\"))");
-        testFilterExpression("cast(1 as string)", "castToString(1)");
-        testFilterExpression("cast(1 as boolean)", "castToBoolean(1)");
-        testFilterExpression("cast(1 as tinyint)", "castToByte(1)");
-        testFilterExpression("cast(1 as smallint)", "castToShort(1)");
-        testFilterExpression("cast(1 as bigint)", "castToLong(1)");
-        testFilterExpression("cast(1 as float)", "castToFloat(1)");
-        testFilterExpression("cast(1 as double)", "castToDouble(1)");
-        testFilterExpression("cast(1 as decimal)", "castToBigDecimal(1, 10, 0)");
-        testFilterExpression("cast(1 as char)", "castToString(1)");
-        testFilterExpression("cast(1 as varchar)", "castToString(1)");
-        testFilterExpression("cast(null as int)", "castToInteger(null)");
-        testFilterExpression("cast(null as string)", "castToString(null)");
-        testFilterExpression("cast(null as boolean)", "castToBoolean(null)");
-        testFilterExpression("cast(null as tinyint)", "castToByte(null)");
-        testFilterExpression("cast(null as smallint)", "castToShort(null)");
-        testFilterExpression("cast(null as bigint)", "castToLong(null)");
-        testFilterExpression("cast(null as float)", "castToFloat(null)");
-        testFilterExpression("cast(null as double)", "castToDouble(null)");
-        testFilterExpression("cast(null as decimal)", "castToBigDecimal(null, 10, 0)");
-        testFilterExpression("cast(null as char)", "castToString(null)");
-        testFilterExpression("cast(null as varchar)", "castToString(null)");
+        testFilterExpression(mode, "cast(id||'0' as int)", "castToInteger(concat(id, \"0\"))");
+        testFilterExpression(mode, "cast(1 as string)", "castToString(1)");
+        testFilterExpression(mode, "cast(1 as boolean)", "castToBoolean(1)");
+        testFilterExpression(mode, "cast(1 as tinyint)", "castToByte(1)");
+        testFilterExpression(mode, "cast(1 as smallint)", "castToShort(1)");
+        testFilterExpression(mode, "cast(1 as bigint)", "castToLong(1)");
+        testFilterExpression(mode, "cast(1 as float)", "castToFloat(1)");
+        testFilterExpression(mode, "cast(1 as double)", "castToDouble(1)");
+        testFilterExpression(mode, "cast(1 as decimal)", "castToBigDecimal(1, 10, 0)");
+        testFilterExpression(mode, "cast(1 as char)", "castToString(1)");
+        testFilterExpression(mode, "cast(1 as varchar)", "castToString(1)");
+        testFilterExpression(mode, "cast(null as int)", "castToInteger(null)");
+        testFilterExpression(mode, "cast(null as string)", "castToString(null)");
+        testFilterExpression(mode, "cast(null as boolean)", "castToBoolean(null)");
+        testFilterExpression(mode, "cast(null as tinyint)", "castToByte(null)");
+        testFilterExpression(mode, "cast(null as smallint)", "castToShort(null)");
+        testFilterExpression(mode, "cast(null as bigint)", "castToLong(null)");
+        testFilterExpression(mode, "cast(null as float)", "castToFloat(null)");
+        testFilterExpression(mode, "cast(null as double)", "castToDouble(null)");
+        testFilterExpression(mode, "cast(null as decimal)", "castToBigDecimal(null, 10, 0)");
+        testFilterExpression(mode, "cast(null as char)", "castToString(null)");
+        testFilterExpression(mode, "cast(null as varchar)", "castToString(null)");
         testFilterExpression(
+                mode,
                 "cast(CURRENT_TIMESTAMP as TIMESTAMP)",
                 "castToTimestamp(currentTimestamp(__epoch_time__), __time_zone__)");
-        testFilterExpression("cast(dt as TIMESTAMP)", "castToTimestamp(dt, __time_zone__)");
-        testFilterExpression("parse_json(jsonStr)", "parseJson(jsonStr)");
-        testFilterExpression("try_parse_json(jsonStr)", "tryParseJson(jsonStr)");
+        testFilterExpression(mode, "cast(dt as TIMESTAMP)", "castToTimestamp(dt, __time_zone__)");
+        testFilterExpression(mode, "parse_json(jsonStr)", "parseJson(jsonStr)");
+        testFilterExpression(mode, "try_parse_json(jsonStr)", "tryParseJson(jsonStr)");
     }
 
-    @Test
-    public void testTranslateItemAccessToJaninoExpression() {
+    @ParameterizedTest(name = "precision mode: {0}")
+    @EnumSource
+    public void testTranslateItemAccessToJaninoExpression(DecimalPrecisionMode mode) {
         // Test collection access functions (ARRAY, MAP) with proper column schema
         List<Column> columns =
                 List.of(
@@ -404,21 +473,26 @@ class TransformParserTest {
 
         // Array access: array[index] - index is 1-based (SQL standard)
         // Result type is String (from ARRAY<STRING>), so cast is added
-        testFilterExpressionWithColumns("arr[1]", "(java.lang.String) itemAccess(arr, 1)", columns);
-        testFilterExpressionWithColumns("arr[2]", "(java.lang.String) itemAccess(arr, 2)", columns);
         testFilterExpressionWithColumns(
-                "arr[idx]", "(java.lang.String) itemAccess(arr, idx)", columns);
+                mode, "arr[1]", "(java.lang.String) itemAccess(arr, 1)", columns);
+        testFilterExpressionWithColumns(
+                mode, "arr[2]", "(java.lang.String) itemAccess(arr, 2)", columns);
+        testFilterExpressionWithColumns(
+                mode, "arr[idx]", "(java.lang.String) itemAccess(arr, idx)", columns);
         // Map access: map[key]
         // Result type is Integer (from MAP<STRING, INT>), so cast is added
         testFilterExpressionWithColumns(
-                "m['key']", "(java.lang.Integer) itemAccess(m, \"key\")", columns);
-        testFilterExpressionWithColumns("m[k]", "(java.lang.Integer) itemAccess(m, k)", columns);
+                mode, "m['key']", "(java.lang.Integer) itemAccess(m, \"key\")", columns);
+        testFilterExpressionWithColumns(
+                mode, "m[k]", "(java.lang.Integer) itemAccess(m, k)", columns);
         // Nested access with comparisons
         testFilterExpressionWithColumns(
+                mode,
                 "arr[1] = 'value'",
                 "valueEquals((java.lang.String) itemAccess(arr, 1), \"value\")",
                 columns);
         testFilterExpressionWithColumns(
+                mode,
                 "m['key'] > 10",
                 "greaterThan((java.lang.Integer) itemAccess(m, \"key\"), 10)",
                 columns);
@@ -426,80 +500,86 @@ class TransformParserTest {
         List<Column> binaryArrayColumns =
                 List.of(Column.physicalColumn("binArr", DataTypes.ARRAY(DataTypes.BINARY(16))));
         testFilterExpressionWithColumns(
-                "binArr[1]", "(byte[]) itemAccess(binArr, 1)", binaryArrayColumns);
+                mode, "binArr[1]", "(byte[]) itemAccess(binArr, 1)", binaryArrayColumns);
 
         // Variant access tests
         List<Column> variantColumns = List.of(Column.physicalColumn("v", DataTypes.VARIANT()));
         testFilterExpressionWithColumns(
+                mode,
                 "v['key']",
                 "(org.apache.flink.cdc.common.types.variant.Variant) itemAccess(v, \"key\")",
                 variantColumns);
         testFilterExpressionWithColumns(
+                mode,
                 "v[1]",
                 "(org.apache.flink.cdc.common.types.variant.Variant) itemAccess(v, 1)",
                 variantColumns);
         testFilterExpressionWithColumns(
+                mode,
                 "v['a']['b']",
                 "(org.apache.flink.cdc.common.types.variant.Variant) itemAccess((org.apache.flink.cdc.common.types.variant.Variant) itemAccess(v, \"a\"), \"b\")",
                 variantColumns);
         testFilterExpressionWithColumns(
+                mode,
                 "parse_json('{\"key\": \"value\"}')['key']",
                 "(org.apache.flink.cdc.common.types.variant.Variant) itemAccess(parseJson(\"{\\\"key\\\": \\\"value\\\"}\"), \"key\")",
                 Collections.emptyList());
     }
 
-    @Test
-    public void testTranslateFilterToJaninoExpressionError() {
+    @ParameterizedTest(name = "precision mode: {0}")
+    @EnumSource
+    public void testTranslateFilterToJaninoExpressionError(DecimalPrecisionMode mode) {
         Assertions.assertThatThrownBy(
-                        () -> {
-                            TransformParser.translateFilterExpressionToJaninoExpression(
-                                    "TIMESTAMPDIFF(SECONDS, dt1, dt2)",
-                                    Collections.emptyList(),
-                                    Collections.emptyList(),
-                                    new SupportedMetadataColumn[0],
-                                    Collections.emptyMap());
-                        })
+                        () ->
+                                TransformParser.translateFilterExpressionToJaninoExpression(
+                                        "TIMESTAMPDIFF(SECONDS, dt1, dt2)",
+                                        Collections.emptyList(),
+                                        Collections.emptyList(),
+                                        new SupportedMetadataColumn[0],
+                                        Collections.emptyMap(),
+                                        mode))
                 .isExactlyInstanceOf(ParseException.class)
                 .hasMessage("Statements can not be parsed.");
         Assertions.assertThatThrownBy(
-                        () -> {
-                            TransformParser.translateFilterExpressionToJaninoExpression(
-                                    "TIMESTAMPDIFF(QUARTER, dt1, dt2)",
-                                    Collections.emptyList(),
-                                    Collections.emptyList(),
-                                    new SupportedMetadataColumn[0],
-                                    Collections.emptyMap());
-                        })
+                        () ->
+                                TransformParser.translateFilterExpressionToJaninoExpression(
+                                        "TIMESTAMPDIFF(QUARTER, dt1, dt2)",
+                                        Collections.emptyList(),
+                                        Collections.emptyList(),
+                                        new SupportedMetadataColumn[0],
+                                        Collections.emptyMap(),
+                                        mode))
                 .isExactlyInstanceOf(ParseException.class)
                 .hasMessage(
                         "Unsupported time interval unit in timestamp diff function: \"QUARTER\"");
         Assertions.assertThatThrownBy(
-                        () -> {
-                            TransformParser.translateFilterExpressionToJaninoExpression(
-                                    "TIMESTAMPADD(SECONDS, dt1, dt2)",
-                                    Collections.emptyList(),
-                                    Collections.emptyList(),
-                                    new SupportedMetadataColumn[0],
-                                    Collections.emptyMap());
-                        })
+                        () ->
+                                TransformParser.translateFilterExpressionToJaninoExpression(
+                                        "TIMESTAMPADD(SECONDS, dt1, dt2)",
+                                        Collections.emptyList(),
+                                        Collections.emptyList(),
+                                        new SupportedMetadataColumn[0],
+                                        Collections.emptyMap(),
+                                        mode))
                 .isExactlyInstanceOf(ParseException.class)
                 .hasMessage("Statements can not be parsed.");
         Assertions.assertThatThrownBy(
-                        () -> {
-                            TransformParser.translateFilterExpressionToJaninoExpression(
-                                    "TIMESTAMPADD(QUARTER, dt1, dt2)",
-                                    Collections.emptyList(),
-                                    Collections.emptyList(),
-                                    new SupportedMetadataColumn[0],
-                                    Collections.emptyMap());
-                        })
+                        () ->
+                                TransformParser.translateFilterExpressionToJaninoExpression(
+                                        "TIMESTAMPADD(QUARTER, dt1, dt2)",
+                                        Collections.emptyList(),
+                                        Collections.emptyList(),
+                                        new SupportedMetadataColumn[0],
+                                        Collections.emptyMap(),
+                                        mode))
                 .isExactlyInstanceOf(ParseException.class)
                 .hasMessage(
                         "Unsupported time interval unit in timestamp add function: \"QUARTER\"");
     }
 
-    @Test
-    void testGenerateProjectionColumns() {
+    @ParameterizedTest(name = "precision mode: {0}")
+    @EnumSource
+    void testGenerateProjectionColumns(DecimalPrecisionMode mode) {
         List<Column> testColumns =
                 Arrays.asList(
                         Column.physicalColumn("id", DataTypes.INT(), "id"),
@@ -518,7 +598,8 @@ class TransformParserTest {
                         "id, upper(name) as name, age + 1 as newage, createTime as newCreateTime, address as newAddress, deposit as deposits, weight / (height * height) as bmi",
                         testColumns,
                         Collections.emptyList(),
-                        new SupportedMetadataColumn[0]);
+                        new SupportedMetadataColumn[0],
+                        mode);
 
         List<String> expected =
                 Arrays.asList(
@@ -536,7 +617,8 @@ class TransformParserTest {
                         "*, __namespace_name__, __schema_name__, __table_name__, __data_event_type__ AS op_type",
                         testColumns,
                         Collections.emptyList(),
-                        new SupportedMetadataColumn[0]);
+                        new SupportedMetadataColumn[0],
+                        mode);
 
         List<String> metadataExpected =
                 Arrays.asList(
@@ -563,14 +645,16 @@ class TransformParserTest {
                                         "id, 1 + 1",
                                         testColumns,
                                         Collections.emptyList(),
-                                        new SupportedMetadataColumn[0]))
+                                        new SupportedMetadataColumn[0],
+                                        mode))
                 .isExactlyInstanceOf(IllegalArgumentException.class)
                 .hasMessage(
                         "Unrecognized projection expression: 1 + 1. Should be <EXPR> AS <IDENTIFIER>");
     }
 
-    @Test
-    public void testGenerateProjectionColumnsWithPrecision() {
+    @ParameterizedTest(name = "precision mode: {0}")
+    @EnumSource
+    public void testGenerateProjectionColumnsWithPrecision(DecimalPrecisionMode mode) {
         List<Column> testColumns =
                 Arrays.asList(
                         Column.physicalColumn("id", DataTypes.INT(), "id"),
@@ -589,7 +673,8 @@ class TransformParserTest {
                         "id, UPPER(name) as name2, UPPER(sex) as sex2, COALESCE(address,address) as address2, COALESCE(phone,phone) as phone2, COALESCE(deposit,deposit) as deposit2, COALESCE(birthday,birthday) as birthday2, COALESCE(birthday_ltz,birthday_ltz) as birthday_ltz2, COALESCE(update_time,update_time) as update_time2",
                         testColumns,
                         Collections.emptyList(),
-                        new SupportedMetadataColumn[0]);
+                        new SupportedMetadataColumn[0],
+                        mode);
 
         List<String> expected =
                 Arrays.asList(
@@ -641,52 +726,59 @@ class TransformParserTest {
                 .isExactlyInstanceOf(ParseException.class);
     }
 
-    @Test
-    void testTranslateUdfFilterToJaninoExpression() {
+    @ParameterizedTest(name = "precision mode: {0}")
+    @EnumSource
+    void testTranslateUdfFilterToJaninoExpression(DecimalPrecisionMode mode) {
         testFilterExpressionWithUdf(
-                "format(upper(id))", "__instanceOfFormatFunctionClass.eval(upper(id))");
+                mode, "format(upper(id))", "__instanceOfFormatFunctionClass.eval(upper(id))");
         testFilterExpressionWithUdf(
-                "format(lower(id))", "__instanceOfFormatFunctionClass.eval(lower(id))");
+                mode, "format(lower(id))", "__instanceOfFormatFunctionClass.eval(lower(id))");
         testFilterExpressionWithUdf(
-                "format(concat(a,b))", "__instanceOfFormatFunctionClass.eval(concat(a, b))");
+                mode, "format(concat(a,b))", "__instanceOfFormatFunctionClass.eval(concat(a, b))");
         testFilterExpressionWithUdf(
-                "format(SUBSTR(a,1))", "__instanceOfFormatFunctionClass.eval(substr(a, 1))");
+                mode, "format(SUBSTR(a,1))", "__instanceOfFormatFunctionClass.eval(substr(a, 1))");
         testFilterExpressionWithUdf(
+                mode,
                 "typeof(id like '^[a-zA-Z]')",
                 "__instanceOfTypeOfFunctionClass.eval(like(id, \"^[a-zA-Z]\"))");
         testFilterExpressionWithUdf(
+                mode,
                 "typeof(id not like '^[a-zA-Z]')",
                 "__instanceOfTypeOfFunctionClass.eval(notLike(id, \"^[a-zA-Z]\"))");
         testFilterExpressionWithUdf(
-                "typeof(abs(2))", "__instanceOfTypeOfFunctionClass.eval(abs(2))");
+                mode, "typeof(abs(2))", "__instanceOfTypeOfFunctionClass.eval(abs(2))");
         testFilterExpressionWithUdf(
-                "typeof(ceil(2))", "__instanceOfTypeOfFunctionClass.eval(ceil(2))");
+                mode, "typeof(ceil(2))", "__instanceOfTypeOfFunctionClass.eval(ceil(2))");
         testFilterExpressionWithUdf(
-                "typeof(ceiling(2))", "__instanceOfTypeOfFunctionClass.eval(ceil(2))");
+                mode, "typeof(ceiling(2))", "__instanceOfTypeOfFunctionClass.eval(ceil(2))");
         testFilterExpressionWithUdf(
-                "typeof(floor(2))", "__instanceOfTypeOfFunctionClass.eval(floor(2))");
+                mode, "typeof(floor(2))", "__instanceOfTypeOfFunctionClass.eval(floor(2))");
         testFilterExpressionWithUdf(
-                "typeof(round(2,2))", "__instanceOfTypeOfFunctionClass.eval(round(2, 2))");
+                mode, "typeof(round(2,2))", "__instanceOfTypeOfFunctionClass.eval(round(2, 2))");
         testFilterExpressionWithUdf(
-                "typeof(id + 2)", "__instanceOfTypeOfFunctionClass.eval(id + 2)");
+                mode, "typeof(id + 2)", "__instanceOfTypeOfFunctionClass.eval(id + 2)");
         testFilterExpressionWithUdf(
-                "typeof(id - 2)", "__instanceOfTypeOfFunctionClass.eval(id - 2)");
+                mode, "typeof(id - 2)", "__instanceOfTypeOfFunctionClass.eval(id - 2)");
         testFilterExpressionWithUdf(
-                "typeof(id * 2)", "__instanceOfTypeOfFunctionClass.eval(id * 2)");
+                mode, "typeof(id * 2)", "__instanceOfTypeOfFunctionClass.eval(id * 2)");
         testFilterExpressionWithUdf(
-                "typeof(id / 2)", "__instanceOfTypeOfFunctionClass.eval(id / 2)");
+                mode, "typeof(id / 2)", "__instanceOfTypeOfFunctionClass.eval(id / 2)");
         testFilterExpressionWithUdf(
-                "typeof(id % 2)", "__instanceOfTypeOfFunctionClass.eval(id % 2)");
+                mode, "typeof(id % 2)", "__instanceOfTypeOfFunctionClass.eval(id % 2)");
         testFilterExpressionWithUdf(
+                mode,
                 "addone(addone(id)) > 4 OR typeof(id) <> 'bool' AND format('from %s to %s is %s', 'a', 'z', 'lie') <> ''",
                 "greaterThan(__instanceOfAddOneFunctionClass.eval(__instanceOfAddOneFunctionClass.eval(id)), 4) || !valueEquals(__instanceOfTypeOfFunctionClass.eval(id), \"bool\") && !valueEquals(__instanceOfFormatFunctionClass.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")");
         testFilterExpressionWithUdf(
+                mode,
                 "ADDONE(ADDONE(id)) > 4 OR TYPEOF(id) <> 'bool' AND FORMAT('from %s to %s is %s', 'a', 'z', 'lie') <> ''",
                 "greaterThan(__instanceOfAddOneFunctionClass.eval(__instanceOfAddOneFunctionClass.eval(id)), 4) || !valueEquals(__instanceOfTypeOfFunctionClass.eval(id), \"bool\") && !valueEquals(__instanceOfFormatFunctionClass.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")");
     }
 
-    @Test
-    public void testTranslateUdfFilterToJaninoExpressionWithColumnNameMap() {
+    @ParameterizedTest(name = "precision mode: {0}")
+    @EnumSource
+    public void testTranslateUdfFilterToJaninoExpressionWithColumnNameMap(
+            DecimalPrecisionMode mode) {
         List<Column> columns =
                 List.of(
                         Column.physicalColumn("a", DataTypes.INT()),
@@ -699,68 +791,81 @@ class TransformParserTest {
         columnNameMap.put("a-b", "$2");
 
         testFilterExpressionWithUdf(
+                mode,
                 "format(upper(a))",
                 "__instanceOfFormatFunctionClass.eval(upper($0))",
                 columns,
                 columnNameMap);
         testFilterExpressionWithUdf(
+                mode,
                 "format(lower(b))",
                 "__instanceOfFormatFunctionClass.eval(lower($1))",
                 columns,
                 columnNameMap);
         testFilterExpressionWithUdf(
+                mode,
                 "format(concat(a,b))",
                 "__instanceOfFormatFunctionClass.eval(concat($0, $1))",
                 columns,
                 columnNameMap);
         testFilterExpressionWithUdf(
+                mode,
                 "format(SUBSTR(`a-b`,1))",
                 "__instanceOfFormatFunctionClass.eval(substr($2, 1))",
                 columns,
                 columnNameMap);
         testFilterExpressionWithUdf(
+                mode,
                 "typeof(`a-b` like '^[a-zA-Z]')",
                 "__instanceOfTypeOfFunctionClass.eval(like($2, \"^[a-zA-Z]\"))",
                 columns,
                 columnNameMap);
         testFilterExpressionWithUdf(
+                mode,
                 "typeof(`a-b` not like '^[a-zA-Z]')",
                 "__instanceOfTypeOfFunctionClass.eval(notLike($2, \"^[a-zA-Z]\"))",
                 columns,
                 columnNameMap);
         testFilterExpressionWithUdf(
+                mode,
                 "typeof(a-b-`a-b`)",
                 "__instanceOfTypeOfFunctionClass.eval($0 - $1 - $2)",
                 columns,
                 columnNameMap);
         testFilterExpressionWithUdf(
+                mode,
                 "typeof(a-b-2)",
                 "__instanceOfTypeOfFunctionClass.eval($0 - $1 - 2)",
                 columns,
                 columnNameMap);
         testFilterExpressionWithUdf(
+                mode,
                 "addone(addone(`a-b`)) > 4 OR typeof(a-b) <> 'bool' AND format('from %s to %s is %s', 'a', 'z', 'lie') <> ''",
                 "greaterThan(__instanceOfAddOneFunctionClass.eval(__instanceOfAddOneFunctionClass.eval($2)), 4) || !valueEquals(__instanceOfTypeOfFunctionClass.eval($0 - $1), \"bool\") && !valueEquals(__instanceOfFormatFunctionClass.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")",
                 columns,
                 columnNameMap);
         testFilterExpressionWithUdf(
+                mode,
                 "ADDONE(ADDONE(`a-b`)) > 4 OR TYPEOF(a-b) <> 'bool' AND FORMAT('from %s to %s is %s', 'a', 'z', 'lie') <> ''",
                 "greaterThan(__instanceOfAddOneFunctionClass.eval(__instanceOfAddOneFunctionClass.eval($2)), 4) || !valueEquals(__instanceOfTypeOfFunctionClass.eval($0 - $1), \"bool\") && !valueEquals(__instanceOfFormatFunctionClass.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")",
                 columns,
                 columnNameMap);
     }
 
-    @Test
-    void testLargeNumericalLiterals() {
+    @ParameterizedTest(name = "precision mode: {0}")
+    @EnumSource
+    void testLargeNumericalLiterals(DecimalPrecisionMode mode) {
         // For literals within [-2147483648, 2147483647] range, plain Integers are OK
-        testFilterExpression("id > 2147483647", "greaterThan(id, 2147483647)");
-        testFilterExpression("id < -2147483648", "lessThan(id, -2147483648)");
+        testFilterExpression(mode, "id > 2147483647", "greaterThan(id, 2147483647)");
+        testFilterExpression(mode, "id < -2147483648", "lessThan(id, -2147483648)");
 
         // For out-of-range literals, an extra `L` suffix is required
-        testFilterExpression("id > 2147483648", "greaterThan(id, 2147483648L)");
-        testFilterExpression("id > -2147483649", "greaterThan(id, -2147483649L)");
-        testFilterExpression("id < 9223372036854775807", "lessThan(id, 9223372036854775807L)");
-        testFilterExpression("id > -9223372036854775808", "greaterThan(id, -9223372036854775808L)");
+        testFilterExpression(mode, "id > 2147483648", "greaterThan(id, 2147483648L)");
+        testFilterExpression(mode, "id > -2147483649", "greaterThan(id, -2147483649L)");
+        testFilterExpression(
+                mode, "id < 9223372036854775807", "lessThan(id, 9223372036854775807L)");
+        testFilterExpression(
+                mode, "id > -9223372036854775808", "greaterThan(id, -9223372036854775808L)");
 
         // But there's still a limit
         Assertions.assertThatThrownBy(
@@ -770,7 +875,8 @@ class TransformParserTest {
                                         Collections.emptyList(),
                                         Collections.emptyList(),
                                         new SupportedMetadataColumn[0],
-                                        Collections.emptyMap()))
+                                        Collections.emptyMap(),
+                                        mode))
                 .isExactlyInstanceOf(CalciteContextException.class)
                 .hasMessageContaining("Numeric literal '9223372036854775808' out of range");
 
@@ -781,13 +887,15 @@ class TransformParserTest {
                                         Collections.emptyList(),
                                         Collections.emptyList(),
                                         new SupportedMetadataColumn[0],
-                                        Collections.emptyMap()))
+                                        Collections.emptyMap(),
+                                        mode))
                 .isExactlyInstanceOf(CalciteContextException.class)
                 .hasMessageContaining("Numeric literal '-9223372036854775809' out of range");
     }
 
-    @Test
-    public void testProjectionColumnsWithColumnNameMap() {
+    @ParameterizedTest(name = "precision mode: {0}")
+    @EnumSource
+    public void testProjectionColumnsWithColumnNameMap(DecimalPrecisionMode mode) {
         List<Column> testColumns =
                 Arrays.asList(
                         Column.physicalColumn("a", DataTypes.INT(), "a"),
@@ -799,7 +907,8 @@ class TransformParserTest {
                         "a, b, a-b as c, `a-b`, `a-b` AS d, `a-b`-1 AS e, a-b+`a-b` AS f, `test-meta-col`, `test-meta-col`-a-b AS g",
                         testColumns,
                         Collections.emptyList(),
-                        new SupportedMetadataColumn[] {new TestMetadataColumn()});
+                        new SupportedMetadataColumn[] {new TestMetadataColumn()},
+                        mode);
 
         List<String> expected =
                 Arrays.asList(
@@ -830,8 +939,9 @@ class TransformParserTest {
         "piedzimst brīvi"
     };
 
-    @Test
-    void testParsingExpressionWithUnicodeLiterals() {
+    @ParameterizedTest(name = "precision mode: {0}")
+    @EnumSource
+    void testParsingExpressionWithUnicodeLiterals(DecimalPrecisionMode mode) {
         List<Column> columns =
                 Arrays.asList(
                         Column.physicalColumn("a", DataTypes.STRING(), "a"),
@@ -844,7 +954,8 @@ class TransformParserTest {
                                             .replace("{UNICODE_STRING}", unicodeString),
                                     columns,
                                     Collections.emptyList(),
-                                    new SupportedMetadataColumn[] {}))
+                                    new SupportedMetadataColumn[] {},
+                                    mode))
                     .map(ProjectionColumn::getScriptExpression)
                     .containsExactly(
                             "$0",
@@ -855,44 +966,56 @@ class TransformParserTest {
                             "!valueEquals($0, castToInteger(\"" + unicodeString + "\"))");
 
             testFilterExpression(
-                    "a = '" + unicodeString + "'", "valueEquals(a, \"" + unicodeString + "\")");
+                    mode,
+                    "a = '" + unicodeString + "'",
+                    "valueEquals(a, \"" + unicodeString + "\")");
             testFilterExpression(
-                    "a <> '" + unicodeString + "'", "!valueEquals(a, \"" + unicodeString + "\")");
+                    mode,
+                    "a <> '" + unicodeString + "'",
+                    "!valueEquals(a, \"" + unicodeString + "\")");
         }
     }
 
     private static final List<Column> DUMMY_COLUMNS =
             List.of(Column.physicalColumn("id", DataTypes.INT()));
 
-    private void testFilterExpression(String expression, String expressionExpect) {
+    private void testFilterExpression(
+            DecimalPrecisionMode mode, String expression, String expressionExpect) {
         String janinoExpression =
                 TransformParser.translateFilterExpressionToJaninoExpression(
                         expression,
                         DUMMY_COLUMNS,
                         Collections.emptyList(),
                         new SupportedMetadataColumn[0],
-                        Collections.emptyMap());
+                        Collections.emptyMap(),
+                        mode);
         Assertions.assertThat(janinoExpression).isEqualTo(expressionExpect);
     }
 
     private void testFilterExpressionWithColumns(
-            String expression, String expressionExpect, List<Column> columns) {
+            DecimalPrecisionMode mode,
+            String expression,
+            String expressionExpect,
+            List<Column> columns) {
         String janinoExpression =
                 TransformParser.translateFilterExpressionToJaninoExpression(
                         expression,
                         columns,
                         Collections.emptyList(),
                         new SupportedMetadataColumn[0],
-                        Collections.emptyMap());
+                        Collections.emptyMap(),
+                        mode);
         Assertions.assertThat(janinoExpression).isEqualTo(expressionExpect);
     }
 
-    private void testFilterExpressionWithUdf(String expression, String expressionExpect) {
+    private void testFilterExpressionWithUdf(
+            DecimalPrecisionMode mode, String expression, String expressionExpect) {
         testFilterExpressionWithUdf(
-                expression, expressionExpect, DUMMY_COLUMNS, Collections.emptyMap());
+                mode, expression, expressionExpect, DUMMY_COLUMNS, Collections.emptyMap());
     }
 
     private void testFilterExpressionWithUdf(
+            DecimalPrecisionMode mode,
             String expression,
             String expressionExpect,
             List<Column> columns,
@@ -912,7 +1035,8 @@ class TransformParserTest {
                                         "typeof",
                                         "org.apache.flink.cdc.udf.examples.java.TypeOfFunctionClass")),
                         new SupportedMetadataColumn[0],
-                        columnNameMap);
+                        columnNameMap,
+                        mode);
         Assertions.assertThat(janinoExpression).isEqualTo(expressionExpect);
     }
 

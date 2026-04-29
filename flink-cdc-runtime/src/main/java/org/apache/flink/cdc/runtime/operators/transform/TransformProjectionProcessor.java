@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.runtime.operators.transform;
 
+import org.apache.flink.cdc.common.pipeline.DecimalPrecisionMode;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.runtime.parser.TransformParser;
@@ -47,6 +48,7 @@ public class TransformProjectionProcessor {
     private final PostTransformChangeInfo changeInfo;
     private final String projectionExpression;
     private final String timezone;
+    private final DecimalPrecisionMode decimalPrecisionMode;
     private final List<UserDefinedFunctionDescriptor> udfDescriptors;
     private final List<Object> udfFunctionInstances;
     private final List<ProjectionColumnProcessor> columnProcessors;
@@ -57,12 +59,14 @@ public class TransformProjectionProcessor {
             PostTransformChangeInfo changeInfo,
             String projectionExpression,
             String timezone,
+            DecimalPrecisionMode decimalPrecisionMode,
             List<UserDefinedFunctionDescriptor> udfDescriptors,
             List<Object> udfFunctionInstances,
             SupportedMetadataColumn[] supportedMetadataColumns) {
         this.changeInfo = changeInfo;
         this.projectionExpression = projectionExpression;
         this.timezone = timezone;
+        this.decimalPrecisionMode = decimalPrecisionMode;
         this.udfDescriptors = udfDescriptors;
         this.udfFunctionInstances = udfFunctionInstances;
         this.supportedMetadataColumns = supportedMetadataColumns;
@@ -93,7 +97,8 @@ public class TransformProjectionProcessor {
                         projectionExpression,
                         changeInfo.getPreTransformedSchema().getColumns(),
                         udfDescriptors,
-                        supportedMetadataColumns);
+                        supportedMetadataColumns,
+                        decimalPrecisionMode);
 
         List<ProjectionColumnProcessor> columnProcessors =
                 projectionColumns.stream()
