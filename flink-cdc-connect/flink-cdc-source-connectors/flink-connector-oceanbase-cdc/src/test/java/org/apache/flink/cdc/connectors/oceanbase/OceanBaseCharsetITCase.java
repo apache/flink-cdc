@@ -29,7 +29,6 @@ import org.apache.flink.util.StringUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -40,8 +39,6 @@ import java.util.Arrays;
 import java.util.stream.Stream;
 
 /** Test supporting different column charsets for OceanBase. */
-@Disabled(
-        "Temporarily disabled for GitHub CI due to unavailability of OceanBase Binlog Service docker image. These tests are currently only supported for local execution.")
 public class OceanBaseCharsetITCase extends OceanBaseSourceTestBase {
 
     private static final String DDL_FILE = "charset_test";
@@ -183,7 +180,7 @@ public class OceanBaseCharsetITCase extends OceanBaseSourceTestBase {
                                 + ")",
                         testName,
                         getHost(),
-                        PORT,
+                        getPort(),
                         USER_NAME,
                         PASSWORD,
                         DATABASE_NAME,

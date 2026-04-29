@@ -30,6 +30,12 @@ import org.apache.commons.lang3.StringUtils;
 import org.assertj.core.api.Assertions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.Network;
+import org.testcontainers.containers.output.Slf4jLogConsumer;
+import org.testcontainers.containers.wait.strategy.LogMessageWaitStrategy;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.net.URL;
 import java.nio.file.Files;
@@ -38,6 +44,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.Duration;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -56,22 +63,40 @@ import java.util.stream.Collectors;
 import static java.lang.String.format;
 import static org.apache.flink.util.Preconditions.checkState;
 
-/** Basic class for testing Database OceanBase which supported the mysql protocol. */
+/** Basic class for testing Database OceanBase. */
+@Testcontainers
 public abstract class OceanBaseSourceTestBase extends AbstractTestBase {
 
     private static final Logger LOG = LoggerFactory.getLogger(OceanBaseSourceTestBase.class);
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
-    protected static final Integer PORT = 3306;
-    protected static final String USER_NAME = System.getenv("OCEANBASE_USERNAME");
-    protected static final String PASSWORD = System.getenv("OCEANBASE_PASSWORD");
-    protected static final String HOSTNAME = System.getenv("OCEANBASE_HOSTNAME");
+
+    protected static final Integer INNER_PORT = 2883;
+    protected static final String USER_NAME = "root@test";
+    protected static final String PASSWORD = "123456";
+    protected static final Duration WAITING_TIMEOUT = Duration.ofMinutes(5);
+
+    public static final Network NETWORK = Network.newNetwork();
+
+    @SuppressWarnings("resource")
+    @Container
+    public static final GenericContainer<?> OB_BINLOG_CONTAINER =
+            new GenericContainer<>("quay.io/oceanbase/obbinlog-ce:4.2.5-test")
+                    .withNetwork(NETWORK)
+                    .withStartupTimeout(WAITING_TIMEOUT)
+                    .withExposedPorts(2881, 2883)
+                    .withLogConsumer(new Slf4jLogConsumer(LOG))
+                    .waitingFor(
+                            new LogMessageWaitStrategy()
+                                    .withRegEx(".*OBBinlog is ready!.*")
+                                    .withTimes(1)
+                                    .withStartupTimeout(Duration.ofMinutes(6)));
 
     protected static String getHost() {
-        return HOSTNAME;
+        return OB_BINLOG_CONTAINER.getHost();
     }
 
-    protected static Integer getPort() {
-        return PORT;
+    protected static int getPort() {
+        return OB_BINLOG_CONTAINER.getMappedPort(INNER_PORT);
     }
 
     protected static String getUserName() {
@@ -83,7 +108,7 @@ public abstract class OceanBaseSourceTestBase extends AbstractTestBase {
     }
 
     protected static String getJdbcUrl() {
-        return String.format("jdbc:mysql://%s:%s", HOSTNAME, PORT);
+        return String.format("jdbc:mysql://%s:%s", getHost(), getPort());
     }
 
     protected static Connection getJdbcConnection() throws SQLException {
@@ -253,7 +278,7 @@ public abstract class OceanBaseSourceTestBase extends AbstractTestBase {
         properties.put("database.port", String.valueOf(getPort()));
         properties.put("database.user", getUserName());
         properties.put("database.password", getPassword());
-        properties.put("database.serverTimezone", ZoneId.of("UTC").toString());
+        properties.put("database.serverTimezone", ZoneId.of("Asia/Shanghai").toString());
         io.debezium.config.Configuration configuration =
                 io.debezium.config.Configuration.from(properties);
         return DebeziumUtils.createMySqlConnection(configuration, new Properties());
