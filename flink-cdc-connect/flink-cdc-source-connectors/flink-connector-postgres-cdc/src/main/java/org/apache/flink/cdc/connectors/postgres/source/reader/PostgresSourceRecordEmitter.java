@@ -17,7 +17,9 @@
 
 package org.apache.flink.cdc.connectors.postgres.source.reader;
 
+import org.apache.flink.api.connector.source.SourceOutput;
 import org.apache.flink.cdc.connectors.base.source.meta.offset.OffsetFactory;
+import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitState;
 import org.apache.flink.cdc.connectors.base.source.metrics.SourceReaderMetrics;
 import org.apache.flink.cdc.connectors.base.source.reader.IncrementalSourceRecordEmitter;
 import org.apache.flink.cdc.connectors.postgres.source.schema.PostgresSchemaRecord;
@@ -41,6 +43,18 @@ public class PostgresSourceRecordEmitter<T> extends IncrementalSourceRecordEmitt
                 sourceReaderMetrics,
                 includeSchemaChanges,
                 offsetFactory);
+    }
+
+    @Override
+    protected void processElement(
+            SourceRecord element, SourceOutput<T> output, SourceSplitState splitState)
+            throws Exception {
+        if (PostgresSourceStreamFetcher.isLogicalMessage(element)) {
+            updateStreamSplitState(splitState, element);
+            emitElement(element, output);
+            return;
+        }
+        super.processElement(element, output, splitState);
     }
 
     @Override

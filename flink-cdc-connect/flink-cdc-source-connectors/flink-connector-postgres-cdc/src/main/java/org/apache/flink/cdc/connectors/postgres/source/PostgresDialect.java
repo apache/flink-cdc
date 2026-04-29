@@ -26,11 +26,13 @@ import org.apache.flink.cdc.connectors.base.source.assigner.state.ChunkSplitterS
 import org.apache.flink.cdc.connectors.base.source.meta.offset.Offset;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.reader.external.FetchTask;
+import org.apache.flink.cdc.connectors.base.source.reader.external.IncrementalSourceStreamFetcher;
 import org.apache.flink.cdc.connectors.base.source.reader.external.JdbcSourceFetchTaskContext;
 import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfig;
 import org.apache.flink.cdc.connectors.postgres.source.fetch.PostgresScanFetchTask;
 import org.apache.flink.cdc.connectors.postgres.source.fetch.PostgresSourceFetchTaskContext;
 import org.apache.flink.cdc.connectors.postgres.source.fetch.PostgresStreamFetchTask;
+import org.apache.flink.cdc.connectors.postgres.source.reader.PostgresSourceStreamFetcher;
 import org.apache.flink.cdc.connectors.postgres.source.utils.CustomPostgresSchema;
 import org.apache.flink.cdc.connectors.postgres.source.utils.TableDiscoveryUtils;
 import org.apache.flink.util.FlinkRuntimeException;
@@ -237,6 +239,13 @@ public class PostgresDialect implements JdbcDataSourceDialect {
     @Override
     public JdbcSourceFetchTaskContext createFetchTaskContext(JdbcSourceConfig taskSourceConfig) {
         return new PostgresSourceFetchTaskContext(taskSourceConfig, this);
+    }
+
+    @Override
+    public IncrementalSourceStreamFetcher createStreamFetcher(
+            FetchTask.Context taskContext, int subtaskId) {
+        return new PostgresSourceStreamFetcher(
+                taskContext, subtaskId, sourceConfig.isLogicalMessageEnabled());
     }
 
     @Override

@@ -132,7 +132,7 @@ public class IncrementalSourceRecordEmitter<T>
         return TABLE_CHANGE_SERIALIZER.deserialize(tableChanges, true);
     }
 
-    private void updateStreamSplitState(SourceSplitState splitState, SourceRecord element) {
+    protected void updateStreamSplitState(SourceSplitState splitState, SourceRecord element) {
         if (splitState.isStreamSplitState()) {
             Offset position = getOffsetPosition(element);
             splitState.asStreamSplitState().setStartingOffset(position);

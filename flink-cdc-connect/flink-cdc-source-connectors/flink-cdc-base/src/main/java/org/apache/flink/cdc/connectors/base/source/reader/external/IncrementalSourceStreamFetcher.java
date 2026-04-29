@@ -185,7 +185,7 @@ public class IncrementalSourceStreamFetcher implements Fetcher<SourceRecords, So
      *  only the change event belong to [1024, 2048) and offset is after highWatermark1 should send.
      * </pre>
      */
-    private boolean shouldEmit(SourceRecord sourceRecord) {
+    protected boolean shouldEmit(SourceRecord sourceRecord) {
         if (taskContext.isDataChangeRecord(sourceRecord)) {
             TableId tableId = taskContext.getTableId(sourceRecord);
             Offset position = taskContext.getStreamOffset(sourceRecord);

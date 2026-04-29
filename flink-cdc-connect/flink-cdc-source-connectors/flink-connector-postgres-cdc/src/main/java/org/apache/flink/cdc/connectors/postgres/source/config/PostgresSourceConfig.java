@@ -40,6 +40,7 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
     private final int lsnCommitCheckpointsDelay;
     private final boolean includePartitionedTables;
     private final boolean includeDatabaseInTableId;
+    private final boolean includeLogicalMessages;
 
     public PostgresSourceConfig(
             int subtaskId,
@@ -71,7 +72,8 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
             int lsnCommitCheckpointsDelay,
             boolean assignUnboundedChunkFirst,
             boolean includePartitionedTables,
-            boolean includeDatabaseInTableId) {
+            boolean includeDatabaseInTableId,
+            boolean includeLogicalMessages) {
         super(
                 startupOptions,
                 databaseList,
@@ -103,6 +105,7 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
         this.lsnCommitCheckpointsDelay = lsnCommitCheckpointsDelay;
         this.includePartitionedTables = includePartitionedTables;
         this.includeDatabaseInTableId = includeDatabaseInTableId;
+        this.includeLogicalMessages = includeLogicalMessages;
     }
 
     /**
@@ -155,5 +158,10 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
     /** Returns whether to include database in the generated Table ID. */
     public boolean isIncludeDatabaseInTableId() {
         return includeDatabaseInTableId;
+    }
+
+    /** Returns whether to emit Postgres logical decoding messages to the deserializer. */
+    public boolean isLogicalMessageEnabled() {
+        return includeLogicalMessages;
     }
 }

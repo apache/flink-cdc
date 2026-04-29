@@ -98,6 +98,16 @@ public class PostgresSourceOptions extends JdbcSourceOptions {
                                     + "(1) PUBLICATION must be created beforehand with parameter publish_via_partition_root=true\n"
                                     + "(2) Table list (regex or predefined list) should only match the parent table name, if table list matches both parent and child tables, snapshot data will be read twice.");
 
+    public static final ConfigOption<Boolean> SCAN_LOGICAL_MESSAGE_ENABLED =
+            ConfigOptions.key("scan.logical-message.enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Whether to emit Postgres logical messages produced by "
+                                    + "pg_logical_emit_message() to the deserializer. "
+                                    + "Disabled by default; logical messages are not bound to "
+                                    + "any table and are dropped by table-based watermark filtering.");
+
     public static final ConfigOption<Boolean> TABLE_ID_INCLUDE_DATABASE =
             ConfigOptions.key("table-id.include-database")
                     .booleanType()
