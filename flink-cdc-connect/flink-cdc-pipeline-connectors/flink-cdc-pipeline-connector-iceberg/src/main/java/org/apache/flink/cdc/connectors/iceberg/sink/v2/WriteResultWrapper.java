@@ -40,17 +40,31 @@ public class WriteResultWrapper implements Serializable {
 
     private final String operatorId;
 
+    /** Batch index within the checkpoint for this table; increments on each schema-change flush. */
+    private final int batchIndex;
+
+    public WriteResultWrapper(
+            WriteResult writeResult,
+            TableId tableId,
+            long checkpointId,
+            String jobId,
+            String operatorId,
+            int batchIndex) {
+        this.writeResult = writeResult;
+        this.tableId = tableId;
+        this.checkpointId = checkpointId;
+        this.jobId = jobId;
+        this.operatorId = operatorId;
+        this.batchIndex = batchIndex;
+    }
+
     public WriteResultWrapper(
             WriteResult writeResult,
             TableId tableId,
             long checkpointId,
             String jobId,
             String operatorId) {
-        this.writeResult = writeResult;
-        this.tableId = tableId;
-        this.checkpointId = checkpointId;
-        this.jobId = jobId;
-        this.operatorId = operatorId;
+        this(writeResult, tableId, checkpointId, jobId, operatorId, 0);
     }
 
     public WriteResult getWriteResult() {
@@ -71,6 +85,10 @@ public class WriteResultWrapper implements Serializable {
 
     public String getOperatorId() {
         return operatorId;
+    }
+
+    public int getBatchIndex() {
+        return batchIndex;
     }
 
     /** Build a simple description for the write result. */
@@ -95,6 +113,8 @@ public class WriteResultWrapper implements Serializable {
                 + jobId
                 + ", OperatorId: "
                 + operatorId
+                + ", BatchIndex: "
+                + batchIndex
                 + ", AddCount: "
                 + addCount
                 + ", DeleteCount: "

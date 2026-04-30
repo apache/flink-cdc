@@ -72,6 +72,11 @@ public class IcebergWriter
 
     private final List<WriteResultWrapper> temporaryWriteResult;
 
+    /**
+     * Per-table batch index; incremented on each schema-change flush, even when no writer exists.
+     */
+    private Map<TableId, Integer> tableBatchIndexMap;
+
     private Catalog catalog;
 
     private final int taskId;
@@ -102,6 +107,7 @@ public class IcebergWriter
         writerFactoryMap = new HashMap<>();
         writerMap = new HashMap<>();
         schemaMap = new HashMap<>();
+        tableBatchIndexMap = new HashMap<>();
         temporaryWriteResult = new ArrayList<>();
         this.taskId = taskId;
         this.attemptId = attemptId;
@@ -129,6 +135,7 @@ public class IcebergWriter
         list.addAll(temporaryWriteResult);
         list.addAll(getWriteResult());
         temporaryWriteResult.clear();
+        tableBatchIndexMap.clear();
         lastCheckpointId++;
         return list;
     }
@@ -166,6 +173,11 @@ public class IcebergWriter
         } else {
             SchemaChangeEvent schemaChangeEvent = (SchemaChangeEvent) event;
             TableId tableId = schemaChangeEvent.tableId();
+            // Flush only when the table is already known; skip on initial CreateTableEvent since
+            // no data has been written yet and there is nothing to split.
+            if (schemaMap.containsKey(tableId)) {
+                flushTableWriter(tableId);
+            }
             TableSchemaWrapper tableSchemaWrapper = schemaMap.get(tableId);
 
             Schema newSchema =
@@ -178,22 +190,47 @@ public class IcebergWriter
     }
 
     @Override
-    public void flush(boolean flush) throws IOException {
-        // Notice: flush method may be called many times during one checkpoint.
-        temporaryWriteResult.addAll(getWriteResult());
+    public void flush(boolean flush) {
+        // Flush may be called many times during one checkpoint by non-data events.
+        // Avoid rotating all task writers here, which can split same-PK updates into multiple
+        // batches within one checkpoint and break dedup semantics in downstream reads.
+    }
+
+    private void flushTableWriter(TableId tableId) throws IOException {
+        TaskWriter<RowData> writer = writerMap.remove(tableId);
+        // Advance even when no writer exists, to keep batchIndex in sync across subtasks.
+        int batchIndex = tableBatchIndexMap.getOrDefault(tableId, 0);
+        tableBatchIndexMap.put(tableId, batchIndex + 1);
+        if (writer == null) {
+            return;
+        }
+        WriteResultWrapper writeResultWrapper =
+                new WriteResultWrapper(
+                        writer.complete(),
+                        tableId,
+                        lastCheckpointId + 1,
+                        jobId,
+                        operatorId,
+                        batchIndex);
+        temporaryWriteResult.add(writeResultWrapper);
+        LOGGER.info(writeResultWrapper.buildDescription());
+        writerFactoryMap.remove(tableId);
     }
 
     private List<WriteResultWrapper> getWriteResult() throws IOException {
         long currentCheckpointId = lastCheckpointId + 1;
         List<WriteResultWrapper> writeResults = new ArrayList<>();
         for (Map.Entry<TableId, TaskWriter<RowData>> entry : writerMap.entrySet()) {
+            TableId tableId = entry.getKey();
+            int batchIndex = tableBatchIndexMap.getOrDefault(tableId, 0);
             WriteResultWrapper writeResultWrapper =
                     new WriteResultWrapper(
                             entry.getValue().complete(),
-                            entry.getKey(),
+                            tableId,
                             currentCheckpointId,
                             jobId,
-                            operatorId);
+                            operatorId,
+                            batchIndex);
             writeResults.add(writeResultWrapper);
             LOGGER.info(writeResultWrapper.buildDescription());
         }
@@ -223,6 +260,11 @@ public class IcebergWriter
         if (writerFactoryMap != null) {
             writerFactoryMap.clear();
             writerFactoryMap = null;
+        }
+
+        if (tableBatchIndexMap != null) {
+            tableBatchIndexMap.clear();
+            tableBatchIndexMap = null;
         }
 
         catalog = null;
