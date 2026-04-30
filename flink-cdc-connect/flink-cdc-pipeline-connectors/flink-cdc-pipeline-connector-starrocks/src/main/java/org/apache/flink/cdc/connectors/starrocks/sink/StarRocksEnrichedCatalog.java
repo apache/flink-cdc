@@ -23,12 +23,15 @@ import org.apache.flink.util.StringUtils;
 import com.starrocks.connector.flink.catalog.StarRocksCatalog;
 import com.starrocks.connector.flink.catalog.StarRocksCatalogException;
 import com.starrocks.connector.flink.catalog.StarRocksColumn;
+import com.starrocks.connector.flink.catalog.StarRocksTable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /** An enriched {@code StarRocksCatalog} with more schema evolution abilities. */
 public class StarRocksEnrichedCatalog extends StarRocksCatalog {
@@ -37,6 +40,70 @@ public class StarRocksEnrichedCatalog extends StarRocksCatalog {
     }
 
     private static final Logger LOG = LoggerFactory.getLogger(StarRocksEnrichedCatalog.class);
+
+    @Override
+    public void createTable(StarRocksTable table, boolean ignoreIfExists)
+            throws StarRocksCatalogException {
+        String createTableSql = buildCreateTableSql(table, ignoreIfExists);
+        try {
+            executeUpdateStatement(createTableSql);
+            LOG.info(
+                    "Success to create table {}.{}, sql: {}",
+                    table.getDatabaseName(),
+                    table.getDatabaseName(),
+                    createTableSql);
+        } catch (Exception e) {
+            LOG.error(
+                    "Failed to create table {}.{}, sql: {}",
+                    table.getDatabaseName(),
+                    table.getDatabaseName(),
+                    createTableSql,
+                    e);
+            throw new StarRocksCatalogException(
+                    String.format(
+                            "Failed to create table %s.%s",
+                            table.getDatabaseName(), table.getDatabaseName()),
+                    e);
+        }
+    }
+
+    @Override
+    public void alterAddColumns(
+            String databaseName,
+            String tableName,
+            List<StarRocksColumn> addColumns,
+            long timeoutSecond)
+            throws StarRocksCatalogException {
+        Preconditions.checkArgument(
+                !StringUtils.isNullOrWhitespaceOnly(databaseName),
+                "database name cannot be null or empty.");
+        Preconditions.checkArgument(
+                !StringUtils.isNullOrWhitespaceOnly(tableName),
+                "table name cannot be null or empty.");
+        Preconditions.checkArgument(!addColumns.isEmpty(), "Added columns should not be empty.");
+
+        String alterSql =
+                buildAlterAddColumnsSql(databaseName, tableName, addColumns, timeoutSecond);
+        try {
+            long startTimeMillis = System.currentTimeMillis();
+            executeAlter(databaseName, tableName, alterSql, timeoutSecond);
+            LOG.info(
+                    "Success to add columns to {}.{}, duration: {}ms, sql: {}",
+                    databaseName,
+                    tableName,
+                    System.currentTimeMillis() - startTimeMillis,
+                    alterSql);
+        } catch (Exception e) {
+            LOG.error(
+                    "Failed to add columns to {}.{}, sql: {}",
+                    databaseName,
+                    tableName,
+                    alterSql,
+                    e);
+            throw new StarRocksCatalogException(
+                    String.format("Failed to add columns to %s.%s ", databaseName, tableName), e);
+        }
+    }
 
     public void truncateTable(String databaseName, String tableName)
             throws StarRocksCatalogException {
@@ -137,6 +204,80 @@ public class StarRocksEnrichedCatalog extends StarRocksCatalog {
         }
     }
 
+    private String buildAlterAddColumnsSql(
+            String databaseName,
+            String tableName,
+            List<StarRocksColumn> addColumns,
+            long timeoutSecond) {
+        StringBuilder builder = new StringBuilder();
+        builder.append(String.format("ALTER TABLE `%s`.`%s` ", databaseName, tableName));
+        String columnsStmt =
+                addColumns.stream()
+                        .map(col -> "ADD COLUMN " + buildColumnStmt(col))
+                        .collect(Collectors.joining(", "));
+        builder.append(columnsStmt);
+        builder.append(String.format(" PROPERTIES (\"timeout\" = \"%s\")", timeoutSecond));
+        builder.append(";");
+        return builder.toString();
+    }
+
+    private String buildCreateTableSql(StarRocksTable table, boolean ignoreIfExists) {
+        StringBuilder builder = new StringBuilder();
+        builder.append(
+                String.format(
+                        "CREATE TABLE %s`%s`.`%s`",
+                        ignoreIfExists ? "IF NOT EXISTS " : "",
+                        table.getDatabaseName(),
+                        table.getTableName()));
+        builder.append(" (\n");
+        String columnsStmt =
+                table.getColumns().stream()
+                        .map(this::buildColumnStmt)
+                        .collect(Collectors.joining(",\n"));
+        builder.append(columnsStmt);
+        builder.append("\n) ");
+
+        Preconditions.checkArgument(
+                table.getTableType() == StarRocksTable.TableType.PRIMARY_KEY,
+                "Not support to build create table sql for table type " + table.getTableType());
+        Preconditions.checkArgument(
+                table.getTableKeys().isPresent(),
+                "Can't build create table sql because there is no table keys");
+        String tableKeys =
+                table.getTableKeys().get().stream()
+                        .map(key -> "`" + key + "`")
+                        .collect(Collectors.joining(", "));
+        builder.append(String.format("PRIMARY KEY (%s)\n", tableKeys));
+
+        Preconditions.checkArgument(
+                table.getDistributionKeys().isPresent(),
+                "Can't build create table sql because there is no distribution keys");
+        String distributionKeys =
+                table.getDistributionKeys().get().stream()
+                        .map(key -> "`" + key + "`")
+                        .collect(Collectors.joining(", "));
+        builder.append(String.format("DISTRIBUTED BY HASH (%s)", distributionKeys));
+        if (table.getNumBuckets().isPresent()) {
+            builder.append(" BUCKETS ");
+            builder.append(table.getNumBuckets().get());
+        }
+        if (!table.getProperties().isEmpty()) {
+            builder.append("\nPROPERTIES (\n");
+            String properties =
+                    table.getProperties().entrySet().stream()
+                            .map(
+                                    entry ->
+                                            String.format(
+                                                    "\"%s\" = \"%s\"",
+                                                    entry.getKey(), entry.getValue()))
+                            .collect(Collectors.joining(",\n"));
+            builder.append(properties);
+            builder.append("\n)");
+        }
+        builder.append(";");
+        return builder.toString();
+    }
+
     private String buildTruncateTableSql(String databaseName, String tableName) {
         return String.format("TRUNCATE TABLE `%s`.`%s`;", databaseName, tableName);
     }
@@ -171,6 +312,26 @@ public class StarRocksEnrichedCatalog extends StarRocksCatalog {
         }
     }
 
+    private void executeAlter(
+            String databaseName, String tableName, String alterSql, long timeoutSecond)
+            throws StarRocksCatalogException {
+        try {
+            Method m =
+                    getClass()
+                            .getSuperclass()
+                            .getDeclaredMethod(
+                                    "executeAlter",
+                                    String.class,
+                                    String.class,
+                                    String.class,
+                                    long.class);
+            m.setAccessible(true);
+            m.invoke(this, databaseName, tableName, alterSql, timeoutSecond);
+        } catch (InvocationTargetException | NoSuchMethodException | IllegalAccessException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     private void checkTableArgument(String databaseName, String tableName) {
         Preconditions.checkArgument(
                 !StringUtils.isNullOrWhitespaceOnly(databaseName),
@@ -191,13 +352,23 @@ public class StarRocksEnrichedCatalog extends StarRocksCatalog {
         builder.append(" ");
         builder.append(column.isNullable() ? "NULL" : "NOT NULL");
         if (column.getDefaultValue().isPresent()) {
-            builder.append(String.format(" DEFAULT \"%s\"", column.getDefaultValue().get()));
+            builder.append(
+                    String.format(
+                            " DEFAULT \"%s\"",
+                            escapeForDoubleQuotedSqlString(column.getDefaultValue().get())));
         }
 
         if (column.getColumnComment().isPresent()) {
-            builder.append(String.format(" COMMENT \"%s\"", column.getColumnComment().get()));
+            builder.append(
+                    String.format(
+                            " COMMENT \"%s\"",
+                            escapeForDoubleQuotedSqlString(column.getColumnComment().get())));
         }
         return builder.toString();
+    }
+
+    private String escapeForDoubleQuotedSqlString(String value) {
+        return value.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 
     private String getFullColumnType(
