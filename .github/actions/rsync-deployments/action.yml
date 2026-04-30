@@ -1,0 +1,68 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+# Inspired by https://github.com/Burnett01/rsync-deployments/blob/7.1.0/action.yml
+name: Rsync Deploy
+description: Upload a folder to a remote destination via rsync over SSH.
+inputs:
+  switches:
+    description: rsync switches
+    required: false
+    default: "--archive --compress"
+  path:
+    description: Local source directory
+    required: true
+  remote_path:
+    description: Remote destination directory
+    required: true
+  remote_host:
+    description: SSH host
+    required: true
+  remote_port:
+    description: SSH port
+    required: false
+    default: "22"
+  remote_user:
+    description: SSH username
+    required: true
+  remote_key:
+    description: SSH private key (OpenSSH/PEM)
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: rsync via ssh-agent
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        # Start agent and load the key
+        eval "$(ssh-agent -s)"
+        ssh-add - <<< "${{ inputs.remote_key }}"
+
+        # SSH command with host key checking disabled
+        RSH="ssh -o StrictHostKeyChecking=no -p ${{ inputs.remote_port }}"
+
+        # Resolve paths and DSN
+        LOCAL_PATH="$GITHUB_WORKSPACE/${{ inputs.path }}"
+        DSN="${{ inputs.remote_user }}@${{ inputs.remote_host }}"
+
+        # Deploy
+        rsync ${{ inputs.switches }} -e "$RSH" "$LOCAL_PATH" "$DSN:${{ inputs.remote_path }}"
+
+        # Cleanup identities from the agent
+        ssh-add -D || true
