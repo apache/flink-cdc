@@ -56,6 +56,7 @@ public class MongoDBSourceConfig implements SourceConfig {
     private final boolean skipSnapshotBackfill;
     private final boolean isScanNewlyAddedTableEnabled;
     private final boolean assignUnboundedChunkFirst;
+    private final double recordsPerSecond;
 
     MongoDBSourceConfig(
             String scheme,
@@ -79,7 +80,8 @@ public class MongoDBSourceConfig implements SourceConfig {
             boolean disableCursorTimeout,
             boolean skipSnapshotBackfill,
             boolean isScanNewlyAddedTableEnabled,
-            boolean assignUnboundedChunkFirst) {
+            boolean assignUnboundedChunkFirst,
+            double recordsPerSecond) {
         this.scheme = checkNotNull(scheme);
         this.hosts = checkNotNull(hosts);
         this.username = username;
@@ -103,6 +105,7 @@ public class MongoDBSourceConfig implements SourceConfig {
         this.skipSnapshotBackfill = skipSnapshotBackfill;
         this.isScanNewlyAddedTableEnabled = isScanNewlyAddedTableEnabled;
         this.assignUnboundedChunkFirst = assignUnboundedChunkFirst;
+        this.recordsPerSecond = recordsPerSecond;
     }
 
     public String getScheme() {
@@ -208,6 +211,11 @@ public class MongoDBSourceConfig implements SourceConfig {
     }
 
     @Override
+    public double getRecordsPerSecond() {
+        return recordsPerSecond;
+    }
+
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
@@ -234,7 +242,8 @@ public class MongoDBSourceConfig implements SourceConfig {
                 && Objects.equals(collectionList, that.collectionList)
                 && Objects.equals(connectionString, that.connectionString)
                 && Objects.equals(skipSnapshotBackfill, that.skipSnapshotBackfill)
-                && Objects.equals(isScanNewlyAddedTableEnabled, that.isScanNewlyAddedTableEnabled);
+                && Objects.equals(isScanNewlyAddedTableEnabled, that.isScanNewlyAddedTableEnabled)
+                && recordsPerSecond == that.recordsPerSecond;
     }
 
     @Override
@@ -258,6 +267,7 @@ public class MongoDBSourceConfig implements SourceConfig {
                 samplesPerChunk,
                 closeIdleReaders,
                 skipSnapshotBackfill,
-                isScanNewlyAddedTableEnabled);
+                isScanNewlyAddedTableEnabled,
+                recordsPerSecond);
     }
 }

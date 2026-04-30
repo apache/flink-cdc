@@ -24,6 +24,8 @@ import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -131,6 +133,126 @@ public class PostgresE2eITCase extends PipelineTestEnvironment {
                         postgresInventoryDatabase.getDatabaseName(),
                         postgresInventoryDatabase.getDatabaseName(),
                         slotName,
+                        parallelism);
+        Path postgresCdcJar = TestUtils.getResource("postgres-cdc-pipeline-connector.jar");
+        submitPipelineJob(pipelineJob, postgresCdcJar);
+        waitUntilJobRunning(Duration.ofSeconds(30));
+        LOG.info("Pipeline job is running");
+
+        validateResult(
+                dbNameFormatter,
+                "CreateTableEvent{tableId=%s.customers, schema=columns={`id` INT NOT NULL 'nextval('inventory.customers_id_seq'::regclass)',`first_name` VARCHAR(255) NOT NULL,`last_name` VARCHAR(255) NOT NULL,`email` VARCHAR(255) NOT NULL}, primaryKeys=id, options=()}",
+                "DataChangeEvent{tableId=%s.customers, before=[], after=[104, Anne, Kretchmar, annek@noanswer.org], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.customers, before=[], after=[103, Edward, Walker, ed@walker.com], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.customers, before=[], after=[102, George, Bailey, gbailey@foobar.com], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.customers, before=[], after=[101, Sally, Thomas, sally.thomas@acme.com], op=INSERT, meta=()}",
+                "CreateTableEvent{tableId=%s.products, schema=columns={`id` INT NOT NULL 'nextval('inventory.products_id_seq'::regclass)',`name` VARCHAR(255) NOT NULL,`description` VARCHAR(512),`weight` FLOAT}, primaryKeys=id, options=()}",
+                "DataChangeEvent{tableId=%s.products, before=[], after=[109, spare tire, 24 inch spare tire, 22.2], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.products, before=[], after=[107, rocks, box of assorted rocks, 5.3], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.products, before=[], after=[108, jacket, water resistent black wind breaker, 0.1], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.products, before=[], after=[105, hammer, 14oz carpenter's hammer, 0.875], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.products, before=[], after=[106, hammer, 16oz carpenter's hammer, 1.0], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.products, before=[], after=[103, 12-pack drill bits, 12-pack of drill bits with sizes ranging from #40 to #3, 0.8], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.products, before=[], after=[104, hammer, 12oz carpenter's hammer, 0.75], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.products, before=[], after=[101, scooter, Small 2-wheel scooter, 3.14], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.products, before=[], after=[102, car battery, 12V car battery, 8.1], op=INSERT, meta=()}");
+
+        LOG.info("Begin incremental reading stage.");
+
+        try (Connection conn =
+                        getJdbcConnection(
+                                POSTGRES_CONTAINER, postgresInventoryDatabase.getDatabaseName());
+                Statement stat = conn.createStatement()) {
+            stat.execute(
+                    "UPDATE inventory.products SET description='18oz carpenter hammer' WHERE id=106;");
+            stat.execute("UPDATE inventory.products SET weight='5.1' WHERE id=107;");
+
+            // Perform DML changes after the wal log is generated
+            waitUntilSpecificEvent(
+                    "DataChangeEvent{tableId=inventory.products, before=[106, hammer, 16oz carpenter's hammer, 1.0], after=[106, hammer, 18oz carpenter hammer, 1.0], op=UPDATE, meta=()}");
+            waitUntilSpecificEvent(
+                    "DataChangeEvent{tableId=inventory.products, before=[107, rocks, box of assorted rocks, 5.3], after=[107, rocks, box of assorted rocks, 5.1], op=UPDATE, meta=()}");
+        } catch (Exception e) {
+            LOG.error("Update table for CDC failed.", e);
+            throw new RuntimeException(e);
+        }
+
+        LOG.info("Begin schema change stage.");
+
+        try (Connection conn =
+                        getJdbcConnection(
+                                POSTGRES_CONTAINER, postgresInventoryDatabase.getDatabaseName());
+                Statement stat = conn.createStatement()) {
+            // Test ADD COLUMN
+            stat.execute("ALTER TABLE inventory.products ADD COLUMN category VARCHAR(255);");
+            stat.execute(
+                    "INSERT INTO inventory.products VALUES (default, 'widget', 'A small widget', 1.5, 'tools');");
+
+            // Test DROP COLUMN
+            stat.execute("ALTER TABLE inventory.products DROP COLUMN weight;");
+            stat.execute(
+                    "INSERT INTO inventory.products VALUES (default, 'gadget', 'A useful gadget', 'electronics');");
+
+            // Test RENAME COLUMN
+            stat.execute(
+                    "ALTER TABLE inventory.products RENAME COLUMN category TO product_category;");
+            stat.execute(
+                    "INSERT INTO inventory.products VALUES (default, 'gizmo', 'A fancy gizmo', 'gadgets');");
+        } catch (Exception e) {
+            LOG.error("Schema change test failed.", e);
+            throw new RuntimeException(e);
+        }
+
+        // Validate schema change events and corresponding data
+        waitUntilSpecificEvent(
+                "AddColumnEvent{tableId=inventory.products, addedColumns=[ColumnWithPosition{column=`category` VARCHAR(255), position=LAST, existedColumnName=null}]}");
+        waitUntilSpecificEvent(
+                "DataChangeEvent{tableId=inventory.products, before=[], after=[110, widget, A small widget, 1.5, tools], op=INSERT, meta=()}");
+
+        waitUntilSpecificEvent(
+                "DropColumnEvent{tableId=inventory.products, droppedColumnNames=[weight]}");
+        waitUntilSpecificEvent(
+                "DataChangeEvent{tableId=inventory.products, before=[], after=[111, gadget, A useful gadget, electronics], op=INSERT, meta=()}");
+
+        waitUntilSpecificEvent(
+                "RenameColumnEvent{tableId=inventory.products, nameMapping={category=product_category}}");
+        waitUntilSpecificEvent(
+                "DataChangeEvent{tableId=inventory.products, before=[], after=[112, gizmo, A fancy gizmo, gadgets], op=INSERT, meta=()}");
+    }
+
+    @ParameterizedTest
+    @ValueSource(doubles = {-1d, 2d})
+    void testRateLimit(double rateLimit) throws Exception {
+        String pipelineJob =
+                String.format(
+                        "source:\n"
+                                + "  type: postgres\n"
+                                + "  hostname: %s\n"
+                                + "  port: %d\n"
+                                + "  username: %s\n"
+                                + "  password: %s\n"
+                                + "  tables: %s.inventory.products,%s.inventory.customers\n"
+                                + "  slot.name: %s\n"
+                                + "  scan.startup.mode: initial\n"
+                                + "  server-time-zone: UTC\n"
+                                + "  connect.timeout: 120s\n"
+                                + "  schema-change.enabled: true\n"
+                                + "  records.per.second: %f\n"
+                                + "\n"
+                                + "sink:\n"
+                                + "  type: values\n"
+                                + "\n"
+                                + "pipeline:\n"
+                                + "  parallelism: %d\n"
+                                + "  schema.change.behavior: evolve",
+                        INTER_CONTAINER_POSTGRES_ALIAS,
+                        5432,
+                        POSTGRES_TEST_USER,
+                        POSTGRES_TEST_PASSWORD,
+                        postgresInventoryDatabase.getDatabaseName(),
+                        postgresInventoryDatabase.getDatabaseName(),
+                        slotName,
+                        rateLimit,
                         parallelism);
         Path postgresCdcJar = TestUtils.getResource("postgres-cdc-pipeline-connector.jar");
         submitPipelineJob(pipelineJob, postgresCdcJar);

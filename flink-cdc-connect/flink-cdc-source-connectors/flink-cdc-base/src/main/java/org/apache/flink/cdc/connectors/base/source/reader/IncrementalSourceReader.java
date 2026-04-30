@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.base.source.reader;
 
 import org.apache.flink.api.connector.source.SourceEvent;
+import org.apache.flink.api.connector.source.util.ratelimit.RateLimiterStrategy;
 import org.apache.flink.cdc.common.annotation.Experimental;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.connectors.base.config.SourceConfig;
@@ -45,7 +46,7 @@ import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplitState;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
 import org.apache.flink.connector.base.source.reader.RecordsWithSplitIds;
-import org.apache.flink.connector.base.source.reader.SingleThreadMultiplexSourceReaderBase;
+import org.apache.flink.connector.base.source.reader.SingleThreadMultiplexSourceReaderBaseAdapter;
 import org.apache.flink.connector.base.source.reader.fetcher.SingleThreadFetcherManager;
 import org.apache.flink.connector.base.source.reader.synchronization.FutureCompletingBlockingQueue;
 import org.apache.flink.util.FlinkRuntimeException;
@@ -78,7 +79,7 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
  */
 @Experimental
 public class IncrementalSourceReader<T, C extends SourceConfig>
-        extends SingleThreadMultiplexSourceReaderBase<
+        extends SingleThreadMultiplexSourceReaderBaseAdapter<
                 SourceRecords, T, SourceSplitBase, SourceSplitState> {
 
     private static final Logger LOG = LoggerFactory.getLogger(IncrementalSourceReader.class);
@@ -121,8 +122,12 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
         super(
                 new SingleThreadFetcherManager<>(splitReaderSupplier::get),
                 recordEmitter,
+                null,
                 config,
-                incrementalSourceReaderContext.getSourceReaderContext());
+                incrementalSourceReaderContext.getSourceReaderContext(),
+                sourceConfig.getRecordsPerSecond() == -1
+                        ? null
+                        : RateLimiterStrategy.perSecond(sourceConfig.getRecordsPerSecond()));
         this.sourceConfig = sourceConfig;
         this.finishedUnackedSplits = new HashMap<>();
         this.uncompletedStreamSplits = new HashMap<>();

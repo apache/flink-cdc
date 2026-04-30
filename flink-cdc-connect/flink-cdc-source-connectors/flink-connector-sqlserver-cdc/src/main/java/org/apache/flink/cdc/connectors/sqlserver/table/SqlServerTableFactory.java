@@ -37,6 +37,7 @@ import java.util.Set;
 import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.CONNECTION_POOL_SIZE;
 import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.CONNECT_MAX_RETRIES;
 import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.CONNECT_TIMEOUT;
+import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.RECORDS_PER_SECOND;
 import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.CHUNK_META_GROUP_SIZE;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED;
@@ -142,6 +143,7 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
         boolean skipSnapshotBackfill = config.get(SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP);
         boolean assignUnboundedChunkFirst =
                 config.get(SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED);
+        double recordsPerSecond = config.get(RECORDS_PER_SECOND);
 
         if (enableParallelRead) {
             validateIntegerOption(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE, splitSize, 1);
@@ -178,7 +180,8 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
                 chunkKeyColumn,
                 closeIdleReaders,
                 skipSnapshotBackfill,
-                assignUnboundedChunkFirst);
+                assignUnboundedChunkFirst,
+                recordsPerSecond);
     }
 
     @Override
@@ -216,6 +219,7 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
         options.add(SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED);
+        options.add(RECORDS_PER_SECOND);
         return options;
     }
 
