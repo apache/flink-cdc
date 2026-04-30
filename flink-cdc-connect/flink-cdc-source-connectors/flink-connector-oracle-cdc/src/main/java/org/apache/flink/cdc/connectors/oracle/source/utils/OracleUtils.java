@@ -48,15 +48,30 @@ public class OracleUtils {
 
     private OracleUtils() {}
 
-    public static long queryApproximateRowCnt(JdbcConnection jdbc, TableId tableId)
-            throws SQLException {
+    public static long queryApproximateRowCnt(
+            JdbcConnection jdbc, TableId tableId, boolean analyzeTableEnabled) throws SQLException {
+        final String rowCountQuery =
+                String.format(
+                        "select NUM_ROWS from all_tables where OWNER = '%s' and TABLE_NAME = '%s'",
+                        tableId.schema(), tableId.table());
+        if (!analyzeTableEnabled) {
+            return jdbc.queryAndMap(
+                    rowCountQuery,
+                    rs -> {
+                        if (!rs.next()) {
+                            throw new SQLException(
+                                    String.format(
+                                            "No result returned after running query [%s]",
+                                            rowCountQuery));
+                        }
+                        return rs.getLong(1);
+                    });
+        }
+
         final String analyzeTable =
                 String.format(
                         "analyze table %s compute statistics for table",
                         quoteSchemaAndTable(tableId));
-        final String rowCountQuery =
-                String.format(
-                        "select NUM_ROWS from all_tables where TABLE_NAME = '%s'", tableId.table());
         return jdbc.execute(analyzeTable)
                 .queryAndMap(
                         rowCountQuery,

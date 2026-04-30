@@ -39,9 +39,12 @@ public class OracleSourceConfigFactory extends JdbcSourceConfigFactory {
     private static final long serialVersionUID = 1L;
     private static final String DATABASE_SERVER_NAME = "oracle_logminer";
     private static final String DRIVER_ClASS_NAME = "oracle.jdbc.OracleDriver";
+    public static final String ANALYZE_TABLE_FOR_APPROXIMATE_ROW_COUNT_ENABLED =
+            "scan.incremental.snapshot.analyze-table.enabled";
 
     @Nullable private String url;
     private List<String> schemaList;
+    @Nullable private Boolean analyzeTableForApproximateRowCountEnabled;
 
     /** Url to use when connecting to the Oracle database server. */
     public JdbcSourceConfigFactory url(@Nullable String url) {
@@ -56,6 +59,11 @@ public class OracleSourceConfigFactory extends JdbcSourceConfigFactory {
      */
     public JdbcSourceConfigFactory schemaList(String... schemaList) {
         this.schemaList = Arrays.asList(schemaList);
+        return this;
+    }
+
+    public JdbcSourceConfigFactory analyzeTableForApproximateRowCountEnabled(boolean enabled) {
+        this.analyzeTableForApproximateRowCountEnabled = enabled;
         return this;
     }
 
@@ -106,6 +114,10 @@ public class OracleSourceConfigFactory extends JdbcSourceConfigFactory {
         // override the user-defined debezium properties
         if (dbzProperties != null) {
             props.putAll(dbzProperties);
+        }
+
+        if (Boolean.FALSE.equals(analyzeTableForApproximateRowCountEnabled)) {
+            props.setProperty(ANALYZE_TABLE_FOR_APPROXIMATE_ROW_COUNT_ENABLED, "false");
         }
 
         Configuration dbzConfiguration = Configuration.from(props);
