@@ -190,10 +190,10 @@ public class IcebergWriter
     }
 
     @Override
-    public void flush(boolean flush) {
-        // Flush may be called many times during one checkpoint by non-data events.
-        // Avoid rotating all task writers here, which can split same-PK updates into multiple
-        // batches within one checkpoint and break dedup semantics in downstream reads.
+    public void flush(boolean flush) throws IOException {
+        // Clear the factory cache so the next write picks up the latest catalog schema.
+        // Writers keep running; schema-change splits are handled in flushTableWriter.
+        writerFactoryMap.clear();
     }
 
     private void flushTableWriter(TableId tableId) throws IOException {

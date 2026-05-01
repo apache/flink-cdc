@@ -649,12 +649,22 @@ public class IcebergWriterTest {
                 generator.generate(new Object[] {1L, BinaryStringData.fromString("b")});
 
         icebergWriter.write(DataChangeEvent.insertEvent(tableId, recordA), null);
-        // flush(false) is a no-op; both events reach the same writer so the position-delete
-        // mechanism within the writer handles dedup correctly.
+        // flush resets the factory cache but keeps the writer running, so the update
+        // lands in the same writer as the insert and uses a position delete.
         icebergWriter.flush(false);
         icebergWriter.write(DataChangeEvent.updateEvent(tableId, recordA, recordB), null);
 
         Collection<WriteResultWrapper> writeResults = icebergWriter.prepareCommit();
+
+        // Both writes went through the same writer (batchIndex 0) since flush only
+        // cleared the factory. Position delete handles dedup within the snapshot.
+        List<Integer> batchIndexes =
+                writeResults.stream()
+                        .map(WriteResultWrapper::getBatchIndex)
+                        .sorted()
+                        .collect(Collectors.toList());
+        Assertions.assertThat(batchIndexes).containsExactly(0);
+
         IcebergCommitter icebergCommitter = new IcebergCommitter(catalogOptions, new HashMap<>());
         Collection<Committer.CommitRequest<WriteResultWrapper>> collection =
                 writeResults.stream().map(MockCommitRequestImpl::new).collect(Collectors.toList());
@@ -665,16 +675,11 @@ public class IcebergWriterTest {
     }
 
     /**
-     * Verifies that same-PK updates split across a schema-change-triggered writer flush within one
-     * checkpoint do not produce duplicate records.
-     *
-     * <p>Root cause: when a schema-change event forces {@code flushTableWriter}, the pre-change
-     * writes land in one {@code WriteResultWrapper} (batch 0) and the post-change writes land in
-     * another (batch 1). Committing both in a single Iceberg {@code RowDelta} would give all files
-     * the same sequence number N, so the equality-delete file from batch 1 (seq=N) cannot delete
-     * the data file from batch 0 (seq=N) — Iceberg equality-delete semantics require strictly lower
-     * sequence numbers. The fix commits each batch as a separate sequential snapshot, giving batch
-     * 1 a higher sequence number so its equality-delete correctly supersedes batch 0's data.
+     * A schema change mid-checkpoint splits writes into two batches for the same table. Both
+     * batches must not land in the same Iceberg snapshot: files in one snapshot share the same
+     * seq_num, so the equality-delete from batch 1 would silently miss the insert from batch 0.
+     * Each batch gets its own snapshot so the delete's seq_num is strictly higher than the data it
+     * targets.
      */
     @Test
     public void testNoDuplicateWhenSchemaChangeFlushSplitsSamePkUpdates() throws Exception {
