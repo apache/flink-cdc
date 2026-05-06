@@ -50,19 +50,19 @@ public class StarRocksEnrichedCatalog extends StarRocksCatalog {
             LOG.info(
                     "Success to create table {}.{}, sql: {}",
                     table.getDatabaseName(),
-                    table.getDatabaseName(),
+                    table.getTableName(),
                     createTableSql);
         } catch (Exception e) {
             LOG.error(
                     "Failed to create table {}.{}, sql: {}",
                     table.getDatabaseName(),
-                    table.getDatabaseName(),
+                    table.getTableName(),
                     createTableSql,
                     e);
             throw new StarRocksCatalogException(
                     String.format(
                             "Failed to create table %s.%s",
-                            table.getDatabaseName(), table.getDatabaseName()),
+                            table.getDatabaseName(), table.getTableName()),
                     e);
         }
     }

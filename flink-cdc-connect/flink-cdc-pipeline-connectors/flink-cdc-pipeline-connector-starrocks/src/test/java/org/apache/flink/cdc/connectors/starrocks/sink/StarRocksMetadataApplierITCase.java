@@ -103,7 +103,10 @@ class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
                         .column(new PhysicalColumn("number", DataTypes.DOUBLE(), null))
                         .column(
                                 new PhysicalColumn(
-                                        "name", DataTypes.VARCHAR(17), "\"name\"", "\"\""))
+                                        "name",
+                                        DataTypes.VARCHAR(17),
+                                        "\"name\"",
+                                        "\"name\\\\default\""))
                         .primaryKey("id")
                         .build();
 
@@ -134,7 +137,7 @@ class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
                                                 "extra_string",
                                                 DataTypes.VARCHAR(17),
                                                 "\"extra_string\"",
-                                                "\"\"")))));
+                                                "\"extra\\\\string\"")))));
     }
 
     private List<Event> generateDropColumnEvents(TableId tableId) {
@@ -294,11 +297,11 @@ class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
                 Arrays.asList(
                         "id | int | NO | true | null",
                         "number | double | YES | false | null",
-                        "name | varchar(51) | YES | false | \"\"",
+                        "name | varchar(51) | YES | false | \"name\\\\default\"",
                         "extra_date | date | YES | false | null",
                         "extra_bool | boolean | YES | false | null",
                         "extra_decimal | decimal(17,0) | YES | false | null",
-                        "extra_string | varchar(51) | YES | false | \"\"");
+                        "extra_string | varchar(51) | YES | false | \"extra\\\\string\"");
 
         assertEqualsInOrder(expected, actual);
     }
