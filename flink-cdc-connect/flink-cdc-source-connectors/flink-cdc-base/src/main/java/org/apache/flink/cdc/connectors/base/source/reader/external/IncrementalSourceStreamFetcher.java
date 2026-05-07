@@ -90,6 +90,7 @@ public class IncrementalSourceStreamFetcher implements Fetcher<SourceRecords, So
         configureFilter();
         taskContext.configure(currentStreamSplit);
         this.queue = taskContext.getQueue();
+        startReadTask();
         executorService.submit(
                 () -> {
                     try {
@@ -280,6 +281,10 @@ public class IncrementalSourceStreamFetcher implements Fetcher<SourceRecords, So
         this.finishedSplitsInfo = splitsInfoMap;
         this.maxSplitHighWatermarkMap = tableIdOffsetPositionMap;
         this.pureStreamPhaseTables.clear();
+    }
+
+    public void startReadTask() {
+        this.currentTaskRunning = true;
     }
 
     public void stopReadTask() throws Exception {
