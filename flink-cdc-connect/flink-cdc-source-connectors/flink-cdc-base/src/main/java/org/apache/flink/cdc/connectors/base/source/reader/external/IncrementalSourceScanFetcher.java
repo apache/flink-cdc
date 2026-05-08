@@ -269,14 +269,11 @@ public class IncrementalSourceScanFetcher implements Fetcher<SourceRecords, Sour
         // Skip records of other captured tables; their schema may not be loaded yet
         // and their PKs do not align with this chunk's bounds.
         TableId recordTableId = taskContext.getTableId(record);
-        if (recordTableId == null
-                || !recordTableId.equals(currentSnapshotSplit.getTableId())) {
+        if (recordTableId == null || !recordTableId.equals(currentSnapshotSplit.getTableId())) {
             return false;
         }
         return taskContext.isRecordBetween(
-                record,
-                currentSnapshotSplit.getSplitStart(),
-                currentSnapshotSplit.getSplitEnd());
+                record, currentSnapshotSplit.getSplitStart(), currentSnapshotSplit.getSplitEnd());
     }
 
     @VisibleForTesting

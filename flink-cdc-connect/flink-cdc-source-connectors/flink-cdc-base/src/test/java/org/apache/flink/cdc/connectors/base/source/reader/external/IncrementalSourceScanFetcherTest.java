@@ -41,12 +41,11 @@ class IncrementalSourceScanFetcherTest {
     private static final TableId OTHER_TABLE = TableId.parse("test_db.table_b");
 
     /**
-     * Reproduces the NPE seen in PostgreSQL backfill when the WAL stream carries change records
-     * for a captured table other than the one currently being snapshotted. Before the fix, the
-     * fetcher passed the foreign-table record to {@code isRecordBetween}, which dereferenced a
-     * null Debezium {@code Table} from the schema cache and threw NPE. After the fix, the
-     * foreign-table record is filtered out by tableId and {@code isRecordBetween} is never
-     * invoked.
+     * Reproduces the NPE seen in PostgreSQL backfill when the WAL stream carries change records for
+     * a captured table other than the one currently being snapshotted. Before the fix, the fetcher
+     * passed the foreign-table record to {@code isRecordBetween}, which dereferenced a null
+     * Debezium {@code Table} from the schema cache and threw NPE. After the fix, the foreign-table
+     * record is filtered out by tableId and {@code isRecordBetween} is never invoked.
      */
     @Test
     void testIsChangeRecordInChunkRangeFiltersOutForeignTableRecord() {
@@ -105,9 +104,7 @@ class IncrementalSourceScanFetcherTest {
 
     private static SnapshotSplit newSnapshotSplit(TableId tableId) {
         RowType splitKeyType =
-                (RowType)
-                        DataTypes.ROW(DataTypes.FIELD("id", DataTypes.BIGINT()))
-                                .getLogicalType();
+                (RowType) DataTypes.ROW(DataTypes.FIELD("id", DataTypes.BIGINT())).getLogicalType();
         return new SnapshotSplit(
                 tableId,
                 0,
