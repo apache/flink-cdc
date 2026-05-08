@@ -169,6 +169,11 @@ public class Elasticsearch8AsyncWriter<InputT> extends AsyncSinkWriterAdapter<In
         Throwable retryableError = error.getCause() != null ? error.getCause() : error;
         if (isRetryable(retryableError)) {
             resultHandler.retryForEntries(requestEntries);
+        } else {
+            resultHandler.completeExceptionally(
+                    retryableError instanceof Exception
+                            ? (Exception) retryableError
+                            : new FlinkRuntimeException(retryableError));
         }
     }
 
