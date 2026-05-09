@@ -28,6 +28,7 @@ import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.common.types.DataType;
 
+import org.apache.paimon.CoreOptions;
 import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.catalog.Identifier;
 import org.apache.paimon.flink.FlinkCatalogFactory;
@@ -51,6 +52,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 /** Tests for {@link PaimonMetadataApplier}. */
 class PaimonMetadataApplierTest {
@@ -722,5 +725,470 @@ class PaimonMetadataApplierTest {
         Table table = catalog.getTable(Identifier.fromString("test.timestamp_micros_test"));
 
         Assertions.assertThat(table).isNotNull();
+    }
+
+    // ========== BLOB type support tests ==========
+    // NOTE: Paimon BLOB type has the following constraints that prevent integration tests:
+    // 1. BLOB type requires data-evolution.enabled = true
+    // 2. BLOB type requires row-tracking.enabled = true
+    // 3. row-tracking.enabled cannot be combined with primary keys
+    // This means BLOB columns can only exist in append-only tables (no primary keys).
+    // Since CDC pipeline typically works with primary key tables, actual BLOB type creation
+    // tests are disabled. The type conversion logic (VARBINARY/BINARY to BLOB) is correctly
+    // implemented in PaimonMetadataApplier.convertBinaryToBlobIfNeeded() and
+    // SchemaChangeProvider.convertBinaryToBlobIfNeeded() methods.
+
+    @ParameterizedTest
+    @ValueSource(strings = {"filesystem"})
+    void testCreateTableWithoutBlobFieldConfig(String metastore)
+            throws Catalog.TableNotExistException,
+                    Catalog.DatabaseNotEmptyException,
+                    Catalog.DatabaseNotExistException,
+                    SchemaEvolveException {
+        initialize(metastore);
+        MetadataApplier metadataApplier = new PaimonMetadataApplier(catalogOptions);
+
+        CreateTableEvent createTableEvent =
+                new CreateTableEvent(
+                        TableId.parse("test.no_blob_config_table"),
+                        org.apache.flink.cdc.common.schema.Schema.newBuilder()
+                                .physicalColumn(
+                                        "id",
+                                        org.apache.flink.cdc.common.types.DataTypes.INT().notNull())
+                                .physicalColumn(
+                                        "varbinary_content",
+                                        org.apache.flink.cdc.common.types.DataTypes.VARBINARY(100))
+                                .physicalColumn(
+                                        "binary_content",
+                                        org.apache.flink.cdc.common.types.DataTypes.BINARY(10))
+                                .primaryKey("id")
+                                .build());
+        metadataApplier.applySchemaChange(createTableEvent);
+
+        Table table = catalog.getTable(Identifier.fromString("test.no_blob_config_table"));
+        RowType rowType = table.rowType();
+
+        assertThat(rowType.getField("varbinary_content").type().getTypeRoot())
+                .isEqualTo(org.apache.paimon.types.DataTypeRoot.VARBINARY);
+        assertThat(rowType.getField("binary_content").type().getTypeRoot())
+                .isEqualTo(org.apache.paimon.types.DataTypeRoot.BINARY);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"filesystem"})
+    void testAddNormalVarbinaryColumnWithoutBlobConfig(String metastore)
+            throws Catalog.TableNotExistException,
+                    Catalog.DatabaseNotEmptyException,
+                    Catalog.DatabaseNotExistException,
+                    SchemaEvolveException {
+        initialize(metastore);
+        Map<String, String> tableOptions = new HashMap<>();
+        MetadataApplier metadataApplier =
+                new PaimonMetadataApplier(catalogOptions, tableOptions, new HashMap<>());
+
+        CreateTableEvent createTableEvent =
+                new CreateTableEvent(
+                        TableId.parse("test.normal_varbinary_table"),
+                        org.apache.flink.cdc.common.schema.Schema.newBuilder()
+                                .physicalColumn(
+                                        "id",
+                                        org.apache.flink.cdc.common.types.DataTypes.INT().notNull())
+                                .primaryKey("id")
+                                .build());
+        metadataApplier.applySchemaChange(createTableEvent);
+
+        List<AddColumnEvent.ColumnWithPosition> addedColumns = new ArrayList<>();
+        addedColumns.add(
+                new AddColumnEvent.ColumnWithPosition(
+                        Column.physicalColumn(
+                                "varbinary_col",
+                                org.apache.flink.cdc.common.types.DataTypes.VARBINARY(100))));
+        AddColumnEvent addColumnEvent =
+                new AddColumnEvent(TableId.parse("test.normal_varbinary_table"), addedColumns);
+        metadataApplier.applySchemaChange(addColumnEvent);
+
+        Table table = catalog.getTable(Identifier.fromString("test.normal_varbinary_table"));
+        RowType rowType = table.rowType();
+
+        assertThat(rowType.getField("varbinary_col").type().getTypeRoot())
+                .isEqualTo(org.apache.paimon.types.DataTypeRoot.VARBINARY);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"filesystem"})
+    void testCreateTableWithEmptyBlobFieldConfig(String metastore)
+            throws Catalog.TableNotExistException,
+                    Catalog.DatabaseNotEmptyException,
+                    Catalog.DatabaseNotExistException,
+                    SchemaEvolveException {
+        initialize(metastore);
+        Map<String, String> tableOptions = new HashMap<>();
+        tableOptions.put(CoreOptions.BLOB_FIELD.key(), "");
+        MetadataApplier metadataApplier =
+                new PaimonMetadataApplier(catalogOptions, tableOptions, new HashMap<>());
+
+        CreateTableEvent createTableEvent =
+                new CreateTableEvent(
+                        TableId.parse("test.empty_blob_config_table"),
+                        org.apache.flink.cdc.common.schema.Schema.newBuilder()
+                                .physicalColumn(
+                                        "id",
+                                        org.apache.flink.cdc.common.types.DataTypes.INT().notNull())
+                                .physicalColumn(
+                                        "content",
+                                        org.apache.flink.cdc.common.types.DataTypes.VARBINARY(100))
+                                .primaryKey("id")
+                                .build());
+        metadataApplier.applySchemaChange(createTableEvent);
+
+        Table table = catalog.getTable(Identifier.fromString("test.empty_blob_config_table"));
+        RowType rowType = table.rowType();
+
+        assertThat(rowType.getField("content").type().getTypeRoot())
+                .isEqualTo(org.apache.paimon.types.DataTypeRoot.VARBINARY);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"filesystem"})
+    void testCreateTableWithNonExistentBlobFieldConfig(String metastore)
+            throws Catalog.TableNotExistException,
+                    Catalog.DatabaseNotEmptyException,
+                    Catalog.DatabaseNotExistException,
+                    SchemaEvolveException {
+        initialize(metastore);
+        Map<String, String> tableOptions = new HashMap<>();
+        tableOptions.put(CoreOptions.BLOB_FIELD.key(), "nonexistent_blob_col");
+        MetadataApplier metadataApplier =
+                new PaimonMetadataApplier(catalogOptions, tableOptions, new HashMap<>());
+
+        CreateTableEvent createTableEvent =
+                new CreateTableEvent(
+                        TableId.parse("test.nonexistent_blob_config_table"),
+                        org.apache.flink.cdc.common.schema.Schema.newBuilder()
+                                .physicalColumn(
+                                        "id",
+                                        org.apache.flink.cdc.common.types.DataTypes.INT().notNull())
+                                .physicalColumn(
+                                        "actual_varbinary",
+                                        org.apache.flink.cdc.common.types.DataTypes.VARBINARY(100))
+                                .primaryKey("id")
+                                .build());
+        metadataApplier.applySchemaChange(createTableEvent);
+
+        Table table = catalog.getTable(Identifier.fromString("test.nonexistent_blob_config_table"));
+        RowType rowType = table.rowType();
+
+        assertThat(rowType.getField("actual_varbinary").type().getTypeRoot())
+                .isEqualTo(org.apache.paimon.types.DataTypeRoot.VARBINARY);
+        assertThat(rowType.getField("id").type().getTypeRoot())
+                .isEqualTo(org.apache.paimon.types.DataTypeRoot.INTEGER);
+    }
+
+    // ========== BLOB type integration tests with append-only tables (no primary keys) ==========
+    // These tests verify actual BLOB type creation in Paimon tables.
+    // BLOB type requires:
+    // 1. row-tracking.enabled = true
+    // 2. data-evolution.enabled = true
+    // These options cannot be combined with primary keys.
+
+    @ParameterizedTest
+    @ValueSource(strings = {"filesystem"})
+    void testCreateAppendOnlyTableWithBlobField(String metastore)
+            throws Catalog.TableNotExistException,
+                    Catalog.DatabaseNotEmptyException,
+                    Catalog.DatabaseNotExistException,
+                    SchemaEvolveException {
+        initialize(metastore);
+        Map<String, String> tableOptions = new HashMap<>();
+        // Configure blob-field to convert VARBINARY to BLOB
+        tableOptions.put(CoreOptions.BLOB_FIELD.key(), "content");
+        // Required for BLOB type
+        tableOptions.put(CoreOptions.ROW_TRACKING_ENABLED.key(), "true");
+        tableOptions.put(CoreOptions.DATA_EVOLUTION_ENABLED.key(), "true");
+        MetadataApplier metadataApplier =
+                new PaimonMetadataApplier(catalogOptions, tableOptions, new HashMap<>());
+
+        // Create append-only table (no primary keys)
+        CreateTableEvent createTableEvent =
+                new CreateTableEvent(
+                        TableId.parse("test.blob_append_only_table"),
+                        org.apache.flink.cdc.common.schema.Schema.newBuilder()
+                                .physicalColumn(
+                                        "id",
+                                        org.apache.flink.cdc.common.types.DataTypes.INT().notNull())
+                                .physicalColumn(
+                                        "content",
+                                        org.apache.flink.cdc.common.types.DataTypes.VARBINARY(100))
+                                // No primaryKey() - append-only table
+                                .build());
+        metadataApplier.applySchemaChange(createTableEvent);
+
+        Table table = catalog.getTable(Identifier.fromString("test.blob_append_only_table"));
+        RowType rowType = table.rowType();
+
+        // Verify content field is converted to BLOB type
+        assertThat(rowType.getField("content").type().getTypeRoot())
+                .isEqualTo(org.apache.paimon.types.DataTypeRoot.BLOB);
+        assertThat(rowType.getField("id").type().getTypeRoot())
+                .isEqualTo(org.apache.paimon.types.DataTypeRoot.INTEGER);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"filesystem"})
+    void testCreateAppendOnlyTableWithMultipleBlobFields(String metastore)
+            throws Catalog.TableNotExistException,
+                    Catalog.DatabaseNotEmptyException,
+                    Catalog.DatabaseNotExistException,
+                    SchemaEvolveException {
+        initialize(metastore);
+        Map<String, String> tableOptions = new HashMap<>();
+        // Configure multiple blob fields
+        tableOptions.put(CoreOptions.BLOB_FIELD.key(), "blob_content,image_data");
+        tableOptions.put(CoreOptions.ROW_TRACKING_ENABLED.key(), "true");
+        tableOptions.put(CoreOptions.DATA_EVOLUTION_ENABLED.key(), "true");
+        MetadataApplier metadataApplier =
+                new PaimonMetadataApplier(catalogOptions, tableOptions, new HashMap<>());
+
+        // Create append-only table with multiple VARBINARY columns
+        CreateTableEvent createTableEvent =
+                new CreateTableEvent(
+                        TableId.parse("test.multi_blob_append_only_table"),
+                        org.apache.flink.cdc.common.schema.Schema.newBuilder()
+                                .physicalColumn(
+                                        "id",
+                                        org.apache.flink.cdc.common.types.DataTypes.INT().notNull())
+                                .physicalColumn(
+                                        "blob_content",
+                                        org.apache.flink.cdc.common.types.DataTypes.VARBINARY(100))
+                                .physicalColumn(
+                                        "image_data",
+                                        org.apache.flink.cdc.common.types.DataTypes.VARBINARY(1000))
+                                .physicalColumn(
+                                        "normal_varbinary",
+                                        org.apache.flink.cdc.common.types.DataTypes.VARBINARY(50))
+                                // No primaryKey() - append-only table
+                                .build());
+        metadataApplier.applySchemaChange(createTableEvent);
+
+        Table table = catalog.getTable(Identifier.fromString("test.multi_blob_append_only_table"));
+        RowType rowType = table.rowType();
+
+        // Verify blob_content and image_data are converted to BLOB
+        assertThat(rowType.getField("blob_content").type().getTypeRoot())
+                .isEqualTo(org.apache.paimon.types.DataTypeRoot.BLOB);
+        assertThat(rowType.getField("image_data").type().getTypeRoot())
+                .isEqualTo(org.apache.paimon.types.DataTypeRoot.BLOB);
+        // normal_varbinary is not in blob-field config, should remain VARBINARY
+        assertThat(rowType.getField("normal_varbinary").type().getTypeRoot())
+                .isEqualTo(org.apache.paimon.types.DataTypeRoot.VARBINARY);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"filesystem"})
+    void testAddBlobColumnToAppendOnlyTable(String metastore)
+            throws Catalog.TableNotExistException,
+                    Catalog.DatabaseNotEmptyException,
+                    Catalog.DatabaseNotExistException,
+                    SchemaEvolveException {
+        initialize(metastore);
+        Map<String, String> tableOptions = new HashMap<>();
+        tableOptions.put(CoreOptions.BLOB_FIELD.key(), "new_blob_col");
+        tableOptions.put(CoreOptions.ROW_TRACKING_ENABLED.key(), "true");
+        tableOptions.put(CoreOptions.DATA_EVOLUTION_ENABLED.key(), "true");
+        MetadataApplier metadataApplier =
+                new PaimonMetadataApplier(catalogOptions, tableOptions, new HashMap<>());
+
+        // Create append-only table first
+        CreateTableEvent createTableEvent =
+                new CreateTableEvent(
+                        TableId.parse("test.add_blob_column_table"),
+                        org.apache.flink.cdc.common.schema.Schema.newBuilder()
+                                .physicalColumn(
+                                        "id",
+                                        org.apache.flink.cdc.common.types.DataTypes.INT().notNull())
+                                .build());
+        metadataApplier.applySchemaChange(createTableEvent);
+
+        // Add VARBINARY column that should be converted to BLOB
+        List<AddColumnEvent.ColumnWithPosition> addedColumns = new ArrayList<>();
+        addedColumns.add(
+                new AddColumnEvent.ColumnWithPosition(
+                        Column.physicalColumn(
+                                "new_blob_col",
+                                org.apache.flink.cdc.common.types.DataTypes.VARBINARY(100))));
+        AddColumnEvent addColumnEvent =
+                new AddColumnEvent(TableId.parse("test.add_blob_column_table"), addedColumns);
+        metadataApplier.applySchemaChange(addColumnEvent);
+
+        Table table = catalog.getTable(Identifier.fromString("test.add_blob_column_table"));
+        RowType rowType = table.rowType();
+
+        // Verify the added column is BLOB type
+        assertThat(rowType.getField("new_blob_col").type().getTypeRoot())
+                .isEqualTo(org.apache.paimon.types.DataTypeRoot.BLOB);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"filesystem"})
+    void testCreateAppendOnlyTableWithBinaryToBlob(String metastore)
+            throws Catalog.TableNotExistException,
+                    Catalog.DatabaseNotEmptyException,
+                    Catalog.DatabaseNotExistException,
+                    SchemaEvolveException {
+        initialize(metastore);
+        Map<String, String> tableOptions = new HashMap<>();
+        // Configure blob-field for BINARY type conversion
+        tableOptions.put(CoreOptions.BLOB_FIELD.key(), "fixed_content");
+        tableOptions.put(CoreOptions.ROW_TRACKING_ENABLED.key(), "true");
+        tableOptions.put(CoreOptions.DATA_EVOLUTION_ENABLED.key(), "true");
+        MetadataApplier metadataApplier =
+                new PaimonMetadataApplier(catalogOptions, tableOptions, new HashMap<>());
+
+        // Create append-only table with BINARY column
+        CreateTableEvent createTableEvent =
+                new CreateTableEvent(
+                        TableId.parse("test.binary_to_blob_table"),
+                        org.apache.flink.cdc.common.schema.Schema.newBuilder()
+                                .physicalColumn(
+                                        "id",
+                                        org.apache.flink.cdc.common.types.DataTypes.INT().notNull())
+                                .physicalColumn(
+                                        "fixed_content",
+                                        org.apache.flink.cdc.common.types.DataTypes.BINARY(10))
+                                .build());
+        metadataApplier.applySchemaChange(createTableEvent);
+
+        Table table = catalog.getTable(Identifier.fromString("test.binary_to_blob_table"));
+        RowType rowType = table.rowType();
+
+        // Verify BINARY is also converted to BLOB type
+        assertThat(rowType.getField("fixed_content").type().getTypeRoot())
+                .isEqualTo(org.apache.paimon.types.DataTypeRoot.BLOB);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"filesystem"})
+    void testCreateAppendOnlyTableWithVarcharToBlob(String metastore)
+            throws Catalog.TableNotExistException,
+                    Catalog.DatabaseNotEmptyException,
+                    Catalog.DatabaseNotExistException,
+                    SchemaEvolveException {
+        initialize(metastore);
+        Map<String, String> tableOptions = new HashMap<>();
+        // Configure blob-field for VARCHAR type conversion (path string case)
+        tableOptions.put(CoreOptions.BLOB_FIELD.key(), "blob_path");
+        tableOptions.put(CoreOptions.BLOB_AS_DESCRIPTOR.key(), "true");
+        tableOptions.put(CoreOptions.ROW_TRACKING_ENABLED.key(), "true");
+        tableOptions.put(CoreOptions.DATA_EVOLUTION_ENABLED.key(), "true");
+        tableOptions.put(CoreOptions.BUCKET.key(), "-1");
+        MetadataApplier metadataApplier =
+                new PaimonMetadataApplier(catalogOptions, tableOptions, new HashMap<>());
+
+        // Create append-only table with VARCHAR column (representing blob path)
+        CreateTableEvent createTableEvent =
+                new CreateTableEvent(
+                        TableId.parse("test.varchar_to_blob_table"),
+                        org.apache.flink.cdc.common.schema.Schema.newBuilder()
+                                .physicalColumn(
+                                        "id",
+                                        org.apache.flink.cdc.common.types.DataTypes.INT().notNull())
+                                .physicalColumn(
+                                        "blob_path",
+                                        org.apache.flink.cdc.common.types.DataTypes.VARCHAR(500))
+                                .build());
+        metadataApplier.applySchemaChange(createTableEvent);
+
+        Table table = catalog.getTable(Identifier.fromString("test.varchar_to_blob_table"));
+        RowType rowType = table.rowType();
+
+        // Verify VARCHAR is converted to BLOB type
+        assertThat(rowType.getField("blob_path").type().getTypeRoot())
+                .isEqualTo(org.apache.paimon.types.DataTypeRoot.BLOB);
+        assertThat(rowType.getField("id").type().getTypeRoot())
+                .isEqualTo(org.apache.paimon.types.DataTypeRoot.INTEGER);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"filesystem"})
+    void testCreateAppendOnlyTableWithStringToBlob(String metastore)
+            throws Catalog.TableNotExistException,
+                    Catalog.DatabaseNotEmptyException,
+                    Catalog.DatabaseNotExistException,
+                    SchemaEvolveException {
+        initialize(metastore);
+        Map<String, String> tableOptions = new HashMap<>();
+        // Configure blob-field for STRING type conversion (path string case)
+        tableOptions.put(CoreOptions.BLOB_FIELD.key(), "blob_uri");
+        tableOptions.put(CoreOptions.BLOB_AS_DESCRIPTOR.key(), "true");
+        tableOptions.put(CoreOptions.ROW_TRACKING_ENABLED.key(), "true");
+        tableOptions.put(CoreOptions.DATA_EVOLUTION_ENABLED.key(), "true");
+        tableOptions.put(CoreOptions.BUCKET.key(), "-1");
+        MetadataApplier metadataApplier =
+                new PaimonMetadataApplier(catalogOptions, tableOptions, new HashMap<>());
+
+        // Create append-only table with STRING column (representing blob URI)
+        CreateTableEvent createTableEvent =
+                new CreateTableEvent(
+                        TableId.parse("test.string_to_blob_table"),
+                        org.apache.flink.cdc.common.schema.Schema.newBuilder()
+                                .physicalColumn(
+                                        "id",
+                                        org.apache.flink.cdc.common.types.DataTypes.INT().notNull())
+                                .physicalColumn(
+                                        "blob_uri",
+                                        org.apache.flink.cdc.common.types.DataTypes.STRING())
+                                .build());
+        metadataApplier.applySchemaChange(createTableEvent);
+
+        Table table = catalog.getTable(Identifier.fromString("test.string_to_blob_table"));
+        RowType rowType = table.rowType();
+
+        // Verify STRING is converted to BLOB type
+        assertThat(rowType.getField("blob_uri").type().getTypeRoot())
+                .isEqualTo(org.apache.paimon.types.DataTypeRoot.BLOB);
+        assertThat(rowType.getField("id").type().getTypeRoot())
+                .isEqualTo(org.apache.paimon.types.DataTypeRoot.INTEGER);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"filesystem"})
+    void testCreateAppendOnlyTableWithCharToBlob(String metastore)
+            throws Catalog.TableNotExistException,
+                    Catalog.DatabaseNotEmptyException,
+                    Catalog.DatabaseNotExistException,
+                    SchemaEvolveException {
+        initialize(metastore);
+        Map<String, String> tableOptions = new HashMap<>();
+        // Configure blob-field for CHAR type conversion (path string case)
+        tableOptions.put(CoreOptions.BLOB_FIELD.key(), "blob_path");
+        tableOptions.put(CoreOptions.BLOB_AS_DESCRIPTOR.key(), "true");
+        tableOptions.put(CoreOptions.ROW_TRACKING_ENABLED.key(), "true");
+        tableOptions.put(CoreOptions.DATA_EVOLUTION_ENABLED.key(), "true");
+        tableOptions.put(CoreOptions.BUCKET.key(), "-1");
+        MetadataApplier metadataApplier =
+                new PaimonMetadataApplier(catalogOptions, tableOptions, new HashMap<>());
+
+        // Create append-only table with CHAR column (representing blob path)
+        CreateTableEvent createTableEvent =
+                new CreateTableEvent(
+                        TableId.parse("test.char_to_blob_table"),
+                        org.apache.flink.cdc.common.schema.Schema.newBuilder()
+                                .physicalColumn(
+                                        "id",
+                                        org.apache.flink.cdc.common.types.DataTypes.INT().notNull())
+                                .physicalColumn(
+                                        "blob_path",
+                                        org.apache.flink.cdc.common.types.DataTypes.CHAR(500))
+                                .build());
+        metadataApplier.applySchemaChange(createTableEvent);
+
+        Table table = catalog.getTable(Identifier.fromString("test.char_to_blob_table"));
+        RowType rowType = table.rowType();
+
+        // Verify CHAR is converted to BLOB type
+        assertThat(rowType.getField("blob_path").type().getTypeRoot())
+                .isEqualTo(org.apache.paimon.types.DataTypeRoot.BLOB);
+        assertThat(rowType.getField("id").type().getTypeRoot())
+                .isEqualTo(org.apache.paimon.types.DataTypeRoot.INTEGER);
     }
 }

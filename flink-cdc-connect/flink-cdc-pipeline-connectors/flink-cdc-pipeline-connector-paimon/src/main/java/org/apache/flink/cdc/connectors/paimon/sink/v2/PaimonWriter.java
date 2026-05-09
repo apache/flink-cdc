@@ -20,7 +20,9 @@ package org.apache.flink.cdc.connectors.paimon.sink.v2;
 import org.apache.flink.api.connector.sink2.CommittingSinkWriter;
 import org.apache.flink.api.connector.sink2.Sink;
 import org.apache.flink.api.connector.sink2.StatefulSinkWriter;
+import org.apache.flink.cdc.common.event.ChangeEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
+import org.apache.flink.cdc.connectors.paimon.sink.v2.blob.BlobWriteContext;
 import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.runtime.io.disk.iomanager.IOManager;
 import org.apache.flink.runtime.io.disk.iomanager.IOManagerAsync;
@@ -152,10 +154,21 @@ public class PaimonWriter<InputT>
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
+            try {
+                FileStoreTable table = getTable(tableId);
+                BlobWriteContext blobWriteContext =
+                        BlobWriteContext.fromTable(catalog.caseSensitive(), table);
+                ((PaimonRecordEventSerializer) serializer)
+                        .updateBlobWriteContext(((ChangeEvent) event).tableId(), blobWriteContext);
+            } catch (Exception e) {
+                // Table might not exist yet, ignore and continue
+                LOG.debug("Could not get table for BlobWriteContext: {}", e.getMessage());
+            }
         }
         if (paimonEvent.getGenericRows() != null) {
             FileStoreTable table;
             table = getTable(tableId);
+
             if (memoryPoolFactory == null) {
                 memoryPoolFactory =
                         new MemoryPoolFactory(
