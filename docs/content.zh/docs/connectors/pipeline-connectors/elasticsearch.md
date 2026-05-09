@@ -160,7 +160,7 @@ Pipeline Connector Options
     <tr>
       <td>record.size.max.bytes</td>
       <td>optional</td>
-      <td style="word-wrap: break-word;">10485760</td>
+      <td style="word-wrap: break-word;">5242880</td>
       <td>Long</td>
       <td>单个记录的最大大小（以byte为单位）。</td>
     </tr>
