@@ -99,6 +99,21 @@ public class Elasticsearch8AsyncSink<InputT> extends AsyncSinkBaseAdapter<InputT
                 Collections.emptyList());
     }
 
+    @Override
+    public SinkWriter<InputT> createWriter(WriterInitContext context) throws IOException {
+        return new Elasticsearch8AsyncWriter<>(
+                getElementConverter(),
+                new InitContextAdapter(context),
+                getMaxBatchSize(),
+                getMaxInFlightRequests(),
+                getMaxBufferedRequests(),
+                getMaxBatchSizeInBytes(),
+                getMaxTimeInBufferMS(),
+                getMaxRecordSizeInBytes(),
+                networkConfig,
+                Collections.emptyList());
+    }
+
     /**
      * Restores a {@link StatefulSinkWriterAdapter} from a previously saved state.
      *
