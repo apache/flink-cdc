@@ -47,6 +47,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.apache.flink.cdc.connectors.base.source.meta.wartermark.WatermarkEvent.isEndWatermarkEvent;
 
@@ -57,9 +58,9 @@ public class IncrementalSourceStreamFetcher implements Fetcher<SourceRecords, So
     private final FetchTask.Context taskContext;
     private final ExecutorService executorService;
     private final Set<TableId> pureStreamPhaseTables;
+    private final AtomicInteger numberOfRunningTasks;
 
     private volatile ChangeEventQueue<DataChangeEvent> queue;
-    private volatile boolean currentTaskRunning;
     private volatile Throwable readException;
 
     private FetchTask<SourceSplitBase> streamFetchTask;
@@ -77,10 +78,10 @@ public class IncrementalSourceStreamFetcher implements Fetcher<SourceRecords, So
         ThreadFactory threadFactory =
                 new ThreadFactoryBuilder().setNameFormat("debezium-reader-" + subTaskId).build();
         this.executorService = Executors.newSingleThreadExecutor(threadFactory);
-        this.currentTaskRunning = true;
         this.pureStreamPhaseTables = new HashSet<>();
         this.isBackfillSkipped = taskContext.getSourceConfig().isSkipSnapshotBackfill();
         this.supportsSplitKeyOptimization = taskContext.supportsSplitKeyOptimization();
+        this.numberOfRunningTasks = new AtomicInteger(0);
     }
 
     @Override
@@ -108,7 +109,7 @@ public class IncrementalSourceStreamFetcher implements Fetcher<SourceRecords, So
 
     @Override
     public boolean isFinished() {
-        return currentStreamSplit == null || !currentTaskRunning;
+        return currentStreamSplit == null || numberOfRunningTasks.get() == 0;
     }
 
     @Nullable
@@ -117,7 +118,7 @@ public class IncrementalSourceStreamFetcher implements Fetcher<SourceRecords, So
         checkReadException();
         final List<SourceRecord> sourceRecords = new ArrayList<>();
         // what happens if currentTaskRunning
-        if (currentTaskRunning) {
+        if (numberOfRunningTasks.get() > 0) {
             List<DataChangeEvent> batch = queue.poll();
             for (DataChangeEvent event : batch) {
                 if (isEndWatermarkEvent(event.getRecord())) {
@@ -284,11 +285,11 @@ public class IncrementalSourceStreamFetcher implements Fetcher<SourceRecords, So
     }
 
     public void startReadTask() {
-        this.currentTaskRunning = true;
+        this.numberOfRunningTasks.incrementAndGet();
     }
 
     public void stopReadTask() throws Exception {
-        this.currentTaskRunning = false;
+        this.numberOfRunningTasks.decrementAndGet();
 
         if (taskContext != null) {
             taskContext.close();
