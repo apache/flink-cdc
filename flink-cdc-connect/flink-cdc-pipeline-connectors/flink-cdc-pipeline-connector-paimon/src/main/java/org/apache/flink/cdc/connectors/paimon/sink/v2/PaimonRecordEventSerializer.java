@@ -25,6 +25,7 @@ import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
+import org.apache.flink.cdc.connectors.paimon.sink.v2.blob.BlobWriteContext;
 import org.apache.flink.cdc.connectors.paimon.sink.v2.bucket.BucketWrapperChangeEvent;
 
 import org.apache.paimon.catalog.Identifier;
@@ -52,6 +53,23 @@ public class PaimonRecordEventSerializer implements PaimonRecordSerializer<Event
         this.zoneId = zoneId;
     }
 
+    /**
+     * Update the BlobWriteContext for a specific table.
+     *
+     * <p>This is called by PaimonWriter when it has access to the Paimon table configuration. The
+     * field getters will be recreated with the new BlobWriteContext to properly convert VARBINARY
+     * fields to BLOB type.
+     *
+     * @param tableId The table identifier.
+     * @param blobWriteContext The BlobWriteContext from the Paimon table.
+     */
+    public void updateBlobWriteContext(TableId tableId, BlobWriteContext blobWriteContext) {
+        TableSchemaInfo schemaInfo = schemaMaps.get(tableId);
+        if (schemaInfo != null) {
+            schemaInfo.updateBlobWriteContext(blobWriteContext, zoneId);
+        }
+    }
+
     @Override
     public PaimonEvent serialize(Event event) {
         int bucket = 0;
@@ -70,11 +88,14 @@ public class PaimonRecordEventSerializer implements PaimonRecordSerializer<Event
                 SchemaChangeEvent schemaChangeEvent = (SchemaChangeEvent) event;
                 Schema schema = schemaMaps.get(schemaChangeEvent.tableId()).getSchema();
                 if (!SchemaUtils.isSchemaChangeEventRedundant(schema, schemaChangeEvent)) {
+                    Schema newSchema =
+                            SchemaUtils.applySchemaChangeEvent(schema, schemaChangeEvent);
+                    // Preserve BlobWriteContext if it exists
+                    BlobWriteContext existingContext =
+                            schemaMaps.get(schemaChangeEvent.tableId()).getBlobWriteContext();
                     schemaMaps.put(
                             schemaChangeEvent.tableId(),
-                            new TableSchemaInfo(
-                                    SchemaUtils.applySchemaChangeEvent(schema, schemaChangeEvent),
-                                    zoneId));
+                            new TableSchemaInfo(newSchema, zoneId, existingContext));
                 }
             }
             return new PaimonEvent(tableId, null, true);
@@ -91,5 +112,9 @@ public class PaimonRecordEventSerializer implements PaimonRecordSerializer<Event
             throw new IllegalArgumentException(
                     "failed to convert Input into PaimonEvent, unsupported event: " + event);
         }
+    }
+
+    public Map<TableId, TableSchemaInfo> getSchemaMaps() {
+        return schemaMaps;
     }
 }
