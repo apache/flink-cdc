@@ -91,6 +91,15 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
     private final boolean assignUnboundedChunkFirst;
     private final boolean releaseSnapshotMetadataEnabled;
 
+    private final boolean sslEnabled;
+    private final boolean sslInvalidHostnameAllowed;
+    @Nullable private final String sslKeyStore;
+    @Nullable private final String sslKeyStorePassword;
+    private final String sslKeyStoreType;
+    @Nullable private final String sslTrustStore;
+    @Nullable private final String sslTrustStorePassword;
+    private final String sslTrustStoreType;
+
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
     // --------------------------------------------------------------------------------------------
@@ -129,7 +138,15 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
             boolean skipSnapshotBackfill,
             boolean scanNewlyAddedTableEnabled,
             boolean assignUnboundedChunkFirst,
-            boolean releaseSnapshotMetadataEnabled) {
+            boolean releaseSnapshotMetadataEnabled,
+            boolean sslEnabled,
+            boolean sslInvalidHostnameAllowed,
+            @Nullable String sslKeyStore,
+            @Nullable String sslKeyStorePassword,
+            String sslKeyStoreType,
+            @Nullable String sslTrustStore,
+            @Nullable String sslTrustStorePassword,
+            String sslTrustStoreType) {
         this.physicalSchema = physicalSchema;
         this.scheme = checkNotNull(scheme);
         this.hosts = checkNotNull(hosts);
@@ -160,6 +177,14 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
         this.scanNewlyAddedTableEnabled = scanNewlyAddedTableEnabled;
         this.assignUnboundedChunkFirst = assignUnboundedChunkFirst;
         this.releaseSnapshotMetadataEnabled = releaseSnapshotMetadataEnabled;
+        this.sslEnabled = sslEnabled;
+        this.sslInvalidHostnameAllowed = sslInvalidHostnameAllowed;
+        this.sslKeyStore = sslKeyStore;
+        this.sslKeyStorePassword = sslKeyStorePassword;
+        this.sslKeyStoreType = sslKeyStoreType;
+        this.sslTrustStore = sslTrustStore;
+        this.sslTrustStorePassword = sslTrustStorePassword;
+        this.sslTrustStoreType = sslTrustStoreType;
     }
 
     @Override
@@ -236,6 +261,16 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
             Optional.ofNullable(splitMetaGroupSize).ifPresent(builder::splitMetaGroupSize);
             Optional.ofNullable(splitSizeMB).ifPresent(builder::splitSizeMB);
             Optional.ofNullable(samplesPerChunk).ifPresent(builder::samplesPerChunk);
+
+            builder.sslEnabled(sslEnabled)
+                    .sslInvalidHostnameAllowed(sslInvalidHostnameAllowed)
+                    .sslKeyStoreType(sslKeyStoreType)
+                    .sslTrustStoreType(sslTrustStoreType);
+            Optional.ofNullable(sslKeyStore).ifPresent(builder::sslKeyStore);
+            Optional.ofNullable(sslKeyStorePassword).ifPresent(builder::sslKeyStorePassword);
+            Optional.ofNullable(sslTrustStore).ifPresent(builder::sslTrustStore);
+            Optional.ofNullable(sslTrustStorePassword).ifPresent(builder::sslTrustStorePassword);
+
             return SourceProvider.of(builder.build());
         } else {
             org.apache.flink.cdc.connectors.mongodb.MongoDBSource.Builder<RowData> builder =
@@ -329,7 +364,15 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                         skipSnapshotBackfill,
                         scanNewlyAddedTableEnabled,
                         assignUnboundedChunkFirst,
-                        releaseSnapshotMetadataEnabled);
+                        releaseSnapshotMetadataEnabled,
+                        sslEnabled,
+                        sslInvalidHostnameAllowed,
+                        sslKeyStore,
+                        sslKeyStorePassword,
+                        sslKeyStoreType,
+                        sslTrustStore,
+                        sslTrustStorePassword,
+                        sslTrustStoreType);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
@@ -374,7 +417,15 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                 && Objects.equals(scanNewlyAddedTableEnabled, that.scanNewlyAddedTableEnabled)
                 && Objects.equals(assignUnboundedChunkFirst, that.assignUnboundedChunkFirst)
                 && Objects.equals(
-                        releaseSnapshotMetadataEnabled, that.releaseSnapshotMetadataEnabled);
+                        releaseSnapshotMetadataEnabled, that.releaseSnapshotMetadataEnabled)
+                && sslEnabled == that.sslEnabled
+                && sslInvalidHostnameAllowed == that.sslInvalidHostnameAllowed
+                && Objects.equals(sslKeyStore, that.sslKeyStore)
+                && Objects.equals(sslKeyStorePassword, that.sslKeyStorePassword)
+                && Objects.equals(sslKeyStoreType, that.sslKeyStoreType)
+                && Objects.equals(sslTrustStore, that.sslTrustStore)
+                && Objects.equals(sslTrustStorePassword, that.sslTrustStorePassword)
+                && Objects.equals(sslTrustStoreType, that.sslTrustStoreType);
     }
 
     @Override
@@ -409,7 +460,15 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                 skipSnapshotBackfill,
                 scanNewlyAddedTableEnabled,
                 assignUnboundedChunkFirst,
-                releaseSnapshotMetadataEnabled);
+                releaseSnapshotMetadataEnabled,
+                sslEnabled,
+                sslInvalidHostnameAllowed,
+                sslKeyStore,
+                sslKeyStorePassword,
+                sslKeyStoreType,
+                sslTrustStore,
+                sslTrustStorePassword,
+                sslTrustStoreType);
     }
 
     @Override
