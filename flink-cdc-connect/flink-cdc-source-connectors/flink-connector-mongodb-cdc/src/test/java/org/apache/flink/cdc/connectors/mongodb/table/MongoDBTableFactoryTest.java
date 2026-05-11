@@ -62,6 +62,14 @@ import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourc
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED;
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_NO_CURSOR_TIMEOUT;
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCHEME;
+import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SSL_ENABLED;
+import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SSL_INVALID_HOSTNAME_ALLOWED;
+import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SSL_KEYSTORE;
+import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SSL_KEYSTORE_PASSWORD;
+import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SSL_KEYSTORE_TYPE;
+import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SSL_TRUSTSTORE;
+import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SSL_TRUSTSTORE_PASSWORD;
+import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SSL_TRUSTSTORE_TYPE;
 import static org.apache.flink.cdc.connectors.utils.AssertUtils.assertProducedTypeOfSourceFunction;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -125,6 +133,18 @@ class MongoDBTableFactoryTest {
     private static final boolean SCAN_NEWLY_ADDED_TABLE_ENABLED_DEFAULT =
             SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue();
 
+    private static final boolean SSL_ENABLED_DEFAULT = SSL_ENABLED.defaultValue();
+    private static final boolean SSL_INVALID_HOSTNAME_ALLOWED_DEFAULT =
+            SSL_INVALID_HOSTNAME_ALLOWED.defaultValue();
+    private static final String SSL_KEYSTORE_DEFAULT = SSL_KEYSTORE.defaultValue();
+    private static final String SSL_KEYSTORE_PASSWORD_DEFAULT =
+            SSL_KEYSTORE_PASSWORD.defaultValue();
+    private static final String SSL_KEYSTORE_TYPE_DEFAULT = SSL_KEYSTORE_TYPE.defaultValue();
+    private static final String SSL_TRUSTSTORE_DEFAULT = SSL_TRUSTSTORE.defaultValue();
+    private static final String SSL_TRUSTSTORE_PASSWORD_DEFAULT =
+            SSL_TRUSTSTORE_PASSWORD.defaultValue();
+    private static final String SSL_TRUSTSTORE_TYPE_DEFAULT = SSL_TRUSTSTORE_TYPE.defaultValue();
+
     @Test
     void testCommonProperties() {
         Map<String, String> properties = getAllOptions();
@@ -159,7 +179,15 @@ class MongoDBTableFactoryTest {
                         SCAN_NO_CURSOR_TIMEOUT_DEFAULT,
                         SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP_DEFAULT,
                         SCAN_NEWLY_ADDED_TABLE_ENABLED_DEFAULT,
-                        SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED.defaultValue());
+                        SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED.defaultValue(),
+                        SSL_ENABLED_DEFAULT,
+                        SSL_INVALID_HOSTNAME_ALLOWED_DEFAULT,
+                        SSL_KEYSTORE_DEFAULT,
+                        SSL_KEYSTORE_PASSWORD_DEFAULT,
+                        SSL_KEYSTORE_TYPE_DEFAULT,
+                        SSL_TRUSTSTORE_DEFAULT,
+                        SSL_TRUSTSTORE_PASSWORD_DEFAULT,
+                        SSL_TRUSTSTORE_TYPE_DEFAULT);
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
@@ -215,7 +243,15 @@ class MongoDBTableFactoryTest {
                         false,
                         true,
                         true,
-                        true);
+                        true,
+                        SSL_ENABLED_DEFAULT,
+                        SSL_INVALID_HOSTNAME_ALLOWED_DEFAULT,
+                        SSL_KEYSTORE_DEFAULT,
+                        SSL_KEYSTORE_PASSWORD_DEFAULT,
+                        SSL_KEYSTORE_TYPE_DEFAULT,
+                        SSL_TRUSTSTORE_DEFAULT,
+                        SSL_TRUSTSTORE_PASSWORD_DEFAULT,
+                        SSL_TRUSTSTORE_TYPE_DEFAULT);
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
@@ -259,7 +295,15 @@ class MongoDBTableFactoryTest {
                         SCAN_NO_CURSOR_TIMEOUT_DEFAULT,
                         SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP_DEFAULT,
                         SCAN_NEWLY_ADDED_TABLE_ENABLED_DEFAULT,
-                        SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED.defaultValue());
+                        SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED.defaultValue(),
+                        SSL_ENABLED_DEFAULT,
+                        SSL_INVALID_HOSTNAME_ALLOWED_DEFAULT,
+                        SSL_KEYSTORE_DEFAULT,
+                        SSL_KEYSTORE_PASSWORD_DEFAULT,
+                        SSL_KEYSTORE_TYPE_DEFAULT,
+                        SSL_TRUSTSTORE_DEFAULT,
+                        SSL_TRUSTSTORE_PASSWORD_DEFAULT,
+                        SSL_TRUSTSTORE_TYPE_DEFAULT);
 
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys = Arrays.asList("op_ts", "database_name", "row_kind");
@@ -370,7 +414,15 @@ class MongoDBTableFactoryTest {
                         SCAN_NO_CURSOR_TIMEOUT_DEFAULT,
                         SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP_DEFAULT,
                         SCAN_NEWLY_ADDED_TABLE_ENABLED_DEFAULT,
-                        SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED.defaultValue());
+                        SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED.defaultValue(),
+                        SSL_ENABLED_DEFAULT,
+                        SSL_INVALID_HOSTNAME_ALLOWED_DEFAULT,
+                        SSL_KEYSTORE_DEFAULT,
+                        SSL_KEYSTORE_PASSWORD_DEFAULT,
+                        SSL_KEYSTORE_TYPE_DEFAULT,
+                        SSL_TRUSTSTORE_DEFAULT,
+                        SSL_TRUSTSTORE_PASSWORD_DEFAULT,
+                        SSL_TRUSTSTORE_TYPE_DEFAULT);
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 

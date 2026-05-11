@@ -59,6 +59,14 @@ import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourc
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED;
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_NO_CURSOR_TIMEOUT;
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCHEME;
+import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SSL_ENABLED;
+import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SSL_INVALID_HOSTNAME_ALLOWED;
+import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SSL_KEYSTORE;
+import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SSL_KEYSTORE_PASSWORD;
+import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SSL_KEYSTORE_TYPE;
+import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SSL_TRUSTSTORE;
+import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SSL_TRUSTSTORE_PASSWORD;
+import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SSL_TRUSTSTORE_TYPE;
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.USERNAME;
 import static org.apache.flink.cdc.debezium.utils.ResolvedSchemaUtils.getPhysicalSchema;
 import static org.apache.flink.util.Preconditions.checkArgument;
@@ -144,6 +152,15 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         checkArgument(physicalSchema.getPrimaryKey().isPresent(), "Primary key must be present");
         checkPrimaryKey(physicalSchema.getPrimaryKey().get(), "Primary key must be _id field");
 
+        boolean sslEnabled = config.get(SSL_ENABLED);
+        boolean sslInvalidHostnameAllowed = config.get(SSL_INVALID_HOSTNAME_ALLOWED);
+        String sslKeyStore = config.getOptional(SSL_KEYSTORE).orElse(null);
+        String sslKeyStorePassword = config.getOptional(SSL_KEYSTORE_PASSWORD).orElse(null);
+        String sslKeyStoreType = config.get(SSL_KEYSTORE_TYPE);
+        String sslTrustStore = config.getOptional(SSL_TRUSTSTORE).orElse(null);
+        String sslTrustStorePassword = config.getOptional(SSL_TRUSTSTORE_PASSWORD).orElse(null);
+        String sslTrustStoreType = config.get(SSL_TRUSTSTORE_TYPE);
+
         OptionUtils.printOptions(IDENTIFIER, ((Configuration) config).toMap());
 
         return new MongoDBTableSource(
@@ -173,7 +190,15 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
                 noCursorTimeout,
                 skipSnapshotBackfill,
                 scanNewlyAddedTableEnabled,
-                assignUnboundedChunkFirst);
+                assignUnboundedChunkFirst,
+                sslEnabled,
+                sslInvalidHostnameAllowed,
+                sslKeyStore,
+                sslKeyStorePassword,
+                sslKeyStoreType,
+                sslTrustStore,
+                sslTrustStorePassword,
+                sslTrustStoreType);
     }
 
     private void checkPrimaryKey(UniqueConstraint pk, String message) {
@@ -258,6 +283,14 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         options.add(SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP);
         options.add(SCAN_NEWLY_ADDED_TABLE_ENABLED);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED);
+        options.add(SSL_ENABLED);
+        options.add(SSL_INVALID_HOSTNAME_ALLOWED);
+        options.add(SSL_KEYSTORE);
+        options.add(SSL_KEYSTORE_PASSWORD);
+        options.add(SSL_KEYSTORE_TYPE);
+        options.add(SSL_TRUSTSTORE);
+        options.add(SSL_TRUSTSTORE_PASSWORD);
+        options.add(SSL_TRUSTSTORE_TYPE);
         return options;
     }
 }
