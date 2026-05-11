@@ -65,9 +65,8 @@ class IncrementalSourceScanFetcherTest {
         IncrementalSourceScanFetcher fetcher = new IncrementalSourceScanFetcher(taskContext, 0);
         fetcher.setCurrentSnapshotSplit(newSnapshotSplit(CURRENT_SPLIT_TABLE));
 
-        Assertions.assertThatCode(() -> fetcher.isChangeRecordInChunkRange(foreignTableRecord))
-                .doesNotThrowAnyException();
-        Assertions.assertThat(fetcher.isChangeRecordInChunkRange(foreignTableRecord)).isFalse();
+        boolean result = fetcher.isChangeRecordInChunkRange(foreignTableRecord);
+        Assertions.assertThat(result).isFalse();
         verify(taskContext, never()).isRecordBetween(any(), any(), any());
     }
 
