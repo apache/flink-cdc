@@ -24,6 +24,7 @@ import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.runtime.operators.transform.ProjectionColumn;
 import org.apache.flink.cdc.runtime.operators.transform.UserDefinedFunctionDescriptor;
+import org.apache.flink.cdc.runtime.parser.metadata.AiFunctionSqlOperatorTable;
 import org.apache.flink.cdc.runtime.parser.metadata.TransformSchemaFactory;
 import org.apache.flink.cdc.runtime.parser.metadata.TransformSqlOperatorTable;
 import org.apache.flink.cdc.runtime.typeutils.CalciteDataTypeConverter;
@@ -163,9 +164,13 @@ public class TransformParser {
                         new CalciteConnectionConfigImpl(new Properties()));
         TransformSqlOperatorTable transformSqlOperatorTable = TransformSqlOperatorTable.instance();
         SqlOperatorTable udfOperatorTable = SqlOperatorTables.of(udfFunctions);
+        SqlOperatorTable aiFunctionOperatorTable = AiFunctionSqlOperatorTable.create();
         SqlValidator validator =
                 SqlValidatorUtil.newValidator(
-                        SqlOperatorTables.chain(transformSqlOperatorTable, udfOperatorTable),
+                        SqlOperatorTables.chain(
+                                transformSqlOperatorTable,
+                                udfOperatorTable,
+                                aiFunctionOperatorTable),
                         calciteCatalogReader,
                         factory,
                         SqlValidator.Config.DEFAULT

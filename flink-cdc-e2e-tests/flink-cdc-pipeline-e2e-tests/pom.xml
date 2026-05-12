@@ -545,6 +545,16 @@ limitations under the License.
 
                         <artifactItem>
                             <groupId>org.apache.flink</groupId>
+                            <artifactId>flink-cdc-pipeline-model-dummy</artifactId>
+                            <version>${project.version}</version>
+                            <destFileName>dummy-model.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+
+                        <artifactItem>
+                            <groupId>org.apache.flink</groupId>
                             <artifactId>flink-cdc-pipeline-connector-mysql</artifactId>
                             <version>${project.version}</version>
                             <destFileName>mysql-cdc-pipeline-connector.jar</destFileName>

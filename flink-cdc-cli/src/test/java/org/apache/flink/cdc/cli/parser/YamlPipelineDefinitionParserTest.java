@@ -34,6 +34,8 @@ import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableSet;
 import org.apache.flink.shaded.guava31.com.google.common.io.Resources;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.net.URL;
 import java.time.Duration;
@@ -422,17 +424,28 @@ class YamlPipelineDefinitionParserTest {
                                     "add new uniq_id for each row",
                                     null)),
                     Collections.emptyList(),
-                    Collections.singletonList(
+                    Arrays.asList(
                             new ModelDef(
-                                    "GET_EMBEDDING",
-                                    "OpenAIEmbeddingModel",
+                                    "Sonnet",
+                                    "openai-compatible",
                                     new LinkedHashMap<>(
                                             ImmutableMap.<String, String>builder()
-                                                    .put("model-name", "GET_EMBEDDING")
-                                                    .put("class-name", "OpenAIEmbeddingModel")
-                                                    .put("openai.model", "text-embedding-3-small")
-                                                    .put("openai.host", "https://xxxx")
-                                                    .put("openai.apikey", "abcd1234")
+                                                    .put("model-name", "claude-sonnet-4-6")
+                                                    .put(
+                                                            "endpoint",
+                                                            "https://idealab.alibaba-inc.com/api/openai/v1")
+                                                    .put("api-key", "cafebabe")
+                                                    .build())),
+                            new ModelDef(
+                                    "Opus",
+                                    "openai-compatible",
+                                    new LinkedHashMap<>(
+                                            ImmutableMap.<String, String>builder()
+                                                    .put("model-name", "claude-opus-4-5")
+                                                    .put(
+                                                            "endpoint",
+                                                            "https://idealab.alibaba-inc.com/api/openai/v1")
+                                                    .put("api-key", "cafebabe")
                                                     .build()))),
                     Configuration.fromMap(
                             ImmutableMap.<String, String>builder()
@@ -492,11 +505,16 @@ class YamlPipelineDefinitionParserTest {
                         + "  schema-operator.rpc-timeout: 1 h\n"
                         + "  execution.runtime-mode: STREAMING\n"
                         + "  model:\n"
-                        + "    - model-name: GET_EMBEDDING\n"
-                        + "      class-name: OpenAIEmbeddingModel\n"
-                        + "      openai.model: text-embedding-3-small\n"
-                        + "      openai.host: https://xxxx\n"
-                        + "      openai.apikey: abcd1234";
+                        + "    - name: Sonnet\n"
+                        + "      type: openai-compatible\n"
+                        + "      model-name: claude-sonnet-4-6\n"
+                        + "      endpoint: https://idealab.alibaba-inc.com/api/openai/v1\n"
+                        + "      api-key: cafebabe\n"
+                        + "    - name: Opus\n"
+                        + "      type: openai-compatible\n"
+                        + "      model-name: claude-opus-4-5\n"
+                        + "      endpoint: https://idealab.alibaba-inc.com/api/openai/v1\n"
+                        + "      api-key: cafebabe\n";
         YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
         PipelineDef pipelineDef = parser.parse(pipelineDefText, new Configuration());
         assertThat(pipelineDef).isEqualTo(fullDef);
@@ -560,17 +578,28 @@ class YamlPipelineDefinitionParserTest {
                                     "add new uniq_id for each row",
                                     null)),
                     Collections.emptyList(),
-                    Collections.singletonList(
+                    Arrays.asList(
                             new ModelDef(
-                                    "GET_EMBEDDING",
-                                    "OpenAIEmbeddingModel",
+                                    "Sonnet",
+                                    "openai-compatible",
                                     new LinkedHashMap<>(
                                             ImmutableMap.<String, String>builder()
-                                                    .put("model-name", "GET_EMBEDDING")
-                                                    .put("class-name", "OpenAIEmbeddingModel")
-                                                    .put("openai.model", "text-embedding-3-small")
-                                                    .put("openai.host", "https://xxxx")
-                                                    .put("openai.apikey", "abcd1234")
+                                                    .put("model-name", "claude-sonnet-4-6")
+                                                    .put(
+                                                            "endpoint",
+                                                            "https://idealab.alibaba-inc.com/api/openai/v1")
+                                                    .put("api-key", "cafebabe")
+                                                    .build())),
+                            new ModelDef(
+                                    "Opus",
+                                    "openai-compatible",
+                                    new LinkedHashMap<>(
+                                            ImmutableMap.<String, String>builder()
+                                                    .put("model-name", "claude-opus-4-5")
+                                                    .put(
+                                                            "endpoint",
+                                                            "https://idealab.alibaba-inc.com/api/openai/v1")
+                                                    .put("api-key", "cafebabe")
                                                     .build()))),
                     Configuration.fromMap(
                             ImmutableMap.<String, String>builder()
@@ -709,6 +738,189 @@ class YamlPipelineDefinitionParserTest {
                                     .put("schema.change.behavior", "evolve")
                                     .put("schema-operator.rpc-timeout", "1 h")
                                     .build()));
+
+    @Test
+    void testParsingSingleModelAsObject() throws Exception {
+        String pipelineDefText =
+                "source:\n"
+                        + "  type: foo\n"
+                        + "sink:\n"
+                        + "  type: bar\n"
+                        + "pipeline:\n"
+                        + "  parallelism: 1\n"
+                        + "  model:\n"
+                        + "    name: Sonnet\n"
+                        + "    type: openai-compatible\n"
+                        + "    model-name: claude-sonnet-4-6\n"
+                        + "    endpoint: https://example.com/v1\n"
+                        + "    api-key: test-key\n";
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+        PipelineDef pipelineDef = parser.parse(pipelineDefText, new Configuration());
+        assertThat(pipelineDef.getModels()).hasSize(1);
+        assertThat(pipelineDef.getModels().get(0))
+                .isEqualTo(
+                        new ModelDef(
+                                "Sonnet",
+                                "openai-compatible",
+                                new LinkedHashMap<>(
+                                        ImmutableMap.of(
+                                                "model-name",
+                                                "claude-sonnet-4-6",
+                                                "endpoint",
+                                                "https://example.com/v1",
+                                                "api-key",
+                                                "test-key"))));
+    }
+
+    @Test
+    void testParsingMultipleModelsAsList() throws Exception {
+        String pipelineDefText =
+                "source:\n"
+                        + "  type: foo\n"
+                        + "sink:\n"
+                        + "  type: bar\n"
+                        + "pipeline:\n"
+                        + "  parallelism: 1\n"
+                        + "  model:\n"
+                        + "    - name: Sonnet\n"
+                        + "      type: openai-compatible\n"
+                        + "      model-name: claude-sonnet-4-6\n"
+                        + "      endpoint: https://example.com/v1\n"
+                        + "      api-key: key1\n"
+                        + "    - name: Opus\n"
+                        + "      type: openai-compatible\n"
+                        + "      model-name: claude-opus-4-5\n"
+                        + "      endpoint: https://example.com/v1\n"
+                        + "      api-key: key2\n";
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+        PipelineDef pipelineDef = parser.parse(pipelineDefText, new Configuration());
+        assertThat(pipelineDef.getModels()).hasSize(2);
+        assertThat(pipelineDef.getModels().get(0))
+                .isEqualTo(
+                        new ModelDef(
+                                "Sonnet",
+                                "openai-compatible",
+                                new LinkedHashMap<>(
+                                        ImmutableMap.of(
+                                                "model-name",
+                                                "claude-sonnet-4-6",
+                                                "endpoint",
+                                                "https://example.com/v1",
+                                                "api-key",
+                                                "key1"))));
+        assertThat(pipelineDef.getModels().get(1))
+                .isEqualTo(
+                        new ModelDef(
+                                "Opus",
+                                "openai-compatible",
+                                new LinkedHashMap<>(
+                                        ImmutableMap.of(
+                                                "model-name",
+                                                "claude-opus-4-5",
+                                                "endpoint",
+                                                "https://example.com/v1",
+                                                "api-key",
+                                                "key2"))));
+    }
+
+    @Test
+    void testDuplicateModelName() {
+        String pipelineDefText =
+                "source:\n"
+                        + "  type: foo\n"
+                        + "sink:\n"
+                        + "  type: bar\n"
+                        + "pipeline:\n"
+                        + "  parallelism: 1\n"
+                        + "  model:\n"
+                        + "    - name: Sonnet\n"
+                        + "      type: openai-compatible\n"
+                        + "      model-name: claude-sonnet-4-6\n"
+                        + "      endpoint: https://example.com/v1\n"
+                        + "      api-key: key1\n"
+                        + "    - name: Sonnet\n"
+                        + "      type: openai-compatible\n"
+                        + "      model-name: claude-sonnet-4-5\n"
+                        + "      endpoint: https://example.com/v1\n"
+                        + "      api-key: key2\n";
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+        assertThatThrownBy(() -> parser.parse(pipelineDefText, new Configuration()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Duplicate model name 'Sonnet' in pipeline definition.");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"123model", "my-model", "__reserved", "my model", "my.model"})
+    void testInvalidModelName(String invalidName) {
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+        assertThatThrownBy(
+                        () ->
+                                parser.parse(
+                                        buildPipelineDefWithModelName(invalidName),
+                                        new Configuration()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining(
+                        "Model name \"" + invalidName + "\" is not a valid identifier");
+    }
+
+    @Test
+    void testModelOptionsValueTypes() throws Exception {
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+
+        // Boolean, integer, and float values in YAML should all be converted to String
+        String yaml =
+                "source:\n"
+                        + "  type: foo\n"
+                        + "sink:\n"
+                        + "  type: bar\n"
+                        + "pipeline:\n"
+                        + "  parallelism: 1\n"
+                        + "  model:\n"
+                        + "    - name: myModel\n"
+                        + "      type: dummy\n"
+                        + "      debug: true\n"
+                        + "      max-tokens: 1024\n"
+                        + "      temperature: 0.7\n"
+                        + "      endpoint: https://example.com/v1\n";
+
+        PipelineDef def = parser.parse(yaml, new Configuration());
+        assertThat(def.getModels()).hasSize(1);
+        ModelDef model = def.getModels().get(0);
+        assertThat(model.getOptions())
+                .containsEntry("debug", "true")
+                .containsEntry("max-tokens", "1024")
+                .containsEntry("temperature", "0.7")
+                .containsEntry("endpoint", "https://example.com/v1");
+        // Verify all values are String type
+        model.getOptions().values().forEach(v -> assertThat(v).isInstanceOf(String.class));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"Sonnet", "my_model_v2", "_private"})
+    void testValidModelName(String validName) throws Exception {
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+        PipelineDef def =
+                parser.parse(buildPipelineDefWithModelName(validName), new Configuration());
+        assertThat(def.getModels()).hasSize(1);
+        assertThat(def.getModels().get(0).getName()).isEqualTo(validName);
+    }
+
+    private String buildPipelineDefWithModelName(String modelName) {
+        return "source:\n"
+                + "  type: foo\n"
+                + "sink:\n"
+                + "  type: bar\n"
+                + "pipeline:\n"
+                + "  parallelism: 1\n"
+                + "  model:\n"
+                + "    - name: "
+                + modelName
+                + "\n"
+                + "      type: openai-compatible\n"
+                + "      model-name: some-model\n"
+                + "      endpoint: https://example.com/v1\n"
+                + "      api-key: test-key\n";
+    }
 
     private final PipelineDef pipelineDefWithUdf =
             new PipelineDef(

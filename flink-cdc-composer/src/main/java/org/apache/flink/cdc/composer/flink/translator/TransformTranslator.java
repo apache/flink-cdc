@@ -19,6 +19,9 @@ package org.apache.flink.cdc.composer.flink.translator;
 
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.model.AiModelClient;
+import org.apache.flink.cdc.common.model.AiModelClientFactory;
+import org.apache.flink.cdc.common.model.ModelContext;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.composer.definition.ModelDef;
 import org.apache.flink.cdc.composer.definition.TransformDef;
@@ -30,8 +33,12 @@ import org.apache.flink.cdc.runtime.operators.transform.PreTransformOperatorBuil
 import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.streaming.api.datastream.DataStream;
 
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.ServiceLoader;
 import java.util.stream.Collectors;
 
 /**
@@ -40,15 +47,10 @@ import java.util.stream.Collectors;
  */
 public class TransformTranslator {
 
-    /** Package of built-in model. */
-    public static final String PREFIX_CLASSPATH_BUILT_IN_MODEL =
-            "org.apache.flink.cdc.runtime.model.";
-
     public DataStream<Event> translatePreTransform(
             DataStream<Event> input,
             List<TransformDef> transforms,
             List<UdfDef> udfFunctions,
-            List<ModelDef> models,
             SupportedMetadataColumn[] supportedMetadataColumns) {
         if (transforms.isEmpty()) {
             return input;
@@ -56,13 +58,12 @@ public class TransformTranslator {
         return input.transform(
                 "Transform:Schema",
                 new EventTypeInfo(),
-                generatePreTransform(transforms, udfFunctions, models, supportedMetadataColumns));
+                generatePreTransform(transforms, udfFunctions, supportedMetadataColumns));
     }
 
     private PreTransformOperator generatePreTransform(
             List<TransformDef> transforms,
             List<UdfDef> udfFunctions,
-            List<ModelDef> models,
             SupportedMetadataColumn[] supportedMetadataColumns) {
 
         PreTransformOperatorBuilder preTransformFunctionBuilder = PreTransformOperator.newBuilder();
@@ -79,14 +80,8 @@ public class TransformTranslator {
                     supportedMetadataColumns);
         }
 
-        preTransformFunctionBuilder
-                .addUdfFunctions(
-                        udfFunctions.stream()
-                                .map(this::udfDefToUDFTuple)
-                                .collect(Collectors.toList()))
-                .addUdfFunctions(
-                        models.stream().map(this::modelToUDFTuple).collect(Collectors.toList()));
-
+        preTransformFunctionBuilder.addUdfFunctions(
+                udfFunctions.stream().map(this::udfDefToUDFTuple).collect(Collectors.toList()));
         return preTransformFunctionBuilder.build();
     }
 
@@ -116,24 +111,85 @@ public class TransformTranslator {
                     transform.getPostTransformConverter(),
                     supportedMetadataColumns);
         }
-        postTransformFunctionBuilder.addTimezone(timezone);
-        postTransformFunctionBuilder.addUdfFunctions(
-                udfFunctions.stream().map(this::udfDefToUDFTuple).collect(Collectors.toList()));
-        postTransformFunctionBuilder.addUdfFunctions(
-                models.stream().map(this::modelToUDFTuple).collect(Collectors.toList()));
+        postTransformFunctionBuilder
+                .addTimezone(timezone)
+                .addUdfFunctions(
+                        udfFunctions.stream()
+                                .map(this::udfDefToUDFTuple)
+                                .collect(Collectors.toList()))
+                .addModelClients(loadModelClients(models));
+
         return input.transform(
                         "Transform:Data", new EventTypeInfo(), postTransformFunctionBuilder.build())
                 .uid(operatorUidGenerator.generateUid("post-transform"));
     }
 
-    private Tuple3<String, String, Map<String, String>> modelToUDFTuple(ModelDef model) {
-        return Tuple3.of(
-                model.getModelName(),
-                PREFIX_CLASSPATH_BUILT_IN_MODEL + model.getClassName(),
-                model.getParameters());
+    /**
+     * Loads AI model clients for all declared models via SPI, returning a map from Janino parameter
+     * name to the client instance.
+     */
+    private Map<String, AiModelClient> loadModelClients(List<ModelDef> models) {
+        if (models.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        Map<String, AiModelClientFactory> factories = new HashMap<>();
+        ServiceLoader<AiModelClientFactory> loader =
+                ServiceLoader.load(
+                        AiModelClientFactory.class, Thread.currentThread().getContextClassLoader());
+        for (AiModelClientFactory factory : loader) {
+            factories.put(factory.identifier(), factory);
+        }
+
+        Map<String, AiModelClient> clients = new LinkedHashMap<>();
+        for (ModelDef model : models) {
+            AiModelClientFactory factory = factories.get(model.getType());
+            if (factory == null) {
+                throw new IllegalArgumentException(
+                        "No AiModelClientFactory found for model type '"
+                                + model.getType()
+                                + "'. Available factories: "
+                                + factories.keySet());
+            }
+            ModelContext ctx =
+                    new DefaultModelContext(model, Thread.currentThread().getContextClassLoader());
+            factory.validate(ctx);
+            AiModelClient client = factory.createClient(ctx);
+            clients.put(model.getName(), client);
+        }
+        return clients;
     }
 
     private Tuple3<String, String, Map<String, String>> udfDefToUDFTuple(UdfDef udf) {
         return Tuple3.of(udf.getName(), udf.getClasspath(), udf.getOptions());
+    }
+
+    // -------------------------------------------------------------------------
+    // Internal ModelContext implementation
+    // -------------------------------------------------------------------------
+
+    private static final class DefaultModelContext implements ModelContext {
+        private final ModelDef modelDef;
+        private final ClassLoader classLoader;
+
+        DefaultModelContext(ModelDef modelDef, ClassLoader classLoader) {
+            this.modelDef = modelDef;
+            this.classLoader = classLoader;
+        }
+
+        @Override
+        public String getModelName() {
+            return modelDef.getName();
+        }
+
+        @Override
+        public Map<String, String> getOptions() {
+            return modelDef.getOptions();
+        }
+
+        @Override
+        public ClassLoader getClassLoader() {
+            return classLoader;
+        }
     }
 }

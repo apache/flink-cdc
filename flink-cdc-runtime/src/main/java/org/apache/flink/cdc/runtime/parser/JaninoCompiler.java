@@ -27,6 +27,8 @@ import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypeRoot;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.common.utils.StringUtils;
+import org.apache.flink.cdc.runtime.ai.AiEmbeddingFunctionDef;
+import org.apache.flink.cdc.runtime.ai.AiTextFunctionDef;
 import org.apache.flink.cdc.runtime.operators.transform.UserDefinedFunctionDescriptor;
 
 import org.apache.calcite.sql.SqlBasicCall;
@@ -90,7 +92,7 @@ public class JaninoCompiler {
     public static final String DEFAULT_TIME_ZONE = "__time_zone__";
 
     private static final String[] BUILTIN_FUNCTION_MODULES = {
-        "Arithmetic", "Casting", "Comparison", "Logical", "String", "Struct", "Temporal"
+        "Ai", "Arithmetic", "Casting", "Comparison", "Logical", "String", "Struct", "Temporal"
     };
 
     @VisibleForTesting
@@ -526,23 +528,44 @@ public class JaninoCompiler {
                     context.udfDescriptors.stream()
                             .filter(e -> e.getName().equalsIgnoreCase(operationName))
                             .findFirst();
-            return udfFunctionOptional
-                    .map(
-                            udfFunction ->
-                                    new Java.MethodInvocation(
-                                            Location.NOWHERE,
-                                            null,
-                                            generateInvokeExpression(udfFunction),
-                                            atoms))
-                    .orElseGet(
-                            () ->
-                                    new Java.MethodInvocation(
-                                            Location.NOWHERE,
-                                            null,
-                                            StringUtils.convertToCamelCase(
-                                                    sqlBasicCall.getOperator().getName()),
-                                            atoms));
+            if (udfFunctionOptional.isPresent()) {
+                return new Java.MethodInvocation(
+                        Location.NOWHERE,
+                        null,
+                        generateInvokeExpression(udfFunctionOptional.get()),
+                        atoms);
+            }
+            if (isAiFunction(operationName) && atoms.length >= 1) {
+                rewriteAiFunctionModelArg(atoms);
+            }
+            return new Java.MethodInvocation(
+                    Location.NOWHERE,
+                    null,
+                    StringUtils.convertToCamelCase(sqlBasicCall.getOperator().getName()),
+                    atoms);
         }
+    }
+
+    private static boolean isAiFunction(String upperCaseName) {
+        for (AiTextFunctionDef def : AiTextFunctionDef.values()) {
+            if (def.getFunctionName().equals(upperCaseName)) {
+                return true;
+            }
+        }
+        for (AiEmbeddingFunctionDef def : AiEmbeddingFunctionDef.values()) {
+            if (def.getFunctionName().equals(upperCaseName)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void rewriteAiFunctionModelArg(Java.Rvalue[] atoms) {
+        String modelName = atoms[0].toString();
+        if (modelName.startsWith("\"") && modelName.endsWith("\"")) {
+            modelName = modelName.substring(1, modelName.length() - 1);
+        }
+        atoms[0] = new Java.AmbiguousName(Location.NOWHERE, new String[] {modelName});
     }
 
     private static Java.Rvalue generateTimezoneFreeTemporalFunctionOperation(
