@@ -31,6 +31,7 @@ limitations under the License.
 
     <modules>
         <module>flink-cdc-pipeline-model-dummy</module>
+        <module>flink-cdc-pipeline-model-openai-compatible</module>
     </modules>
 
     <dependencies>
