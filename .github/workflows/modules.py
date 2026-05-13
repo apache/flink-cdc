@@ -13,6 +13,7 @@ MODULES_CORE = [
     "flink-cdc-common",
     "flink-cdc-composer",
     "flink-cdc-runtime",
+    "flink-cdc-pipeline-udf-python",
     "flink-cdc-connect/flink-cdc-source-connectors/flink-cdc-base",
     "flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-values"
 ]

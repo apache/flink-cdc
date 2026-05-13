@@ -64,7 +64,7 @@ public class TransformExpressionCompiler {
                         List<Class<?>> argumentClasses = new ArrayList<>(key.getArgumentClasses());
 
                         for (UserDefinedFunctionDescriptor udfFunction : udfDescriptors) {
-                            argumentNames.add("__instanceOf" + udfFunction.getClassName());
+                            argumentNames.add("__udf_" + udfFunction.getName());
                             argumentClasses.add(Class.forName(udfFunction.getClasspath()));
                         }
 

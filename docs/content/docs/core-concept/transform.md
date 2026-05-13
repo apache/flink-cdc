@@ -477,6 +477,47 @@ transform:
     filter: inc(id) < 100
 ```
 
+### Python UDFs
+
+Flink CDC ships a built-in generic UDF, `org.apache.flink.cdc.python.PythonUdf`, that embeds an inline Python function via [Pemja](https://pypi.org/project/pemja/). It is packaged as an opt-in dependency: download `flink-cdc-pipeline-udf-python-{$CDC_VERSION}.jar` and add `--jar {$PYTHON_UDF_JAR_PATH}` to your `flink-cdc.sh` invocation, then declare each Python function as a regular `user-defined-function` entry pointing at the built-in class:
+
+```yaml
+source:
+  type: mysql
+  # ...
+
+sink:
+  type: values
+
+transform:
+  - source-table: db.users
+    projection: ID, py_normalize(EMAIL) AS EMAIL_NORM, py_double(AGE) AS DOUBLED
+
+pipeline:
+  parallelism: 4
+  user-defined-function:
+    - name: py_normalize
+      classpath: org.apache.flink.cdc.python.PythonUdf
+      options:
+        python-executable: /usr/bin/python3
+        source: |
+          def eval(s: str) -> str:
+              return s.strip().lower()
+    - name: py_double
+      classpath: org.apache.flink.cdc.python.PythonUdf
+      options:
+        python-executable: /usr/bin/python3
+        source: |
+          def eval(x: int) -> int:
+              return x * 2
+```
+
+**Requirements**
+
+* Every TaskManager must expose a Python 3 interpreter at the path supplied via `options.python-executable` (default: the first `python3` on `PATH`) with a matching `pemja` package installed. The CLI host does not need Python — only the TaskManagers that run the UDF do.
+* Each UDF entry holds one Python callable named `eval`; declare one `user-defined-function` entry per logical UDF. Each of them has individual lifecycle and context.
+
+
 ## Embedding AI Model
 
 Embedding AI Model can be used in transform rules.

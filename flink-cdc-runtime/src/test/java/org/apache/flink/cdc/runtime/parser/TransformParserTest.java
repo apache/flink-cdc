@@ -643,46 +643,30 @@ class TransformParserTest {
 
     @Test
     void testTranslateUdfFilterToJaninoExpression() {
+        testFilterExpressionWithUdf("format(upper(id))", "__udf_format.eval(upper(id))");
+        testFilterExpressionWithUdf("format(lower(id))", "__udf_format.eval(lower(id))");
+        testFilterExpressionWithUdf("format(concat(a,b))", "__udf_format.eval(concat(a, b))");
+        testFilterExpressionWithUdf("format(SUBSTR(a,1))", "__udf_format.eval(substr(a, 1))");
         testFilterExpressionWithUdf(
-                "format(upper(id))", "__instanceOfFormatFunctionClass.eval(upper(id))");
+                "typeof(id like '^[a-zA-Z]')", "__udf_typeof.eval(like(id, \"^[a-zA-Z]\"))");
         testFilterExpressionWithUdf(
-                "format(lower(id))", "__instanceOfFormatFunctionClass.eval(lower(id))");
-        testFilterExpressionWithUdf(
-                "format(concat(a,b))", "__instanceOfFormatFunctionClass.eval(concat(a, b))");
-        testFilterExpressionWithUdf(
-                "format(SUBSTR(a,1))", "__instanceOfFormatFunctionClass.eval(substr(a, 1))");
-        testFilterExpressionWithUdf(
-                "typeof(id like '^[a-zA-Z]')",
-                "__instanceOfTypeOfFunctionClass.eval(like(id, \"^[a-zA-Z]\"))");
-        testFilterExpressionWithUdf(
-                "typeof(id not like '^[a-zA-Z]')",
-                "__instanceOfTypeOfFunctionClass.eval(notLike(id, \"^[a-zA-Z]\"))");
-        testFilterExpressionWithUdf(
-                "typeof(abs(2))", "__instanceOfTypeOfFunctionClass.eval(abs(2))");
-        testFilterExpressionWithUdf(
-                "typeof(ceil(2))", "__instanceOfTypeOfFunctionClass.eval(ceil(2))");
-        testFilterExpressionWithUdf(
-                "typeof(ceiling(2))", "__instanceOfTypeOfFunctionClass.eval(ceil(2))");
-        testFilterExpressionWithUdf(
-                "typeof(floor(2))", "__instanceOfTypeOfFunctionClass.eval(floor(2))");
-        testFilterExpressionWithUdf(
-                "typeof(round(2,2))", "__instanceOfTypeOfFunctionClass.eval(round(2, 2))");
-        testFilterExpressionWithUdf(
-                "typeof(id + 2)", "__instanceOfTypeOfFunctionClass.eval(id + 2)");
-        testFilterExpressionWithUdf(
-                "typeof(id - 2)", "__instanceOfTypeOfFunctionClass.eval(id - 2)");
-        testFilterExpressionWithUdf(
-                "typeof(id * 2)", "__instanceOfTypeOfFunctionClass.eval(id * 2)");
-        testFilterExpressionWithUdf(
-                "typeof(id / 2)", "__instanceOfTypeOfFunctionClass.eval(id / 2)");
-        testFilterExpressionWithUdf(
-                "typeof(id % 2)", "__instanceOfTypeOfFunctionClass.eval(id % 2)");
+                "typeof(id not like '^[a-zA-Z]')", "__udf_typeof.eval(notLike(id, \"^[a-zA-Z]\"))");
+        testFilterExpressionWithUdf("typeof(abs(2))", "__udf_typeof.eval(abs(2))");
+        testFilterExpressionWithUdf("typeof(ceil(2))", "__udf_typeof.eval(ceil(2))");
+        testFilterExpressionWithUdf("typeof(ceiling(2))", "__udf_typeof.eval(ceil(2))");
+        testFilterExpressionWithUdf("typeof(floor(2))", "__udf_typeof.eval(floor(2))");
+        testFilterExpressionWithUdf("typeof(round(2,2))", "__udf_typeof.eval(round(2, 2))");
+        testFilterExpressionWithUdf("typeof(id + 2)", "__udf_typeof.eval(id + 2)");
+        testFilterExpressionWithUdf("typeof(id - 2)", "__udf_typeof.eval(id - 2)");
+        testFilterExpressionWithUdf("typeof(id * 2)", "__udf_typeof.eval(id * 2)");
+        testFilterExpressionWithUdf("typeof(id / 2)", "__udf_typeof.eval(id / 2)");
+        testFilterExpressionWithUdf("typeof(id % 2)", "__udf_typeof.eval(id % 2)");
         testFilterExpressionWithUdf(
                 "addone(addone(id)) > 4 OR typeof(id) <> 'bool' AND format('from %s to %s is %s', 'a', 'z', 'lie') <> ''",
-                "greaterThan(__instanceOfAddOneFunctionClass.eval(__instanceOfAddOneFunctionClass.eval(id)), 4) || !valueEquals(__instanceOfTypeOfFunctionClass.eval(id), \"bool\") && !valueEquals(__instanceOfFormatFunctionClass.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")");
+                "greaterThan(__udf_addone.eval(__udf_addone.eval(id)), 4) || !valueEquals(__udf_typeof.eval(id), \"bool\") && !valueEquals(__udf_format.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")");
         testFilterExpressionWithUdf(
                 "ADDONE(ADDONE(id)) > 4 OR TYPEOF(id) <> 'bool' AND FORMAT('from %s to %s is %s', 'a', 'z', 'lie') <> ''",
-                "greaterThan(__instanceOfAddOneFunctionClass.eval(__instanceOfAddOneFunctionClass.eval(id)), 4) || !valueEquals(__instanceOfTypeOfFunctionClass.eval(id), \"bool\") && !valueEquals(__instanceOfFormatFunctionClass.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")");
+                "greaterThan(__udf_addone.eval(__udf_addone.eval(id)), 4) || !valueEquals(__udf_typeof.eval(id), \"bool\") && !valueEquals(__udf_format.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")");
     }
 
     @Test
@@ -699,53 +683,38 @@ class TransformParserTest {
         columnNameMap.put("a-b", "$2");
 
         testFilterExpressionWithUdf(
-                "format(upper(a))",
-                "__instanceOfFormatFunctionClass.eval(upper($0))",
-                columns,
-                columnNameMap);
+                "format(upper(a))", "__udf_format.eval(upper($0))", columns, columnNameMap);
         testFilterExpressionWithUdf(
-                "format(lower(b))",
-                "__instanceOfFormatFunctionClass.eval(lower($1))",
-                columns,
-                columnNameMap);
+                "format(lower(b))", "__udf_format.eval(lower($1))", columns, columnNameMap);
         testFilterExpressionWithUdf(
-                "format(concat(a,b))",
-                "__instanceOfFormatFunctionClass.eval(concat($0, $1))",
-                columns,
-                columnNameMap);
+                "format(concat(a,b))", "__udf_format.eval(concat($0, $1))", columns, columnNameMap);
         testFilterExpressionWithUdf(
                 "format(SUBSTR(`a-b`,1))",
-                "__instanceOfFormatFunctionClass.eval(substr($2, 1))",
+                "__udf_format.eval(substr($2, 1))",
                 columns,
                 columnNameMap);
         testFilterExpressionWithUdf(
                 "typeof(`a-b` like '^[a-zA-Z]')",
-                "__instanceOfTypeOfFunctionClass.eval(like($2, \"^[a-zA-Z]\"))",
+                "__udf_typeof.eval(like($2, \"^[a-zA-Z]\"))",
                 columns,
                 columnNameMap);
         testFilterExpressionWithUdf(
                 "typeof(`a-b` not like '^[a-zA-Z]')",
-                "__instanceOfTypeOfFunctionClass.eval(notLike($2, \"^[a-zA-Z]\"))",
+                "__udf_typeof.eval(notLike($2, \"^[a-zA-Z]\"))",
                 columns,
                 columnNameMap);
         testFilterExpressionWithUdf(
-                "typeof(a-b-`a-b`)",
-                "__instanceOfTypeOfFunctionClass.eval($0 - $1 - $2)",
-                columns,
-                columnNameMap);
+                "typeof(a-b-`a-b`)", "__udf_typeof.eval($0 - $1 - $2)", columns, columnNameMap);
         testFilterExpressionWithUdf(
-                "typeof(a-b-2)",
-                "__instanceOfTypeOfFunctionClass.eval($0 - $1 - 2)",
-                columns,
-                columnNameMap);
+                "typeof(a-b-2)", "__udf_typeof.eval($0 - $1 - 2)", columns, columnNameMap);
         testFilterExpressionWithUdf(
                 "addone(addone(`a-b`)) > 4 OR typeof(a-b) <> 'bool' AND format('from %s to %s is %s', 'a', 'z', 'lie') <> ''",
-                "greaterThan(__instanceOfAddOneFunctionClass.eval(__instanceOfAddOneFunctionClass.eval($2)), 4) || !valueEquals(__instanceOfTypeOfFunctionClass.eval($0 - $1), \"bool\") && !valueEquals(__instanceOfFormatFunctionClass.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")",
+                "greaterThan(__udf_addone.eval(__udf_addone.eval($2)), 4) || !valueEquals(__udf_typeof.eval($0 - $1), \"bool\") && !valueEquals(__udf_format.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")",
                 columns,
                 columnNameMap);
         testFilterExpressionWithUdf(
                 "ADDONE(ADDONE(`a-b`)) > 4 OR TYPEOF(a-b) <> 'bool' AND FORMAT('from %s to %s is %s', 'a', 'z', 'lie') <> ''",
-                "greaterThan(__instanceOfAddOneFunctionClass.eval(__instanceOfAddOneFunctionClass.eval($2)), 4) || !valueEquals(__instanceOfTypeOfFunctionClass.eval($0 - $1), \"bool\") && !valueEquals(__instanceOfFormatFunctionClass.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")",
+                "greaterThan(__udf_addone.eval(__udf_addone.eval($2)), 4) || !valueEquals(__udf_typeof.eval($0 - $1), \"bool\") && !valueEquals(__udf_format.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")",
                 columns,
                 columnNameMap);
     }

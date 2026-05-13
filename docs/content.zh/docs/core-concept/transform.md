@@ -472,6 +472,46 @@ transform:
     filter: inc(id) < 100
 ```
 
+### Python UDF
+
+Flink CDC 内置了一个通用 UDF —— `org.apache.flink.cdc.python.PythonUdf`，通过 [Pemja](https://pypi.org/project/pemja/) 在 TaskManager 上嵌入一段内联的 Python 函数。它以可选依赖的方式提供：先下载 `flink-cdc-pipeline-udf-python-{$CDC_VERSION}.jar`，在执行 `flink-cdc.sh` 时通过 `--jar {$PYTHON_UDF_JAR_PATH}` 加上即可；再像声明普通 `user-defined-function` 一样，把每个 Python 函数都指向这个内置类：
+
+```yaml
+source:
+  type: mysql
+  # ...
+
+sink:
+  type: values
+
+transform:
+  - source-table: db.users
+    projection: ID, py_normalize(EMAIL) AS EMAIL_NORM, py_double(AGE) AS DOUBLED
+
+pipeline:
+  parallelism: 4
+  user-defined-function:
+    - name: py_normalize
+      classpath: org.apache.flink.cdc.python.PythonUdf
+      options:
+        python-executable: /usr/bin/python3
+        source: |
+          def eval(s: str) -> str:
+              return s.strip().lower()
+    - name: py_double
+      classpath: org.apache.flink.cdc.python.PythonUdf
+      options:
+        python-executable: /usr/bin/python3
+        source: |
+          def eval(x: int) -> int:
+              return x * 2
+```
+
+**前置条件**
+
+* 每个 TaskManager 都需要在 `options.python-executable` 指向的路径（默认是 `PATH` 上第一个 `python3`）安装好 Python 3 及对应版本的 `pemja`。CLI 端无需安装 Python，只有真正运行 UDF 的 TaskManager 需要。
+* 每个 UDF 条目里只能放一个名为 `eval` 的 Python 函数；如果需要多个 Python UDF，请逐条声明，每个 UDF 函数具有独立的生命周期和上下文。
+
 ## Embedding AI 模型
 
 内置 AI 模型可以在 transform 规则中使用。

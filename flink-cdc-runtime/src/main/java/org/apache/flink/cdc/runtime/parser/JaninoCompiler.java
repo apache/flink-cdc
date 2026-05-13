@@ -654,12 +654,12 @@ public class JaninoCompiler {
     private static String generateInvokeExpression(UserDefinedFunctionDescriptor udfFunction) {
         if (udfFunction.getReturnTypeHint() != null) {
             return String.format(
-                    "(%s) __instanceOf%s.eval",
+                    "(%s) __udf_%s.eval",
                     JavaClassConverter.toJavaClass(udfFunction.getReturnTypeHint())
                             .getCanonicalName(),
-                    udfFunction.getClassName());
+                    udfFunction.getName());
         } else {
-            return String.format("__instanceOf%s.eval", udfFunction.getClassName());
+            return String.format("__udf_%s.eval", udfFunction.getName());
         }
     }
 

@@ -229,6 +229,12 @@ limitations under the License.
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-cdc-pipeline-udf-python</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
 
         <!-- testcontainers -->
         <dependency>
@@ -783,6 +789,16 @@ limitations under the License.
                             <artifactId>flink-cdc-pipeline-udf-examples</artifactId>
                             <version>${project.version}</version>
                             <destFileName>udf-examples.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+
+                        <artifactItem>
+                            <groupId>org.apache.flink</groupId>
+                            <artifactId>flink-cdc-pipeline-udf-python</artifactId>
+                            <version>${project.version}</version>
+                            <destFileName>flink-cdc-pipeline-udf-python.jar</destFileName>
                             <type>jar</type>
                             <outputDirectory>${project.build.directory}/dependencies
                             </outputDirectory>
