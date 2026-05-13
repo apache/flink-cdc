@@ -224,6 +224,8 @@ class PaimonPostponeBucketTest {
     private static class CollectingOutput implements Output<StreamRecord<Event>> {
         private final List<StreamRecord<Event>> records = new ArrayList<>();
 
+        public void emitWatermark(org.apache.flink.runtime.event.WatermarkEvent watermark) {}
+
         @Override
         public void emitWatermark(Watermark mark) {}
 
