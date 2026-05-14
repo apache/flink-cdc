@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.mysql.source.utils;
 
+import org.apache.flink.cdc.connectors.mysql.source.config.ChunkKeyCompareMode;
 import org.apache.flink.table.types.logical.RowType;
 
 import io.debezium.jdbc.JdbcConnection;
@@ -38,12 +39,24 @@ public class StatementUtils {
 
     private StatementUtils() {}
 
-    public static Object[] queryMinMax(JdbcConnection jdbc, TableId tableId, String columnName)
+    public static Object[] queryMinMax(
+            JdbcConnection jdbc,
+            TableId tableId,
+            String columnName,
+            ChunkKeyCompareMode compareMode)
             throws SQLException {
-        final String minMaxQuery =
-                String.format(
-                        "SELECT MIN(%s), MAX(%s) FROM %s",
-                        quote(columnName), quote(columnName), quote(tableId));
+        final String minMaxQuery;
+        if (compareMode == ChunkKeyCompareMode.BINARY) {
+            minMaxQuery =
+                    String.format(
+                            "SELECT CAST(MIN(BINARY %s) AS CHAR), CAST(MAX(BINARY %s) AS CHAR) FROM %s",
+                            quote(columnName), quote(columnName), quote(tableId));
+        } else {
+            minMaxQuery =
+                    String.format(
+                            "SELECT MIN(%s), MAX(%s) FROM %s",
+                            quote(columnName), quote(columnName), quote(tableId));
+        }
         return jdbc.queryAndMap(
                 minMaxQuery,
                 rs -> {
@@ -97,12 +110,24 @@ public class StatementUtils {
     }
 
     public static Object queryMin(
-            JdbcConnection jdbc, TableId tableId, String columnName, Object excludedLowerBound)
+            JdbcConnection jdbc,
+            TableId tableId,
+            String columnName,
+            Object excludedLowerBound,
+            ChunkKeyCompareMode compareMode)
             throws SQLException {
-        final String minQuery =
-                String.format(
-                        "SELECT MIN(%s) FROM %s WHERE %s > ?",
-                        quote(columnName), quote(tableId), quote(columnName));
+        final String minQuery;
+        if (compareMode == ChunkKeyCompareMode.BINARY) {
+            minQuery =
+                    String.format(
+                            "SELECT CAST(MIN(BINARY %s) AS CHAR) FROM %s WHERE BINARY %s > BINARY ?",
+                            quote(columnName), quote(tableId), quote(columnName));
+        } else {
+            minQuery =
+                    String.format(
+                            "SELECT MIN(%s) FROM %s WHERE %s > ?",
+                            quote(columnName), quote(tableId), quote(columnName));
+        }
         return jdbc.prepareQueryAndMap(
                 minQuery,
                 ps -> setSafeObject(ps, 1, excludedLowerBound),
@@ -122,20 +147,36 @@ public class StatementUtils {
             TableId tableId,
             String splitColumnName,
             int chunkSize,
-            Object includedLowerBound)
+            Object includedLowerBound,
+            ChunkKeyCompareMode compareMode)
             throws SQLException {
         String quotedColumn = quote(splitColumnName);
-        String query =
-                String.format(
-                        "SELECT MAX(%s) FROM ("
-                                + "SELECT %s FROM %s WHERE %s >= ? ORDER BY %s ASC LIMIT %s"
-                                + ") AS T",
-                        quotedColumn,
-                        quotedColumn,
-                        quote(tableId),
-                        quotedColumn,
-                        quotedColumn,
-                        chunkSize);
+        String query;
+        if (compareMode == ChunkKeyCompareMode.BINARY) {
+            query =
+                    String.format(
+                            "SELECT CAST(MAX(BINARY %s) AS CHAR) FROM ("
+                                    + "SELECT %s FROM %s WHERE BINARY %s >= BINARY ? ORDER BY BINARY %s ASC LIMIT %s"
+                                    + ") AS T",
+                            quotedColumn,
+                            quotedColumn,
+                            quote(tableId),
+                            quotedColumn,
+                            quotedColumn,
+                            chunkSize);
+        } else {
+            query =
+                    String.format(
+                            "SELECT MAX(%s) FROM ("
+                                    + "SELECT %s FROM %s WHERE %s >= ? ORDER BY %s ASC LIMIT %s"
+                                    + ") AS T",
+                            quotedColumn,
+                            quotedColumn,
+                            quote(tableId),
+                            quotedColumn,
+                            quotedColumn,
+                            chunkSize);
+        }
         return jdbc.prepareQueryAndMap(
                 query,
                 ps -> setSafeObject(ps, 1, includedLowerBound),
@@ -151,8 +192,13 @@ public class StatementUtils {
     }
 
     public static String buildSplitScanQuery(
-            TableId tableId, RowType pkRowType, boolean isFirstSplit, boolean isLastSplit) {
-        return buildSplitQuery(tableId, pkRowType, isFirstSplit, isLastSplit, -1, true);
+            TableId tableId,
+            RowType pkRowType,
+            boolean isFirstSplit,
+            boolean isLastSplit,
+            ChunkKeyCompareMode compareMode) {
+        return buildSplitQuery(
+                tableId, pkRowType, isFirstSplit, isLastSplit, -1, true, compareMode);
     }
 
     private static String buildSplitQuery(
@@ -161,34 +207,36 @@ public class StatementUtils {
             boolean isFirstSplit,
             boolean isLastSplit,
             int limitSize,
-            boolean isScanningData) {
+            boolean isScanningData,
+            ChunkKeyCompareMode compareMode) {
+        final boolean isBinaryMode = compareMode == ChunkKeyCompareMode.BINARY;
         final String condition;
 
         if (isFirstSplit && isLastSplit) {
             condition = null;
         } else if (isFirstSplit) {
             final StringBuilder sql = new StringBuilder();
-            addPrimaryKeyColumnsToCondition(pkRowType, sql, " <= ?");
+            addPrimaryKeyColumnsToCondition(pkRowType, sql, " <= ?", isBinaryMode);
             if (isScanningData) {
                 sql.append(" AND NOT (");
-                addPrimaryKeyColumnsToCondition(pkRowType, sql, " = ?");
+                addPrimaryKeyColumnsToCondition(pkRowType, sql, " = ?", isBinaryMode);
                 sql.append(")");
             }
             condition = sql.toString();
         } else if (isLastSplit) {
             final StringBuilder sql = new StringBuilder();
-            addPrimaryKeyColumnsToCondition(pkRowType, sql, " >= ?");
+            addPrimaryKeyColumnsToCondition(pkRowType, sql, " >= ?", isBinaryMode);
             condition = sql.toString();
         } else {
             final StringBuilder sql = new StringBuilder();
-            addPrimaryKeyColumnsToCondition(pkRowType, sql, " >= ?");
+            addPrimaryKeyColumnsToCondition(pkRowType, sql, " >= ?", isBinaryMode);
             if (isScanningData) {
                 sql.append(" AND NOT (");
-                addPrimaryKeyColumnsToCondition(pkRowType, sql, " = ?");
+                addPrimaryKeyColumnsToCondition(pkRowType, sql, " = ?", isBinaryMode);
                 sql.append(")");
             }
             sql.append(" AND ");
-            addPrimaryKeyColumnsToCondition(pkRowType, sql, " <= ?");
+            addPrimaryKeyColumnsToCondition(pkRowType, sql, " <= ?", isBinaryMode);
             condition = sql.toString();
         }
 
@@ -261,10 +309,18 @@ public class StatementUtils {
     }
 
     private static void addPrimaryKeyColumnsToCondition(
-            RowType pkRowType, StringBuilder sql, String predicate) {
+            RowType pkRowType, StringBuilder sql, String predicate, boolean isBinaryMode) {
         for (Iterator<String> fieldNamesIt = pkRowType.getFieldNames().iterator();
                 fieldNamesIt.hasNext(); ) {
-            sql.append(quote(fieldNamesIt.next())).append(predicate);
+            if (isBinaryMode) {
+                sql.append("BINARY ");
+            }
+            sql.append(quote(fieldNamesIt.next()));
+            if (isBinaryMode) {
+                sql.append(predicate.replace("?", "BINARY ?"));
+            } else {
+                sql.append(predicate);
+            }
             if (fieldNamesIt.hasNext()) {
                 sql.append(" AND ");
             }

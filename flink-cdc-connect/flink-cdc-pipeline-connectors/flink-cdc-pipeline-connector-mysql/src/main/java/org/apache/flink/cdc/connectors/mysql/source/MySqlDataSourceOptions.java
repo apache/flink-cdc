@@ -225,6 +225,19 @@ public class MySqlDataSourceOptions {
                                     + "eg. db1.user_table_[0-9]+:col1;db[1-2].[app|web]_order_\\.*:col2;");
 
     @Experimental
+    public static final ConfigOption<String> SCAN_INCREMENTAL_SNAPSHOT_STRING_KEY_COMPARE_MODE =
+            ConfigOptions.key("scan.incremental.snapshot.string-key.compare-mode")
+                    .stringType()
+                    .defaultValue("default")
+                    .withDescription(
+                            "The compare mode for string chunk key during incremental snapshot. Supported values are: "
+                                    + "'default' (uses Java String.compareTo), "
+                                    + "'case-insensitive' (uses Java String.compareToIgnoreCase to align with MySQL case-insensitive collations), "
+                                    + "'binary' (forces binary comparison in both MySQL SQL and Java). "
+                                    + "The 'case-insensitive' mode is recommended for tables using utf8mb4_general_ci or similar case-insensitive collations. "
+                                    + "The 'binary' mode ensures consistent byte-level ordering but may impact query performance during chunk splitting.");
+
+    @Experimental
     public static final ConfigOption<Boolean> SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED =
             ConfigOptions.key("scan.incremental.close-idle-reader.enabled")
                     .booleanType()

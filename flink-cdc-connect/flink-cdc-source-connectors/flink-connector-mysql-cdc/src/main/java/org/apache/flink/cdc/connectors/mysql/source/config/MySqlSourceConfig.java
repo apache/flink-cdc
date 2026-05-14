@@ -74,10 +74,11 @@ public class MySqlSourceConfig implements Serializable {
     public static boolean useLegacyJsonFormat = true;
     private final boolean assignUnboundedChunkFirst;
     private final boolean releaseSnapshotMetadataEnabled;
+    private final ChunkKeyCompareMode chunkKeyCompareMode;
 
     // --------------------------------------------------------------------------------------------
     // Debezium Configurations
-    // --------------------------------------------------------------------------------------------
+    // -------------------------------------------------------------------------------------------
     private final Properties dbzProperties;
     private final Configuration dbzConfiguration;
     private final MySqlConnectorConfig dbzMySqlConfig;
@@ -115,7 +116,8 @@ public class MySqlSourceConfig implements Serializable {
             boolean treatTinyInt1AsBoolean,
             boolean useLegacyJsonFormat,
             boolean assignUnboundedChunkFirst,
-            boolean releaseSnapshotMetadataEnabled) {
+            boolean releaseSnapshotMetadataEnabled,
+            ChunkKeyCompareMode chunkKeyCompareMode) {
         this.hostname = checkNotNull(hostname);
         this.port = port;
         this.username = checkNotNull(username);
@@ -164,6 +166,7 @@ public class MySqlSourceConfig implements Serializable {
         this.useLegacyJsonFormat = useLegacyJsonFormat;
         this.assignUnboundedChunkFirst = assignUnboundedChunkFirst;
         this.releaseSnapshotMetadataEnabled = releaseSnapshotMetadataEnabled;
+        this.chunkKeyCompareMode = chunkKeyCompareMode;
     }
 
     public String getHostname() {
@@ -265,6 +268,10 @@ public class MySqlSourceConfig implements Serializable {
 
     public boolean isAssignUnboundedChunkFirst() {
         return assignUnboundedChunkFirst;
+    }
+
+    public ChunkKeyCompareMode getChunkKeyCompareMode() {
+        return chunkKeyCompareMode;
     }
 
     public Properties getDbzProperties() {

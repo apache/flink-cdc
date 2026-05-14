@@ -475,6 +475,18 @@ Flink SQL> SELECT * FROM orders;
         例如，更新快照阶段已更新的值，或删除快照阶段已删除的数据。这些重放的 binlog 事件应进行特殊处理。
       </td>
     </tr>
+    <tr>
+      <td>scan.incremental.snapshot.string-key.compare-mode</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">default</td>
+      <td>String</td>
+      <td>
+        增量快照阶段字符串类型 chunk key 的比较模式。可选值包括：
+        <li><code>default</code>：使用 Java 默认字符串比较（区分大小写，Unicode 码点顺序）。可能与 MySQL 的 <code>utf8mb4_general_ci</code> 等大小写不敏感排序规则不一致。</li>
+        <li><code>case-insensitive</code>：使用大小写不敏感比较（Java 中的 <code>compareToIgnoreCase</code>），适用于 MySQL 使用 <code>utf8mb4_general_ci</code> 等大小写不敏感排序规则的场景。</li>
+        <li><code>binary</code>：在 SQL 查询和 Java 比较中均使用二进制比较，强制按字节精确匹配。适用于 MySQL 使用 <code>utf8mb4_bin</code> 或 <code>BINARY</code> 关键字等二进制比较的场景。</li>
+      </td>
+    </tr>
     </tbody>
 </table>
 </div>

@@ -20,6 +20,7 @@ package org.apache.flink.cdc.connectors.mysql.source.utils;
 import org.apache.flink.cdc.common.utils.StringUtils;
 import org.apache.flink.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher.WatermarkKind;
 import org.apache.flink.cdc.connectors.mysql.debezium.reader.DebeziumReader;
+import org.apache.flink.cdc.connectors.mysql.source.config.ChunkKeyCompareMode;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
 import org.apache.flink.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
@@ -100,7 +101,8 @@ public class RecordUtils {
             RowType splitBoundaryType,
             SchemaNameAdjuster nameAdjuster,
             Object[] splitStart,
-            Object[] splitEnd) {
+            Object[] splitEnd,
+            ChunkKeyCompareMode compareMode) {
         if (isDataChangeRecord(binlogRecord)) {
             Struct value = (Struct) binlogRecord.value();
             if (value != null) {
@@ -108,7 +110,8 @@ public class RecordUtils {
                 if (SplitKeyUtils.splitKeyRangeContains(
                         SplitKeyUtils.getSplitKey(splitBoundaryType, nameAdjuster, chunkKeyStruct),
                         splitStart,
-                        splitEnd)) {
+                        splitEnd,
+                        compareMode)) {
                     boolean hasPrimaryKey = binlogRecord.key() != null;
                     Envelope.Operation operation =
                             Envelope.Operation.forCode(
@@ -137,7 +140,8 @@ public class RecordUtils {
                                         SplitKeyUtils.getSplitKey(
                                                 splitBoundaryType, nameAdjuster, structFromAfter),
                                         splitStart,
-                                        splitEnd)) {
+                                        splitEnd,
+                                        compareMode)) {
                                     LOG.warn(
                                             "The updated chunk key is out of the split range. Cannot provide exactly-once semantics.");
                                 }

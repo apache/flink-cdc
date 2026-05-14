@@ -30,6 +30,7 @@ import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.common.utils.StringUtils;
 import org.apache.flink.cdc.connectors.mysql.source.MySqlDataSource;
+import org.apache.flink.cdc.connectors.mysql.source.config.ChunkKeyCompareMode;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import org.apache.flink.cdc.connectors.mysql.source.config.ServerIdRange;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
@@ -81,6 +82,7 @@ import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOption
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED;
+import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_STRING_KEY_COMPARE_MODE;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
@@ -170,6 +172,9 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         boolean useLegacyJsonFormat = config.get(USE_LEGACY_JSON_FORMAT);
         boolean isAssignUnboundedChunkFirst =
                 config.get(SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED);
+        ChunkKeyCompareMode chunkKeyCompareMode =
+                ChunkKeyCompareMode.fromValue(
+                        config.get(SCAN_INCREMENTAL_SNAPSHOT_STRING_KEY_COMPARE_MODE));
 
         validateIntegerOption(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE, splitSize, 1);
         validateIntegerOption(CHUNK_META_GROUP_SIZE, splitMetaGroupSize, 1);
@@ -224,6 +229,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
                         .treatTinyInt1AsBoolean(treatTinyInt1AsBoolean)
                         .useLegacyJsonFormat(useLegacyJsonFormat)
                         .assignUnboundedChunkFirst(isAssignUnboundedChunkFirst)
+                        .chunkKeyCompareMode(chunkKeyCompareMode)
                         .skipSnapshotBackfill(skipSnapshotBackfill);
 
         List<TableId> tableIds = MySqlSchemaUtils.listTables(configFactory.createConfig(0), null);
@@ -363,6 +369,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         options.add(PARSE_ONLINE_SCHEMA_CHANGES);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP);
+        options.add(SCAN_INCREMENTAL_SNAPSHOT_STRING_KEY_COMPARE_MODE);
         return options;
     }
 
