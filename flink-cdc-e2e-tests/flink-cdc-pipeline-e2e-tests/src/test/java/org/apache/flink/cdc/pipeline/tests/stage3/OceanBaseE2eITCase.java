@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.pipeline.tests;
+package org.apache.flink.cdc.pipeline.tests.stage3;
 
 import org.apache.flink.cdc.common.test.utils.TestUtils;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
@@ -29,6 +29,8 @@ import org.apache.commons.text.StringEscapeUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedClass;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
@@ -51,10 +53,16 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** OceanBase flink cdc pipeline connector sink integrate test. */
+@ParameterizedClass
+@ValueSource(ints = {1, 4})
 class OceanBaseE2eITCase extends PipelineTestEnvironment {
     private static final Logger LOG = LoggerFactory.getLogger(OceanBaseE2eITCase.class);
 
     private static final String MYSQL_TEST_TABLE_NAME = "products";
+
+    OceanBaseE2eITCase(int parallelism) {
+        super(parallelism);
+    }
 
     @Container
     private static final OceanBaseContainer OB_SERVER =

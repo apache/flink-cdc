@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.pipeline.tests.migration;
+package org.apache.flink.cdc.pipeline.tests.stage1.migration;
 
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.cdc.common.test.utils.TestUtils;
@@ -29,8 +29,10 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.junit.jupiter.params.ParameterizedClass;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.Container;
@@ -54,6 +56,8 @@ import java.util.stream.Collectors;
  * E2e cases for stopping & restarting jobs of `MySQL source to Paimon sink` from previous state.
  */
 @EnabledIfSystemProperty(named = "specifiedFlinkVersion", matches = "^1.*")
+@ParameterizedClass
+@ValueSource(ints = {1, 4})
 class MySqlToPaimonMigrationITCase extends PipelineTestEnvironment {
 
     private static final Logger LOG = LoggerFactory.getLogger(MySqlToPaimonMigrationITCase.class);
@@ -61,6 +65,11 @@ class MySqlToPaimonMigrationITCase extends PipelineTestEnvironment {
     private static final Duration PAIMON_TESTCASE_TIMEOUT = Duration.ofMinutes(3);
 
     protected UniqueDatabase mysqlInventoryDatabase;
+
+    MySqlToPaimonMigrationITCase(int parallelism) {
+        super(parallelism);
+    }
+
     private final Function<String, String> dbNameFormatter =
             (s) -> String.format(s, mysqlInventoryDatabase.getDatabaseName());
 

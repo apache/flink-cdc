@@ -27,16 +27,16 @@ on:
         description: "Flink versions to test against."
         required: false
         type: string
-        default: "['generic']"
+        default: "['1.20.3']"
       modules:
         description: "Flink CDC modules to test against."
         required: true
         type: string
-      parallelism:
-        description: "Flink parallelism."
+      e2e-stages:
+        description: "Pipeline E2E stage filters (JSON array). Defaults to a single empty entry meaning no filter (run everything). Set to e.g. ['stage1','stage2','stage3'] to fan out the pipeline E2E module across multiple jobs by subpackage."
         required: false
-        type: number
-        default: 4
+        type: string
+        default: '[""]'
       custom-maven-parameter:
         description: "Custom maven parameter."
         required: false
@@ -44,6 +44,7 @@ on:
 
 jobs:
   test:
+    name: jdk${{ matrix.java-version }}-flink-${{ matrix.flink-version }}, ${{ matrix.module }}${{ matrix.stage != '' && format(', {0}', matrix.stage) || '' }}
     runs-on: ubuntu-22.04
     timeout-minutes: 120
     strategy:
@@ -53,6 +54,7 @@ jobs:
         java-version: ${{ fromJSON(inputs.java-versions) }}
         flink-version: ${{ fromJSON(inputs.flink-versions) }}
         module: ${{ fromJSON(inputs.modules) }}
+        stage: ${{ fromJSON(inputs.e2e-stages) }}
     steps:
       - run: echo "Running CI pipeline for JDK version ${{ matrix.java-version }}"
       - name: Clean up disk space
@@ -60,7 +62,7 @@ jobs:
           set -euo pipefail
 
           echo "Disk space before cleanup"
-          df -h 
+          df -h
 
           echo "Cleaning up disk space"
           sudo rm -rf /usr/share/dotnet
@@ -70,6 +72,25 @@ jobs:
           sudo docker image prune --all --force
 
           echo "Disk space after cleanup"
+          df -h
+
+      - name: Relocate Docker data-root to /mnt
+        run: |
+          set -euo pipefail
+
+          # GitHub-hosted runners ship a large secondary volume mounted at /mnt
+          # (typically /dev/sdb1, ~75G). The default Docker data-root lives on
+          # /dev/root and gets crowded by Maven, build artifacts and other test
+          # containers, leaving e2e containers (notably OceanBase, which OBD
+          # pre-checks for ~10G free) failing to boot. Point Docker at /mnt to
+          # give containers the headroom they need.
+          sudo systemctl stop docker docker.socket
+          sudo mkdir -p /mnt/docker
+          echo '{"data-root":"/mnt/docker"}' | sudo tee /etc/docker/daemon.json
+          sudo systemctl start docker
+          docker info | grep "Docker Root Dir"
+
+          echo "Disk space after Docker relocation"
           df -h
 
       - name: Check out repository code
@@ -99,16 +120,27 @@ jobs:
 
           modules=$(./.github/workflows/modules.py test "${{ matrix.module }}")
           compile_modules=$(./.github/workflows/modules.py compile "${{ matrix.module }}")
-          
+
           build_maven_parameter="-DspecifiedMongoVersion=8.0.14"
 
           if [ ! -z "${{ matrix.flink-version }}" ]; then
             build_maven_parameter="${build_maven_parameter:+$build_maven_parameter }-DspecifiedFlinkVersion=${{ matrix.flink-version }}"
           fi
-          
+
           build_maven_parameter="${build_maven_parameter:+$build_maven_parameter }${{ inputs.custom-maven-parameter }}"
-          
-          mvn --no-snapshot-updates -B -DskipTests ${{ inputs.custom-maven-parameter }} -pl $compile_modules -am install && mvn --no-snapshot-updates -B $build_maven_parameter -pl $modules -DspecifiedParallelism=${{ inputs.parallelism }} -Duser.timezone=$jvm_timezone verify
+
+          # Pipeline E2E stage filter: when matrix.stage is set, restrict surefire to the
+          # matching subpackage. Stage1 hosts the YARN test; stage2/stage3 skip it via
+          # -DskipYarnTest=true. Empty stage (default) means no filter — run everything.
+          e2e_stage="${{ matrix.stage }}"
+          if [ -n "$e2e_stage" ]; then
+            build_maven_parameter="$build_maven_parameter -De2eIncludePattern=**/${e2e_stage}/**/*ITCase.java"
+            if [ "$e2e_stage" != "stage1" ]; then
+              build_maven_parameter="$build_maven_parameter -DskipYarnTest=true"
+            fi
+          fi
+
+          mvn --no-snapshot-updates -B -DskipTests ${{ inputs.custom-maven-parameter }} -pl $compile_modules -am install && mvn --no-snapshot-updates -B $build_maven_parameter -pl $modules -Duser.timezone=$jvm_timezone verify
 
       - name: Print JVM thread dumps when cancelled
         if: ${{ failure() }}

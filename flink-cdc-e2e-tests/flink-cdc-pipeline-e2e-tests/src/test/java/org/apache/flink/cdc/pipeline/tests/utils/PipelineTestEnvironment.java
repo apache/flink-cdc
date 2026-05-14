@@ -80,17 +80,10 @@ public abstract class PipelineTestEnvironment extends TestLogger {
 
     private static final Logger LOG = LoggerFactory.getLogger(PipelineTestEnvironment.class);
 
-    protected Integer parallelism = getParallelism();
+    protected final Integer parallelism;
 
-    private int getParallelism() {
-        try {
-            return Integer.parseInt(System.getProperty("specifiedParallelism"));
-        } catch (NumberFormatException ex) {
-            LOG.warn(
-                    "Unable to parse specified parallelism configuration ({} provided). Use 4 by default.",
-                    System.getProperty("specifiedParallelism"));
-            return 4;
-        }
+    protected PipelineTestEnvironment(int parallelism) {
+        this.parallelism = parallelism;
     }
 
     // ------------------------------------------------------------------------------------------

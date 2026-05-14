@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.pipeline.tests.specs;
+package org.apache.flink.cdc.pipeline.tests.stage1.specs;
 
 import java.util.List;
 import java.util.stream.Collectors;

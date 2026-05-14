@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.pipeline.tests;
+package org.apache.flink.cdc.pipeline.tests.stage3;
 
 import org.apache.flink.cdc.common.test.utils.TestUtils;
 import org.apache.flink.cdc.connectors.postgres.testutils.UniqueDatabase;
@@ -24,6 +24,8 @@ import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedClass;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -42,8 +44,14 @@ import static org.apache.flink.cdc.connectors.postgres.PostgresTestBase.getJdbcC
 import static org.apache.flink.cdc.connectors.postgres.PostgresTestBase.getSlotName;
 
 /** End-to-end tests for postgres cdc pipeline job. */
+@ParameterizedClass
+@ValueSource(ints = {1, 4})
 public class PostgresE2eITCase extends PipelineTestEnvironment {
     private static final Logger LOG = LoggerFactory.getLogger(PostgresE2eITCase.class);
+
+    public PostgresE2eITCase(int parallelism) {
+        super(parallelism);
+    }
 
     // ------------------------------------------------------------------------------------------
     // Postgres Variables (we always use Postgres as the data source for easier verifying)

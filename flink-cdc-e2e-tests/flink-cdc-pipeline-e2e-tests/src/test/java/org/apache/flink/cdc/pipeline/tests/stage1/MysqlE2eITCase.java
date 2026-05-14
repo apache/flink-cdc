@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.pipeline.tests;
+package org.apache.flink.cdc.pipeline.tests.stage1;
 
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
@@ -24,6 +24,8 @@ import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedClass;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,6 +38,8 @@ import java.time.Duration;
 import java.util.function.Function;
 
 /** End-to-end tests for mysql cdc pipeline job. */
+@ParameterizedClass
+@ValueSource(ints = {1, 4})
 class MysqlE2eITCase extends PipelineTestEnvironment {
     private static final Logger LOG = LoggerFactory.getLogger(MysqlE2eITCase.class);
 
@@ -44,6 +48,10 @@ class MysqlE2eITCase extends PipelineTestEnvironment {
 
     private final Function<String, String> dbNameFormatter =
             (s) -> String.format(s, mysqlInventoryDatabase.getDatabaseName());
+
+    MysqlE2eITCase(int parallelism) {
+        super(parallelism);
+    }
 
     @BeforeEach
     public void before() throws Exception {

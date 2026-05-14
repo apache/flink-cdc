@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.pipeline.tests;
+package org.apache.flink.cdc.pipeline.tests.stage2;
 
 import org.apache.flink.cdc.common.test.utils.TestUtils;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
@@ -26,6 +26,7 @@ import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.params.ParameterizedClass;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
@@ -49,12 +50,18 @@ import java.util.stream.Collectors;
 
 /** An End-to-end test case for Fluss pipeline connector. */
 @Testcontainers
+@ParameterizedClass
+@ValueSource(ints = {1, 4})
 public class FlussE2eITCase extends PipelineTestEnvironment {
 
     private static final Logger LOG = LoggerFactory.getLogger(FlussE2eITCase.class);
     private static final Duration FLUSS_TESTCASE_TIMEOUT = Duration.ofMinutes(3);
     private static final String flussImageTag = "apache/fluss:0.9.0-incubating";
     private static final String zooKeeperImageTag = "zookeeper:3.9.2";
+
+    public FlussE2eITCase(int parallelism) {
+        super(parallelism);
+    }
 
     private static final List<String> flussCoordinatorProperties =
             Arrays.asList(
