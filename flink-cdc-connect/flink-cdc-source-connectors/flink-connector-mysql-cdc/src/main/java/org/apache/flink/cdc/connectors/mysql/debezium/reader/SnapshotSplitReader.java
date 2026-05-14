@@ -360,7 +360,8 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
                             currentSnapshotSplit.getSplitKeyType(),
                             nameAdjuster,
                             currentSnapshotSplit.getSplitStart(),
-                            currentSnapshotSplit.getSplitEnd());
+                            currentSnapshotSplit.getSplitEnd(),
+                            statefulTaskContext.getSourceConfig().getChunkKeyCompareMode());
                 }
             }
         }

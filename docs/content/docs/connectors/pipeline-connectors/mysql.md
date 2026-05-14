@@ -363,6 +363,18 @@ pipeline:
       </td>
     </tr>
     <tr>
+      <td>scan.incremental.snapshot.string-key.compare-mode</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">default</td>
+      <td>String</td>
+      <td>
+        The compare mode for string type chunk key during incremental snapshot phase. Available values are:
+        <li><code>default</code>: Use Java's default string comparison (case-sensitive, Unicode code point order). This may be inconsistent with MySQL's case-insensitive collations like <code>utf8mb4_general_ci</code>.</li>
+        <li><code>case-insensitive</code>: Use case-insensitive comparison (<code>compareToIgnoreCase</code> in Java), suitable when MySQL uses case-insensitive collation such as <code>utf8mb4_general_ci</code>.</li>
+        <li><code>binary</code>: Use binary comparison in both SQL queries and Java comparison, forcing byte-level exact match. Suitable when MySQL uses binary collation like <code>utf8mb4_bin</code> or <code>BINARY</code> keyword.</li>
+      </td>
+    </tr>
+    <tr>
       <td>metadata.list</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>

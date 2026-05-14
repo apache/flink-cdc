@@ -78,6 +78,10 @@ public class MySqlSourceConfigFactory implements Serializable {
     private boolean treatTinyInt1AsBoolean = true;
     private boolean useLegacyJsonFormat = true;
     private boolean assignUnboundedChunkFirst = false;
+    private ChunkKeyCompareMode chunkKeyCompareMode =
+            ChunkKeyCompareMode.fromValue(
+                    MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_STRING_KEY_COMPARE_MODE
+                            .defaultValue());
 
     public MySqlSourceConfigFactory hostname(String hostname) {
         this.hostname = hostname;
@@ -341,6 +345,12 @@ public class MySqlSourceConfigFactory implements Serializable {
         return this;
     }
 
+    /** The compare mode for string chunk key during incremental snapshot. Defaults to 'default'. */
+    public MySqlSourceConfigFactory chunkKeyCompareMode(ChunkKeyCompareMode chunkKeyCompareMode) {
+        this.chunkKeyCompareMode = chunkKeyCompareMode;
+        return this;
+    }
+
     /** Creates a new {@link MySqlSourceConfig} for the given subtask {@code subtaskId}. */
     public MySqlSourceConfig createConfig(int subtaskId) {
         // hard code server name, because we don't need to distinguish it, docs:
@@ -444,6 +454,7 @@ public class MySqlSourceConfigFactory implements Serializable {
                 parseOnLineSchemaChanges,
                 treatTinyInt1AsBoolean,
                 useLegacyJsonFormat,
-                assignUnboundedChunkFirst);
+                assignUnboundedChunkFirst,
+                chunkKeyCompareMode);
     }
 }

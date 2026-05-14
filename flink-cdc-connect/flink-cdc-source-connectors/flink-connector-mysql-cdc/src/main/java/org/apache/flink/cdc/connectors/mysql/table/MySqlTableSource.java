@@ -20,6 +20,7 @@ package org.apache.flink.cdc.connectors.mysql.table;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.connectors.mysql.source.MySqlSource;
+import org.apache.flink.cdc.connectors.mysql.source.config.ChunkKeyCompareMode;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.cdc.debezium.DebeziumSourceFunction;
 import org.apache.flink.cdc.debezium.table.MetadataConverter;
@@ -101,6 +102,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
     final boolean parseOnlineSchemaChanges;
     private final boolean useLegacyJsonFormat;
     private final boolean assignUnboundedChunkFirst;
+    private final ChunkKeyCompareMode chunkKeyCompareMode;
 
     private final boolean appendOnly;
 
@@ -144,6 +146,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
             boolean parseOnlineSchemaChanges,
             boolean useLegacyJsonFormat,
             boolean assignUnboundedChunkFirst,
+            ChunkKeyCompareMode chunkKeyCompareMode,
             boolean appendOnly) {
         this.physicalSchema = physicalSchema;
         this.port = port;
@@ -177,6 +180,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
         this.skipSnapshotBackFill = skipSnapshotBackFill;
         this.useLegacyJsonFormat = useLegacyJsonFormat;
         this.assignUnboundedChunkFirst = assignUnboundedChunkFirst;
+        this.chunkKeyCompareMode = chunkKeyCompareMode;
         this.appendOnly = appendOnly;
     }
 
@@ -241,6 +245,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                             .parseOnLineSchemaChanges(parseOnlineSchemaChanges)
                             .useLegacyJsonFormat(useLegacyJsonFormat)
                             .assignUnboundedChunkFirst(assignUnboundedChunkFirst)
+                            .chunkKeyCompareMode(chunkKeyCompareMode)
                             .build();
             return SourceProvider.of(parallelSource);
         } else {
@@ -330,6 +335,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                         parseOnlineSchemaChanges,
                         useLegacyJsonFormat,
                         assignUnboundedChunkFirst,
+                        chunkKeyCompareMode,
                         appendOnly);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
@@ -376,6 +382,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 && parseOnlineSchemaChanges == that.parseOnlineSchemaChanges
                 && useLegacyJsonFormat == that.useLegacyJsonFormat
                 && assignUnboundedChunkFirst == that.assignUnboundedChunkFirst
+                && Objects.equals(chunkKeyCompareMode, that.chunkKeyCompareMode)
                 && Objects.equals(appendOnly, that.appendOnly);
     }
 
@@ -413,6 +420,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 parseOnlineSchemaChanges,
                 useLegacyJsonFormat,
                 assignUnboundedChunkFirst,
+                chunkKeyCompareMode,
                 appendOnly);
     }
 

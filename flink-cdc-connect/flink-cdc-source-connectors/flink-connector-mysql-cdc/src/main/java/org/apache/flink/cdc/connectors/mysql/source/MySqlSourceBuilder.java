@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.mysql.source;
 
 import org.apache.flink.cdc.common.annotation.PublicEvolving;
+import org.apache.flink.cdc.connectors.mysql.source.config.ChunkKeyCompareMode;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
@@ -309,6 +310,12 @@ public class MySqlSourceBuilder<T> {
      */
     public MySqlSourceBuilder<T> assignUnboundedChunkFirst(boolean assignUnboundedChunkFirst) {
         this.configFactory.assignUnboundedChunkFirst(assignUnboundedChunkFirst);
+        return this;
+    }
+
+    /** The compare mode for string chunk key during incremental snapshot. Defaults to 'default'. */
+    public MySqlSourceBuilder<T> chunkKeyCompareMode(ChunkKeyCompareMode chunkKeyCompareMode) {
+        this.configFactory.chunkKeyCompareMode(chunkKeyCompareMode);
         return this;
     }
 

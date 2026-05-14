@@ -82,9 +82,31 @@ public class ObjectUtils {
      */
     @SuppressWarnings("unchecked")
     public static int compare(Object obj1, Object obj2) {
+        return compare(
+                obj1,
+                obj2,
+                org.apache.flink.cdc.connectors.mysql.source.config.ChunkKeyCompareMode.DEFAULT);
+    }
+
+    @SuppressWarnings("unchecked")
+    public static int compare(
+            Object obj1,
+            Object obj2,
+            org.apache.flink.cdc.connectors.mysql.source.config.ChunkKeyCompareMode compareMode) {
         if (obj1 instanceof Comparable && obj1.getClass().equals(obj2.getClass())) {
+            if (obj1 instanceof String
+                    && compareMode
+                            == org.apache.flink.cdc.connectors.mysql.source.config
+                                    .ChunkKeyCompareMode.CASE_INSENSITIVE) {
+                return String.CASE_INSENSITIVE_ORDER.compare((String) obj1, (String) obj2);
+            }
             return ((Comparable) obj1).compareTo(obj2);
         } else {
+            if (compareMode
+                    == org.apache.flink.cdc.connectors.mysql.source.config.ChunkKeyCompareMode
+                            .CASE_INSENSITIVE) {
+                return obj1.toString().compareToIgnoreCase(obj2.toString());
+            }
             return obj1.toString().compareTo(obj2.toString());
         }
     }
