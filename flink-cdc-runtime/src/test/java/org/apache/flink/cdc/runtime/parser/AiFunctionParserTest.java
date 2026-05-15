@@ -113,6 +113,38 @@ class AiFunctionParserTest {
                         "AI function model name 'class' is not a valid Java identifier.")
                 .hasMessageContaining(
                         "Model names must follow Java identifier rules and must not be reserved keywords.");
+
+        assertThatThrownBy(
+                        () ->
+                                translateAsProjection(
+                                        "AI_COMPLETE('my.model', content, 'p') AS out_col"))
+                .hasMessageContaining(
+                        "AI function model name 'my.model' is not a valid Java identifier.");
+
+        assertThatThrownBy(
+                        () ->
+                                translateAsProjection(
+                                        "AI_COMPLETE('my model', content, 'p') AS out_col"))
+                .hasMessageContaining(
+                        "AI function model name 'my model' is not a valid Java identifier.");
+
+        assertThatThrownBy(
+                        () ->
+                                translateAsProjection(
+                                        "AI_COMPLETE('123model', content, 'p') AS out_col"))
+                .hasMessageContaining(
+                        "AI function model name '123model' is not a valid Java identifier.");
+
+        assertThatThrownBy(() -> translateAsProjection("AI_COMPLETE('', content, 'p') AS out_col"))
+                .hasMessageContaining("AI function model name '' is not a valid Java identifier.");
+    }
+
+    @Test
+    void testAiFunctionPreservesModelNameCase() {
+        assertThat(translateAsFilter("AI_COMPLETE('MyModel', content, 'p')"))
+                .isEqualTo("aiComplete(MyModel, $2, \"p\")");
+        assertThat(translateAsFilter("AI_COMPLETE('mymodel', content, 'p')"))
+                .isEqualTo("aiComplete(mymodel, $2, \"p\")");
     }
 
     @Test

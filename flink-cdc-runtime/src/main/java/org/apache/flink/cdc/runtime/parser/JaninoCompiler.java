@@ -591,7 +591,7 @@ public class JaninoCompiler {
         if (modelName.startsWith("\"") && modelName.endsWith("\"")) {
             modelName = modelName.substring(1, modelName.length() - 1);
         }
-        if (!SourceVersion.isName(modelName)) {
+        if (!SourceVersion.isIdentifier(modelName) || SourceVersion.isKeyword(modelName)) {
             throw new ParseException(
                     "AI function model name '"
                             + modelName
