@@ -19,6 +19,7 @@ package org.apache.flink.cdc.common.model;
 
 import org.apache.flink.cdc.common.annotation.Experimental;
 
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -64,10 +65,11 @@ public interface AiModelClientFactory {
             }
         }
         if (required != null && optional != null) {
-            Set<String> unknown =
+            List<String> unknown =
                     context.getOptions().keySet().stream()
                             .filter(k -> !required.contains(k) && !optional.contains(k))
-                            .collect(Collectors.toSet());
+                            .sorted()
+                            .collect(Collectors.toList());
             if (!unknown.isEmpty()) {
                 throw new IllegalArgumentException(
                         "Unknown options for model '"
