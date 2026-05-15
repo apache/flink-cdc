@@ -31,7 +31,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -52,12 +51,6 @@ public class TransformExpressionCompiler {
         // when invoking Cache#cleanUp, which may cause classloader leakage. Use #invalidateAll
         // instead to ensure all key / value pairs to be correctly discarded.
         COMPILED_EXPRESSION_CACHE.invalidateAll();
-    }
-
-    /** Compiles an expression code to a janino {@link ExpressionEvaluator}. */
-    public static ExpressionEvaluator compileExpression(
-            TransformExpressionKey key, List<UserDefinedFunctionDescriptor> udfDescriptors) {
-        return compileExpression(key, udfDescriptors, Collections.emptyMap());
     }
 
     /**
