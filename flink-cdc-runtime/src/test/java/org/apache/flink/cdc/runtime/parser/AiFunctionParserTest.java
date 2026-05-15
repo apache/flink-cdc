@@ -80,6 +80,42 @@ class AiFunctionParserTest {
     }
 
     @Test
+    void testAiFunctionRejectsNonStringLiteralModelArg() {
+        assertThatThrownBy(
+                        () ->
+                                translateAsProjection(
+                                        "AI_COMPLETE(content, content, 'prompt') AS out_col"))
+                .hasMessageContaining(
+                        "The first argument of AI function 'AI_COMPLETE' must be a string literal naming the model");
+
+        assertThatThrownBy(() -> translateAsProjection("AI_EMBED(123, content) AS out_col"))
+                .hasMessageContaining(
+                        "The first argument of AI function 'AI_EMBED' must be a string literal naming the model");
+
+        assertThatThrownBy(() -> translateAsProjection("AI_EMBED(UPPER('m'), content) AS out_col"))
+                .hasMessageContaining(
+                        "The first argument of AI function 'AI_EMBED' must be a string literal naming the model");
+
+        assertThatThrownBy(
+                        () ->
+                                translateAsProjection(
+                                        "AI_COMPLETE('my-model', content, 'p') AS out_col"))
+                .hasMessageContaining(
+                        "AI function model name 'my-model' is not a valid Java identifier.")
+                .hasMessageContaining(
+                        "Model names must follow Java identifier rules and must not be reserved keywords.");
+
+        assertThatThrownBy(
+                        () ->
+                                translateAsProjection(
+                                        "AI_COMPLETE('class', content, 'p') AS out_col"))
+                .hasMessageContaining(
+                        "AI function model name 'class' is not a valid Java identifier.")
+                .hasMessageContaining(
+                        "Model names must follow Java identifier rules and must not be reserved keywords.");
+    }
+
+    @Test
     void testTranslateAiFunctionInFilter() {
         assertThat(translateAsFilter("AI_COMPLETE('myModel', content, 'Classify this text')"))
                 .isEqualTo("aiComplete(myModel, $2, \"Classify this text\")");
