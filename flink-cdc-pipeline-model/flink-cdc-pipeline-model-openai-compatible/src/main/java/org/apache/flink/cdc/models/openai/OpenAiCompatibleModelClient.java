@@ -84,7 +84,11 @@ public class OpenAiCompatibleModelClient
         CreateEmbeddingResponse response = client.embeddings().create(params);
         List<Embedding> data = response.data();
         if (data.isEmpty()) {
-            return new float[0];
+            throw new IllegalStateException(
+                    "Embedding response from model '"
+                            + modelName
+                            + "' contained no embeddings. "
+                            + "This indicates a server-side anomaly; refusing to emit an empty vector.");
         }
         List<Float> embedding = data.get(0).embedding();
         float[] result = new float[embedding.size()];
