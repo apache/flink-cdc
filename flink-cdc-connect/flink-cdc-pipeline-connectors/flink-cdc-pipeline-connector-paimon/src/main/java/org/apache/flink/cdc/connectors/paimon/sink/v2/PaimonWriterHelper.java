@@ -250,7 +250,6 @@ public class PaimonWriterHelper {
                     break;
                 }
             case UPDATE:
-            case REPLACE:
                 {
                     if (hasPrimaryKey) {
                         fullGenericRows.add(
@@ -259,6 +258,13 @@ public class PaimonWriterHelper {
                                         fieldGetters,
                                         RowKind.UPDATE_BEFORE));
                     }
+                    fullGenericRows.add(
+                            convertRecordDataToGenericRow(
+                                    dataChangeEvent.after(), fieldGetters, RowKind.UPDATE_AFTER));
+                    break;
+                }
+            case REPLACE:
+                {
                     fullGenericRows.add(
                             convertRecordDataToGenericRow(
                                     dataChangeEvent.after(), fieldGetters, RowKind.UPDATE_AFTER));

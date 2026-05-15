@@ -201,6 +201,91 @@ class PaimonWriterHelperTest {
     }
 
     @Test
+    void testConvertEventToFullGenericRowsOfDataChangeTypes() {
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("col1", DataTypes.STRING())
+                        .physicalColumn("col2", DataTypes.STRING())
+                        .build();
+        List<RecordData.FieldGetter> fieldGetters =
+                PaimonWriterHelper.createFieldGetters(schema, ZoneId.systemDefault());
+        TableId tableId = TableId.parse("database.table");
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(RowType.of(DataTypes.STRING(), DataTypes.STRING()));
+        BinaryRecordData beforeData =
+                generator.generate(
+                        new Object[] {
+                            BinaryStringData.fromString("1"), BinaryStringData.fromString("old")
+                        });
+        BinaryRecordData afterData =
+                generator.generate(
+                        new Object[] {
+                            BinaryStringData.fromString("1"), BinaryStringData.fromString("new")
+                        });
+
+        // INSERT: single INSERT row regardless of hasPrimaryKey
+        DataChangeEvent dataChangeEvent = DataChangeEvent.insertEvent(tableId, afterData);
+        List<GenericRow> rows =
+                PaimonWriterHelper.convertEventToFullGenericRows(
+                        dataChangeEvent, fieldGetters, true);
+        Assertions.assertThat(rows).hasSize(1);
+        Assertions.assertThat(rows.get(0).getRowKind()).isEqualTo(RowKind.INSERT);
+
+        rows =
+                PaimonWriterHelper.convertEventToFullGenericRows(
+                        dataChangeEvent, fieldGetters, false);
+        Assertions.assertThat(rows).hasSize(1);
+        Assertions.assertThat(rows.get(0).getRowKind()).isEqualTo(RowKind.INSERT);
+
+        // REPLACE: single INSERT row regardless of hasPrimaryKey (same as INSERT)
+        dataChangeEvent = DataChangeEvent.replaceEvent(tableId, afterData, null);
+        rows =
+                PaimonWriterHelper.convertEventToFullGenericRows(
+                        dataChangeEvent, fieldGetters, true);
+        Assertions.assertThat(rows).hasSize(1);
+        Assertions.assertThat(rows.get(0).getRowKind()).isEqualTo(RowKind.UPDATE_AFTER);
+        Assertions.assertThat(rows.get(0).getString(1)).isEqualTo(BinaryString.fromString("new"));
+
+        rows =
+                PaimonWriterHelper.convertEventToFullGenericRows(
+                        dataChangeEvent, fieldGetters, false);
+        Assertions.assertThat(rows).hasSize(1);
+        Assertions.assertThat(rows.get(0).getRowKind()).isEqualTo(RowKind.UPDATE_AFTER);
+
+        // UPDATE with primary key: UPDATE_BEFORE + UPDATE_AFTER
+        dataChangeEvent = DataChangeEvent.updateEvent(tableId, beforeData, afterData);
+        rows =
+                PaimonWriterHelper.convertEventToFullGenericRows(
+                        dataChangeEvent, fieldGetters, true);
+        Assertions.assertThat(rows).hasSize(2);
+        Assertions.assertThat(rows.get(0).getRowKind()).isEqualTo(RowKind.UPDATE_BEFORE);
+        Assertions.assertThat(rows.get(0).getString(1)).isEqualTo(BinaryString.fromString("old"));
+        Assertions.assertThat(rows.get(1).getRowKind()).isEqualTo(RowKind.UPDATE_AFTER);
+        Assertions.assertThat(rows.get(1).getString(1)).isEqualTo(BinaryString.fromString("new"));
+
+        // UPDATE without primary key: only UPDATE_AFTER
+        rows =
+                PaimonWriterHelper.convertEventToFullGenericRows(
+                        dataChangeEvent, fieldGetters, false);
+        Assertions.assertThat(rows).hasSize(1);
+        Assertions.assertThat(rows.get(0).getRowKind()).isEqualTo(RowKind.UPDATE_AFTER);
+
+        // DELETE with primary key: single DELETE row
+        dataChangeEvent = DataChangeEvent.deleteEvent(tableId, beforeData);
+        rows =
+                PaimonWriterHelper.convertEventToFullGenericRows(
+                        dataChangeEvent, fieldGetters, true);
+        Assertions.assertThat(rows).hasSize(1);
+        Assertions.assertThat(rows.get(0).getRowKind()).isEqualTo(RowKind.DELETE);
+
+        // DELETE without primary key: empty (no rows)
+        rows =
+                PaimonWriterHelper.convertEventToFullGenericRows(
+                        dataChangeEvent, fieldGetters, false);
+        Assertions.assertThat(rows).isEmpty();
+    }
+
+    @Test
     void testConvertEventToGenericRowWithNestedRow() {
         // Define the inner row type with an integer and a map
         RowType innerRowType =
