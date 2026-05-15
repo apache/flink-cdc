@@ -56,7 +56,13 @@ public class OpenAiCompatibleModelClient
 
     @Override
     public void close() {
-        client = null;
+        if (client != null) {
+            try {
+                client.close();
+            } finally {
+                client = null;
+            }
+        }
     }
 
     @Override
