@@ -511,6 +511,7 @@ class TransformSpecsITCase {
         "specs/logical.yaml",
         "specs/meta.yaml",
         "specs/nested.yaml",
+        "specs/regression.yaml",
         "specs/string.yaml",
         "specs/temporal.yaml"
     };

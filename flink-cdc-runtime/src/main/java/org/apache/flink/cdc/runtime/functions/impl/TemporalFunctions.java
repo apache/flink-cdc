@@ -30,6 +30,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.TimeZone;
 
@@ -150,6 +151,27 @@ public class TemporalFunctions {
 
     public static LocalDate toDate(String str, String format) {
         return DateTimeUtils.parseDate(str, format);
+    }
+
+    public static LocalDate toDate(LocalDateTime localDateTime) {
+        if (localDateTime == null) {
+            return null;
+        }
+        return localDateTime.toLocalDate();
+    }
+
+    public static LocalDate toDate(ZonedDateTime zonedDateTime) {
+        if (zonedDateTime == null) {
+            return null;
+        }
+        return zonedDateTime.toLocalDate();
+    }
+
+    public static LocalDate toDate(Instant instant) {
+        if (instant == null) {
+            return null;
+        }
+        return LocalDateTime.ofInstant(instant, ZoneId.of("UTC")).toLocalDate();
     }
 
     public static LocalDateTime toTimestamp(String str, String timezone) {

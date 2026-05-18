@@ -285,8 +285,10 @@ public class TransformSqlOperatorTable extends ReflectiveSqlOperatorTable {
                             SqlTypeTransforms.FORCE_NULLABLE),
                     null,
                     OperandTypes.or(
+                            // Only "from string" mode supports specifying formatter.
                             OperandTypes.family(SqlTypeFamily.STRING),
-                            OperandTypes.family(SqlTypeFamily.STRING, SqlTypeFamily.STRING)),
+                            OperandTypes.family(SqlTypeFamily.STRING, SqlTypeFamily.STRING),
+                            OperandTypes.family(SqlTypeFamily.TIMESTAMP)),
                     SqlFunctionCategory.TIMEDATE);
     public static final SqlFunction TO_TIMESTAMP =
             new SqlFunction(
