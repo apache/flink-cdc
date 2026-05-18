@@ -382,6 +382,37 @@ public class SchemaEvolveTest extends SchemaTestBase {
                         "Unexpected schema change events occurred in EXCEPTION mode. Job will fail now.");
     }
 
+    @Test
+    void testFlushEventUsesSourcePartitionInsteadOfSchemaOperatorSubtask() throws Exception {
+        CreateTableEvent createTableEvent = new CreateTableEvent(TABLE_ID, INITIAL_SCHEMA);
+
+        Assertions.assertThat(
+                        runInHarness(
+                                () ->
+                                        new SchemaOperator(
+                                                ROUTING_RULES,
+                                                RouteMode.ALL_MATCH,
+                                                Duration.ofMinutes(3),
+                                                SchemaChangeBehavior.LENIENT,
+                                                "UTC"),
+                                (op) ->
+                                        new DistributedEventOperatorTestHarness<>(
+                                                op,
+                                                20,
+                                                1,
+                                                Duration.ofSeconds(3),
+                                                Duration.ofMinutes(3)),
+                                (operator, harness) ->
+                                        operator.processElement(wrap(createTableEvent, 0, 1))))
+                .map(StreamRecord::getValue)
+                .first()
+                .isEqualTo(
+                        new FlushEvent(
+                                0,
+                                Collections.singletonList(TABLE_ID),
+                                createTableEvent.getType()));
+    }
+
     protected static <
                     OP extends AbstractStreamOperatorAdapter<E>,
                     E extends Event,

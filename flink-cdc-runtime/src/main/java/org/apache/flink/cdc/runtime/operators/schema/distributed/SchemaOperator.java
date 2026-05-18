@@ -195,11 +195,16 @@ public class SchemaOperator extends AbstractStreamOperatorAdapter<Event>
 
     private void requestSchemaChange(
             TableId sourceTableId, SchemaChangeRequest schemaChangeRequest) {
-        LOG.info("{}> Sent FlushEvent to downstream...", subTaskId);
+        final int sourcePartition = schemaChangeRequest.getSourceSubTaskId();
+
+        LOG.info(
+                "{}> Sent FlushEvent to downstream for source partition {}...",
+                subTaskId,
+                sourcePartition);
         output.collect(
                 new StreamRecord<>(
                         new FlushEvent(
-                                subTaskId,
+                                sourcePartition,
                                 tableIdRouter.route(sourceTableId),
                                 schemaChangeRequest.getSchemaChangeEvent().getType())));
 
