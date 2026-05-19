@@ -20,9 +20,13 @@ package org.apache.flink.cdc.common.utils;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.annotation.PublicEvolving;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
+import org.apache.flink.cdc.common.converter.JavaObjectConverter;
+import org.apache.flink.cdc.common.data.ArrayData;
 import org.apache.flink.cdc.common.data.DateData;
 import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
+import org.apache.flink.cdc.common.data.MapData;
+import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.StringData;
 import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
@@ -61,14 +65,19 @@ import org.apache.flink.cdc.common.types.VarBinaryType;
 import org.apache.flink.cdc.common.types.VarCharType;
 import org.apache.flink.cdc.common.types.VariantType;
 import org.apache.flink.cdc.common.types.ZonedTimestampType;
+import org.apache.flink.cdc.common.types.variant.BinaryVariantInternalBuilder;
 import org.apache.flink.cdc.common.types.variant.Variant;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableList;
 import org.apache.flink.shaded.guava31.com.google.common.collect.Streams;
 import org.apache.flink.shaded.guava31.com.google.common.io.BaseEncoding;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonProcessingException;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.json.JsonMapper;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 import javax.annotation.Nullable;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -350,6 +359,10 @@ public class SchemaMergingUtils {
             return currentType.copy(nullable);
         }
 
+        if (currentType instanceof VariantType || targetType instanceof VariantType) {
+            return DataTypes.VARIANT().copy(nullable);
+        }
+
         // For TIMESTAMP and EXACT_NUMERIC types, we have fine-grained type merging logic.
         if (currentType.is(DataTypeFamily.TIMESTAMP) && targetType.is(DataTypeFamily.TIMESTAMP)) {
             return mergeTimestampType(currentType, targetType).copy(nullable);
@@ -582,6 +595,10 @@ public class SchemaMergingUtils {
             return coerceToZonedTimestamp(originalField, timezone);
         }
 
+        if (destinationType.is(DataTypeRoot.VARIANT)) {
+            return coerceToVariant(originalField, originalType);
+        }
+
         throw new IllegalArgumentException(
                 String.format(
                         "Column type \"%s\" doesn't support type coercion to \"%s\"",
@@ -609,6 +626,12 @@ public class SchemaMergingUtils {
             return BinaryStringData.fromString(((Variant) originalField).toJson());
         }
 
+        if (originalField instanceof MapData
+                || originalField instanceof ArrayData
+                || originalField instanceof RecordData) {
+            Object javaObject = JavaObjectConverter.convertToJava(originalField, originalType);
+            return BinaryStringData.fromString(javaObject.toString());
+        }
         return BinaryStringData.fromString(originalField.toString());
     }
 
@@ -843,6 +866,24 @@ public class SchemaMergingUtils {
                         ZoneId.of(timezone)));
     }
 
+    private static final JsonMapper jsonMapper =
+            JsonMapper.builder().addModule(new JavaTimeModule()).build();
+
+    private static Variant coerceToVariant(Object object, DataType originalType) {
+        try {
+            // Convert internal object to Plain Java before serializing
+            Object javaObject = JavaObjectConverter.convertToJava(object, originalType);
+            return BinaryVariantInternalBuilder.parseJson(
+                    jsonMapper.writeValueAsString(javaObject), false);
+        } catch (JsonProcessingException e) {
+            throw new IllegalArgumentException(
+                    "Failed to convert object to JSON for VARIANT type: " + e.getMessage(), e);
+        } catch (IOException e) {
+            throw new IllegalArgumentException(
+                    "IO error while converting object to VARIANT type: " + e.getMessage(), e);
+        }
+    }
+
     private static String hexlify(byte[] bytes) {
         return BaseEncoding.base64().encode(bytes);
     }
@@ -864,24 +905,27 @@ public class SchemaMergingUtils {
         DataType timestampLtzType = DataTypes.TIMESTAMP_LTZ(LocalZonedTimestampType.MAX_PRECISION);
         DataType timestampType = DataTypes.TIMESTAMP(TimestampType.MAX_PRECISION);
         DataType dateType = DataTypes.DATE();
+        DataType variantType = DataTypes.VARIANT();
 
         Map<Class<? extends DataType>, List<DataType>> mergingTree = new HashMap<>();
 
         // Simple data types
-        mergingTree.put(VarCharType.class, ImmutableList.of(stringType));
-        mergingTree.put(CharType.class, ImmutableList.of(stringType));
-        mergingTree.put(BooleanType.class, ImmutableList.of(stringType));
-        mergingTree.put(BinaryType.class, ImmutableList.of(stringType));
-        mergingTree.put(VarBinaryType.class, ImmutableList.of(stringType));
-        mergingTree.put(DoubleType.class, ImmutableList.of(doubleType, stringType));
-        mergingTree.put(FloatType.class, ImmutableList.of(floatType, doubleType, stringType));
-        mergingTree.put(DecimalType.class, ImmutableList.of(stringType));
+        mergingTree.put(VarCharType.class, ImmutableList.of(stringType, variantType));
+        mergingTree.put(CharType.class, ImmutableList.of(stringType, variantType));
+        mergingTree.put(BooleanType.class, ImmutableList.of(stringType, variantType));
+        mergingTree.put(BinaryType.class, ImmutableList.of(stringType, variantType));
+        mergingTree.put(VarBinaryType.class, ImmutableList.of(stringType, variantType));
+        mergingTree.put(DoubleType.class, ImmutableList.of(doubleType, stringType, variantType));
+        mergingTree.put(
+                FloatType.class, ImmutableList.of(floatType, doubleType, stringType, variantType));
+        mergingTree.put(DecimalType.class, ImmutableList.of(stringType, variantType));
         mergingTree.put(
                 BigIntType.class,
-                ImmutableList.of(bigIntType, decimalType, doubleType, stringType));
+                ImmutableList.of(bigIntType, decimalType, doubleType, stringType, variantType));
         mergingTree.put(
                 IntType.class,
-                ImmutableList.of(intType, bigIntType, decimalType, doubleType, stringType));
+                ImmutableList.of(
+                        intType, bigIntType, decimalType, doubleType, stringType, variantType));
         mergingTree.put(
                 SmallIntType.class,
                 ImmutableList.of(
@@ -891,7 +935,8 @@ public class SchemaMergingUtils {
                         decimalType,
                         floatType,
                         doubleType,
-                        stringType));
+                        stringType,
+                        variantType));
         mergingTree.put(
                 TinyIntType.class,
                 ImmutableList.of(
@@ -902,27 +947,36 @@ public class SchemaMergingUtils {
                         decimalType,
                         floatType,
                         doubleType,
-                        stringType));
+                        stringType,
+                        variantType));
 
         // Timestamp series
-        mergingTree.put(ZonedTimestampType.class, ImmutableList.of(timestampTzType, stringType));
+        mergingTree.put(
+                ZonedTimestampType.class,
+                ImmutableList.of(timestampTzType, stringType, variantType));
         mergingTree.put(
                 LocalZonedTimestampType.class,
-                ImmutableList.of(timestampLtzType, timestampTzType, stringType));
+                ImmutableList.of(timestampLtzType, timestampTzType, stringType, variantType));
         mergingTree.put(
                 TimestampType.class,
-                ImmutableList.of(timestampType, timestampLtzType, timestampTzType, stringType));
+                ImmutableList.of(
+                        timestampType, timestampLtzType, timestampTzType, stringType, variantType));
         mergingTree.put(
                 DateType.class,
                 ImmutableList.of(
-                        dateType, timestampType, timestampLtzType, timestampTzType, stringType));
-        mergingTree.put(TimeType.class, ImmutableList.of(stringType));
+                        dateType,
+                        timestampType,
+                        timestampLtzType,
+                        timestampTzType,
+                        stringType,
+                        variantType));
+        mergingTree.put(TimeType.class, ImmutableList.of(stringType, variantType));
 
         // Complex types
-        mergingTree.put(RowType.class, ImmutableList.of(stringType));
-        mergingTree.put(ArrayType.class, ImmutableList.of(stringType));
-        mergingTree.put(MapType.class, ImmutableList.of(stringType));
-        mergingTree.put(VariantType.class, ImmutableList.of(stringType));
+        mergingTree.put(RowType.class, ImmutableList.of(stringType, variantType));
+        mergingTree.put(ArrayType.class, ImmutableList.of(stringType, variantType));
+        mergingTree.put(MapType.class, ImmutableList.of(stringType, variantType));
+        mergingTree.put(VariantType.class, ImmutableList.of(stringType, variantType));
         return mergingTree;
     }
 }
