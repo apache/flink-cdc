@@ -428,8 +428,9 @@ Connector Options
           <td style="word-wrap: break-word;">(none)</td>
           <td>String</td>
           <td>The chunk key column used to split table snapshots into chunks.
-            By default, the chunk key is <code>ROWID</code>. A non-primary-key column can be used, but this may lead to slower query performance.
+            By default, the chunk key is <code>ROWID</code>.
             For tables <b>without a primary key</b>, this option is <b>required</b> and the specified column must be <code>NOT NULL</code>.
+            A non-primary-key column can be used, but this may lead to slower query performance.
             <br>
             <b>Warning:</b> Using a non-primary key column as a chunk key may lead to data inconsistencies. Please see <a href="#warning">Warning</a> for details.
           </td>
