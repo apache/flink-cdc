@@ -115,4 +115,21 @@ class OpenAiCompatibleModelClientFactoryTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Unknown options");
     }
+
+    @Test
+    void testCreateClientFailFast() {
+        Map<String, String> options = new HashMap<>();
+        options.put("endpoint", "https://api.example.com/v1");
+        options.put("api-key", "sk-test");
+        options.put("model-name", "gpt-4");
+
+        AiModelClient client = factory.createClient(contextWithOptions(options));
+        assertThat(client).isInstanceOf(OpenAiCompatibleModelClient.class);
+        assertThat(client).isInstanceOf(SupportsTextGeneration.class);
+        assertThat(client).isInstanceOf(SupportsEmbedding.class);
+
+        assertThatThrownBy(client::open)
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Failed to perform livecheck on OpenAI model client");
+    }
 }

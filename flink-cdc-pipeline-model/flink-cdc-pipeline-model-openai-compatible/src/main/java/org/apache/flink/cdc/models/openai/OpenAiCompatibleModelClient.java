@@ -28,12 +28,16 @@ import com.openai.models.chat.completions.ChatCompletionCreateParams;
 import com.openai.models.embeddings.CreateEmbeddingResponse;
 import com.openai.models.embeddings.Embedding;
 import com.openai.models.embeddings.EmbeddingCreateParams;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 
 /** AI model client that connects to any OpenAI-compatible endpoint. */
 public class OpenAiCompatibleModelClient
         implements AiModelClient, SupportsTextGeneration, SupportsEmbedding {
+
+    private static final Logger LOG = LoggerFactory.getLogger(OpenAiCompatibleModelClient.class);
 
     private static final long serialVersionUID = 1L;
 
@@ -52,6 +56,15 @@ public class OpenAiCompatibleModelClient
     @Override
     public void open() {
         client = OpenAIOkHttpClient.builder().baseUrl(endpoint).apiKey(apiKey).build();
+        LOG.info(
+                "Successfully constructed OpenAI http client. Endpoint: {} Model: {}",
+                endpoint,
+                modelName);
+        try {
+            client.models().list();
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to perform livecheck on OpenAI model client", e);
+        }
     }
 
     @Override
