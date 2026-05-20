@@ -267,8 +267,14 @@ Connector Options
           <td>optional</td>
           <td style="word-wrap: break-word;">(none)</td>
           <td>String</td>
-          <td>The chunk key of table snapshot, captured tables are split into multiple chunks by a chunk key when read the snapshot of table.
-            By default, the chunk key is the first column of the primary key. A column that is not part of the primary key can be used as a chunk key, but this may lead to slower query performance.
+          <td>The chunk key column(s) used to split table snapshots into chunks.
+            By default, the chunk key is the first column of the primary key.
+            For tables <b>without a primary key</b>, this option is <b>required</b> and the specified column must be <code>NOT NULL</code>.
+            A non-primary-key column can be used, but this may lead to slower query performance.
+            <br>
+            For the pipeline connector, multiple tables can be assigned different chunk keys using the format
+            <code>&lt;table-pattern&gt;:&lt;column&gt;</code>, with entries separated by semicolons (<code>;</code>).
+            For example: <code>db1.table_[0-9]+:col1;db2.orders:col2</code>.
             <br>
             <b>Warning:</b> Using a non-primary key column as a chunk key may lead to data inconsistencies. Please see <a href="#warning">Warning</a> for details.
           </td>

@@ -268,10 +268,15 @@ Flink SQL> SELECT * FROM orders;
           <td>optional</td>
           <td style="word-wrap: break-word;">(none)</td>
           <td>String</td>
-          <td>表快照的分片键，在读取表的快照时，被捕获的表会按分片键拆分为多个分片。  
-              默认情况下，分片键是主键的第一列。可以使用非主键列作为分片键，但这可能会导致查询性能下降。  
-              <br>  
-              <b>警告：</b> 使用非主键列作为分片键可能会导致数据不一致。请参阅 <a href="#警告">警告</a> 了解详细信息。  
+          <td>表快照的分片键列，用于将表快照拆分为多个分片。
+              默认情况下，分片键是主键的第一列。
+              对于<b>无主键表</b>，此选项为<b>必填项</b>，且指定列必须为 <code>NOT NULL</code>。
+              可以使用非主键列作为分片键，但这可能会导致查询性能下降。
+              <br>
+              在 Pipeline 连接器中，可使用 <code>&lt;table-pattern&gt;:&lt;column&gt;</code> 格式为多张表分别指定分片键，多个配置之间用分号（<code>;</code>）分隔。
+              例如：<code>db1.table_[0-9]+:col1;db2.orders:col2</code>。
+              <br>
+              <b>警告：</b> 使用非主键列作为分片键可能会导致数据不一致。请参阅 <a href="#警告">警告</a> 了解详细信息。
           </td>
     </tr>
     <tr>
