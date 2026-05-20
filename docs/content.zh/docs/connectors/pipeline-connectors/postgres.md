@@ -166,6 +166,8 @@ pipeline:
         可以使用非主键列作为分片键，但这可能会导致查询性能下降。
       </td>
     </tr>
+    <tr>
+      <td>scan.snapshot.fetch.size</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">1024</td>
       <td>Integer</td>

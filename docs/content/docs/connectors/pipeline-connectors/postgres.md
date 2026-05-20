@@ -166,6 +166,8 @@ pipeline:
         A non-primary-key column can be used, but this may lead to slower query performance.
       </td>
     </tr>
+    <tr>
+      <td>scan.snapshot.fetch.size</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">1024</td>
       <td>Integer</td>
