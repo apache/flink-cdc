@@ -137,6 +137,31 @@ public class StarRocksUtils {
     private static final DateTimeFormatter DATETIME_FORMATTER =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
+    private static final DateTimeFormatter[] DATETIME_FORMATTERS = new DateTimeFormatter[10];
+
+    private static DateTimeFormatter datetimeFormatter(int precision) {
+        if (precision <= 0) {
+            return DATETIME_FORMATTER;
+        }
+        if (precision < DATETIME_FORMATTERS.length) {
+            DateTimeFormatter formatter = DATETIME_FORMATTERS[precision];
+            if (formatter == null) {
+                formatter =
+                        new DateTimeFormatterBuilder()
+                                .appendPattern("yyyy-MM-dd HH:mm:ss")
+                                .appendFraction(
+                                        ChronoField.NANO_OF_SECOND, precision, precision, true)
+                                .toFormatter();
+                DATETIME_FORMATTERS[precision] = formatter;
+            }
+            return formatter;
+        }
+        return new DateTimeFormatterBuilder()
+                .appendPattern("yyyy-MM-dd HH:mm:ss")
+                .appendFraction(ChronoField.NANO_OF_SECOND, precision, precision, true)
+                .toFormatter();
+    }
+
     /** Format TIME type data. */
     private static final DateTimeFormatter TIME_FORMATTER =
             new DateTimeFormatterBuilder().appendPattern("HH:mm:ss").toFormatter();
@@ -229,22 +254,24 @@ public class StarRocksUtils {
                                         .format(timeFormatter(getPrecision(fieldType)));
                 break;
             case TIMESTAMP_WITHOUT_TIME_ZONE:
+                final int tsPrecision = getPrecision(fieldType);
                 fieldGetter =
                         record ->
-                                record.getTimestamp(fieldPos, getPrecision(fieldType))
+                                record.getTimestamp(fieldPos, tsPrecision)
                                         .toLocalDateTime()
-                                        .format(DATETIME_FORMATTER);
+                                        .format(datetimeFormatter(tsPrecision));
                 break;
             case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
+                final int ltzPrecision = getPrecision(fieldType);
                 fieldGetter =
                         record ->
                                 ZonedDateTime.ofInstant(
                                                 record.getLocalZonedTimestampData(
-                                                                fieldPos, getPrecision(fieldType))
+                                                                fieldPos, ltzPrecision)
                                                         .toInstant(),
                                                 zoneId)
                                         .toLocalDateTime()
-                                        .format(DATETIME_FORMATTER);
+                                        .format(datetimeFormatter(ltzPrecision));
                 break;
             default:
                 throw new UnsupportedOperationException(
