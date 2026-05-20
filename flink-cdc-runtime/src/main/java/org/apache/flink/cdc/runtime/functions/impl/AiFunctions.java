@@ -27,10 +27,15 @@ import org.apache.flink.cdc.runtime.ai.AiTextFunctionDef;
 
 import org.apache.flink.shaded.guava31.com.google.common.primitives.Floats;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.List;
 
 /** Built-in AI functions available as static imports in Janino-compiled transform expressions. */
 public class AiFunctions {
+
+    private static final Logger LOG = LoggerFactory.getLogger(AiFunctions.class);
 
     /** General-purpose text completion with a user-provided system prompt. */
     public static BinaryVariant aiComplete(AiModelClient model, String input, String systemPrompt) {
@@ -48,7 +53,21 @@ public class AiFunctions {
             throw new UnsupportedOperationException(
                     "Model " + model.getClass().getName() + " does not support embedding");
         }
-        return Floats.asList(((SupportsEmbedding) model).embed(input));
+
+        long startTime = 0;
+        if (LOG.isDebugEnabled()) {
+            startTime = System.currentTimeMillis();
+        }
+        float[] embeddingResult = ((SupportsEmbedding) model).embed(input);
+        if (LOG.isDebugEnabled()) {
+            long endTime = System.currentTimeMillis();
+            LOG.debug(
+                    "Generated {}-dim vector in {} ms",
+                    embeddingResult.length,
+                    endTime - startTime);
+        }
+
+        return Floats.asList(embeddingResult);
     }
 
     private static BinaryVariant invokeTextGeneration(
@@ -62,7 +81,18 @@ public class AiFunctions {
         promptBuilder.append("\n").append(buildOutputSchemaHint(funcDef.getOutputType()));
 
         String systemPrompt = promptBuilder.toString();
+
+        long startTime = 0;
+        if (LOG.isDebugEnabled()) {
+            startTime = System.currentTimeMillis();
+        }
         String json = ((SupportsTextGeneration) model).generate(systemPrompt, input);
+
+        if (LOG.isDebugEnabled()) {
+            long endTime = System.currentTimeMillis();
+            LOG.debug("Generated {} characters in {} ms", json.length(), endTime - startTime);
+        }
+
         if (json == null) {
             return null;
         }
