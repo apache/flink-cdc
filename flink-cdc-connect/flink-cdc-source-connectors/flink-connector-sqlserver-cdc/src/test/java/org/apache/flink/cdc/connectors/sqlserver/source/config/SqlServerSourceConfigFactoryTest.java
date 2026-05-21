@@ -35,8 +35,8 @@ class SqlServerSourceConfigFactoryTest {
 
         SqlServerSourceConfig config = factory.create(0);
 
-        assertThat(config.getDbzProperties().getProperty("query.fetch.size")).isEqualTo("5000");
-        assertThat(config.getDbzConnectorConfig().getQueryFetchSize()).isEqualTo(5000);
+        assertThat(config.getDbzProperties().getProperty("snapshot.fetch.size")).isEqualTo("5000");
+        assertThat(config.getDbzConnectorConfig().getSnapshotFetchSize()).isEqualTo(5000);
     }
 
     @Test
@@ -45,8 +45,8 @@ class SqlServerSourceConfigFactoryTest {
 
         SqlServerSourceConfig config = factory.create(0);
 
-        assertThat(config.getDbzProperties().getProperty("query.fetch.size")).isEqualTo("1024");
-        assertThat(config.getDbzConnectorConfig().getQueryFetchSize()).isEqualTo(1024);
+        assertThat(config.getDbzProperties().getProperty("snapshot.fetch.size")).isEqualTo("1024");
+        assertThat(config.getDbzConnectorConfig().getSnapshotFetchSize()).isEqualTo(1024);
     }
 
     @Test
@@ -54,13 +54,13 @@ class SqlServerSourceConfigFactoryTest {
         SqlServerSourceConfigFactory factory = createFactory();
         factory.fetchSize(5000);
         Properties dbzProps = new Properties();
-        dbzProps.setProperty("query.fetch.size", "8000");
+        dbzProps.setProperty("snapshot.fetch.size", "8000");
         factory.debeziumProperties(dbzProps);
 
         SqlServerSourceConfig config = factory.create(0);
 
-        assertThat(config.getDbzProperties().getProperty("query.fetch.size")).isEqualTo("8000");
-        assertThat(config.getDbzConnectorConfig().getQueryFetchSize()).isEqualTo(8000);
+        assertThat(config.getDbzProperties().getProperty("snapshot.fetch.size")).isEqualTo("8000");
+        assertThat(config.getDbzConnectorConfig().getSnapshotFetchSize()).isEqualTo(8000);
     }
 
     private static SqlServerSourceConfigFactory createFactory() {
