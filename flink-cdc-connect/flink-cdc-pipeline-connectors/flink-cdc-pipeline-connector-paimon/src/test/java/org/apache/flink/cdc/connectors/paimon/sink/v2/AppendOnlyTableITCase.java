@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.paimon.sink.v2;
 
 import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.composer.PipelineExecution;
 import org.apache.flink.cdc.composer.definition.PipelineDef;
@@ -26,8 +27,9 @@ import org.apache.flink.cdc.composer.definition.SourceDef;
 import org.apache.flink.cdc.composer.flink.FlinkPipelineComposer;
 import org.apache.flink.cdc.connectors.paimon.sink.PaimonDataSinkFactory;
 import org.apache.flink.cdc.connectors.paimon.sink.PaimonDataSinkOptions;
-import org.apache.flink.cdc.connectors.paimon.sink.testsource.AppendOnlyTableDataSourceFactory;
-import org.apache.flink.cdc.connectors.paimon.sink.testsource.AppendOnlyTableSourceFunction;
+import org.apache.flink.cdc.connectors.values.factory.ValuesDataFactory;
+import org.apache.flink.cdc.connectors.values.source.ValuesDataSourceHelper;
+import org.apache.flink.cdc.connectors.values.source.ValuesDataSourceOptions;
 import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
 import org.apache.flink.test.junit5.MiniClusterExtension;
 
@@ -66,6 +68,8 @@ public class AppendOnlyTableITCase {
     String warehouse;
 
     private static final int PARALLELISM = 4;
+
+    private static final TableId TEST_TABLE_ID = TableId.tableId("default_database", "table1");
 
     // Always use parent-first classloader for CDC classes.
     // The reason is that test source uses static field for holding data, we need to make sure
@@ -106,10 +110,7 @@ public class AppendOnlyTableITCase {
 
         runPipelineJob(false);
 
-        Table table =
-                catalog.getTable(
-                        Identifier.fromString(
-                                AppendOnlyTableSourceFunction.TEST_TABLE_ID.identifier()));
+        Table table = catalog.getTable(Identifier.fromString(TEST_TABLE_ID.identifier()));
         List<String> results = getResultsFromTable(table, false);
         Assertions.assertThat(results)
                 .containsExactlyInAnyOrder(
@@ -127,10 +128,7 @@ public class AppendOnlyTableITCase {
 
         runPipelineJob(true);
 
-        Table table =
-                catalog.getTable(
-                        Identifier.fromString(
-                                AppendOnlyTableSourceFunction.TEST_TABLE_ID.identifier()));
+        Table table = catalog.getTable(Identifier.fromString(TEST_TABLE_ID.identifier()));
         List<String> results = getResultsFromTable(table, true);
         Assertions.assertThat(results)
                 .containsExactlyInAnyOrder(
@@ -158,10 +156,7 @@ public class AppendOnlyTableITCase {
                     result.add(
                             String.format(
                                     "%s:uuid=%s;path=%s;blobContent=%s",
-                                    AppendOnlyTableSourceFunction.TEST_TABLE_ID.identifier(),
-                                    uuid,
-                                    path,
-                                    blobContent));
+                                    TEST_TABLE_ID.identifier(), uuid, path, blobContent));
                 });
         return result;
     }
@@ -169,13 +164,14 @@ public class AppendOnlyTableITCase {
     private void runPipelineJob(boolean withBlobDescriptor) throws Exception {
         FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
 
-        // Setup append-only table source
+        // Setup values source with APPEND_ONLY_BLOB_TABLE events
         Configuration sourceConfig = new Configuration();
+        sourceConfig.set(
+                ValuesDataSourceOptions.EVENT_SET_ID,
+                ValuesDataSourceHelper.EventSetId.APPEND_ONLY_BLOB_TABLE);
         SourceDef sourceDef =
                 new SourceDef(
-                        AppendOnlyTableDataSourceFactory.IDENTIFIER,
-                        "Append Only Table Source",
-                        sourceConfig);
+                        ValuesDataFactory.IDENTIFIER, "Append Only Table Source", sourceConfig);
 
         // Setup pipeline
         Configuration pipelineConfig = new Configuration();

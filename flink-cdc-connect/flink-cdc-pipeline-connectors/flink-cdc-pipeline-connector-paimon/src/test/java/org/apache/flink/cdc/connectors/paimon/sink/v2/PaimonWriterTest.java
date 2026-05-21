@@ -101,14 +101,12 @@ class PaimonWriterTest {
         when(mockCatalog.getTable(any(Identifier.class))).thenReturn(mockTable);
         when(mockCoreOptions.writeBufferSize()).thenReturn(32 * 1024 * 1024L);
         when(mockCoreOptions.pageSize()).thenReturn(32 * 1024);
-        when(mockCoreOptions.bucket()).thenReturn(1);
         when(mockTable.coreOptions()).thenReturn(mockCoreOptions);
 
         MetricGroup metricGroup = UnregisteredMetricsGroup.createOperatorMetricGroup();
-        PaimonRecordEventSerializer serializer =
-                new PaimonRecordEventSerializer(ZoneId.systemDefault());
-
         Options catalogOptions = new Options();
+        PaimonRecordEventSerializer serializer =
+                new PaimonRecordEventSerializer(ZoneId.systemDefault(), catalogOptions);
 
         mockedConstruction =
                 Mockito.mockConstruction(
@@ -174,7 +172,7 @@ class PaimonWriterTest {
                     null);
         }
 
-        verify(mockCatalog, times(1)).getTable(testIdentifier);
+        verify(mockCatalog, times(2)).getTable(testIdentifier);
 
         List<AddColumnEvent.ColumnWithPosition> addedColumns = new ArrayList<>();
         addedColumns.add(
@@ -183,7 +181,7 @@ class PaimonWriterTest {
         AddColumnEvent addColumnEvent = new AddColumnEvent(testTableId, addedColumns);
         writer.write(addColumnEvent, null);
 
-        verify(mockCatalog, times(2)).getTable(testIdentifier);
+        verify(mockCatalog, times(3)).getTable(testIdentifier);
 
         RowType rowTypeWithAge =
                 RowType.of(
@@ -207,7 +205,7 @@ class PaimonWriterTest {
                     null);
         }
 
-        verify(mockCatalog, times(2)).getTable(testIdentifier);
+        verify(mockCatalog, times(3)).getTable(testIdentifier);
 
         Map<String, DataType> typeMapping = new HashMap<>();
         typeMapping.put("value", DataTypes.BIGINT());
@@ -215,6 +213,6 @@ class PaimonWriterTest {
                 new AlterColumnTypeEvent(testTableId, typeMapping);
         writer.write(alterColumnTypeEvent, null);
 
-        verify(mockCatalog, times(3)).getTable(testIdentifier);
+        verify(mockCatalog, times(4)).getTable(testIdentifier);
     }
 }
