@@ -17,14 +17,20 @@
 
 package org.apache.flink.cdc.models.dummy;
 
+import org.apache.flink.cdc.common.configuration.ConfigOption;
+import org.apache.flink.cdc.common.factories.AiModelClientFactory;
+import org.apache.flink.cdc.common.factories.Factory;
 import org.apache.flink.cdc.common.model.AiModelClient;
-import org.apache.flink.cdc.common.model.AiModelClientFactory;
-import org.apache.flink.cdc.common.model.ModelContext;
 
 import java.util.Set;
 
+import static org.apache.flink.cdc.common.configuration.ConfigOptions.key;
+
 /** SPI factory for {@link DummyModelClient}. For testing purposes only. */
 public class DummyModelClientFactory implements AiModelClientFactory {
+
+    public static final ConfigOption<Boolean> DEBUG =
+            key("debug").booleanType().defaultValue(false);
 
     @Override
     public String identifier() {
@@ -32,18 +38,18 @@ public class DummyModelClientFactory implements AiModelClientFactory {
     }
 
     @Override
-    public Set<String> requiredOptions() {
+    public Set<ConfigOption<?>> requiredOptions() {
         return Set.of();
     }
 
     @Override
-    public Set<String> optionalOptions() {
-        return Set.of("debug");
+    public Set<ConfigOption<?>> optionalOptions() {
+        return Set.of(DEBUG);
     }
 
     @Override
-    public AiModelClient createClient(ModelContext context) {
-        boolean debug = Boolean.parseBoolean(context.getOptions().getOrDefault("debug", "false"));
+    public AiModelClient createClient(Factory.Context context) {
+        boolean debug = context.getFactoryConfiguration().get(DEBUG);
         return new DummyModelClient(debug);
     }
 }

@@ -18,14 +18,17 @@
 package org.apache.flink.cdc.composer.flink.translator;
 
 import org.apache.flink.api.java.tuple.Tuple3;
+import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.factories.AiModelClientFactory;
+import org.apache.flink.cdc.common.factories.Factory;
+import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.model.AiModelClient;
-import org.apache.flink.cdc.common.model.AiModelClientFactory;
-import org.apache.flink.cdc.common.model.ModelContext;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.composer.definition.ModelDef;
 import org.apache.flink.cdc.composer.definition.TransformDef;
 import org.apache.flink.cdc.composer.definition.UdfDef;
+import org.apache.flink.cdc.composer.utils.FactoryDiscoveryUtils;
 import org.apache.flink.cdc.runtime.operators.transform.PostTransformOperator;
 import org.apache.flink.cdc.runtime.operators.transform.PostTransformOperatorBuilder;
 import org.apache.flink.cdc.runtime.operators.transform.PreTransformOperator;
@@ -34,11 +37,9 @@ import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.streaming.api.datastream.DataStream;
 
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.ServiceLoader;
 import java.util.stream.Collectors;
 
 /**
@@ -133,27 +134,17 @@ public class TransformTranslator {
             return Collections.emptyMap();
         }
 
-        Map<String, AiModelClientFactory> factories = new HashMap<>();
-        ServiceLoader<AiModelClientFactory> loader =
-                ServiceLoader.load(
-                        AiModelClientFactory.class, Thread.currentThread().getContextClassLoader());
-        for (AiModelClientFactory factory : loader) {
-            factories.put(factory.identifier(), factory);
-        }
-
         Map<String, AiModelClient> clients = new LinkedHashMap<>();
         for (ModelDef model : models) {
-            AiModelClientFactory factory = factories.get(model.getType());
-            if (factory == null) {
-                throw new IllegalArgumentException(
-                        "No AiModelClientFactory found for model type '"
-                                + model.getType()
-                                + "'. Available factories: "
-                                + factories.keySet());
-            }
-            ModelContext ctx =
-                    new DefaultModelContext(model, Thread.currentThread().getContextClassLoader());
-            factory.validate(ctx);
+            AiModelClientFactory factory =
+                    FactoryDiscoveryUtils.getFactoryByIdentifier(
+                            model.getType(), AiModelClientFactory.class);
+            Factory.Context ctx =
+                    new FactoryHelper.DefaultContext(
+                            Configuration.fromMap(model.getOptions()),
+                            new Configuration(),
+                            Thread.currentThread().getContextClassLoader());
+            FactoryHelper.createFactoryHelper(factory, ctx).validate();
             AiModelClient client = factory.createClient(ctx);
             clients.put(model.getName(), client);
         }
@@ -162,34 +153,5 @@ public class TransformTranslator {
 
     private Tuple3<String, String, Map<String, String>> udfDefToUDFTuple(UdfDef udf) {
         return Tuple3.of(udf.getName(), udf.getClasspath(), udf.getOptions());
-    }
-
-    // -------------------------------------------------------------------------
-    // Internal ModelContext implementation
-    // -------------------------------------------------------------------------
-
-    private static final class DefaultModelContext implements ModelContext {
-        private final ModelDef modelDef;
-        private final ClassLoader classLoader;
-
-        DefaultModelContext(ModelDef modelDef, ClassLoader classLoader) {
-            this.modelDef = modelDef;
-            this.classLoader = classLoader;
-        }
-
-        @Override
-        public String getModelName() {
-            return modelDef.getName();
-        }
-
-        @Override
-        public Map<String, String> getOptions() {
-            return modelDef.getOptions();
-        }
-
-        @Override
-        public ClassLoader getClassLoader() {
-            return classLoader;
-        }
     }
 }

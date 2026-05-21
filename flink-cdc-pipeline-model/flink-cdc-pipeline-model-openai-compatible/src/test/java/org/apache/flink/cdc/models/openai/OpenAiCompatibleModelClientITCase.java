@@ -22,22 +22,41 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.Collections;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class OpenAiCompatibleModelClientITCase {
 
     private OpenAiCompatibleModelClient client;
 
+    private final String endpoint = System.getenv("OPENAI_BASE_URL");
+    private final String apiKey = System.getenv("OPENAI_API_KEY");
+    private final String model = System.getenv("OPENAI_MODEL");
+
     @BeforeEach
     void setUp() {
-        String endpoint = System.getenv("OPENAI_BASE_URL");
-        String apiKey = System.getenv("OPENAI_API_KEY");
-        String model = System.getenv("OPENAI_MODEL");
         Assumptions.assumeThat(endpoint != null && apiKey != null && model != null)
                 .as("OPENAI_BASE_URL, OPENAI_API_KEY and OPENAI_MODEL must be set")
                 .isTrue();
 
-        client = new OpenAiCompatibleModelClient(endpoint, apiKey, model);
+        client =
+                new OpenAiCompatibleModelClient(
+                        endpoint,
+                        apiKey,
+                        model,
+                        "You are a helpful assistant.",
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        "text",
+                        Collections.emptyMap(),
+                        Collections.emptyMap(),
+                        null);
         client.open();
     }
 
@@ -59,5 +78,36 @@ class OpenAiCompatibleModelClientITCase {
     void testGenerateWithEmptyUserInput() {
         String result = client.generate("Reply with exactly: OK", "");
         assertThat(result).isNotNull().contains("OK");
+    }
+
+    @Test
+    void testGenerateWithGlobalSystemPrompt() {
+        String marker = "GLOBAL_MARKER_9F2A";
+        OpenAiCompatibleModelClient globalPromptClient =
+                new OpenAiCompatibleModelClient(
+                        endpoint,
+                        apiKey,
+                        model,
+                        "You must always include the exact token '"
+                                + marker
+                                + "' in every response.",
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        "text",
+                        Collections.emptyMap(),
+                        Collections.emptyMap(),
+                        null);
+        try (globalPromptClient) {
+            globalPromptClient.open();
+            String result =
+                    globalPromptClient.generate(
+                            "Reply in one short sentence to say hello.", "Say hello.");
+            assertThat(result).isNotNull().contains(marker);
+        }
     }
 }

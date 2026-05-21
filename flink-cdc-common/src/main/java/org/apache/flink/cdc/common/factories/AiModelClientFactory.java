@@ -15,22 +15,18 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.common.model;
+package org.apache.flink.cdc.common.factories;
 
 import org.apache.flink.cdc.common.annotation.Experimental;
+import org.apache.flink.cdc.common.model.AiModelClient;
 
-import java.util.Map;
-
-/** Context passed to {@link AiModelClientFactory#createClient} at pipeline assembly time. */
+/**
+ * A factory to create {@link AiModelClient} instances. See also {@link Factory} for more
+ * information.
+ */
 @Experimental
-public interface ModelContext {
+public interface AiModelClientFactory extends Factory {
 
-    /** The logical name of this model as declared in the pipeline YAML. */
-    String getModelName();
-
-    /** Raw key/value options from the pipeline YAML {@code model.options} block. */
-    Map<String, String> getOptions();
-
-    /** Class loader to use when loading implementation classes. */
-    ClassLoader getClassLoader();
+    /** Creates a new {@link AiModelClient} instance. */
+    AiModelClient createClient(Context context);
 }
