@@ -101,8 +101,11 @@ class PaimonPostponeBucketTest {
     @Test
     void testSerializerKeepsAssignedBucketBeforeWriterRewrite() throws Exception {
         Schema schema = createPostponeBucketSchema();
+        Options catalogOptions = createCatalogOptions();
+        new PaimonMetadataApplier(catalogOptions)
+                .applySchemaChange(new CreateTableEvent(TABLE_ID, schema));
         PaimonRecordSerializer<Event> serializer =
-                new PaimonRecordEventSerializer(ZoneId.systemDefault());
+                new PaimonRecordEventSerializer(ZoneId.systemDefault(), catalogOptions);
         serializer.serialize(new CreateTableEvent(TABLE_ID, schema));
         int assignedBucket = 2;
         BucketWrapperChangeEvent bucketWrapperChangeEvent =
@@ -147,7 +150,7 @@ class PaimonPostponeBucketTest {
                             catalogOptions,
                             UnregisteredMetricsGroup.createSinkWriterMetricGroup(),
                             "test-user",
-                            new PaimonRecordEventSerializer(ZoneId.systemDefault()),
+                            new PaimonRecordEventSerializer(ZoneId.systemDefault(), catalogOptions),
                             0);
 
             writer.write(new CreateTableEvent(TABLE_ID, schema), null);

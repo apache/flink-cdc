@@ -28,8 +28,12 @@ import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.connectors.paimon.sink.v2.blob.BlobWriteContext;
 import org.apache.flink.cdc.connectors.paimon.sink.v2.bucket.BucketWrapperChangeEvent;
 
+import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.catalog.Identifier;
 import org.apache.paimon.data.GenericRow;
+import org.apache.paimon.flink.FlinkCatalogFactory;
+import org.apache.paimon.options.Options;
+import org.apache.paimon.table.FileStoreTable;
 
 import java.time.ZoneId;
 import java.util.HashMap;
@@ -48,30 +52,19 @@ public class PaimonRecordEventSerializer implements PaimonRecordSerializer<Event
     // ZoneId for converting relevant type.
     private final ZoneId zoneId;
 
-    public PaimonRecordEventSerializer(ZoneId zoneId) {
+    private final Options options;
+
+    private transient Catalog catalog;
+
+    public PaimonRecordEventSerializer(ZoneId zoneId, Options options) {
         schemaMaps = new HashMap<>();
         this.zoneId = zoneId;
-    }
-
-    /**
-     * Update the BlobWriteContext for a specific table.
-     *
-     * <p>This is called by PaimonWriter when it has access to the Paimon table configuration. The
-     * field getters will be recreated with the new BlobWriteContext to properly convert VARBINARY
-     * fields to BLOB type.
-     *
-     * @param tableId The table identifier.
-     * @param blobWriteContext The BlobWriteContext from the Paimon table.
-     */
-    public void updateBlobWriteContext(TableId tableId, BlobWriteContext blobWriteContext) {
-        TableSchemaInfo schemaInfo = schemaMaps.get(tableId);
-        if (schemaInfo != null) {
-            schemaInfo.updateBlobWriteContext(blobWriteContext, zoneId);
-        }
+        this.options = options;
     }
 
     @Override
     public PaimonEvent serialize(Event event) {
+        lazilyInitializeCatalog();
         int bucket = 0;
         if (event instanceof BucketWrapperChangeEvent) {
             bucket = ((BucketWrapperChangeEvent) event).getBucket();
@@ -80,10 +73,18 @@ public class PaimonRecordEventSerializer implements PaimonRecordSerializer<Event
         Identifier tableId = Identifier.fromString(((ChangeEvent) event).tableId().toString());
         if (event instanceof SchemaChangeEvent) {
             if (event instanceof CreateTableEvent) {
-                CreateTableEvent createTableEvent = (CreateTableEvent) event;
-                schemaMaps.put(
-                        createTableEvent.tableId(),
-                        new TableSchemaInfo(createTableEvent.getSchema(), zoneId));
+                try {
+                    FileStoreTable table = (FileStoreTable) catalog.getTable(tableId);
+                    BlobWriteContext blobWriteContext =
+                            BlobWriteContext.fromTable(catalog.caseSensitive(), table);
+                    CreateTableEvent createTableEvent = (CreateTableEvent) event;
+                    schemaMaps.put(
+                            createTableEvent.tableId(),
+                            new TableSchemaInfo(
+                                    createTableEvent.getSchema(), zoneId, blobWriteContext));
+                } catch (Catalog.TableNotExistException e) {
+                    throw new IllegalStateException(e);
+                }
             } else {
                 SchemaChangeEvent schemaChangeEvent = (SchemaChangeEvent) event;
                 Schema schema = schemaMaps.get(schemaChangeEvent.tableId()).getSchema();
@@ -114,7 +115,9 @@ public class PaimonRecordEventSerializer implements PaimonRecordSerializer<Event
         }
     }
 
-    public Map<TableId, TableSchemaInfo> getSchemaMaps() {
-        return schemaMaps;
+    private void lazilyInitializeCatalog() {
+        if (this.catalog == null) {
+            this.catalog = FlinkCatalogFactory.createPaimonCatalog(options);
+        }
     }
 }
