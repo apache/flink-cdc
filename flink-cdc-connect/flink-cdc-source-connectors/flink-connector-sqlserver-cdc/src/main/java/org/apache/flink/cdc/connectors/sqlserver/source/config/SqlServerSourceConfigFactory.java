@@ -99,7 +99,7 @@ public class SqlServerSourceConfigFactory extends JdbcSourceConfigFactory {
                 throw new UnsupportedOperationException();
         }
 
-        props.setProperty("query.fetch.size", String.valueOf(fetchSize));
+        props.setProperty("snapshot.fetch.size", String.valueOf(fetchSize));
 
         if (dbzProperties != null) {
             props.putAll(dbzProperties);
