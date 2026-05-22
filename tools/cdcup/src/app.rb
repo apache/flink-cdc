@@ -90,7 +90,6 @@ flink_cdc_version = @prompt.select('  ️ Which Flink CDC version would you like
   'hostname' => 'jobmanager',
   'ports' => ['8081'],
   'command' => 'jobmanager',
-  'volumes' => ["#{CDC_DATA_VOLUME}:/data"],
   'environment' => {
     'FLINK_PROPERTIES' => "jobmanager.rpc.address: jobmanager\nexecution.checkpointing.interval: 3000"
   }
@@ -100,7 +99,6 @@ flink_cdc_version = @prompt.select('  ️ Which Flink CDC version would you like
   'image' => "flink:#{flink_version}-scala_2.12",
   'hostname' => 'taskmanager',
   'command' => 'taskmanager',
-  'volumes' => ["#{CDC_DATA_VOLUME}:/data"],
   'environment' => {
     'FLINK_PROPERTIES' => "jobmanager.rpc.address: jobmanager\ntaskmanager.numberOfTaskSlots: 4\nexecution.checkpointing.interval: 3000"
   }
