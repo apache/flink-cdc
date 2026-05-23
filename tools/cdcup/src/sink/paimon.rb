@@ -22,8 +22,14 @@ class Paimon
       'flink-cdc-pipeline-connector-paimon'
     end
 
-    # Nothing to do
-    def prepend_to_docker_compose_yaml(_); end
+    # Paimon's FileSystemCatalog writes happen inside the Flink JobManager and
+    # TaskManager, so they need /data backed by the shared cdc-data volume.
+    def prepend_to_docker_compose_yaml(docker_compose_yaml)
+      %w[jobmanager taskmanager].each do |service|
+        docker_compose_yaml['services'][service]['volumes'] ||= []
+        docker_compose_yaml['services'][service]['volumes'] << "#{CDC_DATA_VOLUME}:/data"
+      end
+    end
 
     def prepend_to_pipeline_yaml(pipeline_yaml)
       pipeline_yaml['sink'] = {
