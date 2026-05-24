@@ -46,7 +46,10 @@ import java.util.Map;
 public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<PendingSplitsState> {
 
     // TODO: need proper implementation of the new version
-    private static final int VERSION = 5;
+    // Version 6 adds the optional checkpointIdToFinish field to SnapshotPendingSplitsState so the
+    // assigner can transition out of *_ASSIGNING after restore without waiting two additional
+    // checkpoint cycles (see FLINK-39478).
+    private static final int VERSION = 6;
     private static final ThreadLocal<DataOutputSerializer> SERIALIZER_CACHE =
             ThreadLocal.withInitial(() -> new DataOutputSerializer(64));
 
@@ -110,6 +113,7 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
             case 3:
             case 4:
             case 5:
+            case 6:
                 return deserializePendingSplitsState(version, serialized);
             default:
                 throw new IOException("Unknown version: " + version);
@@ -175,6 +179,12 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
                     SerializerUtils.rowToSerializedString(
                             new Object[] {chunkSplitterState.getNextChunkStart().getValue()}));
             out.writeInt(chunkSplitterState.getNextChunkId());
+        }
+
+        Long checkpointIdToFinish = state.getCheckpointIdToFinish();
+        out.writeBoolean(checkpointIdToFinish != null);
+        if (checkpointIdToFinish != null) {
+            out.writeLong(checkpointIdToFinish);
         }
     }
 
@@ -299,6 +309,15 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
                 nextChunkId = in.readInt();
             }
         }
+
+        Long checkpointIdToFinish = null;
+        if (version >= 6) {
+            boolean hasCheckpointIdToFinish = in.readBoolean();
+            if (hasCheckpointIdToFinish) {
+                checkpointIdToFinish = in.readLong();
+            }
+        }
+
         return new SnapshotPendingSplitsState(
                 alreadyProcessedTables,
                 remainingSchemalessSplits,
@@ -314,7 +333,8 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
                         : new ChunkSplitterState(
                                 splittingTableId,
                                 ChunkSplitterState.ChunkBound.middleOf(nextChunkStart),
-                                nextChunkId));
+                                nextChunkId),
+                checkpointIdToFinish);
     }
 
     private HybridPendingSplitsState deserializeHybridPendingSplitsState(

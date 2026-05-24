@@ -30,6 +30,7 @@ import io.debezium.relational.TableEditor;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges;
 import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -60,6 +61,7 @@ class PendingSplitsStateSerializerTest {
         return Stream.of(
                 Arguments.of(getTestSnapshotPendingSplitsState(true)),
                 Arguments.of(getTestSnapshotPendingSplitsState(false)),
+                Arguments.of(getTestSnapshotPendingSplitsStateWithCheckpointIdToFinish()),
                 Arguments.of(getTestHybridPendingSplitsState(false)),
                 Arguments.of(getTestHybridPendingSplitsState(true)),
                 Arguments.of(getTestBinlogPendingSplitsState()));
@@ -89,6 +91,40 @@ class PendingSplitsStateSerializerTest {
                                     .keySet())
                     .isEqualTo(getTestTableSchema(tableId0, tableId1).keySet());
         }
+    }
+
+    @ParameterizedTest
+    @MethodSource("params")
+    void testCheckpointIdToFinishRoundTrip(PendingSplitsState state) throws Exception {
+        PendingSplitsState deserialized = serializeAndDeserializeSourceEnumState(state);
+        if (state instanceof SnapshotPendingSplitsState) {
+            Assertions.assertThat(
+                            ((SnapshotPendingSplitsState) deserialized).getCheckpointIdToFinish())
+                    .isEqualTo(((SnapshotPendingSplitsState) state).getCheckpointIdToFinish());
+        } else if (state instanceof HybridPendingSplitsState) {
+            Assertions.assertThat(
+                            ((HybridPendingSplitsState) deserialized)
+                                    .getSnapshotPendingSplits()
+                                    .getCheckpointIdToFinish())
+                    .isEqualTo(
+                            ((HybridPendingSplitsState) state)
+                                    .getSnapshotPendingSplits()
+                                    .getCheckpointIdToFinish());
+        }
+    }
+
+    @Test
+    void testDeserializeV5MissingCheckpointIdToFinish() throws Exception {
+        // FLINK-39478: v5 read path predates checkpointIdToFinish; deserializing a payload as v5
+        // must not attempt to read the new trailing field and must return null for it.
+        SnapshotPendingSplitsState state = getTestSnapshotPendingSplitsState(false);
+        final PendingSplitsStateSerializer serializer =
+                new PendingSplitsStateSerializer(MySqlSplitSerializer.INSTANCE);
+        byte[] serialized = serializer.serialize(state);
+        PendingSplitsState restored = serializer.deserialize(5, serialized);
+        Assertions.assertThat(restored).isInstanceOf(SnapshotPendingSplitsState.class);
+        Assertions.assertThat(((SnapshotPendingSplitsState) restored).getCheckpointIdToFinish())
+                .isNull();
     }
 
     @ParameterizedTest
@@ -195,6 +231,25 @@ class PendingSplitsStateSerializerTest {
                     true,
                     ChunkSplitterState.NO_SPLITTING_TABLE_STATE);
         }
+    }
+
+    private static SnapshotPendingSplitsState
+            getTestSnapshotPendingSplitsStateWithCheckpointIdToFinish() {
+        // Reuse the base state and overlay a non-null checkpointIdToFinish, exercising the
+        // FLINK-39478 backward-compat serialization path (version >= 6).
+        SnapshotPendingSplitsState base = getTestSnapshotPendingSplitsState(false);
+        return new SnapshotPendingSplitsState(
+                base.getAlreadyProcessedTables(),
+                base.getRemainingSplits(),
+                base.getAssignedSplits(),
+                base.getTableSchemas(),
+                base.getSplitFinishedOffsets(),
+                base.getSnapshotAssignerStatus(),
+                base.getRemainingTables(),
+                base.isTableIdCaseSensitive(),
+                base.isRemainingTablesCheckpointed(),
+                base.getChunkSplitterState(),
+                42L);
     }
 
     private static HybridPendingSplitsState getTestHybridPendingSplitsState(
