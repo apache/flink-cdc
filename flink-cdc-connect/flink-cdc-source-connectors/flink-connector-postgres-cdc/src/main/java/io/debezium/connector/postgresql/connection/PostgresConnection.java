@@ -45,7 +45,11 @@ import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Timestamp;
 import java.time.Duration;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -831,6 +835,41 @@ public class PostgresConnection extends JdbcConnection {
                     // precision,
                     // read the column as a string instead and then re-parse inside the converter.
                     return rs.getString(columnIndex);
+                case PgOid.TIMESTAMP:
+                    {
+                        // LocalDateTime bypasses GregorianCalendar's Julian/Gregorian cutover
+                        // (1582-10-15), which shifts pre-cutover values by N days
+                        // (e.g. 0001-01-01 by 2 days).
+                        LocalDateTime ldt = rs.getObject(columnIndex, LocalDateTime.class);
+                        if (ldt == null) {
+                            return null;
+                        }
+                        // PG +/-infinity surfaces as Timestamp(Long.MAX/MIN_VALUE) via the legacy
+                        // rs.getObject() path; preserve that contract for downstream converters.
+                        if (ldt == LocalDateTime.MAX) {
+                            return new Timestamp(Long.MAX_VALUE);
+                        }
+                        if (ldt == LocalDateTime.MIN) {
+                            return new Timestamp(Long.MIN_VALUE);
+                        }
+                        return ldt;
+                    }
+                case PgOid.TIMESTAMPTZ:
+                    {
+                        OffsetDateTime odt = rs.getObject(columnIndex, OffsetDateTime.class);
+                        if (odt == null) {
+                            return null;
+                        }
+                        if (odt == OffsetDateTime.MAX) {
+                            return new Timestamp(Long.MAX_VALUE);
+                        }
+                        if (odt == OffsetDateTime.MIN) {
+                            return new Timestamp(Long.MIN_VALUE);
+                        }
+                        return odt;
+                    }
+                case PgOid.DATE:
+                    return rs.getObject(columnIndex, LocalDate.class);
                 default:
                     Object x = rs.getObject(columnIndex);
                     if (x != null) {

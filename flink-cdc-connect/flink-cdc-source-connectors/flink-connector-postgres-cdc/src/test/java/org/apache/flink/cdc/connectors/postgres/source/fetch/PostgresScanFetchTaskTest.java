@@ -25,6 +25,7 @@ import org.apache.flink.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceRecords;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.metrics.SourceEnumeratorMetrics;
+import org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils;
 import org.apache.flink.cdc.connectors.base.source.reader.external.AbstractScanFetchTask;
 import org.apache.flink.cdc.connectors.base.source.reader.external.FetchTask;
 import org.apache.flink.cdc.connectors.base.source.reader.external.IncrementalSourceScanFetcher;
@@ -44,16 +45,22 @@ import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.types.DataType;
 
 import io.debezium.connector.postgresql.connection.PostgresConnection;
+import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.jupiter.api.Test;
 
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 
@@ -73,6 +80,14 @@ class PostgresScanFetchTaskTest extends PostgresTestBase {
                     POSTGRES_CONTAINER,
                     "postgres",
                     "customer",
+                    POSTGRES_CONTAINER.getUsername(),
+                    POSTGRES_CONTAINER.getPassword());
+
+    private final UniqueDatabase historicalDatesDatabase =
+            new UniqueDatabase(
+                    POSTGRES_CONTAINER,
+                    "postgres",
+                    "historical_dates",
                     POSTGRES_CONTAINER.getUsername(),
                     POSTGRES_CONTAINER.getPassword());
 
@@ -281,6 +296,91 @@ class PostgresScanFetchTaskTest extends PostgresTestBase {
                 ResultSet rs = selectStatement.executeQuery()) {
             assertThat(rs.getFetchSize()).isEqualTo(2);
         }
+    }
+
+    @Test
+    void testHistoricalDatesInSnapshotScan() throws Exception {
+        // Pre-fix, dates before 1582-10-15 are shifted by N days (e.g. 0001-01-01 by 2)
+        // because the snapshot path's rs.getObject() goes through GregorianCalendar.
+        // Post-fix, getColumnValue() reads via java.time types and is calendar-clean.
+        historicalDatesDatabase.createAndInitialize();
+
+        PostgresSourceConfigFactory sourceConfigFactory =
+                getMockPostgresSourceConfigFactory(
+                        historicalDatesDatabase,
+                        "historical_dates",
+                        "date_boundary",
+                        null,
+                        10,
+                        false);
+        PostgresSourceConfig sourceConfig = sourceConfigFactory.create(0);
+        PostgresDialect postgresDialect = new PostgresDialect(sourceConfigFactory.create(0));
+        List<SnapshotSplit> snapshotSplits = getSnapshotSplits(sourceConfig, postgresDialect);
+        PostgresSourceFetchTaskContext taskContext =
+                new PostgresSourceFetchTaskContext(sourceConfig, postgresDialect);
+
+        List<SourceRecord> rawRecords =
+                readRawSnapshotRecords(
+                        reOrderSnapshotSplits(snapshotSplits),
+                        taskContext,
+                        1,
+                        new SnapshotPhaseHooks());
+
+        Map<Integer, Struct> afterById = new HashMap<>();
+        for (SourceRecord r : rawRecords) {
+            if (!SourceRecordUtils.isDataChangeRecord(r)) {
+                continue;
+            }
+            Struct after = ((Struct) r.value()).getStruct("after");
+            afterById.put(after.getInt32("id"), after);
+        }
+
+        // Debezium emits TIMESTAMP as MicroTimestamp (long micros from epoch UTC),
+        // TIMESTAMPTZ as ZonedTimestamp (ISO string), DATE as days from epoch.
+        assertHistoricalRow(afterById.get(1), "0001-01-01T00:00:00", "0001-01-01T00:00:00Z", LocalDate.of(1, 1, 1));
+        assertHistoricalRow(afterById.get(2), "1582-10-04T00:00:00", "1582-10-04T00:00:00Z", LocalDate.of(1582, 10, 4));
+        assertHistoricalRow(afterById.get(3), "1582-10-15T00:00:00", "1582-10-15T00:00:00Z", LocalDate.of(1582, 10, 15));
+        assertHistoricalRow(afterById.get(4), "1900-12-31T23:59:59.123456", "1900-12-31T23:59:59.123456Z", LocalDate.of(1900, 12, 31));
+        assertHistoricalRow(afterById.get(5), "1901-01-02T00:00:00", "1901-01-02T00:00:00Z", LocalDate.of(1901, 1, 2));
+    }
+
+    private static void assertHistoricalRow(
+            Struct after, String expectedTsIso, String expectedTstz, LocalDate expectedDate) {
+        long expectedMicros =
+                LocalDateTime.parse(expectedTsIso).toInstant(ZoneOffset.UTC).getEpochSecond()
+                                * 1_000_000L
+                        + LocalDateTime.parse(expectedTsIso).getNano() / 1_000L;
+        assertThat(after.get("ts")).isEqualTo(expectedMicros);
+        assertThat(after.get("tstz")).isEqualTo(expectedTstz);
+        assertThat(after.get("d")).isEqualTo((int) expectedDate.toEpochDay());
+    }
+
+    private List<SourceRecord> readRawSnapshotRecords(
+            List<SnapshotSplit> snapshotSplits,
+            PostgresSourceFetchTaskContext taskContext,
+            int scanSplitsNum,
+            SnapshotPhaseHooks snapshotPhaseHooks)
+            throws Exception {
+        IncrementalSourceScanFetcher sourceScanFetcher =
+                new IncrementalSourceScanFetcher(taskContext, 0);
+        List<SourceRecord> result = new ArrayList<>();
+        for (int i = 0; i < scanSplitsNum; i++) {
+            SnapshotSplit sqlSplit = snapshotSplits.get(i);
+            if (sourceScanFetcher.isFinished()) {
+                FetchTask<SourceSplitBase> fetchTask =
+                        taskContext.getDataSourceDialect().createFetchTask(sqlSplit);
+                ((AbstractScanFetchTask) fetchTask).setSnapshotPhaseHooks(snapshotPhaseHooks);
+                sourceScanFetcher.submitTask(fetchTask);
+            }
+            Iterator<SourceRecords> res;
+            while ((res = sourceScanFetcher.pollSplitRecords()) != null) {
+                while (res.hasNext()) {
+                    result.addAll(res.next().getSourceRecordList());
+                }
+            }
+        }
+        sourceScanFetcher.close();
+        return result;
     }
 
     private List<String> getDataInSnapshotScan(
