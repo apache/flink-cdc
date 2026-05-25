@@ -25,12 +25,12 @@ import org.apache.flink.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceRecords;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.metrics.SourceEnumeratorMetrics;
-import org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils;
 import org.apache.flink.cdc.connectors.base.source.reader.external.AbstractScanFetchTask;
 import org.apache.flink.cdc.connectors.base.source.reader.external.FetchTask;
 import org.apache.flink.cdc.connectors.base.source.reader.external.IncrementalSourceScanFetcher;
 import org.apache.flink.cdc.connectors.base.source.utils.hooks.SnapshotPhaseHook;
 import org.apache.flink.cdc.connectors.base.source.utils.hooks.SnapshotPhaseHooks;
+import org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils;
 import org.apache.flink.cdc.connectors.postgres.PostgresTestBase;
 import org.apache.flink.cdc.connectors.postgres.source.PostgresDialect;
 import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfig;
@@ -337,11 +337,31 @@ class PostgresScanFetchTaskTest extends PostgresTestBase {
 
         // Debezium emits TIMESTAMP as MicroTimestamp (long micros from epoch UTC),
         // TIMESTAMPTZ as ZonedTimestamp (ISO string), DATE as days from epoch.
-        assertHistoricalRow(afterById.get(1), "0001-01-01T00:00:00", "0001-01-01T00:00:00Z", LocalDate.of(1, 1, 1));
-        assertHistoricalRow(afterById.get(2), "1582-10-04T00:00:00", "1582-10-04T00:00:00Z", LocalDate.of(1582, 10, 4));
-        assertHistoricalRow(afterById.get(3), "1582-10-15T00:00:00", "1582-10-15T00:00:00Z", LocalDate.of(1582, 10, 15));
-        assertHistoricalRow(afterById.get(4), "1900-12-31T23:59:59.123456", "1900-12-31T23:59:59.123456Z", LocalDate.of(1900, 12, 31));
-        assertHistoricalRow(afterById.get(5), "1901-01-02T00:00:00", "1901-01-02T00:00:00Z", LocalDate.of(1901, 1, 2));
+        assertHistoricalRow(
+                afterById.get(1),
+                "0001-01-01T00:00:00",
+                "0001-01-01T00:00:00Z",
+                LocalDate.of(1, 1, 1));
+        assertHistoricalRow(
+                afterById.get(2),
+                "1582-10-04T00:00:00",
+                "1582-10-04T00:00:00Z",
+                LocalDate.of(1582, 10, 4));
+        assertHistoricalRow(
+                afterById.get(3),
+                "1582-10-15T00:00:00",
+                "1582-10-15T00:00:00Z",
+                LocalDate.of(1582, 10, 15));
+        assertHistoricalRow(
+                afterById.get(4),
+                "1900-12-31T23:59:59.123456",
+                "1900-12-31T23:59:59.123456Z",
+                LocalDate.of(1900, 12, 31));
+        assertHistoricalRow(
+                afterById.get(5),
+                "1901-01-02T00:00:00",
+                "1901-01-02T00:00:00Z",
+                LocalDate.of(1901, 1, 2));
     }
 
     private static void assertHistoricalRow(
