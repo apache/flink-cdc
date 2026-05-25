@@ -15,19 +15,27 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.pipeline.tests;
+package org.apache.flink.cdc.pipeline.tests.stage1;
 
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedClass;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 
 /** End-to-end tests for values cdc pipeline job. */
+@ParameterizedClass
+@ValueSource(ints = {1, 4})
 class ValuesE2eITCase extends PipelineTestEnvironment {
     private static final Logger LOG = LoggerFactory.getLogger(ValuesE2eITCase.class);
+
+    ValuesE2eITCase(int parallelism) {
+        super(parallelism);
+    }
 
     @Test
     void testValuesSingleSplitSingleTable() throws Exception {

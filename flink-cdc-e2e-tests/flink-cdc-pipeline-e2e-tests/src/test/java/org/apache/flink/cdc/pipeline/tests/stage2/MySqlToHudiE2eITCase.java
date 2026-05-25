@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.pipeline.tests;
+package org.apache.flink.cdc.pipeline.tests.stage2;
 
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.JobStatus;
@@ -36,6 +36,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.junit.jupiter.params.ParameterizedClass;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.BindMode;
@@ -66,11 +68,17 @@ import java.util.stream.Stream;
 
 /** End-to-end tests for mysql cdc to Iceberg pipeline job. */
 @EnabledIfSystemProperty(named = "specifiedFlinkVersion", matches = "^1.*")
+@ParameterizedClass
+@ValueSource(ints = {1, 4})
 public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
 
     private static final Logger LOG = LoggerFactory.getLogger(MySqlToHudiE2eITCase.class);
 
     private static final Duration HUDI_TESTCASE_TIMEOUT = Duration.ofMinutes(20);
+
+    public MySqlToHudiE2eITCase(int parallelism) {
+        super(parallelism);
+    }
 
     private static final String FLINK_LIB_DIR = "/opt/flink/lib";
 

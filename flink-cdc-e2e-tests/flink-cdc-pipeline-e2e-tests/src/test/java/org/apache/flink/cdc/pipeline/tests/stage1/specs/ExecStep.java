@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.pipeline.tests.specs;
+package org.apache.flink.cdc.pipeline.tests.stage1.specs;
 
 /** A {@link SpecStep} to execute SQL commands. */
 class ExecStep implements SpecStep {

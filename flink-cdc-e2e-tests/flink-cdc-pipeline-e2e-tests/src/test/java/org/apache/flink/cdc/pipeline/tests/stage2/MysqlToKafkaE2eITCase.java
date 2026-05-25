@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.pipeline.tests;
+package org.apache.flink.cdc.pipeline.tests.stage2;
 
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.test.utils.TestUtils;
@@ -38,6 +38,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedClass;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.KafkaContainer;
@@ -71,8 +73,14 @@ import static org.apache.flink.util.DockerImageVersions.KAFKA;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** End-to-end tests for mysql cdc to Kafka pipeline job. */
+@ParameterizedClass
+@ValueSource(ints = {1, 4})
 class MysqlToKafkaE2eITCase extends PipelineTestEnvironment {
     private static final Logger LOG = LoggerFactory.getLogger(MysqlToKafkaE2eITCase.class);
+
+    MysqlToKafkaE2eITCase(int parallelism) {
+        super(parallelism);
+    }
 
     private static AdminClient admin;
     private static final String INTER_CONTAINER_KAFKA_ALIAS = "kafka";

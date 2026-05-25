@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.pipeline.tests;
+package org.apache.flink.cdc.pipeline.tests.stage1;
 
 import org.apache.flink.cdc.common.test.utils.TestUtils;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
@@ -23,9 +23,11 @@ import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.params.ParameterizedClass;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,11 +41,17 @@ import java.util.function.Function;
 import java.util.stream.Stream;
 
 /** E2e tests for User-defined functions. */
+@ParameterizedClass
+@ValueSource(ints = {1, 4})
 class UdfE2eITCase extends PipelineTestEnvironment {
-    private static final Logger LOG = LoggerFactory.getLogger(TransformE2eITCase.class);
+    private static final Logger LOG = LoggerFactory.getLogger(UdfE2eITCase.class);
 
     protected final UniqueDatabase udfTestDatabase =
             new UniqueDatabase(MYSQL, "transform_test", MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
+
+    UdfE2eITCase(int parallelism) {
+        super(parallelism);
+    }
 
     private final Function<String, String> dbNameFormatter =
             (s) -> String.format(s, udfTestDatabase.getDatabaseName());

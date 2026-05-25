@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.pipeline.tests;
+package org.apache.flink.cdc.pipeline.tests.stage1;
 
 import org.apache.flink.cdc.common.test.utils.TestUtils;
 import org.apache.flink.cdc.connectors.mysql.testutils.MySqlContainer;

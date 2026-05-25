@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.pipeline.tests.specs;
+package org.apache.flink.cdc.pipeline.tests.stage1.specs;
 
 import org.apache.flink.cdc.cli.utils.YamlParserUtils;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
@@ -23,9 +23,11 @@ import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.params.ParameterizedClass;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,10 +52,16 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /** YAML-spec based pipeline test cases. */
+@ParameterizedClass
+@ValueSource(ints = {1, 4})
 public class FlinkPipelineSpecsITCase extends PipelineTestEnvironment {
 
     private static final Logger LOG = LoggerFactory.getLogger(FlinkPipelineSpecsITCase.class);
     private static final String MYSQL_CONTAINER_ALIAS = "mysql";
+
+    public FlinkPipelineSpecsITCase(int parallelism) {
+        super(parallelism);
+    }
 
     static Stream<Arguments> loadTestSpecs() throws IOException {
         Path path = Paths.get("").toAbsolutePath().resolve("src/test/resources/rules");

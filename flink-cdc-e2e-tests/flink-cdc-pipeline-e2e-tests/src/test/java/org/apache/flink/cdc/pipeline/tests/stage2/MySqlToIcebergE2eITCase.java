@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.pipeline.tests;
+package org.apache.flink.cdc.pipeline.tests.stage2;
 
 import org.apache.flink.cdc.common.test.utils.TestUtils;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
@@ -37,6 +37,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedClass;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.BindMode;
@@ -67,11 +69,17 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /** End-to-end tests for mysql cdc to Iceberg pipeline job. */
+@ParameterizedClass
+@ValueSource(ints = {1, 4})
 public class MySqlToIcebergE2eITCase extends PipelineTestEnvironment {
 
     private static final Logger LOG = LoggerFactory.getLogger(MySqlToIcebergE2eITCase.class);
 
     @TempDir public Path temporaryFolder;
+
+    public MySqlToIcebergE2eITCase(int parallelism) {
+        super(parallelism);
+    }
 
     protected final UniqueDatabase inventoryDatabase =
             new UniqueDatabase(MYSQL, "iceberg_inventory", MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);

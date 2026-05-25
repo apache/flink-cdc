@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.pipeline.tests;
+package org.apache.flink.cdc.pipeline.tests.stage3;
 
 import org.apache.flink.cdc.common.data.DateData;
 import org.apache.flink.cdc.common.data.TimeData;
@@ -27,6 +27,7 @@ import org.apache.flink.cdc.runtime.operators.transform.PreTransformOperator;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedClass;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
@@ -51,11 +52,17 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** E2e tests for the {@link PreTransformOperator} and {@link PostTransformOperator}. */
+@ParameterizedClass
+@ValueSource(ints = {1, 4})
 class TransformE2eITCase extends PipelineTestEnvironment {
     private static final Logger LOG = LoggerFactory.getLogger(TransformE2eITCase.class);
 
     protected final UniqueDatabase transformTestDatabase =
             new UniqueDatabase(MYSQL, "transform_test", MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
+
+    TransformE2eITCase(int parallelism) {
+        super(parallelism);
+    }
 
     private final Function<String, String> dbNameFormatter =
             (s) -> {

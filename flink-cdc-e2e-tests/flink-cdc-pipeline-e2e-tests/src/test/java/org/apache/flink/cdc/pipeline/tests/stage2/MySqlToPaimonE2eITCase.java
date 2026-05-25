@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.pipeline.tests;
+package org.apache.flink.cdc.pipeline.tests.stage2;
 
 import org.apache.flink.cdc.common.test.utils.TestUtils;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
@@ -26,6 +26,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedClass;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.Container;
@@ -48,10 +50,16 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /** End-to-end tests for mysql cdc to Paimon pipeline job. */
+@ParameterizedClass
+@ValueSource(ints = {1, 4})
 class MySqlToPaimonE2eITCase extends PipelineTestEnvironment {
     private static final Logger LOG = LoggerFactory.getLogger(MySqlToPaimonE2eITCase.class);
 
     private static final Duration PAIMON_TESTCASE_TIMEOUT = Duration.ofMinutes(3);
+
+    MySqlToPaimonE2eITCase(int parallelism) {
+        super(parallelism);
+    }
 
     protected final UniqueDatabase inventoryDatabase =
             new UniqueDatabase(MYSQL, "paimon_inventory", MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);

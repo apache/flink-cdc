@@ -42,6 +42,12 @@ limitations under the License.
         <fluss.version>0.9.0-incubating</fluss.version>
         <jmh.version>1.37</jmh.version>
         <hudi.version>1.1.0</hudi.version>
+        <!-- E2E stage filtering: CI overrides via -De2eIncludePattern=**/stageN/**/*ITCase.java
+             and -DskipYarnTest=true for stages where the YARN test should not run. The defaults
+             here preserve the original `mvn verify` behavior for local developers. -->
+        <e2eIncludePattern>**/*ITCase.java</e2eIncludePattern>
+        <e2eExcludePattern>**/MysqlE2eWithYarnApplicationITCase.java</e2eExcludePattern>
+        <skipYarnTest>false</skipYarnTest>
     </properties>
 
     <dependencies>
@@ -436,10 +442,10 @@ limitations under the License.
                         </goals>
                         <configuration>
                             <includes>
-                                <include>**/*.*</include>
+                                <include>${e2eIncludePattern}</include>
                             </includes>
                             <excludes>
-                                <exclude>**/MysqlE2eWithYarnApplicationITCase.java</exclude>
+                                <exclude>${e2eExcludePattern}</exclude>
                             </excludes>
                             <forkCount>1</forkCount>
                             <systemPropertyVariables>
@@ -454,6 +460,7 @@ limitations under the License.
                             <goal>test</goal>
                         </goals>
                         <configuration>
+                            <skip>${skipYarnTest}</skip>
                             <includes>
                                 <include>**/MysqlE2eWithYarnApplicationITCase.java</include>
                             </includes>

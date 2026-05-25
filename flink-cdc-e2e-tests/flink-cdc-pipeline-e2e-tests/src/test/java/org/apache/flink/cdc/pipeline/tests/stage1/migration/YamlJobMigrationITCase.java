@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.pipeline.tests.migration;
+package org.apache.flink.cdc.pipeline.tests.stage1.migration;
 
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.JobStatus;
@@ -30,8 +30,10 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.junit.jupiter.params.ParameterizedClass;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,6 +47,8 @@ import java.util.function.Function;
 
 /** E2e cases for stopping & restarting jobs from previous state. */
 @EnabledIfSystemProperty(named = "specifiedFlinkVersion", matches = "^1.*")
+@ParameterizedClass
+@ValueSource(ints = {1, 4})
 class YamlJobMigrationITCase extends PipelineTestEnvironment {
 
     private static final Logger LOG = LoggerFactory.getLogger(YamlJobMigrationITCase.class);
@@ -52,6 +56,10 @@ class YamlJobMigrationITCase extends PipelineTestEnvironment {
     protected UniqueDatabase mysqlInventoryDatabase;
     private final Function<String, String> dbNameFormatter =
             (s) -> String.format(s, mysqlInventoryDatabase.getDatabaseName());
+
+    YamlJobMigrationITCase(int parallelism) {
+        super(parallelism);
+    }
 
     @BeforeEach
     public void before() throws Exception {
