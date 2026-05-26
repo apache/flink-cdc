@@ -19,40 +19,44 @@ package org.apache.flink.cdc.connectors.postgres.source.reader;
 
 import org.apache.flink.cdc.connectors.base.source.reader.external.FetchTask;
 import org.apache.flink.cdc.connectors.base.source.reader.external.IncrementalSourceStreamFetcher;
+import org.apache.flink.cdc.connectors.postgres.source.utils.PostgresSourceRecordUtils;
 
-import io.debezium.data.Envelope;
-import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 
+import java.util.List;
+
 /**
- * Stream fetcher for Postgres. When {@code includeLogicalMessages} is enabled, lets {@code
+ * Stream fetcher for Postgres. When {@code logicalMessageEnabled} is enabled, lets {@code
  * pg_logical_emit_message} records (op="m") bypass table-based watermark filtering, since logical
  * messages are not bound to a table.
  */
 public class PostgresSourceStreamFetcher extends IncrementalSourceStreamFetcher {
 
-    private final boolean includeLogicalMessages;
+    private final boolean logicalMessageEnabled;
+    private final List<String> logicalMessagePrefixes;
 
     public PostgresSourceStreamFetcher(
-            FetchTask.Context taskContext, int subtaskId, boolean includeLogicalMessages) {
+            FetchTask.Context taskContext,
+            int subtaskId,
+            boolean logicalMessageEnabled,
+            List<String> logicalMessagePrefixes) {
         super(taskContext, subtaskId);
-        this.includeLogicalMessages = includeLogicalMessages;
+        this.logicalMessageEnabled = logicalMessageEnabled;
+        this.logicalMessagePrefixes = logicalMessagePrefixes;
     }
 
     @Override
     protected boolean shouldEmit(SourceRecord sourceRecord) {
-        if (includeLogicalMessages && isLogicalMessage(sourceRecord)) {
-            return true;
+        if (logicalMessageEnabled && PostgresSourceRecordUtils.isLogicalMessage(sourceRecord)) {
+            return logicalMessagePrefixes == null
+                    || logicalMessagePrefixes.isEmpty()
+                    || logicalMessagePrefixes.stream()
+                            .anyMatch(
+                                    prefix ->
+                                            PostgresSourceRecordUtils.getLogicalMessagePrefix(
+                                                            sourceRecord)
+                                                    .startsWith(prefix));
         }
         return super.shouldEmit(sourceRecord);
-    }
-
-    static boolean isLogicalMessage(SourceRecord record) {
-        if (record.value() instanceof Struct) {
-            Struct struct = (Struct) record.value();
-            return struct.schema().field(Envelope.FieldName.OPERATION) != null
-                    && "m".equals(struct.getString(Envelope.FieldName.OPERATION));
-        }
-        return false;
     }
 }

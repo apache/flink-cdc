@@ -8,17 +8,14 @@
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Unless required by applicable law.
  */
 
 package org.apache.flink.cdc.connectors.postgres.source.reader;
 
 import org.apache.flink.api.connector.source.SourceEvent;
 import org.apache.flink.cdc.common.annotation.Experimental;
+import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
 import org.apache.flink.cdc.connectors.base.config.SourceConfig;
 import org.apache.flink.cdc.connectors.base.dialect.DataSourceDialect;
 import org.apache.flink.cdc.connectors.base.source.meta.events.LatestFinishedSplitsNumberEvent;
@@ -32,6 +29,7 @@ import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplitState;
 import org.apache.flink.cdc.connectors.base.source.reader.IncrementalSourceReaderContext;
 import org.apache.flink.cdc.connectors.base.source.reader.IncrementalSourceReaderWithCommit;
 import org.apache.flink.cdc.connectors.base.source.reader.IncrementalSourceRecordEmitter;
+import org.apache.flink.cdc.connectors.base.source.reader.IncrementalSourceSplitReader;
 import org.apache.flink.cdc.connectors.postgres.source.PostgresDialect;
 import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfig;
 import org.apache.flink.cdc.connectors.postgres.source.events.OffsetCommitAckEvent;
@@ -67,7 +65,7 @@ public class PostgresSourceReader extends IncrementalSourceReaderWithCommit {
 
     public PostgresSourceReader(
             FutureCompletingBlockingQueue elementQueue,
-            Supplier supplier,
+            Supplier<IncrementalSourceSplitReader<JdbcSourceConfig>> supplier,
             RecordEmitter recordEmitter,
             Configuration config,
             IncrementalSourceReaderContext incrementalSourceReaderContext,

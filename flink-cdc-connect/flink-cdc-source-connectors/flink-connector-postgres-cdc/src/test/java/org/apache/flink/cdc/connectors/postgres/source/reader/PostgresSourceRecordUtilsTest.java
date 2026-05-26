@@ -17,6 +17,8 @@
 
 package org.apache.flink.cdc.connectors.postgres.source.reader;
 
+import org.apache.flink.cdc.connectors.postgres.source.utils.PostgresSourceRecordUtils;
+
 import io.debezium.data.Envelope;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.SchemaBuilder;
@@ -28,8 +30,8 @@ import java.util.Collections;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Tests for {@link PostgresSourceStreamFetcher#isLogicalMessage(SourceRecord)}. */
-class PostgresSourceStreamFetcherTest {
+/** Tests for {@link PostgresSourceRecordUtils}. */
+class PostgresSourceRecordUtilsTest {
 
     private static final Schema ENVELOPE_WITH_OP =
             SchemaBuilder.struct()
@@ -42,14 +44,14 @@ class PostgresSourceStreamFetcherTest {
     @Test
     void logicalMessageRecordIsDetected() {
         SourceRecord record = recordWithOp("m");
-        assertThat(PostgresSourceStreamFetcher.isLogicalMessage(record)).isTrue();
+        assertThat(PostgresSourceRecordUtils.isLogicalMessage(record)).isTrue();
     }
 
     @Test
     void dataChangeRecordsAreNotLogicalMessages() {
         for (String op : new String[] {"c", "u", "d", "r", "t"}) {
             SourceRecord record = recordWithOp(op);
-            assertThat(PostgresSourceStreamFetcher.isLogicalMessage(record))
+            assertThat(PostgresSourceRecordUtils.isLogicalMessage(record))
                     .as("op=%s should not be detected as logical message", op)
                     .isFalse();
         }
@@ -64,7 +66,7 @@ class PostgresSourceStreamFetcherTest {
                         "topic",
                         ENVELOPE_WITH_OP,
                         null);
-        assertThat(PostgresSourceStreamFetcher.isLogicalMessage(record)).isFalse();
+        assertThat(PostgresSourceRecordUtils.isLogicalMessage(record)).isFalse();
     }
 
     @Test
@@ -77,7 +79,7 @@ class PostgresSourceStreamFetcherTest {
                         "topic",
                         ENVELOPE_WITHOUT_OP,
                         value);
-        assertThat(PostgresSourceStreamFetcher.isLogicalMessage(record)).isFalse();
+        assertThat(PostgresSourceRecordUtils.isLogicalMessage(record)).isFalse();
     }
 
     @Test
@@ -90,7 +92,7 @@ class PostgresSourceStreamFetcherTest {
                         "topic",
                         ENVELOPE_WITH_OP,
                         value);
-        assertThat(PostgresSourceStreamFetcher.isLogicalMessage(record)).isFalse();
+        assertThat(PostgresSourceRecordUtils.isLogicalMessage(record)).isFalse();
     }
 
     @Test
@@ -102,7 +104,7 @@ class PostgresSourceStreamFetcherTest {
                         "topic",
                         Schema.STRING_SCHEMA,
                         "not-a-struct");
-        assertThat(PostgresSourceStreamFetcher.isLogicalMessage(record)).isFalse();
+        assertThat(PostgresSourceRecordUtils.isLogicalMessage(record)).isFalse();
     }
 
     private static SourceRecord recordWithOp(String op) {

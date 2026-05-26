@@ -94,5 +94,16 @@ public interface FetchTask<Split> {
         DataSourceDialect getDataSourceDialect();
 
         SourceConfig getSourceConfig();
+
+        /**
+         * A hook for dialects to implement custom filtering logic for records that should not be
+         * subjected to the default watermark-based filtering.
+         *
+         * @param record the source record
+         * @return true if the record should be emitted, false otherwise
+         */
+        default boolean shouldEmit(SourceRecord record) {
+            return true;
+        }
     }
 }

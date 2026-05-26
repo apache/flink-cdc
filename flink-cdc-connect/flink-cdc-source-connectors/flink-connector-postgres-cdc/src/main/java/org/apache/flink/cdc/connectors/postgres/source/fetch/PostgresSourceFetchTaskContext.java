@@ -32,6 +32,7 @@ import org.apache.flink.cdc.connectors.postgres.source.offset.PostgresOffsetUtil
 import org.apache.flink.cdc.connectors.postgres.source.schema.PostgresSchemaRecord;
 import org.apache.flink.cdc.connectors.postgres.source.schema.RelationAwarePostgresSchema;
 import org.apache.flink.cdc.connectors.postgres.source.utils.ChunkUtils;
+import org.apache.flink.cdc.connectors.postgres.source.utils.PostgresSourceRecordUtils;
 import org.apache.flink.table.types.logical.RowType;
 
 import io.debezium.DebeziumException;
@@ -70,6 +71,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.SQLException;
+import java.util.List;
 
 import static io.debezium.connector.AbstractSourceInfo.SCHEMA_NAME_KEY;
 import static io.debezium.connector.AbstractSourceInfo.TABLE_NAME_KEY;
@@ -391,5 +393,22 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
             return tableId.table();
         }
         return tableId.schema() + "." + tableId.table();
+    }
+
+    @Override
+    public boolean shouldEmit(SourceRecord record) {
+        if (!((PostgresSourceConfig) sourceConfig).isLogicalMessageEnabled()) {
+            return true;
+        }
+        if (PostgresSourceRecordUtils.isLogicalMessage(record)) {
+            List<String> prefixes =
+                    ((PostgresSourceConfig) sourceConfig).getLogicalMessagePrefixes();
+            if (prefixes == null || prefixes.isEmpty()) {
+                return true;
+            }
+            String prefix = PostgresSourceRecordUtils.getLogicalMessagePrefix(record);
+            return prefixes.stream().anyMatch(p -> prefix.startsWith(p));
+        }
+        return true;
     }
 }

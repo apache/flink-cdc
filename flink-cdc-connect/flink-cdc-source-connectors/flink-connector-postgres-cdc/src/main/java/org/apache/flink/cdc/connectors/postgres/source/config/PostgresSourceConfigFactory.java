@@ -57,8 +57,10 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
     private boolean includeDatabaseInTableId =
             PostgresSourceOptions.TABLE_ID_INCLUDE_DATABASE.defaultValue();
 
-    private boolean includeLogicalMessages =
-            PostgresSourceOptions.SCAN_LOGICAL_MESSAGE_ENABLED.defaultValue();
+    private boolean logicalMessageEnabled =
+            PostgresSourceOptions.LOGICAL_MESSAGE_ENABLED.defaultValue();
+
+    private List<String> logicalMessagePrefixes;
 
     /** Creates a new {@link PostgresSourceConfig} for the given subtask {@code subtaskId}. */
     @Override
@@ -144,7 +146,8 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
                 assignUnboundedChunkFirst,
                 includePartitionedTables,
                 includeDatabaseInTableId,
-                includeLogicalMessages);
+                logicalMessageEnabled,
+                logicalMessagePrefixes);
     }
 
     /**
@@ -204,7 +207,12 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
     }
 
     /** Set whether to emit Postgres logical decoding messages to the deserializer. */
-    public void setIncludeLogicalMessages(boolean includeLogicalMessages) {
-        this.includeLogicalMessages = includeLogicalMessages;
+    public void setLogicalMessageEnabled(boolean logicalMessageEnabled) {
+        this.logicalMessageEnabled = logicalMessageEnabled;
+    }
+
+    /** Set the prefixes for Postgres logical decoding messages. */
+    public void setLogicalMessagePrefixes(List<String> logicalMessagePrefixes) {
+        this.logicalMessagePrefixes = logicalMessagePrefixes;
     }
 }

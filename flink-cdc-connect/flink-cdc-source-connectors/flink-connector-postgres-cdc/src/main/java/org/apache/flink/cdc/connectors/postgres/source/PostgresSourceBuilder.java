@@ -316,8 +316,14 @@ public class PostgresSourceBuilder<T> {
     }
 
     /** Whether to emit Postgres logical decoding messages to the deserializer. */
-    public PostgresSourceBuilder<T> includeLogicalMessages(boolean includeLogicalMessages) {
-        this.configFactory.setIncludeLogicalMessages(includeLogicalMessages);
+    public PostgresSourceBuilder<T> logicalMessageEnabled(boolean logicalMessageEnabled) {
+        this.configFactory.setLogicalMessageEnabled(logicalMessageEnabled);
+        return this;
+    }
+
+    /** The prefixes for Postgres logical decoding messages. */
+    public PostgresSourceBuilder<T> logicalMessagePrefixes(List<String> logicalMessagePrefixes) {
+        this.configFactory.setLogicalMessagePrefixes(logicalMessagePrefixes);
         return this;
     }
 

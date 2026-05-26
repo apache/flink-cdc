@@ -32,7 +32,6 @@ import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConf
 import org.apache.flink.cdc.connectors.postgres.source.fetch.PostgresScanFetchTask;
 import org.apache.flink.cdc.connectors.postgres.source.fetch.PostgresSourceFetchTaskContext;
 import org.apache.flink.cdc.connectors.postgres.source.fetch.PostgresStreamFetchTask;
-import org.apache.flink.cdc.connectors.postgres.source.reader.PostgresSourceStreamFetcher;
 import org.apache.flink.cdc.connectors.postgres.source.utils.CustomPostgresSchema;
 import org.apache.flink.cdc.connectors.postgres.source.utils.TableDiscoveryUtils;
 import org.apache.flink.util.FlinkRuntimeException;
@@ -244,8 +243,7 @@ public class PostgresDialect implements JdbcDataSourceDialect {
     @Override
     public IncrementalSourceStreamFetcher createStreamFetcher(
             FetchTask.Context taskContext, int subtaskId) {
-        return new PostgresSourceStreamFetcher(
-                taskContext, subtaskId, sourceConfig.isLogicalMessageEnabled());
+        return new IncrementalSourceStreamFetcher(taskContext, subtaskId);
     }
 
     @Override
