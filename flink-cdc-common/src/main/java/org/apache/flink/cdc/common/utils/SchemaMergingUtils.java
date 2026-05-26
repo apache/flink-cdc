@@ -20,9 +20,13 @@ package org.apache.flink.cdc.common.utils;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.annotation.PublicEvolving;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
+import org.apache.flink.cdc.common.converter.JavaObjectConverter;
+import org.apache.flink.cdc.common.data.ArrayData;
 import org.apache.flink.cdc.common.data.DateData;
 import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
+import org.apache.flink.cdc.common.data.MapData;
+import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.StringData;
 import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
@@ -609,6 +613,12 @@ public class SchemaMergingUtils {
             return BinaryStringData.fromString(((Variant) originalField).toJson());
         }
 
+        if (originalField instanceof MapData
+                || originalField instanceof ArrayData
+                || originalField instanceof RecordData) {
+            Object javaObject = JavaObjectConverter.convertToJava(originalField, originalType);
+            return BinaryStringData.fromString(javaObject.toString());
+        }
         return BinaryStringData.fromString(originalField.toString());
     }
 
