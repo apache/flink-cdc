@@ -23,7 +23,6 @@ import org.apache.flink.cdc.common.source.discover.JdbcTableDiscoverer;
 import org.apache.flink.cdc.common.source.discover.TableDiscoverer;
 import org.apache.flink.cdc.common.source.discover.TableDiscovererFactory;
 
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.MySQLContainer;
@@ -42,10 +41,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Integration tests for {@link JdbcTableDiscoverer} and {@link TableDiscovererFactory} SPI loading.
- * Uses a real MySQL container via Testcontainers to verify end-to-end table discovery.
+ * Uses a real MySQL container via Testcontainers to verify both the default shared-table mode and
+ * the advanced custom-query escape hatch.
  */
 @Testcontainers
 class JdbcTableDiscovererITCase {
+
+    private static final String SUBSCRIBE_ID_ORDERS = "orders-subscription";
+    private static final String SUBSCRIBE_ID_ANALYTICS = "analytics-subscription";
 
     @Container
     private static final MySQLContainer<?> MYSQL =
@@ -60,45 +63,52 @@ class JdbcTableDiscovererITCase {
                         DriverManager.getConnection(
                                 MYSQL.getJdbcUrl(), MYSQL.getUsername(), MYSQL.getPassword());
                 Statement stmt = conn.createStatement()) {
-            // Create the subscription table with the default column name
+            // Shared subscription table with default column names.
             stmt.execute(
                     "CREATE TABLE cdc_subscriptions ("
-                            + "  subscribe_table_name VARCHAR(255) PRIMARY KEY"
+                            + "  subscribe_id VARCHAR(64) NOT NULL,"
+                            + "  subscribe_table_name VARCHAR(255) NOT NULL,"
+                            + "  PRIMARY KEY (subscribe_id, subscribe_table_name)"
                             + ")");
-            // Seed some subscription entries
             stmt.execute(
                     "INSERT INTO cdc_subscriptions VALUES "
-                            + "('source_db.orders'), "
-                            + "('source_db.products'), "
-                            + "('analytics_db.user_events')");
+                            + "('orders-subscription',    'source_db.orders'),"
+                            + "('orders-subscription',    'source_db.order_items'),"
+                            + "('orders-subscription',    'source_db.products'),"
+                            + "('analytics-subscription', 'analytics_db.user_events')");
 
-            // Create another subscription table with a custom column name
+            // Shared subscription table using non-default column names.
             stmt.execute(
                     "CREATE TABLE custom_subscriptions ("
-                            + "  table_fqn VARCHAR(255) PRIMARY KEY"
+                            + "  sub_id VARCHAR(64) NOT NULL,"
+                            + "  table_fqn VARCHAR(255) NOT NULL,"
+                            + "  PRIMARY KEY (sub_id, table_fqn)"
                             + ")");
             stmt.execute(
                     "INSERT INTO custom_subscriptions VALUES "
-                            + "('warehouse.inventory'), "
-                            + "('warehouse.shipments')");
+                            + "('warehouse-sub', 'warehouse.inventory'),"
+                            + "('warehouse-sub', 'warehouse.shipments'),"
+                            + "('hr-sub',        'hr.employees')");
         }
     }
 
-    @AfterAll
-    static void tearDown() {
-        // Container is auto-stopped by Testcontainers
-    }
-
     // =========================================================================
-    //  SPI Loading Tests
+    //  SPI loading
     // =========================================================================
 
     @Test
     void testSpiLoadsJdbcFactory() {
-        // Verify that the SPI mechanism correctly discovers JdbcTableDiscovererFactory
         TableDiscoverer discoverer =
                 TableDiscovererFactory.createDiscoverer(
                         "jdbc", Thread.currentThread().getContextClassLoader());
+        assertThat(discoverer).isInstanceOf(JdbcTableDiscoverer.class);
+    }
+
+    @Test
+    void testSpiCaseInsensitive() {
+        TableDiscoverer discoverer =
+                TableDiscovererFactory.createDiscoverer(
+                        "JDBC", Thread.currentThread().getContextClassLoader());
         assertThat(discoverer).isInstanceOf(JdbcTableDiscoverer.class);
     }
 
@@ -113,145 +123,241 @@ class JdbcTableDiscovererITCase {
                 .hasMessageContaining("Unsupported 'table.discoverer.type' value: 'unknown-type'");
     }
 
-    @Test
-    void testSpiCaseInsensitive() {
-        // Verify case-insensitive matching
-        TableDiscoverer discoverer =
-                TableDiscovererFactory.createDiscoverer(
-                        "JDBC", Thread.currentThread().getContextClassLoader());
-        assertThat(discoverer).isInstanceOf(JdbcTableDiscoverer.class);
-    }
-
     // =========================================================================
-    //  End-to-End Discovery Tests (SPI + MySQL read)
+    //  Default mode — shared subscription table
     // =========================================================================
 
     @Test
-    void testDiscoverTablesWithDefaultColumn() throws Exception {
-        // Load discoverer via SPI
-        TableDiscoverer discoverer =
-                TableDiscovererFactory.createDiscoverer(
-                        "jdbc", Thread.currentThread().getContextClassLoader());
-
-        // Build configuration
-        Configuration config = buildConfig("cdc_subscriptions", null);
-
-        // Open and discover
-        discoverer.open(
-                TableDiscovererFactory.createContext(
-                        config, Thread.currentThread().getContextClassLoader()));
-        try {
-            Set<TableId> discovered = discoverer.discover();
-            assertThat(discovered)
-                    .containsExactlyInAnyOrder(
-                            TableId.tableId("source_db", "orders"),
-                            TableId.tableId("source_db", "products"),
-                            TableId.tableId("analytics_db", "user_events"));
-        } finally {
-            discoverer.close();
-        }
-    }
-
-    @Test
-    void testDiscoverTablesWithCustomColumn() throws Exception {
-        TableDiscoverer discoverer =
-                TableDiscovererFactory.createDiscoverer(
-                        "jdbc", Thread.currentThread().getContextClassLoader());
-
-        Configuration config = buildConfig("custom_subscriptions", "table_fqn");
-
-        discoverer.open(
-                TableDiscovererFactory.createContext(
-                        config, Thread.currentThread().getContextClassLoader()));
-        try {
-            Set<TableId> discovered = discoverer.discover();
-            assertThat(discovered)
-                    .containsExactlyInAnyOrder(
-                            TableId.tableId("warehouse", "inventory"),
-                            TableId.tableId("warehouse", "shipments"));
-        } finally {
-            discoverer.close();
-        }
-    }
-
-    @Test
-    void testDiscoverReflectsDynamicChanges() throws Exception {
-        TableDiscoverer discoverer =
-                TableDiscovererFactory.createDiscoverer(
-                        "jdbc", Thread.currentThread().getContextClassLoader());
-
-        Configuration config = buildConfig("cdc_subscriptions", null);
-        discoverer.open(
-                TableDiscovererFactory.createContext(
-                        config, Thread.currentThread().getContextClassLoader()));
-        try {
-            // Initial discovery
-            Set<TableId> initial = discoverer.discover();
-            assertThat(initial).hasSize(3);
-
-            // Dynamically add a new subscription row
-            try (Connection conn =
-                            DriverManager.getConnection(
-                                    MYSQL.getJdbcUrl(), MYSQL.getUsername(), MYSQL.getPassword());
-                    Statement stmt = conn.createStatement()) {
-                stmt.execute("INSERT INTO cdc_subscriptions VALUES ('new_db.new_table')");
-            }
-
-            // Re-discover — should include the new entry
-            Set<TableId> updated = discoverer.discover();
-            assertThat(updated).hasSize(4);
-            assertThat(updated).contains(TableId.tableId("new_db", "new_table"));
-
-            // Cleanup: remove the added row to not affect other tests
-            try (Connection conn =
-                            DriverManager.getConnection(
-                                    MYSQL.getJdbcUrl(), MYSQL.getUsername(), MYSQL.getPassword());
-                    Statement stmt = conn.createStatement()) {
-                stmt.execute(
-                        "DELETE FROM cdc_subscriptions WHERE subscribe_table_name = 'new_db.new_table'");
-            }
-        } finally {
-            discoverer.close();
-        }
-    }
-
-    @Test
-    void testMissingRequiredConfigThrows() {
-        TableDiscoverer discoverer =
-                TableDiscovererFactory.createDiscoverer(
-                        "jdbc", Thread.currentThread().getContextClassLoader());
-
-        // Missing jdbc-url
+    void testDefaultModeWithDefaultColumns() throws Exception {
         Configuration config =
-                Configuration.fromMap(
-                        Map.of(
-                                "table.discoverer.jdbc.table-name", "some_table",
-                                "table.discoverer.jdbc.username", "user",
-                                "table.discoverer.jdbc.password", "pass"));
+                sharedTableConfigBuilder()
+                        .table("cdc_subscriptions")
+                        .subscribeId(SUBSCRIBE_ID_ORDERS)
+                        .build();
 
-        assertThatThrownBy(
-                        () ->
-                                discoverer.open(
-                                        TableDiscovererFactory.createContext(
-                                                config,
-                                                Thread.currentThread().getContextClassLoader())))
+        assertThat(runDiscovery(config))
+                .containsExactlyInAnyOrder(
+                        TableId.tableId("source_db", "orders"),
+                        TableId.tableId("source_db", "order_items"),
+                        TableId.tableId("source_db", "products"));
+    }
+
+    @Test
+    void testDefaultModeFiltersBySubscribeId() throws Exception {
+        Configuration config =
+                sharedTableConfigBuilder()
+                        .table("cdc_subscriptions")
+                        .subscribeId(SUBSCRIBE_ID_ANALYTICS)
+                        .build();
+
+        assertThat(runDiscovery(config))
+                .containsExactlyInAnyOrder(TableId.tableId("analytics_db", "user_events"));
+    }
+
+    @Test
+    void testDefaultModeWithCustomColumns() throws Exception {
+        Configuration config =
+                sharedTableConfigBuilder()
+                        .table("custom_subscriptions")
+                        .columnName("table_fqn")
+                        .subscribeIdColumn("sub_id")
+                        .subscribeId("warehouse-sub")
+                        .build();
+
+        assertThat(runDiscovery(config))
+                .containsExactlyInAnyOrder(
+                        TableId.tableId("warehouse", "inventory"),
+                        TableId.tableId("warehouse", "shipments"));
+    }
+
+    @Test
+    void testDefaultModeReflectsDynamicChanges() throws Exception {
+        Configuration config =
+                sharedTableConfigBuilder()
+                        .table("cdc_subscriptions")
+                        .subscribeId(SUBSCRIBE_ID_ANALYTICS)
+                        .build();
+
+        TableDiscoverer discoverer =
+                TableDiscovererFactory.createDiscoverer(
+                        "jdbc", Thread.currentThread().getContextClassLoader());
+        discoverer.open(
+                TableDiscovererFactory.createContext(
+                        config, Thread.currentThread().getContextClassLoader()));
+        try {
+            assertThat(discoverer.discover()).hasSize(1);
+
+            executeSql(
+                    "INSERT INTO cdc_subscriptions VALUES "
+                            + "('analytics-subscription', 'analytics_db.sessions')");
+            try {
+                Set<TableId> updated = discoverer.discover();
+                assertThat(updated)
+                        .containsExactlyInAnyOrder(
+                                TableId.tableId("analytics_db", "user_events"),
+                                TableId.tableId("analytics_db", "sessions"));
+            } finally {
+                executeSql(
+                        "DELETE FROM cdc_subscriptions WHERE subscribe_table_name "
+                                + "= 'analytics_db.sessions'");
+            }
+        } finally {
+            discoverer.close();
+        }
+    }
+
+    // =========================================================================
+    //  Advanced escape hatch — custom query
+    // =========================================================================
+
+    @Test
+    void testCustomQueryReadsFirstColumn() throws Exception {
+        Map<String, String> map = baseConnectionConfig();
+        map.put(
+                "table.discoverer.jdbc.subscribe-query",
+                "SELECT subscribe_table_name FROM cdc_subscriptions "
+                        + "WHERE subscribe_id = 'orders-subscription' "
+                        + "ORDER BY subscribe_table_name");
+
+        assertThat(runDiscovery(Configuration.fromMap(map)))
+                .containsExactlyInAnyOrder(
+                        TableId.tableId("source_db", "order_items"),
+                        TableId.tableId("source_db", "orders"),
+                        TableId.tableId("source_db", "products"));
+    }
+
+    @Test
+    void testCustomQueryOverridesDefaultModeOptions() throws Exception {
+        // Mix both modes: the custom-query option must win and silently ignore the default-mode
+        // options below (table-name / subscribe-id).
+        Map<String, String> map = baseConnectionConfig();
+        map.put("table.discoverer.jdbc.table-name", "cdc_subscriptions");
+        map.put("table.discoverer.jdbc.subscribe-id", SUBSCRIBE_ID_ANALYTICS);
+        map.put(
+                "table.discoverer.jdbc.subscribe-query",
+                "SELECT subscribe_table_name FROM cdc_subscriptions "
+                        + "WHERE subscribe_id = 'orders-subscription'");
+
+        assertThat(runDiscovery(Configuration.fromMap(map)))
+                .containsExactlyInAnyOrder(
+                        TableId.tableId("source_db", "orders"),
+                        TableId.tableId("source_db", "order_items"),
+                        TableId.tableId("source_db", "products"));
+    }
+
+    // =========================================================================
+    //  Validation
+    // =========================================================================
+
+    @Test
+    void testMissingJdbcUrlThrows() {
+        Map<String, String> map = new HashMap<>();
+        map.put("table.discoverer.jdbc.username", "user");
+        map.put("table.discoverer.jdbc.password", "pass");
+        map.put("table.discoverer.jdbc.table-name", "cdc_subscriptions");
+        map.put("table.discoverer.jdbc.subscribe-id", "x");
+
+        assertThatThrownBy(() -> runDiscovery(Configuration.fromMap(map)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("table.discoverer.jdbc.url");
+    }
+
+    @Test
+    void testDefaultModeMissingTableNameThrows() {
+        Map<String, String> map = baseConnectionConfig();
+        map.put("table.discoverer.jdbc.subscribe-id", SUBSCRIBE_ID_ORDERS);
+
+        assertThatThrownBy(() -> runDiscovery(Configuration.fromMap(map)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("table.discoverer.jdbc.table-name");
+    }
+
+    @Test
+    void testDefaultModeMissingSubscribeIdThrows() {
+        Map<String, String> map = baseConnectionConfig();
+        map.put("table.discoverer.jdbc.table-name", "cdc_subscriptions");
+
+        assertThatThrownBy(() -> runDiscovery(Configuration.fromMap(map)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("table.discoverer.jdbc.subscribe-id");
     }
 
     // =========================================================================
     //  Helpers
     // =========================================================================
 
-    private Configuration buildConfig(String tableName, String columnName) {
+    private Set<TableId> runDiscovery(Configuration config) throws Exception {
+        TableDiscoverer discoverer =
+                TableDiscovererFactory.createDiscoverer(
+                        "jdbc", Thread.currentThread().getContextClassLoader());
+        discoverer.open(
+                TableDiscovererFactory.createContext(
+                        config, Thread.currentThread().getContextClassLoader()));
+        try {
+            return discoverer.discover();
+        } finally {
+            discoverer.close();
+        }
+    }
+
+    private static Map<String, String> baseConnectionConfig() {
         Map<String, String> map = new HashMap<>();
         map.put("table.discoverer.jdbc.url", MYSQL.getJdbcUrl());
-        map.put("table.discoverer.jdbc.table-name", tableName);
         map.put("table.discoverer.jdbc.username", MYSQL.getUsername());
         map.put("table.discoverer.jdbc.password", MYSQL.getPassword());
-        if (columnName != null) {
-            map.put("table.discoverer.jdbc.column-name", columnName);
+        return map;
+    }
+
+    private static void executeSql(String sql) throws Exception {
+        try (Connection conn =
+                        DriverManager.getConnection(
+                                MYSQL.getJdbcUrl(), MYSQL.getUsername(), MYSQL.getPassword());
+                Statement stmt = conn.createStatement()) {
+            stmt.execute(sql);
         }
-        return Configuration.fromMap(map);
+    }
+
+    private SharedTableConfigBuilder sharedTableConfigBuilder() {
+        return new SharedTableConfigBuilder();
+    }
+
+    private static final class SharedTableConfigBuilder {
+        private String table;
+        private String columnName;
+        private String subscribeIdColumn;
+        private String subscribeId;
+
+        SharedTableConfigBuilder table(String table) {
+            this.table = table;
+            return this;
+        }
+
+        SharedTableConfigBuilder columnName(String columnName) {
+            this.columnName = columnName;
+            return this;
+        }
+
+        SharedTableConfigBuilder subscribeIdColumn(String subscribeIdColumn) {
+            this.subscribeIdColumn = subscribeIdColumn;
+            return this;
+        }
+
+        SharedTableConfigBuilder subscribeId(String subscribeId) {
+            this.subscribeId = subscribeId;
+            return this;
+        }
+
+        Configuration build() {
+            Map<String, String> map = baseConnectionConfig();
+            map.put("table.discoverer.jdbc.table-name", table);
+            map.put("table.discoverer.jdbc.subscribe-id", subscribeId);
+            if (columnName != null) {
+                map.put("table.discoverer.jdbc.column-name", columnName);
+            }
+            if (subscribeIdColumn != null) {
+                map.put("table.discoverer.jdbc.subscribe-id-column", subscribeIdColumn);
+            }
+            return Configuration.fromMap(map);
+        }
     }
 }
