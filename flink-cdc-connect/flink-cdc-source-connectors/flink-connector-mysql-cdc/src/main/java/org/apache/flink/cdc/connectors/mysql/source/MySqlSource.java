@@ -28,6 +28,7 @@ import org.apache.flink.api.java.typeutils.ResultTypeQueryable;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.annotation.PublicEvolving;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
+import org.apache.flink.cdc.common.lineage.LineageUtils;
 import org.apache.flink.cdc.connectors.mysql.MySqlValidator;
 import org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils;
 import org.apache.flink.cdc.connectors.mysql.source.assigners.MySqlBinlogSplitAssigner;
@@ -54,6 +55,8 @@ import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
 import org.apache.flink.metrics.MetricGroup;
+import org.apache.flink.streaming.api.lineage.LineageVertex;
+import org.apache.flink.streaming.api.lineage.LineageVertexProvider;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import io.debezium.jdbc.JdbcConnection;
@@ -61,6 +64,9 @@ import io.debezium.jdbc.JdbcConnection;
 import java.io.Serializable;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.function.Supplier;
 
 /**
@@ -93,7 +99,9 @@ import java.util.function.Supplier;
  */
 @Internal
 public class MySqlSource<T>
-        implements Source<T, MySqlSplit, PendingSplitsState>, ResultTypeQueryable<T> {
+        implements Source<T, MySqlSplit, PendingSplitsState>,
+                ResultTypeQueryable<T>,
+                LineageVertexProvider {
 
     private static final long serialVersionUID = 1L;
 
@@ -102,6 +110,8 @@ public class MySqlSource<T>
     private final MySqlSourceConfigFactory configFactory;
     private final DebeziumDeserializationSchema<T> deserializationSchema;
     private final RecordEmitterSupplier<T> recordEmitterSupplier;
+    private final List<String> tableList;
+    private final Map<String, LinkedHashMap<String, String>> tableSchemas;
 
     // Actions to perform during the snapshot phase.
     // This field is introduced for testing purpose, for example testing if changes made in the
@@ -138,9 +148,20 @@ public class MySqlSource<T>
             MySqlSourceConfigFactory configFactory,
             DebeziumDeserializationSchema<T> deserializationSchema,
             RecordEmitterSupplier<T> recordEmitterSupplier) {
+        this(configFactory, deserializationSchema, recordEmitterSupplier, null, null);
+    }
+
+    MySqlSource(
+            MySqlSourceConfigFactory configFactory,
+            DebeziumDeserializationSchema<T> deserializationSchema,
+            RecordEmitterSupplier<T> recordEmitterSupplier,
+            List<String> tableList,
+            Map<String, LinkedHashMap<String, String>> tableSchemas) {
         this.configFactory = configFactory;
         this.deserializationSchema = deserializationSchema;
         this.recordEmitterSupplier = recordEmitterSupplier;
+        this.tableList = tableList;
+        this.tableSchemas = tableSchemas;
     }
 
     public MySqlSourceConfigFactory getConfigFactory() {
@@ -155,6 +176,18 @@ public class MySqlSource<T>
         } else {
             return Boundedness.CONTINUOUS_UNBOUNDED;
         }
+    }
+
+    @Override
+    public LineageVertex getLineageVertex() {
+        MySqlSourceConfig sourceConfig = configFactory.createConfig(0);
+        return LineageUtils.sourceLineageVertex(
+                "mysql",
+                sourceConfig.getHostname(),
+                sourceConfig.getPort(),
+                sourceConfig.getStartupOptions().isSnapshotOnly(),
+                tableList,
+                tableSchemas);
     }
 
     @Override
