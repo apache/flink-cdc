@@ -71,7 +71,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.SQLException;
-import java.util.List;
 
 import static io.debezium.connector.AbstractSourceInfo.SCHEMA_NAME_KEY;
 import static io.debezium.connector.AbstractSourceInfo.TABLE_NAME_KEY;
@@ -337,6 +336,12 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
     }
 
     @Override
+    public boolean isDataChangeRecord(SourceRecord record) {
+        // logical message (which op is 'm') is not a data change record.
+        return PostgresSourceRecordUtils.isDataChangeRecord(record);
+    }
+
+    @Override
     public Offset getStreamOffset(SourceRecord sourceRecord) {
         return PostgresOffset.of(sourceRecord);
     }
@@ -393,22 +398,5 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
             return tableId.table();
         }
         return tableId.schema() + "." + tableId.table();
-    }
-
-    @Override
-    public boolean shouldEmit(SourceRecord record) {
-        if (!((PostgresSourceConfig) sourceConfig).isLogicalMessageEnabled()) {
-            return true;
-        }
-        if (PostgresSourceRecordUtils.isLogicalMessage(record)) {
-            List<String> prefixes =
-                    ((PostgresSourceConfig) sourceConfig).getLogicalMessagePrefixes();
-            if (prefixes == null || prefixes.isEmpty()) {
-                return true;
-            }
-            String prefix = PostgresSourceRecordUtils.getLogicalMessagePrefix(record);
-            return prefixes.stream().anyMatch(p -> prefix.startsWith(p));
-        }
-        return true;
     }
 }

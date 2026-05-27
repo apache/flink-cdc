@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.postgres.source.utils;
 
 import io.debezium.data.Envelope;
+import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 
@@ -41,6 +42,16 @@ public final class PostgresSourceRecordUtils {
         return false;
     }
 
+    public static boolean isDataChangeRecord(SourceRecord record) {
+        Schema valueSchema = record.valueSchema();
+        Struct value = (Struct) record.value();
+        return value != null
+                && valueSchema != null
+                && valueSchema.field(Envelope.FieldName.OPERATION) != null
+                && value.getString(Envelope.FieldName.OPERATION) != null
+                && !isLogicalMessage(record);
+    }
+
     /**
      * Returns the prefix of a logical message.
      *
@@ -49,8 +60,8 @@ public final class PostgresSourceRecordUtils {
      */
     public static String getLogicalMessagePrefix(SourceRecord record) {
         if (record.value() instanceof Struct) {
-            Struct struct = (Struct) record.value();
-            return struct.getString("message_prefix");
+            Struct struct = (Struct) record.key();
+            return struct.getString("prefix");
         }
         return null;
     }

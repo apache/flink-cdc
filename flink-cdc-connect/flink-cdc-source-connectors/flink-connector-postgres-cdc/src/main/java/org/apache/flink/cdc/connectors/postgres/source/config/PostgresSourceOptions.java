@@ -24,7 +24,6 @@ import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
 
 import java.time.Duration;
-import java.util.List;
 
 /** Configurations for {@link PostgresSourceBuilder.PostgresIncrementalSource}. */
 public class PostgresSourceOptions extends JdbcSourceOptions {
@@ -98,27 +97,6 @@ public class PostgresSourceOptions extends JdbcSourceOptions {
                                     + "If enabled:\n"
                                     + "(1) PUBLICATION must be created beforehand with parameter publish_via_partition_root=true\n"
                                     + "(2) Table list (regex or predefined list) should only match the parent table name, if table list matches both parent and child tables, snapshot data will be read twice.");
-
-    public static final ConfigOption<Boolean> LOGICAL_MESSAGE_ENABLED =
-            ConfigOptions.key("logical-message.enabled")
-                    .booleanType()
-                    .defaultValue(false)
-                    .withDescription(
-                            "Whether to emit Postgres logical messages produced by "
-                                    + "pg_logical_emit_message() to the deserializer. "
-                                    + "Disabled by default. "
-                                    + "PostgreSQL versions 14+ support logical messages in pgoutput. "
-                                    + "To enable this feature, set 'wal_level' to 'logical' in postgresql.conf.");
-
-    public static final ConfigOption<List<String>> LOGICAL_MESSAGE_PREFIXES =
-            ConfigOptions.key("logical-message.prefixes")
-                    .stringType()
-                    .asList()
-                    .noDefaultValue()
-                    .withDescription(
-                            "A comma-separated list of prefixes for logical messages. "
-                                    + "Only messages with a matching prefix will be emitted. "
-                                    + "This is useful for distinguishing between different message types.");
 
     public static final ConfigOption<Boolean> TABLE_ID_INCLUDE_DATABASE =
             ConfigOptions.key("table-id.include-database")

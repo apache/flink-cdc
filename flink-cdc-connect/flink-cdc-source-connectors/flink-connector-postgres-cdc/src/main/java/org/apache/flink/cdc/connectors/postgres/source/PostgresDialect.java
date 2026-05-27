@@ -26,7 +26,6 @@ import org.apache.flink.cdc.connectors.base.source.assigner.state.ChunkSplitterS
 import org.apache.flink.cdc.connectors.base.source.meta.offset.Offset;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.reader.external.FetchTask;
-import org.apache.flink.cdc.connectors.base.source.reader.external.IncrementalSourceStreamFetcher;
 import org.apache.flink.cdc.connectors.base.source.reader.external.JdbcSourceFetchTaskContext;
 import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfig;
 import org.apache.flink.cdc.connectors.postgres.source.fetch.PostgresScanFetchTask;
@@ -238,12 +237,6 @@ public class PostgresDialect implements JdbcDataSourceDialect {
     @Override
     public JdbcSourceFetchTaskContext createFetchTaskContext(JdbcSourceConfig taskSourceConfig) {
         return new PostgresSourceFetchTaskContext(taskSourceConfig, this);
-    }
-
-    @Override
-    public IncrementalSourceStreamFetcher createStreamFetcher(
-            FetchTask.Context taskContext, int subtaskId) {
-        return new IncrementalSourceStreamFetcher(taskContext, subtaskId);
     }
 
     @Override

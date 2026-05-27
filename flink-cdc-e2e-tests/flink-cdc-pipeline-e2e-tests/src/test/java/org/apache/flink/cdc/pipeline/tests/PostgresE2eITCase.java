@@ -184,18 +184,18 @@ public class PostgresE2eITCase extends PipelineTestEnvironment {
             // Test ADD COLUMN
             stat.execute("ALTER TABLE inventory.products ADD COLUMN category VARCHAR(255);");
             stat.execute(
-                    "INSERT INTO inventory.products VALUES (default, 'widget', 'A small widget', 1.5, 'tools');");
+                    "INSERT INTO inventory.products VALUES (default, 'widget', 'A small widget', 1.5, '2024-01-06T15:30+00', 'tools');");
 
             // Test DROP COLUMN
             stat.execute("ALTER TABLE inventory.products DROP COLUMN weight;");
             stat.execute(
-                    "INSERT INTO inventory.products VALUES (default, 'gadget', 'A useful gadget', 'electronics');");
+                    "INSERT INTO inventory.products VALUES (default, 'gadget', 'A useful gadget', '2024-01-06T15:30+00', 'electronics');");
 
             // Test RENAME COLUMN
             stat.execute(
                     "ALTER TABLE inventory.products RENAME COLUMN category TO product_category;");
             stat.execute(
-                    "INSERT INTO inventory.products VALUES (default, 'gizmo', 'A fancy gizmo', 'gadgets');");
+                    "INSERT INTO inventory.products VALUES (default, 'gizmo', 'A fancy gizmo', '2024-01-06T15:30+00', 'gadgets');");
         } catch (Exception e) {
             LOG.error("Schema change test failed.", e);
             throw new RuntimeException(e);
@@ -205,16 +205,16 @@ public class PostgresE2eITCase extends PipelineTestEnvironment {
         waitUntilSpecificEvent(
                 "AddColumnEvent{tableId=inventory.products, addedColumns=[ColumnWithPosition{column=`category` VARCHAR(255), position=LAST, existedColumnName=null}]}");
         waitUntilSpecificEvent(
-                "DataChangeEvent{tableId=inventory.products, before=[], after=[110, widget, A small widget, 1.5, tools], op=INSERT, meta=()}");
+                "DataChangeEvent{tableId=inventory.products, before=[], after=[110, widget, A small widget, 1.5, 2024-01-06T15:30, tools], op=INSERT, meta=()}");
 
         waitUntilSpecificEvent(
                 "DropColumnEvent{tableId=inventory.products, droppedColumnNames=[weight]}");
         waitUntilSpecificEvent(
-                "DataChangeEvent{tableId=inventory.products, before=[], after=[111, gadget, A useful gadget, electronics], op=INSERT, meta=()}");
+                "DataChangeEvent{tableId=inventory.products, before=[], after=[111, gadget, A useful gadget, 2024-01-06T15:30, electronics], op=INSERT, meta=()}");
 
         waitUntilSpecificEvent(
                 "RenameColumnEvent{tableId=inventory.products, nameMapping={category=product_category}}");
         waitUntilSpecificEvent(
-                "DataChangeEvent{tableId=inventory.products, before=[], after=[112, gizmo, A fancy gizmo, gadgets], op=INSERT, meta=()}");
+                "DataChangeEvent{tableId=inventory.products, before=[], after=[112, gizmo, A fancy gizmo, 2024-01-06T15:30, gadgets], op=INSERT, meta=()}");
     }
 }

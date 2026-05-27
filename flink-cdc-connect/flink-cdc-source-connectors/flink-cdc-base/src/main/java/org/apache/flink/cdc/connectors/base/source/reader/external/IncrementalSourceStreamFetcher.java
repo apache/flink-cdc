@@ -186,9 +186,6 @@ public class IncrementalSourceStreamFetcher implements Fetcher<SourceRecords, So
      * </pre>
      */
     protected boolean shouldEmit(SourceRecord sourceRecord) {
-        if (!taskContext.shouldEmit(sourceRecord)) {
-            return false;
-        }
         if (taskContext.isDataChangeRecord(sourceRecord)) {
             TableId tableId = taskContext.getTableId(sourceRecord);
             Offset position = taskContext.getStreamOffset(sourceRecord);

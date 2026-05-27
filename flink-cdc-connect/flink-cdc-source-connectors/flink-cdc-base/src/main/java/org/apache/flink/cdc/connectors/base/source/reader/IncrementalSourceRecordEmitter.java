@@ -24,6 +24,7 @@ import org.apache.flink.cdc.connectors.base.source.meta.split.SourceRecords;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitState;
 import org.apache.flink.cdc.connectors.base.source.metrics.SourceReaderMetrics;
+import org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.cdc.debezium.history.FlinkJsonTableChangeSerializer;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
@@ -124,6 +125,10 @@ public class IncrementalSourceRecordEmitter<T>
                     "Meet unknown element {} for splitState = {}, just skip.", element, splitState);
             sourceReaderMetrics.addNumRecordsInErrors(1L);
         }
+    }
+
+    protected boolean isDataChangeRecord(SourceRecord record) {
+        return SourceRecordUtils.isDataChangeRecord(record);
     }
 
     protected TableChanges getTableChangeRecord(SourceRecord element) throws IOException {
