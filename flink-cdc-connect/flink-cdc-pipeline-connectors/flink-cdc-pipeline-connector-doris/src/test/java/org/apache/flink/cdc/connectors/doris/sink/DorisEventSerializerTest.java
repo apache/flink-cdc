@@ -1129,6 +1129,72 @@ public class DorisEventSerializerTest {
     }
 
     @Test
+    public void testJsonSerializationSkipsDorisOnlyDefaultColumns() throws IOException {
+        TableId tableId = TableId.parse("doris_database.json_default_column_table");
+        Schema inputSchema =
+                Schema.newBuilder()
+                        .physicalColumn("_id_", DataTypes.BIGINT())
+                        .physicalColumn("_create_time_", DataTypes.TIMESTAMP())
+                        .physicalColumn("_db_", DataTypes.STRING())
+                        .physicalColumn("_tb_", DataTypes.STRING())
+                        .physicalColumn("_op_", DataTypes.STRING())
+                        .physicalColumn("id", DataTypes.BIGINT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .physicalColumn("create_time", DataTypes.TIMESTAMP())
+                        .primaryKey("_id_")
+                        .build();
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(((RowType) inputSchema.toRowDataType()));
+
+        DorisEventSerializer serializer =
+                new DorisEventSerializer(
+                        ZoneId.of("UTC"),
+                        new Configuration(),
+                        DorisExecutionOptions.defaults(),
+                        null,
+                        DorisEventSerializer.createJsonFieldMappingResolver(
+                                createDorisOptions(),
+                                (options, requestedTableId) ->
+                                        createDorisSchema(
+                                                "_id_",
+                                                "_create_time_",
+                                                "confluent__last_updated",
+                                                "_db_",
+                                                "_tb_",
+                                                "_op_",
+                                                "id",
+                                                "name",
+                                                "create_time"),
+                                10L,
+                                1L));
+        serializer.serialize(new CreateTableEvent(tableId, inputSchema));
+
+        TimestampData createTime =
+                TimestampData.fromLocalDateTime(
+                        LocalDateTime.of(2026, 5, 28, 10, 20, 30, 123000000));
+        DorisRecord dorisRecord =
+                serializer.serialize(
+                        DataChangeEvent.insertEvent(
+                                tableId,
+                                generator.generate(
+                                        new Object[] {
+                                            1L,
+                                            createTime,
+                                            BinaryStringData.fromString("test"),
+                                            BinaryStringData.fromString("student"),
+                                            BinaryStringData.fromString("+I"),
+                                            1L,
+                                            BinaryStringData.fromString("Alice"),
+                                            createTime
+                                        })));
+
+        JsonNode jsonNode = objectMapper.readTree(dorisRecord.getRow());
+        Assertions.assertThat(jsonNode.has("confluent__last_updated")).isFalse();
+        Assertions.assertThat(jsonNode.get("_id_").asLong()).isEqualTo(1L);
+        Assertions.assertThat(jsonNode.get("name").asText()).isEqualTo("Alice");
+    }
+
+    @Test
     public void testWaitUntilDorisSchemaCoversInputSchemaWithinTimeBudget() {
         TableId tableId = TableId.parse("doris_database.json_schema_time_budget_table");
         Schema baseSchema =

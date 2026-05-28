@@ -570,7 +570,9 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
                 Column inputColumn =
                         DorisSchemaUtils.getColumnCaseInsensitive(inputSchema, field.getName())
                                 .orElse(null);
-                mapping.put(field.getName(), inputColumn == null ? null : inputColumn.getName());
+                if (inputColumn != null) {
+                    mapping.put(field.getName(), inputColumn.getName());
+                }
             }
             return mapping;
         };
