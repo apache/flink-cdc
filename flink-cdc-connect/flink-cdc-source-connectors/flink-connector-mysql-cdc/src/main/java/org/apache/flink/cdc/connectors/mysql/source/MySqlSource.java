@@ -28,6 +28,7 @@ import org.apache.flink.api.java.typeutils.ResultTypeQueryable;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.annotation.PublicEvolving;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
+import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.lineage.LineageUtils;
 import org.apache.flink.cdc.connectors.mysql.MySqlValidator;
 import org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils;
@@ -59,15 +60,20 @@ import org.apache.flink.streaming.api.lineage.LineageVertex;
 import org.apache.flink.streaming.api.lineage.LineageVertexProvider;
 import org.apache.flink.util.FlinkRuntimeException;
 
+import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.jdbc.JdbcConnection;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 /**
  * The MySQL CDC Source based on FLIP-27 and Watermark Signal Algorithm which supports parallel
@@ -105,13 +111,15 @@ public class MySqlSource<T>
 
     private static final long serialVersionUID = 1L;
 
+    private static final Logger LOG = LoggerFactory.getLogger(MySqlSource.class);
+
     private static final String ENUMERATOR_SERVER_NAME = "mysql_source_split_enumerator";
 
     private final MySqlSourceConfigFactory configFactory;
     private final DebeziumDeserializationSchema<T> deserializationSchema;
     private final RecordEmitterSupplier<T> recordEmitterSupplier;
     private final List<String> tableList;
-    private final Map<String, LinkedHashMap<String, String>> tableSchemas;
+    private transient Map<String, LinkedHashMap<String, String>> fetchedLineageTableSchemas;
 
     // Actions to perform during the snapshot phase.
     // This field is introduced for testing purpose, for example testing if changes made in the
@@ -148,20 +156,18 @@ public class MySqlSource<T>
             MySqlSourceConfigFactory configFactory,
             DebeziumDeserializationSchema<T> deserializationSchema,
             RecordEmitterSupplier<T> recordEmitterSupplier) {
-        this(configFactory, deserializationSchema, recordEmitterSupplier, null, null);
+        this(configFactory, deserializationSchema, recordEmitterSupplier, null);
     }
 
     MySqlSource(
             MySqlSourceConfigFactory configFactory,
             DebeziumDeserializationSchema<T> deserializationSchema,
             RecordEmitterSupplier<T> recordEmitterSupplier,
-            List<String> tableList,
-            Map<String, LinkedHashMap<String, String>> tableSchemas) {
+            List<String> tableList) {
         this.configFactory = configFactory;
         this.deserializationSchema = deserializationSchema;
         this.recordEmitterSupplier = recordEmitterSupplier;
-        this.tableList = tableList;
-        this.tableSchemas = tableSchemas;
+        this.tableList = tableList == null ? null : new ArrayList<>(tableList);
     }
 
     public MySqlSourceConfigFactory getConfigFactory() {
@@ -181,13 +187,80 @@ public class MySqlSource<T>
     @Override
     public LineageVertex getLineageVertex() {
         MySqlSourceConfig sourceConfig = configFactory.createConfig(0);
+
+        /*
+         * Note: Flink collects lineage during job graph construction, so this includes tables that
+         * already exist when the job is submitted. If `scan.binlog.newly-added-table.enabled` later
+         * captures newly created tables while the job is running, those tables appear in lineage
+         * in the next job submission.
+         */
         return LineageUtils.sourceLineageVertex(
                 "mysql",
                 sourceConfig.getHostname(),
                 sourceConfig.getPort(),
                 sourceConfig.getStartupOptions().isSnapshotOnly(),
                 tableList,
-                tableSchemas);
+                fetchLineageTableSchemas(sourceConfig));
+    }
+
+    /** Fetch table schemas for lineage schema facets, only called when lineage is enabled. */
+    private synchronized Map<String, LinkedHashMap<String, String>> fetchLineageTableSchemas(
+            MySqlSourceConfig sourceConfig) {
+        if (fetchedLineageTableSchemas != null) {
+            return fetchedLineageTableSchemas;
+        }
+        Map<String, LinkedHashMap<String, String>> schemas = new HashMap<>();
+        if (tableList == null || tableList.isEmpty()) {
+            fetchedLineageTableSchemas = schemas;
+            return fetchedLineageTableSchemas;
+        }
+        List<TableId> tableIds =
+                tableList.stream().map(TableId::parse).collect(Collectors.toList());
+        tableList.forEach(table -> schemas.put(table, new LinkedHashMap<>()));
+        try (MySqlConnection jdbc = DebeziumUtils.createMySqlConnection(sourceConfig)) {
+            jdbc.query(
+                    "SELECT TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE "
+                            + "FROM information_schema.COLUMNS WHERE "
+                            + tableFilter(tableIds)
+                            + " ORDER BY TABLE_SCHEMA, TABLE_NAME, ORDINAL_POSITION",
+                    rs -> {
+                        while (rs.next()) {
+                            String table =
+                                    TableId.tableId(
+                                                    rs.getString("TABLE_SCHEMA"),
+                                                    rs.getString("TABLE_NAME"))
+                                            .toString();
+                            LinkedHashMap<String, String> fields = schemas.get(table);
+                            if (fields != null) {
+                                String type = rs.getString("COLUMN_TYPE");
+                                String nullable = rs.getString("IS_NULLABLE");
+                                fields.put(
+                                        rs.getString("COLUMN_NAME"),
+                                        "YES".equals(nullable) ? type : type + " NOT NULL");
+                            }
+                        }
+                    });
+        } catch (Exception e) {
+            LOG.warn("Failed to fetch table schemas for lineage: {}", e.getMessage());
+        }
+        fetchedLineageTableSchemas = schemas;
+        return fetchedLineageTableSchemas;
+    }
+
+    private static String tableFilter(List<TableId> tableIds) {
+        return tableIds.stream()
+                .map(
+                        tableId ->
+                                "(TABLE_SCHEMA = "
+                                        + quoteStringLiteral(tableId.getSchemaName())
+                                        + " AND TABLE_NAME = "
+                                        + quoteStringLiteral(tableId.getTableName())
+                                        + ")")
+                .collect(Collectors.joining(" OR "));
+    }
+
+    private static String quoteStringLiteral(String literal) {
+        return "'" + literal.replace("'", "''") + "'";
     }
 
     @Override

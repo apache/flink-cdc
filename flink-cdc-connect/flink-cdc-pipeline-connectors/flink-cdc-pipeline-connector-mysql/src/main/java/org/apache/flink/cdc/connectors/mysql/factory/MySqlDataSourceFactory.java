@@ -29,9 +29,7 @@ import org.apache.flink.cdc.common.pipeline.RuntimeExecutionMode;
 import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.common.utils.StringUtils;
-import org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils;
 import org.apache.flink.cdc.connectors.mysql.source.MySqlDataSource;
-import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import org.apache.flink.cdc.connectors.mysql.source.config.ServerIdRange;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
@@ -45,7 +43,6 @@ import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.ObjectPath;
 
 import com.mysql.cj.conf.PropertyKey;
-import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.relational.RelationalDatabaseConnectorConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,7 +55,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -228,13 +224,16 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
 
         List<TableId> tableIds = MySqlSchemaUtils.listTables(configFactory.createConfig(0), null);
 
-        // Resolve concrete table names for lineage (always, regardless of binlog mode)
         Selectors tableSelectors = new Selectors.SelectorsBuilder().includeTables(tables).build();
-        List<String> tableList = getTableList(tableIds, tableSelectors);
+        List<String> capturedTables = getTableList(tableIds, tableSelectors);
+        boolean hasIncludedTables = !capturedTables.isEmpty();
         if (tablesExclude != null) {
-            Selectors excludeSelectors =
+            Selectors selectExclude =
                     new Selectors.SelectorsBuilder().includeTables(tablesExclude).build();
-            tableList.removeAll(getTableList(tableIds, excludeSelectors));
+            List<String> excludeTables = getTableList(tableIds, selectExclude);
+            if (!excludeTables.isEmpty()) {
+                capturedTables.removeAll(excludeTables);
+            }
         }
 
         if (scanBinlogNewlyAddedTableEnabled && scanNewlyAddedTableEnabled) {
@@ -248,24 +247,14 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
             configFactory.excludeTableList(tablesExclude);
 
         } else {
-            Selectors selectors = new Selectors.SelectorsBuilder().includeTables(tables).build();
-            List<String> capturedTables = getTableList(tableIds, selectors);
-            if (capturedTables.isEmpty()) {
+            if (!hasIncludedTables) {
                 throw new IllegalArgumentException(
                         "Cannot find any table by the option 'tables' = " + tables);
             }
-            if (tablesExclude != null) {
-                Selectors selectExclude =
-                        new Selectors.SelectorsBuilder().includeTables(tablesExclude).build();
-                List<String> excludeTables = getTableList(tableIds, selectExclude);
-                if (!excludeTables.isEmpty()) {
-                    capturedTables.removeAll(excludeTables);
-                }
-                if (capturedTables.isEmpty()) {
-                    throw new IllegalArgumentException(
-                            "Cannot find any table with by the option 'tables.exclude'  = "
-                                    + tablesExclude);
-                }
+            if (capturedTables.isEmpty()) {
+                throw new IllegalArgumentException(
+                        "Cannot find any table with by the option 'tables.exclude'  = "
+                                + tablesExclude);
             }
             configFactory.tableList(capturedTables.toArray(new String[0]));
         }
@@ -297,13 +286,9 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
             LOG.info("Add chunkKeyColumn {}.", chunkKeyColumnMap);
             configFactory.chunkKeyColumn(chunkKeyColumnMap);
         }
-        // Fetch table schemas for lineage.
-        Map<String, LinkedHashMap<String, String>> tableSchemas =
-                fetchTableSchemas(configFactory, tableList);
-
         String metadataList = config.get(METADATA_LIST);
         List<MySqlReadableMetadata> readableMetadataList = listReadableMetadata(metadataList);
-        return new MySqlDataSource(configFactory, readableMetadataList, tableList, tableSchemas);
+        return new MySqlDataSource(configFactory, readableMetadataList, capturedTables);
     }
 
     private List<MySqlReadableMetadata> listReadableMetadata(String metadataList) {
@@ -543,50 +528,5 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
                     SERVER_TIME_ZONE.key());
             return ZoneId.systemDefault();
         }
-    }
-
-    /** Fetch table schemas for lineage schema facets. */
-    private static Map<String, LinkedHashMap<String, String>> fetchTableSchemas(
-            MySqlSourceConfigFactory configFactory, List<String> tableList) {
-        Map<String, LinkedHashMap<String, String>> schemas = new HashMap<>();
-        if (tableList == null || tableList.isEmpty()) {
-            return schemas;
-        }
-        try {
-            MySqlSourceConfig sourceConfig = configFactory.createConfig(0);
-            try (MySqlConnection jdbc = DebeziumUtils.createMySqlConnection(sourceConfig)) {
-                for (String table : tableList) {
-                    try {
-                        TableId tableId = TableId.parse(table);
-                        LinkedHashMap<String, String> fields = new LinkedHashMap<>();
-                        jdbc.query(
-                                "SHOW COLUMNS FROM "
-                                        + quoteIdentifier(tableId.getTableName())
-                                        + " FROM "
-                                        + quoteIdentifier(tableId.getSchemaName()),
-                                rs -> {
-                                    while (rs.next()) {
-                                        String name = rs.getString("Field");
-                                        String type = rs.getString("Type");
-                                        String nullable = rs.getString("Null");
-                                        fields.put(
-                                                name,
-                                                "YES".equals(nullable) ? type : type + " NOT NULL");
-                                    }
-                                });
-                        schemas.put(table, fields);
-                    } catch (Exception e) {
-                        LOG.warn("Failed to fetch schema for table {}: {}", table, e.getMessage());
-                    }
-                }
-            }
-        } catch (Exception e) {
-            LOG.warn("Failed to fetch table schemas for lineage: {}", e.getMessage());
-        }
-        return schemas;
-    }
-
-    private static String quoteIdentifier(String identifier) {
-        return "`" + identifier.replace("`", "``") + "`";
     }
 }

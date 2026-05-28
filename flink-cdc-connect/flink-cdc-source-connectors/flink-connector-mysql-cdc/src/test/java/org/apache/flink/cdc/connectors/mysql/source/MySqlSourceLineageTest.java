@@ -20,7 +20,6 @@ package org.apache.flink.cdc.connectors.mysql.source;
 import org.apache.flink.api.connector.source.Boundedness;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
-import org.apache.flink.streaming.api.lineage.DatasetSchemaFacet;
 import org.apache.flink.streaming.api.lineage.LineageDataset;
 import org.apache.flink.streaming.api.lineage.SourceLineageVertex;
 
@@ -28,9 +27,6 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 import java.time.ZoneId;
-import java.util.Arrays;
-import java.util.LinkedHashMap;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -38,34 +34,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 class MySqlSourceLineageTest {
 
     @Test
-    void testGetLineageVertexUsesInjectedTablesAndSchemas() {
-        LinkedHashMap<String, String> customersSchema = new LinkedHashMap<>();
-        customersSchema.put("id", "int NOT NULL");
-        customersSchema.put("name", "varchar(255)");
-        Map<String, LinkedHashMap<String, String>> tableSchemas =
-                java.util.Collections.singletonMap("db.customers", customersSchema);
-
+    void testGetLineageVertexFallsBackToConnectorDatasetWithoutTables() {
         MySqlSource<String> source =
                 new MySqlSource<>(
                         configFactory(StartupOptions.initial()),
                         null,
-                        (metrics, sourceConfig) -> null,
-                        Arrays.asList("db.customers", "db.orders"),
-                        tableSchemas);
+                        (metrics, sourceConfig) -> null);
 
         SourceLineageVertex vertex = (SourceLineageVertex) source.getLineageVertex();
 
         assertThat(vertex.boundedness()).isEqualTo(Boundedness.CONTINUOUS_UNBOUNDED);
-        assertThat(vertex.datasets())
-                .extracting(LineageDataset::name)
-                .containsExactly("db.customers", "db.orders");
+        assertThat(vertex.datasets()).extracting(LineageDataset::name).containsExactly("mysql");
         assertThat(vertex.datasets().get(0).namespace()).isEqualTo("mysql://mysql-host:3307");
-
-        DatasetSchemaFacet schemaFacet =
-                (DatasetSchemaFacet) vertex.datasets().get(0).facets().get("schema");
-        assertThat(schemaFacet.fields().get("id").type()).isEqualTo("int NOT NULL");
-        assertThat(schemaFacet.fields().get("name").type()).isEqualTo("varchar(255)");
-        assertThat(vertex.datasets().get(1).facets()).doesNotContainKey("schema");
+        assertThat(vertex.datasets().get(0).facets()).doesNotContainKey("schema");
     }
 
     @Test
@@ -74,9 +55,7 @@ class MySqlSourceLineageTest {
                 new MySqlSource<>(
                         configFactory(StartupOptions.snapshot()),
                         null,
-                        (metrics, sourceConfig) -> null,
-                        java.util.Collections.singletonList("db.customers"),
-                        java.util.Collections.emptyMap());
+                        (metrics, sourceConfig) -> null);
 
         SourceLineageVertex vertex = (SourceLineageVertex) source.getLineageVertex();
 

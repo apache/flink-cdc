@@ -35,9 +35,7 @@ import org.apache.flink.cdc.debezium.table.DebeziumChangelogMode;
 import io.debezium.relational.RelationalDatabaseConnectorConfig;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 /** A {@link DataSource} for mysql cdc connector. */
 @Internal
@@ -46,30 +44,27 @@ public class MySqlDataSource implements DataSource {
     private final MySqlSourceConfigFactory configFactory;
     private final MySqlSourceConfig sourceConfig;
     private final List<String> tableList;
-    private final Map<String, LinkedHashMap<String, String>> tableSchemas;
 
     private List<MySqlReadableMetadata> readableMetadataList;
 
     public MySqlDataSource(MySqlSourceConfigFactory configFactory) {
-        this(configFactory, new ArrayList<>(), null, null);
+        this(configFactory, new ArrayList<>(), null);
     }
 
     public MySqlDataSource(
             MySqlSourceConfigFactory configFactory,
             List<MySqlReadableMetadata> readableMetadataList) {
-        this(configFactory, readableMetadataList, null, null);
+        this(configFactory, readableMetadataList, null);
     }
 
     public MySqlDataSource(
             MySqlSourceConfigFactory configFactory,
             List<MySqlReadableMetadata> readableMetadataList,
-            List<String> tableList,
-            Map<String, LinkedHashMap<String, String>> tableSchemas) {
+            List<String> tableList) {
         this.configFactory = configFactory;
         this.sourceConfig = configFactory.createConfig(0);
         this.readableMetadataList = readableMetadataList;
         this.tableList = tableList;
-        this.tableSchemas = tableSchemas;
     }
 
     @Override
@@ -100,8 +95,7 @@ public class MySqlDataSource implements DataSource {
                                         sourceReaderMetrics,
                                         sourceConfig,
                                         isTableIdCaseInsensitive),
-                        tableList,
-                        tableSchemas);
+                        tableList);
 
         return FlinkSourceProvider.of(source);
     }
