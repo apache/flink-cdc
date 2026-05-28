@@ -47,7 +47,6 @@ import static org.apache.flink.cdc.connectors.base.source.meta.wartermark.Waterm
 import static org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils.getFetchTimestamp;
 import static org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils.getHistoryRecord;
 import static org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils.getMessageTimestamp;
-import static org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils.isDataChangeRecord;
 import static org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils.isHeartbeatEvent;
 import static org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils.isSchemaChangeEvent;
 

@@ -103,7 +103,6 @@ public class PostgresSourceReaderTest extends PostgresTestBase {
         PostgresSourceConfigFactory configFactory = createConfigFactory();
         configFactory.includeLogicalMessages(Collections.singletonList("test_prefix"));
         PostgresSourceConfig sourceConfig = configFactory.create(0);
-        final SimpleReaderOutput output;
         try (PostgresDialect dialect = new PostgresDialect(sourceConfig);
                 PostgresSourceReader reader =
                         createStreamReaderWithLogicalMessage(
@@ -144,28 +143,20 @@ public class PostgresSourceReaderTest extends PostgresTestBase {
             Thread.sleep(2000L);
 
             // Poll records so the emitter processes all events
-            output = new SimpleReaderOutput();
-            for (int i = 0; i < 30; i++) {
-                reader.pollNext(output);
-            }
+            List<String> results = consumeStreamRecords(reader, dataType, 4);
+            // Verify ordering and filtering:
+            // - message1 (test_prefix) is captured
+            // - insert between_msg is captured
+            // - message2 (other_prefix) is filtered out
+            // - insert after_other is captured
+            // - message3 (test_prefix) is captured
+            assertThat(results)
+                    .containsExactly(
+                            "M[test_prefix, message1]",
+                            "+I[3001, between_msg, Beijing, 111]",
+                            "+I[3002, after_other, Shanghai, 222]",
+                            "M[test_prefix, message3]");
         }
-
-        // Format all records (data + logical messages) preserving order
-        final RecordsFormatter formatter = new RecordsFormatter(dataType);
-        List<String> results = formatter.format(output.getResults());
-
-        // Verify ordering and filtering:
-        // - message1 (test_prefix) is captured
-        // - insert between_msg is captured
-        // - message2 (other_prefix) is filtered out
-        // - insert after_other is captured
-        // - message3 (test_prefix) is captured
-        assertThat(results)
-                .containsExactly(
-                        "M[test_prefix, message1]",
-                        "+I[3001, between_msg, Beijing, 111]",
-                        "+I[3002, after_other, Shanghai, 222]",
-                        "M[test_prefix, message3]");
     }
 
     @Test
@@ -380,6 +371,18 @@ public class PostgresSourceReaderTest extends PostgresTestBase {
         final SimpleReaderOutput output = new SimpleReaderOutput();
         InputStatus status = MORE_AVAILABLE;
         while (END_OF_INPUT != status) {
+            status = sourceReader.pollNext(output);
+        }
+        final RecordsFormatter formatter = new RecordsFormatter(recordType);
+        return formatter.format(output.getResults());
+    }
+
+    private List<String> consumeStreamRecords(
+            PostgresSourceReader sourceReader, DataType recordType, int size) throws Exception {
+        // Poll all the n records of the single split.
+        final SimpleReaderOutput output = new SimpleReaderOutput();
+        InputStatus status = MORE_AVAILABLE;
+        while (MORE_AVAILABLE == status || output.getResults().size() < size) {
             status = sourceReader.pollNext(output);
         }
         final RecordsFormatter formatter = new RecordsFormatter(recordType);
