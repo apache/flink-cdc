@@ -20,6 +20,7 @@ package org.apache.flink.cdc.cli.parser;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
+import org.apache.flink.cdc.common.pipeline.TargetTableCreateMode;
 import org.apache.flink.cdc.composer.definition.ModelDef;
 import org.apache.flink.cdc.composer.definition.PipelineDef;
 import org.apache.flink.cdc.composer.definition.RouteDef;
@@ -325,6 +326,52 @@ class YamlPipelineDefinitionParserTest {
         // Test case 7: Lenient mode with specified include, create.table should be auto-added
         testSchemaEvolutionTypesParsing(
                 "lenient", "[add.column]", null, ImmutableSet.of(ADD_COLUMN, CREATE_TABLE));
+    }
+
+    @Test
+    void testTargetTableCreateModeParsing() throws Exception {
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+
+        PipelineDef defaultPipelineDef =
+                parser.parse(
+                        "source:\n"
+                                + "  type: foo\n"
+                                + "sink:\n"
+                                + "  type: bar\n"
+                                + "  bootstrap.servers: localhost:9123\n",
+                        new Configuration());
+        assertThat(defaultPipelineDef.getSink().getTargetTableCreateMode())
+                .isEqualTo(TargetTableCreateMode.CREATE_IF_NOT_EXISTS);
+        assertThat(defaultPipelineDef.getSink().getConfig().toMap())
+                .containsEntry("bootstrap.servers", "localhost:9123")
+                .doesNotContainKey("target.table.create.mode");
+
+        PipelineDef errorIfNotExistsPipelineDef =
+                parser.parse(
+                        "source:\n"
+                                + "  type: foo\n"
+                                + "sink:\n"
+                                + "  type: bar\n"
+                                + "  target.table.create.mode: ERROR_IF_NOT_EXISTS\n"
+                                + "  bootstrap.servers: localhost:9123\n",
+                        new Configuration());
+        assertThat(errorIfNotExistsPipelineDef.getSink().getTargetTableCreateMode())
+                .isEqualTo(TargetTableCreateMode.ERROR_IF_NOT_EXISTS);
+        assertThat(errorIfNotExistsPipelineDef.getSink().getConfig().toMap())
+                .containsEntry("bootstrap.servers", "localhost:9123")
+                .doesNotContainKey("target.table.create.mode");
+
+        assertThatThrownBy(
+                        () ->
+                                parser.parse(
+                                        "source:\n"
+                                                + "  type: foo\n"
+                                                + "sink:\n"
+                                                + "  type: bar\n"
+                                                + "  target.table.create.mode: INVALID\n",
+                                        new Configuration()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("target.table.create.mode");
     }
 
     private void testSchemaEvolutionTypesParsing(

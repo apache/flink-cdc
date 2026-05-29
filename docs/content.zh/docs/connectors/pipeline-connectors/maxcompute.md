@@ -94,6 +94,13 @@ pipeline:
       <td>Sink 的名称.</td>
     </tr>
     <tr>
+      <td>target.table.create.mode</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">CREATE_IF_NOT_EXISTS</td>
+      <td>Enum</td>
+      <td>目标端建表行为。使用 <code>CREATE_IF_NOT_EXISTS</code> 自动创建缺失的 MaxCompute 表；使用 <code>ERROR_IF_NOT_EXISTS</code> 要求目标 MaxCompute 表必须提前存在。</td>
+    </tr>
+    <tr>
       <td>access-id</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
@@ -198,6 +205,8 @@ pipeline:
 
 * 链接器 支持自动建表，将MaxCompute表与源表的位置关系、数据类型进行自动映射（参见下文映射表），当源表有主键时，自动创建
   MaxCompute Delta 表，否则创建普通 MaxCompute 表（Append表）
+  * 默认通过 `target.table.create.mode: CREATE_IF_NOT_EXISTS` 启用自动建表。
+  * 如需在 Flink CDC 外部提前创建目标表，可将 `target.table.create.mode` 设置为 `ERROR_IF_NOT_EXISTS`。该模式下目标表必须已存在；已有的 MaxCompute schema 和主键兼容性检查仍按原逻辑执行。
 * 当写入普通 MaxCompute 表（Append表）时，会忽略`delete`操作，`update`操作会被视为`insert`操作
 * 目前仅支持 at-least-once，Delta 表由于主键特性能够实现幂等写
 * 对于表结构变更同步

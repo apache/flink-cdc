@@ -26,6 +26,7 @@ import org.apache.flink.cdc.common.event.SchemaChangeEventTypeFamily;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
+import org.apache.flink.cdc.common.sink.SupportsTargetTableExistenceCheck;
 import org.apache.flink.table.api.ValidationException;
 
 import org.apache.fluss.client.Connection;
@@ -54,7 +55,7 @@ import static org.apache.flink.cdc.connectors.fluss.utils.FlussConversions.toFlu
 import static org.apache.flink.cdc.connectors.fluss.utils.FlussConversions.toFlussType;
 
 /** {@link MetadataApplier} for fluss. */
-public class FlussMetaDataApplier implements MetadataApplier {
+public class FlussMetaDataApplier implements MetadataApplier, SupportsTargetTableExistenceCheck {
     private static final Logger LOG = LoggerFactory.getLogger(FlussMetaDataApplier.class);
     private final Configuration flussClientConfig;
     private final Map<String, String> tableProperties;
@@ -128,8 +129,23 @@ public class FlussMetaDataApplier implements MetadataApplier {
                 // sanity check to prevent unexpected table schema evolution.
                 sanityCheck(inferredFlussTable, currentTableInfo);
             }
+        } catch (ValidationException e) {
+            throw e;
         } catch (Exception e) {
             LOG.error("Failed to apply schema change {}", event, e);
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public boolean targetTableExists(TableId tableId) {
+        try (Connection connection = ConnectionFactory.createConnection(flussClientConfig);
+                Admin admin = connection.getAdmin()) {
+            TablePath tablePath = new TablePath(tableId.getSchemaName(), tableId.getTableName());
+            return admin.databaseExists(tablePath.getDatabaseName()).get()
+                    && admin.tableExists(tablePath).get();
+        } catch (Exception e) {
+            LOG.error("Failed to check whether Fluss table {} exists.", tableId, e);
             throw new RuntimeException(e);
         }
     }

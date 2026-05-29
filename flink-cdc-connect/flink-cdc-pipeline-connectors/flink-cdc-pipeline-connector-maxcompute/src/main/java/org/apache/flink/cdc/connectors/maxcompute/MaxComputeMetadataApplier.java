@@ -26,9 +26,11 @@ import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
+import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
+import org.apache.flink.cdc.common.sink.SupportsTargetTableExistenceCheck;
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeOptions;
 import org.apache.flink.cdc.connectors.maxcompute.utils.MaxComputeUtils;
 import org.apache.flink.cdc.connectors.maxcompute.utils.SchemaEvolutionUtils;
@@ -42,7 +44,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** A {@link MetadataApplier} for "MaxCompute" connector. */
-public class MaxComputeMetadataApplier implements MetadataApplier {
+public class MaxComputeMetadataApplier
+        implements MetadataApplier, SupportsTargetTableExistenceCheck {
     private static final long serialVersionUID = 1L;
     private static final Logger LOG = LoggerFactory.getLogger(MaxComputeMetadataApplier.class);
 
@@ -58,9 +61,10 @@ public class MaxComputeMetadataApplier implements MetadataApplier {
         try {
             if (schemaChangeEvent instanceof CreateTableEvent) {
                 CreateTableEvent createTableEvent = (CreateTableEvent) schemaChangeEvent;
-                if (MaxComputeUtils.isTableExist(maxComputeOptions, createTableEvent.tableId())) {
+                if (targetTableExists(createTableEvent.tableId())) {
                     Table table =
-                            MaxComputeUtils.getTable(maxComputeOptions, createTableEvent.tableId());
+                            MaxComputeUtils.getTable(
+                                    maxComputeOptions, createTableEvent.tableId());
                     TableSchema expectSchema =
                             TypeConvertUtils.toMaxCompute(createTableEvent.getSchema());
                     if (!MaxComputeUtils.schemaEquals(table.getSchema(), expectSchema)) {
@@ -125,5 +129,10 @@ public class MaxComputeMetadataApplier implements MetadataApplier {
         } catch (OdpsException e) {
             throw new SchemaEvolveException(schemaChangeEvent, e.getMessage(), e);
         }
+    }
+
+    @Override
+    public boolean targetTableExists(TableId tableId) {
+        return MaxComputeUtils.isTableExist(maxComputeOptions, tableId);
     }
 }
