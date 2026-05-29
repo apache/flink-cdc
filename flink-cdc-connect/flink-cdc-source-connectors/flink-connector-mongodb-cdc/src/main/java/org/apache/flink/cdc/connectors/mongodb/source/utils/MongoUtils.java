@@ -86,6 +86,7 @@ public class MongoUtils {
     public static final int CHANGE_STREAM_HISTORY_LOST = 286;
     public static final int BSON_OBJECT_TOO_LARGE = 10334;
     public static final int UNKNOWN_FIELD_ERROR = 40415;
+    private static final int MONGO_CHUNKS_UUID_FILTER_VERSION_CODE = 409;
 
     private static final Set<Integer> INVALID_CHANGE_STREAM_ERRORS =
             new HashSet<>(
@@ -380,19 +381,40 @@ public class MongoUtils {
                 collectionFor(mongoClient, TableId.parse("config.chunks"), BsonDocument.class);
         List<BsonDocument> collectionChunks = new ArrayList<>();
 
-        Bson filter =
-                or(
-                        new BsonDocument(NAMESPACE_FIELD, collectionMetadata.get(ID_FIELD)),
-                        // MongoDB 4.9.0 removed ns field of config.chunks collection, using
-                        // collection's uuid instead.
-                        // See: https://jira.mongodb.org/browse/SERVER-53105
-                        new BsonDocument(UUID_FIELD, collectionMetadata.get(UUID_FIELD)));
+        Bson filter = chunksFilter(collectionMetadata, readMongoVersionCode(mongoClient));
 
         chunks.find(filter)
                 .projection(include("min", "max", "shard"))
                 .sort(ascending("min"))
                 .into(collectionChunks);
         return collectionChunks;
+    }
+
+    static Bson chunksFilter(BsonDocument collectionMetadata, @Nullable Integer mongoVersionCode) {
+        Bson nsFilter = new BsonDocument(NAMESPACE_FIELD, collectionMetadata.get(ID_FIELD));
+        Bson uuidFilter = new BsonDocument(UUID_FIELD, collectionMetadata.get(UUID_FIELD));
+
+        if (mongoVersionCode == null) {
+            // Keep old behavior when version detection fails.
+            return or(nsFilter, uuidFilter);
+        }
+
+        // MongoDB 4.9.0 removed ns field from config.chunks and uses collection uuid instead.
+        // See: https://jira.mongodb.org/browse/SERVER-53105
+        return mongoVersionCode >= MONGO_CHUNKS_UUID_FILTER_VERSION_CODE ? uuidFilter : nsFilter;
+    }
+
+    @Nullable
+    static Integer readMongoVersionCode(MongoClient mongoClient) {
+        try {
+            String[] parts = getMongoVersion(mongoClient).split("\\.");
+            int major = Integer.parseInt(parts[0]);
+            int minor = parts.length > 1 ? Integer.parseInt(parts[1]) : 0;
+            return major * 100 + minor;
+        } catch (RuntimeException e) {
+            LOG.warn("Failed to read MongoDB version, fallback to chunks $or filter.", e);
+        }
+        return null;
     }
 
     @Nullable
@@ -417,10 +439,15 @@ public class MongoUtils {
 
     public static String getMongoVersion(MongoDBSourceConfig sourceConfig) {
         MongoClient client = MongoClientPool.getInstance().getOrCreateMongoClient(sourceConfig);
-        return client.getDatabase("config")
-                .runCommand(new BsonDocument("buildinfo", new BsonString("")))
-                .get("version")
-                .toString();
+        return getMongoVersion(client);
+    }
+
+    public static String getMongoVersion(MongoClient mongoClient) {
+        return mongoClient
+                .getDatabase("config")
+                .runCommand(new BsonDocument("buildinfo", new BsonString("")), BsonDocument.class)
+                .getString("version")
+                .getValue();
     }
 
     public static MongoClient clientFor(MongoDBSourceConfig sourceConfig) {
