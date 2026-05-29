@@ -108,7 +108,11 @@ class ShardedChunkSplitterITCase {
                     waitProfiledFindEntries(mongoClient.getDatabase("config"), queryStart);
             Assertions.assertThat(profiledEntries).isNotEmpty();
             Assertions.assertThat(profiledPlanSummaries(profiledEntries))
-                    .allMatch(plan -> plan != null && plan.contains("IXSCAN"));
+                    .allMatch(
+                            plan ->
+                                    plan != null
+                                            && plan.contains("IXSCAN")
+                                            && !plan.contains("COLLSCAN"));
 
             for (Document entry : profiledEntries) {
                 Document filter = findCommandFilter(entry);

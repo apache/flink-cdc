@@ -131,7 +131,11 @@ class LegacyShardedChunkSplitterITCase {
                             profileDebugLines(rawProfileEntries))
                     .isNotEmpty();
             Assertions.assertThat(profiledPlanSummaries(profileEntries))
-                    .allMatch(plan -> plan != null && plan.contains("IXSCAN"));
+                    .allMatch(
+                            plan ->
+                                    plan != null
+                                            && plan.contains("IXSCAN")
+                                            && !plan.contains("COLLSCAN"));
 
             for (Document entry : profileEntries) {
                 Document filter = findCommandFilter(entry);
