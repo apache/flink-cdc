@@ -377,9 +377,10 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
             Map<String, Object> outputRecord = new LinkedHashMap<>();
             for (Map.Entry<String, String> entry : jsonFieldMapping.entrySet()) {
                 String inputFieldName = entry.getValue();
-                outputRecord.put(
-                        entry.getKey(),
-                        inputFieldName == null ? null : valueMap.get(inputFieldName));
+                if (inputFieldName == null) {
+                    continue;
+                }
+                outputRecord.put(entry.getKey(), valueMap.get(inputFieldName));
             }
             return outputRecord;
         }

@@ -37,19 +37,17 @@ import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.common.types.DataType;
-import org.apache.flink.cdc.common.types.DataTypeChecks;
 import org.apache.flink.cdc.common.types.LocalZonedTimestampType;
 import org.apache.flink.cdc.common.types.TimestampType;
 import org.apache.flink.cdc.common.types.ZonedTimestampType;
-import org.apache.flink.cdc.common.types.utils.DataTypeUtils;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.connectors.doris.utils.DorisSchemaUtils;
+import org.apache.flink.cdc.connectors.doris.utils.DorisTypeUtils;
 import org.apache.flink.util.CollectionUtil;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.Sets;
 
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.doris.flink.catalog.DorisTypeMapper;
 import org.apache.doris.flink.catalog.doris.DataModel;
 import org.apache.doris.flink.catalog.doris.DorisSchemaFactory;
 import org.apache.doris.flink.catalog.doris.FieldSchema;
@@ -206,7 +204,10 @@ public class DorisMetadataApplier implements MetadataApplier {
             org.apache.doris.flink.rest.models.Schema existingDorisSchema =
                     fetchExistingDorisSchema(tableId);
             if (existingDorisSchema == null) {
-                schemaChangeManager.createTable(buildTableSchema(tableId, schema));
+                ensureSchemaChangeSucceeded(
+                        schemaChangeManager.createTable(buildTableSchema(tableId, schema)),
+                        "create table",
+                        tableId);
             } else {
                 reconcileExistingTable(tableId, schema, existingDorisSchema);
             }
@@ -277,7 +278,7 @@ public class DorisMetadataApplier implements MetadataApplier {
                     "Failed to resolve Doris physical schema properties for " + tableId);
         }
 
-        validateExistingColumnCompatibility(tableId, desiredSchema, existingDorisSchema);
+        logExistingColumnTypeDifferences(tableId, desiredSchema, existingDorisSchema);
 
         Schema currentSchema =
                 buildCurrentSchemaFromExistingTable(desiredSchema, existingDorisSchema);
@@ -302,12 +303,15 @@ public class DorisMetadataApplier implements MetadataApplier {
             FieldSchema addFieldSchema =
                     new FieldSchema(
                             column.getName(),
-                            buildTypeString(column.getType()),
+                            DorisTypeUtils.toDorisTypeString(column.getType()),
                             convertInvalidTimestampDefaultValue(
                                     column.getDefaultValueExpression(), column.getType()),
                             column.getComment());
-            schemaChangeManager.addColumn(
-                    tableId.getSchemaName(), tableId.getTableName(), addFieldSchema);
+            ensureSchemaChangeSucceeded(
+                    schemaChangeManager.addColumn(
+                            tableId.getSchemaName(), tableId.getTableName(), addFieldSchema),
+                    "add missing column " + column.getName(),
+                    tableId);
             currentSchema =
                     SchemaUtils.applySchemaChangeEvent(
                             currentSchema,
@@ -315,7 +319,7 @@ public class DorisMetadataApplier implements MetadataApplier {
         }
     }
 
-    private void validateExistingColumnCompatibility(
+    private void logExistingColumnTypeDifferences(
             TableId tableId,
             Schema desiredSchema,
             org.apache.doris.flink.rest.models.Schema existingDorisSchema) {
@@ -331,20 +335,52 @@ public class DorisMetadataApplier implements MetadataApplier {
                 continue;
             }
 
-            String desiredType =
-                    normalizeDorisTypeDefinition(buildTypeString(desiredColumn.getType()));
-            String existingType =
-                    normalizeDorisTypeDefinition(buildExistingFieldType(existingField));
-            if (!desiredType.equals(existingType)) {
-                throw new IllegalStateException(
-                        String.format(
-                                "Doris table %s already has column %s with incompatible type. "
-                                        + "desired=%s, actual=%s. Existing-table reconcile only "
-                                        + "supports additive missing columns.",
-                                tableId.identifier(),
-                                existingField.getName(),
-                                desiredType,
-                                existingType));
+            DorisExistingColumnTypeAnalyzer.ExistingColumnTypeAssessment assessment =
+                    DorisExistingColumnTypeAnalyzer.assess(desiredColumn, existingField);
+            String desiredType = assessment.desiredType;
+            String existingType = assessment.existingType;
+
+            if (assessment.typeDefinitionDrift) {
+                LOG.warn(
+                        "Doris existing-table type drift detected. table={}, column={}, "
+                                + "physicalType={}, desiredType={}, typeDefinitionDrift=true. "
+                                + "Existing-table reconcile will not alter existing columns and "
+                                + "will only add missing columns.",
+                        tableId.identifier(),
+                        existingField.getName(),
+                        existingType,
+                        desiredType);
+            }
+            if (assessment.lowConfidencePhysicalMetadata) {
+                LOG.warn(
+                        "Doris existing-table schema metadata has low confidence. table={}, "
+                                + "column={}, physicalType={}, lowConfidencePhysicalMetadata=true. "
+                                + "Doris FE did not expose complete type parameters. Verify SHOW "
+                                + "CREATE TABLE before trusting runtime writes.",
+                        tableId.identifier(),
+                        existingField.getName(),
+                        existingType);
+            }
+            if (assessment.capacityRisk) {
+                LOG.warn(
+                        "Doris existing-table column has capacity risk. table={}, column={}, "
+                                + "physicalType={}, desiredType={}, capacityRisk=true. Job startup "
+                                + "will continue, but data may be truncated or rejected during "
+                                + "Stream Load.",
+                        tableId.identifier(),
+                        existingField.getName(),
+                        existingType,
+                        desiredType);
+            }
+            if (assessment.familyMismatch) {
+                LOG.warn(
+                        "Doris existing-table column has family mismatch. table={}, column={}, "
+                                + "physicalType={}, desiredType={}, familyMismatch=true. Job "
+                                + "startup will continue, but Stream Load may fail at runtime.",
+                        tableId.identifier(),
+                        existingField.getName(),
+                        existingType,
+                        desiredType);
             }
         }
     }
@@ -472,23 +508,11 @@ public class DorisMetadataApplier implements MetadataApplier {
         List<String> columnNameList = schema.getColumnNames();
         for (String columnName : columnNameList) {
             Column column = schema.getColumn(columnName).get();
-            String typeString;
-            if (column.getType() instanceof LocalZonedTimestampType
-                    || column.getType() instanceof TimestampType
-                    || column.getType() instanceof ZonedTimestampType) {
-                int precision = DataTypeChecks.getPrecision(column.getType());
-                typeString =
-                        String.format("%s(%s)", "DATETIMEV2", Math.min(Math.max(precision, 0), 6));
-            } else {
-                typeString =
-                        DorisTypeMapper.toDorisType(
-                                DataTypeUtils.toFlinkDataType(column.getType()));
-            }
             fieldSchemaMap.put(
                     column.getName(),
                     new FieldSchema(
                             column.getName(),
-                            typeString,
+                            DorisTypeUtils.toDorisTypeString(column.getType()),
                             convertInvalidTimestampDefaultValue(
                                     column.getDefaultValueExpression(), column.getType()),
                             column.getComment()));
@@ -510,17 +534,6 @@ public class DorisMetadataApplier implements MetadataApplier {
         return new ArrayList<>();
     }
 
-    private String buildTypeString(DataType dataType) {
-        if (dataType instanceof LocalZonedTimestampType
-                || dataType instanceof TimestampType
-                || dataType instanceof ZonedTimestampType) {
-            int precision = DataTypeChecks.getPrecision(dataType);
-            return String.format("%s(%s)", "DATETIMEV2", Math.min(Math.max(precision, 0), 6));
-        } else {
-            return DorisTypeMapper.toDorisType(DataTypeUtils.toFlinkDataType(dataType));
-        }
-    }
-
     private void applyAddColumnEvent(AddColumnEvent event) throws SchemaEvolveException {
         try {
             TableId tableId = event.tableId();
@@ -531,12 +544,15 @@ public class DorisMetadataApplier implements MetadataApplier {
                 FieldSchema addFieldSchema =
                         new FieldSchema(
                                 column.getName(),
-                                buildTypeString(column.getType()),
+                                DorisTypeUtils.toDorisTypeString(column.getType()),
                                 convertInvalidTimestampDefaultValue(
                                         column.getDefaultValueExpression(), column.getType()),
                                 column.getComment());
-                schemaChangeManager.addColumn(
-                        tableId.getSchemaName(), tableId.getTableName(), addFieldSchema);
+                ensureSchemaChangeSucceeded(
+                        schemaChangeManager.addColumn(
+                                tableId.getSchemaName(), tableId.getTableName(), addFieldSchema),
+                        "add column " + column.getName(),
+                        tableId);
                 currentSchema =
                         SchemaUtils.applySchemaChangeEvent(
                                 currentSchema,
@@ -553,8 +569,11 @@ public class DorisMetadataApplier implements MetadataApplier {
             TableId tableId = event.tableId();
             List<String> droppedColumns = event.getDroppedColumnNames();
             for (String col : droppedColumns) {
-                schemaChangeManager.dropColumn(
-                        tableId.getSchemaName(), tableId.getTableName(), col);
+                ensureSchemaChangeSucceeded(
+                        schemaChangeManager.dropColumn(
+                                tableId.getSchemaName(), tableId.getTableName(), col),
+                        "drop column " + col,
+                        tableId);
             }
             schemaCache.put(
                     tableId, SchemaUtils.applySchemaChangeEvent(getSchemaOrThrow(tableId), event));
@@ -568,11 +587,14 @@ public class DorisMetadataApplier implements MetadataApplier {
             TableId tableId = event.tableId();
             Map<String, String> nameMapping = event.getNameMapping();
             for (Map.Entry<String, String> entry : nameMapping.entrySet()) {
-                schemaChangeManager.renameColumn(
-                        tableId.getSchemaName(),
-                        tableId.getTableName(),
-                        entry.getKey(),
-                        entry.getValue());
+                ensureSchemaChangeSucceeded(
+                        schemaChangeManager.renameColumn(
+                                tableId.getSchemaName(),
+                                tableId.getTableName(),
+                                entry.getKey(),
+                                entry.getValue()),
+                        "rename column " + entry.getKey() + " to " + entry.getValue(),
+                        tableId);
             }
             schemaCache.put(
                     tableId, SchemaUtils.applySchemaChangeEvent(getSchemaOrThrow(tableId), event));
@@ -589,13 +611,16 @@ public class DorisMetadataApplier implements MetadataApplier {
             Map<String, String> comments = event.getComments();
 
             for (Map.Entry<String, DataType> entry : typeMapping.entrySet()) {
-                schemaChangeManager.modifyColumnDataType(
-                        tableId.getSchemaName(),
-                        tableId.getTableName(),
-                        new FieldSchema(
-                                entry.getKey(),
-                                buildTypeString(entry.getValue()),
-                                comments.get(entry.getKey())));
+                ensureSchemaChangeSucceeded(
+                        schemaChangeManager.modifyColumnDataType(
+                                tableId.getSchemaName(),
+                                tableId.getTableName(),
+                                new FieldSchema(
+                                        entry.getKey(),
+                                        DorisTypeUtils.toDorisTypeString(entry.getValue()),
+                                        comments.get(entry.getKey()))),
+                        "alter column type " + entry.getKey(),
+                        tableId);
             }
             schemaCache.put(
                     tableId, SchemaUtils.applySchemaChangeEvent(getSchemaOrThrow(tableId), event));
@@ -608,7 +633,11 @@ public class DorisMetadataApplier implements MetadataApplier {
             throws SchemaEvolveException {
         TableId tableId = truncateTableEvent.tableId();
         try {
-            schemaChangeManager.truncateTable(tableId.getSchemaName(), tableId.getTableName());
+            ensureSchemaChangeSucceeded(
+                    schemaChangeManager.truncateTable(
+                            tableId.getSchemaName(), tableId.getTableName()),
+                    "truncate table",
+                    tableId);
         } catch (Exception e) {
             throw new SchemaEvolveException(truncateTableEvent, "fail to truncate table", e);
         }
@@ -617,7 +646,10 @@ public class DorisMetadataApplier implements MetadataApplier {
     private void applyDropTableEvent(DropTableEvent dropTableEvent) throws SchemaEvolveException {
         TableId tableId = dropTableEvent.tableId();
         try {
-            schemaChangeManager.dropTable(tableId.getSchemaName(), tableId.getTableName());
+            ensureSchemaChangeSucceeded(
+                    schemaChangeManager.dropTable(tableId.getSchemaName(), tableId.getTableName()),
+                    "drop table",
+                    tableId);
             schemaCache.remove(tableId);
         } catch (Exception e) {
             throw new SchemaEvolveException(dropTableEvent, "fail to drop table", e);
@@ -636,6 +668,16 @@ public class DorisMetadataApplier implements MetadataApplier {
     @VisibleForTesting
     Schema getCachedSchema(TableId tableId) {
         return schemaCache.get(tableId);
+    }
+
+    private void ensureSchemaChangeSucceeded(boolean succeeded, String operation, TableId tableId) {
+        if (!succeeded) {
+            throw new IllegalStateException(
+                    String.format(
+                            "Doris schema change returned false for %s on %s. "
+                                    + "Will not update local schema cache.",
+                            operation, tableId.identifier()));
+        }
     }
 
     private String convertInvalidTimestampDefaultValue(String defaultValue, DataType dataType) {
@@ -675,67 +717,17 @@ public class DorisMetadataApplier implements MetadataApplier {
                 || normalizedMessage.contains("table not exist");
     }
 
-    private String buildExistingFieldType(Field field) {
-        String type = field.getType();
-        if (type == null || type.trim().isEmpty()) {
-            return "";
-        }
-
-        String trimmedType = type.trim();
-        if (trimmedType.contains("(")) {
-            return trimmedType;
-        }
-
-        String upperType = trimmedType.toUpperCase(Locale.ROOT);
-        switch (upperType) {
-            case "CHAR":
-            case "VARCHAR":
-                return field.getPrecision() > 0
-                        ? String.format("%s(%s)", upperType, field.getPrecision())
-                        : upperType;
-            case "DECIMAL":
-            case "DECIMALV2":
-            case "DECIMALV3":
-                return field.getPrecision() > 0
-                        ? String.format(
-                                "%s(%s,%s)", upperType, field.getPrecision(), field.getScale())
-                        : upperType;
-            case "DATETIME":
-            case "DATETIMEV2":
-                return String.format("%s(%s)", upperType, Math.max(field.getScale(), 0));
-            default:
-                return upperType;
-        }
-    }
-
-    private String normalizeDorisTypeDefinition(String typeDefinition) {
-        if (typeDefinition == null || typeDefinition.trim().isEmpty()) {
-            return "";
-        }
-
-        String normalized =
-                typeDefinition
-                        .toUpperCase(Locale.ROOT)
-                        .replaceAll("\\s*,\\s*", ",")
-                        .replaceAll("\\(\\s*", "(")
-                        .replaceAll("\\s*\\)", ")")
-                        .replaceAll("\\s+", " ")
-                        .trim();
-        normalized = normalized.replace("DATETIMEV2", "DATETIME");
-        normalized = normalized.replace("DATEV2", "DATE");
-        normalized = normalized.replace("DECIMALV3", "DECIMAL");
-        normalized = normalized.replace("DECIMALV2", "DECIMAL");
-        return normalized;
-    }
-
     private void applyAlterTableCommentEvent(AlterTableCommentEvent alterTableCommentEvent)
             throws SchemaEvolveException {
         TableId tableId = alterTableCommentEvent.tableId();
         try {
-            schemaChangeManager.alterTableComment(
-                    tableId.getSchemaName(),
-                    tableId.getTableName(),
-                    alterTableCommentEvent.getComment());
+            ensureSchemaChangeSucceeded(
+                    schemaChangeManager.alterTableComment(
+                            tableId.getSchemaName(),
+                            tableId.getTableName(),
+                            alterTableCommentEvent.getComment()),
+                    "alter table comment",
+                    tableId);
         } catch (Exception e) {
             throw new SchemaEvolveException(
                     alterTableCommentEvent, "fail to alter table comment", e);

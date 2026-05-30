@@ -31,21 +31,21 @@ public class DorisSchemaChangeManager extends SchemaChangeManager {
         super(dorisOptions, charsetEncoding);
     }
 
-    public void truncateTable(String databaseName, String tableName)
+    public boolean truncateTable(String databaseName, String tableName)
             throws IOException, IllegalArgumentException {
         String truncateTableDDL =
                 "TRUNCATE TABLE " + identifier(databaseName) + "." + identifier(tableName);
-        this.execute(truncateTableDDL, databaseName);
+        return this.execute(truncateTableDDL, databaseName);
     }
 
-    public void dropTable(String databaseName, String tableName)
+    public boolean dropTable(String databaseName, String tableName)
             throws IOException, IllegalArgumentException {
         String dropTableDDL =
                 "DROP TABLE " + identifier(databaseName) + "." + identifier(tableName);
-        this.execute(dropTableDDL, databaseName);
+        return this.execute(dropTableDDL, databaseName);
     }
 
-    public void alterTableComment(String databaseName, String tableName, String comment)
+    public boolean alterTableComment(String databaseName, String tableName, String comment)
             throws IOException, IllegalArgumentException {
         String alterTableCommentDDL =
                 "ALTER TABLE "
@@ -54,7 +54,7 @@ public class DorisSchemaChangeManager extends SchemaChangeManager {
                         + identifier(tableName)
                         + " MODIFY COMMENT "
                         + quoted(comment);
-        this.execute(alterTableCommentDDL, databaseName);
+        return this.execute(alterTableCommentDDL, databaseName);
     }
 
     private String quoted(String str) {

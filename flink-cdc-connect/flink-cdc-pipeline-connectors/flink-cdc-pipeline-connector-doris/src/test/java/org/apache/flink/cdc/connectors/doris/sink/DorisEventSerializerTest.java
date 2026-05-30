@@ -1195,6 +1195,46 @@ public class DorisEventSerializerTest {
     }
 
     @Test
+    public void testJsonSerializationSkipsNullInputFieldMappings() throws IOException {
+        TableId tableId = TableId.parse("doris_database.json_null_mapping_table");
+        Schema inputSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.BIGINT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(((RowType) inputSchema.toRowDataType()));
+
+        DorisEventSerializer serializer =
+                new DorisEventSerializer(
+                        ZoneId.of("UTC"),
+                        new Configuration(),
+                        DorisExecutionOptions.defaults(),
+                        null,
+                        (requestedTableId, schema) -> {
+                            LinkedHashMap<String, String> mapping = new LinkedHashMap<>();
+                            mapping.put("confluent__last_updated", null);
+                            mapping.put("id", "id");
+                            mapping.put("name", "name");
+                            return mapping;
+                        });
+        serializer.serialize(new CreateTableEvent(tableId, inputSchema));
+
+        DorisRecord dorisRecord =
+                serializer.serialize(
+                        DataChangeEvent.insertEvent(
+                                tableId,
+                                generator.generate(
+                                        new Object[] {1L, BinaryStringData.fromString("Alice")})));
+
+        JsonNode jsonNode = objectMapper.readTree(dorisRecord.getRow());
+        Assertions.assertThat(jsonNode.has("confluent__last_updated")).isFalse();
+        Assertions.assertThat(jsonNode.get("id").asLong()).isEqualTo(1L);
+        Assertions.assertThat(jsonNode.get("name").asText()).isEqualTo("Alice");
+    }
+
+    @Test
     public void testWaitUntilDorisSchemaCoversInputSchemaWithinTimeBudget() {
         TableId tableId = TableId.parse("doris_database.json_schema_time_budget_table");
         Schema baseSchema =
