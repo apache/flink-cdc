@@ -27,6 +27,7 @@ import org.apache.flink.cdc.connectors.mysql.source.assigners.MySqlSplitAssigner
 import org.apache.flink.cdc.connectors.mysql.source.assigners.state.PendingSplitsState;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.events.BinlogSplitAssignedEvent;
+import org.apache.flink.cdc.connectors.mysql.source.events.BinlogSplitMetaAssembledEvent;
 import org.apache.flink.cdc.connectors.mysql.source.events.BinlogSplitMetaEvent;
 import org.apache.flink.cdc.connectors.mysql.source.events.BinlogSplitMetaRequestEvent;
 import org.apache.flink.cdc.connectors.mysql.source.events.BinlogSplitUpdateAckEvent;
@@ -180,6 +181,16 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
                     "The enumerator receives notice from subtask {} for the binlog split assignment. ",
                     subtaskId);
             binlogSplitTaskId = subtaskId;
+        } else if (sourceEvent instanceof BinlogSplitMetaAssembledEvent) {
+            LOG.info(
+                    "The enumerator receives notice from subtask {} that the binlog split metadata has been fully assembled. ",
+                    subtaskId);
+            if (splitAssigner instanceof MySqlHybridSplitAssigner) {
+                ((MySqlHybridSplitAssigner) splitAssigner)
+                        .onBinlogSplitMetaAssembled(
+                                ((BinlogSplitMetaAssembledEvent) sourceEvent)
+                                        .getBinlogAssignmentGeneration());
+            }
         }
     }
 
@@ -191,6 +202,13 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
     @Override
     public void notifyCheckpointComplete(long checkpointId) {
         splitAssigner.notifyCheckpointComplete(checkpointId);
+        // Once the assigner has released the snapshot metadata, drop the enumerator's cached binlog
+        // split meta groups too: it is a second copy of the same finished-split infos.
+        if (binlogSplitMeta != null
+                && splitAssigner instanceof MySqlHybridSplitAssigner
+                && ((MySqlHybridSplitAssigner) splitAssigner).isSnapshotMetaReleased()) {
+            binlogSplitMeta = null;
+        }
         // binlog split may be available after checkpoint complete
         assignSplits();
     }
@@ -319,7 +337,8 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
                             requestEvent.getSplitId(),
                             requestMetaGroupId,
                             null,
-                            totalFinishedSplitSizeOfEnumerator);
+                            totalFinishedSplitSizeOfEnumerator,
+                            currentBinlogAssignmentGeneration());
             context.sendEventToSourceReader(subTask, metadataEvent);
         } else if (binlogSplitMeta.size() > requestMetaGroupId) {
             List<FinishedSnapshotSplitInfo> metaToSend = binlogSplitMeta.get(requestMetaGroupId);
@@ -330,7 +349,8 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
                             metaToSend.stream()
                                     .map(FinishedSnapshotSplitInfo::serialize)
                                     .collect(Collectors.toList()),
-                            totalFinishedSplitSizeOfEnumerator);
+                            totalFinishedSplitSizeOfEnumerator,
+                            currentBinlogAssignmentGeneration());
             context.sendEventToSourceReader(subTask, metadataEvent);
         } else {
             throw new FlinkRuntimeException(
@@ -341,6 +361,16 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
                             totalFinishedSplitSizeOfReader,
                             totalFinishedSplitSizeOfEnumerator));
         }
+    }
+
+    /**
+     * The current binlog split assignment generation, or 0 when not in hybrid mode. Stamped onto
+     * the meta groups served to a reader so a stale assembled event can be filtered out.
+     */
+    private long currentBinlogAssignmentGeneration() {
+        return splitAssigner instanceof MySqlHybridSplitAssigner
+                ? ((MySqlHybridSplitAssigner) splitAssigner).getBinlogAssignmentGeneration()
+                : 0L;
     }
 
     private void handleLatestFinishedSplitNumberRequest(int subTask) {

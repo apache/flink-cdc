@@ -22,6 +22,7 @@ import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.events.BinlogSplitAssignedEvent;
+import org.apache.flink.cdc.connectors.mysql.source.events.BinlogSplitMetaAssembledEvent;
 import org.apache.flink.cdc.connectors.mysql.source.events.BinlogSplitMetaEvent;
 import org.apache.flink.cdc.connectors.mysql.source.events.BinlogSplitMetaRequestEvent;
 import org.apache.flink.cdc.connectors.mysql.source.events.BinlogSplitUpdateAckEvent;
@@ -80,6 +81,15 @@ public class MySqlSourceReader<T>
     private volatile MySqlBinlogSplit suspendedBinlogSplit;
     private final MySqlRecordEmitter<T> recordEmitter;
     private final MySqlPartition partition;
+
+    /**
+     * Generation the reader learned from its served meta groups, echoed in {@link
+     * BinlogSplitMetaAssembledEvent} so the coordinator can drop a stale signal from a failed
+     * attempt. Stays {@link BinlogSplitMetaAssembledEvent#COMPLETE_WITHOUT_META_GENERATION} for an
+     * inline split that requested none.
+     */
+    private long binlogAssignmentGeneration =
+            BinlogSplitMetaAssembledEvent.COMPLETE_WITHOUT_META_GENERATION;
 
     public MySqlSourceReader(
             Supplier<MySqlSplitReader> splitReaderSupplier,
@@ -285,6 +295,11 @@ public class MySqlSourceReader<T>
                             discoverTableSchemasForBinlogSplit(
                                     binlogSplit, sourceConfig, checkNewlyAddedTableSchema);
                     unfinishedSplits.add(mySqlBinlogSplit);
+                    // binlog split is complete: tell the enumerator so it can release the snapshot
+                    // metadata. Also fires on restore of a complete split, which is fine. The
+                    // generation ties this signal to the current assignment.
+                    context.sendSourceEventToCoordinator(
+                            new BinlogSplitMetaAssembledEvent(binlogAssignmentGeneration));
                 }
                 LOG.info(
                         "Source reader {} received the binlog split : {}.", subtaskId, binlogSplit);
@@ -400,6 +415,9 @@ public class MySqlSourceReader<T>
     private void fillMetadataForBinlogSplit(BinlogSplitMetaEvent metadataEvent) {
         MySqlBinlogSplit binlogSplit = uncompletedBinlogSplits.get(metadataEvent.getSplitId());
         if (binlogSplit != null) {
+            // Track the generation this metadata was served under, so the assembled event we send
+            // once the split is complete is tied to the current assignment.
+            this.binlogAssignmentGeneration = metadataEvent.getBinlogAssignmentGeneration();
             final int receivedMetaGroupId = metadataEvent.getMetaGroupId();
             final int receivedTotalFinishedSplitSize = metadataEvent.getTotalFinishedSplitSize();
             final int expectedMetaGroupId =

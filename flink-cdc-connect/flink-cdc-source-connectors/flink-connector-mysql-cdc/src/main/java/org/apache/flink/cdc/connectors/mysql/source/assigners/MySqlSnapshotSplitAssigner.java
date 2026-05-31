@@ -108,6 +108,9 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
 
     @Nullable private Long checkpointIdToFinish;
 
+    /** Whether the snapshot split metadata has been released. */
+    private boolean snapshotMetaReleased;
+
     public MySqlSnapshotSplitAssigner(
             MySqlSourceConfig sourceConfig,
             int currentParallelism,
@@ -569,6 +572,28 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
 
     public Map<String, BinlogOffset> getSplitFinishedOffsets() {
         return splitFinishedOffsets;
+    }
+
+    /**
+     * Releases the heavyweight snapshot split metadata (assigned splits, finished offsets, table
+     * schemas) after the binlog phase begins, so it is no longer held in the coordinator nor
+     * checkpointed. Keeps {@link #alreadyProcessedTables} and the assigner status so a restore does
+     * not re-discover tables. Only called once the binlog split is assigned and checkpoint-covered.
+     */
+    public void releaseSnapshotMetadata() {
+        if (snapshotMetaReleased) {
+            return;
+        }
+        assignedSplits.clear();
+        splitFinishedOffsets.clear();
+        tableSchemas.clear();
+        snapshotMetaReleased = true;
+        LOG.info("Released snapshot split metadata after entering the binlog phase.");
+    }
+
+    /** Returns whether {@link #releaseSnapshotMetadata()} has already been performed. */
+    public boolean isSnapshotMetaReleased() {
+        return snapshotMetaReleased;
     }
 
     // -------------------------------------------------------------------------------------------
