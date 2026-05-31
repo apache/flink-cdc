@@ -342,6 +342,144 @@ class DebeziumJsonSerializationSchemaTest {
     }
 
     @Test
+    void testSerializeWithNonStringDefaultValues() throws Exception {
+        ObjectMapper mapper =
+                JacksonMapperFactory.createObjectMapper()
+                        .configure(JsonGenerator.Feature.WRITE_BIGDECIMAL_AS_PLAIN, false);
+        Map<String, String> properties = new HashMap<>();
+        properties.put("include-schema.enabled", "true");
+        Configuration configuration = Configuration.fromMap(properties);
+        SerializationSchema<Event> serializationSchema =
+                ChangeLogJsonFormatFactory.createSerializationSchema(
+                        configuration, JsonSerializationType.DEBEZIUM_JSON, ZoneId.systemDefault());
+        serializationSchema.open(new MockInitializationContext());
+
+        // create table covering all types supported by convertDefaultValue
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("_boolean", DataTypes.BOOLEAN(), null, "true")
+                        .physicalColumn("_tinyint", DataTypes.TINYINT(), null, "1")
+                        .physicalColumn("_smallint", DataTypes.SMALLINT(), null, "5")
+                        .physicalColumn("_int", DataTypes.INT(), null, "10")
+                        .physicalColumn("_bigint", DataTypes.BIGINT(), null, "0")
+                        .physicalColumn("_float", DataTypes.FLOAT(), null, "1.5")
+                        .physicalColumn("_double", DataTypes.DOUBLE(), null, "3.14")
+                        .physicalColumn("_decimal", DataTypes.DECIMAL(10, 2), null, "99.99")
+                        .physicalColumn("_char", DataTypes.CHAR(5), null, "abc")
+                        .physicalColumn("_varchar", DataTypes.VARCHAR(10), null, "hello")
+                        .physicalColumn("_string", DataTypes.STRING(), null, "unknown")
+                        .physicalColumn("_date", DataTypes.DATE(), null, "100")
+                        .physicalColumn("_time", DataTypes.TIME(), null, "200000")
+                        .physicalColumn(
+                                "_timestamp", DataTypes.TIMESTAMP(), null, "1672531200000000")
+                        .physicalColumn(
+                                "_timestamp_3", DataTypes.TIMESTAMP(3), null, "1672531200000")
+                        .physicalColumn(
+                                "_timestamp_ltz",
+                                DataTypes.TIMESTAMP_LTZ(),
+                                null,
+                                "2023-01-01T00:00:00Z")
+                        .physicalColumn("_binary", DataTypes.BINARY(3), null, "bin")
+                        .primaryKey("_bigint")
+                        .build();
+
+        RowType rowType =
+                RowType.of(
+                        DataTypes.BOOLEAN(),
+                        DataTypes.TINYINT(),
+                        DataTypes.SMALLINT(),
+                        DataTypes.INT(),
+                        DataTypes.BIGINT(),
+                        DataTypes.FLOAT(),
+                        DataTypes.DOUBLE(),
+                        DataTypes.DECIMAL(10, 2),
+                        DataTypes.CHAR(5),
+                        DataTypes.VARCHAR(10),
+                        DataTypes.STRING(),
+                        DataTypes.DATE(),
+                        DataTypes.TIME(),
+                        DataTypes.TIMESTAMP(),
+                        DataTypes.TIMESTAMP(3),
+                        DataTypes.TIMESTAMP_LTZ(),
+                        DataTypes.BINARY(3));
+
+        CreateTableEvent createTableEvent = new CreateTableEvent(TABLE_1, schema);
+        // This should not throw - previously would fail with
+        // "Invalid Java object for schema with type INT64: class java.lang.String"
+        assertThat(serializationSchema.serialize(createTableEvent)).isNull();
+
+        BinaryRecordDataGenerator generator = new BinaryRecordDataGenerator(rowType);
+
+        DataChangeEvent insertEvent =
+                DataChangeEvent.insertEvent(
+                        TABLE_1,
+                        generator.generate(
+                                new Object[] {
+                                    true,
+                                    (byte) 1,
+                                    (short) 7,
+                                    42,
+                                    1L,
+                                    2.5f,
+                                    9.99,
+                                    DecimalData.fromBigDecimal(new BigDecimal("123.45"), 10, 2),
+                                    BinaryStringData.fromString("test1"),
+                                    BinaryStringData.fromString("test2"),
+                                    BinaryStringData.fromString("test3"),
+                                    DateData.fromEpochDay(100),
+                                    TimeData.fromNanoOfDay(200_000_000L),
+                                    TimestampData.fromTimestamp(
+                                            java.sql.Timestamp.valueOf("2023-01-01 00:00:00.000")),
+                                    TimestampData.fromTimestamp(
+                                            java.sql.Timestamp.valueOf("2023-01-01 00:00:00")),
+                                    LocalZonedTimestampData.fromInstant(
+                                            Instant.parse("2023-01-01T00:00:00.000Z")),
+                                    new byte[] {1, 2, 3}
+                                }));
+
+        byte[] serialized = serializationSchema.serialize(insertEvent);
+        JsonNode actual = mapper.readTree(serialized);
+
+        String fieldsSchema =
+                "{\"type\":\"boolean\",\"optional\":true,\"default\":true,\"field\":\"_boolean\"},"
+                        + "{\"type\":\"int16\",\"optional\":true,\"default\":1,\"field\":\"_tinyint\"},"
+                        + "{\"type\":\"int16\",\"optional\":true,\"default\":5,\"field\":\"_smallint\"},"
+                        + "{\"type\":\"int32\",\"optional\":true,\"default\":10,\"field\":\"_int\"},"
+                        + "{\"type\":\"int64\",\"optional\":true,\"default\":0,\"field\":\"_bigint\"},"
+                        + "{\"type\":\"float\",\"optional\":true,\"default\":1.5,\"field\":\"_float\"},"
+                        + "{\"type\":\"double\",\"optional\":true,\"default\":3.14,\"field\":\"_double\"},"
+                        + "{\"type\":\"bytes\",\"optional\":true,\"name\":\"org.apache.kafka.connect.data.Decimal\",\"version\":1,\"parameters\":{\"scale\":\"2\",\"connect.decimal.precision\":\"10\"},\"default\":\"Jw8=\",\"field\":\"_decimal\"},"
+                        + "{\"type\":\"string\",\"optional\":true,\"default\":\"abc\",\"field\":\"_char\"},"
+                        + "{\"type\":\"string\",\"optional\":true,\"default\":\"hello\",\"field\":\"_varchar\"},"
+                        + "{\"type\":\"string\",\"optional\":true,\"default\":\"unknown\",\"field\":\"_string\"},"
+                        + "{\"type\":\"int32\",\"optional\":true,\"name\":\"io.debezium.time.Date\",\"version\":1,\"default\":100,\"field\":\"_date\"},"
+                        + "{\"type\":\"int64\",\"optional\":true,\"name\":\"io.debezium.time.MicroTime\",\"version\":1,\"default\":200000,\"field\":\"_time\"},"
+                        + "{\"type\":\"int64\",\"optional\":true,\"name\":\"io.debezium.time.MicroTimestamp\",\"version\":1,\"default\":1672531200000000,\"field\":\"_timestamp\"},"
+                        + "{\"type\":\"int64\",\"optional\":true,\"name\":\"io.debezium.time.Timestamp\",\"version\":1,\"default\":1672531200000,\"field\":\"_timestamp_3\"},"
+                        + "{\"type\":\"string\",\"optional\":true,\"name\":\"io.debezium.time.ZonedTimestamp\",\"version\":1,\"default\":\"2023-01-01T00:00:00Z\",\"field\":\"_timestamp_ltz\"},"
+                        + "{\"type\":\"bytes\",\"optional\":true,\"name\":\"io.debezium.data.Bits\",\"version\":1,\"parameters\":{\"length\":\"3\"},\"default\":\"Ymlu\",\"field\":\"_binary\"}";
+        JsonNode expected =
+                mapper.readTree(
+                        "{\"schema\":{\"type\":\"struct\",\"fields\":["
+                                + "{\"type\":\"struct\",\"fields\":["
+                                + fieldsSchema
+                                + "],\"optional\":true,\"field\":\"before\"},"
+                                + "{\"type\":\"struct\",\"fields\":["
+                                + fieldsSchema
+                                + "],\"optional\":true,\"field\":\"after\"}"
+                                + "],\"optional\":false},"
+                                + "\"payload\":{\"before\":null,\"after\":"
+                                + "{\"_boolean\":true,\"_tinyint\":1,\"_smallint\":7,\"_int\":42,\"_bigint\":1,"
+                                + "\"_float\":2.5,\"_double\":9.99,\"_decimal\":123.45,"
+                                + "\"_char\":\"test1\",\"_varchar\":\"test2\",\"_string\":\"test3\","
+                                + "\"_date\":\"1970-04-11\",\"_time\":\"00:00:00\","
+                                + "\"_timestamp\":\"2023-01-01 00:00:00\",\"_timestamp_3\":\"2023-01-01 00:00:00\","
+                                + "\"_timestamp_ltz\":\"2023-01-01 00:00:00Z\",\"_binary\":\"AQID\"},"
+                                + "\"op\":\"c\",\"source\":{\"db\":\"default_schema\",\"table\":\"table1\"}}}");
+        assertThat(actual).isEqualTo(expected);
+    }
+
+    @Test
     void testSerializeWithSchemaComplexTypes() throws Exception {
         ObjectMapper mapper =
                 JacksonMapperFactory.createObjectMapper()
