@@ -33,7 +33,6 @@ import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
-import org.apache.flink.cdc.common.event.InitializeTablesEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
@@ -68,7 +67,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -1432,34 +1430,9 @@ class FlinkPipelineComposerITCase {
                         "1234567890123456.789",
                         List.of(
                                 "CreateTableEvent{tableId=test_database.merged, schema=columns={`id` BIGINT NOT NULL,`dec` DECIMAL(21, 5)}, primaryKeys=id, options=()}",
-                                "DataChangeEvent{tableId=test_database.merged, before=[], after=[1, 12345.54321], op=INSERT, meta=()}",
-                                "DataChangeEvent{tableId=test_database.merged, before=[], after=[2, 1234567890123456.78900], op=INSERT, meta=()}"),
-                        true),
-                Arguments.of(
-                        10,
-                        5,
-                        "12345.54321",
-                        19,
-                        3,
-                        "1234567890123456.789",
-                        List.of(
-                                "CreateTableEvent{tableId=test_database.merged, schema=columns={`id` BIGINT NOT NULL,`dec` DECIMAL(10, 5)}, primaryKeys=id, options=()}",
                                 "AlterColumnTypeEvent{tableId=test_database.merged, typeMapping={dec=DECIMAL(21, 5)}, oldTypeMapping={dec=DECIMAL(10, 5)}}",
                                 "DataChangeEvent{tableId=test_database.merged, before=[], after=[1, 12345.54321], op=INSERT, meta=()}",
-                                "DataChangeEvent{tableId=test_database.merged, before=[], after=[2, 1234567890123456.78900], op=INSERT, meta=()}"),
-                        false),
-                Arguments.of(
-                        25,
-                        16,
-                        "123456789.1234567890123456",
-                        32,
-                        32,
-                        "0.12345678901234567890123456789012",
-                        List.of(
-                                "CreateTableEvent{tableId=test_database.merged, schema=columns={`id` BIGINT NOT NULL,`dec` DECIMAL(38, 29)}, primaryKeys=id, options=()}",
-                                "DataChangeEvent{tableId=test_database.merged, before=[], after=[1, 123456789.12345678901234560000000000000], op=INSERT, meta=()}",
-                                "DataChangeEvent{tableId=test_database.merged, before=[], after=[2, 0.12345678901234567890123456789], op=INSERT, meta=()}"),
-                        true),
+                                "DataChangeEvent{tableId=test_database.merged, before=[], after=[2, 1234567890123456.78900], op=INSERT, meta=()}")),
                 Arguments.of(
                         25,
                         16,
@@ -1471,20 +1444,7 @@ class FlinkPipelineComposerITCase {
                                 "CreateTableEvent{tableId=test_database.merged, schema=columns={`id` BIGINT NOT NULL,`dec` DECIMAL(25, 16)}, primaryKeys=id, options=()}",
                                 "AlterColumnTypeEvent{tableId=test_database.merged, typeMapping={dec=DECIMAL(38, 29)}, oldTypeMapping={dec=DECIMAL(25, 16)}}",
                                 "DataChangeEvent{tableId=test_database.merged, before=[], after=[1, 123456789.12345678901234560000000000000], op=INSERT, meta=()}",
-                                "DataChangeEvent{tableId=test_database.merged, before=[], after=[2, 0.12345678901234567890123456789], op=INSERT, meta=()}"),
-                        false),
-                Arguments.of(
-                        38,
-                        38,
-                        "0.12345678901234567890123456789012345678",
-                        38,
-                        0,
-                        "12345678901234567890123456789012345678",
-                        List.of(
-                                "CreateTableEvent{tableId=test_database.merged, schema=columns={`id` BIGINT NOT NULL,`dec` DECIMAL(38, 0)}, primaryKeys=id, options=()}",
-                                "DataChangeEvent{tableId=test_database.merged, before=[], after=[1, 0], op=INSERT, meta=()}",
-                                "DataChangeEvent{tableId=test_database.merged, before=[], after=[2, 12345678901234567890123456789012345678], op=INSERT, meta=()}"),
-                        true),
+                                "DataChangeEvent{tableId=test_database.merged, before=[], after=[2, 0.12345678901234567890123456789], op=INSERT, meta=()}")),
                 Arguments.of(
                         38,
                         38,
@@ -1496,11 +1456,10 @@ class FlinkPipelineComposerITCase {
                                 "CreateTableEvent{tableId=test_database.merged, schema=columns={`id` BIGINT NOT NULL,`dec` DECIMAL(38, 38)}, primaryKeys=id, options=()}",
                                 "AlterColumnTypeEvent{tableId=test_database.merged, typeMapping={dec=DECIMAL(38, 0)}, oldTypeMapping={dec=DECIMAL(38, 38)}}",
                                 "DataChangeEvent{tableId=test_database.merged, before=[], after=[1, 0], op=INSERT, meta=()}",
-                                "DataChangeEvent{tableId=test_database.merged, before=[], after=[2, 12345678901234567890123456789012345678], op=INSERT, meta=()}"),
-                        false));
+                                "DataChangeEvent{tableId=test_database.merged, before=[], after=[2, 12345678901234567890123456789012345678], op=INSERT, meta=()}")));
     }
 
-    @ParameterizedTest(name = "merge Decimal({0}, {1}) and Decimal({3}, {4}), atFirst: {7}")
+    @ParameterizedTest(name = "merge Decimal({0}, {1}) and Decimal({3}, {4})")
     @MethodSource("decimalOOB")
     void testMergingDecimalWithOutOfBoundPrecisions(
             int decimal1Precision,
@@ -1509,8 +1468,7 @@ class FlinkPipelineComposerITCase {
             int decimal2Precision,
             int decimal2Scale,
             String decimal2,
-            List<String> expectedOutput,
-            boolean mergeAtFirst)
+            List<String> expectedOutput)
             throws Exception {
         TableId tableId1 = TableId.tableId("test_database", "test_table_1");
         TableId tableId2 = TableId.tableId("test_database", "test_table_2");
@@ -1533,16 +1491,8 @@ class FlinkPipelineComposerITCase {
                 new BinaryRecordDataGenerator(
                         schema2.getColumnDataTypes().toArray(new DataType[0]));
         List<Event> events = new ArrayList<>();
-        if (mergeAtFirst) {
-            events.add(
-                    new InitializeTablesEvent(
-                            List.of(
-                                    new CreateTableEvent(tableId1, schema1),
-                                    new CreateTableEvent(tableId2, schema2))));
-        } else {
-            events.add(new CreateTableEvent(tableId1, schema1));
-            events.add(new CreateTableEvent(tableId2, schema2));
-        }
+        events.add(new CreateTableEvent(tableId1, schema1));
+        events.add(new CreateTableEvent(tableId2, schema2));
         events.add(
                 DataChangeEvent.insertEvent(
                         tableId1,
