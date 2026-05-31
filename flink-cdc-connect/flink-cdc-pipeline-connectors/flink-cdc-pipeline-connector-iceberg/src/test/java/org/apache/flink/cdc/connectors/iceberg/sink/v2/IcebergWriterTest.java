@@ -766,9 +766,9 @@ public class IcebergWriterTest {
      *
      * <p>On retry, Flink re-delivers the full collection of committables for that checkpoint. The
      * committer must detect that batch 0's snapshot is already present in the table history (via
-     * {@code flink.batch-index} and {@code flink.checkpoint-id} snapshot properties) and skip it,
-     * then commit only batch 1. Without this skip, batch 0's files would be added a second time,
-     * causing duplicate records.
+     * {@code flink-cdc.batch-index} and {@code flink-cdc.checkpoint-id} snapshot properties) and
+     * skip it, then commit only batch 1. Without this skip, batch 0's files would be added a second
+     * time, causing duplicate records.
      */
     @Test
     public void testRetryAfterPartialBatchCommit() throws Exception {

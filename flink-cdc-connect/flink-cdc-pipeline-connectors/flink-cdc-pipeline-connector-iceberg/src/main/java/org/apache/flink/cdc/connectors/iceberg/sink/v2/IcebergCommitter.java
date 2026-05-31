@@ -63,11 +63,14 @@ public class IcebergCommitter implements Committer<WriteResultWrapper> {
 
     public static final String TABLE_GROUP_KEY = "table";
 
+    // Use a flink-cdc. prefix so these don't clash with the flink. namespace reserved by the
+    // Iceberg Flink connector.
+
     /** Snapshot summary key for the batch index; used to resume partial commits on retry. */
-    static final String FLINK_BATCH_INDEX = "flink.batch-index";
+    static final String FLINK_BATCH_INDEX = "flink-cdc.batch-index";
 
     /** Snapshot summary key for the checkpoint ID on intermediate batch commits. */
-    static final String FLINK_CHECKPOINT_ID_PROP = "flink.checkpoint-id";
+    static final String FLINK_CHECKPOINT_ID_PROP = "flink-cdc.checkpoint-id";
 
     private final Catalog catalog;
 
