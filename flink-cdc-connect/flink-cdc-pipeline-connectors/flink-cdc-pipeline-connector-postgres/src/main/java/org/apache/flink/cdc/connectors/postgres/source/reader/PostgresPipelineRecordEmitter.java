@@ -57,7 +57,6 @@ import java.util.Set;
 import static io.debezium.connector.AbstractSourceInfo.SCHEMA_NAME_KEY;
 import static io.debezium.connector.AbstractSourceInfo.TABLE_NAME_KEY;
 import static org.apache.flink.cdc.connectors.base.source.meta.wartermark.WatermarkEvent.isLowWatermarkEvent;
-import static org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils.isDataChangeRecord;
 import static org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils.isSchemaChangeEvent;
 import static org.apache.flink.cdc.connectors.postgres.utils.PostgresSchemaUtils.toCdcTableId;
 import static org.apache.flink.cdc.connectors.postgres.utils.SchemaChangeUtil.inferSchemaChangeEvent;
@@ -66,7 +65,6 @@ import static org.apache.flink.cdc.connectors.postgres.utils.SchemaChangeUtil.to
 /** The {@link RecordEmitter} implementation for PostgreSQL pipeline connector. */
 public class PostgresPipelineRecordEmitter<T> extends PostgresSourceRecordEmitter<T> {
     private static final Logger LOG = LoggerFactory.getLogger(PostgresPipelineRecordEmitter.class);
-    private final PostgresSourceConfig sourceConfig;
     private final PostgresDialect postgresDialect;
 
     // Used when startup mode is initial
@@ -88,8 +86,8 @@ public class PostgresPipelineRecordEmitter<T> extends PostgresSourceRecordEmitte
                 debeziumDeserializationSchema,
                 sourceReaderMetrics,
                 sourceConfig.isIncludeSchemaChanges(),
-                offsetFactory);
-        this.sourceConfig = sourceConfig;
+                offsetFactory,
+                sourceConfig);
         this.includeDatabaseInTableId = sourceConfig.isIncludeDatabaseInTableId();
         this.postgresDialect = postgresDialect;
         this.alreadySendCreateTableTables = new HashSet<>();

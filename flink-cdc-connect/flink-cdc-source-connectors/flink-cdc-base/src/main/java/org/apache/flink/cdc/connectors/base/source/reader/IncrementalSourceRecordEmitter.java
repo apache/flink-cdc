@@ -24,6 +24,7 @@ import org.apache.flink.cdc.connectors.base.source.meta.split.SourceRecords;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitState;
 import org.apache.flink.cdc.connectors.base.source.metrics.SourceReaderMetrics;
+import org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.cdc.debezium.history.FlinkJsonTableChangeSerializer;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
@@ -46,7 +47,6 @@ import static org.apache.flink.cdc.connectors.base.source.meta.wartermark.Waterm
 import static org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils.getFetchTimestamp;
 import static org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils.getHistoryRecord;
 import static org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils.getMessageTimestamp;
-import static org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils.isDataChangeRecord;
 import static org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils.isHeartbeatEvent;
 import static org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils.isSchemaChangeEvent;
 
@@ -126,13 +126,17 @@ public class IncrementalSourceRecordEmitter<T>
         }
     }
 
+    protected boolean isDataChangeRecord(SourceRecord record) {
+        return SourceRecordUtils.isDataChangeRecord(record);
+    }
+
     protected TableChanges getTableChangeRecord(SourceRecord element) throws IOException {
         HistoryRecord historyRecord = getHistoryRecord(element);
         Array tableChanges = historyRecord.document().getArray(HistoryRecord.Fields.TABLE_CHANGES);
         return TABLE_CHANGE_SERIALIZER.deserialize(tableChanges, true);
     }
 
-    private void updateStreamSplitState(SourceSplitState splitState, SourceRecord element) {
+    protected void updateStreamSplitState(SourceSplitState splitState, SourceRecord element) {
         if (splitState.isStreamSplitState()) {
             Offset position = getOffsetPosition(element);
             splitState.asStreamSplitState().setStartingOffset(position);

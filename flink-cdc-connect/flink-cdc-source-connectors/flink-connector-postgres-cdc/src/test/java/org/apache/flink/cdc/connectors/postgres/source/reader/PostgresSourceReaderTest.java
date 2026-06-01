@@ -91,6 +91,75 @@ public class PostgresSourceReaderTest extends PostgresTestBase {
     }
 
     @Test
+    public void testReceiveLogicalMessagesWithPrefix() throws Exception {
+        final DataType dataType =
+                DataTypes.ROW(
+                        DataTypes.FIELD("Id", DataTypes.BIGINT()),
+                        DataTypes.FIELD("Name", DataTypes.STRING()),
+                        DataTypes.FIELD("address", DataTypes.STRING()),
+                        DataTypes.FIELD("phone_number", DataTypes.STRING()));
+
+        // Discover table schemas and create a stream split
+        PostgresSourceConfigFactory configFactory = createConfigFactory();
+        configFactory.includeLogicalMessages(Collections.singletonList("test_prefix"));
+        PostgresSourceConfig sourceConfig = configFactory.create(0);
+        try (PostgresDialect dialect = new PostgresDialect(sourceConfig);
+                PostgresSourceReader reader =
+                        createStreamReaderWithLogicalMessage(
+                                Collections.singletonList("test_prefix"))) {
+            reader.start();
+            Map<TableId, TableChanges.TableChange> tableSchemas =
+                    dialect.discoverDataCollectionSchemas(sourceConfig);
+
+            PostgresOffsetFactory offsetFactory = new PostgresOffsetFactory();
+            StreamSplit streamSplit =
+                    new StreamSplit(
+                            StreamSplit.STREAM_SPLIT_ID,
+                            offsetFactory.createInitialOffset(),
+                            offsetFactory.createNoStoppingOffset(),
+                            Collections.emptyList(),
+                            tableSchemas,
+                            0);
+            reader.addSplits(Collections.singletonList(streamSplit));
+
+            // Wait for the reader to start consuming
+            Thread.sleep(1000L);
+
+            try (Connection conn =
+                            getJdbcConnection(
+                                    POSTGRES_CONTAINER, customDatabase.getDatabaseName());
+                    Statement stmt = conn.createStatement()) {
+                // Emit logical message -> insert data -> emit another logical message
+                stmt.execute("SELECT pg_logical_emit_message(false, 'test_prefix', 'message1')");
+                stmt.execute(
+                        "INSERT INTO customer.\"Customers\" VALUES (3001, 'between_msg', 'Beijing', '111')");
+                stmt.execute("SELECT pg_logical_emit_message(false, 'other_prefix', 'message2')");
+                stmt.execute(
+                        "INSERT INTO customer.\"Customers\" VALUES (3002, 'after_other', 'Shanghai', '222')");
+                stmt.execute("SELECT pg_logical_emit_message(false, 'test_prefix', 'message3')");
+            }
+
+            // Wait for the logical message events to be processed
+            Thread.sleep(2000L);
+
+            // Poll records so the emitter processes all events
+            List<String> results = consumeStreamRecords(reader, dataType, 4);
+            // Verify ordering and filtering:
+            // - message1 (test_prefix) is captured
+            // - insert between_msg is captured
+            // - message2 (other_prefix) is filtered out
+            // - insert after_other is captured
+            // - message3 (test_prefix) is captured
+            assertThat(results)
+                    .containsExactly(
+                            "M[test_prefix, message1]",
+                            "+I[3001, between_msg, Beijing, 111]",
+                            "+I[3002, after_other, Shanghai, 222]",
+                            "M[test_prefix, message3]");
+        }
+    }
+
+    @Test
     void testNotifyCheckpointWindowSizeOne() throws Exception {
         final PostgresSourceReader reader = createReader(1);
         final List<Long> completedCheckpointIds = new ArrayList<>();
@@ -308,6 +377,18 @@ public class PostgresSourceReaderTest extends PostgresTestBase {
         return formatter.format(output.getResults());
     }
 
+    private List<String> consumeStreamRecords(
+            PostgresSourceReader sourceReader, DataType recordType, int size) throws Exception {
+        // Poll all the n records of the single split.
+        final SimpleReaderOutput output = new SimpleReaderOutput();
+        InputStatus status = MORE_AVAILABLE;
+        while (MORE_AVAILABLE == status || output.getResults().size() < size) {
+            status = sourceReader.pollNext(output);
+        }
+        final RecordsFormatter formatter = new RecordsFormatter(recordType);
+        return formatter.format(output.getResults());
+    }
+
     private PostgresSourceReader createReader(final int lsnCommitCheckpointsDelay)
             throws Exception {
         return createReader(lsnCommitCheckpointsDelay, false);
@@ -338,6 +419,20 @@ public class PostgresSourceReaderTest extends PostgresTestBase {
         return source.createReader(new TestingReaderContext());
     }
 
+    private PostgresSourceReader createStreamReaderWithLogicalMessage(List<String> prefixes)
+            throws Exception {
+        final PostgresOffsetFactory offsetFactory = new PostgresOffsetFactory();
+        final PostgresSourceConfigFactory configFactory = createConfigFactory();
+        configFactory.startupOptions(StartupOptions.latest());
+        configFactory.setLsnCommitCheckpointsDelay(1);
+        configFactory.includeLogicalMessages(prefixes);
+        PostgresDialect dialect = new PostgresDialect(configFactory.create(0));
+        final PostgresSourceBuilder.PostgresIncrementalSource<?> source =
+                new PostgresSourceBuilder.PostgresIncrementalSource<>(
+                        configFactory, new ForwardDeserializeSchema(), offsetFactory, dialect);
+        return source.createReader(new TestingReaderContext());
+    }
+
     private PostgresSourceConfigFactory createConfigFactory() {
         final PostgresSourceConfigFactory configFactory = new PostgresSourceConfigFactory();
         configFactory.hostname(customDatabase.getHost());
@@ -346,6 +441,7 @@ public class PostgresSourceReaderTest extends PostgresTestBase {
         configFactory.tableList(SCHEMA_NAME + ".Customers");
         configFactory.username(customDatabase.getUsername());
         configFactory.password(customDatabase.getPassword());
+        configFactory.slotName(slotName);
         configFactory.decodingPluginName("pgoutput");
         return configFactory;
     }
