@@ -20,7 +20,9 @@ import static io.debezium.relational.RelationalDatabaseConnectorConfig.COLUMN_EX
 /**
  * Copied from Debezium 1.9.8.Final.
  *
- * <p>Line 146: add a method to update the tableFilter variable.
+ * <p>Line 97: cache table filter results.
+ *
+ * <p>Line 147: add a method to update the tableFilter variable.
  */
 public class RelationalTableFilters implements DataCollectionFilters {
 
@@ -92,7 +94,7 @@ public class RelationalTableFilters implements DataCollectionFilters {
                         ? tablePredicate.and(systemTablesFilter::isIncluded)
                         : tablePredicate;
 
-        this.tableFilter = finalTablePredicate::test;
+        this.tableFilter = CachedTableFilter.from(finalTablePredicate::test);
 
         // Define the database filter using the include and exclude lists for database names ...
         this.databaseFilter =

@@ -24,6 +24,7 @@ import org.apache.flink.table.catalog.ObjectPath;
 
 import io.debezium.config.Configuration;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
+import io.debezium.relational.CachedTableFilter;
 import io.debezium.relational.RelationalTableFilters;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
@@ -143,14 +144,16 @@ public class MySqlSourceConfig implements Serializable {
                 (excludeTableList == null
                         ? null
                         : new Selectors.SelectorsBuilder().includeTables(excludeTableList).build());
-        Tables.TableFilter tableFilter = dbzMySqlConfig.getTableFilters().dataCollectionFilter();
-        dbzMySqlConfig
-                .getTableFilters()
-                .setDataCollectionFilters(
-                        (TableId tableId) ->
-                                tableFilter.isIncluded(tableId)
-                                        && (excludeTableFilter == null
-                                                || !excludeTableFilter.isMatch(tableId)));
+        if (excludeTableFilter != null) {
+            Tables.TableFilter tableFilter =
+                    dbzMySqlConfig.getTableFilters().dataCollectionFilter();
+            dbzMySqlConfig
+                    .getTableFilters()
+                    .setDataCollectionFilters(
+                            CachedTableFilter.from(tableFilter)
+                                    .withAdditionalFilter(
+                                            tableId -> !excludeTableFilter.isMatch(tableId)));
+        }
         this.jdbcProperties = jdbcProperties;
         this.chunkKeyColumns = chunkKeyColumns;
         this.skipSnapshotBackfill = skipSnapshotBackfill;
