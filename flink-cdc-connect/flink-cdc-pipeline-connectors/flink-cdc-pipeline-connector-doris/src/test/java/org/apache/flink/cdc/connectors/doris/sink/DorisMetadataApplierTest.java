@@ -861,6 +861,30 @@ public class DorisMetadataApplierTest {
     }
 
     @Test
+    public void testAddColumnEventAppliesDorisDdlWhenSchemaCacheIsMissing() {
+        RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
+        DorisMetadataApplier applier =
+                new DorisMetadataApplier(
+                        createDorisOptions(),
+                        Configuration.fromMap(Collections.emptyMap()),
+                        schemaChangeManager,
+                        (dorisOptions, tableId) -> null);
+
+        applier.applySchemaChange(
+                new AddColumnEvent(
+                        TABLE_ID,
+                        Collections.singletonList(
+                                AddColumnEvent.after(
+                                        Column.physicalColumn(
+                                                "age", DataTypes.BIGINT().notNull(), "age comment"),
+                                        "name"))));
+
+        Assertions.assertThat(schemaChangeManager.addedColumns).hasSize(1);
+        Assertions.assertThat(schemaChangeManager.addedColumns.get(0).columnName).isEqualTo("age");
+        Assertions.assertThat(applier.getCachedSchema(TABLE_ID)).isNull();
+    }
+
+    @Test
     public void testAddColumnEventKeepsCdcNullabilityInCache() {
         RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
         DorisMetadataApplier applier =
@@ -885,6 +909,31 @@ public class DorisMetadataApplierTest {
         Assertions.assertThat(applier.getCachedSchema(TABLE_ID).getColumn("tracked_flag"))
                 .hasValueSatisfying(
                         column -> Assertions.assertThat(column.getType().isNullable()).isFalse());
+    }
+
+    @Test
+    public void testAddColumnEventInvalidatesStaleSchemaCacheWhenLocalUpdateFails() {
+        RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
+        DorisMetadataApplier applier =
+                new DorisMetadataApplier(
+                        createDorisOptions(),
+                        Configuration.fromMap(Collections.emptyMap()),
+                        schemaChangeManager,
+                        (dorisOptions, tableId) -> null);
+
+        Schema staleSchema = Schema.newBuilder().physicalColumn("id", DataTypes.INT()).build();
+        applier.applySchemaChange(new CreateTableEvent(TABLE_ID, staleSchema));
+
+        applier.applySchemaChange(
+                new AddColumnEvent(
+                        TABLE_ID,
+                        Collections.singletonList(
+                                AddColumnEvent.after(
+                                        Column.physicalColumn("age", DataTypes.BIGINT()),
+                                        "name"))));
+
+        Assertions.assertThat(schemaChangeManager.addedColumns).hasSize(1);
+        Assertions.assertThat(applier.getCachedSchema(TABLE_ID)).isNull();
     }
 
     @Test

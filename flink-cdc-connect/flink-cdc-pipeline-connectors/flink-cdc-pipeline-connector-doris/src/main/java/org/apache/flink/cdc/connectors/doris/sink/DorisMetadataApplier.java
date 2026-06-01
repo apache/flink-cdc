@@ -537,7 +537,7 @@ public class DorisMetadataApplier implements MetadataApplier {
     private void applyAddColumnEvent(AddColumnEvent event) throws SchemaEvolveException {
         try {
             TableId tableId = event.tableId();
-            Schema currentSchema = getSchemaOrThrow(tableId);
+            Schema currentSchema = schemaCache.get(tableId);
             List<AddColumnEvent.ColumnWithPosition> addedColumns = event.getAddedColumns();
             for (AddColumnEvent.ColumnWithPosition col : addedColumns) {
                 Column column = col.getAddColumn();
@@ -553,12 +553,16 @@ public class DorisMetadataApplier implements MetadataApplier {
                                 tableId.getSchemaName(), tableId.getTableName(), addFieldSchema),
                         "add column " + column.getName(),
                         tableId);
-                currentSchema =
-                        SchemaUtils.applySchemaChangeEvent(
-                                currentSchema,
-                                new AddColumnEvent(tableId, Collections.singletonList(col)));
+                if (currentSchema != null) {
+                    currentSchema =
+                            tryApplySchemaChangeToCache(
+                                    tableId,
+                                    currentSchema,
+                                    new AddColumnEvent(tableId, Collections.singletonList(col)),
+                                    "add column " + column.getName());
+                }
             }
-            schemaCache.put(tableId, currentSchema);
+            updateSchemaCache(tableId, currentSchema, "add column event");
         } catch (Exception e) {
             throw new SchemaEvolveException(event, "fail to apply add column event", e);
         }
@@ -654,6 +658,34 @@ public class DorisMetadataApplier implements MetadataApplier {
         } catch (Exception e) {
             throw new SchemaEvolveException(dropTableEvent, "fail to drop table", e);
         }
+    }
+
+    private Schema tryApplySchemaChangeToCache(
+            TableId tableId, Schema schema, SchemaChangeEvent event, String operation) {
+        try {
+            return SchemaUtils.applySchemaChangeEvent(schema, event);
+        } catch (Exception e) {
+            LOG.warn(
+                    "Failed to update local schema cache for {} after {}. "
+                            + "Doris schema change has been applied, invalidate local cache.",
+                    tableId,
+                    operation,
+                    e);
+            return null;
+        }
+    }
+
+    private void updateSchemaCache(TableId tableId, Schema schema, String operation) {
+        if (schema == null) {
+            LOG.warn(
+                    "Local schema cache of {} is unavailable after {}. "
+                            + "Doris schema change has been applied, skip local cache update.",
+                    tableId,
+                    operation);
+            schemaCache.remove(tableId);
+            return;
+        }
+        schemaCache.put(tableId, schema);
     }
 
     private Schema getSchemaOrThrow(TableId tableId) {
