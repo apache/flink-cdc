@@ -35,6 +35,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
@@ -146,11 +147,7 @@ public class MySqlSourceConfig implements Serializable {
         Tables.TableFilter tableFilter = dbzMySqlConfig.getTableFilters().dataCollectionFilter();
         dbzMySqlConfig
                 .getTableFilters()
-                .setDataCollectionFilters(
-                        (TableId tableId) ->
-                                tableFilter.isIncluded(tableId)
-                                        && (excludeTableFilter == null
-                                                || !excludeTableFilter.isMatch(tableId)));
+                .setDataCollectionFilters(createCachedTableFilter(tableFilter, excludeTableFilter));
         this.jdbcProperties = jdbcProperties;
         this.chunkKeyColumns = chunkKeyColumns;
         this.skipSnapshotBackfill = skipSnapshotBackfill;
@@ -282,6 +279,22 @@ public class MySqlSourceConfig implements Serializable {
     public Predicate<TableId> getTableFilter() {
         RelationalTableFilters tableFilters = dbzMySqlConfig.getTableFilters();
         return tableId -> tableFilters.dataCollectionFilter().isIncluded(tableId);
+    }
+
+    static Tables.TableFilter createCachedTableFilter(
+            Tables.TableFilter tableFilter, @Nullable Selectors excludeTableFilter) {
+        Map<TableId, Boolean> tableFilterCache = new ConcurrentHashMap<>();
+        return tableId ->
+                tableFilterCache.computeIfAbsent(
+                        tableId, id -> isTableIncluded(tableFilter, excludeTableFilter, id));
+    }
+
+    private static boolean isTableIncluded(
+            Tables.TableFilter tableFilter,
+            @Nullable Selectors excludeTableFilter,
+            TableId tableId) {
+        return tableFilter.isIncluded(tableId)
+                && (excludeTableFilter == null || !excludeTableFilter.isMatch(tableId));
     }
 
     public Properties getJdbcProperties() {
