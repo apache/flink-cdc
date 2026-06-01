@@ -1430,7 +1430,7 @@ class FlinkPipelineComposerITCase {
                         "1234567890123456.789",
                         List.of(
                                 "CreateTableEvent{tableId=test_database.merged, schema=columns={`id` BIGINT NOT NULL,`dec` DECIMAL(21, 5)}, primaryKeys=id, options=()}",
-                                "AlterColumnTypeEvent{tableId=test_database.merged, typeMapping={dec=DECIMAL(21, 5)}, oldTypeMapping={dec=DECIMAL(10, 5)}}",
+                                "AlterColumnTypeEvent{tableId=test_database.merged, typeMapping={dec=DECIMAL(21, 5)}, oldTypeMapping={dec=DECIMAL(10, 5)}, comments={}}",
                                 "DataChangeEvent{tableId=test_database.merged, before=[], after=[1, 12345.54321], op=INSERT, meta=()}",
                                 "DataChangeEvent{tableId=test_database.merged, before=[], after=[2, 1234567890123456.78900], op=INSERT, meta=()}")),
                 Arguments.of(
@@ -1442,7 +1442,7 @@ class FlinkPipelineComposerITCase {
                         "0.12345678901234567890123456789012",
                         List.of(
                                 "CreateTableEvent{tableId=test_database.merged, schema=columns={`id` BIGINT NOT NULL,`dec` DECIMAL(25, 16)}, primaryKeys=id, options=()}",
-                                "AlterColumnTypeEvent{tableId=test_database.merged, typeMapping={dec=DECIMAL(38, 29)}, oldTypeMapping={dec=DECIMAL(25, 16)}}",
+                                "AlterColumnTypeEvent{tableId=test_database.merged, typeMapping={dec=DECIMAL(38, 29)}, oldTypeMapping={dec=DECIMAL(25, 16)}, comments={}}",
                                 "DataChangeEvent{tableId=test_database.merged, before=[], after=[1, 123456789.12345678901234560000000000000], op=INSERT, meta=()}",
                                 "DataChangeEvent{tableId=test_database.merged, before=[], after=[2, 0.12345678901234567890123456789], op=INSERT, meta=()}")),
                 Arguments.of(
@@ -1454,7 +1454,7 @@ class FlinkPipelineComposerITCase {
                         "12345678901234567890123456789012345678",
                         List.of(
                                 "CreateTableEvent{tableId=test_database.merged, schema=columns={`id` BIGINT NOT NULL,`dec` DECIMAL(38, 38)}, primaryKeys=id, options=()}",
-                                "AlterColumnTypeEvent{tableId=test_database.merged, typeMapping={dec=DECIMAL(38, 0)}, oldTypeMapping={dec=DECIMAL(38, 38)}}",
+                                "AlterColumnTypeEvent{tableId=test_database.merged, typeMapping={dec=DECIMAL(38, 0)}, oldTypeMapping={dec=DECIMAL(38, 38)}, comments={}}",
                                 "DataChangeEvent{tableId=test_database.merged, before=[], after=[1, 0], op=INSERT, meta=()}",
                                 "DataChangeEvent{tableId=test_database.merged, before=[], after=[2, 12345678901234567890123456789012345678], op=INSERT, meta=()}")));
     }
