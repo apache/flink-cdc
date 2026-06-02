@@ -55,6 +55,7 @@ import org.apache.doris.flink.catalog.doris.TableSchema;
 import org.apache.doris.flink.cfg.DorisOptions;
 import org.apache.doris.flink.rest.RestService;
 import org.apache.doris.flink.rest.models.Field;
+import org.apache.doris.flink.sink.schema.AddColumnPosition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -300,16 +301,12 @@ public class DorisMetadataApplier implements MetadataApplier {
 
         for (AddColumnEvent.ColumnWithPosition missingColumn : missingColumns) {
             Column column = missingColumn.getAddColumn();
-            FieldSchema addFieldSchema =
-                    new FieldSchema(
-                            column.getName(),
-                            DorisTypeUtils.toDorisTypeString(column.getType()),
-                            convertInvalidTimestampDefaultValue(
-                                    column.getDefaultValueExpression(), column.getType()),
-                            column.getComment());
             ensureSchemaChangeSucceeded(
                     schemaChangeManager.addColumn(
-                            tableId.getSchemaName(), tableId.getTableName(), addFieldSchema),
+                            tableId.getSchemaName(),
+                            tableId.getTableName(),
+                            buildAddFieldSchema(column),
+                            toDorisAddColumnPosition(missingColumn, currentSchema)),
                     "add missing column " + column.getName(),
                     tableId);
             currentSchema =
@@ -541,16 +538,12 @@ public class DorisMetadataApplier implements MetadataApplier {
             List<AddColumnEvent.ColumnWithPosition> addedColumns = event.getAddedColumns();
             for (AddColumnEvent.ColumnWithPosition col : addedColumns) {
                 Column column = col.getAddColumn();
-                FieldSchema addFieldSchema =
-                        new FieldSchema(
-                                column.getName(),
-                                DorisTypeUtils.toDorisTypeString(column.getType()),
-                                convertInvalidTimestampDefaultValue(
-                                        column.getDefaultValueExpression(), column.getType()),
-                                column.getComment());
                 ensureSchemaChangeSucceeded(
                         schemaChangeManager.addColumn(
-                                tableId.getSchemaName(), tableId.getTableName(), addFieldSchema),
+                                tableId.getSchemaName(),
+                                tableId.getTableName(),
+                                buildAddFieldSchema(column),
+                                toDorisAddColumnPosition(col, currentSchema)),
                         "add column " + column.getName(),
                         tableId);
                 if (currentSchema != null) {
@@ -566,6 +559,73 @@ public class DorisMetadataApplier implements MetadataApplier {
         } catch (Exception e) {
             throw new SchemaEvolveException(event, "fail to apply add column event", e);
         }
+    }
+
+    private FieldSchema buildAddFieldSchema(Column column) {
+        return new FieldSchema(
+                column.getName(),
+                DorisTypeUtils.toDorisTypeString(column.getType()),
+                convertInvalidTimestampDefaultValue(
+                        column.getDefaultValueExpression(), column.getType()),
+                column.getComment());
+    }
+
+    private AddColumnPosition toDorisAddColumnPosition(
+            AddColumnEvent.ColumnWithPosition columnWithPosition, Schema currentSchema) {
+        switch (columnWithPosition.getPosition()) {
+            case FIRST:
+                return AddColumnPosition.first();
+            case AFTER:
+                return columnWithPosition.getExistedColumnName() == null
+                        ? AddColumnPosition.last()
+                        : AddColumnPosition.after(columnWithPosition.getExistedColumnName());
+            case BEFORE:
+                return translateBeforePosition(
+                        columnWithPosition.getExistedColumnName(), currentSchema);
+            case LAST:
+            default:
+                return AddColumnPosition.last();
+        }
+    }
+
+    private AddColumnPosition translateBeforePosition(
+            String referenceColumn, Schema currentSchema) {
+        if (referenceColumn == null || currentSchema == null) {
+            LOG.warn(
+                    "Cannot translate CDC BEFORE column position to Doris ADD COLUMN position. "
+                            + "referenceColumn={}, hasSchemaCache={}. Fallback to LAST.",
+                    referenceColumn,
+                    currentSchema != null);
+            return AddColumnPosition.last();
+        }
+
+        List<String> columnNames = currentSchema.getColumnNames();
+        int referenceIndex = findColumnIndex(columnNames, referenceColumn);
+        if (referenceIndex < 0) {
+            LOG.warn(
+                    "Cannot find reference column {} in local schema cache while translating CDC "
+                            + "BEFORE position to Doris ADD COLUMN position. Fallback to LAST.",
+                    referenceColumn);
+            return AddColumnPosition.last();
+        }
+        if (referenceIndex == 0) {
+            return AddColumnPosition.first();
+        }
+        return AddColumnPosition.after(columnNames.get(referenceIndex - 1));
+    }
+
+    private int findColumnIndex(List<String> columnNames, String columnName) {
+        for (int i = 0; i < columnNames.size(); i++) {
+            if (columnNames.get(i).equals(columnName)) {
+                return i;
+            }
+        }
+        for (int i = 0; i < columnNames.size(); i++) {
+            if (columnNames.get(i).equalsIgnoreCase(columnName)) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     private void applyDropColumnEvent(DropColumnEvent event) throws SchemaEvolveException {
