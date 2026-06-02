@@ -1402,8 +1402,8 @@ class FlinkPipelineComposerITCase {
                         .map(
                                 s ->
                                         s.replace(
-                                                "{}",
-                                                "default_namespace.default_schema.default_everything_merged"))
+                                                "tableId={}",
+                                                "tableId=default_namespace.default_schema.default_everything_merged"))
                         .collect(Collectors.toList());
 
         runGenericMergingTest(
@@ -1429,7 +1429,7 @@ class FlinkPipelineComposerITCase {
                         3,
                         "1234567890123456.789",
                         List.of(
-                                "CreateTableEvent{tableId=test_database.merged, schema=columns={`id` BIGINT NOT NULL,`dec` DECIMAL(21, 5)}, primaryKeys=id, options=()}",
+                                "CreateTableEvent{tableId=test_database.merged, schema=columns={`id` BIGINT NOT NULL,`dec` DECIMAL(10, 5)}, primaryKeys=id, options=()}",
                                 "AlterColumnTypeEvent{tableId=test_database.merged, typeMapping={dec=DECIMAL(21, 5)}, oldTypeMapping={dec=DECIMAL(10, 5)}, comments={}}",
                                 "DataChangeEvent{tableId=test_database.merged, before=[], after=[1, 12345.54321], op=INSERT, meta=()}",
                                 "DataChangeEvent{tableId=test_database.merged, before=[], after=[2, 1234567890123456.78900], op=INSERT, meta=()}")),

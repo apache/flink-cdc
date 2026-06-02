@@ -453,11 +453,7 @@ public class SchemaMergingUtils {
                 Math.max(
                         decimalType.getPrecision(),
                         decimalType.getScale() + getNumericPrecision(otherType));
-        if (resultPrecision <= DecimalType.MAX_PRECISION) {
-            return DataTypes.DECIMAL(resultPrecision, decimalType.getScale());
-        } else {
-            return DataTypes.STRING();
-        }
+        return createDecimalBounded(resultPrecision, decimalType.getScale());
     }
 
     @VisibleForTesting
