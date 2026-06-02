@@ -17,10 +17,14 @@
 
 package org.apache.flink.cdc.connectors.mysql.source.config;
 
+import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.connectors.mysql.schema.Selectors;
 import org.apache.flink.cdc.connectors.mysql.source.MySqlSource;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
 import org.apache.flink.table.catalog.ObjectPath;
+
+import org.apache.flink.shaded.guava31.com.google.common.cache.Cache;
+import org.apache.flink.shaded.guava31.com.google.common.cache.CacheBuilder;
 
 import io.debezium.config.Configuration;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
@@ -42,6 +46,7 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
 /** A MySql Source configuration which is used by {@link MySqlSource}. */
 public class MySqlSourceConfig implements Serializable {
     private static final long serialVersionUID = 1L;
+    private static final Duration TABLE_FILTER_CACHE_EXPIRE_DURATION = Duration.ofHours(1);
 
     private final String hostname;
     private final int port;
@@ -144,13 +149,13 @@ public class MySqlSourceConfig implements Serializable {
                         ? null
                         : new Selectors.SelectorsBuilder().includeTables(excludeTableList).build());
         Tables.TableFilter tableFilter = dbzMySqlConfig.getTableFilters().dataCollectionFilter();
-        dbzMySqlConfig
-                .getTableFilters()
-                .setDataCollectionFilters(
+        Tables.TableFilter cachedTableFilter =
+                createCachedTableFilter(
                         (TableId tableId) ->
                                 tableFilter.isIncluded(tableId)
                                         && (excludeTableFilter == null
                                                 || !excludeTableFilter.isMatch(tableId)));
+        dbzMySqlConfig.getTableFilters().setDataCollectionFilters(cachedTableFilter);
         this.jdbcProperties = jdbcProperties;
         this.chunkKeyColumns = chunkKeyColumns;
         this.skipSnapshotBackfill = skipSnapshotBackfill;
@@ -158,6 +163,24 @@ public class MySqlSourceConfig implements Serializable {
         this.treatTinyInt1AsBoolean = treatTinyInt1AsBoolean;
         this.useLegacyJsonFormat = useLegacyJsonFormat;
         this.assignUnboundedChunkFirst = assignUnboundedChunkFirst;
+    }
+
+    @VisibleForTesting
+    static Tables.TableFilter createCachedTableFilter(Tables.TableFilter delegate) {
+        Cache<TableId, Boolean> cache =
+                CacheBuilder.newBuilder()
+                        .expireAfterAccess(TABLE_FILTER_CACHE_EXPIRE_DURATION)
+                        .build();
+        return tableId -> {
+            Boolean cachedResult = cache.getIfPresent(tableId);
+            if (cachedResult != null) {
+                return cachedResult;
+            }
+
+            boolean included = delegate.isIncluded(tableId);
+            cache.put(tableId, included);
+            return included;
+        };
     }
 
     public String getHostname() {
