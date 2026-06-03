@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.oracle.utils;
 
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
+import org.apache.flink.cdc.common.types.DecimalType;
 
 import io.debezium.relational.Column;
 import oracle.jdbc.OracleTypes;
@@ -72,11 +73,19 @@ public class OracleTypeUtils {
                 return DataTypes.DOUBLE();
             case Types.NUMERIC:
             case Types.DECIMAL:
-                return column.length() == 0
-                                || !column.scale().isPresent()
-                                || column.scale().get() <= 0
-                        ? DataTypes.BIGINT()
-                        : DataTypes.DECIMAL(column.length(), column.scale().orElse(0));
+                {
+                    int precision = column.length();
+                    boolean isIntegerFamily =
+                            !column.scale().isPresent() || column.scale().get() <= 0;
+                    if (isIntegerFamily) {
+                        if (precision > 0 && precision <= 18) {
+                            return DataTypes.BIGINT();
+                        }
+                        return DataTypes.DECIMAL(
+                                precision > 0 ? precision : DecimalType.MAX_PRECISION, 0);
+                    }
+                    return DataTypes.DECIMAL(precision, column.scale().get());
+                }
             case Types.DATE:
                 return DataTypes.DATE();
             case Types.TIMESTAMP:
