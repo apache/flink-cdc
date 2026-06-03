@@ -21,6 +21,7 @@ import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.connector.sink2.Sink;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
+import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
@@ -44,7 +45,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import static org.apache.flink.cdc.connectors.starrocks.sink.StarRocksDataSinkOptions.JDBC_URL;
@@ -217,5 +221,142 @@ class StarRocksPipelineITCase extends StarRocksSinkTestBase {
                         "21 | 1.732 | Disenchanted | 2023-01-01 00:00:00.0");
 
         assertEqualsInAnyOrder(expected, actual);
+    }
+
+    @Test
+    void testTimestampPrecisionToStarRocks() throws Exception {
+        String precisionTable = "timestamp_precision_table";
+        TableId tableId =
+                TableId.tableId(StarRocksContainer.STARROCKS_DATABASE_NAME, precisionTable);
+
+        executeSql(
+                String.format(
+                        "CREATE TABLE `%s`.`%s` ("
+                                + "id INT NOT NULL, "
+                                + "ts3 DATETIME, "
+                                + "ts6 DATETIME"
+                                + ") PRIMARY KEY (`id`) DISTRIBUTED BY HASH(`id`) BUCKETS 1"
+                                + " PROPERTIES (\"replication_num\" = \"1\");",
+                        StarRocksContainer.STARROCKS_DATABASE_NAME, precisionTable));
+
+        Schema schema =
+                Schema.newBuilder()
+                        .column(new PhysicalColumn("id", DataTypes.INT(), null))
+                        .column(new PhysicalColumn("ts3", DataTypes.TIMESTAMP(3), null))
+                        .column(new PhysicalColumn("ts6", DataTypes.TIMESTAMP(6), null))
+                        .primaryKey("id")
+                        .build();
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(
+                        RowType.of(
+                                DataTypes.INT(), DataTypes.TIMESTAMP(3), DataTypes.TIMESTAMP(6)));
+
+        LocalDateTime dt3 = LocalDateTime.of(2026, 3, 27, 15, 20, 29, 123_000_000);
+        LocalDateTime dt6 = LocalDateTime.of(2026, 3, 27, 15, 20, 29, 921_550_000);
+
+        List<Event> events =
+                Arrays.asList(
+                        new CreateTableEvent(tableId, schema),
+                        DataChangeEvent.insertEvent(
+                                tableId,
+                                generator.generate(
+                                        new Object[] {
+                                            1,
+                                            TimestampData.fromLocalDateTime(dt3),
+                                            TimestampData.fromLocalDateTime(dt6)
+                                        })));
+
+        DataStream<Event> stream =
+                env.fromCollection(events, TypeInformation.of(Event.class));
+
+        Configuration config =
+                new Configuration()
+                        .set(LOAD_URL, STARROCKS_CONTAINER.getLoadUrl())
+                        .set(JDBC_URL, STARROCKS_CONTAINER.getJdbcUrl())
+                        .set(USERNAME, StarRocksContainer.STARROCKS_USERNAME)
+                        .set(PASSWORD, StarRocksContainer.STARROCKS_PASSWORD);
+
+        Sink<Event> starRocksSink =
+                ((FlinkSinkProvider) createStarRocksDataSink(config).getEventSinkProvider())
+                        .getSink();
+        stream.sinkTo(starRocksSink);
+
+        env.execute("Timestamp Precision to StarRocks Sink");
+
+        List<String> actual = fetchTableContent(tableId, 3);
+        assertEqualsInAnyOrder(
+                Collections.singletonList("1 | 2026-03-27 15:20:29.123 | 2026-03-27 15:20:29.92155"),
+                actual);
+
+        executeSql(
+                String.format(
+                        "DROP TABLE `%s`.`%s`;",
+                        StarRocksContainer.STARROCKS_DATABASE_NAME, precisionTable));
+    }
+
+    @Test
+    void testLocalZonedTimestampPrecisionToStarRocks() throws Exception {
+        String precisionTable = "ltz_precision_table";
+        TableId tableId =
+                TableId.tableId(StarRocksContainer.STARROCKS_DATABASE_NAME, precisionTable);
+
+        executeSql(
+                String.format(
+                        "CREATE TABLE `%s`.`%s` ("
+                                + "id INT NOT NULL, "
+                                + "ts6 DATETIME"
+                                + ") PRIMARY KEY (`id`) DISTRIBUTED BY HASH(`id`) BUCKETS 1"
+                                + " PROPERTIES (\"replication_num\" = \"1\");",
+                        StarRocksContainer.STARROCKS_DATABASE_NAME, precisionTable));
+
+        Schema schema =
+                Schema.newBuilder()
+                        .column(new PhysicalColumn("id", DataTypes.INT(), null))
+                        .column(new PhysicalColumn("ts6", DataTypes.TIMESTAMP_LTZ(6), null))
+                        .primaryKey("id")
+                        .build();
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(
+                        RowType.of(DataTypes.INT(), DataTypes.TIMESTAMP_LTZ(6)));
+
+        // UTC 07:20:29.921550 -> stored as-is (pipeline local-time-zone is UTC in MockContext)
+        Instant instant =
+                LocalDateTime.of(2026, 3, 27, 7, 20, 29, 921_550_000).toInstant(ZoneOffset.UTC);
+
+        List<Event> events =
+                Arrays.asList(
+                        new CreateTableEvent(tableId, schema),
+                        DataChangeEvent.insertEvent(
+                                tableId,
+                                generator.generate(
+                                        new Object[] {
+                                            1, LocalZonedTimestampData.fromInstant(instant)
+                                        })));
+
+        DataStream<Event> stream =
+                env.fromCollection(events, TypeInformation.of(Event.class));
+
+        Configuration config =
+                new Configuration()
+                        .set(LOAD_URL, STARROCKS_CONTAINER.getLoadUrl())
+                        .set(JDBC_URL, STARROCKS_CONTAINER.getJdbcUrl())
+                        .set(USERNAME, StarRocksContainer.STARROCKS_USERNAME)
+                        .set(PASSWORD, StarRocksContainer.STARROCKS_PASSWORD);
+
+        Sink<Event> starRocksSink =
+                ((FlinkSinkProvider) createStarRocksDataSink(config).getEventSinkProvider())
+                        .getSink();
+        stream.sinkTo(starRocksSink);
+
+        env.execute("LocalZonedTimestamp Precision to StarRocks Sink");
+
+        List<String> actual = fetchTableContent(tableId, 2);
+        assertEqualsInAnyOrder(
+                Collections.singletonList("1 | 2026-03-27 07:20:29.92155"), actual);
+
+        executeSql(
+                String.format(
+                        "DROP TABLE `%s`.`%s`;",
+                        StarRocksContainer.STARROCKS_DATABASE_NAME, precisionTable));
     }
 }
