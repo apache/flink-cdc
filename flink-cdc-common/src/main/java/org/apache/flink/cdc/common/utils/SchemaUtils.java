@@ -51,6 +51,8 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import static org.apache.flink.cdc.common.utils.SchemaMergingUtils.createDecimalBounded;
+
 /** Utils for {@link Schema} to perform the ability of evolution. */
 @PublicEvolving
 public class SchemaUtils {
@@ -575,15 +577,7 @@ public class SchemaUtils {
                             lhsDecimal.getPrecision() - lhsDecimal.getScale(),
                             rhsDecimal.getPrecision() - rhsDecimal.getScale());
             int resultScale = Math.max(lhsDecimal.getScale(), rhsDecimal.getScale());
-            Preconditions.checkArgument(
-                    resultIntDigits + resultScale <= DecimalType.MAX_PRECISION,
-                    String.format(
-                            "Failed to merge %s and %s type into DECIMAL. %d precision digits required, %d available",
-                            lType,
-                            rType,
-                            resultIntDigits + resultScale,
-                            DecimalType.MAX_PRECISION));
-            mergedType = DataTypes.DECIMAL(resultIntDigits + resultScale, resultScale);
+            mergedType = createDecimalBounded(resultIntDigits + resultScale, resultScale);
         } else if (lType instanceof DecimalType && rType.is(DataTypeFamily.EXACT_NUMERIC)) {
             // Merge decimal and int
             mergedType = mergeExactNumericsIntoDecimal((DecimalType) lType, rType);
@@ -608,12 +602,7 @@ public class SchemaUtils {
                 Math.max(
                         decimalType.getPrecision(),
                         decimalType.getScale() + getNumericPrecision(otherType));
-        Preconditions.checkArgument(
-                resultPrecision <= DecimalType.MAX_PRECISION,
-                String.format(
-                        "Failed to merge %s and %s type into DECIMAL. %d precision digits required, %d available",
-                        decimalType, otherType, resultPrecision, DecimalType.MAX_PRECISION));
-        return DataTypes.DECIMAL(resultPrecision, decimalType.getScale());
+        return createDecimalBounded(resultPrecision, decimalType.getScale());
     }
 
     @Deprecated

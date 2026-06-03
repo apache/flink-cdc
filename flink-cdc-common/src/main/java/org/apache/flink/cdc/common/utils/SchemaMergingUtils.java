@@ -435,15 +435,7 @@ public class SchemaMergingUtils {
                             lhsDecimal.getPrecision() - lhsDecimal.getScale(),
                             rhsDecimal.getPrecision() - rhsDecimal.getScale());
             int resultScale = Math.max(lhsDecimal.getScale(), rhsDecimal.getScale());
-            Preconditions.checkArgument(
-                    resultIntDigits + resultScale <= DecimalType.MAX_PRECISION,
-                    String.format(
-                            "Failed to merge %s and %s type into DECIMAL. %d precision digits required, %d available",
-                            lType,
-                            rType,
-                            resultIntDigits + resultScale,
-                            DecimalType.MAX_PRECISION));
-            return DataTypes.DECIMAL(resultIntDigits + resultScale, resultScale);
+            return createDecimalBounded(resultIntDigits + resultScale, resultScale);
         } else if (lType instanceof DecimalType && rType.is(DataTypeFamily.EXACT_NUMERIC)) {
             // Merge decimal and int
             return mergeExactNumericsIntoDecimal((DecimalType) lType, rType);
@@ -461,11 +453,7 @@ public class SchemaMergingUtils {
                 Math.max(
                         decimalType.getPrecision(),
                         decimalType.getScale() + getNumericPrecision(otherType));
-        if (resultPrecision <= DecimalType.MAX_PRECISION) {
-            return DataTypes.DECIMAL(resultPrecision, decimalType.getScale());
-        } else {
-            return DataTypes.STRING();
-        }
+        return createDecimalBounded(resultPrecision, decimalType.getScale());
     }
 
     @VisibleForTesting
@@ -934,5 +922,14 @@ public class SchemaMergingUtils {
         mergingTree.put(MapType.class, ImmutableList.of(stringType));
         mergingTree.put(VariantType.class, ImmutableList.of(stringType));
         return mergingTree;
+    }
+
+    static DecimalType createDecimalBounded(int precision, int scale) {
+        if (precision > DecimalType.MAX_PRECISION) {
+            int lossDigits = precision - DecimalType.MAX_PRECISION;
+            return DataTypes.DECIMAL(precision - lossDigits, scale - lossDigits);
+        } else {
+            return DataTypes.DECIMAL(precision, scale);
+        }
     }
 }
