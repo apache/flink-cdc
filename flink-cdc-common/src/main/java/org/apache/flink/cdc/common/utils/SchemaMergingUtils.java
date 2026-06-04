@@ -74,6 +74,7 @@ import org.apache.flink.shaded.guava31.com.google.common.io.BaseEncoding;
 import javax.annotation.Nullable;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -614,7 +615,7 @@ public class SchemaMergingUtils {
         if (originalField instanceof byte[]) {
             return originalField;
         } else {
-            return originalField.toString().getBytes();
+            return originalField.toString().getBytes(StandardCharsets.UTF_8);
         }
     }
 
