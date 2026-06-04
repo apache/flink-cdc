@@ -281,4 +281,17 @@ public class PostgresDataSourceOptions {
                     .defaultValue(false)
                     .withDescription(
                             "Whether to infer CDC column types when processing pgoutput Relation messages.");
+
+    @Experimental
+    public static final ConfigOption<Boolean> SCAN_NEWLY_ADDED_TABLE_ENABLED =
+            ConfigOptions.key("scan.newly-added-table.enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Whether to scan the newly added tables or not. Defaults to false. "
+                                    + "This option only takes effect when restoring from a savepoint or checkpoint, "
+                                    + "and enables the existing SnapshotSplitAssigner#captureNewlyAddedTables() code path "
+                                    + "to discover tables that match the source `tables:` pattern but were not part of "
+                                    + "the captured set at savepoint time. Mirrors the MySQL Pipeline connector option "
+                                    + "of the same name.");
 }
