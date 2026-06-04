@@ -34,6 +34,7 @@ import org.apache.flink.cdc.connectors.postgres.source.PostgresSourceBuilder;
 import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfigFactory;
 import org.apache.flink.cdc.connectors.postgres.table.PostgreSQLReadableMetadata;
 import org.apache.flink.cdc.connectors.postgres.utils.PostgresSchemaUtils;
+import org.apache.flink.cdc.debezium.table.DebeziumChangelogMode;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.data.RowData;
 
@@ -55,6 +56,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.connectors.base.utils.ObjectUtils.doubleCompare;
+import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.CHANGELOG_MODE;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.CHUNK_META_GROUP_SIZE;
@@ -211,8 +213,22 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
         String metadataList = config.get(METADATA_LIST);
         List<PostgreSQLReadableMetadata> readableMetadataList = listReadableMetadata(metadataList);
 
-        // Create a custom PostgresDataSource that passes the includeDatabaseInTableId flag
-        return new PostgresDataSource(configFactory, readableMetadataList);
+        String changelogModeRaw = config.get(CHANGELOG_MODE);
+        DebeziumChangelogMode changelogMode;
+        switch (changelogModeRaw.toLowerCase()) {
+            case "upsert":
+                changelogMode = DebeziumChangelogMode.UPSERT;
+                break;
+            case "all":
+                changelogMode = DebeziumChangelogMode.ALL;
+                break;
+            default:
+                throw new IllegalArgumentException(
+                        "Invalid value for option 'changelog-mode'. Supported: [all, upsert]. Got: "
+                                + changelogModeRaw);
+        }
+
+        return new PostgresDataSource(configFactory, readableMetadataList, changelogMode);
     }
 
     private List<PostgreSQLReadableMetadata> listReadableMetadata(String metadataList) {
@@ -297,6 +313,7 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
         options.add(SCAN_NEWLY_ADDED_TABLE_ENABLED);
         options.add(SCAN_PRE_EPOCH_TIMESTAMP_WALL_CLOCK_CONVERSION_ENABLED);
         options.add(SCAN_RATE_LIMIT_RECORDS_PER_SECOND);
+        options.add(CHANGELOG_MODE);
         return options;
     }
 
