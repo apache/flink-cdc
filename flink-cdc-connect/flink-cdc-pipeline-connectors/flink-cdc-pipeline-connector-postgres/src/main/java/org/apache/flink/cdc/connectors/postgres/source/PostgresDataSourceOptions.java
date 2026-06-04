@@ -281,4 +281,17 @@ public class PostgresDataSourceOptions {
                     .defaultValue(false)
                     .withDescription(
                             "Whether to infer CDC column types when processing pgoutput Relation messages.");
+
+    @Experimental
+    public static final ConfigOption<String> CHANGELOG_MODE =
+            ConfigOptions.key("changelog-mode")
+                    .stringType()
+                    .defaultValue("all")
+                    .withDescription(
+                            "The changelog mode used for encoding streaming changes. "
+                                    + "Supported values: 'all' (default) emits both before-image and after-image "
+                                    + "for UPDATE events; 'upsert' emits only the after-image (before is null), "
+                                    + "which lets the pipeline work with REPLICA IDENTITY DEFAULT on the source — "
+                                    + "avoiding the WAL overhead of REPLICA IDENTITY FULL and sidestepping the "
+                                    + "NullPointerException reported in FLINK-38647.");
 }
