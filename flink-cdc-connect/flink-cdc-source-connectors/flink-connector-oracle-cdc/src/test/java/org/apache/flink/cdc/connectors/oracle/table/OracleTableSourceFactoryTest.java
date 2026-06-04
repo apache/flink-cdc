@@ -487,6 +487,16 @@ class OracleTableSourceFactoryTest {
                         "Invalid value for option 'scan.startup.mode'. Supported values are "
                                 + "[initial, snapshot, latest-offset, timestamp], "
                                 + "but was: abc");
+
+        Assertions.assertThatThrownBy(
+                        () -> {
+                            Map<String, String> properties = getAllRequiredOptionsWithHost();
+                            properties.put("debezium.database.connection.adapter", "xstream");
+                            properties.put("scan.incremental.snapshot.backfill.skip", "false");
+                            createTableSource(properties);
+                        })
+                .hasStackTraceContaining("scan.incremental.snapshot.backfill.skip")
+                .hasStackTraceContaining("xstream");
     }
 
     private Map<String, String> getAllRequiredOptions() {

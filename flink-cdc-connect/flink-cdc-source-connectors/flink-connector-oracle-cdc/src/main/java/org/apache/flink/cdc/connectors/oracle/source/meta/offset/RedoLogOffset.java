@@ -111,7 +111,22 @@ public class RedoLogOffset extends Offset {
         } else if (StringUtils.isNotEmpty(scnStr)) {
             return 1;
         }
+
+        String lcrPosition = this.getLcrPosition();
+        String targetLcrPosition = that.getLcrPosition();
+        if (isValidOffsetValue(targetLcrPosition)) {
+            if (isValidOffsetValue(lcrPosition)) {
+                return lcrPosition.compareTo(targetLcrPosition);
+            }
+            return -1;
+        } else if (isValidOffsetValue(lcrPosition)) {
+            return 1;
+        }
         return 0;
+    }
+
+    private static boolean isValidOffsetValue(String value) {
+        return StringUtils.isNotEmpty(value) && !"null".equalsIgnoreCase(value);
     }
 
     @Override

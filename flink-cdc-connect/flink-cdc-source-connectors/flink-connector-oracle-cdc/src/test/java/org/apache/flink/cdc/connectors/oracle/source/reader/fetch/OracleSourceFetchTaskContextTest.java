@@ -20,6 +20,13 @@ package org.apache.flink.cdc.connectors.oracle.source.reader.fetch;
 import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
 import org.apache.flink.cdc.connectors.oracle.source.meta.offset.RedoLogOffset;
 
+import io.debezium.config.Configuration;
+import io.debezium.connector.oracle.OracleConnectorConfig;
+import io.debezium.connector.oracle.logminer.LogMinerOracleOffsetContextLoader;
+import io.debezium.connector.oracle.xstream.XStreamOracleOffsetContextLoader;
+import io.debezium.relational.TableId;
+import org.apache.kafka.connect.data.SchemaAndValue;
+import org.apache.kafka.connect.header.ConnectHeaders;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -28,6 +35,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Unit tests for startup-offset resolution in {@link OracleSourceFetchTaskContext}. */
 class OracleSourceFetchTaskContextTest {
@@ -84,5 +92,94 @@ class OracleSourceFetchTaskContextTest {
         assertThat(observedTimestamp.get()).isEqualTo(startupTimestampMillis);
         assertThat(resolution.getStartupTimestampMillis()).isEqualTo(startupTimestampMillis);
         assertThat(((RedoLogOffset) resolution.getOffset()).getScn()).isEqualTo("456");
+    }
+
+    @Test
+    void testResolveOffsetContextLoaderByAdapter() {
+        assertThat(
+                        OracleSourceFetchTaskContext.createOffsetContextLoader(
+                                connectorConfig("logminer")))
+                .isInstanceOf(LogMinerOracleOffsetContextLoader.class);
+        assertThat(
+                        OracleSourceFetchTaskContext.createOffsetContextLoader(
+                                connectorConfig("xstream")))
+                .isInstanceOf(XStreamOracleOffsetContextLoader.class);
+    }
+
+    @Test
+    void testIsLogMinerAdapter() {
+        assertThat(OracleSourceFetchTaskContext.isLogMinerAdapter(connectorConfig("logminer")))
+                .isTrue();
+        assertThat(OracleSourceFetchTaskContext.isLogMinerAdapter(connectorConfig("xstream")))
+                .isFalse();
+    }
+
+    @Test
+    void testDefaultAdapterFallsBackToLogMiner() {
+        OracleConnectorConfig defaultConfig = connectorConfig(null);
+        assertThat(OracleSourceFetchTaskContext.isLogMinerAdapter(defaultConfig)).isTrue();
+        assertThat(OracleSourceFetchTaskContext.createOffsetContextLoader(defaultConfig))
+                .isInstanceOf(LogMinerOracleOffsetContextLoader.class);
+    }
+
+    @Test
+    void testIsXStreamAdapter() {
+        assertThat(OracleSourceFetchTaskContext.isXStreamAdapter(connectorConfig("xstream")))
+                .isTrue();
+        assertThat(OracleSourceFetchTaskContext.isXStreamAdapter(connectorConfig("logminer")))
+                .isFalse();
+    }
+
+    @Test
+    void testParseRowIdFromHeadersReturnsRowId() throws Exception {
+        String rowIdValue = "AAAzIdACKAAABWCAAA";
+        ConnectHeaders headers = new ConnectHeaders();
+        headers.add("ROWID", new SchemaAndValue(null, rowIdValue));
+        TableId tableId = new TableId("ORCL19", "TESTUSER", "ORDERS");
+
+        assertThat(OracleSourceFetchTaskContext.parseRowIdFromHeaders(headers, tableId))
+                .isEqualTo(new oracle.sql.ROWID(rowIdValue));
+    }
+
+    @Test
+    void testParseRowIdFromHeadersThrowsClearErrorWhenHeaderMissing() {
+        ConnectHeaders headers = new ConnectHeaders();
+        TableId tableId = new TableId("ORCL19", "TESTUSER", "ORDERS");
+
+        assertThatThrownBy(
+                        () -> OracleSourceFetchTaskContext.parseRowIdFromHeaders(headers, tableId))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Missing ROWID header")
+                .hasMessageContaining("scan.incremental.snapshot.chunk.key-column")
+                .hasMessageContaining("scan.incremental.snapshot.backfill.skip=true");
+    }
+
+    @Test
+    void testParseRowIdFromHeadersThrowsClearErrorWhenHeaderInvalid() {
+        ConnectHeaders headers = new ConnectHeaders();
+        headers.add("ROWID", new SchemaAndValue(null, 1L));
+        TableId tableId = new TableId("ORCL19", "TESTUSER", "ORDERS");
+
+        assertThatThrownBy(
+                        () -> OracleSourceFetchTaskContext.parseRowIdFromHeaders(headers, tableId))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Invalid ROWID header type")
+                .hasMessageContaining("scan.incremental.snapshot.chunk.key-column")
+                .hasMessageContaining("scan.incremental.snapshot.backfill.skip=true");
+    }
+
+    private static OracleConnectorConfig connectorConfig(String adapter) {
+        Configuration.Builder builder =
+                Configuration.create()
+                        .with("database.server.name", "test")
+                        .with("database.dbname", "ORCLCDB")
+                        .with("database.hostname", "127.0.0.1")
+                        .with("database.port", 1521)
+                        .with("database.user", "flinkuser")
+                        .with("database.password", "flinkpw");
+        if (adapter != null) {
+            builder.with("database.connection.adapter", adapter);
+        }
+        return new OracleConnectorConfig(builder.build());
     }
 }

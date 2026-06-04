@@ -28,7 +28,6 @@ import io.debezium.connector.oracle.OracleConnectorConfig;
 import io.debezium.connector.oracle.OracleDatabaseSchema;
 import io.debezium.connector.oracle.OracleOffsetContext;
 import io.debezium.connector.oracle.OraclePartition;
-import io.debezium.connector.oracle.logminer.LogMinerOracleOffsetContextLoader;
 import io.debezium.heartbeat.Heartbeat;
 import io.debezium.pipeline.EventDispatcher;
 import io.debezium.pipeline.source.AbstractSnapshotChangeEventSource;
@@ -53,6 +52,7 @@ import java.sql.SQLException;
 import java.time.Duration;
 
 import static org.apache.flink.cdc.connectors.oracle.source.reader.fetch.OracleStreamFetchTask.RedoLogSplitReadTask;
+import static org.apache.flink.cdc.connectors.oracle.source.reader.fetch.OracleStreamFetchTask.XStreamSplitReadTask;
 import static org.apache.flink.cdc.connectors.oracle.source.utils.OracleUtils.buildSplitScanQuery;
 import static org.apache.flink.cdc.connectors.oracle.source.utils.OracleUtils.readTableSplitDataStatement;
 
@@ -94,46 +94,51 @@ public class OracleScanFetchTask extends AbstractScanFetchTask {
             throws Exception {
         OracleSourceFetchTaskContext sourceFetchContext = (OracleSourceFetchTaskContext) context;
 
-        final RedoLogSplitReadTask backfillRedoLogReadTask =
-                createBackfillRedoLogReadTask(backfillStreamSplit, sourceFetchContext);
+        OracleConnectorConfig backfillConnectorConfig =
+                createBackfillConnectorConfig(sourceFetchContext);
+        OracleStreamFetchTask.validateAdapterSupportsSplit(
+                backfillConnectorConfig, backfillStreamSplit);
 
-        final LogMinerOracleOffsetContextLoader loader =
-                new LogMinerOracleOffsetContextLoader(
-                        ((OracleSourceFetchTaskContext) context).getDbzConnectorConfig());
         final OracleOffsetContext oracleOffsetContext =
-                loader.load(backfillStreamSplit.getStartingOffset().getOffset());
-        backfillRedoLogReadTask.execute(
-                new StoppableChangeEventSourceContext(),
-                sourceFetchContext.getPartition(),
-                oracleOffsetContext);
+                OracleSourceFetchTaskContext.createOffsetContextLoader(backfillConnectorConfig)
+                        .load(backfillStreamSplit.getStartingOffset().getOffset());
+
+        if (OracleSourceFetchTaskContext.isLogMinerAdapter(backfillConnectorConfig)) {
+            final RedoLogSplitReadTask backfillRedoLogReadTask =
+                    createBackfillRedoLogReadTask(
+                            backfillConnectorConfig, backfillStreamSplit, sourceFetchContext);
+            backfillRedoLogReadTask.execute(
+                    new StoppableChangeEventSourceContext(),
+                    sourceFetchContext.getPartition(),
+                    oracleOffsetContext);
+            return;
+        }
+
+        if (OracleSourceFetchTaskContext.isXStreamAdapter(backfillConnectorConfig)) {
+            StoppableChangeEventSourceContext changeEventSourceContext =
+                    new StoppableChangeEventSourceContext();
+            XStreamSplitReadTask backfillXstreamSplitReadTask =
+                    createBackfillXstreamReadTask(
+                            backfillConnectorConfig, backfillStreamSplit, sourceFetchContext);
+            backfillXstreamSplitReadTask.execute(
+                    changeEventSourceContext,
+                    sourceFetchContext.getPartition(),
+                    oracleOffsetContext);
+            return;
+        }
+
+        throw new UnsupportedOperationException(
+                String.format(
+                        "Oracle adapter %s does not support backfill task yet",
+                        backfillConnectorConfig.getAdapter().getType()));
     }
 
     private RedoLogSplitReadTask createBackfillRedoLogReadTask(
-            StreamSplit backfillRedoLogSplit, OracleSourceFetchTaskContext context) {
-        // we should only capture events for the current table,
-        // otherwise, we may can't find corresponding schema
-        Configuration dezConf =
-                context.getSourceConfig()
-                        .getDbzConfiguration()
-                        .edit()
-                        // It will cause data loss before.
-                        // Because the table name contains the database
-                        // prefix when logminer queries the redo log, but in fact the
-                        // logminer content does not contain the database prefix,
-                        // this will cause the back fill tofail,
-                        // thereby affecting data consistency.
-                        .with(
-                                "table.include.list",
-                                String.format(
-                                        "%s.%s",
-                                        snapshotSplit.getTableId().schema(),
-                                        snapshotSplit.getTableId().table()))
-                        // Disable heartbeat event in snapshot split fetcher
-                        .with(Heartbeat.HEARTBEAT_INTERVAL, 0)
-                        .build();
-        // task to read redo log and backfill for current split
+            OracleConnectorConfig backfillConnectorConfig,
+            StreamSplit backfillRedoLogSplit,
+            OracleSourceFetchTaskContext context) {
         return new RedoLogSplitReadTask(
-                new OracleConnectorConfig(dezConf),
+                backfillConnectorConfig,
                 context.getConnection(),
                 context.getEventDispatcher(),
                 context.getWaterMarkDispatcher(),
@@ -143,6 +148,32 @@ public class OracleScanFetchTask extends AbstractScanFetchTask {
                 context.getStreamingChangeEventSourceMetrics(),
                 backfillRedoLogSplit,
                 null);
+    }
+
+    private XStreamSplitReadTask createBackfillXstreamReadTask(
+            OracleConnectorConfig backfillConnectorConfig,
+            StreamSplit backfillStreamSplit,
+            OracleSourceFetchTaskContext context) {
+        return XStreamSplitReadTask.createTask(
+                backfillConnectorConfig, context, backfillStreamSplit, null);
+    }
+
+    private OracleConnectorConfig createBackfillConnectorConfig(
+            OracleSourceFetchTaskContext context) {
+        Configuration dezConf =
+                context.getSourceConfig()
+                        .getDbzConfiguration()
+                        .edit()
+                        .with(
+                                "table.include.list",
+                                String.format(
+                                        "%s.%s",
+                                        snapshotSplit.getTableId().schema(),
+                                        snapshotSplit.getTableId().table()))
+                        // Disable heartbeat event in snapshot split fetcher
+                        .with(Heartbeat.HEARTBEAT_INTERVAL, 0)
+                        .build();
+        return new OracleConnectorConfig(dezConf);
     }
 
     /** A wrapped task to fetch snapshot split of table. */
