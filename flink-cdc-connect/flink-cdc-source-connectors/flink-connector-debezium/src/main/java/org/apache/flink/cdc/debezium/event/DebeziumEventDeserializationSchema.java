@@ -144,12 +144,29 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
     private RecordData extractBeforeDataRecord(Struct value, Schema valueSchema) throws Exception {
         Schema beforeSchema = fieldSchema(valueSchema, Envelope.FieldName.BEFORE);
         Struct beforeValue = fieldStruct(value, Envelope.FieldName.BEFORE);
+        if (beforeValue == null) {
+            throw new NullPointerException(
+                    "Before data is null for UPDATE/DELETE event. "
+                            + getNullBeforeDataHint()
+                            + "Schema name: "
+                            + valueSchema.name());
+        }
         return extractDataRecord(beforeValue, beforeSchema);
+    }
+
+    protected String getNullBeforeDataHint() {
+        return "";
     }
 
     private RecordData extractAfterDataRecord(Struct value, Schema valueSchema) throws Exception {
         Schema afterSchema = fieldSchema(valueSchema, Envelope.FieldName.AFTER);
         Struct afterValue = fieldStruct(value, Envelope.FieldName.AFTER);
+        if (afterValue == null) {
+            throw new NullPointerException(
+                    "After data is null for CREATE/READ/UPDATE event. "
+                            + "Schema name: "
+                            + valueSchema.name());
+        }
         return extractDataRecord(afterValue, afterSchema);
     }
 
