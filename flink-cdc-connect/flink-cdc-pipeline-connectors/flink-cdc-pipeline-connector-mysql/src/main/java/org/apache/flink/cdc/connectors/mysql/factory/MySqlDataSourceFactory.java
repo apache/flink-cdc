@@ -513,8 +513,6 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
                         distributionFactorLower));
     }
 
-    private static final String DOT_PLACEHOLDER = "_$dot_placeholder$_";
-
     /** Replaces the default timezone placeholder with session timezone, if applicable. */
     private static ZoneId getServerTimeZone(Configuration config) {
         final String serverTimeZone = config.get(SERVER_TIME_ZONE);
