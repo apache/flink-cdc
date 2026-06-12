@@ -139,7 +139,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
                 && !StartupOptions.snapshot().equals(startupOptions)) {
             throw new IllegalArgumentException(
                     String.format(
-                            "Only \"snapshot\" of MySQLDataSource StartupOption is supported in BATCH pipeline, but actual MySQLDataSource StartupOption is {}.",
+                            "Only \"snapshot\" of MySQLDataSource StartupOption is supported in BATCH pipeline, but actual MySQLDataSource StartupOption is %s.",
                             startupOptions.startupMode));
         }
         boolean includeSchemaChanges = config.get(SCHEMA_CHANGE_ENABLED);
