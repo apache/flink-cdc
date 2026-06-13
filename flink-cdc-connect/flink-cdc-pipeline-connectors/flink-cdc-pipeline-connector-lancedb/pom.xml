@@ -1,0 +1,199 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one or more
+contributor license agreements.  See the NOTICE file distributed with
+this work for additional information regarding copyright ownership.
+The ASF licenses this file to You under the Apache License, Version 2.0
+(the "License"); you may not use this file except in compliance with
+the License.  You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <artifactId>flink-cdc-pipeline-connectors</artifactId>
+        <groupId>org.apache.flink</groupId>
+        <version>3.6.0</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>flink-cdc-pipeline-connector-lancedb</artifactId>
+    <name>flink-cdc-pipeline-connector-lancedb</name>
+
+    <properties>
+        <lance.core.version>0.39.0</lance.core.version>
+        <surefire.jvm.args>
+            -Dfile.encoding=UTF-8
+            --add-opens=java.base/java.nio=ALL-UNNAMED
+            --add-opens=java.base/sun.nio.ch=ALL-UNNAMED
+            -Dio.netty.tryReflectionSetAccessible=true
+        </surefire.jvm.args>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-cdc-composer</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>com.lancedb</groupId>
+            <artifactId>lance-core</artifactId>
+            <version>${lance.core.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <argLine>${surefire.jvm.args}</argLine>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>${maven.shade.plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>shade-flink</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <shadeTestJar>false</shadeTestJar>
+                            <artifactSet>
+                                <includes>
+                                    <include>com.lancedb:lance-core</include>
+                                    <include>com.lancedb:lance-namespace-core</include>
+                                    <include>com.lancedb:lance-namespace-apache-client</include>
+                                    <include>org.apache.opendal:opendal</include>
+                                    <include>org.apache.arrow:*</include>
+                                    <include>org.questdb:jar-jni</include>
+                                    <include>org.apache.commons:commons-lang3</include>
+                                    <include>commons-codec:commons-codec</include>
+                                    <include>io.netty:*</include>
+                                    <include>com.google.flatbuffers:flatbuffers-java</include>
+                                    <include>org.eclipse.collections:*</include>
+                                    <include>org.apache.httpcomponents.client5:*</include>
+                                    <include>org.apache.httpcomponents.core5:*</include>
+                                    <include>com.fasterxml.jackson.core:*</include>
+                                    <include>com.fasterxml.jackson.datatype:*</include>
+                                    <include>com.fasterxml.jackson.jaxrs:*</include>
+                                    <include>com.fasterxml.jackson.module:*</include>
+                                    <include>org.openapitools:jackson-databind-nullable</include>
+                                    <include>jakarta.xml.bind:jakarta.xml.bind-api</include>
+                                    <include>jakarta.activation:jakarta.activation-api</include>
+                                    <include>com.google.guava:guava</include>
+                                    <include>com.google.guava:failureaccess</include>
+                                    <include>com.google.guava:listenablefuture</include>
+                                    <include>com.google.code.findbugs:jsr305</include>
+                                    <include>org.checkerframework:checker-qual</include>
+                                    <include>com.google.errorprone:error_prone_annotations</include>
+                                    <include>com.google.j2objc:j2objc-annotations</include>
+                                </includes>
+                            </artifactSet>
+                            <relocations>
+                                <relocation>
+                                    <pattern>org.apache.arrow</pattern>
+                                    <shadedPattern>
+                                        org.apache.flink.cdc.connectors.lancedb.shaded.org.apache.arrow
+                                    </shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>org.apache.commons.lang3</pattern>
+                                    <shadedPattern>
+                                        org.apache.flink.cdc.connectors.lancedb.shaded.org.apache.commons.lang3
+                                    </shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>org.apache.commons.codec</pattern>
+                                    <shadedPattern>
+                                        org.apache.flink.cdc.connectors.lancedb.shaded.org.apache.commons.codec
+                                    </shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>io.netty</pattern>
+                                    <shadedPattern>
+                                        org.apache.flink.cdc.connectors.lancedb.shaded.io.netty
+                                    </shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>com.google.flatbuffers</pattern>
+                                    <shadedPattern>
+                                        org.apache.flink.cdc.connectors.lancedb.shaded.com.google.flatbuffers
+                                    </shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>org.eclipse.collections</pattern>
+                                    <shadedPattern>
+                                        org.apache.flink.cdc.connectors.lancedb.shaded.org.eclipse.collections
+                                    </shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>org.apache.hc</pattern>
+                                    <shadedPattern>
+                                        org.apache.flink.cdc.connectors.lancedb.shaded.org.apache.hc
+                                    </shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>com.fasterxml.jackson</pattern>
+                                    <shadedPattern>
+                                        org.apache.flink.cdc.connectors.lancedb.shaded.com.fasterxml.jackson
+                                    </shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>org.openapitools.jackson</pattern>
+                                    <shadedPattern>
+                                        org.apache.flink.cdc.connectors.lancedb.shaded.org.openapitools.jackson
+                                    </shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>jakarta.xml.bind</pattern>
+                                    <shadedPattern>
+                                        org.apache.flink.cdc.connectors.lancedb.shaded.jakarta.xml.bind
+                                    </shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>jakarta.activation</pattern>
+                                    <shadedPattern>
+                                        org.apache.flink.cdc.connectors.lancedb.shaded.jakarta.activation
+                                    </shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>com.google</pattern>
+                                    <shadedPattern>
+                                        org.apache.flink.cdc.connectors.lancedb.shaded.com.google
+                                    </shadedPattern>
+                                </relocation>
+                            </relocations>
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                            </transformers>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

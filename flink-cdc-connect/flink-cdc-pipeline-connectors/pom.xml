@@ -33,6 +33,7 @@ limitations under the License.
         <module>flink-cdc-pipeline-connector-postgres</module>
         <module>flink-cdc-pipeline-connector-pgvector</module>
         <module>flink-cdc-pipeline-connector-milvus</module>
+        <module>flink-cdc-pipeline-connector-lancedb</module>
         <module>flink-cdc-pipeline-connector-tdengine</module>
         <module>flink-cdc-pipeline-connector-doris</module>
         <module>flink-cdc-pipeline-connector-starrocks</module>
