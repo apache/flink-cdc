@@ -77,6 +77,7 @@ import static org.apache.flink.cdc.common.event.SchemaChangeEventType.RENAME_COL
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.TRUNCATE_TABLE;
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.CHARSET_ENCODING;
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.TABLE_BUCKETS;
+import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.TABLE_CREATE_EXTRA_SCHEMA;
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.TABLE_CREATE_PROPERTIES_PREFIX;
 
 /** Supports {@link DorisDataSink} to schema evolution. */
@@ -230,6 +231,12 @@ public class DorisMetadataApplier implements MetadataApplier {
         tableSchema.setKeys(buildKeys(schema));
         tableSchema.setDistributeKeys(buildDistributeKeys(schema));
         tableSchema.setTableComment(schema.comment());
+        config.getOptional(TABLE_CREATE_EXTRA_SCHEMA)
+                .ifPresent(
+                        extraSchema ->
+                                tableSchema.setExtraSchemaElements(
+                                        DorisSchemaFactory.parseExtraSchemaElements(
+                                                extraSchema, schema.getColumnNames())));
 
         Map<String, String> tableProperties =
                 DorisDataSinkOptions.getPropertiesByPrefix(config, TABLE_CREATE_PROPERTIES_PREFIX);

@@ -158,6 +158,16 @@ public class DorisDataSinkOptions {
     public static final String STREAM_LOAD_PROP_PREFIX = "sink.properties.";
     // Prefix for Doris Create table.
     public static final String TABLE_CREATE_PROPERTIES_PREFIX = "table.create.properties.";
+    public static final ConfigOption<String> TABLE_CREATE_EXTRA_SCHEMA =
+            ConfigOptions.key("table.create.extra-schema")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "Doris CREATE TABLE schema fragment appended to the generated "
+                                    + "column/index definition list. It is applied only when "
+                                    + "the Doris sink automatically creates a new table. If an "
+                                    + "extra column has the same name as an upstream CDC schema "
+                                    + "column, the upstream column definition wins.");
     // Prefix for Doris Create auto partition table.
     public static final String TABLE_CREATE_AUTO_PARTITION_PROPERTIES_PREFIX =
             "table.create.auto-partition.properties.";

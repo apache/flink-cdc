@@ -222,6 +222,135 @@ public class DorisMetadataApplierTest {
     }
 
     @Test
+    public void testCreateTableEventAppliesExtraSchemaOnlyForNewTable() {
+        RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
+        Map<String, String> configMap = new HashMap<>();
+        configMap.put(
+                "table.create.extra-schema",
+                "`confluent__last_updated` DATETIME(0) NOT NULL DEFAULT CURRENT_TIMESTAMP(0) ON UPDATE CURRENT_TIMESTAMP(0),"
+                        + "`_db_` STRING NOT NULL,"
+                        + "`_tb_` STRING NOT NULL,"
+                        + "`_op_` STRING NOT NULL,"
+                        + "INDEX idx_confluent_last_updated (`confluent__last_updated`) USING INVERTED");
+        DorisMetadataApplier applier =
+                new DorisMetadataApplier(
+                        createDorisOptions(),
+                        Configuration.fromMap(configMap),
+                        schemaChangeManager,
+                        (dorisOptions, tableId) -> null);
+
+        Schema targetSchema =
+                Schema.newBuilder()
+                        .physicalColumn("uid", DataTypes.BIGINT().notNull())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .primaryKey("uid")
+                        .build();
+
+        applier.applySchemaChange(
+                new CreateTableEvent(TableId.parse("test.sequence"), targetSchema));
+
+        Assertions.assertThat(schemaChangeManager.createTableInvocations).isOne();
+        Assertions.assertThat(schemaChangeManager.createdTableSchema.getExtraSchemaElements())
+                .containsExactly(
+                        "`confluent__last_updated` DATETIME(0) NOT NULL DEFAULT CURRENT_TIMESTAMP(0) ON UPDATE CURRENT_TIMESTAMP(0)",
+                        "`_db_` STRING NOT NULL",
+                        "`_tb_` STRING NOT NULL",
+                        "`_op_` STRING NOT NULL",
+                        "INDEX idx_confluent_last_updated (`confluent__last_updated`) USING INVERTED");
+        Assertions.assertThat(applier.getCachedSchema(TableId.parse("test.sequence")))
+                .isEqualTo(targetSchema);
+    }
+
+    @Test
+    public void testCreateTableEventFiltersExtraSchemaDuplicateColumns() {
+        RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
+        Map<String, String> configMap = new HashMap<>();
+        configMap.put(
+                "table.create.extra-schema",
+                "`confluent__last_updated` DATETIME(0) NOT NULL DEFAULT CURRENT_TIMESTAMP(0) ON UPDATE CURRENT_TIMESTAMP(0),"
+                        + "`_db_` STRING NOT NULL,"
+                        + "INDEX idx_confluent_last_updated (`confluent__last_updated`) USING INVERTED");
+        DorisMetadataApplier applier =
+                new DorisMetadataApplier(
+                        createDorisOptions(),
+                        Configuration.fromMap(configMap),
+                        schemaChangeManager,
+                        (dorisOptions, tableId) -> null);
+
+        Schema targetSchema =
+                Schema.newBuilder()
+                        .physicalColumn("uid", DataTypes.BIGINT().notNull())
+                        .physicalColumn("CONFLUENT__LAST_UPDATED", DataTypes.TIMESTAMP())
+                        .primaryKey("uid")
+                        .build();
+
+        applier.applySchemaChange(
+                new CreateTableEvent(TableId.parse("test.sequence"), targetSchema));
+
+        Assertions.assertThat(schemaChangeManager.createdTableSchema.getExtraSchemaElements())
+                .containsExactly(
+                        "`_db_` STRING NOT NULL",
+                        "INDEX idx_confluent_last_updated (`confluent__last_updated`) USING INVERTED");
+    }
+
+    @Test
+    public void testCreateTableEventIgnoresExtraSchemaForExistingTable() {
+        RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
+        Map<String, String> configMap = new HashMap<>();
+        configMap.put("table.create.extra-schema", "`_db_` STRING NOT NULL");
+        DorisMetadataApplier applier =
+                new DorisMetadataApplier(
+                        createDorisOptions(),
+                        Configuration.fromMap(configMap),
+                        schemaChangeManager,
+                        (dorisOptions, tableId) ->
+                                createDorisSchema(
+                                        dorisField("uid", "BIGINT"), dorisField("name", "STRING")));
+
+        Schema targetSchema =
+                Schema.newBuilder()
+                        .physicalColumn("uid", DataTypes.BIGINT().notNull())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .primaryKey("uid")
+                        .build();
+
+        applier.applySchemaChange(
+                new CreateTableEvent(TableId.parse("test.sequence"), targetSchema));
+
+        Assertions.assertThat(schemaChangeManager.createTableInvocations).isZero();
+        Assertions.assertThat(schemaChangeManager.createdTableSchema).isNull();
+        Assertions.assertThat(schemaChangeManager.addedColumns).isEmpty();
+    }
+
+    @Test
+    public void testCreateTableEventFailsFastForInvalidExtraSchema() {
+        RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
+        Map<String, String> configMap = new HashMap<>();
+        configMap.put("table.create.extra-schema", "`_db_` STRING NOT NULL;");
+        DorisMetadataApplier applier =
+                new DorisMetadataApplier(
+                        createDorisOptions(),
+                        Configuration.fromMap(configMap),
+                        schemaChangeManager,
+                        (dorisOptions, tableId) -> null);
+
+        Schema targetSchema =
+                Schema.newBuilder()
+                        .physicalColumn("uid", DataTypes.BIGINT().notNull())
+                        .primaryKey("uid")
+                        .build();
+
+        Assertions.assertThatThrownBy(
+                        () ->
+                                applier.applySchemaChange(
+                                        new CreateTableEvent(
+                                                TableId.parse("test.sequence"), targetSchema)))
+                .isInstanceOf(SchemaEvolveException.class)
+                .hasMessageContaining("Invalid table.create.extra-schema");
+        Assertions.assertThat(schemaChangeManager.createTableInvocations).isZero();
+    }
+
+    @Test
     public void testCreateTableEventAcceptsExistingPhysicalColumnAlreadyPresent() {
         RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
         DorisMetadataApplier applier =
@@ -1187,6 +1316,7 @@ public class DorisMetadataApplierTest {
 
     private static class RecordingSchemaChangeManager extends DorisSchemaChangeManager {
         private int createTableInvocations;
+        private org.apache.doris.flink.catalog.doris.TableSchema createdTableSchema;
         private boolean createTableResult = true;
         private boolean addColumnResult = true;
         private boolean modifyColumnDataTypeResult = true;
@@ -1202,6 +1332,7 @@ public class DorisMetadataApplierTest {
         @Override
         public boolean createTable(org.apache.doris.flink.catalog.doris.TableSchema tableSchema) {
             createTableInvocations++;
+            createdTableSchema = tableSchema;
             return createTableResult;
         }
 
