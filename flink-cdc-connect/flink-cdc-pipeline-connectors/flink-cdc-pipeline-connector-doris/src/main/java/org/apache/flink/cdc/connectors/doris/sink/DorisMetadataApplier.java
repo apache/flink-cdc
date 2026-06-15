@@ -801,7 +801,7 @@ public class DorisMetadataApplier implements MetadataApplier {
         Throwable current = e;
         while (current != null) {
             if (current.getMessage() != null) {
-                if (message.length() > 0) {
+                if (!message.isEmpty()) {
                     message.append(" | ");
                 }
                 message.append(current.getMessage());
@@ -813,7 +813,8 @@ public class DorisMetadataApplier implements MetadataApplier {
                 || normalizedMessage.contains("reason: not found")
                 || normalizedMessage.contains("unknown table")
                 || normalizedMessage.contains("table does not exist")
-                || normalizedMessage.contains("table not exist");
+                || normalizedMessage.contains("table not exist")
+                || normalizedMessage.contains("table not found");
     }
 
     private void applyAlterTableCommentEvent(AlterTableCommentEvent alterTableCommentEvent)

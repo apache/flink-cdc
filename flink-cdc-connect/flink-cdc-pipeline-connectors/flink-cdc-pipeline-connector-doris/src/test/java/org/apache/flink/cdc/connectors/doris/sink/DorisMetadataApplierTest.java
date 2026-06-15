@@ -600,6 +600,34 @@ public class DorisMetadataApplierTest {
     }
 
     @Test
+    public void testCreateTableEventTreatsDorisTableNotFoundSchemaLookupAsAbsentTable() {
+        RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
+        DorisMetadataApplier applier =
+                new DorisMetadataApplier(
+                        createDorisOptions(),
+                        Configuration.fromMap(Collections.emptyMap()),
+                        schemaChangeManager,
+                        (dorisOptions, tableId) -> {
+                            throw new RuntimeException(
+                                    "can not parse response schema \"errCode = 7, "
+                                            + "detailMessage = table not found, "
+                                            + "tableName=daily_stock\"");
+                        });
+
+        Schema targetSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.VARCHAR(17))
+                        .build();
+
+        applier.applySchemaChange(new CreateTableEvent(TABLE_ID, targetSchema));
+
+        Assertions.assertThat(schemaChangeManager.createTableInvocations).isEqualTo(1);
+        Assertions.assertThat(schemaChangeManager.addedColumns).isEmpty();
+        Assertions.assertThat(applier.getCachedSchema(TABLE_ID)).isEqualTo(targetSchema);
+    }
+
+    @Test
     public void testCreateTableEventFailsWhenExistingSchemaLookupThrowsUnexpectedException() {
         RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
         DorisMetadataApplier applier =
