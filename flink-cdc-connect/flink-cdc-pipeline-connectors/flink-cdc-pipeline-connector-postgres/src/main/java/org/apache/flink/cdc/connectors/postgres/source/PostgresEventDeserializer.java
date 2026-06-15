@@ -85,7 +85,7 @@ public class PostgresEventDeserializer extends DebeziumEventDeserializationSchem
 
     @Override
     protected String getNullBeforeDataHint() {
-        return "You may need to execute 'ALTER TABLE <table> REPLICA IDENTITY FULL' on the source table. ";
+        return "You may need to execute 'ALTER TABLE <table> REPLICA IDENTITY FULL' on the source table.";
     }
 
     @Override

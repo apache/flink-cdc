@@ -147,15 +147,28 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
         if (beforeValue == null) {
             throw new NullPointerException(
                     "Before data is null for UPDATE/DELETE event. "
-                            + getNullBeforeDataHint()
+                            + formatHint(getNullBeforeDataHint())
                             + "Schema name: "
                             + valueSchema.name());
         }
         return extractDataRecord(beforeValue, beforeSchema);
     }
 
+    /** Connector-specific hint appended to the error message when before data is null. */
     protected String getNullBeforeDataHint() {
         return "";
+    }
+
+    /**
+     * Normalizes the hint string to a single trailing space so that overrides do not need to manage
+     * whitespace themselves. Returns an empty string when the hint is null or blank.
+     */
+    private static String formatHint(String hint) {
+        if (hint == null) {
+            return "";
+        }
+        String trimmed = hint.trim();
+        return trimmed.isEmpty() ? "" : trimmed + " ";
     }
 
     private RecordData extractAfterDataRecord(Struct value, Schema valueSchema) throws Exception {
