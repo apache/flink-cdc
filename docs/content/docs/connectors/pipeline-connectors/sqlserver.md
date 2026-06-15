@@ -34,7 +34,7 @@ This document describes how to set up the SQL Server connector.
 - SQL Server Agent is running.
 - Change Data Capture is enabled for the database and captured tables.
 - The configured SQL Server user can connect to the server and read the captured tables.
-- The current connector scope supports one literal database name in `tables`; schema and table components may use regular expressions.
+- In `tables`, the database must be a single fixed database name; schema and table support regular expressions to match multiple objects.
 
 Enable CDC on a database and table:
 
@@ -71,9 +71,9 @@ source:
    name: SQL Server Source
    hostname: 127.0.0.1
    port: 1433
-   username: debezium
-   password: password
-   # All matched tables must use the same literal database name.
+   username: root
+   password: 123456
+   # The database must be a single fixed name; schema and table support regex to match multiple tables.
    tables: inventory.dbo.\.*
    schema-change.enabled: true
 
@@ -82,7 +82,7 @@ sink:
   name: Doris Sink
   fenodes: 127.0.0.1:8030
   username: root
-  password: password
+  password: 123456
 
 pipeline:
    name: SQL Server to Doris Pipeline
@@ -136,7 +136,7 @@ pipeline:
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Table names of the SQL Server tables to monitor. Regular expressions are supported for schema and table names. All table patterns must use the same literal database name; database-level regular expressions and cross-database patterns are not supported. The dot (.) is treated as a delimiter for database, schema, and table names. If a dot (.) is needed in a regular expression to match any character, escape it with a backslash.<br>
+      <td>Table names of the SQL Server tables to monitor. The database must be a single fixed database name, while schema and table support regular expressions to match multiple objects. Database-level regular expressions and cross-database patterns are not supported. The dot (.) is treated as a delimiter for database, schema, and table names. If a dot (.) is needed in a regular expression to match any character, escape it with a backslash.<br>
           Examples: inventory.dbo.\.*, inventory.dbo.user_table_[0-9]+, inventory.dbo.(app|web)_order_\.*</td>
     </tr>
     <tr>
@@ -144,7 +144,7 @@ pipeline:
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Table names of the SQL Server tables to exclude after applying `tables`. Regular expressions are supported for schema and table names. All exclude patterns must use the same literal database name as the `tables` option.<br>
+      <td>Table names of the SQL Server tables to exclude after applying `tables`. Schema and table support regular expressions to match multiple objects. All exclude patterns must use the same fixed database name as the `tables` option.<br>
           Examples: inventory.dbo.audit_\.*, inventory.dbo.tmp_[0-9]+</td>
     </tr>
     <tr>
@@ -308,10 +308,162 @@ The config option `scan.startup.mode` specifies the startup mode for SQL Server 
 - `snapshot`: Reads the snapshot only.
 - `timestamp`: Starts from the specified timestamp in `scan.startup.timestamp-millis`.
 
+## Data Type Mapping
+
+<div class="wy-table-responsive">
+<table class="colwidths-auto docutils">
+    <thead>
+      <tr>
+        <th class="text-left" style="width:30%;">SQL Server type<a href="https://learn.microsoft.com/en-us/sql/t-sql/data-types/data-types-transact-sql"></a></th>
+        <th class="text-left" style="width:20%;">CDC type</th>
+        <th class="text-left" style="width:50%;">NOTE</th>
+      </tr>
+    </thead>
+    <tbody>
+    <tr>
+      <td>BIT</td>
+      <td>BOOLEAN</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>TINYINT</td>
+      <td>SMALLINT</td>
+      <td>SQL Server <code>TINYINT</code> is unsigned (0-255), so it is widened to <code>SMALLINT</code>.</td>
+    </tr>
+    <tr>
+      <td>SMALLINT</td>
+      <td>SMALLINT</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>INT</td>
+      <td>INT</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>BIGINT</td>
+      <td>BIGINT</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>REAL</td>
+      <td>FLOAT</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>FLOAT</td>
+      <td>DOUBLE</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>
+        DECIMAL(p, s)<br>
+        NUMERIC(p, s)
+      </td>
+      <td>DECIMAL(p, s)</td>
+      <td>When precision is greater than 38, it falls back to <code>DECIMAL(38, 0)</code>.</td>
+    </tr>
+    <tr>
+      <td>MONEY</td>
+      <td>DECIMAL(19, 4)</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>SMALLMONEY</td>
+      <td>DECIMAL(10, 4)</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>
+        CHAR(n)<br>
+        NCHAR(n)
+      </td>
+      <td>CHAR(n)</td>
+      <td>Mapped to <code>STRING</code> when the length is not available.</td>
+    </tr>
+    <tr>
+      <td>
+        VARCHAR(n)<br>
+        NVARCHAR(n)
+      </td>
+      <td>VARCHAR(n)</td>
+      <td>Mapped to <code>STRING</code> when the length is not available.</td>
+    </tr>
+    <tr>
+      <td>
+        TEXT<br>
+        NTEXT
+      </td>
+      <td>STRING</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>
+        BINARY<br>
+        VARBINARY<br>
+        IMAGE
+      </td>
+      <td>BYTES</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>
+        TIMESTAMP<br>
+        ROWVERSION
+      </td>
+      <td>BYTES</td>
+      <td>SQL Server <code>TIMESTAMP</code>/<code>ROWVERSION</code> is a row-version binary value, not a datetime.</td>
+    </tr>
+    <tr>
+      <td>DATE</td>
+      <td>DATE</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>TIME(p)</td>
+      <td>TIME(p)</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>SMALLDATETIME</td>
+      <td>TIMESTAMP(0)</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>DATETIME</td>
+      <td>TIMESTAMP(3)</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>DATETIME2(p)</td>
+      <td>TIMESTAMP(p)</td>
+      <td>Precision defaults to 7 when not specified.</td>
+    </tr>
+    <tr>
+      <td>DATETIMEOFFSET(p)</td>
+      <td>TIMESTAMP_LTZ(p)</td>
+      <td>Precision defaults to 7 when not specified.</td>
+    </tr>
+    <tr>
+      <td>
+        UNIQUEIDENTIFIER<br>
+        XML<br>
+        SQL_VARIANT<br>
+        HIERARCHYID<br>
+        GEOMETRY<br>
+        GEOGRAPHY
+      </td>
+      <td>STRING</td>
+      <td></td>
+    </tr>
+    </tbody>
+</table>
+</div>
+
 ## Limitations
 
 ### Single Database
 
-All entries in `tables` must belong to the same literal database. Regular expressions are supported for schema and table names, but not for the database segment.
+All entries in `tables` must belong to the same database. The database must be a single fixed name, while schema and table support regular expressions to match multiple objects.
 
 {{< top >}}

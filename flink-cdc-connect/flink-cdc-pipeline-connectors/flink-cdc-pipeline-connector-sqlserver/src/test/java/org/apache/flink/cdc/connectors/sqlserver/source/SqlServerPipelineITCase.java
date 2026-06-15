@@ -18,7 +18,6 @@
 package org.apache.flink.cdc.connectors.sqlserver.source;
 
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
-import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
@@ -40,6 +39,7 @@ import org.apache.flink.cdc.connectors.sqlserver.source.config.SqlServerSourceCo
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.util.RestartStrategyUtils;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.util.CloseableIterator;
 
@@ -62,7 +62,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.testcontainers.containers.MSSQLServerContainer.MS_SQL_SERVER_PORT;
 
 /** Integration tests for SQL Server pipeline source. */
-public class SqlServerPipelineITCaseTest extends SqlServerTestBase {
+public class SqlServerPipelineITCase extends SqlServerTestBase {
     private static final String DATABASE_NAME = "inventory";
 
     private static final StreamExecutionEnvironment env =
@@ -74,7 +74,7 @@ public class SqlServerPipelineITCaseTest extends SqlServerTestBase {
         TestValuesTableFactory.clearAllData();
         env.setParallelism(4);
         env.enableCheckpointing(200);
-        env.setRestartStrategy(RestartStrategies.noRestart());
+        RestartStrategyUtils.configureNoRestartStrategy(env);
         initializeSqlServerTable(DATABASE_NAME);
     }
 

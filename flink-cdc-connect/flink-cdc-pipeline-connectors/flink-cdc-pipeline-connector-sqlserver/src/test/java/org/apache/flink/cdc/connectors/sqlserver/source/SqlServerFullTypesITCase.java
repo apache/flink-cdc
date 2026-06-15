@@ -18,7 +18,6 @@
 package org.apache.flink.cdc.connectors.sqlserver.source;
 
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
-import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.cdc.common.data.DateData;
 import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
@@ -37,6 +36,7 @@ import org.apache.flink.cdc.connectors.sqlserver.factory.SqlServerDataSourceFact
 import org.apache.flink.cdc.connectors.sqlserver.source.config.SqlServerSourceConfigFactory;
 import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.util.RestartStrategyUtils;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.util.CloseableIterator;
 
@@ -71,7 +71,7 @@ public class SqlServerFullTypesITCase extends SqlServerTestBase {
         TestValuesTableFactory.clearAllData();
         env.setParallelism(4);
         env.enableCheckpointing(200);
-        env.setRestartStrategy(RestartStrategies.noRestart());
+        RestartStrategyUtils.configureNoRestartStrategy(env);
         initializeSqlServerTable(DATABASE_NAME);
     }
 
