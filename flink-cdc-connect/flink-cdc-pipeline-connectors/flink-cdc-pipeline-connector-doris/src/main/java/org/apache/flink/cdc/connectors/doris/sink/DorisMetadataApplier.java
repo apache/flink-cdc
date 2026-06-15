@@ -100,13 +100,15 @@ public class DorisMetadataApplier implements MetadataApplier {
     private Map<String, Integer> tableBucketsMap;
     private Map<TableId, Schema> schemaCache;
     private final DorisSchemaFetcher dorisSchemaFetcher;
+    private final DorisTableExistenceChecker tableExistenceChecker;
 
     public DorisMetadataApplier(DorisOptions dorisOptions, Configuration config) {
         this(
                 dorisOptions,
                 config,
                 new DorisSchemaChangeManager(dorisOptions, config.get(CHARSET_ENCODING)),
-                DEFAULT_DORIS_SCHEMA_FETCHER);
+                DEFAULT_DORIS_SCHEMA_FETCHER,
+                DorisTableExistenceChecker.HTTP);
     }
 
     DorisMetadataApplier(
@@ -114,6 +116,20 @@ public class DorisMetadataApplier implements MetadataApplier {
             Configuration config,
             DorisSchemaChangeManager schemaChangeManager,
             DorisSchemaFetcher dorisSchemaFetcher) {
+        this(
+                dorisOptions,
+                config,
+                schemaChangeManager,
+                dorisSchemaFetcher,
+                (options, tableId) -> DorisTableExistenceChecker.Existence.TABLE_EXISTS);
+    }
+
+    DorisMetadataApplier(
+            DorisOptions dorisOptions,
+            Configuration config,
+            DorisSchemaChangeManager schemaChangeManager,
+            DorisSchemaFetcher dorisSchemaFetcher,
+            DorisTableExistenceChecker tableExistenceChecker) {
         this.dorisOptions = dorisOptions;
         this.schemaChangeManager = schemaChangeManager;
         this.config = config;
@@ -121,6 +137,7 @@ public class DorisMetadataApplier implements MetadataApplier {
         this.tableBucketsMap = parseTableBuckets(config);
         this.schemaCache = new HashMap<>();
         this.dorisSchemaFetcher = dorisSchemaFetcher;
+        this.tableExistenceChecker = tableExistenceChecker;
     }
 
     @VisibleForTesting
@@ -255,17 +272,29 @@ public class DorisMetadataApplier implements MetadataApplier {
     }
 
     private org.apache.doris.flink.rest.models.Schema fetchExistingDorisSchema(TableId tableId) {
+        DorisTableExistenceChecker.Existence existence =
+                tableExistenceChecker.check(dorisOptions, tableId);
+        if (existence == DorisTableExistenceChecker.Existence.DATABASE_ABSENT
+                || existence == DorisTableExistenceChecker.Existence.TABLE_ABSENT) {
+            LOG.info(
+                    "Doris table {} is absent before create-table handling "
+                            + "(existence={}). Will try CREATE TABLE first.",
+                    tableId.identifier(),
+                    existence);
+            return null;
+        }
+
         try {
-            return dorisSchemaFetcher.fetch(dorisOptions, tableId);
-        } catch (Exception e) {
-            if (isLikelyMissingTableSchema(e)) {
-                LOG.info(
-                        "Doris schema for {} is absent before create-table handling. "
-                                + "Will treat it as a new table and try CREATE TABLE first.",
-                        tableId.identifier(),
-                        e);
-                return null;
+            org.apache.doris.flink.rest.models.Schema existingSchema =
+                    dorisSchemaFetcher.fetch(dorisOptions, tableId);
+            if (existingSchema == null) {
+                throw new IllegalStateException(
+                        "Doris table "
+                                + tableId.identifier()
+                                + " exists but schema lookup returned null");
             }
+            return existingSchema;
+        } catch (Exception e) {
             LOG.warn(
                     "Failed to resolve existing Doris schema for {} before create-table handling. "
                             + "Aborting instead of assuming the table is absent.",
@@ -794,27 +823,6 @@ public class DorisMetadataApplier implements MetadataApplier {
         }
 
         return defaultValue;
-    }
-
-    private boolean isLikelyMissingTableSchema(Exception e) {
-        StringBuilder message = new StringBuilder();
-        Throwable current = e;
-        while (current != null) {
-            if (current.getMessage() != null) {
-                if (!message.isEmpty()) {
-                    message.append(" | ");
-                }
-                message.append(current.getMessage());
-            }
-            current = current.getCause();
-        }
-        String normalizedMessage = message.toString().toLowerCase(Locale.ROOT);
-        return normalizedMessage.contains("status: 404")
-                || normalizedMessage.contains("reason: not found")
-                || normalizedMessage.contains("unknown table")
-                || normalizedMessage.contains("table does not exist")
-                || normalizedMessage.contains("table not exist")
-                || normalizedMessage.contains("table not found");
     }
 
     private void applyAlterTableCommentEvent(AlterTableCommentEvent alterTableCommentEvent)

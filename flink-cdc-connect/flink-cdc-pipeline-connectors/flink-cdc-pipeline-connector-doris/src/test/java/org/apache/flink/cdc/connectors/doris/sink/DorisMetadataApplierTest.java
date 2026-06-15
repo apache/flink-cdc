@@ -233,11 +233,7 @@ public class DorisMetadataApplierTest {
                         + "`_op_` STRING NOT NULL,"
                         + "INDEX idx_confluent_last_updated (`confluent__last_updated`) USING INVERTED");
         DorisMetadataApplier applier =
-                new DorisMetadataApplier(
-                        createDorisOptions(),
-                        Configuration.fromMap(configMap),
-                        schemaChangeManager,
-                        (dorisOptions, tableId) -> null);
+                createApplierForAbsentTable(schemaChangeManager, Configuration.fromMap(configMap));
 
         Schema targetSchema =
                 Schema.newBuilder()
@@ -271,11 +267,7 @@ public class DorisMetadataApplierTest {
                         + "`_db_` STRING NOT NULL,"
                         + "INDEX idx_confluent_last_updated (`confluent__last_updated`) USING INVERTED");
         DorisMetadataApplier applier =
-                new DorisMetadataApplier(
-                        createDorisOptions(),
-                        Configuration.fromMap(configMap),
-                        schemaChangeManager,
-                        (dorisOptions, tableId) -> null);
+                createApplierForAbsentTable(schemaChangeManager, Configuration.fromMap(configMap));
 
         Schema targetSchema =
                 Schema.newBuilder()
@@ -328,11 +320,7 @@ public class DorisMetadataApplierTest {
         Map<String, String> configMap = new HashMap<>();
         configMap.put("table.create.extra-schema", "`_db_` STRING NOT NULL;");
         DorisMetadataApplier applier =
-                new DorisMetadataApplier(
-                        createDorisOptions(),
-                        Configuration.fromMap(configMap),
-                        schemaChangeManager,
-                        (dorisOptions, tableId) -> null);
+                createApplierForAbsentTable(schemaChangeManager, Configuration.fromMap(configMap));
 
         Schema targetSchema =
                 Schema.newBuilder()
@@ -551,14 +539,48 @@ public class DorisMetadataApplierTest {
     }
 
     @Test
-    public void testCreateTableEventCreatesTableWhenExistingSchemaIsAbsent() {
+    public void testCreateTableEventFailsWhenExistingTableSchemaLookupReturnsNull() {
         RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
         DorisMetadataApplier applier =
                 new DorisMetadataApplier(
                         createDorisOptions(),
                         Configuration.fromMap(Collections.emptyMap()),
                         schemaChangeManager,
-                        (dorisOptions, tableId) -> null);
+                        (dorisOptions, tableId) -> null,
+                        (dorisOptions, tableId) ->
+                                DorisTableExistenceChecker.Existence.TABLE_EXISTS);
+
+        Schema targetSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.VARCHAR(17))
+                        .build();
+
+        Assertions.assertThatThrownBy(
+                        () ->
+                                applier.applySchemaChange(
+                                        new CreateTableEvent(TABLE_ID, targetSchema)))
+                .isInstanceOf(SchemaEvolveException.class)
+                .hasMessageContaining("Failed to resolve existing Doris schema")
+                .hasRootCauseMessage(
+                        "Doris table streampark.t_flink_app exists but schema lookup returned null");
+
+        Assertions.assertThat(schemaChangeManager.createTableInvocations).isZero();
+    }
+
+    @Test
+    public void testCreateTableEventCreatesTableWhenDatabaseIsAbsent() {
+        RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
+        DorisMetadataApplier applier =
+                new DorisMetadataApplier(
+                        createDorisOptions(),
+                        Configuration.fromMap(Collections.emptyMap()),
+                        schemaChangeManager,
+                        (dorisOptions, tableId) -> {
+                            throw new AssertionError("schema fetch should not be called");
+                        },
+                        (dorisOptions, tableId) ->
+                                DorisTableExistenceChecker.Existence.DATABASE_ABSENT);
 
         Schema targetSchema =
                 Schema.newBuilder()
@@ -574,7 +596,7 @@ public class DorisMetadataApplierTest {
     }
 
     @Test
-    public void testCreateTableEventTreats404SchemaLookupAsAbsentTable() {
+    public void testCreateTableEventCreatesTableWhenTableIsAbsent() {
         RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
         DorisMetadataApplier applier =
                 new DorisMetadataApplier(
@@ -582,8 +604,64 @@ public class DorisMetadataApplierTest {
                         Configuration.fromMap(Collections.emptyMap()),
                         schemaChangeManager,
                         (dorisOptions, tableId) -> {
-                            throw new RuntimeException(
-                                    "Failed to parse response, status: 404, reason: Not Found");
+                            throw new AssertionError("schema fetch should not be called");
+                        },
+                        (dorisOptions, tableId) ->
+                                DorisTableExistenceChecker.Existence.TABLE_ABSENT);
+
+        Schema targetSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.VARCHAR(17))
+                        .build();
+
+        applier.applySchemaChange(new CreateTableEvent(TABLE_ID, targetSchema));
+
+        Assertions.assertThat(schemaChangeManager.createTableInvocations).isEqualTo(1);
+        Assertions.assertThat(schemaChangeManager.addedColumns).isEmpty();
+        Assertions.assertThat(applier.getCachedSchema(TABLE_ID)).isEqualTo(targetSchema);
+    }
+
+    @Test
+    public void testCreateTableEventReconcilesWhenTableExistenceCheckerFindsTable() {
+        RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
+        DorisMetadataApplier applier =
+                new DorisMetadataApplier(
+                        createDorisOptions(),
+                        Configuration.fromMap(Collections.emptyMap()),
+                        schemaChangeManager,
+                        (dorisOptions, tableId) ->
+                                createDorisSchema(
+                                        dorisField("id", "INT"), dorisVarcharField("name", 51)),
+                        (dorisOptions, tableId) ->
+                                DorisTableExistenceChecker.Existence.TABLE_EXISTS);
+
+        Schema targetSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.VARCHAR(17))
+                        .build();
+
+        applier.applySchemaChange(new CreateTableEvent(TABLE_ID, targetSchema));
+
+        Assertions.assertThat(schemaChangeManager.createTableInvocations).isZero();
+        Assertions.assertThat(schemaChangeManager.addedColumns).isEmpty();
+        Assertions.assertThat(applier.getCachedSchema(TABLE_ID)).isEqualTo(targetSchema);
+    }
+
+    @Test
+    public void testCreateTableEventFailsWhenTableExistenceCheckFails() {
+        RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
+        DorisMetadataApplier applier =
+                new DorisMetadataApplier(
+                        createDorisOptions(),
+                        Configuration.fromMap(Collections.emptyMap()),
+                        schemaChangeManager,
+                        (dorisOptions, tableId) -> {
+                            throw new AssertionError("schema fetch should not be called");
+                        },
+                        (dorisOptions, tableId) -> {
+                            throw new IllegalStateException("existence query permission denied");
                         });
 
         Schema targetSchema =
@@ -592,15 +670,17 @@ public class DorisMetadataApplierTest {
                         .physicalColumn("name", DataTypes.VARCHAR(17))
                         .build();
 
-        applier.applySchemaChange(new CreateTableEvent(TABLE_ID, targetSchema));
-
-        Assertions.assertThat(schemaChangeManager.createTableInvocations).isEqualTo(1);
-        Assertions.assertThat(schemaChangeManager.addedColumns).isEmpty();
-        Assertions.assertThat(applier.getCachedSchema(TABLE_ID)).isEqualTo(targetSchema);
+        Assertions.assertThatThrownBy(
+                        () ->
+                                applier.applySchemaChange(
+                                        new CreateTableEvent(TABLE_ID, targetSchema)))
+                .isInstanceOf(SchemaEvolveException.class)
+                .hasRootCauseMessage("existence query permission denied");
+        Assertions.assertThat(schemaChangeManager.createTableInvocations).isZero();
     }
 
     @Test
-    public void testCreateTableEventTreatsDorisTableNotFoundSchemaLookupAsAbsentTable() {
+    public void testCreateTableEventDoesNotInferAbsentTableFromSchemaLookupTableNotFoundMessage() {
         RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
         DorisMetadataApplier applier =
                 new DorisMetadataApplier(
@@ -612,7 +692,9 @@ public class DorisMetadataApplierTest {
                                     "can not parse response schema \"errCode = 7, "
                                             + "detailMessage = table not found, "
                                             + "tableName=daily_stock\"");
-                        });
+                        },
+                        (dorisOptions, tableId) ->
+                                DorisTableExistenceChecker.Existence.TABLE_EXISTS);
 
         Schema targetSchema =
                 Schema.newBuilder()
@@ -620,11 +702,47 @@ public class DorisMetadataApplierTest {
                         .physicalColumn("name", DataTypes.VARCHAR(17))
                         .build();
 
-        applier.applySchemaChange(new CreateTableEvent(TABLE_ID, targetSchema));
+        Assertions.assertThatThrownBy(
+                        () ->
+                                applier.applySchemaChange(
+                                        new CreateTableEvent(TABLE_ID, targetSchema)))
+                .isInstanceOf(SchemaEvolveException.class)
+                .hasMessageContaining("Failed to resolve existing Doris schema")
+                .hasRootCauseMessage(
+                        "can not parse response schema \"errCode = 7, "
+                                + "detailMessage = table not found, tableName=daily_stock\"");
+        Assertions.assertThat(schemaChangeManager.createTableInvocations).isZero();
+    }
 
-        Assertions.assertThat(schemaChangeManager.createTableInvocations).isEqualTo(1);
-        Assertions.assertThat(schemaChangeManager.addedColumns).isEmpty();
-        Assertions.assertThat(applier.getCachedSchema(TABLE_ID)).isEqualTo(targetSchema);
+    @Test
+    public void testCreateTableEventDoesNotInferAbsentTableFromGenericHttp404Message() {
+        RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
+        DorisMetadataApplier applier =
+                new DorisMetadataApplier(
+                        createDorisOptions(),
+                        Configuration.fromMap(Collections.emptyMap()),
+                        schemaChangeManager,
+                        (dorisOptions, tableId) -> {
+                            throw new RuntimeException(
+                                    "Failed to parse response, status: 404, reason: Not Found");
+                        },
+                        (dorisOptions, tableId) ->
+                                DorisTableExistenceChecker.Existence.TABLE_EXISTS);
+
+        Schema targetSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.VARCHAR(17))
+                        .build();
+
+        Assertions.assertThatThrownBy(
+                        () ->
+                                applier.applySchemaChange(
+                                        new CreateTableEvent(TABLE_ID, targetSchema)))
+                .isInstanceOf(SchemaEvolveException.class)
+                .hasMessageContaining("Failed to resolve existing Doris schema")
+                .hasRootCauseMessage("Failed to parse response, status: 404, reason: Not Found");
+        Assertions.assertThat(schemaChangeManager.createTableInvocations).isZero();
     }
 
     @Test
@@ -937,11 +1055,8 @@ public class DorisMetadataApplierTest {
         RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
         schemaChangeManager.createTableResult = false;
         DorisMetadataApplier applier =
-                new DorisMetadataApplier(
-                        createDorisOptions(),
-                        Configuration.fromMap(Collections.emptyMap()),
-                        schemaChangeManager,
-                        (dorisOptions, tableId) -> null);
+                createApplierForAbsentTable(
+                        schemaChangeManager, Configuration.fromMap(Collections.emptyMap()));
 
         Schema targetSchema =
                 Schema.newBuilder()
@@ -992,11 +1107,8 @@ public class DorisMetadataApplierTest {
     public void testAddColumnEventFailsAndKeepsPreviousCacheWhenAddColumnReturnsFalse() {
         RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
         DorisMetadataApplier applier =
-                new DorisMetadataApplier(
-                        createDorisOptions(),
-                        Configuration.fromMap(Collections.emptyMap()),
-                        schemaChangeManager,
-                        (dorisOptions, tableId) -> null);
+                createApplierForAbsentTable(
+                        schemaChangeManager, Configuration.fromMap(Collections.emptyMap()));
 
         Schema initialSchema = Schema.newBuilder().physicalColumn("id", DataTypes.INT()).build();
         applier.applySchemaChange(new CreateTableEvent(TABLE_ID, initialSchema));
@@ -1022,11 +1134,8 @@ public class DorisMetadataApplierTest {
     public void testAddColumnEventAppliesDorisDdlWhenSchemaCacheIsMissing() {
         RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
         DorisMetadataApplier applier =
-                new DorisMetadataApplier(
-                        createDorisOptions(),
-                        Configuration.fromMap(Collections.emptyMap()),
-                        schemaChangeManager,
-                        (dorisOptions, tableId) -> null);
+                createApplierForAbsentTable(
+                        schemaChangeManager, Configuration.fromMap(Collections.emptyMap()));
 
         applier.applySchemaChange(
                 new AddColumnEvent(
@@ -1050,11 +1159,8 @@ public class DorisMetadataApplierTest {
     public void testAddColumnEventKeepsCdcNullabilityInCache() {
         RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
         DorisMetadataApplier applier =
-                new DorisMetadataApplier(
-                        createDorisOptions(),
-                        Configuration.fromMap(Collections.emptyMap()),
-                        schemaChangeManager,
-                        (dorisOptions, tableId) -> null);
+                createApplierForAbsentTable(
+                        schemaChangeManager, Configuration.fromMap(Collections.emptyMap()));
 
         Schema initialSchema = Schema.newBuilder().physicalColumn("id", DataTypes.INT()).build();
         applier.applySchemaChange(new CreateTableEvent(TABLE_ID, initialSchema));
@@ -1077,11 +1183,8 @@ public class DorisMetadataApplierTest {
     public void testAddColumnEventAppliesAfterPositionToDorisDdl() {
         RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
         DorisMetadataApplier applier =
-                new DorisMetadataApplier(
-                        createDorisOptions(),
-                        Configuration.fromMap(Collections.emptyMap()),
-                        schemaChangeManager,
-                        (dorisOptions, tableId) -> null);
+                createApplierForAbsentTable(
+                        schemaChangeManager, Configuration.fromMap(Collections.emptyMap()));
 
         Schema initialSchema =
                 Schema.newBuilder()
@@ -1114,11 +1217,8 @@ public class DorisMetadataApplierTest {
     public void testAddColumnEventTranslatesBeforePositionToDorisAfterPreviousColumn() {
         RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
         DorisMetadataApplier applier =
-                new DorisMetadataApplier(
-                        createDorisOptions(),
-                        Configuration.fromMap(Collections.emptyMap()),
-                        schemaChangeManager,
-                        (dorisOptions, tableId) -> null);
+                createApplierForAbsentTable(
+                        schemaChangeManager, Configuration.fromMap(Collections.emptyMap()));
 
         Schema initialSchema =
                 Schema.newBuilder()
@@ -1148,11 +1248,8 @@ public class DorisMetadataApplierTest {
     public void testAddColumnEventTranslatesBeforeFirstColumnToDorisFirst() {
         RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
         DorisMetadataApplier applier =
-                new DorisMetadataApplier(
-                        createDorisOptions(),
-                        Configuration.fromMap(Collections.emptyMap()),
-                        schemaChangeManager,
-                        (dorisOptions, tableId) -> null);
+                createApplierForAbsentTable(
+                        schemaChangeManager, Configuration.fromMap(Collections.emptyMap()));
 
         Schema initialSchema =
                 Schema.newBuilder()
@@ -1181,11 +1278,8 @@ public class DorisMetadataApplierTest {
     public void testAddColumnEventInvalidatesStaleSchemaCacheWhenLocalUpdateFails() {
         RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
         DorisMetadataApplier applier =
-                new DorisMetadataApplier(
-                        createDorisOptions(),
-                        Configuration.fromMap(Collections.emptyMap()),
-                        schemaChangeManager,
-                        (dorisOptions, tableId) -> null);
+                createApplierForAbsentTable(
+                        schemaChangeManager, Configuration.fromMap(Collections.emptyMap()));
 
         Schema staleSchema = Schema.newBuilder().physicalColumn("id", DataTypes.INT()).build();
         applier.applySchemaChange(new CreateTableEvent(TABLE_ID, staleSchema));
@@ -1206,11 +1300,8 @@ public class DorisMetadataApplierTest {
     public void testAlterColumnTypeEventFailsAndKeepsPreviousCacheWhenDorisReturnsFalse() {
         RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
         DorisMetadataApplier applier =
-                new DorisMetadataApplier(
-                        createDorisOptions(),
-                        Configuration.fromMap(Collections.emptyMap()),
-                        schemaChangeManager,
-                        (dorisOptions, tableId) -> null);
+                createApplierForAbsentTable(
+                        schemaChangeManager, Configuration.fromMap(Collections.emptyMap()));
 
         Schema initialSchema =
                 Schema.newBuilder()
@@ -1238,11 +1329,8 @@ public class DorisMetadataApplierTest {
         RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
         schemaChangeManager.truncateTableResult = false;
         DorisMetadataApplier applier =
-                new DorisMetadataApplier(
-                        createDorisOptions(),
-                        Configuration.fromMap(Collections.emptyMap()),
-                        schemaChangeManager,
-                        (dorisOptions, tableId) -> null);
+                createApplierForAbsentTable(
+                        schemaChangeManager, Configuration.fromMap(Collections.emptyMap()));
 
         Assertions.assertThatThrownBy(
                         () -> applier.applySchemaChange(new TruncateTableEvent(TABLE_ID)))
@@ -1255,11 +1343,8 @@ public class DorisMetadataApplierTest {
     public void testDropTableEventFailsAndKeepsCacheWhenDorisReturnsFalse() {
         RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
         DorisMetadataApplier applier =
-                new DorisMetadataApplier(
-                        createDorisOptions(),
-                        Configuration.fromMap(Collections.emptyMap()),
-                        schemaChangeManager,
-                        (dorisOptions, tableId) -> null);
+                createApplierForAbsentTable(
+                        schemaChangeManager, Configuration.fromMap(Collections.emptyMap()));
 
         Schema initialSchema = Schema.newBuilder().physicalColumn("id", DataTypes.INT()).build();
         applier.applySchemaChange(new CreateTableEvent(TABLE_ID, initialSchema));
@@ -1277,11 +1362,8 @@ public class DorisMetadataApplierTest {
         RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
         schemaChangeManager.alterTableCommentResult = false;
         DorisMetadataApplier applier =
-                new DorisMetadataApplier(
-                        createDorisOptions(),
-                        Configuration.fromMap(Collections.emptyMap()),
-                        schemaChangeManager,
-                        (dorisOptions, tableId) -> null);
+                createApplierForAbsentTable(
+                        schemaChangeManager, Configuration.fromMap(Collections.emptyMap()));
 
         Assertions.assertThatThrownBy(
                         () ->
@@ -1298,6 +1380,18 @@ public class DorisMetadataApplierTest {
                 .setUsername("root")
                 .setPassword("")
                 .build();
+    }
+
+    private static DorisMetadataApplier createApplierForAbsentTable(
+            RecordingSchemaChangeManager schemaChangeManager, Configuration config) {
+        return new DorisMetadataApplier(
+                createDorisOptions(),
+                config,
+                schemaChangeManager,
+                (dorisOptions, tableId) -> {
+                    throw new AssertionError("schema fetch should not be called");
+                },
+                (dorisOptions, tableId) -> DorisTableExistenceChecker.Existence.TABLE_ABSENT);
     }
 
     private static org.apache.doris.flink.rest.models.Schema createDorisSchema(
