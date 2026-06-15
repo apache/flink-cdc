@@ -282,7 +282,6 @@ public class PostgresDataSourceOptions {
                     .withDescription(
                             "Whether to infer CDC column types when processing pgoutput Relation messages.");
 
-    @Experimental
     public static final ConfigOption<Boolean> SCAN_NEWLY_ADDED_TABLE_ENABLED =
             ConfigOptions.key("scan.newly-added-table.enabled")
                     .booleanType()
