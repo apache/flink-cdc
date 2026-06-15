@@ -36,6 +36,8 @@ import io.debezium.relational.history.TableChanges;
 import io.debezium.relational.history.TableChanges.TableChange;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -51,6 +53,9 @@ import static org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils.isSch
 public class SqlServerEventDeserializer extends DebeziumEventDeserializationSchema {
 
     private static final long serialVersionUID = 1L;
+
+    private static final Logger LOG = LoggerFactory.getLogger(SqlServerEventDeserializer.class);
+
     private final boolean includeSchemaChanges;
     private final List<SqlServerReadableMetadata> readableMetadataList;
 
@@ -124,7 +129,10 @@ public class SqlServerEventDeserializer extends DebeziumEventDeserializationSche
                         cache.remove(dbzTableId);
                         break;
                     default:
-                        // ignore others
+                        LOG.warn(
+                                "Ignored unsupported schema change type '{}' for table '{}'.",
+                                change.getType(),
+                                tableId);
                 }
             }
             return events;

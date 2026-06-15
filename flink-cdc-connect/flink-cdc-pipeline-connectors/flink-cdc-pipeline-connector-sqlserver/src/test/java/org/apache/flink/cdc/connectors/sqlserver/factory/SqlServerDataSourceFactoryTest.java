@@ -17,7 +17,6 @@
 
 package org.apache.flink.cdc.connectors.sqlserver.factory;
 
-import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.factories.Factory;
@@ -51,7 +50,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.testcontainers.containers.MSSQLServerContainer.MS_SQL_SERVER_PORT;
 
 /** Tests for {@link SqlServerDataSourceFactory}. */
-@Internal
 public class SqlServerDataSourceFactoryTest extends SqlServerTestBase {
 
     private static final String DATABASE_NAME = "inventory";

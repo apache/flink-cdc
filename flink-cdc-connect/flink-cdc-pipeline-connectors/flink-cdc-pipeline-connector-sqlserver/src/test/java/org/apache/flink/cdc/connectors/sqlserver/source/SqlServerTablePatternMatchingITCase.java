@@ -44,7 +44,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.testcontainers.containers.MSSQLServerContainer.MS_SQL_SERVER_PORT;
 
 /** Test cases for matching SQL Server source tables. */
-public class SqlServerTablePatternMatchingTest extends SqlServerTestBase {
+public class SqlServerTablePatternMatchingITCase extends SqlServerTestBase {
 
     private static final String DATABASE_NAME = "pattern_test";
 
