@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.pipeline.tests.stage2;
 
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.cdc.common.test.utils.TestUtils;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
@@ -192,6 +193,108 @@ class MySqlToPaimonE2eITCase extends PipelineTestEnvironment {
                                 "112, Twelve, Lily, 2.14, null, null, null, null, null, null, null, null, null, null, null, null"));
         recordsInSnapshotPhase.addAll(recordsInIncrementalPhase);
         validateSinkResult(warehouse, database, "products", recordsInSnapshotPhase);
+    }
+
+    @Test
+    void testDropAndRecreateTable() throws Exception {
+        testDropAndRecreateTable(false);
+    }
+
+    @Test
+    void testDropAndRecreateTableAfterSavepointRestore() throws Exception {
+        testDropAndRecreateTable(true);
+    }
+
+    private void testDropAndRecreateTable(boolean restoreBeforeDrop) throws Exception {
+        String warehouse = sharedVolume.toString() + "/paimon_" + UUID.randomUUID();
+        String database = inventoryDatabase.getDatabaseName();
+        String pipelineJob =
+                String.format(
+                        "source:\n"
+                                + "  type: mysql\n"
+                                + "  hostname: mysql\n"
+                                + "  port: 3306\n"
+                                + "  username: %s\n"
+                                + "  password: %s\n"
+                                + "  tables: %s.(drop_recreate|drop_fence)\n"
+                                + "  server-id: 5400-5404\n"
+                                + "  server-time-zone: UTC\n"
+                                + "\n"
+                                + "sink:\n"
+                                + "  type: paimon\n"
+                                + "  catalog.properties.warehouse: %s\n"
+                                + "  catalog.properties.metastore: filesystem\n"
+                                + "  catalog.properties.cache-enabled: false\n"
+                                + "\n"
+                                + "pipeline:\n"
+                                + "  schema.change.behavior: evolve\n"
+                                + "  parallelism: %d",
+                        MYSQL_TEST_USER, MYSQL_TEST_PASSWORD, database, warehouse, parallelism);
+        Path paimonCdcConnector = TestUtils.getResource("paimon-cdc-pipeline-connector.jar");
+        Path hadoopJar = TestUtils.getResource("flink-shade-hadoop.jar");
+        try (Connection connection = inventoryDatabase.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "CREATE TABLE drop_recreate (id INT PRIMARY KEY, name VARCHAR(255));");
+            statement.execute("CREATE TABLE drop_fence (id INT PRIMARY KEY, name VARCHAR(255));");
+            statement.execute("INSERT INTO drop_recreate VALUES (1, 'before');");
+            statement.execute("INSERT INTO drop_fence VALUES (1, 'before');");
+
+            JobID jobId = submitPipelineJob(pipelineJob, paimonCdcConnector, hadoopJar);
+            waitUntilJobRunning(jobId, Duration.ofSeconds(30));
+            validateSinkResult(
+                    warehouse, database, "drop_recreate", Collections.singletonList("1, before"));
+            statement.execute("UPDATE drop_fence SET name = 'streaming' WHERE id = 1;");
+            validateSinkResult(
+                    warehouse, database, "drop_fence", Collections.singletonList("1, streaming"));
+
+            if (restoreBeforeDrop) {
+                String savepointPath = stopJobWithSavepoint(jobId);
+                jobId =
+                        submitPipelineJob(
+                                pipelineJob, savepointPath, false, paimonCdcConnector, hadoopJar);
+                waitUntilJobRunning(jobId, Duration.ofSeconds(30));
+                statement.execute("UPDATE drop_fence SET name = 'restored' WHERE id = 1;");
+                validateSinkResult(
+                        warehouse,
+                        database,
+                        "drop_fence",
+                        Collections.singletonList("1, restored"));
+            }
+
+            statement.execute("DROP TABLE drop_recreate;");
+            String tablePath = warehouse + "/" + database + ".db/drop_recreate";
+            long deadline = System.currentTimeMillis() + PAIMON_TESTCASE_TIMEOUT.toMillis();
+            while (jobManager.execInContainer("test", "-d", tablePath).getExitCode() == 0
+                    && System.currentTimeMillis() < deadline) {
+                Thread.sleep(1000L);
+            }
+            Assertions.assertThat(
+                            jobManager.execInContainer("test", "!", "-d", tablePath).getExitCode())
+                    .as("dropped Paimon table directory")
+                    .isZero();
+            statement.execute("UPDATE drop_fence SET name = 'after_drop' WHERE id = 1;");
+            validateSinkResult(
+                    warehouse, database, "drop_fence", Collections.singletonList("1, after_drop"));
+
+            statement.execute(
+                    "CREATE TABLE drop_recreate (id BIGINT PRIMARY KEY, name VARCHAR(255), score INT);");
+            statement.execute("INSERT INTO drop_recreate VALUES (5000000000, 'recreated', 99);");
+            validateSinkResult(
+                    warehouse,
+                    database,
+                    "drop_recreate",
+                    Collections.singletonList("5000000000, recreated, 99"));
+            statement.execute("UPDATE drop_recreate SET name = 'updated' WHERE id = 5000000000;");
+            validateSinkResult(
+                    warehouse,
+                    database,
+                    "drop_recreate",
+                    Collections.singletonList("5000000000, updated, 99"));
+            statement.execute("DELETE FROM drop_recreate WHERE id = 5000000000;");
+            validateSinkResult(warehouse, database, "drop_recreate", Collections.emptyList());
+            waitUntilJobRunning(jobId, Duration.ofSeconds(30));
+        }
     }
 
     @Test

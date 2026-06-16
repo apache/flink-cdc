@@ -20,6 +20,7 @@ package org.apache.flink.cdc.runtime.partitioning;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
+import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
@@ -71,6 +72,26 @@ class PrePartitionOperatorTest {
                         .isEqualTo(
                                 new StreamRecord<>(
                                         PartitioningEvent.ofRegular(createTableEvent, i)));
+            }
+        }
+    }
+
+    @Test
+    void testBroadcastingDropTableEvent() throws Exception {
+        try (RegularEventOperatorTestHarness<RegularPrePartitionOperator, PartitioningEvent>
+                testHarness = createTestHarness()) {
+            // Initialization
+            testHarness.open();
+
+            RegularPrePartitionOperator operator = testHarness.getOperator();
+            DropTableEvent dropTableEvent = new DropTableEvent(CUSTOMERS);
+            operator.processElement(new StreamRecord<>(dropTableEvent));
+
+            assertThat(testHarness.getOutputRecords()).hasSize(DOWNSTREAM_PARALLELISM);
+            for (int i = 0; i < DOWNSTREAM_PARALLELISM; i++) {
+                assertThat(testHarness.getOutputRecords().poll())
+                        .isEqualTo(
+                                new StreamRecord<>(PartitioningEvent.ofRegular(dropTableEvent, i)));
             }
         }
     }
