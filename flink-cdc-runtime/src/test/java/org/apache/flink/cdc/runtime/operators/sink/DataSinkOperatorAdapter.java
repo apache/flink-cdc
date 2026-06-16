@@ -19,6 +19,7 @@ package org.apache.flink.cdc.runtime.operators.sink;
 
 import org.apache.flink.cdc.common.event.ChangeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
+import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
@@ -110,6 +111,12 @@ public class DataSinkOperatorAdapter extends AbstractStreamOperatorAdapter<Event
             return;
         }
 
+        if (event instanceof DropTableEvent) {
+            processedTableIds.remove(((DropTableEvent) event).tableId());
+            output.collect(element);
+            return;
+        }
+
         // Check if the table is processed before emitting all other events, because we have to make
         // sure that sink have a view of the full schema before processing any change events,
         // including schema changes.
@@ -135,7 +142,8 @@ public class DataSinkOperatorAdapter extends AbstractStreamOperatorAdapter<Event
 
     private void handleFlushEvent(FlushEvent event) throws Exception {
         // omit copySinkWriter/userFunction flush from testing
-        if (event.getSchemaChangeEventType() != SchemaChangeEventType.CREATE_TABLE) {
+        if (event.getSchemaChangeEventType() != SchemaChangeEventType.CREATE_TABLE
+                && event.getSchemaChangeEventType() != SchemaChangeEventType.DROP_TABLE) {
             event.getTableIds().stream()
                     .filter(tableId -> !processedTableIds.contains(tableId))
                     .forEach(

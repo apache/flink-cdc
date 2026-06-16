@@ -19,6 +19,7 @@ package org.apache.flink.cdc.runtime.operators.schema.regular;
 
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
+import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
@@ -284,20 +285,76 @@ public class SchemaCoordinator extends SchemaRegistry {
             Set<TableId> upstreamDependencies =
                     SchemaDerivator.reverseLookupDependingUpstreamTables(
                             router, evolvedTableId, originalTables);
-            Preconditions.checkArgument(
-                    !upstreamDependencies.isEmpty(),
-                    "An affected sink table's upstream dependency cannot be empty.");
             LOG.info("Step 3.2 - upstream dependency tables are: {}", upstreamDependencies);
 
             List<SchemaChangeEvent> rawSchemaChangeEvents = new ArrayList<>();
-            if (upstreamDependencies.size() == 1) {
+            if (event instanceof DropTableEvent) {
+                // A dropped upstream table has been removed from original schemas before
+                // derivation. If no upstream table still routes to this downstream table, the
+                // downstream table should be dropped as well. Otherwise, keep the existing widened
+                // downstream schema because the remaining upstream tables still depend on it.
+                if (upstreamDependencies.isEmpty()) {
+                    if (currentEvolvedSchema != null) {
+                        SchemaChangeEvent rawEvent = event.copy(evolvedTableId);
+                        rawSchemaChangeEvents.add(rawEvent);
+                        LOG.info(
+                                "Step 3.3 - No upstream dependency remains and could be forwarded as {}.",
+                                rawEvent);
+                    } else {
+                        LOG.info(
+                                "Step 3.3 - No upstream dependency or current evolved schema remains.");
+                    }
+                } else {
+                    Set<Schema> toBeMergedSchemas =
+                            SchemaDerivator.reverseLookupDependingUpstreamSchemas(
+                                    router, evolvedTableId, schemaManager);
+                    LOG.info("Step 3.3 - Upstream dependency schemas are: {}.", toBeMergedSchemas);
+
+                    // Keep current schema as the merge base to avoid narrowing downstream schema
+                    // while other upstream tables are still routed to this sink table.
+                    Schema mergedSchema = currentEvolvedSchema;
+                    for (Schema toBeMergedSchema : toBeMergedSchemas) {
+                        mergedSchema =
+                                SchemaMergingUtils.getLeastCommonSchema(
+                                        mergedSchema, toBeMergedSchema);
+                    }
+                    LOG.info("Step 3.4 - Deduced widest schema is: {}.", mergedSchema);
+
+                    List<SchemaChangeEvent> rawEvents =
+                            SchemaMergingUtils.getSchemaDifference(
+                                    evolvedTableId, currentEvolvedSchema, mergedSchema);
+                    LOG.info(
+                            "Step 3.5 - It's an many-to-one routing and causes schema changes: {}.",
+                            rawEvents);
+
+                    rawSchemaChangeEvents.addAll(rawEvents);
+                }
+            } else if (upstreamDependencies.size() == 1) {
                 // If it's a one-by-one routing rule, we can simply forward it to downstream sink.
-                SchemaChangeEvent rawEvent = event.copy(evolvedTableId);
-                rawSchemaChangeEvents.add(rawEvent);
-                LOG.info(
-                        "Step 3.3 - It's an one-by-one routing and could be forwarded as {}.",
-                        rawEvent);
+                if (event instanceof CreateTableEvent && currentEvolvedSchema != null) {
+                    // The downstream table may still exist if a previous DropTableEvent was
+                    // excluded. In that case, evolve it with schema differences instead of sending
+                    // another CreateTableEvent.
+                    List<SchemaChangeEvent> rawEvents =
+                            SchemaMergingUtils.getSchemaDifference(
+                                    evolvedTableId,
+                                    currentEvolvedSchema,
+                                    ((CreateTableEvent) event).getSchema());
+                    rawSchemaChangeEvents.addAll(rawEvents);
+                    LOG.info(
+                            "Step 3.3 - The downstream table exists and causes schema changes: {}.",
+                            rawEvents);
+                } else {
+                    SchemaChangeEvent rawEvent = event.copy(evolvedTableId);
+                    rawSchemaChangeEvents.add(rawEvent);
+                    LOG.info(
+                            "Step 3.3 - It's an one-by-one routing and could be forwarded as {}.",
+                            rawEvent);
+                }
             } else {
+                Preconditions.checkArgument(
+                        !upstreamDependencies.isEmpty(),
+                        "An affected sink table's upstream dependency cannot be empty.");
                 Set<Schema> toBeMergedSchemas =
                         SchemaDerivator.reverseLookupDependingUpstreamSchemas(
                                 router, evolvedTableId, schemaManager);
