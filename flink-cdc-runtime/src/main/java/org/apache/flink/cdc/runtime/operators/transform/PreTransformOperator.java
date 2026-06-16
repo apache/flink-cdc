@@ -200,7 +200,11 @@ public class PreTransformOperator extends AbstractStreamOperatorAdapter<Event>
                 output.collect(new StreamRecord<>(cacheCreateTable(createTableEvent)));
             }
         } else if (event instanceof DropTableEvent) {
-            preTransformProcessorMap.remove(((DropTableEvent) event).tableId());
+            TableId tableId = ((DropTableEvent) event).tableId();
+            // A table with the same identifier may be recreated with a different schema.
+            preTransformProcessorMap.remove(tableId);
+            preTransformChangeInfoMap.remove(tableId);
+            hasAsteriskMap.remove(tableId);
             output.collect(new StreamRecord<>(event));
         } else if (event instanceof TruncateTableEvent) {
             output.collect(new StreamRecord<>(event));

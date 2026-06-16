@@ -20,6 +20,7 @@ package org.apache.flink.cdc.runtime.operators.schema.regular;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
+import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
@@ -161,9 +162,13 @@ public class SchemaOperator extends AbstractStreamOperatorAdapter<Event>
     private void handleSchemaChangeEvent(SchemaChangeEvent originalEvent) throws Exception {
         // First, update original schema map unconditionally and it will never fail
         TableId tableId = originalEvent.tableId();
-        originalSchemaMap.compute(
-                tableId,
-                (tId, schema) -> SchemaUtils.applySchemaChangeEvent(schema, originalEvent));
+        if (originalEvent instanceof DropTableEvent) {
+            originalSchemaMap.remove(tableId);
+        } else {
+            originalSchemaMap.compute(
+                    tableId,
+                    (tId, schema) -> SchemaUtils.applySchemaChangeEvent(schema, originalEvent));
+        }
         schemaOperatorMetrics.increaseSchemaChangeEvents(1);
 
         // First, send FlushEvent or it might be blocked later
@@ -188,7 +193,15 @@ public class SchemaOperator extends AbstractStreamOperatorAdapter<Event>
                 response.getAppliedSchemaChangeEvents();
 
         // Update local evolved schema map's cache
-        evolvedSchemaMap.putAll(response.getEvolvedSchemas());
+        response.getEvolvedSchemas()
+                .forEach(
+                        (tId, schema) -> {
+                            if (schema == null) {
+                                evolvedSchemaMap.remove(tId);
+                            } else {
+                                evolvedSchemaMap.put(tId, schema);
+                            }
+                        });
 
         // and emit the finished event to downstream
         for (SchemaChangeEvent finishedEvent : finishedSchemaChangeEvents) {
@@ -207,6 +220,12 @@ public class SchemaOperator extends AbstractStreamOperatorAdapter<Event>
         // Then, for each routing terminus, coerce data records to the expected schema
         for (TableId sinkTableId : router.route(tableId)) {
             Schema evolvedSchema = evolvedSchemaMap.get(sinkTableId);
+            if (originalSchema == null || evolvedSchema == null) {
+                throw new IllegalStateException(
+                        String.format(
+                                "Unable to coerce data record from %s (schema: %s) to %s (schema: %s)",
+                                tableId, originalSchema, sinkTableId, evolvedSchema));
+            }
             DataChangeEvent coercedDataRecord =
                     derivator
                             .coerceDataRecord(

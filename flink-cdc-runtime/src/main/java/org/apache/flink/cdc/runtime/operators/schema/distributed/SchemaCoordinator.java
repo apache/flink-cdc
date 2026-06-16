@@ -19,6 +19,7 @@ package org.apache.flink.cdc.runtime.operators.schema.distributed;
 
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
+import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.RouteMode;
@@ -310,10 +311,16 @@ public class SchemaCoordinator extends SchemaRegistry {
     private void updateUpstreamSchemaTable(
             TableId tableId, int sourcePartition, SchemaChangeEvent schemaChangeEvent) {
         Schema oldSchema = upstreamSchemaTable.get(tableId, sourcePartition);
-        upstreamSchemaTable.put(
-                tableId,
-                sourcePartition,
-                SchemaUtils.applySchemaChangeEvent(oldSchema, schemaChangeEvent));
+        if (schemaChangeEvent instanceof DropTableEvent) {
+            // DropTableEvent is a table-level DDL and ends the table lifecycle for all source
+            // partitions.
+            upstreamSchemaTable.row(tableId).clear();
+        } else {
+            upstreamSchemaTable.put(
+                    tableId,
+                    sourcePartition,
+                    SchemaUtils.applySchemaChangeEvent(oldSchema, schemaChangeEvent));
+        }
     }
 
     private void startSchemaChange() throws TimeoutException {
@@ -348,9 +355,8 @@ public class SchemaCoordinator extends SchemaRegistry {
         Set<TableId> affectedTableIds = deduceSummary.f0;
         Map<TableId, Schema> evolvedSchemaView = new HashMap<>();
         for (TableId tableId : affectedTableIds) {
-            schemaManager
-                    .getLatestEvolvedSchema(tableId)
-                    .ifPresent(schema -> evolvedSchemaView.put(tableId, schema));
+            evolvedSchemaView.put(
+                    tableId, schemaManager.getLatestEvolvedSchema(tableId).orElse(null));
         }
 
         List<Tuple2<SchemaChangeRequest, CompletableFuture<CoordinationResponse>>> futures =
@@ -417,32 +423,52 @@ public class SchemaCoordinator extends SchemaRegistry {
             Set<TableId> upstreamDependencies =
                     SchemaDerivator.reverseLookupDependingUpstreamTables(
                             router, affectedSinkTableId, upstreamSchemaTable);
-            Preconditions.checkState(
-                    !upstreamDependencies.isEmpty(),
-                    "An affected sink table's upstream dependency cannot be empty.");
             LOG.info("Step 3.2 - upstream dependency tables are: {}", upstreamDependencies);
 
-            // Then, grab all upstream schemas from all known partitions and merge them.
-            Set<Schema> toBeMergedSchemas =
-                    SchemaDerivator.reverseLookupDependingUpstreamSchemas(
-                            router, affectedSinkTableId, upstreamSchemaTable);
-            LOG.info("Step 3.3 - Upstream dependency schemas are: {}.", toBeMergedSchemas);
+            List<SchemaChangeEvent> localEvolvedSchemaChanges;
+            if (upstreamDependencies.isEmpty()) {
+                if (containsDropTableEventForSinkTable(
+                        validSchemaChangeRequests, affectedSinkTableId)) {
+                    if (currentSinkSchema != null) {
+                        localEvolvedSchemaChanges = new ArrayList<>();
+                        localEvolvedSchemaChanges.add(new DropTableEvent(affectedSinkTableId));
+                        LOG.info(
+                                "Step 3.3 - No upstream dependency remains and could be forwarded as {}.",
+                                localEvolvedSchemaChanges);
+                    } else {
+                        localEvolvedSchemaChanges = new ArrayList<>();
+                        LOG.info(
+                                "Step 3.3 - No upstream dependency or current evolved schema remains.");
+                    }
+                } else {
+                    throw new IllegalStateException(
+                            "An affected sink table's upstream dependency cannot be empty.");
+                }
+            } else {
+                // Then, grab all upstream schemas from all known partitions and merge them.
+                Set<Schema> toBeMergedSchemas =
+                        SchemaDerivator.reverseLookupDependingUpstreamSchemas(
+                                router, affectedSinkTableId, upstreamSchemaTable);
+                LOG.info("Step 3.3 - Upstream dependency schemas are: {}.", toBeMergedSchemas);
 
-            // In distributed topology, schema will never be narrowed because current schema is
-            // in the merging base. Notice that current schema might be NULL if it's the first
-            // time we met a CreateTableEvent.
-            Schema mergedSchema = currentSinkSchema;
-            for (Schema toBeMergedSchema : toBeMergedSchemas) {
-                mergedSchema =
-                        SchemaMergingUtils.getLeastCommonSchema(mergedSchema, toBeMergedSchema);
+                // In distributed topology, schema will never be narrowed because current schema is
+                // in the merging base. Notice that current schema might be NULL if it's the first
+                // time we met a CreateTableEvent.
+                Schema mergedSchema = currentSinkSchema;
+                for (Schema toBeMergedSchema : toBeMergedSchemas) {
+                    mergedSchema =
+                            SchemaMergingUtils.getLeastCommonSchema(mergedSchema, toBeMergedSchema);
+                }
+                LOG.info("Step 3.4 - Deduced widest schema is: {}.", mergedSchema);
+
+                // Detect what schema changes we need to apply to get expected sink table.
+                localEvolvedSchemaChanges =
+                        SchemaMergingUtils.getSchemaDifference(
+                                affectedSinkTableId, currentSinkSchema, mergedSchema);
+                LOG.info(
+                        "Step 3.5 - Corresponding schema changes are: {}.",
+                        localEvolvedSchemaChanges);
             }
-            LOG.info("Step 3.4 - Deduced widest schema is: {}.", mergedSchema);
-
-            // Detect what schema changes we need to apply to get expected sink table.
-            List<SchemaChangeEvent> localEvolvedSchemaChanges =
-                    SchemaMergingUtils.getSchemaDifference(
-                            affectedSinkTableId, currentSinkSchema, mergedSchema);
-            LOG.info("Step 3.5 - Corresponding schema changes are: {}.", localEvolvedSchemaChanges);
 
             // Finally, we normalize schema change events, including rewriting events by current
             // schema change behavior configuration, dropping explicitly excluded schema change
@@ -461,6 +487,16 @@ public class SchemaCoordinator extends SchemaRegistry {
         }
 
         return Tuple2.of(affectedSinkTableIds, evolvedSchemaChanges);
+    }
+
+    @VisibleForTesting
+    boolean containsDropTableEventForSinkTable(
+            List<SchemaChangeRequest> schemaChangeRequests, TableId affectedSinkTableId) {
+        return schemaChangeRequests.stream()
+                .map(SchemaChangeRequest::getSchemaChangeEvent)
+                .filter(event -> event instanceof DropTableEvent)
+                .map(event -> ((DropTableEvent) event).tableId())
+                .anyMatch(droppedTable -> router.route(droppedTable).contains(affectedSinkTableId));
     }
 
     private boolean applyAndUpdateEvolvedSchemaChange(SchemaChangeEvent schemaChangeEvent) {

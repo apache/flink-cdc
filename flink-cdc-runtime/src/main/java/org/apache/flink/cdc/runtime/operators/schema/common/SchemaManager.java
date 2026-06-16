@@ -20,6 +20,7 @@ package org.apache.flink.cdc.runtime.operators.schema.common;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
+import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
@@ -151,6 +152,9 @@ public class SchemaManager {
     public void applyOriginalSchemaChange(SchemaChangeEvent schemaChangeEvent) {
         if (schemaChangeEvent instanceof CreateTableEvent) {
             handleCreateTableEvent(originalSchemas, ((CreateTableEvent) schemaChangeEvent));
+        } else if (schemaChangeEvent instanceof DropTableEvent) {
+            // Drop ends the table schema lifecycle.
+            originalSchemas.remove(schemaChangeEvent.tableId());
         } else {
             Optional<Schema> optionalSchema = getLatestOriginalSchema(schemaChangeEvent.tableId());
             checkArgument(
@@ -168,6 +172,9 @@ public class SchemaManager {
     public void applyEvolvedSchemaChange(SchemaChangeEvent schemaChangeEvent) {
         if (schemaChangeEvent instanceof CreateTableEvent) {
             handleCreateTableEvent(evolvedSchemas, ((CreateTableEvent) schemaChangeEvent));
+        } else if (schemaChangeEvent instanceof DropTableEvent) {
+            // Drop ends the table schema lifecycle.
+            evolvedSchemas.remove(schemaChangeEvent.tableId());
         } else {
             Optional<Schema> optionalSchema = getLatestEvolvedSchema(schemaChangeEvent.tableId());
             checkArgument(

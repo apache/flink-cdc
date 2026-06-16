@@ -23,6 +23,7 @@ import org.apache.flink.api.connector.sink2.SinkWriter;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.event.ChangeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
+import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
@@ -166,6 +167,16 @@ public class DataSinkWriterOperator<CommT>
             // CreateTableEvent marks the table as processed directly
             if (event instanceof CreateTableEvent) {
                 processedTableIds.add(((CreateTableEvent) event).tableId());
+                this
+                        .<OneInputStreamOperator<Event, CommittableMessage<CommT>>>
+                                getFlinkWriterOperator()
+                        .processElement(element);
+                return;
+            }
+
+            if (event instanceof DropTableEvent) {
+                // Allow a later table with the same identifier to be initialized again.
+                processedTableIds.remove(((DropTableEvent) event).tableId());
                 this
                         .<OneInputStreamOperator<Event, CommittableMessage<CommT>>>
                                 getFlinkWriterOperator()
