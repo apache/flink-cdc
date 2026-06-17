@@ -29,6 +29,8 @@ under the License.
 The GaussDB DWS connector is a pipeline sink connector that writes Flink CDC events to Huawei Cloud GaussDB(DWS).
 This document describes how to set up the GaussDB DWS pipeline sink connector.
 
+The sink uses SinkV2 staging tables for application-level two-phase commit. Records are first written to checkpoint-scoped staging tables and then committed into target tables by the committer. Data change events require primary keys so staged rows can be merged idempotently.
+
 ## Example
 
 The following example shows how to write data from a Values source to GaussDB DWS:
@@ -127,7 +129,7 @@ pipeline:
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Write mode used by the native DWS client. Supported values include copy_merge, auto, upsert, copy_upsert, copy, update, update_auto, and copy_update.</td>
+      <td>Compatibility option. The SinkV2 staging-table writer commits by primary-key merge and does not use native DWS write modes.</td>
     </tr>
     <tr>
       <td>sink.enable-delete</td>
@@ -141,7 +143,7 @@ pipeline:
       <td>optional</td>
       <td style="word-wrap: break-word;">3</td>
       <td>Integer</td>
-      <td>Maximum number of retries used by the native DWS client.</td>
+      <td>Compatibility option for native DWS client retries. SinkV2 commit retries are handled by Flink's committer retry mechanism.</td>
     </tr>
     <tr>
       <td>sink.parallelism</td>
@@ -155,21 +157,21 @@ pipeline:
       <td>optional</td>
       <td style="word-wrap: break-word;">true</td>
       <td>Boolean</td>
-      <td>Whether automatic flush is enabled.</td>
+      <td>Compatibility option. The SinkV2 staging-table writer flushes staged records during checkpoint commit.</td>
     </tr>
     <tr>
       <td>auto-batch-flush-size</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">50000</td>
       <td>Integer</td>
-      <td>Maximum buffered rows before an automatic flush.</td>
+      <td>Compatibility option for the native DWS client automatic flush threshold.</td>
     </tr>
     <tr>
       <td>auto-flush-max-interval</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">3 min</td>
       <td>Duration</td>
-      <td>Maximum interval between automatic flushes.</td>
+      <td>Compatibility option for the native DWS client automatic flush interval.</td>
     </tr>
     <tr>
       <td>enable-dn-partition</td>
@@ -274,21 +276,21 @@ pipeline:
       <td>optional</td>
       <td style="word-wrap: break-word;">3</td>
       <td>Integer</td>
-      <td>Native DWS client write worker thread count.</td>
+      <td>Compatibility option for the native DWS client write worker thread count.</td>
     </tr>
     <tr>
       <td>dws.client.write.use-copy-size</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">1000</td>
       <td>Integer</td>
-      <td>COPY mode switch threshold used by the native DWS client when batching writes.</td>
+      <td>Compatibility option for the native DWS client COPY mode switch threshold.</td>
     </tr>
     <tr>
       <td>dws.client.write.force-flush-size</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">40000</td>
       <td>Integer</td>
-      <td>Force flush threshold used by the native DWS client.</td>
+      <td>Compatibility option for the native DWS client force flush threshold.</td>
     </tr>
     <tr>
       <td>logSwitch</td>

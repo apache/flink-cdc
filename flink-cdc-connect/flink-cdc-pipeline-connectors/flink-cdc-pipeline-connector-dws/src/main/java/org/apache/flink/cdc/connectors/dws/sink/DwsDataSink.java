@@ -19,8 +19,9 @@ package org.apache.flink.cdc.connectors.dws.sink;
 
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.common.sink.EventSinkProvider;
-import org.apache.flink.cdc.common.sink.FlinkSinkFunctionProvider;
+import org.apache.flink.cdc.common.sink.FlinkSinkProvider;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
+import org.apache.flink.cdc.connectors.dws.sink.v2.DwsSink;
 
 import com.huaweicloud.dws.client.model.WriteMode;
 import com.huaweicloud.dws.connectors.flink.config.DwsConnectionOptions;
@@ -71,17 +72,15 @@ public class DwsDataSink implements DataSink, Serializable {
 
     @Override
     public EventSinkProvider getEventSinkProvider() {
-        return FlinkSinkFunctionProvider.of(
-                new DwsSinkFunction(
-                        connectorOptions,
+        return FlinkSinkProvider.of(
+                new DwsSink(
+                        connectorOptions.getUrl(),
+                        connectorOptions.getUsername(),
+                        connectorOptions.getPassword(),
                         zoneId,
                         caseSensitive,
                         defaultSchema,
-                        autoFlushBatchSize,
-                        autoFlushMaxInterval,
-                        enableAutoFlush,
-                        enableDelete,
-                        writeMode));
+                        enableDelete));
     }
 
     @Override

@@ -17,23 +17,19 @@
 
 package org.apache.flink.cdc.connectors.dws.sink;
 
-import org.apache.flink.api.common.state.BroadcastState;
 import org.apache.flink.api.common.state.CheckpointListener;
 import org.apache.flink.api.common.state.KeyedStateStore;
-import org.apache.flink.api.common.state.ListState;
-import org.apache.flink.api.common.state.ListStateDescriptor;
-import org.apache.flink.api.common.state.MapStateDescriptor;
 import org.apache.flink.api.common.state.OperatorStateStore;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.runtime.compat.MockStreamingRuntimeContextAdapter;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.state.FunctionInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContextSynchronousImpl;
 import org.apache.flink.streaming.api.checkpoint.CheckpointedFunction;
 import org.apache.flink.streaming.api.functions.sink.RichSinkFunction;
-import org.apache.flink.streaming.util.MockStreamingRuntimeContext;
 
 import com.huaweicloud.dws.client.DwsConfig;
 import com.huaweicloud.dws.client.config.DwsClientConfigs;
@@ -42,11 +38,12 @@ import com.huaweicloud.dws.connectors.flink.config.DwsConnectionOptions;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.time.Duration;
 import java.time.ZoneId;
 import java.util.Collections;
 import java.util.OptionalLong;
-import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -75,7 +72,7 @@ class DwsSinkFunctionTest {
                         null,
                         delegate);
 
-        sinkFunction.setRuntimeContext(new MockStreamingRuntimeContext(true, 1, 0));
+        sinkFunction.setRuntimeContext(MockStreamingRuntimeContextAdapter.create(true, 1, 0));
         sinkFunction.initializeState(new TestingFunctionInitializationContext());
         sinkFunction.open(new Configuration());
         sinkFunction.snapshotState(new StateSnapshotContextSynchronousImpl(101L, 101L));
@@ -108,9 +105,9 @@ class DwsSinkFunctionTest {
                         null,
                         delegate);
 
-        sinkFunction.setRuntimeContext(new MockStreamingRuntimeContext(false, 1, 0));
+        sinkFunction.setRuntimeContext(MockStreamingRuntimeContextAdapter.create(false, 1, 0));
         sinkFunction.open(new Configuration());
-        sinkFunction.invoke(TEST_EVENT, null);
+        invokeSinkFunction(sinkFunction);
         sinkFunction.close();
 
         assertThat(delegate.runtimeContextWasSetInOpen).isTrue();
@@ -135,13 +132,13 @@ class DwsSinkFunctionTest {
                         null,
                         delegate);
 
-        sinkFunction.setRuntimeContext(new MockStreamingRuntimeContext(true, 1, 0));
+        sinkFunction.setRuntimeContext(MockStreamingRuntimeContextAdapter.create(true, 1, 0));
         sinkFunction.initializeState(new TestingFunctionInitializationContext());
         sinkFunction.open(new Configuration());
         sinkFunction.snapshotState(new StateSnapshotContextSynchronousImpl(101L, 101L));
         sinkFunction.notifyCheckpointComplete(101L);
         sinkFunction.notifyCheckpointAborted(102L);
-        sinkFunction.invoke(TEST_EVENT, null);
+        invokeSinkFunction(sinkFunction);
         sinkFunction.close();
 
         assertThat(delegate.runtimeContextWasSetInOpen).isTrue();
@@ -331,7 +328,7 @@ class DwsSinkFunctionTest {
         }
 
         @Override
-        public void invoke(Event value, Context context) {
+        public void invoke(Event value) {
             lastInvokedEvent = value;
         }
 
@@ -356,41 +353,18 @@ class DwsSinkFunctionTest {
 
         @Override
         public OperatorStateStore getOperatorStateStore() {
-            return new TestingOperatorStateStore();
+            return (OperatorStateStore)
+                    Proxy.newProxyInstance(
+                            OperatorStateStore.class.getClassLoader(),
+                            new Class<?>[] {OperatorStateStore.class},
+                            (proxy, method, args) -> {
+                                throw new UnsupportedOperationException();
+                            });
         }
 
         @Override
         public KeyedStateStore getKeyedStateStore() {
             return null;
-        }
-    }
-
-    private static final class TestingOperatorStateStore implements OperatorStateStore {
-
-        @Override
-        public <S> ListState<S> getListState(ListStateDescriptor<S> stateDescriptor) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public <S> ListState<S> getUnionListState(ListStateDescriptor<S> stateDescriptor) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public <K, V> BroadcastState<K, V> getBroadcastState(
-                MapStateDescriptor<K, V> stateDescriptor) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public Set<String> getRegisteredStateNames() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public Set<String> getRegisteredBroadcastStateNames() {
-            throw new UnsupportedOperationException();
         }
     }
 
@@ -423,6 +397,18 @@ class DwsSinkFunctionTest {
                 true,
                 writeMode,
                 new ForwardingSinkFunction());
+    }
+
+    private static void invokeSinkFunction(DwsSinkFunction sinkFunction) throws Exception {
+        for (Method method : DwsSinkFunction.class.getMethods()) {
+            if ("invoke".equals(method.getName())
+                    && method.getParameterCount() == 2
+                    && method.getParameterTypes()[0].isAssignableFrom(Event.class)) {
+                method.invoke(sinkFunction, TEST_EVENT, null);
+                return;
+            }
+        }
+        throw new NoSuchMethodException("Cannot find DwsSinkFunction.invoke(Event, Context).");
     }
 
     private static Object readField(Object target, String fieldName) throws Exception {
