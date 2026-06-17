@@ -17,15 +17,19 @@
 
 package org.apache.flink.cdc.connectors.dws.factory;
 
+import org.apache.flink.api.connector.sink2.TwoPhaseCommittingSink;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.factories.DataSinkFactory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.sink.DataSink;
+import org.apache.flink.cdc.common.sink.EventSinkProvider;
+import org.apache.flink.cdc.common.sink.FlinkSinkProvider;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.composer.utils.FactoryDiscoveryUtils;
 import org.apache.flink.cdc.connectors.dws.sink.DwsDataSink;
 import org.apache.flink.cdc.connectors.dws.sink.DwsDataSinkOptions;
+import org.apache.flink.cdc.connectors.dws.sink.v2.DwsSink;
 import org.apache.flink.table.api.ValidationException;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
@@ -52,6 +56,12 @@ class DwsDataSinkFactoryTest {
         DataSink dataSink =
                 createDataSink(sinkFactory, createRequiredConfiguration(), new Configuration());
         Assertions.assertThat(dataSink).isInstanceOf(DwsDataSink.class);
+
+        EventSinkProvider eventSinkProvider = dataSink.getEventSinkProvider();
+        Assertions.assertThat(eventSinkProvider).isInstanceOf(FlinkSinkProvider.class);
+        Assertions.assertThat(((FlinkSinkProvider) eventSinkProvider).getSink())
+                .isInstanceOf(DwsSink.class)
+                .isInstanceOf(TwoPhaseCommittingSink.class);
     }
 
     @Test

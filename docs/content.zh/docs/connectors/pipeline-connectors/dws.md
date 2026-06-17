@@ -28,6 +28,8 @@ under the License.
 
 GaussDB DWS 连接器是一个 Pipeline Sink 连接器，用于将 Flink CDC 事件写入华为云 GaussDB(DWS)。本文描述如何配置 GaussDB DWS Pipeline Sink 连接器。
 
+该 sink 使用 SinkV2 staging table 实现应用层两阶段提交：数据先写入 checkpoint 级 staging table，再由 committer 提交到目标表。数据变更事件要求目标表具备主键，以便 staging 数据可以按主键幂等归并。
+
 ## 示例
 
 下面的示例展示了如何将 Values source 的数据写入 GaussDB DWS：
@@ -126,7 +128,7 @@ pipeline:
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>原生 DWS client 使用的写入模式。支持 copy_merge、auto、upsert、copy_upsert、copy、update、update_auto 和 copy_update。</td>
+      <td>兼容性配置项。SinkV2 staging table 写入器按主键归并提交，不使用原生 DWS 写入模式。</td>
     </tr>
     <tr>
       <td>sink.enable-delete</td>
@@ -140,7 +142,7 @@ pipeline:
       <td>optional</td>
       <td style="word-wrap: break-word;">3</td>
       <td>Integer</td>
-      <td>原生 DWS client 使用的最大重试次数。</td>
+      <td>原生 DWS client 重试次数的兼容性配置项。SinkV2 commit 重试由 Flink committer 重试机制处理。</td>
     </tr>
     <tr>
       <td>sink.parallelism</td>
@@ -154,21 +156,21 @@ pipeline:
       <td>optional</td>
       <td style="word-wrap: break-word;">true</td>
       <td>Boolean</td>
-      <td>是否启用自动 flush。</td>
+      <td>兼容性配置项。SinkV2 staging table 写入器在 checkpoint commit 时 flush staged records。</td>
     </tr>
     <tr>
       <td>auto-batch-flush-size</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">50000</td>
       <td>Integer</td>
-      <td>触发自动 flush 前的最大缓存行数。</td>
+      <td>原生 DWS client 自动 flush 阈值的兼容性配置项。</td>
     </tr>
     <tr>
       <td>auto-flush-max-interval</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">3 min</td>
       <td>Duration</td>
-      <td>自动 flush 的最大间隔。</td>
+      <td>原生 DWS client 自动 flush 间隔的兼容性配置项。</td>
     </tr>
     <tr>
       <td>enable-dn-partition</td>
@@ -273,21 +275,21 @@ pipeline:
       <td>optional</td>
       <td style="word-wrap: break-word;">3</td>
       <td>Integer</td>
-      <td>原生 DWS client 写入线程数。</td>
+      <td>原生 DWS client 写入线程数的兼容性配置项。</td>
     </tr>
     <tr>
       <td>dws.client.write.use-copy-size</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">1000</td>
       <td>Integer</td>
-      <td>原生 DWS client 批量写入时切换 COPY 模式的阈值。</td>
+      <td>原生 DWS client COPY 模式切换阈值的兼容性配置项。</td>
     </tr>
     <tr>
       <td>dws.client.write.force-flush-size</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">40000</td>
       <td>Integer</td>
-      <td>原生 DWS client 强制 flush 阈值。</td>
+      <td>原生 DWS client 强制 flush 阈值的兼容性配置项。</td>
     </tr>
     <tr>
       <td>logSwitch</td>
