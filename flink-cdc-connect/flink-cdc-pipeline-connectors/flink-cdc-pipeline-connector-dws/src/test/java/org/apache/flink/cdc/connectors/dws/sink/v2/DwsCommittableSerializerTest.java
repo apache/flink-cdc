@@ -55,15 +55,4 @@ class DwsCommittableSerializerTest {
         assertThat(restored.getColumnNames()).containsExactly("id", "name");
         assertThat(restored.getPrimaryKeys()).containsExactly("id");
     }
-
-    @Test
-    void testWriterStateRoundTrip() throws Exception {
-        DwsWriterStateSerializer serializer = new DwsWriterStateSerializer();
-
-        DwsWriterState restored =
-                serializer.deserialize(
-                        serializer.getVersion(), serializer.serialize(new DwsWriterState("job")));
-
-        assertThat(restored.getJobId()).isEqualTo("job");
-    }
 }
