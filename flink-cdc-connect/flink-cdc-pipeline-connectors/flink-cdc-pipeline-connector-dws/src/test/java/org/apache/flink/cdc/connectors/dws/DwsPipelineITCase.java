@@ -17,7 +17,6 @@
 
 package org.apache.flink.cdc.connectors.dws;
 
-import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.connector.sink2.Sink;
 import org.apache.flink.cdc.common.configuration.Configuration;
@@ -38,6 +37,7 @@ import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.connectors.dws.utils.DwsContainer;
 import org.apache.flink.cdc.connectors.dws.utils.DwsSinkTestBase;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
+import org.apache.flink.configuration.RestartStrategyOptions;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.SinkFunction;
@@ -73,7 +73,9 @@ class DwsPipelineITCase extends DwsSinkTestBase {
     public static void before() {
         env.setParallelism(DEFAULT_PARALLELISM);
         env.enableCheckpointing(3000);
-        env.setRestartStrategy(RestartStrategies.noRestart());
+        env.configure(
+                new org.apache.flink.configuration.Configuration()
+                        .set(RestartStrategyOptions.RESTART_STRATEGY, "none"));
     }
 
     @BeforeEach

@@ -58,9 +58,9 @@ class DwsMetadataApplierTest {
 
         assertThat(sql)
                 .isEqualTo(
-                        "CREATE TABLE IF NOT EXISTS ods.orders "
-                                + "(id INTEGER NOT NULL, tenant_id INTEGER, PRIMARY KEY (id)) "
-                                + "DISTRIBUTE BY HASH (id, tenant_id)");
+                        "CREATE TABLE IF NOT EXISTS \"ods\".\"orders\" "
+                                + "(\"id\" INTEGER NOT NULL, \"tenant_id\" INTEGER, PRIMARY KEY (\"id\")) "
+                                + "DISTRIBUTE BY HASH (\"id\", \"tenant_id\")");
     }
 
     @Test
@@ -118,17 +118,47 @@ class DwsMetadataApplierTest {
                                 Column.physicalColumn(
                                         "score", DataTypes.DECIMAL(10, 2).notNull(), null, "0")))
                 .isEqualTo(
-                        "ALTER TABLE ods.orders ADD COLUMN score DECIMAL(10, 2) DEFAULT 0 NOT NULL");
+                        "ALTER TABLE \"ods\".\"orders\" ADD COLUMN \"score\" DECIMAL(10, 2) DEFAULT 0 NOT NULL");
         assertThat(metadataApplier.buildDropColumnSql(tableId, "score"))
-                .isEqualTo("ALTER TABLE ods.orders DROP COLUMN IF EXISTS score");
+                .isEqualTo("ALTER TABLE \"ods\".\"orders\" DROP COLUMN IF EXISTS \"score\"");
         assertThat(metadataApplier.buildRenameColumnSql(tableId, "score", "total_score"))
-                .isEqualTo("ALTER TABLE ods.orders RENAME COLUMN score TO total_score");
+                .isEqualTo(
+                        "ALTER TABLE \"ods\".\"orders\" RENAME COLUMN \"score\" TO \"total_score\"");
         assertThat(metadataApplier.buildAlterColumnTypeSql(tableId, "score", DataTypes.VARCHAR(32)))
-                .isEqualTo("ALTER TABLE ods.orders ALTER COLUMN score TYPE VARCHAR(32)");
+                .isEqualTo(
+                        "ALTER TABLE \"ods\".\"orders\" ALTER COLUMN \"score\" TYPE VARCHAR(32)");
         assertThat(metadataApplier.buildTruncateTableSql(tableId))
-                .isEqualTo("TRUNCATE TABLE ods.orders");
+                .isEqualTo("TRUNCATE TABLE \"ods\".\"orders\"");
         assertThat(metadataApplier.buildDropTableSql(tableId))
-                .isEqualTo("DROP TABLE IF EXISTS ods.orders");
+                .isEqualTo("DROP TABLE IF EXISTS \"ods\".\"orders\"");
+    }
+
+    @Test
+    void testBuildCreateTableSqlEscapesCaseInsensitiveIdentifiers() {
+        DwsMetadataApplier metadataApplier =
+                new DwsMetadataApplier(
+                        "jdbc:gaussdb://localhost:8000/test",
+                        "user",
+                        "password",
+                        false,
+                        "Ods",
+                        false,
+                        null);
+
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("User\"Name", DataTypes.STRING().notNull())
+                        .primaryKey("User\"Name")
+                        .build();
+
+        String sql =
+                metadataApplier.buildCreateTableSql(
+                        new CreateTableEvent(TableId.tableId("Sales", "Orders"), schema));
+
+        assertThat(sql)
+                .isEqualTo(
+                        "CREATE TABLE IF NOT EXISTS \"sales\".\"orders\" "
+                                + "(\"user\"\"name\" TEXT NOT NULL, PRIMARY KEY (\"user\"\"name\"))");
     }
 
     @Test

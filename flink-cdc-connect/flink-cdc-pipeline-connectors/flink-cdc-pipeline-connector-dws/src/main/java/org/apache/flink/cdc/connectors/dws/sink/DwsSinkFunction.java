@@ -326,7 +326,12 @@ public class DwsSinkFunction extends RichSinkFunction<Event>
         if (schemaName == null || schemaName.trim().isEmpty()) {
             schemaName = defaultSchema;
         }
-        return schemaName.trim() + "." + tableId.getTableName().trim();
+        return normalizeIdentifier(schemaName) + "." + normalizeIdentifier(tableId.getTableName());
+    }
+
+    private String normalizeIdentifier(String identifier) {
+        String value = identifier.trim();
+        return caseSensitive ? value : value.toLowerCase(java.util.Locale.ROOT);
     }
 
     private static WriteMode resolveWriteMode(WriteMode requestedWriteMode, boolean caseSensitive) {

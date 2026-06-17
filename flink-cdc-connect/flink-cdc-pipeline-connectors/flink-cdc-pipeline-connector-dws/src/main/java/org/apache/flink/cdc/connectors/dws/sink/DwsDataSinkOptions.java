@@ -98,12 +98,6 @@ public final class DwsDataSinkOptions {
                     .defaultValue(false)
                     .withDescription("Whether to enable DWS client logging.");
 
-    public static final ConfigOption<String> DATABASE =
-            ConfigOptions.key("database")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription("Optional database name override.");
-
     public static final ConfigOption<Integer> SINK_PARALLELISM =
             ConfigOptions.key("sink.parallelism")
                     .intType()
