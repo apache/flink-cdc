@@ -18,26 +18,35 @@
 package org.apache.flink.cdc.connectors.dws.utils;
 
 import org.apache.flink.cdc.common.data.ArrayData;
-import org.apache.flink.cdc.common.data.GenericArrayData;
-import org.apache.flink.cdc.common.data.GenericMapData;
+import org.apache.flink.cdc.common.data.DateData;
+import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.MapData;
 import org.apache.flink.cdc.common.data.RecordData;
+import org.apache.flink.cdc.common.data.StringData;
+import org.apache.flink.cdc.common.data.TimeData;
+import org.apache.flink.cdc.common.data.TimestampData;
+import org.apache.flink.cdc.common.data.ZonedTimestampData;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.ZonedTimestampType;
 
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
+import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Arrays;
-import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import static org.apache.flink.cdc.common.types.DataTypeChecks.getFieldCount;
+import static org.apache.flink.cdc.common.types.DataTypeChecks.getFieldNames;
+import static org.apache.flink.cdc.common.types.DataTypeChecks.getFieldTypes;
+import static org.apache.flink.cdc.common.types.DataTypeChecks.getNestedTypes;
 import static org.apache.flink.cdc.common.types.DataTypeChecks.getPrecision;
 import static org.apache.flink.cdc.common.types.DataTypeChecks.getScale;
 
@@ -95,41 +104,66 @@ public final class DwsUtils {
                 break;
             case DATE:
                 fieldGetter =
-                        record ->
-                                LocalDate.ofEpochDay(record.getInt(fieldPos))
-                                        .format(DATE_FORMATTER);
+                        record -> record.getDate(fieldPos).toLocalDate().format(DATE_FORMATTER);
                 break;
             case TIMESTAMP_WITHOUT_TIME_ZONE:
                 fieldGetter =
                         record ->
                                 record.getTimestamp(fieldPos, getPrecision(fieldType))
-                                        .toLocalDateTime()
-                                        .format(DATETIME_FORMATTER);
+                                        .toTimestamp();
                 break;
             case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
                 fieldGetter =
                         record ->
-                                ZonedDateTime.ofInstant(
-                                                record.getLocalZonedTimestampData(
-                                                                fieldPos, getPrecision(fieldType))
-                                                        .toInstant(),
-                                                zoneId)
-                                        .toLocalDateTime()
-                                        .format(DATETIME_FORMATTER);
+                                Timestamp.valueOf(
+                                        ZonedDateTime.ofInstant(
+                                                        record.getLocalZonedTimestampData(
+                                                                        fieldPos,
+                                                                        getPrecision(fieldType))
+                                                                .toInstant(),
+                                                        zoneId)
+                                                .toLocalDateTime());
                 break;
             case TIMESTAMP_WITH_TIME_ZONE:
                 int zonedPrecision = ((ZonedTimestampType) fieldType).getPrecision();
-                fieldGetter = record -> record.getTimestamp(fieldPos, zonedPrecision).toTimestamp();
+                fieldGetter =
+                        record -> record.getZonedTimestamp(fieldPos, zonedPrecision).toTimestamp();
                 break;
             case TIME_WITHOUT_TIME_ZONE:
-                fieldGetter =
-                        record -> LocalTime.ofNanoOfDay(record.getLong(fieldPos) * 1_000_000L);
+                fieldGetter = record -> record.getTime(fieldPos).toLocalTime();
                 break;
             case ARRAY:
-                fieldGetter = record -> convertArrayData(record.getArray(fieldPos));
+                DataType elementType = getNestedTypes(fieldType).get(0);
+                fieldGetter =
+                        record ->
+                                writeValueAsString(
+                                        convertArrayData(
+                                                record.getArray(fieldPos), elementType, zoneId));
                 break;
             case MAP:
-                fieldGetter = record -> writeValueAsString(convertMapData(record.getMap(fieldPos)));
+                DataType keyType = getNestedTypes(fieldType).get(0);
+                DataType valueType = getNestedTypes(fieldType).get(1);
+                fieldGetter =
+                        record ->
+                                writeValueAsString(
+                                        convertMapData(
+                                                record.getMap(fieldPos),
+                                                keyType,
+                                                valueType,
+                                                zoneId));
+                break;
+            case ROW:
+                List<String> fieldNames = getFieldNames(fieldType);
+                List<DataType> fieldTypes = getFieldTypes(fieldType);
+                int fieldCount = getFieldCount(fieldType);
+                fieldGetter =
+                        record ->
+                                writeValueAsString(
+                                        convertRowData(
+                                                record.getRow(fieldPos, fieldCount),
+                                                fieldNames,
+                                                fieldTypes,
+                                                zoneId));
                 break;
             default:
                 throw new UnsupportedOperationException(
@@ -142,24 +176,92 @@ public final class DwsUtils {
         return row -> row.isNullAt(fieldPos) ? null : fieldGetter.getFieldOrNull(row);
     }
 
-    private static List<Object> convertArrayData(ArrayData arrayData) {
-        if (arrayData instanceof GenericArrayData) {
-            return Arrays.asList(((GenericArrayData) arrayData).toObjectArray());
-        }
-        throw new UnsupportedOperationException("Unsupported array data: " + arrayData.getClass());
-    }
-
-    private static Object convertMapData(MapData mapData) {
-        if (!(mapData instanceof GenericMapData)) {
-            throw new UnsupportedOperationException("Unsupported map data: " + mapData.getClass());
-        }
-
-        GenericMapData genericMapData = (GenericMapData) mapData;
-        Map<Object, Object> result = new HashMap<>();
-        for (Object key : ((GenericArrayData) genericMapData.keyArray()).toObjectArray()) {
-            result.put(key, genericMapData.get(key));
+    private static List<Object> convertArrayData(
+            ArrayData arrayData, DataType elementType, ZoneId zoneId) {
+        ArrayData.ElementGetter elementGetter = ArrayData.createElementGetter(elementType);
+        List<Object> result = new ArrayList<>(arrayData.size());
+        for (int i = 0; i < arrayData.size(); i++) {
+            Object value = elementGetter.getElementOrNull(arrayData, i);
+            result.add(convertInternalValue(value, elementType, zoneId));
         }
         return result;
+    }
+
+    private static Object convertMapData(
+            MapData mapData, DataType keyType, DataType valueType, ZoneId zoneId) {
+        ArrayData keyArray = mapData.keyArray();
+        ArrayData valueArray = mapData.valueArray();
+        ArrayData.ElementGetter keyGetter = ArrayData.createElementGetter(keyType);
+        ArrayData.ElementGetter valueGetter = ArrayData.createElementGetter(valueType);
+        Map<Object, Object> result = new LinkedHashMap<>();
+        for (int i = 0; i < mapData.size(); i++) {
+            Object key =
+                    convertInternalValue(keyGetter.getElementOrNull(keyArray, i), keyType, zoneId);
+            Object value =
+                    convertInternalValue(
+                            valueGetter.getElementOrNull(valueArray, i), valueType, zoneId);
+            result.put(key, value);
+        }
+        return result;
+    }
+
+    private static Object convertRowData(
+            RecordData rowData, List<String> fieldNames, List<DataType> fieldTypes, ZoneId zoneId) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        for (int i = 0; i < fieldNames.size(); i++) {
+            RecordData.FieldGetter fieldGetter = RecordData.createFieldGetter(fieldTypes.get(i), i);
+            result.put(
+                    fieldNames.get(i),
+                    convertInternalValue(
+                            fieldGetter.getFieldOrNull(rowData), fieldTypes.get(i), zoneId));
+        }
+        return result;
+    }
+
+    private static Object convertInternalValue(Object value, DataType dataType, ZoneId zoneId) {
+        if (value == null) {
+            return null;
+        }
+        switch (dataType.getTypeRoot()) {
+            case CHAR:
+            case VARCHAR:
+                return value instanceof StringData ? ((StringData) value).toString() : value;
+            case DATE:
+                if (value instanceof DateData) {
+                    return ((DateData) value).toLocalDate().format(DATE_FORMATTER);
+                }
+                return LocalDate.ofEpochDay(((Number) value).longValue()).format(DATE_FORMATTER);
+            case TIME_WITHOUT_TIME_ZONE:
+                if (value instanceof TimeData) {
+                    return ((TimeData) value).toLocalTime().toString();
+                }
+                return LocalTime.ofNanoOfDay(((Number) value).longValue() * 1_000_000L).toString();
+            case TIMESTAMP_WITHOUT_TIME_ZONE:
+                return ((TimestampData) value).toLocalDateTime().format(DATETIME_FORMATTER);
+            case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
+                return ZonedDateTime.ofInstant(
+                                ((LocalZonedTimestampData) value).toInstant(), zoneId)
+                        .toLocalDateTime()
+                        .format(DATETIME_FORMATTER);
+            case TIMESTAMP_WITH_TIME_ZONE:
+                return ((ZonedTimestampData) value).toString();
+            case ARRAY:
+                return convertArrayData((ArrayData) value, getNestedTypes(dataType).get(0), zoneId);
+            case MAP:
+                return convertMapData(
+                        (MapData) value,
+                        getNestedTypes(dataType).get(0),
+                        getNestedTypes(dataType).get(1),
+                        zoneId);
+            case ROW:
+                return convertRowData(
+                        (RecordData) value,
+                        getFieldNames(dataType),
+                        getFieldTypes(dataType),
+                        zoneId);
+            default:
+                return value;
+        }
     }
 
     private static String writeValueAsString(Object value) {

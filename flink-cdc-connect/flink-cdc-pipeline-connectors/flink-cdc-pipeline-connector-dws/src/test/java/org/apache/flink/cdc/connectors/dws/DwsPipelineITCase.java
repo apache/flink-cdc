@@ -45,6 +45,7 @@ import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -120,6 +121,11 @@ class DwsPipelineITCase extends DwsSinkTestBase {
     public void destroyDatabaseAndTable() {
         dropTable(DwsContainer.DWS_DATABASE, DwsContainer.DWS_TABLE_NAME);
         LOG.info("Table {} destroyed.", DwsContainer.DWS_TABLE_NAME);
+    }
+
+    @Test
+    void testValuesToDwsPipeline() throws Exception {
+        runValuesToDwsJob();
     }
 
     private List<Event> generateEvents(TableId tableId) {

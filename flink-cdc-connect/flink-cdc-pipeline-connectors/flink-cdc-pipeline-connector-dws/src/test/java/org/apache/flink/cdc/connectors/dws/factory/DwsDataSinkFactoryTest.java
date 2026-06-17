@@ -34,9 +34,6 @@ import org.apache.flink.table.api.ValidationException;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 
-import com.huaweicloud.dws.client.config.DwsClientConfigs;
-import com.huaweicloud.dws.client.model.PartitionPolicy;
-import com.huaweicloud.dws.client.model.WriteMode;
 import com.huaweicloud.dws.connectors.flink.config.DwsConnectionOptions;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -141,32 +138,19 @@ class DwsDataSinkFactoryTest {
 
         Assertions.assertThat(readField(dataSink, "zoneId")).isEqualTo(ZoneId.of("UTC"));
         Assertions.assertThat(readField(dataSink, "defaultSchema")).isEqualTo("ods");
-        Assertions.assertThat(readField(dataSink, "enableAutoFlush")).isEqualTo(false);
         Assertions.assertThat(readField(dataSink, "enableDelete")).isEqualTo(false);
-        Assertions.assertThat(readField(dataSink, "writeMode")).isEqualTo(WriteMode.AUTO);
         Assertions.assertThat(readField(metadataApplier, "defaultSchema")).isEqualTo("ods");
         Assertions.assertThat(readField(metadataApplier, "enableDnPartition")).isEqualTo(true);
         Assertions.assertThat(readField(metadataApplier, "distributionKey")).isEqualTo("id");
 
         DwsConnectionOptions connectorOptions =
                 (DwsConnectionOptions) readField(dataSink, "connectorOptions");
-        Assertions.assertThat(
-                        connectorOptions.getConfig().get(DwsClientConfigs.WRITE_PARTITION_POLICY))
-                .isEqualTo(PartitionPolicy.DN);
-        Assertions.assertThat(connectorOptions.getConfig().get(DwsClientConfigs.WRITE_THREAD_SIZE))
-                .isEqualTo(8);
-        Assertions.assertThat(
-                        connectorOptions
-                                .getConfig()
-                                .get(DwsClientConfigs.WRITE_USE_COPY_BATCH_SIZE))
-                .isEqualTo(5000);
-        Assertions.assertThat(
-                        connectorOptions
-                                .getConfig()
-                                .get(DwsClientConfigs.WRITE_FORCE_FLUSH_BATCH_SIZE))
-                .isEqualTo(6000);
-        Assertions.assertThat(connectorOptions.getConfig().get(DwsClientConfigs.RETRY_MAX_TIMES))
-                .isEqualTo(9);
+        Assertions.assertThat(connectorOptions.getUrl())
+                .isEqualTo(factoryConfiguration.get(DwsDataSinkOptions.URL));
+        Assertions.assertThat(connectorOptions.getUsername())
+                .isEqualTo(factoryConfiguration.get(DwsDataSinkOptions.USERNAME));
+        Assertions.assertThat(connectorOptions.getPassword())
+                .isEqualTo(factoryConfiguration.get(DwsDataSinkOptions.PASSWORD));
     }
 
     @Test

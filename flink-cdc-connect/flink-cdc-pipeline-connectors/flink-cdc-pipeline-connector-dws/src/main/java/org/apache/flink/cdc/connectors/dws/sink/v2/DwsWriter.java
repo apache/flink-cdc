@@ -25,11 +25,14 @@ import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.common.sink.FlushEventSinkWriter;
+import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.connectors.dws.utils.DwsUtils;
@@ -43,6 +46,7 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Types;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -55,7 +59,8 @@ import java.util.stream.Collectors;
 /** A SinkV2 writer that writes records into checkpoint-scoped DWS staging tables. */
 public class DwsWriter
         implements CommittingSinkWriter<Event, DwsCommittable>,
-                StatefulSinkWriter<Event, DwsWriterState> {
+                StatefulSinkWriter<Event, DwsWriterState>,
+                FlushEventSinkWriter {
 
     private static final Logger LOG = LoggerFactory.getLogger(DwsWriter.class);
 
@@ -142,6 +147,45 @@ public class DwsWriter
     }
 
     @Override
+    public void flush(FlushEvent event) throws IOException, InterruptedException {
+        List<DwsCommittable> committables = new ArrayList<>();
+        Collection<TableId> tableIds =
+                event.getTableIds().isEmpty()
+                        ? new ArrayList<>(stagingTables.keySet())
+                        : event.getTableIds();
+        for (TableId tableId : tableIds) {
+            DwsCommittable committable = sealStagingTable(tableId);
+            if (committable != null) {
+                committables.add(committable);
+            }
+        }
+
+        if (committables.isEmpty()) {
+            return;
+        }
+
+        DwsCommitter committer =
+                new DwsCommitter(jdbcUrl, username, password, defaultSchema, caseSensitive);
+        IOException failure = null;
+        try {
+            committer.commitCommittables(committables);
+        } catch (Exception e) {
+            failure = new IOException("Failed to flush DWS staging tables for schema change.", e);
+            throw failure;
+        } finally {
+            try {
+                committer.close();
+            } catch (Exception e) {
+                if (failure != null) {
+                    failure.addSuppressed(e);
+                } else {
+                    throw new IOException("Failed to close DWS committer after schema flush.", e);
+                }
+            }
+        }
+    }
+
+    @Override
     public void close() throws Exception {
         for (StagingTable stagingTable : stagingTables.values()) {
             closeStagingTable(stagingTable);
@@ -203,13 +247,31 @@ public class DwsWriter
             statement.setLong(2, sequence++);
             for (int i = 0; i < tableInfo.schema.getColumnCount(); i++) {
                 Object fieldValue = tableInfo.fieldGetters[i].getFieldOrNull(recordData);
-                statement.setObject(i + 3, fieldValue);
+                setFieldValue(statement, i + 3, fieldValue, tableInfo.schema.getColumns().get(i));
             }
             statement.addBatch();
             stagingTable.hasPendingBatch = true;
             stagingTable.rowCount++;
         } catch (Exception e) {
             throw new IOException("Failed to write record into DWS staging table.", e);
+        }
+    }
+
+    private void setFieldValue(
+            PreparedStatement statement, int parameterIndex, Object fieldValue, Column column)
+            throws SQLException {
+        DataType dataType = column.getType();
+        switch (dataType.getTypeRoot()) {
+            case MAP:
+            case ROW:
+                if (fieldValue == null) {
+                    statement.setNull(parameterIndex, Types.OTHER);
+                } else {
+                    statement.setObject(parameterIndex, fieldValue, Types.OTHER);
+                }
+                break;
+            default:
+                statement.setObject(parameterIndex, fieldValue);
         }
     }
 

@@ -26,13 +26,9 @@ import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.connectors.dws.sink.DwsDataSink;
 
-import com.huaweicloud.dws.client.DwsConfig;
-import com.huaweicloud.dws.client.config.DwsClientConfigs;
-import com.huaweicloud.dws.client.model.PartitionPolicy;
 import com.huaweicloud.dws.client.model.WriteMode;
 import com.huaweicloud.dws.connectors.flink.config.DwsConnectionOptions;
 
-import java.time.Duration;
 import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -84,18 +80,16 @@ public class DwsDataSinkFactory implements DataSinkFactory {
 
         Configuration config = context.getFactoryConfiguration();
         ZoneId zoneId = resolveZoneId(config, context.getPipelineConfiguration());
-        Duration autoFlushMaxInterval = config.get(AUTO_FLUSH_MAX_INTERVAL);
+        // SinkV2 uses JDBC staging tables instead of the native DWS writer, but keep validation for
+        // compatibility with existing configurations.
+        parseWriteMode(config.get(WRITE_MODE));
 
         return new DwsDataSink(
                 buildConnectorOptions(config),
                 zoneId,
                 config.get(CASE_SENSITIVE),
                 config.get(SCHEMA),
-                config.get(AUTO_BATCH_FLUSH_SIZE),
-                autoFlushMaxInterval,
-                config.get(ENABLE_AUTO_FLUSH),
                 config.get(SINK_ENABLE_DELETE),
-                parseWriteMode(config.get(WRITE_MODE)),
                 config.get(ENABLE_DN_PARTITION),
                 config.getOptional(DISTRIBUTION_KEY).orElse(null));
     }
@@ -150,48 +144,12 @@ public class DwsDataSinkFactory implements DataSinkFactory {
     }
 
     private static DwsConnectionOptions buildConnectorOptions(Configuration config) {
-        DwsConfig dwsConfig =
-                DwsConfig.builder()
-                        .with(
-                                DwsClientConfigs.WRITE_PARTITION_POLICY,
-                                config.get(ENABLE_DN_PARTITION)
-                                        ? PartitionPolicy.DN
-                                        : PartitionPolicy.DYNAMIC)
-                        .with(
-                                DwsClientConfigs.WRITE_THREAD_SIZE,
-                                config.get(DWS_CLIENT_WRITE_THREAD_SIZE))
-                        .with(
-                                DwsClientConfigs.WRITE_USE_COPY_BATCH_SIZE,
-                                config.get(DWS_CLIENT_WRITE_USE_COPY_SIZE))
-                        .with(
-                                DwsClientConfigs.WRITE_FORCE_FLUSH_BATCH_SIZE,
-                                config.get(DWS_CLIENT_WRITE_FORCE_FLUSH_SIZE))
-                        .with(DwsClientConfigs.RETRY_MAX_TIMES, config.get(SINK_MAX_RETRIES))
-                        .build();
-
         DwsConnectionOptions.Builder builder =
                 DwsConnectionOptions.builder()
                         .withUrl(config.get(URL))
                         .withUsername(config.get(USERNAME))
-                        .withPassword(config.get(PASSWORD))
-                        .withDriver(config.get(DRIVER))
-                        .withLogSwitch(config.get(LOG_SWITCH))
-                        .withConnectionSize(config.get(CONNECTION_SIZE))
-                        .withConnectionMaxUseTimeSeconds(
-                                config.get(CONNECTION_MAX_USE_TIME_SECONDS))
-                        .withConnectionMaxIdleMs(config.get(CONNECTION_MAX_IDLE_MS))
-                        .withConnectionTimeOut(config.get(CONNECTION_TIME_OUT))
-                        .withConnectionPoolName(config.get(CONNECTION_POOL_NAME))
-                        .withConnectionPoolSize(config.get(CONNECTION_POOL_SIZE))
-                        .withConnectionPoolTimeout(config.get(CONNECTION_POOL_TIMEOUT))
-                        .withConnectionSocketTimeout(config.get(CONNECTION_SOCKET_TIMEOUT))
-                        .withConnectionMaxUseCount(config.get(CONNECTION_MAX_USE_COUNT))
-                        .withNeedConnectionPoolMonitor(config.get(NEED_CONNECTION_POOL_MONITOR))
-                        .withConnectionPoolMonitorPeriod(config.get(CONNECTION_POOL_MONITOR_PERIOD))
-                        .withConfig(dwsConfig);
+                        .withPassword(config.get(PASSWORD));
 
-        config.getOptional(SINK_PARALLELISM).ifPresent(builder::withParallelism);
-        config.getOptional(TABLE_NAME).ifPresent(builder::withTableName);
         return builder.build();
     }
 
