@@ -82,7 +82,7 @@ class MySqlSnapshotSplitReadTaskConnectionTest {
         MySqlSourceConfig config = createConfig(PRIMARY_HOSTNAME, null);
         BinaryLogClient binaryLogClient = mock(BinaryLogClient.class);
 
-        // When no reader hostname is configured, createReaderMySqlConnection falls back to writer
+        // When no reader hostname is configured, createSnapshotMySqlConnection falls back to writer
         MySqlConnection writerConnection = DebeziumUtils.createMySqlConnection(config);
         MySqlConnection readerConnection = DebeziumUtils.createSnapshotMySqlConnection(config);
 
