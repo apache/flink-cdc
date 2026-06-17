@@ -152,6 +152,12 @@ public class DwsMetadataApplier implements MetadataApplier, Serializable {
                 truncateTableEvent -> {
                     applyTruncateTableEvent(truncateTableEvent);
                     return null;
+                },
+                alterTableCommentEvent -> {
+                    LOG.warn(
+                            "AlterTableCommentEvent is not supported by GaussDB DWS connector yet. Event: {}",
+                            alterTableCommentEvent);
+                    return null;
                 });
     }
 
@@ -319,9 +325,6 @@ public class DwsMetadataApplier implements MetadataApplier, Serializable {
 
     private String quoteIdentifier(String identifier) {
         String normalized = normalizeIdentifier(identifier);
-        if (!caseSensitive) {
-            return normalized;
-        }
         return '"' + normalized.replace("\"", "\"\"") + '"';
     }
 

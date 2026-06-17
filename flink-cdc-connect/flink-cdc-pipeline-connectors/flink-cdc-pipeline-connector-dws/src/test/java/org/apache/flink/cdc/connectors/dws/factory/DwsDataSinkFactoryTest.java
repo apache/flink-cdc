@@ -80,6 +80,29 @@ class DwsDataSinkFactoryTest {
     }
 
     @Test
+    void testDatabaseOptionIsRejectedBecauseJdbcUrlSelectsDatabase() {
+        DataSinkFactory sinkFactory =
+                FactoryDiscoveryUtils.getFactoryByIdentifier("dws", DataSinkFactory.class);
+        Assertions.assertThat(sinkFactory).isInstanceOf(DwsDataSinkFactory.class);
+
+        Configuration conf =
+                Configuration.fromMap(
+                        ImmutableMap.<String, String>builder()
+                                .put(
+                                        DwsDataSinkOptions.URL.key(),
+                                        "jdbc:gaussdb://localhost:8000/test")
+                                .put(DwsDataSinkOptions.USERNAME.key(), "user")
+                                .put(DwsDataSinkOptions.PASSWORD.key(), "password")
+                                .put("database", "ignored_database")
+                                .build());
+
+        Assertions.assertThatThrownBy(() -> createDataSink(sinkFactory, conf, conf))
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining("Unsupported options found for 'dws'")
+                .hasMessageContaining("database");
+    }
+
+    @Test
     void testCreateDataSinkWithConfiguredOptions() throws Exception {
         DataSinkFactory sinkFactory =
                 FactoryDiscoveryUtils.getFactoryByIdentifier("dws", DataSinkFactory.class);

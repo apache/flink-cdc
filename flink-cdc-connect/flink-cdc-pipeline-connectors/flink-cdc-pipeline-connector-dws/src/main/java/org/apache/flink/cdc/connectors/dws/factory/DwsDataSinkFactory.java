@@ -52,7 +52,6 @@ import static org.apache.flink.cdc.connectors.dws.sink.DwsDataSinkOptions.CONNEC
 import static org.apache.flink.cdc.connectors.dws.sink.DwsDataSinkOptions.CONNECTION_SIZE;
 import static org.apache.flink.cdc.connectors.dws.sink.DwsDataSinkOptions.CONNECTION_SOCKET_TIMEOUT;
 import static org.apache.flink.cdc.connectors.dws.sink.DwsDataSinkOptions.CONNECTION_TIME_OUT;
-import static org.apache.flink.cdc.connectors.dws.sink.DwsDataSinkOptions.DATABASE;
 import static org.apache.flink.cdc.connectors.dws.sink.DwsDataSinkOptions.DISTRIBUTION_KEY;
 import static org.apache.flink.cdc.connectors.dws.sink.DwsDataSinkOptions.DRIVER;
 import static org.apache.flink.cdc.connectors.dws.sink.DwsDataSinkOptions.DWS_CLIENT_WRITE_FORCE_FLUSH_SIZE;
@@ -121,7 +120,6 @@ public class DwsDataSinkFactory implements DataSinkFactory {
         optionalOptions.add(AUTO_BATCH_FLUSH_SIZE);
         optionalOptions.add(AUTO_FLUSH_MAX_INTERVAL);
         optionalOptions.add(LOG_SWITCH);
-        optionalOptions.add(DATABASE);
         optionalOptions.add(TABLE_NAME);
         optionalOptions.add(DRIVER);
         optionalOptions.add(PIPELINE_LOCAL_TIME_ZONE);

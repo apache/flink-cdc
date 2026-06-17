@@ -163,6 +163,26 @@ class DwsSinkFunctionTest {
     }
 
     @Test
+    void testBuildQualifiedTableNameNormalizesCaseWhenCaseInsensitive() {
+        DwsSinkFunction sinkFunction = createSinkFunction(false, "Ods", true, null);
+
+        assertThat(
+                        sinkFunction.buildQualifiedTableName(
+                                TableId.tableId("catalog", "Sales", "Orders")))
+                .isEqualTo("sales.orders");
+    }
+
+    @Test
+    void testBuildQualifiedTableNamePreservesCaseWhenCaseSensitive() {
+        DwsSinkFunction sinkFunction = createSinkFunction(true, "Ods", true, null);
+
+        assertThat(
+                        sinkFunction.buildQualifiedTableName(
+                                TableId.tableId("catalog", "Sales", "Orders")))
+                .isEqualTo("Sales.Orders");
+    }
+
+    @Test
     void testBuildQualifiedTableNameUsesPublicSchemaWhenDefaultSchemaIsBlank() {
         DwsSinkFunction sinkFunction = createSinkFunction(false, "   ", true, null);
 
