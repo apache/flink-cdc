@@ -41,12 +41,16 @@ class MySqlSourceConfigTest {
                         null);
 
         TableId includedTable = new TableId("test_db", null, "orders_1");
+        TableId sameIncludedTable = new TableId("test_db", null, "orders_1");
         TableId unmatchedTable = new TableId("test_db", null, "customers");
+        TableId sameUnmatchedTable = new TableId("test_db", null, "customers");
 
         assertThat(cachedTableFilter.isIncluded(includedTable)).isTrue();
         assertThat(cachedTableFilter.isIncluded(includedTable)).isTrue();
+        assertThat(cachedTableFilter.isIncluded(sameIncludedTable)).isTrue();
         assertThat(cachedTableFilter.isIncluded(unmatchedTable)).isFalse();
         assertThat(cachedTableFilter.isIncluded(unmatchedTable)).isFalse();
+        assertThat(cachedTableFilter.isIncluded(sameUnmatchedTable)).isFalse();
         assertThat(filterInvocationCount).hasValue(2);
     }
 
