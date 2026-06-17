@@ -62,23 +62,29 @@ public final class DwsDataSinkOptions {
                     .noDefaultValue()
                     .withDescription(
                             Description.builder()
-                                    .text("Write mode used by the Huawei DWS client.")
+                                    .text(
+                                            "Compatibility option for the legacy Huawei DWS client write mode.")
                                     .linebreak()
                                     .text(
-                                            "Supported values include copy_merge, auto, upsert, copy_upsert, copy, update, update_auto, and copy_update.")
+                                            "SinkV2 uses JDBC staging tables for two-phase commit and validates but does not apply this native client mode.")
+                                    .linebreak()
+                                    .text(
+                                            "Supported legacy values include copy_merge, auto, upsert, copy_upsert, copy, update, update_auto, and copy_update.")
                                     .build());
 
     public static final ConfigOption<Integer> AUTO_BATCH_FLUSH_SIZE =
             ConfigOptions.key("auto-batch-flush-size")
                     .intType()
                     .defaultValue(50_000)
-                    .withDescription("Maximum buffered rows before an automatic flush.");
+                    .withDescription(
+                            "Compatibility option for the legacy native DWS client. SinkV2 staging-table writes are flushed on checkpoints and schema barriers.");
 
     public static final ConfigOption<Duration> AUTO_FLUSH_MAX_INTERVAL =
             ConfigOptions.key("auto-flush-max-interval")
                     .durationType()
                     .defaultValue(Duration.ofMinutes(3))
-                    .withDescription("Maximum interval between automatic flushes.");
+                    .withDescription(
+                            "Compatibility option for the legacy native DWS client automatic flush interval. SinkV2 staging-table writes are flushed on checkpoints and schema barriers.");
 
     public static final ConfigOption<String> TABLE_NAME =
             ConfigOptions.key("sink-table")
@@ -193,7 +199,8 @@ public final class DwsDataSinkOptions {
             ConfigOptions.key("enable-auto-flush")
                     .booleanType()
                     .defaultValue(true)
-                    .withDescription("Whether automatic flush is enabled.");
+                    .withDescription(
+                            "Compatibility option for the legacy native DWS client. SinkV2 staging-table writes are flushed on checkpoints and schema barriers.");
 
     public static final ConfigOption<Boolean> ENABLE_DN_PARTITION =
             ConfigOptions.key("enable-dn-partition")
@@ -206,21 +213,21 @@ public final class DwsDataSinkOptions {
                     .intType()
                     .defaultValue(3)
                     .withDescription(
-                            "Native DWS client write worker thread count used by the built-in execution pool.");
+                            "Compatibility option for the legacy native DWS client write worker thread count. SinkV2 staging-table writes do not use the native DWS client execution pool.");
 
     public static final ConfigOption<Integer> DWS_CLIENT_WRITE_USE_COPY_SIZE =
             ConfigOptions.key("dws.client.write.use-copy-size")
                     .intType()
                     .defaultValue(1000)
                     .withDescription(
-                            "COPY mode switch threshold used by the native DWS client when batching writes.");
+                            "Compatibility option for the legacy native DWS client COPY mode switch threshold. SinkV2 staging-table writes do not use native DWS client batching.");
 
     public static final ConfigOption<Integer> DWS_CLIENT_WRITE_FORCE_FLUSH_SIZE =
             ConfigOptions.key("dws.client.write.force-flush-size")
                     .intType()
                     .defaultValue(40000)
                     .withDescription(
-                            "Force flush threshold used by the native DWS client. This is typically larger than auto-batch-flush-size.");
+                            "Compatibility option for the legacy native DWS client force flush threshold. SinkV2 staging-table writes do not use native DWS client batching.");
 
     public static final ConfigOption<String> DISTRIBUTION_KEY =
             ConfigOptions.key("distribution-key")
@@ -232,7 +239,8 @@ public final class DwsDataSinkOptions {
             ConfigOptions.key("sink.max-retries")
                     .intType()
                     .defaultValue(3)
-                    .withDescription("Maximum number of retries used by the native DWS client.");
+                    .withDescription(
+                            "Compatibility option for the legacy native DWS client retry count. SinkV2 commit retries are controlled by Flink's committer retry flow.");
 
     public static final ConfigOption<Boolean> SINK_ENABLE_DELETE =
             ConfigOptions.key("sink.enable-delete")

@@ -83,6 +83,23 @@ public class DwsCommitter implements Committer<DwsCommittable> {
         }
     }
 
+    void commitCommittables(Collection<DwsCommittable> committables) throws IOException {
+        for (DwsCommittable committable : committables) {
+            try {
+                commitOne(committable);
+            } catch (Exception e) {
+                rollbackQuietly();
+                throw new IOException(
+                        String.format(
+                                "Failed to commit DWS staging table %s.%s for checkpoint %s.",
+                                committable.getStagingSchema(),
+                                committable.getStagingTable(),
+                                committable.getCheckpointId()),
+                        e);
+            }
+        }
+    }
+
     @Override
     public void close() throws Exception {
         if (connection != null) {

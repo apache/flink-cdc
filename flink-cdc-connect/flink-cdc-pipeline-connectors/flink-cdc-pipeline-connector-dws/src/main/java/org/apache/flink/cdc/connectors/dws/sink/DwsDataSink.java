@@ -23,11 +23,9 @@ import org.apache.flink.cdc.common.sink.FlinkSinkProvider;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.connectors.dws.sink.v2.DwsSink;
 
-import com.huaweicloud.dws.client.model.WriteMode;
 import com.huaweicloud.dws.connectors.flink.config.DwsConnectionOptions;
 
 import java.io.Serializable;
-import java.time.Duration;
 import java.time.ZoneId;
 
 /** A {@link DataSink} for the GaussDB DWS pipeline connector. */
@@ -37,11 +35,7 @@ public class DwsDataSink implements DataSink, Serializable {
     private final ZoneId zoneId;
     private final boolean caseSensitive;
     private final String defaultSchema;
-    private final int autoFlushBatchSize;
-    private final Duration autoFlushMaxInterval;
-    private final boolean enableAutoFlush;
     private final boolean enableDelete;
-    private final WriteMode writeMode;
     private final boolean enableDnPartition;
     private final String distributionKey;
 
@@ -50,22 +44,14 @@ public class DwsDataSink implements DataSink, Serializable {
             ZoneId zoneId,
             boolean caseSensitive,
             String defaultSchema,
-            int autoFlushBatchSize,
-            Duration autoFlushMaxInterval,
-            boolean enableAutoFlush,
             boolean enableDelete,
-            WriteMode writeMode,
             boolean enableDnPartition,
             String distributionKey) {
         this.connectorOptions = connectorOptions;
         this.zoneId = zoneId;
         this.caseSensitive = caseSensitive;
         this.defaultSchema = defaultSchema;
-        this.autoFlushBatchSize = autoFlushBatchSize;
-        this.autoFlushMaxInterval = autoFlushMaxInterval;
-        this.enableAutoFlush = enableAutoFlush;
         this.enableDelete = enableDelete;
-        this.writeMode = writeMode;
         this.enableDnPartition = enableDnPartition;
         this.distributionKey = distributionKey;
     }

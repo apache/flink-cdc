@@ -18,9 +18,15 @@
 package org.apache.flink.cdc.connectors.dws.sink.v2;
 
 import org.apache.flink.api.connector.sink2.Committer;
+import org.apache.flink.cdc.common.data.GenericArrayData;
+import org.apache.flink.cdc.common.data.GenericMapData;
+import org.apache.flink.cdc.common.data.GenericRecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
+import org.apache.flink.cdc.common.event.DropColumnEvent;
+import org.apache.flink.cdc.common.event.FlushEvent;
+import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataTypes;
@@ -44,7 +50,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -139,6 +147,149 @@ class DwsSinkV2ITCase extends DwsSinkTestBase {
         }
     }
 
+    @Test
+    void testFlushEventCommitsRowsBeforeDestructiveSchemaChange() throws Exception {
+        Schema originalSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT().notNull())
+                        .physicalColumn("name", DataTypes.VARCHAR(32))
+                        .physicalColumn("amount", DataTypes.INT())
+                        .primaryKey("id")
+                        .build();
+        CreateTableEvent createTableEvent = new CreateTableEvent(TABLE_ID, originalSchema);
+        applySchemaChange(createTableEvent);
+
+        DwsWriter writer = createWriter("schema-flush-job");
+        try {
+            writer.write(createTableEvent, null);
+            writer.write(createInsertEvent(originalSchema, 1, "Alice", 10), null);
+
+            writer.flush(
+                    new FlushEvent(
+                            0,
+                            Collections.singletonList(TABLE_ID),
+                            SchemaChangeEventType.DROP_COLUMN));
+
+            assertThat(fetchRows("id, name, amount")).containsExactly("1 | Alice | 10");
+
+            DropColumnEvent dropColumnEvent =
+                    new DropColumnEvent(TABLE_ID, Collections.singletonList("amount"));
+            applySchemaChange(dropColumnEvent);
+            writer.write(dropColumnEvent, null);
+
+            Schema evolvedSchema =
+                    Schema.newBuilder()
+                            .physicalColumn("id", DataTypes.INT().notNull())
+                            .physicalColumn("name", DataTypes.VARCHAR(32))
+                            .primaryKey("id")
+                            .build();
+            writer.write(createInsertEvent(evolvedSchema, 2, "Bob"), null);
+
+            Collection<DwsCommittable> committables = writer.prepareCommit();
+            assertThat(committables).hasSize(1);
+            commit(committables);
+            assertThat(fetchRows("id, name")).containsExactly("1 | Alice", "2 | Bob");
+        } finally {
+            writer.close();
+        }
+    }
+
+    @Test
+    void testFlushEventCommitIsIdempotentAfterRecoveryReplay() throws Exception {
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT().notNull())
+                        .physicalColumn("name", DataTypes.VARCHAR(32))
+                        .primaryKey("id")
+                        .build();
+        CreateTableEvent createTableEvent = new CreateTableEvent(TABLE_ID, schema);
+        applySchemaChange(createTableEvent);
+        FlushEvent flushEvent =
+                new FlushEvent(
+                        0, Collections.singletonList(TABLE_ID), SchemaChangeEventType.ADD_COLUMN);
+
+        DwsWriter firstAttempt = createWriter("replay-flush-job");
+        try {
+            firstAttempt.write(createTableEvent, null);
+            firstAttempt.write(createInsertEvent(schema, 1, "Alice"), null);
+            firstAttempt.flush(flushEvent);
+        } finally {
+            firstAttempt.close();
+        }
+
+        DwsWriter replayAttempt = createWriter("replay-flush-job");
+        try {
+            replayAttempt.write(createTableEvent, null);
+            replayAttempt.write(createInsertEvent(schema, 1, "Alice"), null);
+            replayAttempt.flush(flushEvent);
+            assertThat(fetchRows("id, name")).containsExactly("1 | Alice");
+            assertThat(replayAttempt.prepareCommit()).isEmpty();
+        } finally {
+            replayAttempt.close();
+        }
+    }
+
+    @Test
+    void testCommitComplexTypesIntoRealDwsTable() throws Exception {
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT().notNull())
+                        .physicalColumn("tags", DataTypes.ARRAY(DataTypes.STRING()))
+                        .physicalColumn(
+                                "attributes", DataTypes.MAP(DataTypes.STRING(), DataTypes.STRING()))
+                        .physicalColumn(
+                                "payload",
+                                DataTypes.ROW(
+                                        DataTypes.FIELD("name", DataTypes.STRING()),
+                                        DataTypes.FIELD("count", DataTypes.INT())))
+                        .primaryKey("id")
+                        .build();
+        CreateTableEvent createTableEvent = new CreateTableEvent(TABLE_ID, schema);
+        applySchemaChange(createTableEvent);
+
+        Map<Object, Object> attributes = new LinkedHashMap<>();
+        attributes.put(BinaryStringData.fromString("k1"), BinaryStringData.fromString("v1"));
+        attributes.put(BinaryStringData.fromString("k2"), BinaryStringData.fromString("v2"));
+
+        DwsWriter writer = createWriter("complex-types-job");
+        try {
+            writer.write(createTableEvent, null);
+            writer.write(
+                    createInsertEvent(
+                            schema,
+                            1,
+                            new GenericArrayData(
+                                    new Object[] {
+                                        BinaryStringData.fromString("alpha"),
+                                        BinaryStringData.fromString("beta")
+                                    }),
+                            new GenericMapData(attributes),
+                            GenericRecordData.of(BinaryStringData.fromString("nested"), 7)),
+                    null);
+
+            Collection<DwsCommittable> committables = writer.prepareCommit();
+            assertThat(committables).hasSize(1);
+            commit(committables);
+
+            assertThat(fetchRows("id, tags, attributes::text, payload::text"))
+                    .singleElement()
+                    .satisfies(
+                            row ->
+                                    assertThat(row)
+                                            .contains("1 | [\"alpha\",\"beta\"]")
+                                            .contains("\"k1\"")
+                                            .contains("\"v1\"")
+                                            .contains("\"k2\"")
+                                            .contains("\"v2\"")
+                                            .contains("\"name\"")
+                                            .contains("\"nested\"")
+                                            .contains("\"count\"")
+                                            .contains("7"));
+        } finally {
+            writer.close();
+        }
+    }
+
     private void applySchemaChange(CreateTableEvent createTableEvent) {
         new DwsMetadataApplier(
                         DWS_CONTAINER.getJdbcUrl(DwsContainer.DWS_DATABASE_TEST),
@@ -149,6 +300,78 @@ class DwsSinkV2ITCase extends DwsSinkTestBase {
                         false,
                         null)
                 .applySchemaChange(createTableEvent);
+    }
+
+    private void applySchemaChange(DropColumnEvent dropColumnEvent) {
+        new DwsMetadataApplier(
+                        DWS_CONTAINER.getJdbcUrl(DwsContainer.DWS_DATABASE_TEST),
+                        DWS_CONTAINER.getUsername(),
+                        DWS_CONTAINER.getPassword(),
+                        false,
+                        DwsContainer.DWS_SCHEMA,
+                        false,
+                        null)
+                .applySchemaChange(dropColumnEvent);
+    }
+
+    private DwsWriter createWriter(String jobId) {
+        return new DwsWriter(
+                DWS_CONTAINER.getJdbcUrl(DwsContainer.DWS_DATABASE_TEST),
+                DWS_CONTAINER.getUsername(),
+                DWS_CONTAINER.getPassword(),
+                ZoneId.of("UTC"),
+                false,
+                DwsContainer.DWS_SCHEMA,
+                true,
+                jobId,
+                0,
+                CheckpointIDCounter.INITIAL_CHECKPOINT_ID - 1);
+    }
+
+    private DataChangeEvent createInsertEvent(Schema schema, Object... values) {
+        return DataChangeEvent.insertEvent(
+                TABLE_ID,
+                new BinaryRecordDataGenerator((RowType) schema.toRowDataType())
+                        .generate(toInternalValues(values)));
+    }
+
+    private Object[] toInternalValues(Object[] values) {
+        Object[] converted = new Object[values.length];
+        for (int i = 0; i < values.length; i++) {
+            converted[i] =
+                    values[i] instanceof String
+                            ? BinaryStringData.fromString((String) values[i])
+                            : values[i];
+        }
+        return converted;
+    }
+
+    private void commit(Collection<DwsCommittable> committables) throws Exception {
+        DwsCommitter committer =
+                new DwsCommitter(
+                        DWS_CONTAINER.getJdbcUrl(DwsContainer.DWS_DATABASE_TEST),
+                        DWS_CONTAINER.getUsername(),
+                        DWS_CONTAINER.getPassword(),
+                        DwsContainer.DWS_SCHEMA,
+                        false);
+        try {
+            List<Committer.CommitRequest<DwsCommittable>> requests = new ArrayList<>();
+            List<TestingCommitRequest> testingRequests = new ArrayList<>();
+            for (DwsCommittable committable : committables) {
+                TestingCommitRequest request = new TestingCommitRequest(committable);
+                requests.add(request);
+                testingRequests.add(request);
+            }
+            committer.commit(requests);
+            assertThat(testingRequests)
+                    .allSatisfy(
+                            request -> {
+                                assertThat(request.alreadyCommitted).isTrue();
+                                assertThat(request.retryLater).isFalse();
+                            });
+        } finally {
+            committer.close();
+        }
     }
 
     private List<DataChangeEvent> createDataChangeEvents() {
@@ -211,6 +434,31 @@ class DwsSinkV2ITCase extends DwsSinkTestBase {
                                 + resultSet.getString(2)
                                 + " | "
                                 + resultSet.getString(3));
+            }
+        }
+        return rows;
+    }
+
+    private List<String> fetchRows(String columns) throws SQLException {
+        List<String> rows = new ArrayList<>();
+        try (Connection connection = createDatabaseConnection(DwsContainer.DWS_DATABASE_TEST);
+                Statement statement = connection.createStatement();
+                ResultSet resultSet =
+                        statement.executeQuery(
+                                "SELECT "
+                                        + columns
+                                        + " FROM "
+                                        + DwsContainer.DWS_SCHEMA
+                                        + "."
+                                        + TABLE_NAME
+                                        + " ORDER BY id")) {
+            int columnCount = resultSet.getMetaData().getColumnCount();
+            while (resultSet.next()) {
+                List<String> values = new ArrayList<>();
+                for (int i = 1; i <= columnCount; i++) {
+                    values.add(resultSet.getString(i));
+                }
+                rows.add(String.join(" | ", values));
             }
         }
         return rows;
