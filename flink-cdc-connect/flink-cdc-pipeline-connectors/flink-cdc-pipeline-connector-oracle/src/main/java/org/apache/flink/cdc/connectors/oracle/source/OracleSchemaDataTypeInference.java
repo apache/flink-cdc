@@ -20,8 +20,10 @@ package org.apache.flink.cdc.connectors.oracle.source;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
+import org.apache.flink.cdc.common.types.DecimalType;
 import org.apache.flink.cdc.debezium.event.DebeziumSchemaDataTypeInference;
 
+import io.debezium.data.VariableScaleDecimal;
 import io.debezium.data.geometry.Geometry;
 import org.apache.kafka.connect.data.Schema;
 
@@ -36,6 +38,10 @@ public class OracleSchemaDataTypeInference extends DebeziumSchemaDataTypeInferen
         // a String with Json format
         if (Geometry.LOGICAL_NAME.equals(schema.name())) {
             return DataTypes.STRING();
+        } else if (VariableScaleDecimal.LOGICAL_NAME.equals(schema.name())) {
+            // Oracle bare NUMBER uses VariableScaleDecimal encoding
+            // Return DECIMAL(MAX_PRECISION, 0) to match OracleTypeUtils
+            return DataTypes.DECIMAL(DecimalType.MAX_PRECISION, 0);
         } else {
             return super.inferStruct(value, schema);
         }
