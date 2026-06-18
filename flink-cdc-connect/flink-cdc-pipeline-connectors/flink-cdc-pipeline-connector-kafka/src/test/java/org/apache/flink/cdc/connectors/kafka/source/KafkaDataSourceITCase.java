@@ -18,8 +18,10 @@
 package org.apache.flink.cdc.connectors.kafka.source;
 
 import org.apache.flink.cdc.common.source.FlinkSourceProvider;
+import org.apache.flink.cdc.connectors.kafka.json.JsonDeserializationType;
 import org.apache.flink.cdc.connectors.kafka.json.canal.CanalJsonDeserializationSchema;
 
+import org.apache.flink.cdc.connectors.kafka.sink.KafkaUtil;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -41,6 +43,7 @@ import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
+import static org.apache.flink.util.DockerImageVersions.KAFKA;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Integration tests for {@link KafkaDataSource} reading Canal JSON from Kafka. */
@@ -52,7 +55,8 @@ class KafkaDataSourceITCase {
     private static final Network NETWORK = Network.newNetwork();
 
     public static final KafkaContainer KAFKA_CONTAINER =
-            new KafkaContainer("confluentinc/cp-kafka:7.4.0")
+            KafkaUtil.createKafkaContainer(KAFKA, LOG)
+                    .withEmbeddedZookeeper()
                     .withNetwork(NETWORK)
                     .withNetworkAliases(INTER_CONTAINER_KAFKA_ALIAS);
 
@@ -135,8 +139,8 @@ class KafkaDataSourceITCase {
                 KafkaDataSourceOptions.PROPERTIES_PREFIX + "bootstrap.servers",
                 KAFKA_CONTAINER.getBootstrapServers());
         config.put(KafkaDataSourceOptions.PROPERTIES_PREFIX + "group.id", groupId);
-        config.put(KafkaDataSourceOptions.VALUE_FORMAT.key(), "canal-json");
-        config.put(KafkaDataSourceOptions.SCAN_STARTUP_MODE.key(), "earliest-offset");
+        config.put(KafkaDataSourceOptions.VALUE_FORMAT.key(), JsonDeserializationType.CANAL_JSON.getValue());
+        config.put(KafkaDataSourceOptions.SCAN_STARTUP_MODE.key(), "EARLIEST_OFFSET");
 
         KafkaDataSourceFactory factory = new KafkaDataSourceFactory();
         KafkaDataSource dataSource =
