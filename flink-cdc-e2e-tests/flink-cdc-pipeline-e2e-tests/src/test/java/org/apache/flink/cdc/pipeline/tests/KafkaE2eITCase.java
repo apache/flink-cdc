@@ -21,6 +21,7 @@ import org.apache.flink.cdc.common.test.utils.TestUtils;
 import org.apache.flink.cdc.connectors.kafka.sink.KafkaUtil;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
 
+import org.apache.kafka.clients.CommonClientConfigs;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.CreateTopicsResult;
 import org.apache.kafka.clients.admin.NewTopic;
@@ -72,7 +73,9 @@ class KafkaE2eITCase extends PipelineTestEnvironment {
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(KAFKA_CONTAINER)).join();
         Map<String, Object> properties = new HashMap<>();
-        properties.put("bootstrap.servers", KAFKA_CONTAINER.getBootstrapServers());
+        properties.put(
+                CommonClientConfigs.BOOTSTRAP_SERVERS_CONFIG,
+                KAFKA_CONTAINER.getBootstrapServers());
         admin = AdminClient.create(properties);
         LOG.info("Containers are started.");
     }
@@ -92,22 +95,7 @@ class KafkaE2eITCase extends PipelineTestEnvironment {
     @Test
     void testSyncCanalJsonFromKafka() throws Exception {
         String groupId = "kafka-source-test-" + UUID.randomUUID();
-        String pipelineJob =
-                String.format(
-                        "source:\n"
-                                + "  type: kafka\n"
-                                + "  topic: %s\n"
-                                + "  properties.bootstrap.servers: kafka:9092\n"
-                                + "  properties.group.id: %s\n"
-                                + "  value.format: canal-json\n"
-                                + "\n"
-                                + "sink:\n"
-                                + "  type: values\n"
-                                + "\n"
-                                + "pipeline:\n"
-                                + "  parallelism: %d\n"
-                                + "  schema.change.behavior: lenient",
-                        topic, groupId, parallelism);
+        String pipelineJob = buildPipeline(topic, groupId);
         Path kafkaCdcJar = TestUtils.getResource("kafka-cdc-pipeline-connector.jar");
         submitPipelineJob(pipelineJob, kafkaCdcJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
@@ -144,22 +132,7 @@ class KafkaE2eITCase extends PipelineTestEnvironment {
     @Test
     void testSyncCanalDdlFromKafka() throws Exception {
         String groupId = "kafka-ddl-test-" + UUID.randomUUID();
-        String pipelineJob =
-                String.format(
-                        "source:\n"
-                                + "  type: kafka\n"
-                                + "  topic: %s\n"
-                                + "  properties.bootstrap.servers: kafka:9092\n"
-                                + "  properties.group.id: %s\n"
-                                + "  value.format: canal-json\n"
-                                + "\n"
-                                + "sink:\n"
-                                + "  type: values\n"
-                                + "\n"
-                                + "pipeline:\n"
-                                + "  parallelism: %d\n"
-                                + "  schema.change.behavior: lenient",
-                        topic, groupId, parallelism);
+        String pipelineJob = buildPipeline(topic, groupId);
         Path kafkaCdcJar = TestUtils.getResource("kafka-cdc-pipeline-connector.jar");
         submitPipelineJob(pipelineJob, kafkaCdcJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
@@ -169,16 +142,35 @@ class KafkaE2eITCase extends PipelineTestEnvironment {
 
         // Verify the CreateTableEvent from DDL message
         waitUntilSpecificEvent(
-                "CreateTableEvent{tableId=flink-test.users, schema=columns={`id` INT,`name` VARCHAR(100),`age` INT}, primaryKeys=id, options=()}");
+                "CreateTableEvent{tableId=flink-test.users, "
+                        + "schema=columns={`id` INT,`name` VARCHAR(100),`age` INT}, "
+                        + "primaryKeys=id, options=()}");
 
-        // Verify the AddColumnEvent from ALTER TABLE ADD COLUMN
+        // Verify the AddColumnEvent from ALTER TABLE ADD COLUMN.
+        // Note: Under LENIENT mode, DropColumnEvent would be filtered (or converted to
+        // AlterColumnTypeEvent when the column is NOT NULL), so we don't verify it here.
         waitUntilSpecificEvent(
-                "AddColumnEvent{tableId=flink-test.users, "
-                        + "addedColumns=[ColumnWithPosition{column=`email` VARCHAR(255), position=LAST, existedColumnName=null}]}");
+                "AddColumnEvent{tableId=flink-test.users, addedColumns="
+                        + "[ColumnWithPosition{column=`email` VARCHAR(255), "
+                        + "position=LAST, existedColumnName=null}]}");
+    }
 
-        // Verify the DropColumnEvent from ALTER TABLE DROP COLUMN
-        waitUntilSpecificEvent(
-                "DropColumnEvent{tableId=flink-test.users, droppedColumns=[Column{`age`, type=INT}]}");
+    private String buildPipeline(String topic, String groupId) {
+        return String.format(
+                "source:\n"
+                        + "  type: kafka\n"
+                        + "  topic: %s\n"
+                        + "  properties.bootstrap.servers: kafka:9092\n"
+                        + "  properties.group.id: %s\n"
+                        + "  value.format: canal-json\n"
+                        + "\n"
+                        + "sink:\n"
+                        + "  type: values\n"
+                        + "\n"
+                        + "pipeline:\n"
+                        + "  parallelism: %d\n"
+                        + "  schema.change.behavior: lenient",
+                topic, groupId, parallelism);
     }
 
     /** Produce DML messages (INSERT / UPDATE / DELETE) with primary key. */
@@ -222,14 +214,16 @@ class KafkaE2eITCase extends PipelineTestEnvironment {
             // CREATE TABLE with primary key
             String createTableDdl =
                     "{\"isDdl\":true,"
-                            + "\"sql\":\"CREATE TABLE users (id INT PRIMARY KEY, name VARCHAR(100), age INT)\","
+                            + "\"sql\":\"CREATE TABLE users (id INT PRIMARY KEY, name VARCHAR(100) NOT NULL, age INT)\","
+                            + "\"type\":\"CREATE\","
                             + "\"database\":\"flink-test\",\"table\":\"users\"}";
             producer.send(record(createTableDdl)).get();
 
             // ALTER TABLE ADD COLUMN
             String addColumnDdl =
                     "{\"isDdl\":true,"
-                            + "\"sql\":\"ALTER TABLE users ADD COLUMN email VARCHAR(255)\","
+                            + "\"sql\":\"ALTER TABLE users ADD COLUMN email VARCHAR(255) AFTER age\","
+                            + "\"type\":\"ALTER\","
                             + "\"database\":\"flink-test\",\"table\":\"users\"}";
             producer.send(record(addColumnDdl)).get();
 
@@ -237,6 +231,7 @@ class KafkaE2eITCase extends PipelineTestEnvironment {
             String dropColumnDdl =
                     "{\"isDdl\":true,"
                             + "\"sql\":\"ALTER TABLE users DROP COLUMN age\","
+                            + "\"type\":\"ALTER\","
                             + "\"database\":\"flink-test\",\"table\":\"users\"}";
             producer.send(record(dropColumnDdl)).get();
         }
