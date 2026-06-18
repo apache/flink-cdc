@@ -23,6 +23,8 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.connectors.base.source.meta.offset.OffsetFactory;
+import org.apache.flink.cdc.connectors.base.source.meta.split.SnapshotSplit;
+import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitState;
 import org.apache.flink.cdc.connectors.base.source.metrics.SourceReaderMetrics;
 import org.apache.flink.cdc.connectors.base.source.reader.IncrementalSourceRecordEmitter;
@@ -39,6 +41,7 @@ import io.debezium.relational.history.TableChanges.TableChange;
 import org.apache.kafka.connect.source.SourceRecord;
 
 import java.sql.SQLException;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -83,7 +86,6 @@ public class SqlServerPipelineRecordEmitter<T> extends IncrementalSourceRecordEm
                 ((DebeziumEventDeserializationSchema) debeziumDeserializationSchema)
                         .getCreateTableEventCache();
         this.isBounded = StartupOptions.snapshot().equals(sourceConfig.getStartupOptions());
-        generateCreateTableEvents();
     }
 
     @Override
@@ -91,8 +93,7 @@ public class SqlServerPipelineRecordEmitter<T> extends IncrementalSourceRecordEm
             SourceRecord element, SourceOutput<T> output, SourceSplitState splitState)
             throws Exception {
         if (isSchemaChangeEvent(element) && splitState.isStreamSplitState()) {
-            restoreCreateTableEventsFromSplitSchemas(
-                    splitState.asStreamSplitState().getTableSchemas());
+            cacheCreateTableEventsFromSchemas(splitState.asStreamSplitState().getTableSchemas());
         }
 
         if (shouldEmitAllCreateTableEventsInSnapshotMode && isBounded) {
@@ -104,13 +105,23 @@ public class SqlServerPipelineRecordEmitter<T> extends IncrementalSourceRecordEm
             // to downstream to avoid checkpoint timeout.
             io.debezium.relational.TableId tableId =
                     splitState.asSnapshotSplitState().toSourceSplit().getTableId();
-            emitCreateTableEventIfNeeded(tableId, output);
+            emitCreateTableEventIfNeeded(tableId, output, splitState);
         } else if (isDataChangeRecord(element)) {
             // Handle data change events, schema change events are handled downstream directly
             io.debezium.relational.TableId tableId = getTableId(element);
-            emitCreateTableEventIfNeeded(tableId, output);
+            emitCreateTableEventIfNeeded(tableId, output, splitState);
         }
         super.processElement(element, output, splitState);
+    }
+
+    @Override
+    public void applySplit(SourceSplitBase split) {
+        if (isBounded && createTableEventCache.isEmpty() && split instanceof SnapshotSplit) {
+            // TableSchemas in SnapshotSplit only contains one table.
+            createTableEventCache.putAll(generateCreateTableEvents());
+        } else {
+            cacheCreateTableEventsFromSchemas(split.getTableSchemas());
+        }
     }
 
     @SuppressWarnings("unchecked")
@@ -124,33 +135,28 @@ public class SqlServerPipelineRecordEmitter<T> extends IncrementalSourceRecordEm
 
     @SuppressWarnings("unchecked")
     private void emitCreateTableEventIfNeeded(
-            io.debezium.relational.TableId tableId, SourceOutput<T> output) {
+            io.debezium.relational.TableId tableId,
+            SourceOutput<T> output,
+            SourceSplitState splitState) {
         if (alreadySendCreateTableTables.contains(tableId)) {
             return;
         }
 
+        cacheCreateTableEventsFromSchemas(splitState.toSourceSplit().getTableSchemas());
         CreateTableEvent createTableEvent = createTableEventCache.get(tableId);
-        if (createTableEvent != null) {
-            output.collect((T) createTableEvent);
-        } else {
-            // Table not in cache, fetch schema from database
-            try (SqlServerConnection jdbc =
-                    createSqlServerConnection(sourceConfig.getDbzConnectorConfig())) {
-                createTableEvent = buildCreateTableEvent(jdbc, tableId);
-                output.collect((T) createTableEvent);
-                createTableEventCache.put(tableId, createTableEvent);
-            } catch (SQLException e) {
-                throw new RuntimeException("Failed to get table schema for " + tableId, e);
-            }
+        if (createTableEvent == null) {
+            throw new IllegalStateException(
+                    "Missing CreateTableEvent for table "
+                            + tableId
+                            + ". Table schema should have been restored before processing records.");
         }
+        output.collect((T) createTableEvent);
         alreadySendCreateTableTables.add(tableId);
     }
 
-    private void restoreCreateTableEventsFromSplitSchemas(
+    private void cacheCreateTableEventsFromSchemas(
             Map<io.debezium.relational.TableId, TableChange> tableSchemas) {
-        if (!sourceConfig.isIncludeSchemaChanges()
-                || tableSchemas == null
-                || tableSchemas.isEmpty()) {
+        if (tableSchemas == null || tableSchemas.isEmpty()) {
             return;
         }
         for (Map.Entry<io.debezium.relational.TableId, TableChange> entry :
@@ -160,7 +166,7 @@ public class SqlServerPipelineRecordEmitter<T> extends IncrementalSourceRecordEm
             if (tableId == null || tableChange == null || tableChange.getTable() == null) {
                 continue;
             }
-            createTableEventCache.putIfAbsent(
+            createTableEventCache.put(
                     tableId,
                     buildCreateTableEvent(
                             tableId, SqlServerSchemaUtils.toSchema(tableChange.getTable())));
@@ -179,16 +185,19 @@ public class SqlServerPipelineRecordEmitter<T> extends IncrementalSourceRecordEm
                 TableId.tableId(tableId.catalog(), tableId.schema(), tableId.table()), schema);
     }
 
-    private void generateCreateTableEvents() {
+    private Map<io.debezium.relational.TableId, CreateTableEvent> generateCreateTableEvents() {
         try (SqlServerConnection jdbc =
                 createSqlServerConnection(sourceConfig.getDbzConnectorConfig())) {
+            Map<io.debezium.relational.TableId, CreateTableEvent> createTableEvents =
+                    new HashMap<>();
             List<io.debezium.relational.TableId> capturedTableIds =
                     SqlServerConnectionUtils.listTables(
                             jdbc, sourceConfig.getTableFilters(), sourceConfig.getDatabaseList());
             for (io.debezium.relational.TableId tableId : capturedTableIds) {
                 CreateTableEvent createTableEvent = buildCreateTableEvent(jdbc, tableId);
-                createTableEventCache.put(tableId, createTableEvent);
+                createTableEvents.put(tableId, createTableEvent);
             }
+            return createTableEvents;
         } catch (SQLException e) {
             throw new RuntimeException("Cannot start emitter to fetch table schema.", e);
         }
