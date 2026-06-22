@@ -29,7 +29,7 @@ limitations under the License.
     <name>flink-cdc-pipeline-connector-dws</name>
 
     <properties>
-        <gauss.jdbc.connector.version>2.0.0.r4</gauss.jdbc.connector.version>
+        <gauss.jdbc.connector.version>2.0.0.6</gauss.jdbc.connector.version>
         <dropwizard.metrics.version>4.2.19</dropwizard.metrics.version>
     </properties>
 
