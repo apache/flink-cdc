@@ -223,6 +223,13 @@ pipeline:
           cause the sink failure. </td>
     </tr>
     <tr>
+      <td>unicode-char.max-bytes</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">3</td>
+      <td>Integer</td>
+      <td>The maximum number of bytes allocated for each upstream character when mapping CHAR and VARCHAR types to StarRocks, whose length is measured in bytes. If the upstream source uses utf8mb4, set this option to 4 to avoid underestimating column lengths.</td>
+    </tr>
+    <tr>
       <td>sink.socket.timeout-ms</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">-1</td>

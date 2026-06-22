@@ -195,6 +195,39 @@ class StarRocksUtilsTest {
     }
 
     @Test
+    void testToStarRocksTableWithUnicodeCharMaxBytes() {
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.BIGINT().notNull())
+                        .physicalColumn("name", DataTypes.VARCHAR(17))
+                        .physicalColumn("code", DataTypes.CHAR(17))
+                        .primaryKey("id")
+                        .build();
+
+        TableId tableId = TableId.tableId("db", "table");
+        // unicode-char.max-bytes = 4 to fit utf8mb4 characters
+        TableCreateConfig config = new TableCreateConfig(null, Collections.emptyMap(), 4);
+
+        StarRocksTable table = StarRocksUtils.toStarRocksTable(tableId, schema, config);
+
+        StarRocksColumn nameColumn =
+                table.getColumns().stream()
+                        .filter(c -> c.getColumnName().equals("name"))
+                        .findFirst()
+                        .get();
+        assertThat(nameColumn.getDataType()).isEqualTo(StarRocksUtils.VARCHAR);
+        assertThat(nameColumn.getColumnSize()).hasValue(68);
+
+        StarRocksColumn codeColumn =
+                table.getColumns().stream()
+                        .filter(c -> c.getColumnName().equals("code"))
+                        .findFirst()
+                        .get();
+        assertThat(codeColumn.getDataType()).isEqualTo(StarRocksUtils.CHAR);
+        assertThat(codeColumn.getColumnSize()).hasValue(68);
+    }
+
+    @Test
     void testToStarRocksTableWithComment() {
         Schema schema =
                 Schema.newBuilder()

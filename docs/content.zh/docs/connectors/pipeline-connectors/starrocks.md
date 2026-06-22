@@ -216,6 +216,13 @@ pipeline:
       <td>StarRocks 侧执行 schema change 的超时时间，必须是秒的整数倍。超时后 StarRocks 将会取消 schema change，从而导致作业失败。</td>
     </tr>
     <tr>
+      <td>unicode-char.max-bytes</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">3</td>
+      <td>Integer</td>
+      <td>将上游 CHAR 和 VARCHAR 类型映射到 StarRocks 时，为每个字符分配的最大字节数。由于 StarRocks 的长度以字节为单位，如果上游使用 utf8mb4，建议将该选项设置为 4，以避免低估目标列长度。</td>
+    </tr>
+    <tr>
       <td>sink.socket.timeout-ms</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">-1</td>

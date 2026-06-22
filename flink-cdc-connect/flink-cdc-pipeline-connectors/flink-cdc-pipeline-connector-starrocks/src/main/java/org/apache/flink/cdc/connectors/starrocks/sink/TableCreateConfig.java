@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.starrocks.sink;
 
 import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.cdc.common.utils.Preconditions;
 
 import javax.annotation.Nullable;
 
@@ -44,9 +45,25 @@ public class TableCreateConfig implements Serializable {
     /** Properties for the table. */
     private final Map<String, String> properties;
 
+    /** Max bytes allocated for each upstream Unicode character during schema mapping. */
+    private final int unicodeCharMaxBytes;
+
     public TableCreateConfig(@Nullable Integer numBuckets, Map<String, String> properties) {
+        this(
+                numBuckets,
+                properties,
+                StarRocksDataSinkOptions.UNICODE_CHAR_MAX_BYTES.defaultValue());
+    }
+
+    public TableCreateConfig(
+            @Nullable Integer numBuckets, Map<String, String> properties, int unicodeCharMaxBytes) {
+        Preconditions.checkArgument(
+                unicodeCharMaxBytes > 0,
+                "unicode-char.max-bytes must be positive, but actually is %s",
+                unicodeCharMaxBytes);
         this.numBuckets = numBuckets;
         this.properties = new HashMap<>(properties);
+        this.unicodeCharMaxBytes = unicodeCharMaxBytes;
     }
 
     public Optional<Integer> getNumBuckets() {
@@ -55,6 +72,10 @@ public class TableCreateConfig implements Serializable {
 
     public Map<String, String> getProperties() {
         return Collections.unmodifiableMap(properties);
+    }
+
+    public int getUnicodeCharMaxBytes() {
+        return unicodeCharMaxBytes;
     }
 
     public static TableCreateConfig from(Configuration config) {
@@ -77,6 +98,9 @@ public class TableCreateConfig implements Serializable {
                                                                         .length())
                                                         .toLowerCase(),
                                         Map.Entry::getValue));
-        return new TableCreateConfig(numBuckets, tableProperties);
+        return new TableCreateConfig(
+                numBuckets,
+                tableProperties,
+                config.get(StarRocksDataSinkOptions.UNICODE_CHAR_MAX_BYTES));
     }
 }
