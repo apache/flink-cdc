@@ -51,9 +51,11 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /** SinkFunction wrapper around the Huawei DWS sink implementation. */
 public class DwsSinkFunction extends RichSinkFunction<Event>
@@ -245,6 +247,9 @@ public class DwsSinkFunction extends RichSinkFunction<Event>
                 writeRecord(event.after(), event, client.write(tableName), DwsConstants.INSERT);
                 break;
             case UPDATE:
+                if (isPrimaryKeyChanged(event, getRequiredTableInfo(event.tableId()))) {
+                    writeRecord(event.before(), event, client.delete(tableName), "DELETE");
+                }
                 writeRecord(event.after(), event, client.write(tableName), DwsConstants.UPSERT);
                 break;
             case DELETE:
@@ -283,12 +288,7 @@ public class DwsSinkFunction extends RichSinkFunction<Event>
     private void setRecordDataToOperate(
             Operate operate, RecordData recordData, DataChangeEvent event)
             throws DwsClientException {
-        TableInfo tableInfo = tableInfoCache.get(event.tableId());
-        if (tableInfo == null) {
-            throw new DwsClientException(
-                    ExceptionCode.TABLE_NOT_FOUND,
-                    "Table schema cache is missing for " + event.tableId());
-        }
+        TableInfo tableInfo = getRequiredTableInfo(event.tableId());
 
         List<Column> columns = tableInfo.schema.getColumns();
         Preconditions.checkArgument(columns.size() == recordData.getArity());
@@ -296,6 +296,34 @@ public class DwsSinkFunction extends RichSinkFunction<Event>
             Object fieldValue = tableInfo.fieldGetters[i].getFieldOrNull(recordData);
             operate.setObject(columns.get(i).getName(), fieldValue);
         }
+    }
+
+    private TableInfo getRequiredTableInfo(TableId tableId) throws DwsClientException {
+        TableInfo tableInfo = tableInfoCache.get(tableId);
+        if (tableInfo == null) {
+            throw new DwsClientException(
+                    ExceptionCode.TABLE_NOT_FOUND, "Table schema cache is missing for " + tableId);
+        }
+        return tableInfo;
+    }
+
+    private boolean isPrimaryKeyChanged(DataChangeEvent event, TableInfo tableInfo) {
+        if (event.before() == null || event.after() == null) {
+            return false;
+        }
+        Preconditions.checkArgument(tableInfo.schema.getColumnCount() == event.before().getArity());
+        Preconditions.checkArgument(tableInfo.schema.getColumnCount() == event.after().getArity());
+
+        for (int primaryKeyIndex : tableInfo.primaryKeyIndexes) {
+            Object beforeValue =
+                    tableInfo.fieldGetters[primaryKeyIndex].getFieldOrNull(event.before());
+            Object afterValue =
+                    tableInfo.fieldGetters[primaryKeyIndex].getFieldOrNull(event.after());
+            if (!Objects.equals(beforeValue, afterValue)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void handleSchemaChangeEvent(SchemaChangeEvent event) {
@@ -311,13 +339,35 @@ public class DwsSinkFunction extends RichSinkFunction<Event>
             newSchema = SchemaUtils.applySchemaChangeEvent(currentTableInfo.schema, event);
         }
 
-        RecordData.FieldGetter[] fieldGetters =
-                new RecordData.FieldGetter[newSchema.getColumnCount()];
-        for (int i = 0; i < newSchema.getColumnCount(); i++) {
+        tableInfoCache.put(tableId, createTableInfo(newSchema));
+    }
+
+    private TableInfo createTableInfo(Schema schema) {
+        RecordData.FieldGetter[] fieldGetters = new RecordData.FieldGetter[schema.getColumnCount()];
+        for (int i = 0; i < schema.getColumnCount(); i++) {
             fieldGetters[i] =
-                    DwsUtils.createFieldGetter(newSchema.getColumns().get(i).getType(), i, zoneId);
+                    DwsUtils.createFieldGetter(schema.getColumns().get(i).getType(), i, zoneId);
         }
-        tableInfoCache.put(tableId, new TableInfo(newSchema, fieldGetters));
+        return new TableInfo(schema, fieldGetters, createPrimaryKeyIndexes(schema));
+    }
+
+    private List<Integer> createPrimaryKeyIndexes(Schema schema) {
+        List<Integer> primaryKeyIndexes = new ArrayList<>();
+        for (String primaryKey : schema.primaryKeys()) {
+            int primaryKeyIndex = -1;
+            for (int i = 0; i < schema.getColumnCount(); i++) {
+                if (schema.getColumns().get(i).getName().equals(primaryKey)) {
+                    primaryKeyIndex = i;
+                    break;
+                }
+            }
+            Preconditions.checkArgument(
+                    primaryKeyIndex >= 0,
+                    "Primary key %s is missing in DWS table schema.",
+                    primaryKey);
+            primaryKeyIndexes.add(primaryKeyIndex);
+        }
+        return primaryKeyIndexes;
     }
 
     String buildQualifiedTableName(TableId tableId) {
@@ -387,10 +437,15 @@ public class DwsSinkFunction extends RichSinkFunction<Event>
     private static final class TableInfo {
         private final Schema schema;
         private final RecordData.FieldGetter[] fieldGetters;
+        private final List<Integer> primaryKeyIndexes;
 
-        private TableInfo(Schema schema, RecordData.FieldGetter[] fieldGetters) {
+        private TableInfo(
+                Schema schema,
+                RecordData.FieldGetter[] fieldGetters,
+                List<Integer> primaryKeyIndexes) {
             this.schema = schema;
             this.fieldGetters = fieldGetters;
+            this.primaryKeyIndexes = primaryKeyIndexes;
         }
     }
 }

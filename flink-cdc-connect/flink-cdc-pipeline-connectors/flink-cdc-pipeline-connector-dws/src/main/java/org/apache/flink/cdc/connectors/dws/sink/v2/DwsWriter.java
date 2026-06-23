@@ -54,6 +54,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /** A SinkV2 writer that writes records into checkpoint-scoped DWS staging tables. */
@@ -203,14 +204,22 @@ public class DwsWriter
     }
 
     private void processDataChangeEvent(DataChangeEvent event) throws IOException {
-        RecordData recordData;
-        String operation;
         switch (event.op()) {
             case INSERT:
-            case UPDATE:
             case REPLACE:
-                recordData = event.after();
-                operation = DwsSqlUtils.UPSERT_OPERATION;
+                appendStagingRecord(
+                        event.after(),
+                        event,
+                        getRequiredTableInfo(event.tableId()),
+                        DwsSqlUtils.UPSERT_OPERATION);
+                break;
+            case UPDATE:
+                TableInfo tableInfo = getRequiredTableInfo(event.tableId());
+                if (isPrimaryKeyChanged(event, tableInfo)) {
+                    appendStagingRecord(
+                            event.before(), event, tableInfo, DwsSqlUtils.DELETE_OPERATION);
+                }
+                appendStagingRecord(event.after(), event, tableInfo, DwsSqlUtils.UPSERT_OPERATION);
                 break;
             case DELETE:
                 if (!enableDelete) {
@@ -218,14 +227,20 @@ public class DwsWriter
                             "Skip DELETE for {} because sink.enable-delete=false", event.tableId());
                     return;
                 }
-                recordData = event.before();
-                operation = DwsSqlUtils.DELETE_OPERATION;
+                appendStagingRecord(
+                        event.before(),
+                        event,
+                        getRequiredTableInfo(event.tableId()),
+                        DwsSqlUtils.DELETE_OPERATION);
                 break;
             default:
                 LOG.warn("Unsupported operation {} for {}", event.op(), event.tableId());
-                return;
         }
+    }
 
+    private void appendStagingRecord(
+            RecordData recordData, DataChangeEvent event, TableInfo tableInfo, String operation)
+            throws IOException {
         if (recordData == null) {
             LOG.warn(
                     "Skip {} for {} because the record payload is null.",
@@ -234,10 +249,6 @@ public class DwsWriter
             return;
         }
 
-        TableInfo tableInfo = tableInfoCache.get(event.tableId());
-        if (tableInfo == null) {
-            throw new IOException("Table schema cache is missing for " + event.tableId());
-        }
         Preconditions.checkArgument(tableInfo.schema.getColumnCount() == recordData.getArity());
 
         StagingTable stagingTable = getOrCreateStagingTable(event.tableId(), tableInfo);
@@ -255,6 +266,52 @@ public class DwsWriter
         } catch (Exception e) {
             throw new IOException("Failed to write record into DWS staging table.", e);
         }
+    }
+
+    private TableInfo getRequiredTableInfo(TableId tableId) throws IOException {
+        TableInfo tableInfo = tableInfoCache.get(tableId);
+        if (tableInfo == null) {
+            throw new IOException("Table schema cache is missing for " + tableId);
+        }
+        return tableInfo;
+    }
+
+    private boolean isPrimaryKeyChanged(DataChangeEvent event, TableInfo tableInfo) {
+        if (event.before() == null || event.after() == null) {
+            return false;
+        }
+        Preconditions.checkArgument(tableInfo.schema.getColumnCount() == event.before().getArity());
+        Preconditions.checkArgument(tableInfo.schema.getColumnCount() == event.after().getArity());
+
+        for (int primaryKeyIndex : tableInfo.primaryKeyIndexes) {
+            Object beforeValue =
+                    tableInfo.fieldGetters[primaryKeyIndex].getFieldOrNull(event.before());
+            Object afterValue =
+                    tableInfo.fieldGetters[primaryKeyIndex].getFieldOrNull(event.after());
+            if (!Objects.equals(beforeValue, afterValue)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private List<Integer> createPrimaryKeyIndexes(Schema schema) {
+        List<Integer> primaryKeyIndexes = new ArrayList<>();
+        for (String primaryKey : schema.primaryKeys()) {
+            int primaryKeyIndex = -1;
+            for (int i = 0; i < schema.getColumnCount(); i++) {
+                if (schema.getColumns().get(i).getName().equals(primaryKey)) {
+                    primaryKeyIndex = i;
+                    break;
+                }
+            }
+            Preconditions.checkArgument(
+                    primaryKeyIndex >= 0,
+                    "Primary key %s is missing in DWS table schema.",
+                    primaryKey);
+            primaryKeyIndexes.add(primaryKeyIndex);
+        }
+        return primaryKeyIndexes;
     }
 
     private void setFieldValue(
@@ -434,17 +491,22 @@ public class DwsWriter
             fieldGetters[i] =
                     DwsUtils.createFieldGetter(schema.getColumns().get(i).getType(), i, zoneId);
         }
-        return new TableInfo(schema, fieldGetters);
+        return new TableInfo(schema, fieldGetters, createPrimaryKeyIndexes(schema));
     }
 
     private static class TableInfo {
 
         private final Schema schema;
         private final RecordData.FieldGetter[] fieldGetters;
+        private final List<Integer> primaryKeyIndexes;
 
-        private TableInfo(Schema schema, RecordData.FieldGetter[] fieldGetters) {
+        private TableInfo(
+                Schema schema,
+                RecordData.FieldGetter[] fieldGetters,
+                List<Integer> primaryKeyIndexes) {
             this.schema = schema;
             this.fieldGetters = fieldGetters;
+            this.primaryKeyIndexes = primaryKeyIndexes;
         }
     }
 

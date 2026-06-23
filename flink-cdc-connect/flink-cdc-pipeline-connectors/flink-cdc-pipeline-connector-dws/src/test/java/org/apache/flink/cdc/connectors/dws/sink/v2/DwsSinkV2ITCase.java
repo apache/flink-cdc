@@ -290,6 +290,39 @@ class DwsSinkV2ITCase extends DwsSinkTestBase {
         }
     }
 
+    @Test
+    void testUpdateChangingCompositePrimaryKeyDeletesOldKey() throws Exception {
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT().notNull())
+                        .physicalColumn("shard", DataTypes.INT().notNull())
+                        .physicalColumn("name", DataTypes.VARCHAR(32))
+                        .primaryKey("id", "shard")
+                        .build();
+        CreateTableEvent createTableEvent = new CreateTableEvent(TABLE_ID, schema);
+        applySchemaChange(createTableEvent);
+
+        DwsWriter writer = createWriter("composite-pk-update-job");
+        try {
+            writer.write(createTableEvent, null);
+            writer.write(createInsertEvent(schema, 1, 1, "Alice"), null);
+            writer.write(
+                    DataChangeEvent.updateEvent(
+                            TABLE_ID,
+                            createRecord(schema, 1, 1, "Alice"),
+                            createRecord(schema, 1, 2, "Alice-moved")),
+                    null);
+
+            Collection<DwsCommittable> committables = writer.prepareCommit();
+            assertThat(committables).hasSize(1);
+            commit(committables);
+
+            assertThat(fetchRows("id, shard, name")).containsExactly("1 | 2 | Alice-moved");
+        } finally {
+            writer.close();
+        }
+    }
+
     private void applySchemaChange(CreateTableEvent createTableEvent) {
         new DwsMetadataApplier(
                         DWS_CONTAINER.getJdbcUrl(DwsContainer.DWS_DATABASE_TEST),
@@ -329,10 +362,13 @@ class DwsSinkV2ITCase extends DwsSinkTestBase {
     }
 
     private DataChangeEvent createInsertEvent(Schema schema, Object... values) {
-        return DataChangeEvent.insertEvent(
-                TABLE_ID,
-                new BinaryRecordDataGenerator((RowType) schema.toRowDataType())
-                        .generate(toInternalValues(values)));
+        return DataChangeEvent.insertEvent(TABLE_ID, createRecord(schema, values));
+    }
+
+    private org.apache.flink.cdc.common.data.RecordData createRecord(
+            Schema schema, Object... values) {
+        return new BinaryRecordDataGenerator((RowType) schema.toRowDataType())
+                .generate(toInternalValues(values));
     }
 
     private Object[] toInternalValues(Object[] values) {
