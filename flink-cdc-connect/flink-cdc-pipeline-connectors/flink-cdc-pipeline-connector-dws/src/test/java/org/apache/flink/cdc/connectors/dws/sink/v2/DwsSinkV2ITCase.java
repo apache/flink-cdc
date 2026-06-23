@@ -291,6 +291,75 @@ class DwsSinkV2ITCase extends DwsSinkTestBase {
     }
 
     @Test
+    void testCommitSucceedsWhenStagingCleanupFails() throws Exception {
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT().notNull())
+                        .physicalColumn("name", DataTypes.VARCHAR(32))
+                        .primaryKey("id")
+                        .build();
+        CreateTableEvent createTableEvent = new CreateTableEvent(TABLE_ID, schema);
+        applySchemaChange(createTableEvent);
+
+        DwsWriter writer = createWriter("cleanup-failure-job");
+        Collection<DwsCommittable> committables;
+        try {
+            writer.write(createTableEvent, null);
+            writer.write(createInsertEvent(schema, 1, "Alice"), null);
+            committables = writer.prepareCommit();
+        } finally {
+            writer.close();
+        }
+        assertThat(committables).hasSize(1);
+        DwsCommittable committable = committables.iterator().next();
+        createViewDependingOnStagingTable(committable);
+
+        DwsCommitter committer =
+                new DwsCommitter(
+                        DWS_CONTAINER.getJdbcUrl(DwsContainer.DWS_DATABASE_TEST),
+                        DWS_CONTAINER.getUsername(),
+                        DWS_CONTAINER.getPassword(),
+                        DwsContainer.DWS_SCHEMA,
+                        false);
+        try {
+            TestingCommitRequest request = new TestingCommitRequest(committable);
+            committer.commit(Collections.singletonList(request));
+
+            assertThat(request.alreadyCommitted).isTrue();
+            assertThat(request.retryLater).isFalse();
+            assertThat(fetchRows("id, name")).containsExactly("1 | Alice");
+            assertThat(fetchCommitMarkerCount(committable)).isEqualTo(1);
+            assertThat(tableExists(committable.getStagingSchema(), committable.getStagingTable()))
+                    .isTrue();
+        } finally {
+            committer.close();
+        }
+
+        dropStagingCleanupBlockerView();
+
+        DwsCommitter recoveryCommitter =
+                new DwsCommitter(
+                        DWS_CONTAINER.getJdbcUrl(DwsContainer.DWS_DATABASE_TEST),
+                        DWS_CONTAINER.getUsername(),
+                        DWS_CONTAINER.getPassword(),
+                        DwsContainer.DWS_SCHEMA,
+                        false);
+        try {
+            TestingCommitRequest replayRequest = new TestingCommitRequest(committable);
+            recoveryCommitter.commit(Collections.singletonList(replayRequest));
+
+            assertThat(replayRequest.alreadyCommitted).isTrue();
+            assertThat(replayRequest.retryLater).isFalse();
+            assertThat(fetchRows("id, name")).containsExactly("1 | Alice");
+            assertThat(fetchCommitMarkerCount(committable)).isEqualTo(1);
+            assertThat(tableExists(committable.getStagingSchema(), committable.getStagingTable()))
+                    .isFalse();
+        } finally {
+            recoveryCommitter.close();
+        }
+    }
+
+    @Test
     void testUpdateChangingCompositePrimaryKeyDeletesOldKey() throws Exception {
         Schema schema =
                 Schema.newBuilder()
@@ -320,6 +389,31 @@ class DwsSinkV2ITCase extends DwsSinkTestBase {
             assertThat(fetchRows("id, shard, name")).containsExactly("1 | 2 | Alice-moved");
         } finally {
             writer.close();
+        }
+    }
+
+    private void createViewDependingOnStagingTable(DwsCommittable committable) throws SQLException {
+        try (Connection connection = createDatabaseConnection(DwsContainer.DWS_DATABASE_TEST);
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "CREATE VIEW "
+                            + DwsSqlUtils.formatTableIdentifier(
+                                    DwsContainer.DWS_SCHEMA, "block_staging_cleanup", false)
+                            + " AS SELECT * FROM "
+                            + DwsSqlUtils.formatTableIdentifier(
+                                    committable.getStagingSchema(),
+                                    committable.getStagingTable(),
+                                    false));
+        }
+    }
+
+    private void dropStagingCleanupBlockerView() throws SQLException {
+        try (Connection connection = createDatabaseConnection(DwsContainer.DWS_DATABASE_TEST);
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "DROP VIEW IF EXISTS "
+                            + DwsSqlUtils.formatTableIdentifier(
+                                    DwsContainer.DWS_SCHEMA, "block_staging_cleanup", false));
         }
     }
 

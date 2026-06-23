@@ -116,25 +116,28 @@ public class DwsCommitter implements Committer<DwsCommittable> {
         }
 
         Connection jdbcConnection = getConnection();
+        boolean alreadyCommitted;
         try (Statement statement = jdbcConnection.createStatement()) {
             statement.execute(DwsSqlUtils.buildCreateCommitTableSql(defaultSchema, caseSensitive));
 
-            if (isAlreadyCommitted(jdbcConnection, committable)) {
-                dropStagingTable(statement, committable);
-                jdbcConnection.commit();
-                LOG.info(
-                        "Skipped already committed DWS staging table {}.{} for checkpoint {}.",
-                        committable.getStagingSchema(),
-                        committable.getStagingTable(),
-                        committable.getCheckpointId());
-                return;
+            alreadyCommitted = isAlreadyCommitted(jdbcConnection, committable);
+            if (!alreadyCommitted) {
+                statement.execute(DwsSqlUtils.buildDeleteLatestRowsSql(committable, caseSensitive));
+                statement.execute(DwsSqlUtils.buildInsertLatestRowsSql(committable, caseSensitive));
+                insertCommitMarker(jdbcConnection, committable);
             }
 
-            statement.execute(DwsSqlUtils.buildDeleteLatestRowsSql(committable, caseSensitive));
-            statement.execute(DwsSqlUtils.buildInsertLatestRowsSql(committable, caseSensitive));
-            insertCommitMarker(jdbcConnection, committable);
-            dropStagingTable(statement, committable);
             jdbcConnection.commit();
+        }
+
+        cleanupStagingTable(committable);
+        if (alreadyCommitted) {
+            LOG.info(
+                    "Skipped already committed DWS staging table {}.{} for checkpoint {}.",
+                    committable.getStagingSchema(),
+                    committable.getStagingTable(),
+                    committable.getCheckpointId());
+        } else {
             LOG.info(
                     "Committed DWS staging table {}.{} into {} for checkpoint {}.",
                     committable.getStagingSchema(),
@@ -191,6 +194,22 @@ public class DwsCommitter implements Committer<DwsCommittable> {
                         committable.getStagingSchema(),
                         committable.getStagingTable(),
                         caseSensitive));
+    }
+
+    private void cleanupStagingTable(DwsCommittable committable) {
+        try (Statement statement = getConnection().createStatement()) {
+            dropStagingTable(statement, committable);
+            connection.commit();
+        } catch (SQLException e) {
+            rollbackQuietly();
+            LOG.warn(
+                    "Failed to clean up DWS staging table {}.{} after committed checkpoint {}. "
+                            + "The data commit remains successful and cleanup can be retried later.",
+                    committable.getStagingSchema(),
+                    committable.getStagingTable(),
+                    committable.getCheckpointId(),
+                    e);
+        }
     }
 
     private void rollbackQuietly() {
