@@ -949,6 +949,26 @@ class YamlPipelineDefinitionParserTest {
     }
 
     @Test
+    void testDorisSchemaChangeOptionsAreParsedAsSinkOptions() throws Exception {
+        String yaml =
+                "source:\n"
+                        + "  type: mysql\n"
+                        + "sink:\n"
+                        + "  type: doris\n"
+                        + "  fenodes: 127.0.0.1:8030\n"
+                        + "  username: root\n"
+                        + "  schema.change.null_enable: false\n"
+                        + "  schema.change.default_value: false\n";
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+        PipelineDef def = parser.parse(yaml, new Configuration());
+
+        assertThat(def.getSink().getType()).isEqualTo("doris");
+        assertThat(def.getSink().getConfig().toMap())
+                .containsEntry("schema.change.null_enable", "false")
+                .containsEntry("schema.change.default_value", "false");
+    }
+
+    @Test
     void testTransformWithOnlyPrimaryKeysDoesNotRegisterPostRule() throws Exception {
         String yaml =
                 "source:\n"

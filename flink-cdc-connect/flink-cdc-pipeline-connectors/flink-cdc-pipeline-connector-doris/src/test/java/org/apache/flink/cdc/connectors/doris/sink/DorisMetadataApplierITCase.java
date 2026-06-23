@@ -54,10 +54,12 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.util.RestartStrategyUtils;
 
+import org.apache.doris.flink.cfg.DorisOptions;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -337,7 +339,7 @@ class DorisMetadataApplierITCase extends DorisSinkTestBase {
         List<String> actual = inspectTableSchema(tableId);
         List<String> expected =
                 Arrays.asList(
-                        "id | INT | Yes | true | null",
+                        "id | INT | No | true | null",
                         "bytes | TEXT | Yes | false | null",
                         "boolean | BOOLEAN | Yes | false | null",
                         "int | INT | Yes | false | null",
@@ -379,7 +381,7 @@ class DorisMetadataApplierITCase extends DorisSinkTestBase {
 
         List<String> expected =
                 Arrays.asList(
-                        "id | INT | Yes | true | null",
+                        "id | INT | No | true | null",
                         "number | DOUBLE | Yes | false | null",
                         "name | VARCHAR(51) | Yes | false | null",
                         "extra_date | DATE | Yes | false | null",
@@ -474,6 +476,109 @@ class DorisMetadataApplierITCase extends DorisSinkTestBase {
                 DATABASE_OPERATION_TIMEOUT_SECONDS * 1000L);
     }
 
+    @Test
+    void testRealDorisAlterColumnTypeWithMissingMetadataApplierCache() throws Exception {
+        TableId tableId =
+                TableId.tableId(
+                        DorisContainer.DORIS_DATABASE_NAME, "real_cache_missing_alter_column_type");
+
+        createTable(
+                tableId.getSchemaName(),
+                tableId.getTableName(),
+                "id",
+                Arrays.asList("id INT NOT NULL", "zyb_ticket_code VARCHAR(50)"));
+        DORIS_CONTAINER.waitForLog(
+                String.format(".*successfully create table\\[%s;.*\\s", tableId.getTableName()),
+                1,
+                DATABASE_OPERATION_TIMEOUT_SECONDS);
+
+        createRealDorisMetadataApplier()
+                .applySchemaChange(
+                        new AlterColumnTypeEvent(
+                                tableId,
+                                Collections.singletonMap(
+                                        "zyb_ticket_code", DataTypes.VARCHAR(64))));
+
+        Assertions.assertThat(inspectTableSchema(tableId))
+                .contains("zyb_ticket_code | VARCHAR(192) | Yes | false | null");
+    }
+
+    @Test
+    void testRealDorisAddColumnBeforeWithMissingMetadataApplierCache() throws Exception {
+        TableId tableId =
+                TableId.tableId(
+                        DorisContainer.DORIS_DATABASE_NAME, "real_cache_missing_add_column_before");
+
+        createTable(
+                tableId.getSchemaName(),
+                tableId.getTableName(),
+                "id",
+                Arrays.asList("id INT NOT NULL", "name VARCHAR(50)", "score INT"));
+        DORIS_CONTAINER.waitForLog(
+                String.format(".*successfully create table\\[%s;.*\\s", tableId.getTableName()),
+                1,
+                DATABASE_OPERATION_TIMEOUT_SECONDS);
+
+        createRealDorisMetadataApplier()
+                .applySchemaChange(
+                        new AddColumnEvent(
+                                tableId,
+                                Collections.singletonList(
+                                        AddColumnEvent.before(
+                                                new PhysicalColumn("age", DataTypes.INT(), null),
+                                                "score"))));
+
+        assertEqualsInOrder(
+                Arrays.asList(
+                        "id | INT | No | true | null",
+                        "name | VARCHAR(50) | Yes | false | null",
+                        "age | INT | Yes | false | null",
+                        "score | INT | Yes | false | null"),
+                inspectTableSchema(tableId));
+    }
+
+    @Test
+    void testRealDorisExistingTablePhysicalColumnOrderDrivesBeforeTranslation() throws Exception {
+        TableId tableId =
+                TableId.tableId(
+                        DorisContainer.DORIS_DATABASE_NAME, "real_existing_table_physical_order");
+
+        createTable(
+                tableId.getSchemaName(),
+                tableId.getTableName(),
+                "id",
+                Arrays.asList("id INT NOT NULL", "score INT", "name VARCHAR(50)"));
+        DORIS_CONTAINER.waitForLog(
+                String.format(".*successfully create table\\[%s;.*\\s", tableId.getTableName()),
+                1,
+                DATABASE_OPERATION_TIMEOUT_SECONDS);
+
+        DorisMetadataApplier applier = createRealDorisMetadataApplier();
+        Schema upstreamSchema =
+                Schema.newBuilder()
+                        .column(new PhysicalColumn("id", DataTypes.INT().notNull(), null))
+                        .column(new PhysicalColumn("name", DataTypes.VARCHAR(50), null))
+                        .column(new PhysicalColumn("score", DataTypes.INT(), null))
+                        .primaryKey("id")
+                        .build();
+        applier.applySchemaChange(new CreateTableEvent(tableId, upstreamSchema));
+        applier.applySchemaChange(
+                new AddColumnEvent(
+                        tableId,
+                        Collections.singletonList(
+                                AddColumnEvent.before(
+                                        new PhysicalColumn("age", DataTypes.INT(), null),
+                                        "name"))));
+
+        assertEqualsInOrder(
+                Arrays.asList(
+                        "id | INT | No | true | null",
+                        "score | INT | Yes | false | null",
+                        "age | INT | Yes | false | null",
+                        "name | VARCHAR(50) | Yes | false | null"),
+                inspectTableSchema(tableId));
+    }
+
     @ParameterizedTest(name = "batchMode: {0}")
     @ValueSource(booleans = {true, false})
     void testDorisAddColumnWithPosition(boolean batchMode) throws Exception {
@@ -487,7 +592,7 @@ class DorisMetadataApplierITCase extends DorisSinkTestBase {
 
         List<String> expected =
                 Arrays.asList(
-                        "id | INT | Yes | true | null",
+                        "id | INT | No | true | null",
                         "extra_after_id | BIGINT | Yes | false | null",
                         "extra_first | TEXT | Yes | false | null",
                         "number | DOUBLE | Yes | false | null",
@@ -510,7 +615,7 @@ class DorisMetadataApplierITCase extends DorisSinkTestBase {
 
         List<String> expected =
                 Arrays.asList(
-                        "id | INT | Yes | true | null", "name | VARCHAR(51) | Yes | false | null");
+                        "id | INT | No | true | null", "name | VARCHAR(51) | Yes | false | null");
 
         assertEqualsInOrder(expected, actual);
     }
@@ -528,7 +633,7 @@ class DorisMetadataApplierITCase extends DorisSinkTestBase {
 
         List<String> expected =
                 Arrays.asList(
-                        "id | INT | Yes | true | null",
+                        "id | INT | No | true | null",
                         "kazu | DOUBLE | Yes | false | null",
                         "namae | VARCHAR(51) | Yes | false | null");
 
@@ -548,7 +653,7 @@ class DorisMetadataApplierITCase extends DorisSinkTestBase {
 
         List<String> expected =
                 Arrays.asList(
-                        "id | INT | Yes | true | null",
+                        "id | INT | No | true | null",
                         "number | DOUBLE | Yes | false | null",
                         "name | VARCHAR(57) | Yes | false | null");
 
@@ -568,7 +673,7 @@ class DorisMetadataApplierITCase extends DorisSinkTestBase {
 
         List<String> expected =
                 Arrays.asList(
-                        "id | INT | Yes | true | null",
+                        "id | INT | No | true | null",
                         "number | DOUBLE | Yes | false | 2.71828",
                         "name | VARCHAR(57) | Yes | false | Alice");
 
@@ -705,7 +810,7 @@ class DorisMetadataApplierITCase extends DorisSinkTestBase {
 
         List<String> expected =
                 Arrays.asList(
-                        "id | INT | Yes | true | null",
+                        "id | INT | No | true | null",
                         "name | VARCHAR(150) | Yes | false | null",
                         "created_time | DATETIME(6) | Yes | false | "
                                 + DorisSchemaUtils.DEFAULT_DATETIME,
@@ -764,7 +869,7 @@ class DorisMetadataApplierITCase extends DorisSinkTestBase {
 
         List<String> expected =
                 Arrays.asList(
-                        "id | INT | Yes | true | null",
+                        "id | INT | No | true | null",
                         "name | VARCHAR(150) | Yes | false | null",
                         "created_time | DATETIME(6) | Yes | false | "
                                 + DorisSchemaUtils.DEFAULT_DATETIME,
@@ -799,7 +904,7 @@ class DorisMetadataApplierITCase extends DorisSinkTestBase {
         List<String> actualSchema = inspectTableSchema(tableId);
         List<String> expectedSchema =
                 Arrays.asList(
-                        "ID | INT | Yes | true | null",
+                        "ID | INT | No | true | null",
                         "deploy_mode | TINYINT | Yes | false | null");
         assertEqualsInOrder(expectedSchema, actualSchema);
 
@@ -835,7 +940,7 @@ class DorisMetadataApplierITCase extends DorisSinkTestBase {
         List<String> actualSchema = inspectTableSchema(tableId);
         List<String> expectedSchema =
                 Arrays.asList(
-                        "ID | INT | Yes | true | null",
+                        "ID | INT | No | true | null",
                         "DEPLOY_MODE | TINYINT | Yes | false | null");
         assertEqualsInOrder(expectedSchema, actualSchema);
 
@@ -885,7 +990,7 @@ class DorisMetadataApplierITCase extends DorisSinkTestBase {
         List<String> actualSchema = inspectTableSchema(tableId);
         List<String> expectedSchema =
                 Arrays.asList(
-                        "id | INT | Yes | true | null",
+                        "id | INT | No | true | null",
                         "name | VARCHAR(51) | Yes | false | null",
                         "age | INT | Yes | false | null");
         assertEqualsInOrder(expectedSchema, actualSchema);
@@ -952,6 +1057,19 @@ class DorisMetadataApplierITCase extends DorisSinkTestBase {
                 new OperatorUidGenerator());
 
         env.execute("Doris Schema Evolution Test");
+    }
+
+    private DorisMetadataApplier createRealDorisMetadataApplier() {
+        DorisOptions dorisOptions =
+                DorisOptions.builder()
+                        .setFenodes(DORIS_CONTAINER.getFeNodes())
+                        .setUsername(DorisContainer.DORIS_USERNAME)
+                        .setPassword(DorisContainer.DORIS_PASSWORD)
+                        .build();
+        Configuration config =
+                Configuration.fromMap(
+                        Collections.singletonMap("table.create.properties.replication_num", "1"));
+        return new DorisMetadataApplier(dorisOptions, config);
     }
 
     BinaryRecordData generate(Schema schema, Object... fields) {

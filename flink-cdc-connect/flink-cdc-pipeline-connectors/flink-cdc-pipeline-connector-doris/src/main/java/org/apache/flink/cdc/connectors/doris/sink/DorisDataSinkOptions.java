@@ -158,6 +158,20 @@ public class DorisDataSinkOptions {
     public static final String STREAM_LOAD_PROP_PREFIX = "sink.properties.";
     // Prefix for Doris Create table.
     public static final String TABLE_CREATE_PROPERTIES_PREFIX = "table.create.properties.";
+    public static final ConfigOption<Boolean> SCHEMA_CHANGE_COLUMN_NULL_ENABLE =
+            ConfigOptions.key("schema.change.null_enable")
+                    .booleanType()
+                    .defaultValue(true)
+                    .withDescription(
+                            "Whether to sync column nullability clauses in Doris schema change DDL.");
+
+    public static final ConfigOption<Boolean> SCHEMA_CHANGE_COLUMN_DEFAULT_VALUE =
+            ConfigOptions.key("schema.change.default_value")
+                    .booleanType()
+                    .defaultValue(true)
+                    .withDescription(
+                            "Whether to sync DEFAULT value clauses in generated Doris DDL.");
+
     public static final ConfigOption<String> TABLE_CREATE_EXTRA_SCHEMA =
             ConfigOptions.key("table.create.extra-schema")
                     .stringType()

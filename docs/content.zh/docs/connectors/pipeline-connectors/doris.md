@@ -204,6 +204,20 @@ pipeline:
       </td>
     </tr>
     <tr>
+      <td>schema.change.null_enable</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">true</td>
+      <td>Boolean</td>
+      <td>是否在 Doris schema change DDL 中同步由上游列可空性生成的 NOT NULL 约束。如果设置为 false，pipeline sink 生成 Doris DDL 时不会为上游非空列追加 NOT NULL。</td>
+    </tr>
+    <tr>
+      <td>schema.change.default_value</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">true</td>
+      <td>Boolean</td>
+      <td>是否在生成的 Doris CREATE TABLE 和 ADD COLUMN DDL 中同步 DEFAULT 默认值。如果设置为 false，Doris DDL 中将省略默认值。</td>
+    </tr>
+    <tr>
       <td>table.create.auto-partition.properties.*</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>

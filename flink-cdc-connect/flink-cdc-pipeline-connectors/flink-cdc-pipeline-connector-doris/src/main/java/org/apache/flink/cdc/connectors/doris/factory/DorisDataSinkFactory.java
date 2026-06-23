@@ -43,6 +43,8 @@ import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.CH
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.FENODES;
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.JDBC_URL;
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.PASSWORD;
+import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.SCHEMA_CHANGE_COLUMN_DEFAULT_VALUE;
+import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.SCHEMA_CHANGE_COLUMN_NULL_ENABLE;
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.SINK_BUFFER_COUNT;
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.SINK_BUFFER_FLUSH_INTERVAL;
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.SINK_BUFFER_FLUSH_MAX_BYTES;
@@ -171,6 +173,8 @@ public class DorisDataSinkFactory implements DataSinkFactory {
         options.add(SINK_IGNORE_UPDATE_BEFORE);
         options.add(SINK_USE_CACHE);
         options.add(TABLE_BUCKETS);
+        options.add(SCHEMA_CHANGE_COLUMN_NULL_ENABLE);
+        options.add(SCHEMA_CHANGE_COLUMN_DEFAULT_VALUE);
         options.add(TABLE_CREATE_EXTRA_SCHEMA);
 
         return options;

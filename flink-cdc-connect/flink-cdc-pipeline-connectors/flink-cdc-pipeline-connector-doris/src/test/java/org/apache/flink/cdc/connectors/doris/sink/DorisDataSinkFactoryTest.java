@@ -48,6 +48,16 @@ class DorisDataSinkFactoryTest {
         Assertions.assertThatCode(dataSink::getEventSinkProvider).doesNotThrowAnyException();
     }
 
+    @Test
+    void testCreateDataSinkAcceptsSchemaChangeOptions() {
+        Map<String, String> options = createValidOptions();
+        options.put("schema.change.null_enable", "false");
+        options.put("schema.change.default_value", "false");
+
+        Assertions.assertThatCode(() -> createDataSink(Configuration.fromMap(options)))
+                .doesNotThrowAnyException();
+    }
+
     private DataSink createDataSink(Configuration conf) {
         DorisDataSinkFactory sinkFactory = new DorisDataSinkFactory();
         Configuration pipelineConf = new Configuration();
