@@ -39,9 +39,9 @@ public class OracleSchemaDataTypeInference extends DebeziumSchemaDataTypeInferen
         if (Geometry.LOGICAL_NAME.equals(schema.name())) {
             return DataTypes.STRING();
         } else if (VariableScaleDecimal.LOGICAL_NAME.equals(schema.name())) {
-            // Oracle bare NUMBER uses VariableScaleDecimal encoding
-            // Return DECIMAL(MAX_PRECISION, 0) to match OracleTypeUtils
-            return DataTypes.DECIMAL(DecimalType.MAX_PRECISION, 0);
+            // Oracle bare NUMBER uses VariableScaleDecimal encoding.
+            // Return DECIMAL(38, 19) to match OracleTypeUtils.
+            return DataTypes.DECIMAL(DecimalType.MAX_PRECISION, 19);
         } else {
             return super.inferStruct(value, schema);
         }

@@ -31,9 +31,74 @@ import static org.assertj.core.api.Assertions.assertThat;
 /** Tests for {@link OracleTypeUtils}. */
 class OracleTypeUtilsTest {
 
+    // --- Bare NUMBER (scale unspecified) tests ---
+
+    @Test
+    void testBareNumberShouldBeDecimal3819() {
+        // NUMBER (scale unspecified) → DECIMAL(38, 19)
+        Column column =
+                Column.editor()
+                        .name("col")
+                        .type("NUMBER")
+                        .jdbcType(Types.NUMERIC)
+                        .length(0)
+                        .optional(true)
+                        .create();
+        DataType result = OracleTypeUtils.fromDbzColumn(column);
+        assertThat(result).isEqualTo(DataTypes.DECIMAL(DecimalType.MAX_PRECISION, 19));
+    }
+
+    @Test
+    void testBareNumberNotNullShouldBeDecimal3819NotNull() {
+        // NOT NULL NUMBER → DECIMAL(38, 19).notNull()
+        Column column =
+                Column.editor()
+                        .name("col")
+                        .type("NUMBER")
+                        .jdbcType(Types.NUMERIC)
+                        .length(0)
+                        .optional(false)
+                        .create();
+        DataType result = OracleTypeUtils.fromDbzColumn(column);
+        assertThat(result).isEqualTo(DataTypes.DECIMAL(DecimalType.MAX_PRECISION, 19).notNull());
+    }
+
+    @Test
+    void testNumberPrecision10ScaleAbsentShouldBeDecimal3819() {
+        // NUMBER(10) with no scale info → DECIMAL(38, 19) (treated as bare NUMBER)
+        Column column =
+                Column.editor()
+                        .name("col")
+                        .type("NUMBER")
+                        .jdbcType(Types.NUMERIC)
+                        .length(10)
+                        .optional(true)
+                        .create();
+        DataType result = OracleTypeUtils.fromDbzColumn(column);
+        assertThat(result).isEqualTo(DataTypes.DECIMAL(DecimalType.MAX_PRECISION, 19));
+    }
+
+    // --- Explicit integer (scale = 0) tests ---
+
+    @Test
+    void testNumberPrecision1ShouldBeBigint() {
+        // NUMBER(1, 0) → BIGINT (precision <= 18)
+        Column column =
+                Column.editor()
+                        .name("col")
+                        .type("NUMBER")
+                        .jdbcType(Types.NUMERIC)
+                        .length(1)
+                        .scale(0)
+                        .optional(true)
+                        .create();
+        DataType result = OracleTypeUtils.fromDbzColumn(column);
+        assertThat(result).isEqualTo(DataTypes.BIGINT());
+    }
+
     @Test
     void testNumberPrecision18ShouldBeBigint() {
-        // NUMBER(18, 0) → BIGINT (precision <= 18)
+        // NUMBER(18, 0) → BIGINT (boundary: precision = 18)
         Column column =
                 Column.editor()
                         .name("col")
@@ -49,7 +114,7 @@ class OracleTypeUtilsTest {
 
     @Test
     void testNumberPrecision19ShouldBeDecimal() {
-        // NUMBER(19, 0) → DECIMAL(19, 0) (precision > 18)
+        // NUMBER(19, 0) → DECIMAL(19, 0) (boundary: precision = 19)
         Column column =
                 Column.editor()
                         .name("col")
@@ -80,19 +145,22 @@ class OracleTypeUtilsTest {
     }
 
     @Test
-    void testNumberNoPrecisionShouldBeDecimalMaxPrecision() {
-        // NUMBER (no precision, length=0) → DECIMAL(MAX_PRECISION, 0)
+    void testNumberPrecision19NotNullShouldBeDecimalNotNull() {
+        // NOT NULL NUMBER(19, 0) → DECIMAL(19, 0).notNull()
         Column column =
                 Column.editor()
                         .name("col")
                         .type("NUMBER")
                         .jdbcType(Types.NUMERIC)
-                        .length(0)
-                        .optional(true)
+                        .length(19)
+                        .scale(0)
+                        .optional(false)
                         .create();
         DataType result = OracleTypeUtils.fromDbzColumn(column);
-        assertThat(result).isEqualTo(DataTypes.DECIMAL(DecimalType.MAX_PRECISION, 0));
+        assertThat(result).isEqualTo(DataTypes.DECIMAL(19, 0).notNull());
     }
+
+    // --- Decimal (scale > 0) tests ---
 
     @Test
     void testNumberWithScaleShouldBeDecimal() {
@@ -111,34 +179,104 @@ class OracleTypeUtilsTest {
     }
 
     @Test
-    void testNumberPrecision1ShouldBeBigint() {
-        // NUMBER(1, 0) → BIGINT (precision <= 18)
+    void testNumberWithScaleBoundaryShouldBeDecimal() {
+        // NUMBER(38, 36) → DECIMAL(38, 36) (scale at boundary)
         Column column =
                 Column.editor()
                         .name("col")
                         .type("NUMBER")
                         .jdbcType(Types.NUMERIC)
-                        .length(1)
-                        .scale(0)
+                        .length(38)
+                        .scale(36)
                         .optional(true)
                         .create();
         DataType result = OracleTypeUtils.fromDbzColumn(column);
-        assertThat(result).isEqualTo(DataTypes.BIGINT());
+        assertThat(result).isEqualTo(DataTypes.DECIMAL(38, 36));
     }
 
+    // --- NUMBER(*, s) (precision == 0, scale > 0) tests ---
+
     @Test
-    void testNumberNotNullPrecision19() {
-        // NOT NULL NUMBER(19, 0) → DECIMAL(19, 0).notNull()
+    void testNumberStarPrecisionShouldBeDecimal38() {
+        // NUMBER(*, 2) → DECIMAL(38, 2) (precision == 0 defaults to MAX_PRECISION)
         Column column =
                 Column.editor()
                         .name("col")
                         .type("NUMBER")
                         .jdbcType(Types.NUMERIC)
-                        .length(19)
-                        .scale(0)
+                        .length(0)
+                        .scale(2)
+                        .optional(true)
+                        .create();
+        DataType result = OracleTypeUtils.fromDbzColumn(column);
+        assertThat(result).isEqualTo(DataTypes.DECIMAL(DecimalType.MAX_PRECISION, 2));
+    }
+
+    @Test
+    void testNumberStarPrecisionNotNullShouldBeDecimal38NotNull() {
+        // NOT NULL NUMBER(*, 4) → DECIMAL(38, 4).notNull()
+        Column column =
+                Column.editor()
+                        .name("col")
+                        .type("NUMBER")
+                        .jdbcType(Types.NUMERIC)
+                        .length(0)
+                        .scale(4)
                         .optional(false)
                         .create();
         DataType result = OracleTypeUtils.fromDbzColumn(column);
-        assertThat(result).isEqualTo(DataTypes.DECIMAL(19, 0).notNull());
+        assertThat(result).isEqualTo(DataTypes.DECIMAL(DecimalType.MAX_PRECISION, 4).notNull());
+    }
+
+    // --- Scale < 0 (negative scale) downgrade tests ---
+
+    @Test
+    void testNegativeScaleShouldBeString() {
+        // NUMBER(10, -2) → STRING (negative scale downgraded)
+        Column column =
+                Column.editor()
+                        .name("col")
+                        .type("NUMBER")
+                        .jdbcType(Types.NUMERIC)
+                        .length(10)
+                        .scale(-2)
+                        .optional(true)
+                        .create();
+        DataType result = OracleTypeUtils.fromDbzColumn(column);
+        assertThat(result).isEqualTo(DataTypes.STRING());
+    }
+
+    @Test
+    void testNegativeScaleStarPrecisionShouldBeString() {
+        // NUMBER(*, -3) → STRING (negative scale downgraded)
+        Column column =
+                Column.editor()
+                        .name("col")
+                        .type("NUMBER")
+                        .jdbcType(Types.NUMERIC)
+                        .length(0)
+                        .scale(-3)
+                        .optional(true)
+                        .create();
+        DataType result = OracleTypeUtils.fromDbzColumn(column);
+        assertThat(result).isEqualTo(DataTypes.STRING());
+    }
+
+    // --- Scale > 36 downgrade tests ---
+
+    @Test
+    void testScaleGreaterThan36ShouldBeString() {
+        // NUMBER(10, 37) → STRING (scale > 36 downgraded)
+        Column column =
+                Column.editor()
+                        .name("col")
+                        .type("NUMBER")
+                        .jdbcType(Types.NUMERIC)
+                        .length(10)
+                        .scale(37)
+                        .optional(true)
+                        .create();
+        DataType result = OracleTypeUtils.fromDbzColumn(column);
+        assertThat(result).isEqualTo(DataTypes.STRING());
     }
 }

@@ -74,17 +74,31 @@ public class OracleTypeUtils {
             case Types.NUMERIC:
             case Types.DECIMAL:
                 {
-                    int precision = column.length();
-                    boolean isIntegerFamily =
-                            !column.scale().isPresent() || column.scale().get() <= 0;
-                    if (isIntegerFamily) {
-                        if (precision > 0 && precision <= 18) {
-                            return DataTypes.BIGINT();
-                        }
-                        return DataTypes.DECIMAL(
-                                precision > 0 ? precision : DecimalType.MAX_PRECISION, 0);
+                    // Bare NUMBER (scale unspecified): floating-point semantic,
+                    // can store both integers and decimals up to 38 significant digits.
+                    // Use DECIMAL(38, 19) as a balanced universal numeric type.
+                    if (!column.scale().isPresent()) {
+                        return DataTypes.DECIMAL(DecimalType.MAX_PRECISION, 19);
                     }
-                    return DataTypes.DECIMAL(precision, column.scale().get());
+
+                    int precision = column.length();
+                    int scale = column.scale().get();
+
+                    // precision == 0 (e.g. NUMBER(*, s)) means unspecified.
+                    int p = precision > 0 ? precision : DecimalType.MAX_PRECISION;
+
+                    // scale < 0 or > 36: not safely representable as DECIMAL, downgrade to STRING.
+                    if (scale < 0 || scale > 36) {
+                        return DataTypes.STRING();
+                    }
+
+                    if (scale == 0) {
+                        // Explicit integer: use BIGINT for p <= 18, DECIMAL otherwise.
+                        return p <= 18 ? DataTypes.BIGINT() : DataTypes.DECIMAL(p, 0);
+                    }
+
+                    // 1 <= scale <= 36: standard decimal with fractional part.
+                    return DataTypes.DECIMAL(p, scale);
                 }
             case Types.DATE:
                 return DataTypes.DATE();
