@@ -32,8 +32,10 @@ import org.testcontainers.images.builder.ImageFromDockerfile;
 import org.testcontainers.lifecycle.Startables;
 import org.testcontainers.utility.DockerImageName;
 
+import java.io.IOException;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -45,6 +47,7 @@ import java.sql.Statement;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
@@ -63,10 +66,11 @@ public class Db2TestBase {
     private static final DockerImageName DEBEZIUM_DOCKER_IMAGE_NAME =
             DockerImageName.parse(
                             new ImageFromDockerfile("custom/db2-cdc:1.4")
-                                    .withDockerfile(getFilePath("db2_server/Dockerfile"))
+                                    .withDockerfile(
+                                            createDb2ServerBuildContext().resolve("Dockerfile"))
                                     .get())
                     .asCompatibleSubstituteFor("ibmcom/db2");
-    private static boolean db2AsnAgentRunning = false;
+    private static final CompletableFuture<Void> db2AsnAgentStarted = new CompletableFuture<>();
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
 
     protected static final Db2Container DB2_CONTAINER =
@@ -77,13 +81,15 @@ public class Db2TestBase {
                     .withEnv("AUTOCONFIG", "false")
                     .withEnv("ARCHIVE_LOGS", "true")
                     .acceptLicense()
+                    .withCreateContainerCmdModifier(
+                            createContainerCmd -> createContainerCmd.withPlatform("linux/amd64"))
                     .withLogConsumer(new Slf4jLogConsumer(LOG))
                     .withLogConsumer(
                             outputFrame -> {
                                 if (outputFrame
                                         .getUtf8String()
                                         .contains("The asncdc program enable finished")) {
-                                    db2AsnAgentRunning = true;
+                                    db2AsnAgentStarted.complete(null);
                                 }
                             });
 
@@ -93,15 +99,9 @@ public class Db2TestBase {
         Startables.deepStart(Stream.of(DB2_CONTAINER)).join();
         LOG.info("Containers are started.");
 
-        LOG.info("Waiting db2 asn agent start...");
-        while (!db2AsnAgentRunning) {
-            try {
-                Thread.sleep(5000L);
-            } catch (InterruptedException e) {
-                LOG.error("unexpected interrupted exception", e);
-            }
-        }
-        LOG.info("Db2 asn agent are started.");
+        db2AsnAgentStarted.join();
+        assertCdcAgentRunning();
+        LOG.info("Db2 asn agent is available.");
     }
 
     @AfterAll
@@ -120,6 +120,36 @@ public class Db2TestBase {
                 DB2_CONTAINER.getPassword());
     }
 
+    private static void assertCdcAgentRunning() {
+        try {
+            Awaitility.await("DB2 ASN agent status")
+                    .atMost(120, TimeUnit.SECONDS)
+                    .until(
+                            () -> {
+                                try (Connection connection =
+                                                DriverManager.getConnection(
+                                                        DB2_CONTAINER.getJdbcUrl(),
+                                                        DB2_CONTAINER.getUsername(),
+                                                        DB2_CONTAINER.getPassword());
+                                        Statement statement = connection.createStatement();
+                                        ResultSet resultSet =
+                                                statement.executeQuery(
+                                                        "VALUES ASNCDC.ASNCDCSERVICES('status','asncdc')")) {
+                                    return resultSet.next()
+                                            && !resultSet
+                                                    .getString(1)
+                                                    .toLowerCase(Locale.ROOT)
+                                                    .contains("asncap is not running");
+                                } catch (SQLException e) {
+                                    LOG.warn("DB2 ASN agent status check failed, will retry.", e);
+                                    return false;
+                                }
+                            });
+        } catch (Exception e) {
+            throw new FlinkRuntimeException("Failed to verify DB2 ASN agent status.", e);
+        }
+    }
+
     private static Path getFilePath(String resourceFilePath) {
         Path path = null;
         try {
@@ -132,6 +162,37 @@ public class Db2TestBase {
             LOG.error("Cannot get path from URI.", e);
         }
         return path;
+    }
+
+    private static Path createDb2ServerBuildContext() {
+        Path sourceDir = getFilePath("db2_server/Dockerfile").getParent();
+        try {
+            Path targetDir = Files.createTempDirectory("flink-cdc-db2-server-build");
+            try (Stream<Path> files = Files.walk(sourceDir)) {
+                for (Path source : files.collect(Collectors.toList())) {
+                    Path target = targetDir.resolve(sourceDir.relativize(source).toString());
+                    if (Files.isDirectory(source)) {
+                        Files.createDirectories(target);
+                    } else {
+                        Files.createDirectories(target.getParent());
+                        Files.copy(source, target);
+                    }
+                }
+            }
+            Path dockerfile = targetDir.resolve("Dockerfile");
+            String dockerfileContent =
+                    new String(Files.readAllBytes(dockerfile), StandardCharsets.UTF_8);
+            Files.write(
+                    dockerfile,
+                    dockerfileContent
+                            .replace(
+                                    "FROM ibmcom/db2:11.5.0.0a",
+                                    "FROM --platform=linux/amd64 ibmcom/db2:11.5.0.0a")
+                            .getBytes(StandardCharsets.UTF_8));
+            return targetDir;
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to create DB2 Docker build context", e);
+        }
     }
 
     private static void dropTestTable(Connection connection, String tableName) {

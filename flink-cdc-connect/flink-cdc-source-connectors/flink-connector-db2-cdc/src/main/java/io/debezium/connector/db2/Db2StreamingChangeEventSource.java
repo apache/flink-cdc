@@ -6,10 +6,15 @@
 
 package io.debezium.connector.db2;
 
+import io.debezium.data.Envelope.Operation;
 import io.debezium.pipeline.ErrorHandler;
 import io.debezium.pipeline.EventDispatcher;
 import io.debezium.pipeline.source.spi.ChangeTableResultSet;
 import io.debezium.pipeline.source.spi.StreamingChangeEventSource;
+import io.debezium.pipeline.spi.OffsetContext;
+import io.debezium.relational.Column;
+import io.debezium.relational.RelationalChangeRecordEmitter;
+import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
 import io.debezium.schema.DatabaseSchema;
 import io.debezium.schema.SchemaChangeEvent.SchemaChangeEventType;
@@ -26,9 +31,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -60,10 +67,14 @@ import java.util.stream.Collectors;
 public class Db2StreamingChangeEventSource
         implements StreamingChangeEventSource<Db2Partition, Db2OffsetContext> {
 
+    static final int OP_DIRECT_UPDATE = 5;
+
     private static final int COL_COMMIT_LSN = 2;
     private static final int COL_ROW_LSN = 3;
     private static final int COL_OPERATION = 1;
     private static final int COL_DATA = 5;
+
+    private static final Lsn ZERO_LSN = Lsn.valueOf("00000000000000000000000000000000");
 
     private static final Pattern MISSING_CDC_FUNCTION_CHANGES_ERROR =
             Pattern.compile("Invalid object name 'cdc.fn_cdc_get_all_changes_(.*)'\\.");
@@ -150,6 +161,7 @@ public class Db2StreamingChangeEventSource
                 if (currentMaxLsn.equals(lastProcessedPosition.getCommitLsn())
                         && shouldIncreaseFromLsn) {
                     LOGGER.debug("No change in the database");
+                    dataConnection.rollback();
                     metronome.pause();
                     continue;
                 }
@@ -165,16 +177,24 @@ public class Db2StreamingChangeEventSource
                 while (!schemaChangeCheckpoints.isEmpty()) {
                     migrateTable(partition, offsetContext, schemaChangeCheckpoints);
                 }
-                if (!dataConnection.listOfNewChangeTables(fromLsn, currentMaxLsn).isEmpty()) {
+                final boolean cdcRegisterAdvanced =
+                        !dataConnection.listOfNewChangeTables(fromLsn, currentMaxLsn).isEmpty();
+                boolean hasPendingSchemaChangeCheckpoint = false;
+                if (cdcRegisterAdvanced) {
                     final Db2ChangeTable[] tables = getCdcTablesToQuery(partition, offsetContext);
                     tablesSlot.set(tables);
                     for (Db2ChangeTable table : tables) {
-                        if (table.getStartLsn().isBetween(fromLsn, currentMaxLsn)) {
-                            LOGGER.info("Schema will be changed for {}", table);
-                            schemaChangeCheckpoints.add(table);
+                        if (table.getStartLsn().compareTo(fromLsn) >= 0
+                                && table.getStartLsn().compareTo(currentMaxLsn) <= 0) {
+                            if (isTableSchemaChanged(table)) {
+                                LOGGER.info("Schema will be changed for {}", table);
+                                schemaChangeCheckpoints.add(table);
+                                hasPendingSchemaChangeCheckpoint = true;
+                            }
                         }
                     }
                 }
+                final AtomicBoolean dispatchedDataChange = new AtomicBoolean(false);
                 try {
                     dataConnection.getChangesForTables(
                             tablesSlot.get(),
@@ -252,10 +272,10 @@ public class Db2StreamingChangeEventSource
                                         tableWithSmallestLsn.next();
                                         continue;
                                     }
-                                    if (tableWithSmallestLsn
-                                                    .getChangeTable()
-                                                    .getStopLsn()
-                                                    .isAvailable()
+                                    if (isValidStopLsn(
+                                                    tableWithSmallestLsn
+                                                            .getChangeTable()
+                                                            .getStopLsn())
                                             && tableWithSmallestLsn
                                                             .getChangeTable()
                                                             .getStopLsn()
@@ -332,17 +352,25 @@ public class Db2StreamingChangeEventSource
                                     dispatcher.dispatchDataChangeEvent(
                                             partition,
                                             tableId,
-                                            new Db2ChangeRecordEmitter(
-                                                    partition,
-                                                    offsetContext,
-                                                    operation,
-                                                    data,
-                                                    dataNext,
-                                                    clock));
+                                            operation == OP_DIRECT_UPDATE
+                                                    ? new DirectUpdateRecordEmitter(
+                                                            partition, offsetContext, data, clock)
+                                                    : new Db2ChangeRecordEmitter(
+                                                            partition,
+                                                            offsetContext,
+                                                            operation,
+                                                            data,
+                                                            dataNext,
+                                                            clock));
+                                    dispatchedDataChange.set(true);
                                     tableWithSmallestLsn.next();
                                 }
                             });
-                    lastProcessedPosition = TxLogPosition.valueOf(currentMaxLsn);
+                    if (dispatchedDataChange.get()) {
+                        lastProcessedPosition = offsetContext.getChangePosition();
+                    } else if (shouldAdvancePositionOnEmptyRead(hasPendingSchemaChangeCheckpoint)) {
+                        lastProcessedPosition = TxLogPosition.valueOf(currentMaxLsn);
+                    }
                     // Terminate the transaction otherwise CDC could not be disabled for tables
                     dataConnection.rollback();
                     // Determine whether to continue streaming in db2 cdc snapshot phase
@@ -363,6 +391,7 @@ public class Db2StreamingChangeEventSource
             throws InterruptedException, SQLException {
         final Db2ChangeTable newTable = schemaChangeCheckpoints.poll();
         LOGGER.info("Migrating schema to {}", newTable);
+        offsetContext.event(newTable.getSourceTableId(), Instant.now());
         dispatcher.dispatchSchemaChangeEvent(
                 partition,
                 newTable.getSourceTableId(),
@@ -372,6 +401,63 @@ public class Db2StreamingChangeEventSource
                         newTable,
                         metadataConnection.getTableSchemaFromTable(newTable),
                         SchemaChangeEventType.ALTER));
+    }
+
+    private boolean isTableSchemaChanged(Db2ChangeTable table) throws SQLException {
+        final Table currentTable = schema.tableFor(table.getSourceTableId());
+        if (currentTable == null) {
+            return true;
+        }
+
+        final Table latestTable = metadataConnection.getTableSchemaFromTable(table);
+        final boolean changed = isTableSchemaChanged(currentTable, latestTable);
+        if (!changed) {
+            LOGGER.debug(
+                    "Ignoring CDC register LSN advance for {} because source table schema is unchanged",
+                    table);
+        }
+        return changed;
+    }
+
+    static boolean isTableSchemaChanged(Table currentTable, Table latestTable) {
+        return !columnsEqual(currentTable.columns(), latestTable.columns())
+                || !currentTable
+                        .primaryKeyColumnNames()
+                        .equals(latestTable.primaryKeyColumnNames());
+    }
+
+    static boolean isValidStopLsn(Lsn stopLsn) {
+        return stopLsn.isAvailable() && stopLsn.compareTo(ZERO_LSN) > 0;
+    }
+
+    static boolean shouldAdvancePositionOnEmptyRead(boolean hasPendingSchemaChangeCheckpoint) {
+        return !hasPendingSchemaChangeCheckpoint;
+    }
+
+    private static boolean columnsEqual(List<Column> currentColumns, List<Column> latestColumns) {
+        if (currentColumns.size() != latestColumns.size()) {
+            return false;
+        }
+        for (int i = 0; i < currentColumns.size(); i++) {
+            Column current = currentColumns.get(i);
+            Column latest = latestColumns.get(i);
+            if (!Objects.equals(current.name(), latest.name())
+                    || current.jdbcType() != latest.jdbcType()
+                    || !Objects.equals(current.length(), latest.length())
+                    || !Objects.equals(current.scale(), latest.scale())
+                    || current.isOptional() != latest.isOptional()
+                    || !typeNamesEqual(current.typeName(), latest.typeName())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean typeNamesEqual(String currentTypeName, String latestTypeName) {
+        if (currentTypeName == null || latestTypeName == null) {
+            return Objects.equals(currentTypeName, latestTypeName);
+        }
+        return currentTypeName.equalsIgnoreCase(latestTypeName);
     }
 
     private Db2ChangeTable[] processErrorFromChangeTableQuery(
@@ -492,6 +578,33 @@ public class Db2StreamingChangeEventSource
                     : TxLogPosition.valueOf(
                             Lsn.valueOf(resultSet.getBytes(COL_COMMIT_LSN)),
                             Lsn.valueOf(resultSet.getBytes(COL_ROW_LSN)));
+        }
+    }
+
+    private static class DirectUpdateRecordEmitter
+            extends RelationalChangeRecordEmitter<Db2Partition> {
+
+        private final Object[] data;
+
+        private DirectUpdateRecordEmitter(
+                Db2Partition partition, OffsetContext offsetContext, Object[] data, Clock clock) {
+            super(partition, offsetContext, clock);
+            this.data = data;
+        }
+
+        @Override
+        public Operation getOperation() {
+            return Operation.UPDATE;
+        }
+
+        @Override
+        protected Object[] getOldColumnValues() {
+            return data;
+        }
+
+        @Override
+        protected Object[] getNewColumnValues() {
+            return data;
         }
     }
 
