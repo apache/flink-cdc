@@ -143,7 +143,7 @@ public class OracleFullTypesITCase extends OracleSourceTestBase {
                     BinaryStringData.fromString("9900"),
                     BinaryStringData.fromString("999999990"),
                     BinaryStringData.fromString("999999999999999900"),
-                    BinaryStringData.fromString("9.99999999999999999999999999999999999E+37"),
+                    BinaryStringData.fromString("9.9999999999999999999999999999999999900E+37"),
                     TimestampData.fromLocalDateTime(
                             LocalDateTime.parse(
                                     "2022-10-30 00:00:00",
