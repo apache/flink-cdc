@@ -95,7 +95,11 @@ public class StarRocksUtils {
                             .setDefaultValue(
                                     convertInvalidTimestampDefaultValue(
                                             column.getDefaultValueExpression(), column.getType()));
-            toStarRocksDataType(column, i < primaryKeyCount, builder);
+            toStarRocksDataType(
+                    column,
+                    i < primaryKeyCount,
+                    builder,
+                    tableCreateConfig.getUnicodeCharMaxBytes());
             starRocksColumns.add(builder.build());
         }
 
@@ -119,14 +123,38 @@ public class StarRocksUtils {
     /** Convert CDC data type to StarRocks data type. */
     public static void toStarRocksDataType(
             DataType cdcDataType, boolean isPrimaryKeys, StarRocksColumn.Builder builder) {
+        toStarRocksDataType(
+                cdcDataType,
+                isPrimaryKeys,
+                builder,
+                StarRocksDataSinkOptions.UNICODE_CHAR_MAX_BYTES.defaultValue());
+    }
+
+    public static void toStarRocksDataType(
+            DataType cdcDataType,
+            boolean isPrimaryKeys,
+            StarRocksColumn.Builder builder,
+            int unicodeCharMaxBytes) {
         CdcDataTypeTransformer dataTypeTransformer =
-                new CdcDataTypeTransformer(isPrimaryKeys, builder);
+                new CdcDataTypeTransformer(isPrimaryKeys, builder, unicodeCharMaxBytes);
         cdcDataType.accept(dataTypeTransformer);
     }
 
     public static void toStarRocksDataType(
             Column cdcColumn, boolean isPrimaryKeys, StarRocksColumn.Builder builder) {
-        toStarRocksDataType(cdcColumn.getType(), isPrimaryKeys, builder);
+        toStarRocksDataType(
+                cdcColumn,
+                isPrimaryKeys,
+                builder,
+                StarRocksDataSinkOptions.UNICODE_CHAR_MAX_BYTES.defaultValue());
+    }
+
+    public static void toStarRocksDataType(
+            Column cdcColumn,
+            boolean isPrimaryKeys,
+            StarRocksColumn.Builder builder,
+            int unicodeCharMaxBytes) {
+        toStarRocksDataType(cdcColumn.getType(), isPrimaryKeys, builder, unicodeCharMaxBytes);
     }
 
     /** Format DATE type data. */
@@ -297,10 +325,20 @@ public class StarRocksUtils {
 
         private final StarRocksColumn.Builder builder;
         private final boolean isPrimaryKeys;
+        private final int unicodeCharMaxBytes;
 
         public CdcDataTypeTransformer(boolean isPrimaryKeys, StarRocksColumn.Builder builder) {
+            this(
+                    isPrimaryKeys,
+                    builder,
+                    StarRocksDataSinkOptions.UNICODE_CHAR_MAX_BYTES.defaultValue());
+        }
+
+        public CdcDataTypeTransformer(
+                boolean isPrimaryKeys, StarRocksColumn.Builder builder, int unicodeCharMaxBytes) {
             this.isPrimaryKeys = isPrimaryKeys;
             this.builder = builder;
+            this.unicodeCharMaxBytes = unicodeCharMaxBytes;
         }
 
         @Override
@@ -379,13 +417,13 @@ public class StarRocksUtils {
         @Override
         public StarRocksColumn.Builder visit(CharType charType) {
             // CDC and StarRocks use different units for the length. It's the number
-            // of characters in CDC, and the number of bytes in StarRocks. One chinese
-            // character will use 3 bytes because it uses UTF-8, so the length of StarRocks
-            // char type should be three times as that of CDC char type. Specifically, if
-            // the length of StarRocks exceeds the MAX_CHAR_SIZE, map CDC char type to StarRocks
-            // varchar type
+            // of characters in CDC, and the number of bytes in StarRocks. The number
+            // of bytes needed for each character depends on the upstream encoding, so
+            // the length of StarRocks char type should be scaled by unicodeCharMaxBytes.
+            // Specifically, if the length of StarRocks exceeds the MAX_CHAR_SIZE, map
+            // CDC char type to StarRocks varchar type.
             int length = charType.getLength();
-            long starRocksLength = length * 3L;
+            long starRocksLength = (long) length * unicodeCharMaxBytes;
             // In the StarRocks, The primary key columns can be any of the following data types:
             // BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, LARGEINT, STRING, VARCHAR, DATE, and
             // DATETIME, But it doesn't include CHAR. When a char type appears in the primary key of
@@ -405,11 +443,11 @@ public class StarRocksUtils {
         @Override
         public StarRocksColumn.Builder visit(VarCharType varCharType) {
             // CDC and StarRocks use different units for the length. It's the number
-            // of characters in CDC, and the number of bytes in StarRocks. One chinese
-            // character will use 3 bytes because it uses UTF-8, so the length of StarRocks
-            // varchar type should be three times as that of CDC varchar type.
+            // of characters in CDC, and the number of bytes in StarRocks. The number
+            // of bytes needed for each character depends on the upstream encoding, so
+            // the length of StarRocks varchar type should be scaled by unicodeCharMaxBytes.
             int length = varCharType.getLength();
-            long starRocksLength = length * 3L;
+            long starRocksLength = (long) length * unicodeCharMaxBytes;
             builder.setDataType(VARCHAR);
             builder.setNullable(varCharType.isNullable());
             builder.setColumnSize((int) Math.min(starRocksLength, MAX_VARCHAR_SIZE));

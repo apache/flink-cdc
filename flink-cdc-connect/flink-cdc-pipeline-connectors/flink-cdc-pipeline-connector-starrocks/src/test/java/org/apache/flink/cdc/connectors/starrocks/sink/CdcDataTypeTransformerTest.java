@@ -151,6 +151,58 @@ class CdcDataTypeTransformerTest {
     }
 
     @Test
+    void testCharTypeWithUnicodeCharMaxBytes() {
+        // With unicode-char.max-bytes = 4, a CHAR(17) should be sized 4 * 17 = 68 (<=
+        // MAX_CHAR_SIZE)
+        StarRocksColumn.Builder charBuilder =
+                new StarRocksColumn.Builder().setColumnName("utf8mb4_char").setOrdinalPosition(0);
+        new CharType(17).accept(new StarRocksUtils.CdcDataTypeTransformer(false, charBuilder, 4));
+        StarRocksColumn charColumn = charBuilder.build();
+        Assertions.assertThat(charColumn.getDataType()).isEqualTo(StarRocksUtils.CHAR);
+        Assertions.assertThat(charColumn.getColumnSize()).hasValue(68);
+
+        // 4 * 100 = 400 > MAX_CHAR_SIZE, so it should fall back to VARCHAR
+        StarRocksColumn.Builder overflowBuilder =
+                new StarRocksColumn.Builder().setColumnName("overflow_char").setOrdinalPosition(1);
+        new CharType(100)
+                .accept(new StarRocksUtils.CdcDataTypeTransformer(false, overflowBuilder, 4));
+        StarRocksColumn overflowColumn = overflowBuilder.build();
+        Assertions.assertThat(overflowColumn.getDataType()).isEqualTo(StarRocksUtils.VARCHAR);
+        Assertions.assertThat(overflowColumn.getColumnSize()).hasValue(400);
+
+        // Primary key CHAR is always mapped to VARCHAR, scaled by unicode-char.max-bytes
+        StarRocksColumn.Builder pkBuilder =
+                new StarRocksColumn.Builder().setColumnName("pk_char").setOrdinalPosition(2);
+        new CharType(17).accept(new StarRocksUtils.CdcDataTypeTransformer(true, pkBuilder, 4));
+        StarRocksColumn pkColumn = pkBuilder.build();
+        Assertions.assertThat(pkColumn.getDataType()).isEqualTo(StarRocksUtils.VARCHAR);
+        Assertions.assertThat(pkColumn.getColumnSize()).hasValue(68);
+    }
+
+    @Test
+    void testVarCharTypeWithUnicodeCharMaxBytes() {
+        // With unicode-char.max-bytes = 4, a VARCHAR(17) should be sized 4 * 17 = 68
+        StarRocksColumn.Builder builder =
+                new StarRocksColumn.Builder()
+                        .setColumnName("utf8mb4_varchar")
+                        .setOrdinalPosition(0);
+        new VarCharType(17).accept(new StarRocksUtils.CdcDataTypeTransformer(false, builder, 4));
+        StarRocksColumn column = builder.build();
+        Assertions.assertThat(column.getDataType()).isEqualTo(StarRocksUtils.VARCHAR);
+        Assertions.assertThat(column.getColumnSize()).hasValue(68);
+
+        // The result should still be capped at MAX_VARCHAR_SIZE
+        StarRocksColumn.Builder largeBuilder =
+                new StarRocksColumn.Builder().setColumnName("large_varchar").setOrdinalPosition(1);
+        new VarCharType(StarRocksUtils.MAX_VARCHAR_SIZE)
+                .accept(new StarRocksUtils.CdcDataTypeTransformer(false, largeBuilder, 4));
+        StarRocksColumn largeColumn = largeBuilder.build();
+        Assertions.assertThat(largeColumn.getDataType()).isEqualTo(StarRocksUtils.VARCHAR);
+        Assertions.assertThat(largeColumn.getColumnSize())
+                .hasValue(StarRocksUtils.MAX_VARCHAR_SIZE);
+    }
+
+    @Test
     void testBinaryType() {
         StarRocksColumn.Builder builder =
                 new StarRocksColumn.Builder().setColumnName("binary_col").setOrdinalPosition(0);
