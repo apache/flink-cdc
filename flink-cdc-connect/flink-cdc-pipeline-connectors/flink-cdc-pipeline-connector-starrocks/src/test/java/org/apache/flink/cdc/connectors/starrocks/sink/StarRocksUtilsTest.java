@@ -210,19 +210,16 @@ class StarRocksUtilsTest {
 
         StarRocksTable table = StarRocksUtils.toStarRocksTable(tableId, schema, config);
 
-        StarRocksColumn nameColumn =
-                table.getColumns().stream()
-                        .filter(c -> c.getColumnName().equals("name"))
-                        .findFirst()
-                        .get();
+        List<StarRocksColumn> columns = table.getColumns();
+        assertThat(columns).hasSize(3);
+
+        StarRocksColumn nameColumn = columns.get(1);
+        assertThat(nameColumn.getColumnName()).isEqualTo("name");
         assertThat(nameColumn.getDataType()).isEqualTo(StarRocksUtils.VARCHAR);
         assertThat(nameColumn.getColumnSize()).hasValue(68);
 
-        StarRocksColumn codeColumn =
-                table.getColumns().stream()
-                        .filter(c -> c.getColumnName().equals("code"))
-                        .findFirst()
-                        .get();
+        StarRocksColumn codeColumn = columns.get(2);
+        assertThat(codeColumn.getColumnName()).isEqualTo("code");
         assertThat(codeColumn.getDataType()).isEqualTo(StarRocksUtils.CHAR);
         assertThat(codeColumn.getColumnSize()).hasValue(68);
     }

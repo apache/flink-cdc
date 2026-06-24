@@ -45,6 +45,9 @@ public class TableCreateConfig implements Serializable {
     /** Properties for the table. */
     private final Map<String, String> properties;
 
+    /** Maximum number of bytes a single character can take in UTF-8 encoding. */
+    public static final int MAX_UNICODE_CHAR_BYTES = 4;
+
     /** Max bytes allocated for each upstream Unicode character during schema mapping. */
     private final int unicodeCharMaxBytes;
 
@@ -58,8 +61,9 @@ public class TableCreateConfig implements Serializable {
     public TableCreateConfig(
             @Nullable Integer numBuckets, Map<String, String> properties, int unicodeCharMaxBytes) {
         Preconditions.checkArgument(
-                unicodeCharMaxBytes > 0,
-                "unicode-char.max-bytes must be positive, but actually is %s",
+                unicodeCharMaxBytes >= 1 && unicodeCharMaxBytes <= MAX_UNICODE_CHAR_BYTES,
+                "unicode-char.max-bytes must be between 1 and %s, but actually is %s",
+                MAX_UNICODE_CHAR_BYTES,
                 unicodeCharMaxBytes);
         this.numBuckets = numBuckets;
         this.properties = new HashMap<>(properties);

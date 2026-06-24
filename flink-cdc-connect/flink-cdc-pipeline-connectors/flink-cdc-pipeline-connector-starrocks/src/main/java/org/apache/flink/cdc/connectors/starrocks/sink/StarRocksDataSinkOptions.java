@@ -165,6 +165,6 @@ public class StarRocksDataSinkOptions {
                     .withDescription(
                             "Specifies how many bytes are allocated for each upstream character when mapping "
                                     + "CHAR and VARCHAR types to StarRocks, whose length is measured in bytes. "
-                                    + "If the upstream source uses utf8mb4, set this option to 4 to avoid "
-                                    + "underestimating column lengths.");
+                                    + "Valid values are within [1, 4]. If the upstream source uses utf8mb4, "
+                                    + "set this option to 4 to avoid underestimating column lengths.");
 }
