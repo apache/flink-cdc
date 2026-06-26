@@ -231,8 +231,8 @@ class OracleTypeUtilsTest {
     // --- Scale < 0 (negative scale) downgrade tests ---
 
     @Test
-    void testNegativeScaleShouldBeString() {
-        // NUMBER(10, -2) → STRING (negative scale downgraded)
+    void testNegativeScaleShouldBeBigint() {
+        // NUMBER(10, -2) → BIGINT (negative scale, p+|s|=12 fits in BIGINT)
         Column column =
                 Column.editor()
                         .name("col")
@@ -243,7 +243,7 @@ class OracleTypeUtilsTest {
                         .optional(true)
                         .create();
         DataType result = OracleTypeUtils.fromDbzColumn(column);
-        assertThat(result).isEqualTo(DataTypes.STRING());
+        assertThat(result).isEqualTo(DataTypes.BIGINT());
     }
 
     @Test
