@@ -20,7 +20,6 @@ package org.apache.flink.cdc.connectors.oracle.source;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.configuration.Configuration;
-import org.apache.flink.cdc.common.data.DateData;
 import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.RecordData;
@@ -145,7 +144,10 @@ public class OracleFullTypesITCase extends OracleSourceTestBase {
                     999999990L,
                     999999999999999900L,
                     BinaryStringData.fromString("9.99999999999999999999999999999999999E+37"),
-                    DateData.fromIsoLocalDateString("2022-10-30"),
+                    TimestampData.fromLocalDateTime(
+                            LocalDateTime.parse(
+                                    "2022-10-30 00:00:00",
+                                    DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))),
                     TimestampData.fromLocalDateTime(
                             LocalDateTime.parse(
                                     "2022-10-30 12:34:56.00789",
@@ -251,7 +253,7 @@ public class OracleFullTypesITCase extends OracleSourceTestBase {
                     DataTypes.BIGINT(),
                     DataTypes.BIGINT(),
                     DataTypes.STRING(),
-                    DataTypes.DATE(),
+                    DataTypes.TIMESTAMP(),
                     DataTypes.TIMESTAMP(6),
                     DataTypes.TIMESTAMP(2),
                     DataTypes.TIMESTAMP(4),
