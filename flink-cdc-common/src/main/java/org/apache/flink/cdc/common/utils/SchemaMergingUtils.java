@@ -214,9 +214,19 @@ public class SchemaMergingUtils {
             DataType afterType = afterColumn.getType();
             if (beforeColumns.containsKey(columnName)) {
                 DataType beforeType = beforeColumns.get(columnName).getType();
-                if (!Objects.equals(beforeType, afterType)) {
+                String beforeComment = beforeColumns.get(columnName).getComment();
+                String afterComment = afterColumn.getComment();
+                boolean typeChanged = !Objects.equals(beforeType, afterType);
+                boolean commentChanged = !Objects.equals(beforeComment, afterComment);
+                if (typeChanged) {
                     oldTypeMapping.put(columnName, beforeType);
                     newTypeMapping.put(columnName, afterType);
+                }
+                // Emit comment when (a) the comment itself changed — `afterComment` may be null
+                // here to signal "remove the comment" — or (b) the type changed and the column
+                // has a non-null comment to carry forward for downstream sinks.
+                if (commentChanged || (typeChanged && afterComment != null)) {
+                    comments.put(columnName, afterComment);
                 }
                 beforeColumns.remove(columnName);
             } else {
@@ -233,9 +243,6 @@ public class SchemaMergingUtils {
                 }
             }
             afterWhichColumnPosition = afterColumn.getName();
-            if (afterColumn.getComment() != null) {
-                comments.put(columnName, afterColumn.getComment());
-            }
         }
 
         List<SchemaChangeEvent> schemaChangeEvents = new ArrayList<>();
@@ -243,7 +250,7 @@ public class SchemaMergingUtils {
             schemaChangeEvents.add(new AddColumnEvent(tableId, appendedColumns));
         }
 
-        if (!newTypeMapping.isEmpty()) {
+        if (!newTypeMapping.isEmpty() || !comments.isEmpty()) {
             schemaChangeEvents.add(
                     new AlterColumnTypeEvent(tableId, newTypeMapping, oldTypeMapping, comments));
         }

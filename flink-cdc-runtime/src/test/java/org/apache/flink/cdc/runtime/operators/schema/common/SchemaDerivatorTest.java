@@ -42,7 +42,10 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -383,6 +386,76 @@ public class SchemaDerivatorTest extends SchemaTestBase {
                                 SchemaChangeBehavior.EVOLVE,
                                 new DropTableEvent(NORMALIZE_TEST_TABLE_ID)))
                 .containsExactly(new DropTableEvent(NORMALIZE_TEST_TABLE_ID));
+    }
+
+    @Test
+    void testNormalizeSchemaChangeEventsResolvesExistingColumnsCaseInsensitively() {
+        Map<String, String> comments = new HashMap<>();
+        comments.put("AGE", "age comment");
+        Map<String, org.apache.flink.cdc.common.types.DataType> typeMapping = new LinkedHashMap<>();
+        typeMapping.put("AGE", DataTypes.DOUBLE());
+
+        assertThat(
+                        normalizeEvent(
+                                SchemaChangeBehavior.EVOLVE,
+                                new AddColumnEvent(
+                                        NORMALIZE_TEST_TABLE_ID,
+                                        Collections.singletonList(
+                                                new AddColumnEvent.ColumnWithPosition(
+                                                        Column.physicalColumn(
+                                                                "added_flag", DataTypes.BOOLEAN()),
+                                                        AddColumnEvent.ColumnPosition.AFTER,
+                                                        "AGE"))),
+                                new AlterColumnTypeEvent(
+                                        NORMALIZE_TEST_TABLE_ID,
+                                        typeMapping,
+                                        Collections.emptyMap(),
+                                        comments),
+                                new RenameColumnEvent(
+                                        NORMALIZE_TEST_TABLE_ID,
+                                        Collections.singletonMap("AGE", "aging")),
+                                new DropColumnEvent(
+                                        NORMALIZE_TEST_TABLE_ID,
+                                        Collections.singletonList("NOTES"))))
+                .containsExactly(
+                        new AddColumnEvent(
+                                NORMALIZE_TEST_TABLE_ID,
+                                Collections.singletonList(
+                                        new AddColumnEvent.ColumnWithPosition(
+                                                Column.physicalColumn(
+                                                        "added_flag", DataTypes.BOOLEAN()),
+                                                AddColumnEvent.ColumnPosition.AFTER,
+                                                "age"))),
+                        new AlterColumnTypeEvent(
+                                NORMALIZE_TEST_TABLE_ID,
+                                Collections.singletonMap("age", DataTypes.DOUBLE()),
+                                Collections.singletonMap("age", DataTypes.FLOAT()),
+                                Collections.singletonMap("age", "age comment")),
+                        new RenameColumnEvent(
+                                NORMALIZE_TEST_TABLE_ID, Collections.singletonMap("age", "aging")),
+                        new DropColumnEvent(
+                                NORMALIZE_TEST_TABLE_ID, Collections.singletonList("notes")));
+    }
+
+    @Test
+    void testNormalizeSchemaChangeEventsPreservesCommentRemoval() {
+        Map<String, String> comments = new HashMap<>();
+        comments.put("AGE", null);
+
+        assertThat(
+                        normalizeEvent(
+                                SchemaChangeBehavior.EVOLVE,
+                                new AlterColumnTypeEvent(
+                                        NORMALIZE_TEST_TABLE_ID,
+                                        Collections.emptyMap(),
+                                        Collections.emptyMap(),
+                                        comments)))
+                .containsExactly(
+                        new AlterColumnTypeEvent(
+                                NORMALIZE_TEST_TABLE_ID,
+                                Collections.emptyMap(),
+                                Collections.emptyMap(),
+                                Collections.singletonMap("age", null)));
     }
 
     @Test

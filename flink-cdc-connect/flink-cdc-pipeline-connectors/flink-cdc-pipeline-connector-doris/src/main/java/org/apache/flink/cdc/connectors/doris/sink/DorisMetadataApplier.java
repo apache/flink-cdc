@@ -804,6 +804,24 @@ public class DorisMetadataApplier implements MetadataApplier {
         }
     }
 
+    private static List<String> resolveDroppedColumnNames(
+            Schema currentSchema, DropColumnEvent event) {
+        if (currentSchema == null) {
+            return event.getDroppedColumnNames();
+        }
+        return event.getDroppedColumnNames().stream()
+                .map(columnName -> SchemaUtils.resolveExistingColumnName(currentSchema, columnName))
+                .collect(Collectors.toList());
+    }
+
+    private static Map<String, String> resolveRenameColumnNameMapping(
+            Schema currentSchema, RenameColumnEvent event) {
+        if (currentSchema == null) {
+            return event.getNameMapping();
+        }
+        return SchemaUtils.resolveExistingColumnNameMap(currentSchema, event.getNameMapping());
+    }
+
     private int findColumnIndex(List<String> columnNames, String columnName) {
         for (int i = 0; i < columnNames.size(); i++) {
             if (columnNames.get(i).equals(columnName)) {
@@ -821,7 +839,8 @@ public class DorisMetadataApplier implements MetadataApplier {
     private void applyDropColumnEvent(DropColumnEvent event) throws SchemaEvolveException {
         try {
             TableId tableId = event.tableId();
-            List<String> droppedColumns = event.getDroppedColumnNames();
+            Schema currentSchema = schemaCache.get(tableId);
+            List<String> droppedColumns = resolveDroppedColumnNames(currentSchema, event);
             for (String col : droppedColumns) {
                 ensureSchemaChangeSucceeded(
                         schemaChangeManager.dropColumn(
@@ -839,7 +858,8 @@ public class DorisMetadataApplier implements MetadataApplier {
     private void applyRenameColumnEvent(RenameColumnEvent event) throws SchemaEvolveException {
         try {
             TableId tableId = event.tableId();
-            Map<String, String> nameMapping = event.getNameMapping();
+            Schema currentSchema = schemaCache.get(tableId);
+            Map<String, String> nameMapping = resolveRenameColumnNameMapping(currentSchema, event);
             for (Map.Entry<String, String> entry : nameMapping.entrySet()) {
                 ensureSchemaChangeSucceeded(
                         schemaChangeManager.renameColumn(
@@ -861,26 +881,65 @@ public class DorisMetadataApplier implements MetadataApplier {
             throws SchemaEvolveException {
         try {
             TableId tableId = event.tableId();
-            Map<String, DataType> typeMapping = event.getTypeMapping();
-            Map<String, String> comments = event.getComments();
+            Schema currentSchema = schemaCache.get(tableId);
+            Map<String, DataType> typeMapping =
+                    currentSchema == null
+                            ? event.getTypeMapping()
+                            : SchemaUtils.resolveExistingColumnNameMap(
+                                    currentSchema, event.getTypeMapping());
+            Map<String, String> comments =
+                    currentSchema == null
+                            ? event.getComments()
+                            : SchemaUtils.resolveExistingColumnNameMap(
+                                    currentSchema, event.getComments());
 
-            for (Map.Entry<String, DataType> entry : typeMapping.entrySet()) {
+            for (String columnName : typeMapping.keySet()) {
+                DataType columnType = typeMapping.get(columnName);
                 ensureSchemaChangeSucceeded(
                         schemaChangeManager.modifyColumnDataType(
                                 tableId.getSchemaName(),
                                 tableId.getTableName(),
                                 new FieldSchema(
-                                        entry.getKey(),
-                                        resolveColumnType(
-                                                entry.getKey(), entry.getValue(), null, false),
-                                        comments.get(entry.getKey()))),
-                        "alter column type " + entry.getKey(),
+                                        columnName,
+                                        resolveColumnType(columnName, columnType, null, false),
+                                        getCurrentColumnComment(currentSchema, columnName))),
+                        "alter column type " + columnName,
+                        tableId);
+            }
+            for (String columnName : comments.keySet()) {
+                String comment = comments.get(columnName);
+                if (!isColumnCommentChanged(currentSchema, columnName, comment)) {
+                    continue;
+                }
+                ensureSchemaChangeSucceeded(
+                        schemaChangeManager.modifyColumnComment(
+                                tableId.getSchemaName(),
+                                tableId.getTableName(),
+                                columnName,
+                                comment == null ? "" : comment),
+                        "alter column comment " + columnName,
                         tableId);
             }
             updateCacheAfterSchemaChange(tableId, event, "alter column type event");
         } catch (Exception e) {
             throw new SchemaEvolveException(event, "fail to apply alter column type event", e);
         }
+    }
+
+    private static boolean isColumnCommentChanged(
+            Schema currentSchema, String columnName, String comment) {
+        return currentSchema == null
+                || currentSchema
+                        .getColumn(columnName)
+                        .map(column -> !Objects.equals(column.getComment(), comment))
+                        .orElse(true);
+    }
+
+    private static String getCurrentColumnComment(Schema currentSchema, String columnName) {
+        if (currentSchema == null) {
+            return null;
+        }
+        return currentSchema.getColumn(columnName).map(Column::getComment).orElse(null);
     }
 
     private void applyTruncateTableEvent(TruncateTableEvent truncateTableEvent)

@@ -18,9 +18,9 @@
 package org.apache.flink.cdc.common.event;
 
 import org.apache.flink.cdc.common.annotation.PublicEvolving;
-import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataType;
+import org.apache.flink.cdc.common.utils.SchemaUtils;
 
 import javax.annotation.Nullable;
 
@@ -72,9 +72,8 @@ public class AlterColumnTypeEvent implements SchemaChangeEventWithPreSchema, Sch
     }
 
     public void addColumnComment(String columnName, @Nullable String comment) {
-        if (comment != null) {
-            this.comments.put(columnName, comment);
-        }
+        // `null` is allowed to signal "remove the comment for this column".
+        this.comments.put(columnName, comment);
     }
 
     /** Returns the type mapping. */
@@ -148,10 +147,20 @@ public class AlterColumnTypeEvent implements SchemaChangeEventWithPreSchema, Sch
     @Override
     public void fillPreSchema(Schema oldTypeSchema) {
         oldTypeMapping.clear();
-        oldTypeMapping.putAll(
-                oldTypeSchema.getColumns().stream()
-                        .filter(e -> typeMapping.containsKey(e.getName()) && e.getType() != null)
-                        .collect(Collectors.toMap(Column::getName, Column::getType)));
+        typeMapping.forEach(
+                (columnName, ignored) -> {
+                    String resolvedColumnName =
+                            SchemaUtils.resolveExistingColumnName(oldTypeSchema, columnName);
+                    oldTypeSchema
+                            .getColumn(resolvedColumnName)
+                            .ifPresent(
+                                    column -> {
+                                        if (column.getType() != null) {
+                                            oldTypeMapping.put(
+                                                    resolvedColumnName, column.getType());
+                                        }
+                                    });
+                });
     }
 
     @Override
@@ -166,7 +175,7 @@ public class AlterColumnTypeEvent implements SchemaChangeEventWithPreSchema, Sch
             typeMapping.keySet().removeAll(redundantlyChangedColumns);
             oldTypeMapping.keySet().removeAll(redundantlyChangedColumns);
         }
-        return !typeMapping.isEmpty();
+        return !typeMapping.isEmpty() || !comments.isEmpty();
     }
 
     @Override
@@ -176,6 +185,6 @@ public class AlterColumnTypeEvent implements SchemaChangeEventWithPreSchema, Sch
 
     @Override
     public SchemaChangeEvent copy(TableId newTableId) {
-        return new AlterColumnTypeEvent(newTableId, typeMapping, oldTypeMapping);
+        return new AlterColumnTypeEvent(newTableId, typeMapping, oldTypeMapping, comments);
     }
 }

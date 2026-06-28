@@ -58,6 +58,9 @@ class AlterColumnTypeEventSerializerTest extends SerializerTestBase<AlterColumnT
         comments.put("col1", "col1 comment");
         comments.put("col2", "col2 comment");
 
+        Map<String, String> removedComments = new HashMap<>();
+        removedComments.put("col1", null);
+
         return new AlterColumnTypeEvent[] {
             new AlterColumnTypeEvent(TableId.tableId("table"), map),
             new AlterColumnTypeEvent(TableId.tableId("schema", "table"), map),
@@ -66,7 +69,12 @@ class AlterColumnTypeEventSerializerTest extends SerializerTestBase<AlterColumnT
             new AlterColumnTypeEvent(TableId.tableId("schema", "table"), map, oldMap),
             new AlterColumnTypeEvent(TableId.tableId("namespace", "schema", "table"), map, oldMap),
             new AlterColumnTypeEvent(
-                    TableId.tableId("namespace", "schema", "table"), map, oldMap, comments)
+                    TableId.tableId("namespace", "schema", "table"), map, oldMap, comments),
+            new AlterColumnTypeEvent(
+                    TableId.tableId("namespace", "schema", "table"),
+                    new HashMap<>(),
+                    new HashMap<>(),
+                    removedComments)
         };
     }
 }

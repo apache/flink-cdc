@@ -26,6 +26,8 @@ import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
 import org.apache.flink.runtime.client.JobStatusMessage;
 import org.apache.flink.table.api.ValidationException;
 
+import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
+
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -52,6 +54,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -74,6 +77,13 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
 
     protected final UniqueDatabase columnCaseDatabase =
             new UniqueDatabase(MYSQL, "mysql_case_inventory", MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
+
+    protected final UniqueDatabase commentDatabase =
+            new UniqueDatabase(
+                    MYSQL,
+                    "mysql_case_inventory_with_comments",
+                    MYSQL_TEST_USER,
+                    MYSQL_TEST_PASSWORD);
 
     @BeforeAll
     public static void initializeContainers() {
@@ -1939,5 +1949,451 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
             }
         }
         return results;
+    }
+
+    /**
+     * End-to-end regression for the schema-change / column-reference / comment PR. Validates that
+     * MySQL→Doris pipeline correctly propagates ALTER COLUMN TYPE, comment-only alters, comment
+     * removals, ADD / DROP / RENAME columns when the upstream column name casing differs from the
+     * downstream Doris column name.
+     */
+    @Test
+    public void testSchemaChangeWithColumnReferenceAndCommentAcrossCase() throws Exception {
+        commentDatabase.createAndInitialize();
+        createDorisDatabase(commentDatabase.getDatabaseName());
+        try {
+            String databaseName = commentDatabase.getDatabaseName();
+            String pipelineJob =
+                    String.format(
+                            "source:\n"
+                                    + "  type: mysql\n"
+                                    + "  hostname: mysql\n"
+                                    + "  port: 3306\n"
+                                    + "  username: %s\n"
+                                    + "  password: %s\n"
+                                    + "  tables: %s.student\n"
+                                    + "  server-id: 5400-5404\n"
+                                    + "  server-time-zone: UTC\n"
+                                    + "\n"
+                                    + "sink:\n"
+                                    + "  type: doris\n"
+                                    + "  fenodes: doris:8030\n"
+                                    + "  benodes: doris:8040\n"
+                                    + "  username: %s\n"
+                                    + "  password: \"%s\"\n"
+                                    + "  table.create.properties.replication_num: 1\n"
+                                    + "  sink.properties.format: json\n"
+                                    + "\n"
+                                    + "pipeline:\n"
+                                    + "  schema.change.behavior: evolve\n"
+                                    + "  parallelism: %d",
+                            MYSQL_TEST_USER,
+                            MYSQL_TEST_PASSWORD,
+                            databaseName,
+                            DORIS.getUsername(),
+                            DORIS.getPassword(),
+                            parallelism);
+            submitMysqlToDorisJob(pipelineJob);
+
+            // ---- Initial snapshot ----
+            validateSinkSchema(
+                    databaseName,
+                    "student",
+                    Arrays.asList(
+                            "id | BIGINT | Yes | true | null",
+                            "name | VARCHAR(192) | No | false | null",
+                            "JOB | VARCHAR(192) | Yes | false | null",
+                            "create_time | DATETIME(0) | Yes | false | null",
+                            "AGE | INT | Yes | false | null",
+                            "flag | INT | Yes | false | null"));
+            validateSinkComments(
+                    databaseName,
+                    "student",
+                    ImmutableMap.<String, String>builder()
+                            .put("id", "student id")
+                            .put("name", "student name")
+                            .put("JOB", "old job")
+                            .put("AGE", "old age comment")
+                            .build());
+
+            String mysqlUrl =
+                    String.format(
+                            "jdbc:mysql://%s:%s/%s",
+                            MYSQL.getHost(), MYSQL.getDatabasePort(), databaseName);
+            try (Connection conn =
+                            DriverManager.getConnection(
+                                    mysqlUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
+                    Statement stat = conn.createStatement()) {
+
+                // ---- (1) Modify column TYPE with unchanged comment: comment must be preserved
+                // through the alter. This is the new behavior introduced by the PR's
+                // "comment-only path" refactor. ----
+                LOG.info("[Step 1] MODIFY COLUMN AGE type-only; expect comment preserved.");
+                stat.execute("ALTER TABLE student MODIFY COLUMN AGE BIGINT;");
+                validateSinkSchema(
+                        databaseName,
+                        "student",
+                        Arrays.asList(
+                                "id | BIGINT | Yes | true | null",
+                                "name | VARCHAR(192) | No | false | null",
+                                "JOB | VARCHAR(192) | Yes | false | null",
+                                "create_time | DATETIME(0) | Yes | false | null",
+                                "AGE | BIGINT | Yes | false | null",
+                                "flag | INT | Yes | false | null"));
+                validateSinkComments(
+                        databaseName,
+                        "student",
+                        ImmutableMap.<String, String>builder()
+                                .put("id", "student id")
+                                .put("name", "student name")
+                                .put("JOB", "old job")
+                                .put("AGE", "old age comment")
+                                .build());
+
+                // ---- (2) Modify TYPE + COMMENT together: comment must be updated. ----
+                LOG.info("[Step 2] MODIFY COLUMN JOB type+comment; expect updated comment.");
+                stat.execute(
+                        "ALTER TABLE student MODIFY COLUMN JOB VARCHAR(255) COMMENT 'new job';");
+                validateSinkSchema(
+                        databaseName,
+                        "student",
+                        Arrays.asList(
+                                "id | BIGINT | Yes | true | null",
+                                "name | VARCHAR(192) | No | false | null",
+                                "JOB | VARCHAR(768) | Yes | false | null",
+                                "create_time | DATETIME(0) | Yes | false | null",
+                                "AGE | BIGINT | Yes | false | null",
+                                "flag | INT | Yes | false | null"));
+                validateSinkComments(
+                        databaseName,
+                        "student",
+                        ImmutableMap.<String, String>builder()
+                                .put("id", "student id")
+                                .put("name", "student name")
+                                .put("JOB", "new job")
+                                .put("AGE", "old age comment")
+                                .build());
+
+                // ---- (3) Comment-only alter: must propagate to Doris. ----
+                LOG.info("[Step 3] MODIFY COLUMN comment-only; expect comment-only alter.");
+                stat.execute(
+                        "ALTER TABLE student MODIFY COLUMN AGE INT COMMENT 'updated age comment';");
+                validateSinkSchema(
+                        databaseName,
+                        "student",
+                        Arrays.asList(
+                                "id | BIGINT | Yes | true | null",
+                                "name | VARCHAR(192) | No | false | null",
+                                "JOB | VARCHAR(768) | Yes | false | null",
+                                "create_time | DATETIME(0) | Yes | false | null",
+                                "AGE | INT | Yes | false | null",
+                                "flag | INT | Yes | false | null"));
+                validateSinkComments(
+                        databaseName,
+                        "student",
+                        ImmutableMap.<String, String>builder()
+                                .put("id", "student id")
+                                .put("name", "student name")
+                                .put("JOB", "new job")
+                                .put("AGE", "updated age comment")
+                                .build());
+
+                // ---- (4) Comment REMOVAL: the Bug #1 fix path. Without the fix, the comment-only
+                // event for removing a comment was silently dropped. ----
+                LOG.info(
+                        "[Step 4] MODIFY COLUMN comment-removed; expect comment to be cleared in"
+                                + " Doris.");
+                stat.execute("ALTER TABLE student MODIFY COLUMN AGE INT;");
+                validateSinkComments(
+                        databaseName,
+                        "student",
+                        ImmutableMap.<String, String>builder()
+                                .put("id", "student id")
+                                .put("name", "student name")
+                                .put("JOB", "new job")
+                                .build());
+
+                // ---- (5) ADD column AFTER a referenced column: validates the new
+                // rewriteAddColumnEvent path. ----
+                LOG.info("[Step 5] ADD COLUMN score AFTER name; expect column added in middle.");
+                stat.execute(
+                        "ALTER TABLE student ADD COLUMN score INT COMMENT 'student score' AFTER"
+                                + " name;");
+                validateSinkSchema(
+                        databaseName,
+                        "student",
+                        Arrays.asList(
+                                "id | BIGINT | Yes | true | null",
+                                "name | VARCHAR(192) | No | false | null",
+                                "score | INT | Yes | false | null",
+                                "JOB | VARCHAR(768) | Yes | false | null",
+                                "create_time | DATETIME(0) | Yes | false | null",
+                                "AGE | INT | Yes | false | null",
+                                "flag | INT | Yes | false | null"));
+                validateSinkComments(
+                        databaseName,
+                        "student",
+                        ImmutableMap.<String, String>builder()
+                                .put("id", "student id")
+                                .put("name", "student name")
+                                .put("score", "student score")
+                                .put("JOB", "new job")
+                                .build());
+
+                // ---- (6) RENAME column: validates new resolver against upstream casing
+                // difference. ----
+                LOG.info("[Step 6] RENAME COLUMN JOB TO job; expect Doris column renamed.");
+                stat.execute("ALTER TABLE student RENAME COLUMN JOB TO job;");
+                validateSinkSchema(
+                        databaseName,
+                        "student",
+                        Arrays.asList(
+                                "id | BIGINT | Yes | true | null",
+                                "name | VARCHAR(192) | No | false | null",
+                                "score | INT | Yes | false | null",
+                                "job | VARCHAR(768) | Yes | false | null",
+                                "create_time | DATETIME(0) | Yes | false | null",
+                                "AGE | INT | Yes | false | null",
+                                "flag | INT | Yes | false | null"));
+
+                // ---- (7) DROP column: validates post-transform drop rewrite. ----
+                LOG.info("[Step 7] DROP COLUMN flag; expect column removed.");
+                stat.execute("ALTER TABLE student DROP COLUMN flag;");
+                validateSinkSchema(
+                        databaseName,
+                        "student",
+                        Arrays.asList(
+                                "id | BIGINT | Yes | true | null",
+                                "name | VARCHAR(192) | No | false | null",
+                                "score | INT | Yes | false | null",
+                                "job | VARCHAR(768) | Yes | false | null",
+                                "create_time | DATETIME(0) | Yes | false | null",
+                                "AGE | INT | Yes | false | null"));
+
+                // ---- (8) COMMENT-only after DROP/RENAME: ensures rename→alter chain still works.
+                LOG.info("[Step 8] MODIFY comment-only after rename; expect comment preserved.");
+                stat.execute(
+                        "ALTER TABLE student MODIFY COLUMN score INT COMMENT 'updated score';");
+                validateSinkComments(
+                        databaseName,
+                        "student",
+                        ImmutableMap.<String, String>builder()
+                                .put("id", "student id")
+                                .put("name", "student name")
+                                .put("score", "updated score")
+                                .put("job", "new job")
+                                .build());
+
+                // ---- Final insert validates data flow after the full chain of schema changes.
+                // ----
+                stat.execute(
+                        "INSERT INTO student VALUES (3, 'Carol', 95, 'scientist', '2024-01-03"
+                                + " 00:00:00', 20);");
+                validateSinkResult(
+                        databaseName,
+                        "student",
+                        6,
+                        Arrays.asList(
+                                "1 | Alice | null | engineer | 2024-01-01 00:00:00 | 18",
+                                "2 | Bob | null | doctor | 2024-01-02 00:00:00 | 19",
+                                "3 | Carol | 95 | scientist | 2024-01-03 00:00:00 | 20"));
+            }
+        } finally {
+            commentDatabase.dropDatabase();
+            dropDorisDatabase(commentDatabase.getDatabaseName());
+        }
+    }
+
+    /**
+     * End-to-end regression for the same matrix with {@code column-name-case: LOWER}. Validates
+     * PostTransformOperator rewrites upstream-cased column names to lower-cased physical names in
+     * every schema-change event reaching Doris.
+     */
+    @Test
+    public void testSchemaChangeWithColumnReferenceAndCommentAcrossCaseAndLowerTransform()
+            throws Exception {
+        commentDatabase.createAndInitialize();
+        createDorisDatabase(commentDatabase.getDatabaseName());
+        try {
+            String databaseName = commentDatabase.getDatabaseName();
+            String pipelineJob =
+                    String.format(
+                            "source:\n"
+                                    + "  type: mysql\n"
+                                    + "  hostname: mysql\n"
+                                    + "  port: 3306\n"
+                                    + "  username: %s\n"
+                                    + "  password: %s\n"
+                                    + "  tables: %s.student\n"
+                                    + "  server-id: 5400-5404\n"
+                                    + "  server-time-zone: UTC\n"
+                                    + "\n"
+                                    + "sink:\n"
+                                    + "  type: doris\n"
+                                    + "  fenodes: doris:8030\n"
+                                    + "  benodes: doris:8040\n"
+                                    + "  username: %s\n"
+                                    + "  password: \"%s\"\n"
+                                    + "  table.create.properties.replication_num: 1\n"
+                                    + "  sink.properties.format: json\n"
+                                    + "\n"
+                                    + "pipeline:\n"
+                                    + "  schema.change.behavior: evolve\n"
+                                    + "  parallelism: %d\n"
+                                    + "  column-name-case: LOWER",
+                            MYSQL_TEST_USER,
+                            MYSQL_TEST_PASSWORD,
+                            databaseName,
+                            DORIS.getUsername(),
+                            DORIS.getPassword(),
+                            parallelism);
+            submitMysqlToDorisJob(pipelineJob);
+
+            // ---- After LOWER transform, all column names are lower-cased in Doris. ----
+            validateSinkSchema(
+                    databaseName,
+                    "student",
+                    Arrays.asList(
+                            "id | BIGINT | Yes | true | null",
+                            "name | VARCHAR(192) | No | false | null",
+                            "job | VARCHAR(192) | Yes | false | null",
+                            "create_time | DATETIME(0) | Yes | false | null",
+                            "age | INT | Yes | false | null",
+                            "flag | INT | Yes | false | null"));
+            validateSinkComments(
+                    databaseName,
+                    "student",
+                    ImmutableMap.<String, String>builder()
+                            .put("id", "student id")
+                            .put("name", "student name")
+                            .put("job", "old job")
+                            .put("age", "old age comment")
+                            .build());
+
+            String mysqlUrl =
+                    String.format(
+                            "jdbc:mysql://%s:%s/%s",
+                            MYSQL.getHost(), MYSQL.getDatabasePort(), databaseName);
+            try (Connection conn =
+                            DriverManager.getConnection(
+                                    mysqlUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
+                    Statement stat = conn.createStatement()) {
+
+                // ---- (1) Comment removal under LOWER transform: this is the post-transform
+                // rewrite path through Bug #1. ----
+                LOG.info("[Step 1] LOWER transform: MODIFY COLUMN drop comment; expect cleared.");
+                stat.execute(
+                        "ALTER TABLE student MODIFY COLUMN AGE BIGINT COMMENT 'temp comment';");
+                stat.execute("ALTER TABLE student MODIFY COLUMN AGE BIGINT;");
+                validateSinkComments(
+                        databaseName,
+                        "student",
+                        ImmutableMap.<String, String>builder()
+                                .put("id", "student id")
+                                .put("name", "student name")
+                                .put("job", "old job")
+                                .build());
+
+                // ---- (2) Comment-only alter through transform. ----
+                LOG.info("[Step 2] LOWER transform: MODIFY comment-only; expect comment applied.");
+                stat.execute(
+                        "ALTER TABLE student MODIFY COLUMN JOB VARCHAR(255) COMMENT 'new job';");
+                validateSinkComments(
+                        databaseName,
+                        "student",
+                        ImmutableMap.<String, String>builder()
+                                .put("id", "student id")
+                                .put("name", "student name")
+                                .put("job", "new job")
+                                .build());
+
+                // ---- (3) ADD column under transform. ----
+                LOG.info("[Step 3] LOWER transform: ADD COLUMN; expect lower-cased new column.");
+                stat.execute(
+                        "ALTER TABLE student ADD COLUMN score INT COMMENT 'student score' AFTER"
+                                + " name;");
+                validateSinkSchema(
+                        databaseName,
+                        "student",
+                        Arrays.asList(
+                                "id | BIGINT | Yes | true | null",
+                                "name | VARCHAR(192) | No | false | null",
+                                "score | INT | Yes | false | null",
+                                "job | VARCHAR(768) | Yes | false | null",
+                                "create_time | DATETIME(0) | Yes | false | null",
+                                "age | BIGINT | Yes | false | null",
+                                "flag | INT | Yes | false | null"));
+                validateSinkComments(
+                        databaseName,
+                        "student",
+                        ImmutableMap.<String, String>builder()
+                                .put("id", "student id")
+                                .put("name", "student name")
+                                .put("score", "student score")
+                                .put("job", "new job")
+                                .build());
+
+                // ---- (4) RENAME column through transform: validates rewriteRenameColumnEvent
+                // returns nothing when source/target collapse under LOWER. ----
+                LOG.info("[Step 4] LOWER transform: RENAME to same lower-case name; expect no-op.");
+                stat.execute("ALTER TABLE student RENAME COLUMN JOB TO job;");
+                validateSinkSchema(
+                        databaseName,
+                        "student",
+                        Arrays.asList(
+                                "id | BIGINT | Yes | true | null",
+                                "name | VARCHAR(192) | No | false | null",
+                                "score | INT | Yes | false | null",
+                                "job | VARCHAR(768) | Yes | false | null",
+                                "create_time | DATETIME(0) | Yes | false | null",
+                                "age | BIGINT | Yes | false | null",
+                                "flag | INT | Yes | false | null"));
+
+                // ---- (5) DROP column through transform. ----
+                LOG.info("[Step 5] LOWER transform: DROP COLUMN; expect column removed.");
+                stat.execute("ALTER TABLE student DROP COLUMN flag;");
+                validateSinkSchema(
+                        databaseName,
+                        "student",
+                        Arrays.asList(
+                                "id | BIGINT | Yes | true | null",
+                                "name | VARCHAR(192) | No | false | null",
+                                "score | INT | Yes | false | null",
+                                "job | VARCHAR(768) | Yes | false | null",
+                                "create_time | DATETIME(0) | Yes | false | null",
+                                "age | BIGINT | Yes | false | null"));
+
+                // ---- Final insert validates data flow through transform after all DDLs. ----
+                stat.execute(
+                        "INSERT INTO student VALUES (3, 'Carol', 95, 'scientist', '2024-01-03"
+                                + " 00:00:00', 20);");
+                validateSinkResult(
+                        databaseName,
+                        "student",
+                        6,
+                        Arrays.asList(
+                                "1 | Alice | null | engineer | 2024-01-01 00:00:00 | 18",
+                                "2 | Bob | null | doctor | 2024-01-02 00:00:00 | 19",
+                                "3 | Carol | 95 | scientist | 2024-01-03 00:00:00 | 20"));
+            }
+        } finally {
+            commentDatabase.dropDatabase();
+            dropDorisDatabase(commentDatabase.getDatabaseName());
+        }
+    }
+
+    /** Fetch (column-name → column-comment) pairs from Doris and compare to the expected map. */
+    private void validateSinkComments(
+            String databaseName, String tableName, Map<String, String> expected) throws Exception {
+        String sql =
+                String.format(
+                        "SELECT COLUMN_NAME, IFNULL(COLUMN_COMMENT, '') FROM"
+                                + " INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '%s' AND"
+                                + " TABLE_NAME = '%s' ORDER BY ORDINAL_POSITION",
+                        databaseName, tableName);
+        List<String> expectedRows = new ArrayList<>();
+        expected.forEach(
+                (col, comment) -> expectedRows.add(col + " | " + (comment == null ? "" : comment)));
+        waitAndVerify(databaseName, sql, 2, expectedRows, EVENT_WAITING_TIMEOUT.toMillis(), false);
     }
 }

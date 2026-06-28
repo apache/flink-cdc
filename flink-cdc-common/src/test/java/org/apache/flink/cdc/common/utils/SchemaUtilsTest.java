@@ -33,6 +33,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -163,6 +164,309 @@ class SchemaUtilsTest {
                                 .physicalColumn("newCol2", DataTypes.VARCHAR(10))
                                 .physicalColumn("newCol4", DataTypes.VARCHAR(10))
                                 .build());
+    }
+
+    @Test
+    void testApplySchemaChangeEventResolvesExistingColumnsCaseInsensitively() {
+        TableId tableId = TableId.parse("default.default.case_table");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.BIGINT())
+                        .physicalColumn("job", DataTypes.STRING())
+                        .physicalColumn("create_time", DataTypes.TIMESTAMP(3))
+                        .build();
+
+        schema =
+                SchemaUtils.applySchemaChangeEvent(
+                        schema,
+                        new AddColumnEvent(
+                                tableId,
+                                Collections.singletonList(
+                                        new AddColumnEvent.ColumnWithPosition(
+                                                Column.physicalColumn("age", DataTypes.INT()),
+                                                AddColumnEvent.ColumnPosition.BEFORE,
+                                                "JOB"))));
+        Assertions.assertThat(schema.getColumnNames())
+                .containsExactly("id", "age", "job", "create_time");
+
+        schema =
+                SchemaUtils.applySchemaChangeEvent(
+                        schema,
+                        new AddColumnEvent(
+                                tableId,
+                                Collections.singletonList(
+                                        new AddColumnEvent.ColumnWithPosition(
+                                                Column.physicalColumn("flag", DataTypes.INT()),
+                                                AddColumnEvent.ColumnPosition.AFTER,
+                                                "JOB"))));
+        Assertions.assertThat(schema.getColumnNames())
+                .containsExactly("id", "age", "job", "flag", "create_time");
+
+        schema =
+                SchemaUtils.applySchemaChangeEvent(
+                        schema,
+                        new AlterColumnTypeEvent(
+                                tableId, Collections.singletonMap("JOB", DataTypes.VARCHAR(255))));
+        Assertions.assertThat(schema.getColumn("job").get().getType())
+                .isEqualTo(DataTypes.VARCHAR(255));
+
+        Map<String, String> comments = new HashMap<>();
+        comments.put("JOB", "job comment");
+        schema =
+                SchemaUtils.applySchemaChangeEvent(
+                        schema,
+                        new AlterColumnTypeEvent(
+                                tableId,
+                                Collections.singletonMap("JOB", DataTypes.VARCHAR(255)),
+                                Collections.emptyMap(),
+                                comments));
+        Assertions.assertThat(schema.getColumn("job").get().getComment()).isEqualTo("job comment");
+
+        schema =
+                SchemaUtils.applySchemaChangeEvent(
+                        schema,
+                        new AlterColumnTypeEvent(
+                                tableId,
+                                Collections.emptyMap(),
+                                Collections.emptyMap(),
+                                Collections.singletonMap("JOB", "updated job comment")));
+        Assertions.assertThat(schema.getColumn("job").get().getType())
+                .isEqualTo(DataTypes.VARCHAR(255));
+        Assertions.assertThat(schema.getColumn("job").get().getComment())
+                .isEqualTo("updated job comment");
+
+        schema =
+                SchemaUtils.applySchemaChangeEvent(
+                        schema,
+                        new RenameColumnEvent(
+                                tableId, Collections.singletonMap("JOB", "job_name")));
+        Assertions.assertThat(schema.getColumnNames())
+                .containsExactly("id", "age", "job_name", "flag", "create_time");
+
+        schema =
+                SchemaUtils.applySchemaChangeEvent(
+                        schema,
+                        new DropColumnEvent(tableId, Collections.singletonList("JOB_NAME")));
+        Assertions.assertThat(schema.getColumnNames())
+                .containsExactly("id", "age", "flag", "create_time");
+    }
+
+    @Test
+    void testSchemaChangeEventRedundancyResolvesExistingColumnsCaseInsensitively() {
+        TableId tableId = TableId.parse("default.default.case_table");
+        Schema schemaWithJob =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.BIGINT())
+                        .physicalColumn("job", DataTypes.VARCHAR(255))
+                        .build();
+        Schema schemaWithJobName =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.BIGINT())
+                        .physicalColumn("job_name", DataTypes.VARCHAR(255))
+                        .build();
+
+        Assertions.assertThat(
+                        SchemaUtils.isSchemaChangeEventRedundant(
+                                schemaWithJob,
+                                new AddColumnEvent(
+                                        tableId,
+                                        Collections.singletonList(
+                                                new AddColumnEvent.ColumnWithPosition(
+                                                        Column.physicalColumn(
+                                                                "JOB", DataTypes.VARCHAR(255)))))))
+                .isTrue();
+        Assertions.assertThat(
+                        SchemaUtils.isSchemaChangeEventRedundant(
+                                schemaWithJob,
+                                new AlterColumnTypeEvent(
+                                        tableId,
+                                        Collections.singletonMap("JOB", DataTypes.VARCHAR(255)))))
+                .isTrue();
+        Assertions.assertThat(
+                        SchemaUtils.isSchemaChangeEventRedundant(
+                                schemaWithJob,
+                                new AlterColumnTypeEvent(
+                                        tableId,
+                                        Collections.singletonMap("JOB", DataTypes.VARCHAR(255)),
+                                        Collections.emptyMap(),
+                                        Collections.singletonMap("JOB", "job comment"))))
+                .isFalse();
+        Assertions.assertThat(
+                        SchemaUtils.isSchemaChangeEventRedundant(
+                                SchemaUtils.applySchemaChangeEvent(
+                                        schemaWithJob,
+                                        new AlterColumnTypeEvent(
+                                                tableId,
+                                                Collections.singletonMap(
+                                                        "JOB", DataTypes.VARCHAR(255)),
+                                                Collections.emptyMap(),
+                                                Collections.singletonMap("JOB", "job comment"))),
+                                new AlterColumnTypeEvent(
+                                        tableId,
+                                        Collections.singletonMap("JOB", DataTypes.VARCHAR(255)),
+                                        Collections.emptyMap(),
+                                        Collections.singletonMap("JOB", "job comment"))))
+                .isTrue();
+        Assertions.assertThat(
+                        SchemaUtils.isSchemaChangeEventRedundant(
+                                schemaWithJob,
+                                new RenameColumnEvent(
+                                        tableId, Collections.singletonMap("JOB", "job_name"))))
+                .isFalse();
+        Assertions.assertThat(
+                        SchemaUtils.isSchemaChangeEventRedundant(
+                                schemaWithJobName,
+                                new RenameColumnEvent(
+                                        tableId, Collections.singletonMap("JOB", "JOB_NAME"))))
+                .isTrue();
+        Assertions.assertThat(
+                        SchemaUtils.isSchemaChangeEventRedundant(
+                                schemaWithJobName,
+                                new DropColumnEvent(
+                                        tableId, Collections.singletonList("JOB_NAME"))))
+                .isFalse();
+        Assertions.assertThat(
+                        SchemaUtils.isSchemaChangeEventRedundant(
+                                schemaWithJobName,
+                                new DropColumnEvent(tableId, Collections.singletonList("job"))))
+                .isTrue();
+        Assertions.assertThat(
+                        SchemaUtils.isSchemaChangeEventRedundant(
+                                SchemaUtils.applySchemaChangeEvent(
+                                        schemaWithJobName,
+                                        new DropColumnEvent(
+                                                tableId, Collections.singletonList("JOB_NAME"))),
+                                new DropColumnEvent(
+                                        tableId, Collections.singletonList("JOB_NAME"))))
+                .isTrue();
+    }
+
+    @Test
+    void testAlterColumnTypeEventCopyPreservesComments() {
+        AlterColumnTypeEvent event =
+                new AlterColumnTypeEvent(
+                        TableId.parse("default.default.source_table"),
+                        Collections.singletonMap("job", DataTypes.VARCHAR(255)),
+                        Collections.singletonMap("job", DataTypes.STRING()),
+                        Collections.singletonMap("job", "job comment"));
+
+        Assertions.assertThat(event.copy(TableId.parse("default.default.sink_table")))
+                .isEqualTo(
+                        new AlterColumnTypeEvent(
+                                TableId.parse("default.default.sink_table"),
+                                Collections.singletonMap("job", DataTypes.VARCHAR(255)),
+                                Collections.singletonMap("job", DataTypes.STRING()),
+                                Collections.singletonMap("job", "job comment")));
+    }
+
+    @Test
+    void testAlterColumnTypeEventTrimRedundantChangesKeepsCommentOnlyChange() {
+        AlterColumnTypeEvent event =
+                new AlterColumnTypeEvent(
+                        TableId.parse("default.default.source_table"),
+                        new HashMap<>(Collections.singletonMap("job", DataTypes.VARCHAR(255))),
+                        new HashMap<>(Collections.singletonMap("job", DataTypes.VARCHAR(255))),
+                        Collections.singletonMap("job", "job comment"));
+
+        Assertions.assertThat(event.trimRedundantChanges()).isTrue();
+        Assertions.assertThat(event.getTypeMapping()).isEmpty();
+        Assertions.assertThat(event.getOldTypeMapping()).isEmpty();
+        Assertions.assertThat(event.getComments())
+                .containsExactlyEntriesOf(Collections.singletonMap("job", "job comment"));
+    }
+
+    @Test
+    void testTransformSchemaChangeEventKeepsProjectedCommentOnlyAlterColumnEvent() {
+        TableId tableId = TableId.parse("default.default.source_table");
+
+        Assertions.assertThat(
+                        SchemaUtils.transformSchemaChangeEvent(
+                                false,
+                                Collections.singletonList("job"),
+                                new AlterColumnTypeEvent(
+                                        tableId,
+                                        Collections.emptyMap(),
+                                        Collections.emptyMap(),
+                                        Collections.singletonMap("job", "job comment"))))
+                .hasValue(
+                        new AlterColumnTypeEvent(
+                                tableId,
+                                Collections.emptyMap(),
+                                Collections.emptyMap(),
+                                Collections.singletonMap("job", "job comment")));
+    }
+
+    @Test
+    void testTransformSchemaChangeEventKeepsProjectedCommentRemovalAlterColumnEvent() {
+        TableId tableId = TableId.parse("default.default.source_table");
+        Map<String, String> comments = new HashMap<>();
+        comments.put("job", null);
+
+        Assertions.assertThat(
+                        SchemaUtils.transformSchemaChangeEvent(
+                                false,
+                                Collections.singletonList("job"),
+                                new AlterColumnTypeEvent(
+                                        tableId,
+                                        Collections.emptyMap(),
+                                        Collections.emptyMap(),
+                                        comments)))
+                .hasValue(
+                        new AlterColumnTypeEvent(
+                                tableId, Collections.emptyMap(), Collections.emptyMap(), comments));
+    }
+
+    @Test
+    void testApplySchemaChangeEventClearsColumnComment() {
+        TableId tableId = TableId.parse("default.default.t");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.BIGINT())
+                        .physicalColumn("name", DataTypes.STRING(), "old comment")
+                        .build();
+
+        Schema updated =
+                SchemaUtils.applySchemaChangeEvent(
+                        schema,
+                        new AlterColumnTypeEvent(
+                                tableId,
+                                Collections.emptyMap(),
+                                Collections.emptyMap(),
+                                Collections.singletonMap("name", null)));
+
+        Assertions.assertThat(updated.getColumn("name").get().getComment()).isNull();
+    }
+
+    @Test
+    void testAlterColumnTypeEventAddColumnCommentAcceptsNull() {
+        AlterColumnTypeEvent event =
+                new AlterColumnTypeEvent(
+                        TableId.parse("default.default.t"),
+                        Collections.emptyMap(),
+                        Collections.emptyMap(),
+                        new HashMap<>());
+        event.addColumnComment("name", "first");
+        event.addColumnComment("name", null);
+
+        Assertions.assertThat(event.getComments()).containsEntry("name", null);
+    }
+
+    @Test
+    void testAlterColumnTypeEventFillPreSchemaResolvesExistingColumnsCaseInsensitively() {
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.BIGINT())
+                        .physicalColumn("job", DataTypes.STRING())
+                        .build();
+        AlterColumnTypeEvent event =
+                new AlterColumnTypeEvent(
+                        TableId.parse("default.default.t"),
+                        Collections.singletonMap("JOB", DataTypes.VARCHAR(255)));
+
+        event.fillPreSchema(schema);
+
+        Assertions.assertThat(event.getOldTypeMapping())
+                .containsExactlyEntriesOf(Collections.singletonMap("job", DataTypes.STRING()));
     }
 
     @Test

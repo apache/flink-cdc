@@ -493,6 +493,77 @@ class SchemaMergingUtilsTest {
                                 TABLE_ID,
                                 ImmutableMap.of("foo", BIGINT, "baz", DOUBLE),
                                 ImmutableMap.of("foo", INT, "baz", FLOAT)));
+
+        Schema schemaWithOldComment =
+                Schema.newBuilder()
+                        .physicalColumn("id", BIGINT)
+                        .physicalColumn("name", VARCHAR(17), "old name comment")
+                        .build();
+        Schema schemaWithNewComment =
+                Schema.newBuilder()
+                        .physicalColumn("id", BIGINT)
+                        .physicalColumn("name", VARCHAR(17), "new name comment")
+                        .build();
+        Assertions.assertThat(
+                        getSchemaDifference(TABLE_ID, schemaWithOldComment, schemaWithNewComment))
+                .as("test comment-only schema difference")
+                .containsExactly(
+                        new AlterColumnTypeEvent(
+                                TABLE_ID,
+                                Collections.emptyMap(),
+                                Collections.emptyMap(),
+                                Collections.singletonMap("name", "new name comment")));
+        Assertions.assertThat(
+                        getSchemaDifference(TABLE_ID, schemaWithNewComment, schemaWithNewComment))
+                .as("test unchanged comments are not emitted")
+                .isEmpty();
+
+        Schema schemaWithCommentBeforeTypeChange =
+                Schema.newBuilder()
+                        .physicalColumn("id", BIGINT)
+                        .physicalColumn("name", VARCHAR(17), "name comment")
+                        .build();
+        Schema schemaWithCommentAfterTypeChange =
+                Schema.newBuilder()
+                        .physicalColumn("id", BIGINT)
+                        .physicalColumn("name", STRING, "name comment")
+                        .build();
+        Assertions.assertThat(
+                        getSchemaDifference(
+                                TABLE_ID,
+                                schemaWithCommentBeforeTypeChange,
+                                schemaWithCommentAfterTypeChange))
+                .as("test type changes retain column comments")
+                .containsExactly(
+                        new AlterColumnTypeEvent(
+                                TABLE_ID,
+                                Collections.singletonMap("name", STRING),
+                                Collections.singletonMap("name", VARCHAR(17)),
+                                Collections.singletonMap("name", "name comment")));
+    }
+
+    @Test
+    void testCommentRemovalEmitsCommentOnlyAlter() {
+        Schema schemaWithComment =
+                Schema.newBuilder()
+                        .physicalColumn("id", BIGINT)
+                        .physicalColumn("name", VARCHAR(17), "old name comment")
+                        .build();
+        Schema schemaWithoutComment =
+                Schema.newBuilder()
+                        .physicalColumn("id", BIGINT)
+                        .physicalColumn("name", VARCHAR(17))
+                        .build();
+
+        Assertions.assertThat(
+                        getSchemaDifference(TABLE_ID, schemaWithComment, schemaWithoutComment))
+                .as("test comment-removal is emitted with null value")
+                .containsExactly(
+                        new AlterColumnTypeEvent(
+                                TABLE_ID,
+                                Collections.emptyMap(),
+                                Collections.emptyMap(),
+                                Collections.singletonMap("name", null)));
     }
 
     @Test

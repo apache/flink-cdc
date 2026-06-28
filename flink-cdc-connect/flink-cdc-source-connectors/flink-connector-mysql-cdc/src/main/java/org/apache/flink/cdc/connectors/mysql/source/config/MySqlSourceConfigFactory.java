@@ -24,6 +24,7 @@ import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
 import org.apache.flink.table.catalog.ObjectPath;
 
 import io.debezium.config.CommonConnectorConfig;
+import io.debezium.relational.RelationalDatabaseConnectorConfig;
 
 import java.io.Serializable;
 import java.time.Duration;
@@ -376,6 +377,14 @@ public class MySqlSourceConfigFactory implements Serializable {
         // Note: the includeSchemaChanges parameter is used to control emitting the schema record,
         // only DataStream API program need to emit the schema record, the Table API need not
         props.setProperty("include.schema.changes", String.valueOf(true));
+        // Persist table and column comments in the parsed table metadata so that downstream
+        // CreateTableEvent / AlterColumnTypeEvent can carry column comments all the way to
+        // the sink metadata applier. Debezium defaults this to false to save memory, but
+        // flink-cdc needs it on so that COMMENT / MODIFY COLUMN COMMENT DDL events
+        // propagate column comments through the schema change pipeline.
+        props.setProperty(
+                RelationalDatabaseConnectorConfig.INCLUDE_SCHEMA_COMMENTS.name(),
+                String.valueOf(true));
         // enable transaction metadata if includeTransactionMetadataEvents is true
         props.setProperty(
                 CommonConnectorConfig.PROVIDE_TRANSACTION_METADATA.name(),

@@ -23,11 +23,14 @@ import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.converter.JavaObjectConverter;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
+import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.ChangeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
+import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.SchemaColumnCaseFormat;
@@ -66,6 +69,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -276,16 +280,25 @@ public class PostTransformOperator extends AbstractStreamOperatorAdapter<Event>
         Schema prevPostSchema = info.getPostTransformedSchema();
         List<String> columnNamesBeforeChange = prevPostSchema.getColumnNames();
 
+        if (isColumnSchemaChangeEvent(event) && prevPostSchema.equals(nextPostSchema)) {
+            return Optional.empty();
+        }
+
+        Optional<SchemaChangeEvent> rewrittenEvent =
+                rewriteSchemaChangeEvent(
+                        event,
+                        prevPreSchema,
+                        nextPreSchema,
+                        prevPostSchema,
+                        nextPostSchema,
+                        effectiveTransformer);
+        if (rewrittenEvent.isPresent()) {
+            return rewrittenEvent.map(Event.class::cast);
+        }
+
         if (hasAsteriskMap.getOrDefault(tableId, true)) {
             // See comments in PreTransformOperator#cacheChangeSchema method.
             return SchemaUtils.transformSchemaChangeEvent(true, columnNamesBeforeChange, event)
-                    .map(Event.class::cast);
-        } else if (event instanceof AlterColumnTypeEvent) {
-            return rewriteAlterColumnTypeEvent(
-                            (AlterColumnTypeEvent) event,
-                            nextPreSchema,
-                            nextPostSchema,
-                            effectiveTransformer)
                     .map(Event.class::cast);
         } else {
             return SchemaUtils.transformSchemaChangeEvent(
@@ -442,38 +455,189 @@ public class PostTransformOperator extends AbstractStreamOperatorAdapter<Event>
                 .collect(Collectors.toList());
     }
 
-    private Optional<AlterColumnTypeEvent> rewriteAlterColumnTypeEvent(
-            AlterColumnTypeEvent event,
+    private Optional<SchemaChangeEvent> rewriteSchemaChangeEvent(
+            SchemaChangeEvent event,
+            Schema prevPreSchema,
             Schema nextPreSchema,
+            Schema prevPostSchema,
             Schema nextPostSchema,
             PostTransformer transformer) {
-        Map<String, String> lineageMap = buildProvableLineageMap(nextPreSchema, transformer);
-        Set<String> postColumnNames = new HashSet<>(nextPostSchema.getColumnNames());
+        if (event instanceof RenameColumnEvent) {
+            return rewriteRenameColumnEvent(
+                            (RenameColumnEvent) event,
+                            prevPreSchema,
+                            nextPreSchema,
+                            prevPostSchema,
+                            nextPostSchema,
+                            transformer)
+                    .map(SchemaChangeEvent.class::cast);
+        }
+        if (event instanceof AlterColumnTypeEvent) {
+            return rewriteAlterColumnTypeEvent(
+                            (AlterColumnTypeEvent) event, prevPostSchema, nextPostSchema)
+                    .map(SchemaChangeEvent.class::cast);
+        }
+        if (event instanceof AddColumnEvent) {
+            return rewriteAddColumnEvent(event.tableId(), prevPostSchema, nextPostSchema)
+                    .map(SchemaChangeEvent.class::cast);
+        }
+        if (event instanceof DropColumnEvent) {
+            return rewriteDropColumnEvent(event.tableId(), prevPostSchema, nextPostSchema)
+                    .map(SchemaChangeEvent.class::cast);
+        }
+        return Optional.empty();
+    }
+
+    private static boolean isColumnSchemaChangeEvent(SchemaChangeEvent event) {
+        return event instanceof AddColumnEvent
+                || event instanceof AlterColumnTypeEvent
+                || event instanceof DropColumnEvent
+                || event instanceof RenameColumnEvent;
+    }
+
+    private Optional<AlterColumnTypeEvent> rewriteAlterColumnTypeEvent(
+            AlterColumnTypeEvent event, Schema prevPostSchema, Schema nextPostSchema) {
         Map<String, DataType> rewrittenTypeMapping = new LinkedHashMap<>();
         Map<String, DataType> rewrittenOldTypeMapping = new LinkedHashMap<>();
+        Map<String, String> rewrittenComments = new LinkedHashMap<>();
 
-        for (Map.Entry<String, DataType> entry : event.getTypeMapping().entrySet()) {
-            String postColumnName = lineageMap.get(entry.getKey());
-            if (postColumnName == null || !postColumnNames.contains(postColumnName)) {
+        for (Column nextColumn : nextPostSchema.getColumns()) {
+            Optional<Column> prevColumnOptional = prevPostSchema.getColumn(nextColumn.getName());
+            if (!prevColumnOptional.isPresent()) {
                 continue;
             }
-            rewrittenTypeMapping.put(postColumnName, entry.getValue());
-            if (event.hasPreSchema() && event.getOldTypeMapping().containsKey(entry.getKey())) {
-                rewrittenOldTypeMapping.put(
-                        postColumnName, event.getOldTypeMapping().get(entry.getKey()));
+            Column prevColumn = prevColumnOptional.get();
+            boolean typeChanged = !Objects.equals(prevColumn.getType(), nextColumn.getType());
+            boolean commentChanged =
+                    !Objects.equals(prevColumn.getComment(), nextColumn.getComment());
+            if (typeChanged) {
+                rewrittenTypeMapping.put(nextColumn.getName(), nextColumn.getType());
+                rewrittenOldTypeMapping.put(nextColumn.getName(), prevColumn.getType());
+            }
+            if (commentChanged || (typeChanged && nextColumn.getComment() != null)) {
+                rewrittenComments.put(nextColumn.getName(), nextColumn.getComment());
             }
         }
 
-        if (rewrittenTypeMapping.isEmpty()) {
+        if (rewrittenTypeMapping.isEmpty() && rewrittenComments.isEmpty()) {
             return Optional.empty();
         }
 
         if (event.hasPreSchema() && !rewrittenOldTypeMapping.isEmpty()) {
             return Optional.of(
                     new AlterColumnTypeEvent(
-                            event.tableId(), rewrittenTypeMapping, rewrittenOldTypeMapping));
+                            event.tableId(),
+                            rewrittenTypeMapping,
+                            rewrittenOldTypeMapping,
+                            rewrittenComments));
         }
-        return Optional.of(new AlterColumnTypeEvent(event.tableId(), rewrittenTypeMapping));
+        return Optional.of(
+                new AlterColumnTypeEvent(
+                        event.tableId(),
+                        rewrittenTypeMapping,
+                        Collections.emptyMap(),
+                        rewrittenComments));
+    }
+
+    private Optional<AddColumnEvent> rewriteAddColumnEvent(
+            TableId tableId, Schema prevPostSchema, Schema nextPostSchema) {
+        Set<String> prevPostColumnNames = new HashSet<>(prevPostSchema.getColumnNames());
+        List<AddColumnEvent.ColumnWithPosition> addedColumns = new ArrayList<>();
+        String previousColumnName = null;
+        for (Column column : nextPostSchema.getColumns()) {
+            if (!prevPostColumnNames.contains(column.getName())) {
+                AddColumnEvent.ColumnPosition position =
+                        previousColumnName == null
+                                ? AddColumnEvent.ColumnPosition.FIRST
+                                : AddColumnEvent.ColumnPosition.AFTER;
+                addedColumns.add(
+                        new AddColumnEvent.ColumnWithPosition(
+                                column, position, previousColumnName));
+            }
+            previousColumnName = column.getName();
+        }
+
+        if (addedColumns.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(new AddColumnEvent(tableId, addedColumns));
+    }
+
+    private Optional<DropColumnEvent> rewriteDropColumnEvent(
+            TableId tableId, Schema prevPostSchema, Schema nextPostSchema) {
+        Set<String> nextPostColumnNames = new HashSet<>(nextPostSchema.getColumnNames());
+        List<String> droppedColumnNames =
+                prevPostSchema.getColumnNames().stream()
+                        .filter(columnName -> !nextPostColumnNames.contains(columnName))
+                        .collect(Collectors.toList());
+        if (droppedColumnNames.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(new DropColumnEvent(tableId, droppedColumnNames));
+    }
+
+    private Optional<RenameColumnEvent> rewriteRenameColumnEvent(
+            RenameColumnEvent event,
+            Schema prevPreSchema,
+            Schema nextPreSchema,
+            Schema prevPostSchema,
+            Schema nextPostSchema,
+            PostTransformer transformer) {
+        Optional<RenameColumnEvent> rewrittenEvent =
+                rewriteRenameColumnEventFromPostSchema(
+                        event.tableId(), prevPostSchema, nextPostSchema);
+        if (rewrittenEvent.isPresent()) {
+            return rewrittenEvent;
+        }
+
+        Map<String, String> prevLineageMap = buildProvableLineageMap(prevPreSchema, transformer);
+        Map<String, String> nextLineageMap = buildProvableLineageMap(nextPreSchema, transformer);
+        Map<String, String> rewrittenNameMapping = new LinkedHashMap<>();
+
+        for (Map.Entry<String, String> entry : event.getNameMapping().entrySet()) {
+            String oldPreColumnName =
+                    SchemaUtils.resolveExistingColumnName(prevPreSchema, entry.getKey());
+            String newPreColumnName =
+                    SchemaUtils.resolveExistingColumnName(nextPreSchema, entry.getValue());
+            String oldPostColumnName = prevLineageMap.get(oldPreColumnName);
+            String newPostColumnName = nextLineageMap.get(newPreColumnName);
+            if (oldPostColumnName == null
+                    || newPostColumnName == null
+                    || oldPostColumnName.equals(newPostColumnName)) {
+                continue;
+            }
+            rewrittenNameMapping.put(oldPostColumnName, newPostColumnName);
+        }
+
+        if (rewrittenNameMapping.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(new RenameColumnEvent(event.tableId(), rewrittenNameMapping));
+    }
+
+    private Optional<RenameColumnEvent> rewriteRenameColumnEventFromPostSchema(
+            TableId tableId, Schema prevPostSchema, Schema nextPostSchema) {
+        if (prevPostSchema.getColumnCount() != nextPostSchema.getColumnCount()) {
+            return Optional.empty();
+        }
+        Map<String, String> nameMapping = new LinkedHashMap<>();
+        List<Column> prevColumns = prevPostSchema.getColumns();
+        List<Column> nextColumns = nextPostSchema.getColumns();
+        for (int i = 0; i < prevColumns.size(); i++) {
+            Column prevColumn = prevColumns.get(i);
+            Column nextColumn = nextColumns.get(i);
+            if (prevColumn.getName().equals(nextColumn.getName())) {
+                continue;
+            }
+            if (!prevColumn.copy(nextColumn.getName()).equals(nextColumn)) {
+                return Optional.empty();
+            }
+            nameMapping.put(prevColumn.getName(), nextColumn.getName());
+        }
+        if (nameMapping.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(new RenameColumnEvent(tableId, nameMapping));
     }
 
     private Map<String, String> buildProvableLineageMap(

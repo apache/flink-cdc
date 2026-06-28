@@ -48,6 +48,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -334,14 +335,18 @@ public class PaimonMetadataApplier implements MetadataApplier {
                                     tableChangeList.add(
                                             SchemaChangeProvider.updateColumnType(
                                                     oldName, newType)));
-            event.getComments()
-                    .forEach(
-                            (name, comment) -> {
-                                if (comment != null) {
-                                    tableChangeList.add(
-                                            SchemaChange.updateColumnComment(name, comment));
-                                }
-                            });
+            Set<String> changedColumns = new LinkedHashSet<>(event.getTypeMapping().keySet());
+            changedColumns.addAll(event.getComments().keySet());
+            for (String columnName : changedColumns) {
+                if (!event.getComments().containsKey(columnName)) {
+                    continue;
+                }
+                String comment = event.getComments().get(columnName);
+                tableChangeList.add(SchemaChange.updateColumnComment(columnName, comment));
+            }
+            if (tableChangeList.isEmpty()) {
+                return;
+            }
             catalog.alterTable(tableIdToIdentifier(event), tableChangeList, true);
         } catch (Catalog.TableNotExistException
                 | Catalog.ColumnAlreadyExistException

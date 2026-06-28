@@ -18,15 +18,20 @@
 package org.apache.flink.cdc.runtime.operators.transform;
 
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
+import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
+import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.pipeline.SchemaColumnCaseFormat;
+import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
+import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.runtime.testutils.operators.RegularEventOperatorTestHarness;
@@ -37,6 +42,8 @@ import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Regression tests for primary/partition key names staying consistent with post-projection column
@@ -191,6 +198,632 @@ class PostTransformOperatorProjectionKeysRegressionTest {
 
         Assertions.assertThat(harness.getOutputRecords().poll())
                 .isEqualTo(new StreamRecord<>(new CreateTableEvent(tableId, expectedSchema)));
+        harness.close();
+    }
+
+    @Test
+    void testExplicitProjectionLowerCaseRewritesAlterColumnTypeEvent() throws Exception {
+        TableId tableId = TableId.tableId("test", "student");
+        Schema sourceSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.BIGINT().notNull())
+                        .physicalColumn("JOB", DataTypes.STRING())
+                        .physicalColumn("flag", DataTypes.INT())
+                        .primaryKey("id")
+                        .build();
+
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
+                        .addTransform(
+                                tableId.identifier(),
+                                "id, JOB",
+                                null,
+                                "id",
+                                "",
+                                "",
+                                ",",
+                                "",
+                                new SupportedMetadataColumn[0],
+                                SchemaColumnCaseFormat.LOWER)
+                        .build();
+        RegularEventOperatorTestHarness<PostTransformOperator, Event> harness =
+                RegularEventOperatorTestHarness.with(transform, 1);
+        harness.open();
+
+        transform.processElement(new StreamRecord<>(new CreateTableEvent(tableId, sourceSchema)));
+        harness.getOutputRecords().poll();
+
+        transform.processElement(
+                new StreamRecord<>(
+                        new AlterColumnTypeEvent(
+                                tableId,
+                                Collections.singletonMap("JOB", DataTypes.VARCHAR(255)),
+                                Collections.emptyMap(),
+                                Collections.singletonMap("JOB", "job comment"))));
+
+        Assertions.assertThat(harness.getOutputRecords().poll())
+                .isEqualTo(
+                        new StreamRecord<>(
+                                new AlterColumnTypeEvent(
+                                        tableId,
+                                        Collections.singletonMap("job", DataTypes.VARCHAR(255)),
+                                        Collections.emptyMap(),
+                                        Collections.singletonMap("job", "job comment"))));
+        harness.close();
+    }
+
+    @Test
+    void testLowerCaseFormatRewritesRenameColumnEvent() throws Exception {
+        TableId tableId = TableId.tableId("test", "student");
+        Schema sourceSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.BIGINT().notNull())
+                        .physicalColumn("JOB", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
+                        .addTransform(
+                                tableId.identifier(),
+                                "*",
+                                null,
+                                "",
+                                "",
+                                "",
+                                ",",
+                                "",
+                                new SupportedMetadataColumn[0],
+                                SchemaColumnCaseFormat.LOWER)
+                        .build();
+        RegularEventOperatorTestHarness<PostTransformOperator, Event> harness =
+                RegularEventOperatorTestHarness.with(transform, 1);
+        harness.open();
+
+        transform.processElement(new StreamRecord<>(new CreateTableEvent(tableId, sourceSchema)));
+        harness.getOutputRecords().poll();
+
+        transform.processElement(
+                new StreamRecord<>(
+                        new RenameColumnEvent(
+                                tableId, Collections.singletonMap("JOB", "job_name"))));
+
+        Assertions.assertThat(harness.getOutputRecords().poll())
+                .isEqualTo(
+                        new StreamRecord<>(
+                                new RenameColumnEvent(
+                                        tableId, Collections.singletonMap("job", "job_name"))));
+        harness.close();
+    }
+
+    @Test
+    void testLowerCaseFormatSkipsCaseOnlyRenameColumnEvent() throws Exception {
+        TableId tableId = TableId.tableId("test", "student");
+        Schema sourceSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.BIGINT().notNull())
+                        .physicalColumn("JOB", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
+                        .addTransform(
+                                tableId.identifier(),
+                                "*",
+                                null,
+                                "",
+                                "",
+                                "",
+                                ",",
+                                "",
+                                new SupportedMetadataColumn[0],
+                                SchemaColumnCaseFormat.LOWER)
+                        .build();
+        RegularEventOperatorTestHarness<PostTransformOperator, Event> harness =
+                RegularEventOperatorTestHarness.with(transform, 1);
+        harness.open();
+
+        transform.processElement(new StreamRecord<>(new CreateTableEvent(tableId, sourceSchema)));
+        harness.getOutputRecords().poll();
+
+        transform.processElement(
+                new StreamRecord<>(
+                        new RenameColumnEvent(tableId, Collections.singletonMap("JOB", "job"))));
+
+        Assertions.assertThat(harness.getOutputRecords()).isEmpty();
+        harness.close();
+    }
+
+    @Test
+    void testLowerCaseFormatRewritesUnderscoreRenameColumnEvent() throws Exception {
+        TableId tableId = TableId.tableId("test", "student");
+        Schema sourceSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.BIGINT().notNull())
+                        .physicalColumn("JOB_NAME", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
+                        .addTransform(
+                                tableId.identifier(),
+                                "*",
+                                null,
+                                "",
+                                "",
+                                "",
+                                ",",
+                                "",
+                                new SupportedMetadataColumn[0],
+                                SchemaColumnCaseFormat.LOWER)
+                        .build();
+        RegularEventOperatorTestHarness<PostTransformOperator, Event> harness =
+                RegularEventOperatorTestHarness.with(transform, 1);
+        harness.open();
+
+        transform.processElement(new StreamRecord<>(new CreateTableEvent(tableId, sourceSchema)));
+        harness.getOutputRecords().poll();
+
+        transform.processElement(
+                new StreamRecord<>(
+                        new RenameColumnEvent(
+                                tableId, Collections.singletonMap("JOB_NAME", "JOB_NAME_123"))));
+
+        Assertions.assertThat(harness.getOutputRecords().poll())
+                .isEqualTo(
+                        new StreamRecord<>(
+                                new RenameColumnEvent(
+                                        tableId,
+                                        Collections.singletonMap("job_name", "job_name_123"))));
+        harness.close();
+    }
+
+    @Test
+    void testLowerCaseFormatRewritesAlterColumnTypeEvent() throws Exception {
+        TableId tableId = TableId.tableId("test", "student");
+        Schema sourceSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.BIGINT().notNull())
+                        .physicalColumn("JOB", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+
+        Map<String, String> comments = new HashMap<>();
+        comments.put("JOB", "job comment");
+
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
+                        .addTransform(
+                                tableId.identifier(),
+                                "*",
+                                null,
+                                "",
+                                "",
+                                "",
+                                ",",
+                                "",
+                                new SupportedMetadataColumn[0],
+                                SchemaColumnCaseFormat.LOWER)
+                        .build();
+        RegularEventOperatorTestHarness<PostTransformOperator, Event> harness =
+                RegularEventOperatorTestHarness.with(transform, 1);
+        harness.open();
+
+        transform.processElement(new StreamRecord<>(new CreateTableEvent(tableId, sourceSchema)));
+        harness.getOutputRecords().poll();
+
+        transform.processElement(
+                new StreamRecord<>(
+                        new AlterColumnTypeEvent(
+                                tableId,
+                                Collections.singletonMap("JOB", DataTypes.VARCHAR(255)),
+                                Collections.emptyMap(),
+                                comments)));
+
+        Assertions.assertThat(harness.getOutputRecords().poll())
+                .isEqualTo(
+                        new StreamRecord<>(
+                                new AlterColumnTypeEvent(
+                                        tableId,
+                                        Collections.singletonMap("job", DataTypes.VARCHAR(255)),
+                                        Collections.emptyMap(),
+                                        Collections.singletonMap("job", "job comment"))));
+        harness.close();
+    }
+
+    @Test
+    void testLowerCaseFormatRewritesDuplicatedForwardedColumnsByPostSchemaDiff() throws Exception {
+        TableId tableId = TableId.tableId("test", "student");
+        Schema sourceSchema = Schema.newBuilder().physicalColumn("JOB", DataTypes.STRING()).build();
+
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
+                        .addTransform(
+                                tableId.identifier(),
+                                "JOB, JOB AS job_copy",
+                                null,
+                                "",
+                                "",
+                                "",
+                                ",",
+                                "",
+                                new SupportedMetadataColumn[0],
+                                SchemaColumnCaseFormat.LOWER)
+                        .build();
+        RegularEventOperatorTestHarness<PostTransformOperator, Event> harness =
+                RegularEventOperatorTestHarness.with(transform, 1);
+        harness.open();
+
+        transform.processElement(new StreamRecord<>(new CreateTableEvent(tableId, sourceSchema)));
+        harness.getOutputRecords().poll();
+
+        transform.processElement(
+                new StreamRecord<>(
+                        new AlterColumnTypeEvent(
+                                tableId, Collections.singletonMap("JOB", DataTypes.VARCHAR(255)))));
+
+        Map<String, DataType> expectedTypeMapping = new HashMap<>();
+        expectedTypeMapping.put("job", DataTypes.VARCHAR(255));
+        expectedTypeMapping.put("job_copy", DataTypes.VARCHAR(255));
+        Assertions.assertThat(harness.getOutputRecords().poll())
+                .isEqualTo(
+                        new StreamRecord<>(new AlterColumnTypeEvent(tableId, expectedTypeMapping)));
+        harness.close();
+    }
+
+    @Test
+    void testLowerCaseFormatRewritesAlterColumnCommentOnlyEvent() throws Exception {
+        TableId tableId = TableId.tableId("test", "student");
+        Schema sourceSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.BIGINT().notNull())
+                        .physicalColumn("JOB", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
+                        .addTransform(
+                                tableId.identifier(),
+                                "*",
+                                null,
+                                "",
+                                "",
+                                "",
+                                ",",
+                                "",
+                                new SupportedMetadataColumn[0],
+                                SchemaColumnCaseFormat.LOWER)
+                        .build();
+        RegularEventOperatorTestHarness<PostTransformOperator, Event> harness =
+                RegularEventOperatorTestHarness.with(transform, 1);
+        harness.open();
+
+        transform.processElement(new StreamRecord<>(new CreateTableEvent(tableId, sourceSchema)));
+        harness.getOutputRecords().poll();
+
+        transform.processElement(
+                new StreamRecord<>(
+                        new AlterColumnTypeEvent(
+                                tableId,
+                                Collections.emptyMap(),
+                                Collections.emptyMap(),
+                                Collections.singletonMap("JOB", "job comment"))));
+
+        Assertions.assertThat(harness.getOutputRecords().poll())
+                .isEqualTo(
+                        new StreamRecord<>(
+                                new AlterColumnTypeEvent(
+                                        tableId,
+                                        Collections.emptyMap(),
+                                        Collections.emptyMap(),
+                                        Collections.singletonMap("job", "job comment"))));
+        harness.close();
+    }
+
+    @Test
+    void testLowerCaseFormatRewritesDropColumnEvent() throws Exception {
+        TableId tableId = TableId.tableId("test", "student");
+        Schema sourceSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.BIGINT().notNull())
+                        .physicalColumn("JOB_NAME", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
+                        .addTransform(
+                                tableId.identifier(),
+                                "*",
+                                null,
+                                "",
+                                "",
+                                "",
+                                ",",
+                                "",
+                                new SupportedMetadataColumn[0],
+                                SchemaColumnCaseFormat.LOWER)
+                        .build();
+        RegularEventOperatorTestHarness<PostTransformOperator, Event> harness =
+                RegularEventOperatorTestHarness.with(transform, 1);
+        harness.open();
+
+        transform.processElement(new StreamRecord<>(new CreateTableEvent(tableId, sourceSchema)));
+        harness.getOutputRecords().poll();
+
+        transform.processElement(
+                new StreamRecord<>(
+                        new DropColumnEvent(tableId, Collections.singletonList("JOB_NAME"))));
+
+        Assertions.assertThat(harness.getOutputRecords().poll())
+                .isEqualTo(
+                        new StreamRecord<>(
+                                new DropColumnEvent(
+                                        tableId, Collections.singletonList("job_name"))));
+        harness.close();
+    }
+
+    @Test
+    void testLowerCaseFormatRewritesDropColumnEventAfterCaseOnlyNameResolution() throws Exception {
+        TableId tableId = TableId.tableId("test", "student");
+        Schema sourceSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.BIGINT().notNull())
+                        .physicalColumn("job_nam", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
+                        .addTransform(
+                                tableId.identifier(),
+                                "*",
+                                null,
+                                "",
+                                "",
+                                "",
+                                ",",
+                                "",
+                                new SupportedMetadataColumn[0],
+                                SchemaColumnCaseFormat.LOWER)
+                        .build();
+        RegularEventOperatorTestHarness<PostTransformOperator, Event> harness =
+                RegularEventOperatorTestHarness.with(transform, 1);
+        harness.open();
+
+        transform.processElement(new StreamRecord<>(new CreateTableEvent(tableId, sourceSchema)));
+        harness.getOutputRecords().poll();
+
+        transform.processElement(
+                new StreamRecord<>(
+                        new RenameColumnEvent(
+                                tableId, Collections.singletonMap("job_nam", "job_name"))));
+        Assertions.assertThat(harness.getOutputRecords().poll())
+                .isEqualTo(
+                        new StreamRecord<>(
+                                new RenameColumnEvent(
+                                        tableId, Collections.singletonMap("job_nam", "job_name"))));
+
+        transform.processElement(
+                new StreamRecord<>(
+                        new DropColumnEvent(tableId, Collections.singletonList("JOB_NAME"))));
+        Assertions.assertThat(harness.getOutputRecords().poll())
+                .isEqualTo(
+                        new StreamRecord<>(
+                                new DropColumnEvent(
+                                        tableId, Collections.singletonList("job_name"))));
+        harness.close();
+    }
+
+    @Test
+    void testLowerCaseFormatRewritesCommentRemovalAlterColumnTypeEvent() throws Exception {
+        TableId tableId = TableId.tableId("test", "student");
+        Schema sourceSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.BIGINT().notNull())
+                        .physicalColumn("JOB", DataTypes.STRING(), "old job comment")
+                        .primaryKey("id")
+                        .build();
+
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
+                        .addTransform(
+                                tableId.identifier(),
+                                "*",
+                                null,
+                                "",
+                                "",
+                                "",
+                                ",",
+                                "",
+                                new SupportedMetadataColumn[0],
+                                SchemaColumnCaseFormat.LOWER)
+                        .build();
+        RegularEventOperatorTestHarness<PostTransformOperator, Event> harness =
+                RegularEventOperatorTestHarness.with(transform, 1);
+        harness.open();
+
+        transform.processElement(new StreamRecord<>(new CreateTableEvent(tableId, sourceSchema)));
+        harness.getOutputRecords().poll();
+
+        Map<String, String> comments = new HashMap<>();
+        comments.put("JOB", null);
+        transform.processElement(
+                new StreamRecord<>(
+                        new AlterColumnTypeEvent(
+                                tableId,
+                                Collections.emptyMap(),
+                                Collections.emptyMap(),
+                                comments)));
+
+        Map<String, String> expectedComments = new HashMap<>();
+        expectedComments.put("job", null);
+        Assertions.assertThat(harness.getOutputRecords().poll())
+                .isEqualTo(
+                        new StreamRecord<>(
+                                new AlterColumnTypeEvent(
+                                        tableId,
+                                        Collections.emptyMap(),
+                                        Collections.emptyMap(),
+                                        expectedComments)));
+        harness.close();
+    }
+
+    @Test
+    void testLowerCaseFormatRewritesAddColumnEvent() throws Exception {
+        TableId tableId = TableId.tableId("test", "student");
+        Schema sourceSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.BIGINT().notNull())
+                        .physicalColumn("JOB", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
+                        .addTransform(
+                                tableId.identifier(),
+                                "*",
+                                null,
+                                "",
+                                "",
+                                "",
+                                ",",
+                                "",
+                                new SupportedMetadataColumn[0],
+                                SchemaColumnCaseFormat.LOWER)
+                        .build();
+        RegularEventOperatorTestHarness<PostTransformOperator, Event> harness =
+                RegularEventOperatorTestHarness.with(transform, 1);
+        harness.open();
+
+        transform.processElement(new StreamRecord<>(new CreateTableEvent(tableId, sourceSchema)));
+        harness.getOutputRecords().poll();
+
+        transform.processElement(
+                new StreamRecord<>(
+                        new AddColumnEvent(
+                                tableId,
+                                Collections.singletonList(
+                                        new AddColumnEvent.ColumnWithPosition(
+                                                Column.physicalColumn("AGE", DataTypes.INT()),
+                                                AddColumnEvent.ColumnPosition.AFTER,
+                                                "JOB")))));
+
+        Assertions.assertThat(harness.getOutputRecords().poll())
+                .isEqualTo(
+                        new StreamRecord<>(
+                                new AddColumnEvent(
+                                        tableId,
+                                        Collections.singletonList(
+                                                new AddColumnEvent.ColumnWithPosition(
+                                                        Column.physicalColumn(
+                                                                "age", DataTypes.INT()),
+                                                        AddColumnEvent.ColumnPosition.AFTER,
+                                                        "job")))));
+        harness.close();
+    }
+
+    @Test
+    void testImplicitLowerCaseFormatRewritesSchemaChangeEvents() throws Exception {
+        TableId tableId = TableId.tableId("test", "student");
+        Schema sourceSchema =
+                Schema.newBuilder()
+                        .physicalColumn("ID", DataTypes.BIGINT().notNull())
+                        .physicalColumn("JOB", DataTypes.STRING())
+                        .physicalColumn("JOB_NAME", DataTypes.STRING())
+                        .primaryKey("ID")
+                        .build();
+
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
+                        .addTransform(
+                                tableId.identifier(),
+                                null,
+                                null,
+                                "",
+                                "",
+                                "",
+                                ",",
+                                "",
+                                new SupportedMetadataColumn[0],
+                                SchemaColumnCaseFormat.LOWER)
+                        .build();
+        RegularEventOperatorTestHarness<PostTransformOperator, Event> harness =
+                RegularEventOperatorTestHarness.with(transform, 1);
+        harness.open();
+
+        transform.processElement(new StreamRecord<>(new CreateTableEvent(tableId, sourceSchema)));
+        Assertions.assertThat(harness.getOutputRecords().poll())
+                .isEqualTo(
+                        new StreamRecord<>(
+                                new CreateTableEvent(
+                                        tableId,
+                                        Schema.newBuilder()
+                                                .physicalColumn("id", DataTypes.BIGINT().notNull())
+                                                .physicalColumn("job", DataTypes.STRING())
+                                                .physicalColumn("job_name", DataTypes.STRING())
+                                                .primaryKey("id")
+                                                .build())));
+
+        transform.processElement(
+                new StreamRecord<>(
+                        new AddColumnEvent(
+                                tableId,
+                                Collections.singletonList(
+                                        new AddColumnEvent.ColumnWithPosition(
+                                                Column.physicalColumn("AGE", DataTypes.INT()),
+                                                AddColumnEvent.ColumnPosition.AFTER,
+                                                "JOB")))));
+        Assertions.assertThat(harness.getOutputRecords().poll())
+                .isEqualTo(
+                        new StreamRecord<>(
+                                new AddColumnEvent(
+                                        tableId,
+                                        Collections.singletonList(
+                                                new AddColumnEvent.ColumnWithPosition(
+                                                        Column.physicalColumn(
+                                                                "age", DataTypes.INT()),
+                                                        AddColumnEvent.ColumnPosition.AFTER,
+                                                        "job")))));
+
+        transform.processElement(
+                new StreamRecord<>(
+                        new AlterColumnTypeEvent(
+                                tableId,
+                                Collections.singletonMap("JOB", DataTypes.VARCHAR(255)),
+                                Collections.emptyMap(),
+                                Collections.singletonMap("JOB", "job comment"))));
+        Assertions.assertThat(harness.getOutputRecords().poll())
+                .isEqualTo(
+                        new StreamRecord<>(
+                                new AlterColumnTypeEvent(
+                                        tableId,
+                                        Collections.singletonMap("job", DataTypes.VARCHAR(255)),
+                                        Collections.emptyMap(),
+                                        Collections.singletonMap("job", "job comment"))));
+
+        transform.processElement(
+                new StreamRecord<>(
+                        new RenameColumnEvent(
+                                tableId, Collections.singletonMap("JOB", "JOB_TITLE"))));
+        Assertions.assertThat(harness.getOutputRecords().poll())
+                .isEqualTo(
+                        new StreamRecord<>(
+                                new RenameColumnEvent(
+                                        tableId, Collections.singletonMap("job", "job_title"))));
+
+        transform.processElement(
+                new StreamRecord<>(
+                        new DropColumnEvent(tableId, Collections.singletonList("JOB_NAME"))));
+        Assertions.assertThat(harness.getOutputRecords().poll())
+                .isEqualTo(
+                        new StreamRecord<>(
+                                new DropColumnEvent(
+                                        tableId, Collections.singletonList("job_name"))));
         harness.close();
     }
 

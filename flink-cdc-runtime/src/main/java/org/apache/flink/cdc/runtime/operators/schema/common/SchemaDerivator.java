@@ -157,8 +157,11 @@ public class SchemaDerivator {
             List<SchemaChangeEvent> schemaChangeEvents,
             SchemaChangeBehavior schemaChangeBehavior,
             MetadataApplier metadataApplier) {
+        List<SchemaChangeEvent> columnReferenceNormalizedEvents =
+                normalizeExistingColumnReferences(oldSchema, schemaChangeEvents);
         List<SchemaChangeEvent> rewrittenSchemaChangeEvents =
-                rewriteSchemaChangeEvents(oldSchema, schemaChangeEvents, schemaChangeBehavior);
+                rewriteSchemaChangeEvents(
+                        oldSchema, columnReferenceNormalizedEvents, schemaChangeBehavior);
         rewrittenSchemaChangeEvents.forEach(
                 evt -> {
                     if (evt instanceof SchemaChangeEventWithPreSchema) {
@@ -179,6 +182,75 @@ public class SchemaDerivator {
             }
         }
         return finalSchemaChangeEvents;
+    }
+
+    private static List<SchemaChangeEvent> normalizeExistingColumnReferences(
+            Schema oldSchema, List<SchemaChangeEvent> schemaChangeEvents) {
+        if (oldSchema == null) {
+            return schemaChangeEvents;
+        }
+        return schemaChangeEvents.stream()
+                .map(event -> normalizeExistingColumnReferences(oldSchema, event))
+                .collect(Collectors.toList());
+    }
+
+    private static SchemaChangeEvent normalizeExistingColumnReferences(
+            Schema oldSchema, SchemaChangeEvent schemaChangeEvent) {
+        if (schemaChangeEvent instanceof AddColumnEvent) {
+            return normalizeAddColumnEvent(oldSchema, (AddColumnEvent) schemaChangeEvent);
+        } else if (schemaChangeEvent instanceof AlterColumnTypeEvent) {
+            return normalizeAlterColumnTypeEvent(
+                    oldSchema, (AlterColumnTypeEvent) schemaChangeEvent);
+        } else if (schemaChangeEvent instanceof DropColumnEvent) {
+            DropColumnEvent dropColumnEvent = (DropColumnEvent) schemaChangeEvent;
+            return new DropColumnEvent(
+                    dropColumnEvent.tableId(),
+                    dropColumnEvent.getDroppedColumnNames().stream()
+                            .map(
+                                    columnName ->
+                                            SchemaUtils.resolveExistingColumnName(
+                                                    oldSchema, columnName))
+                            .collect(Collectors.toList()));
+        } else if (schemaChangeEvent instanceof RenameColumnEvent) {
+            RenameColumnEvent renameColumnEvent = (RenameColumnEvent) schemaChangeEvent;
+            return new RenameColumnEvent(
+                    renameColumnEvent.tableId(),
+                    SchemaUtils.resolveExistingColumnNameMap(
+                            oldSchema, renameColumnEvent.getNameMapping()));
+        }
+        return schemaChangeEvent;
+    }
+
+    private static AddColumnEvent normalizeAddColumnEvent(
+            Schema oldSchema, AddColumnEvent addColumnEvent) {
+        return new AddColumnEvent(
+                addColumnEvent.tableId(),
+                addColumnEvent.getAddedColumns().stream()
+                        .map(
+                                columnWithPosition -> {
+                                    if (columnWithPosition.getExistedColumnName() == null) {
+                                        return columnWithPosition;
+                                    }
+                                    return new AddColumnEvent.ColumnWithPosition(
+                                            columnWithPosition.getAddColumn(),
+                                            columnWithPosition.getPosition(),
+                                            SchemaUtils.resolveExistingColumnName(
+                                                    oldSchema,
+                                                    columnWithPosition.getExistedColumnName()));
+                                })
+                        .collect(Collectors.toList()));
+    }
+
+    private static AlterColumnTypeEvent normalizeAlterColumnTypeEvent(
+            Schema oldSchema, AlterColumnTypeEvent alterColumnTypeEvent) {
+        return new AlterColumnTypeEvent(
+                alterColumnTypeEvent.tableId(),
+                SchemaUtils.resolveExistingColumnNameMap(
+                        oldSchema, alterColumnTypeEvent.getTypeMapping()),
+                SchemaUtils.resolveExistingColumnNameMap(
+                        oldSchema, alterColumnTypeEvent.getOldTypeMapping()),
+                SchemaUtils.resolveExistingColumnNameMap(
+                        oldSchema, alterColumnTypeEvent.getComments()));
     }
 
     private static List<SchemaChangeEvent> rewriteSchemaChangeEvents(

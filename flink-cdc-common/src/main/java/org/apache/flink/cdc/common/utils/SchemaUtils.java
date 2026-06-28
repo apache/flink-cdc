@@ -27,6 +27,8 @@ import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.visitor.SchemaChangeEventVisitor;
 import org.apache.flink.cdc.common.schema.Column;
+import org.apache.flink.cdc.common.schema.MetadataColumn;
+import org.apache.flink.cdc.common.schema.PhysicalColumn;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypeFamily;
@@ -42,6 +44,7 @@ import javax.annotation.Nullable;
 
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -119,6 +122,43 @@ public class SchemaUtils {
                 alterTableCommentEvent -> schema.copy(alterTableCommentEvent.getComment()));
     }
 
+    /**
+     * Resolves a column name to the exact name stored in the given schema.
+     *
+     * <p>The original name is returned when it already exists, when no case-insensitive match
+     * exists, or when multiple case-insensitive matches exist.
+     */
+    @CheckReturnValue
+    public static String resolveExistingColumnName(Schema schema, String columnName) {
+        if (schema == null || columnName == null || schema.getColumn(columnName).isPresent()) {
+            return columnName;
+        }
+
+        List<String> matchedColumnNames =
+                schema.getColumnNames().stream()
+                        .filter(
+                                existingColumnName ->
+                                        existingColumnName.equalsIgnoreCase(columnName))
+                        .collect(Collectors.toList());
+        return matchedColumnNames.size() == 1 ? matchedColumnNames.get(0) : columnName;
+    }
+
+    private static String resolveExistingColumnName(List<Column> columns, String columnName) {
+        if (columnName == null
+                || columns.stream().anyMatch(column -> column.getName().equals(columnName))) {
+            return columnName;
+        }
+
+        List<String> matchedColumnNames =
+                columns.stream()
+                        .map(Column::getName)
+                        .filter(
+                                existingColumnName ->
+                                        existingColumnName.equalsIgnoreCase(columnName))
+                        .collect(Collectors.toList());
+        return matchedColumnNames.size() == 1 ? matchedColumnNames.get(0) : columnName;
+    }
+
     private static Schema applyAddColumnEvent(AddColumnEvent event, Schema oldSchema) {
         LinkedList<Column> columns = new LinkedList<>(oldSchema.getColumns());
         for (AddColumnEvent.ColumnWithPosition columnWithPosition : event.getAddedColumns()) {
@@ -138,9 +178,12 @@ public class SchemaUtils {
                         Preconditions.checkNotNull(
                                 columnWithPosition.getExistedColumnName(),
                                 "existedColumnName could not be null in BEFORE type AddColumnEvent");
+                        String existedColumnName =
+                                resolveExistingColumnName(
+                                        columns, columnWithPosition.getExistedColumnName());
                         List<String> columnNames =
                                 columns.stream().map(Column::getName).collect(Collectors.toList());
-                        int index = columnNames.indexOf(columnWithPosition.getExistedColumnName());
+                        int index = columnNames.indexOf(existedColumnName);
                         if (index < 0) {
                             throw new IllegalArgumentException(
                                     columnWithPosition.getExistedColumnName()
@@ -154,9 +197,12 @@ public class SchemaUtils {
                         Preconditions.checkNotNull(
                                 columnWithPosition.getExistedColumnName(),
                                 "existedColumnName could not be null in AFTER type AddColumnEvent");
+                        String existedColumnName =
+                                resolveExistingColumnName(
+                                        columns, columnWithPosition.getExistedColumnName());
                         List<String> columnNames =
                                 columns.stream().map(Column::getName).collect(Collectors.toList());
-                        int index = columnNames.indexOf(columnWithPosition.getExistedColumnName());
+                        int index = columnNames.indexOf(existedColumnName);
                         if (index < 0) {
                             throw new IllegalArgumentException(
                                     columnWithPosition.getExistedColumnName()
@@ -171,24 +217,27 @@ public class SchemaUtils {
     }
 
     private static Schema applyDropColumnEvent(DropColumnEvent event, Schema oldSchema) {
+        Set<String> droppedColumnNames =
+                event.getDroppedColumnNames().stream()
+                        .map(columnName -> resolveExistingColumnName(oldSchema, columnName))
+                        .collect(Collectors.toSet());
         List<Column> columns =
                 oldSchema.getColumns().stream()
-                        .filter(
-                                (column ->
-                                        !event.getDroppedColumnNames().contains(column.getName())))
+                        .filter(column -> !droppedColumnNames.contains(column.getName()))
                         .collect(Collectors.toList());
         return oldSchema.copy(columns);
     }
 
     private static Schema applyRenameColumnEvent(RenameColumnEvent event, Schema oldSchema) {
+        Map<String, String> nameMapping =
+                resolveExistingColumnNameMap(oldSchema, event.getNameMapping());
         List<Column> columns = new ArrayList<>();
         oldSchema
                 .getColumns()
                 .forEach(
                         column -> {
-                            if (event.getNameMapping().containsKey(column.getName())) {
-                                columns.add(
-                                        column.copy(event.getNameMapping().get(column.getName())));
+                            if (nameMapping.containsKey(column.getName())) {
+                                columns.add(column.copy(nameMapping.get(column.getName())));
                             } else {
                                 columns.add(column);
                             }
@@ -197,19 +246,62 @@ public class SchemaUtils {
     }
 
     private static Schema applyAlterColumnTypeEvent(AlterColumnTypeEvent event, Schema oldSchema) {
+        Map<String, DataType> typeMapping =
+                resolveExistingColumnNameMap(oldSchema, event.getTypeMapping());
+        Map<String, String> comments = resolveExistingColumnNameMap(oldSchema, event.getComments());
         List<Column> columns = new ArrayList<>();
         oldSchema
                 .getColumns()
                 .forEach(
                         column -> {
-                            if (event.getTypeMapping().containsKey(column.getName())) {
-                                columns.add(
-                                        column.copy(event.getTypeMapping().get(column.getName())));
+                            String columnName = column.getName();
+                            Column updatedColumn = column;
+                            if (typeMapping.containsKey(columnName)) {
+                                updatedColumn = updatedColumn.copy(typeMapping.get(columnName));
+                            }
+                            if (comments.containsKey(columnName)) {
+                                updatedColumn =
+                                        copyColumnWithComment(
+                                                updatedColumn, comments.get(columnName));
+                            }
+                            if (typeMapping.containsKey(columnName)
+                                    || comments.containsKey(columnName)) {
+                                columns.add(updatedColumn);
                             } else {
                                 columns.add(column);
                             }
                         });
         return oldSchema.copy(columns);
+    }
+
+    /** Resolves all keys in a column-name keyed map with {@link #resolveExistingColumnName}. */
+    @CheckReturnValue
+    public static <T> Map<String, T> resolveExistingColumnNameMap(
+            Schema schema, Map<String, T> columnNameMap) {
+        Map<String, T> resolvedColumnNameMap = new LinkedHashMap<>();
+        columnNameMap.forEach(
+                (columnName, value) ->
+                        resolvedColumnNameMap.put(
+                                resolveExistingColumnName(schema, columnName), value));
+        return resolvedColumnNameMap;
+    }
+
+    private static Column copyColumnWithComment(Column column, @Nullable String comment) {
+        if (column instanceof PhysicalColumn) {
+            return Column.physicalColumn(
+                    column.getName(),
+                    column.getType(),
+                    comment,
+                    column.getDefaultValueExpression());
+        }
+        if (column instanceof MetadataColumn) {
+            return Column.metadataColumn(
+                    column.getName(),
+                    column.getType(),
+                    ((MetadataColumn) column).getMetadataKey(),
+                    comment);
+        }
+        throw new IllegalArgumentException("Unsupported column type: " + column.getClass());
     }
 
     /**
@@ -279,20 +371,38 @@ public class SchemaUtils {
                 Map<String, DataType> newDataTypeMap =
                         alterColumnTypeEvent.getTypeMapping().entrySet().stream()
                                 .filter(e -> referencedColumns.contains(e.getKey()))
-                                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-                if (!newDataTypeMap.isEmpty()) {
-                    AlterColumnTypeEvent value =
-                            new AlterColumnTypeEvent(
-                                    alterColumnTypeEvent.tableId(), newDataTypeMap);
-                    alterColumnTypeEvent
-                            .getComments()
-                            .forEach(
-                                    (name, comment) -> {
-                                        if (referencedColumns.contains(name)) {
-                                            value.addColumnComment(name, comment);
-                                        }
-                                    });
-                    evolvedSchemaChangeEvent = Optional.of(value);
+                                .collect(
+                                        Collectors.toMap(
+                                                Map.Entry::getKey,
+                                                Map.Entry::getValue,
+                                                (left, right) -> right,
+                                                LinkedHashMap::new));
+                Map<String, DataType> oldDataTypeMap =
+                        alterColumnTypeEvent.getOldTypeMapping().entrySet().stream()
+                                .filter(e -> referencedColumns.contains(e.getKey()))
+                                .collect(
+                                        Collectors.toMap(
+                                                Map.Entry::getKey,
+                                                Map.Entry::getValue,
+                                                (left, right) -> right,
+                                                LinkedHashMap::new));
+                Map<String, String> comments = new LinkedHashMap<>();
+                alterColumnTypeEvent
+                        .getComments()
+                        .forEach(
+                                (columnName, comment) -> {
+                                    if (referencedColumns.contains(columnName)) {
+                                        comments.put(columnName, comment);
+                                    }
+                                });
+                if (!newDataTypeMap.isEmpty() || !comments.isEmpty()) {
+                    evolvedSchemaChangeEvent =
+                            Optional.of(
+                                    new AlterColumnTypeEvent(
+                                            alterColumnTypeEvent.tableId(),
+                                            newDataTypeMap,
+                                            oldDataTypeMap,
+                                            comments));
                 }
             }
         } else if (event instanceof RenameColumnEvent) {
@@ -330,7 +440,8 @@ public class SchemaUtils {
                             // It has been applied only if all columns are present in existedColumns
                             for (AddColumnEvent.ColumnWithPosition column :
                                     addColumnEvent.getAddedColumns()) {
-                                if (!existedColumns.contains(column.getAddColumn())) {
+                                if (!containsSameColumnIgnoreNameCase(
+                                        existedColumns, column.getAddColumn())) {
                                     return false;
                                 }
                             }
@@ -346,11 +457,22 @@ public class SchemaUtils {
                             // It has been applied only if all column types are set as expected
                             for (Map.Entry<String, DataType> entry :
                                     alterColumnTypeEvent.getTypeMapping().entrySet()) {
-                                if (!schema.getColumn(entry.getKey()).isPresent()
-                                        || !schema.getColumn(entry.getKey())
-                                                .get()
-                                                .getType()
-                                                .equals(entry.getValue())) {
+                                String resolvedColumnName =
+                                        resolveExistingColumnName(schema, entry.getKey());
+                                Optional<Column> column = schema.getColumn(resolvedColumnName);
+                                if (!column.isPresent()
+                                        || !column.get().getType().equals(entry.getValue())) {
+                                    return false;
+                                }
+                            }
+                            for (Map.Entry<String, String> entry :
+                                    alterColumnTypeEvent.getComments().entrySet()) {
+                                String resolvedColumnName =
+                                        resolveExistingColumnName(schema, entry.getKey());
+                                Optional<Column> column = schema.getColumn(resolvedColumnName);
+                                if (!column.isPresent()
+                                        || !Objects.equals(
+                                                column.get().getComment(), entry.getValue())) {
                                     return false;
                                 }
                             }
@@ -369,11 +491,15 @@ public class SchemaUtils {
                             if (!latestSchema.isPresent()) {
                                 return false;
                             }
-                            List<String> existedColumnNames = latestSchema.get().getColumnNames();
+                            Schema schema = latestSchema.get();
 
                             // It has been applied only if corresponding column types do not exist
                             return dropColumnEvent.getDroppedColumnNames().stream()
-                                    .noneMatch(existedColumnNames::contains);
+                                    .map(
+                                            columnName ->
+                                                    resolveExistingColumnName(schema, columnName))
+                                    .noneMatch(
+                                            columnName -> schema.getColumn(columnName).isPresent());
                         },
                         dropTableEvent -> {
                             // It has been applied if such table does not exist
@@ -390,8 +516,14 @@ public class SchemaUtils {
                             // new names already exist
                             for (Map.Entry<String, String> entry :
                                     renameColumnEvent.getNameMapping().entrySet()) {
-                                if (existedColumnNames.contains(entry.getKey())
-                                        || !existedColumnNames.contains(entry.getValue())) {
+                                String resolvedOldName =
+                                        resolveExistingColumnName(
+                                                latestSchema.get(), entry.getKey());
+                                String resolvedNewName =
+                                        resolveExistingColumnName(
+                                                latestSchema.get(), entry.getValue());
+                                if (existedColumnNames.contains(resolvedOldName)
+                                        || !existedColumnNames.contains(resolvedNewName)) {
                                     return false;
                                 }
                             }
@@ -407,6 +539,14 @@ public class SchemaUtils {
                             // before. Just assume it's not.
                             return false;
                         }));
+    }
+
+    private static boolean containsSameColumnIgnoreNameCase(
+            List<Column> columns, Column expectedColumn) {
+        String resolvedColumnName = resolveExistingColumnName(columns, expectedColumn.getName());
+        return columns.stream()
+                .filter(column -> column.getName().equals(resolvedColumnName))
+                .anyMatch(column -> column.copy(expectedColumn.getName()).equals(expectedColumn));
     }
 
     @CheckReturnValue
