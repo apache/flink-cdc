@@ -47,7 +47,7 @@ public class Db2SchemaUtils {
         try (JdbcConnection jdbc = getDb2Dialect(sourceConfig).openJdbcConnection(sourceConfig)) {
             return listSchemas(jdbc, namespace);
         } catch (SQLException e) {
-            throw new RuntimeException("Error to list schemas: " + e.getMessage(), e);
+            throw new RuntimeException(db2MetadataError("list schemas", e), e);
         }
     }
 
@@ -58,7 +58,7 @@ public class Db2SchemaUtils {
         try (JdbcConnection jdbc = getDb2Dialect(sourceConfig).openJdbcConnection(sourceConfig)) {
             return listNamespaces(jdbc);
         } catch (SQLException e) {
-            throw new RuntimeException("Error to list namespaces: " + e.getMessage(), e);
+            throw new RuntimeException(db2MetadataError("list namespaces", e), e);
         }
     }
 
@@ -77,7 +77,7 @@ public class Db2SchemaUtils {
                     .map(Db2SchemaUtils::toCdcTableId)
                     .collect(Collectors.toList());
         } catch (SQLException e) {
-            throw new RuntimeException("Error to list tables: " + e.getMessage(), e);
+            throw new RuntimeException(db2MetadataError("list tables", e), e);
         }
     }
 
@@ -86,12 +86,20 @@ public class Db2SchemaUtils {
         try (JdbcConnection jdbc = dialect.openJdbcConnection(sourceConfig)) {
             return getTableSchema(tableId, (Db2Connection) jdbc, dialect);
         } catch (SQLException e) {
-            throw new RuntimeException("Error to get table schema: " + e.getMessage(), e);
+            throw new RuntimeException(db2MetadataError("get table schema", e), e);
         }
     }
 
     public static Db2Dialect getDb2Dialect(Db2SourceConfig sourceConfig) {
         return new Db2Dialect(sourceConfig);
+    }
+
+    static String db2MetadataError(String action, SQLException e) {
+        return "Failed to "
+                + action
+                + ". Verify DB2 SQL Replication/ASNCDC is initialized, captured tables are registered, "
+                + "and the configured user can read ASNCDC metadata and change tables. Cause: "
+                + e.getMessage();
     }
 
     public static List<String> listSchemas(JdbcConnection jdbc, String namespace)

@@ -23,6 +23,7 @@ import org.apache.flink.cdc.common.types.DataTypes;
 
 import org.junit.jupiter.api.Test;
 
+import java.sql.SQLException;
 import java.sql.Types;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -64,5 +65,17 @@ class Db2SchemaUtilsTest {
         assertThat(column.getName()).isEqualTo("STATUS");
         assertThat(column.getType()).isEqualTo(DataTypes.VARCHAR(8));
         assertThat(column.getDefaultValueExpression()).isEqualTo("A'B");
+    }
+
+    @Test
+    void testMetadataErrorMentionsDb2Prerequisites() {
+        assertThat(
+                        Db2SchemaUtils.db2MetadataError(
+                                "list tables", new SQLException("missing ASNCDC")))
+                .contains("Failed to list tables")
+                .contains("ASNCDC")
+                .contains("captured tables")
+                .contains("configured user")
+                .contains("missing ASNCDC");
     }
 }

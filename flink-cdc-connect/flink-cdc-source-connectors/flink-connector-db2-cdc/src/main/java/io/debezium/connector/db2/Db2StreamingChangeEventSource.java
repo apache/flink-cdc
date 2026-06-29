@@ -581,12 +581,11 @@ public class Db2StreamingChangeEventSource
         }
     }
 
-    private static class DirectUpdateRecordEmitter
-            extends RelationalChangeRecordEmitter<Db2Partition> {
+    static class DirectUpdateRecordEmitter extends RelationalChangeRecordEmitter<Db2Partition> {
 
         private final Object[] data;
 
-        private DirectUpdateRecordEmitter(
+        DirectUpdateRecordEmitter(
                 Db2Partition partition, OffsetContext offsetContext, Object[] data, Clock clock) {
             super(partition, offsetContext, clock);
             this.data = data;
@@ -599,7 +598,7 @@ public class Db2StreamingChangeEventSource
 
         @Override
         protected Object[] getOldColumnValues() {
-            return data;
+            return null;
         }
 
         @Override

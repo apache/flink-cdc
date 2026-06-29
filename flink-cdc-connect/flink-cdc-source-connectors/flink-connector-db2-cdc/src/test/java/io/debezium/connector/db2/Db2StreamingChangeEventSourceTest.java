@@ -17,6 +17,7 @@
 
 package io.debezium.connector.db2;
 
+import io.debezium.data.Envelope.Operation;
 import io.debezium.relational.Column;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
@@ -73,5 +74,16 @@ class Db2StreamingChangeEventSourceTest {
                         Db2StreamingChangeEventSource.isValidStopLsn(
                                 Lsn.valueOf("00000000000000000000000000000001")))
                 .isTrue();
+    }
+
+    @Test
+    void testDirectUpdateDoesNotFakeBeforeImage() {
+        Object[] data = new Object[] {1, "after"};
+        Db2StreamingChangeEventSource.DirectUpdateRecordEmitter emitter =
+                new Db2StreamingChangeEventSource.DirectUpdateRecordEmitter(null, null, data, null);
+
+        assertThat(emitter.getOperation()).isEqualTo(Operation.UPDATE);
+        assertThat(emitter.getOldColumnValues()).isNull();
+        assertThat(emitter.getNewColumnValues()).isSameAs(data);
     }
 }

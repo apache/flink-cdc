@@ -191,7 +191,6 @@ limitations under the License.
                                     <include>org.apache.flink:flink-cdc-base</include>
                                     <include>org.apache.flink:flink-connector-debezium</include>
                                     <include>org.apache.flink:flink-connector-db2-cdc</include>
-                                    <include>com.ibm.db2.jcc:db2jcc</include>
                                     <include>com.zaxxer:HikariCP</include>
                                     <include>com.google.protobuf:protobuf-java</include>
                                     <include>com.google.guava:*</include>
