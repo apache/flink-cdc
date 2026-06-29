@@ -28,6 +28,29 @@ under the License.
 
 DB2 CDC Pipeline 连接器支持从 DB2 数据库读取快照数据和增量变更数据。该连接器基于 DB2 CDC Source 连接器，并向 Flink CDC Pipeline 输出变更事件。
 
+## 依赖
+
+IBM DB2 JDBC driver 使用 IBM IPLA 协议，该协议与 Flink CDC 项目不兼容。
+Flink CDC 不会将该驱动打包进 DB2 Pipeline 连接器 jar。
+提交 YAML Pipeline 作业时，需要手动配置以下依赖，并通过 Flink CDC CLI 的 `--jar` 参数传入。
+
+<div class="wy-table-responsive">
+<table class="colwidths-auto docutils">
+    <thead>
+      <tr>
+        <th class="text-left">依赖名称</th>
+        <th class="text-left">说明</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a href="https://mvnrepository.com/artifact/com.ibm.db2.jcc/db2jcc/db2jcc4">com.ibm.db2.jcc:db2jcc:db2jcc4</a></td>
+        <td>用于连接 DB2 数据库。</td>
+      </tr>
+    </tbody>
+</table>
+</div>
+
 ## 前置条件
 
 使用 DB2 Pipeline 连接器前，请确认：

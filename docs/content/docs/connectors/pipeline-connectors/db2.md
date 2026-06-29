@@ -29,6 +29,29 @@ under the License.
 DB2 CDC Pipeline connector allows reading snapshot data and incremental change data from DB2 databases.
 The connector is based on the DB2 CDC source connector and emits Flink CDC pipeline events for end-to-end synchronization.
 
+## Dependencies
+
+The IBM DB2 JDBC driver uses the IBM IPLA license, which is incompatible with the Flink CDC project.
+Flink CDC does not package this driver in the DB2 pipeline connector jar.
+You need to configure the following dependency manually, and pass it with the `--jar` argument of Flink CDC CLI when submitting YAML pipeline jobs.
+
+<div class="wy-table-responsive">
+<table class="colwidths-auto docutils">
+    <thead>
+      <tr>
+        <th class="text-left">Dependency Item</th>
+        <th class="text-left">Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a href="https://mvnrepository.com/artifact/com.ibm.db2.jcc/db2jcc/db2jcc4">com.ibm.db2.jcc:db2jcc:db2jcc4</a></td>
+        <td>Used for connecting to DB2 databases.</td>
+      </tr>
+    </tbody>
+</table>
+</div>
+
 ## Prerequisites
 
 Before using the DB2 pipeline connector, make sure that:

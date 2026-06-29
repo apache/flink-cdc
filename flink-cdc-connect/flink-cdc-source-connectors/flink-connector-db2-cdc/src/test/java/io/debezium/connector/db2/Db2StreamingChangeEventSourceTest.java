@@ -77,6 +77,12 @@ class Db2StreamingChangeEventSourceTest {
     }
 
     @Test
+    void testPendingSchemaChangeCheckpointPreventsEmptyReadLsnAdvance() {
+        assertThat(Db2StreamingChangeEventSource.shouldAdvancePositionOnEmptyRead(true)).isFalse();
+        assertThat(Db2StreamingChangeEventSource.shouldAdvancePositionOnEmptyRead(false)).isTrue();
+    }
+
+    @Test
     void testDirectUpdateDoesNotFakeBeforeImage() {
         Object[] data = new Object[] {1, "after"};
         Db2StreamingChangeEventSource.DirectUpdateRecordEmitter emitter =
