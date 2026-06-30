@@ -121,7 +121,7 @@ class Db2SourceTest extends Db2TestBase {
             statement.execute("UPDATE DB2INST1.PRODUCTS SET WEIGHT=1345.67 WHERE ID=2001");
             records = drain(sourceContext, 1);
             assertUpdate(records.get(0), "ID", 2001);
-            assertDirectUpdateAfterImage(records.get(0), 1345.67d);
+            assertDirectUpdateImages(records.get(0), 1234.56d, 1345.67d);
 
             // ---------------------------------------------------------------------------------------------------------------
             // Change our schema with a fully-qualified name; we should still see this event
@@ -287,7 +287,7 @@ class Db2SourceTest extends Db2TestBase {
             List<SourceRecord> records = drain(sourceContext3, 2);
             assertInsert(records.get(0), "ID", 1001);
             assertUpdate(records.get(1), "ID", 1001);
-            assertDirectUpdateAfterImage(records.get(1), 1345.67d);
+            assertDirectUpdateImages(records.get(1), 1234.56d, 1345.67d);
 
             // make sure there is no more events
             Assertions.assertThat(waitForAvailableRecords(Duration.ofSeconds(3), sourceContext3))
@@ -388,12 +388,15 @@ class Db2SourceTest extends Db2TestBase {
         return !sourceContext.getCollectedOutputs().isEmpty();
     }
 
-    private static void assertDirectUpdateAfterImage(SourceRecord record, double expectedWeight) {
+    private static void assertDirectUpdateImages(
+            SourceRecord record, double expectedBeforeWeight, double expectedAfterWeight) {
         Struct value = (Struct) record.value();
-        Assertions.assertThat(value.get(Envelope.FieldName.BEFORE)).isNull();
+        Struct before = value.getStruct(Envelope.FieldName.BEFORE);
+        Assertions.assertThat((Double) before.get("WEIGHT"))
+                .isCloseTo(expectedBeforeWeight, Assertions.within(0.00001d));
         Struct after = value.getStruct(Envelope.FieldName.AFTER);
         Assertions.assertThat((Double) after.get("WEIGHT"))
-                .isCloseTo(expectedWeight, Assertions.within(0.00001d));
+                .isCloseTo(expectedAfterWeight, Assertions.within(0.00001d));
     }
 
     private static <T> void setupSource(DebeziumSourceFunction<T> source) throws Exception {
