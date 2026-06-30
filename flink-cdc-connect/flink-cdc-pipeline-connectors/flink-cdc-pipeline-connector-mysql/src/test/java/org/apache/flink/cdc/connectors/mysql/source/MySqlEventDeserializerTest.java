@@ -18,11 +18,17 @@
 package org.apache.flink.cdc.connectors.mysql.source;
 
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
+import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
+import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.debezium.event.DebeziumSchemaDataTypeInference;
 import org.apache.flink.cdc.debezium.table.DebeziumChangelogMode;
 
 import io.debezium.data.Envelope;
+import io.debezium.document.DocumentWriter;
+import io.debezium.relational.history.HistoryRecord;
+import io.debezium.relational.history.TableChanges;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Struct;
@@ -30,14 +36,21 @@ import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import static io.debezium.connector.AbstractSourceInfo.DATABASE_NAME_KEY;
 import static io.debezium.connector.AbstractSourceInfo.TABLE_NAME_KEY;
+import static org.apache.flink.cdc.connectors.mysql.debezium.dispatcher.EventDispatcherImpl.HISTORY_RECORD_FIELD;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Unit tests for {@link MySqlEventDeserializer}. */
 class MySqlEventDeserializerTest {
+
+    private static final DocumentWriter DOCUMENT_WRITER = DocumentWriter.defaultWriter();
 
     @Test
     void testGetTableIdLowercasesOnlyTableIdentityWhenCaseInsensitive() {
@@ -75,6 +88,45 @@ class MySqlEventDeserializerTest {
                 .isEqualTo(BinaryStringData.fromString("12345678901234567890.1"));
     }
 
+    @Test
+    void testDeserializeColumnCommentOnlyAlter() throws Exception {
+        TestingMySqlEventDeserializer deserializer = new TestingMySqlEventDeserializer(false);
+        SourceRecord createTableRecord =
+                createSchemaChangeRecord(
+                        "inventory",
+                        "CREATE TABLE student ("
+                                + "id BIGINT NOT NULL COMMENT 'student id',"
+                                + "AGE INT DEFAULT 30 COMMENT 'old age comment',"
+                                + "JOB VARCHAR(64) COMMENT 'old job',"
+                                + "PRIMARY KEY (id))");
+        SourceRecord alterAgeTypeRecord =
+                createSchemaChangeRecord(
+                        "inventory",
+                        "ALTER TABLE student MODIFY COLUMN AGE BIGINT DEFAULT 30 COMMENT 'old age comment'");
+        SourceRecord alterJobRecord =
+                createSchemaChangeRecord(
+                        "inventory",
+                        "ALTER TABLE student MODIFY COLUMN JOB VARCHAR(255) COMMENT 'new job'");
+        SourceRecord alterAgeCommentRecord =
+                createSchemaChangeRecord(
+                        "inventory",
+                        "ALTER TABLE student MODIFY COLUMN AGE BIGINT DEFAULT 30 COMMENT 'updated age comment'");
+
+        deserializer.deserialize(createTableRecord);
+        deserializer.deserialize(alterAgeTypeRecord);
+        deserializer.deserialize(alterJobRecord);
+        List<? extends Event> events = deserializer.deserialize(alterAgeCommentRecord);
+
+        assertThat(events).hasSize(1);
+        assertThat(events.get(0)).isInstanceOf(AlterColumnTypeEvent.class);
+        AlterColumnTypeEvent alterEvent = (AlterColumnTypeEvent) events.get(0);
+        assertThat(alterEvent.tableId()).isEqualTo(TableId.tableId("inventory", "student"));
+        assertThat(alterEvent.getTypeMapping())
+                .containsExactlyEntriesOf(Collections.singletonMap("AGE", DataTypes.BIGINT()));
+        assertThat(alterEvent.getComments())
+                .containsExactlyEntriesOf(Collections.singletonMap("AGE", "updated age comment"));
+    }
+
     private static SourceRecord createRecord(String databaseName, String tableName) {
         Schema sourceSchema =
                 SchemaBuilder.struct()
@@ -100,14 +152,49 @@ class MySqlEventDeserializerTest {
                 value);
     }
 
+    private static SourceRecord createSchemaChangeRecord(String databaseName, String ddl)
+            throws Exception {
+        HistoryRecord historyRecord =
+                new HistoryRecord(
+                        Collections.singletonMap("file", "mysql-bin.000001"),
+                        Collections.singletonMap("file", "mysql-bin.000001"),
+                        databaseName,
+                        null,
+                        ddl,
+                        new TableChanges());
+        Schema keySchema =
+                SchemaBuilder.struct()
+                        .name(MySqlEventDeserializer.SCHEMA_CHANGE_EVENT_KEY_NAME)
+                        .field(HistoryRecord.Fields.DATABASE_NAME, Schema.STRING_SCHEMA)
+                        .build();
+        Struct key = new Struct(keySchema).put(HistoryRecord.Fields.DATABASE_NAME, databaseName);
+        Schema valueSchema =
+                SchemaBuilder.struct().field(HISTORY_RECORD_FIELD, Schema.STRING_SCHEMA).build();
+        Struct value =
+                new Struct(valueSchema)
+                        .put(HISTORY_RECORD_FIELD, DOCUMENT_WRITER.write(historyRecord.document()));
+        Map<String, Object> offset = new HashMap<>();
+        offset.put("file", "mysql-bin.000001");
+        offset.put("pos", 1L);
+
+        return new SourceRecord(
+                Collections.singletonMap("server", "mysql"),
+                offset,
+                "mysql.schema_change",
+                keySchema,
+                key,
+                valueSchema,
+                value);
+    }
+
     private static final class TestingMySqlEventDeserializer extends MySqlEventDeserializer {
 
         private TestingMySqlEventDeserializer(boolean isTableIdCaseInsensitive) {
             super(
                     DebeziumChangelogMode.ALL,
                     false,
-                    Collections.emptyList(),
-                    false,
+                    new ArrayList<>(),
+                    true,
                     true,
                     isTableIdCaseInsensitive);
         }

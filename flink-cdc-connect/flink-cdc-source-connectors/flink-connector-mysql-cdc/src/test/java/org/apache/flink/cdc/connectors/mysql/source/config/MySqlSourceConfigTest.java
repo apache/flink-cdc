@@ -17,10 +17,12 @@
 
 package org.apache.flink.cdc.connectors.mysql.source.config;
 
+import io.debezium.relational.RelationalDatabaseConnectorConfig;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
 import org.junit.jupiter.api.Test;
 
+import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -47,5 +49,34 @@ class MySqlSourceConfigTest {
         assertThat(cachedFilter.isIncluded(equivalent)).isTrue();
         assertThat(cachedFilter.isIncluded(different)).isFalse();
         assertThat(evaluations).hasValue(2);
+    }
+
+    @Test
+    void testRequiredDebeziumPropertiesOverrideUserProperties() {
+        Properties userProperties = new Properties();
+        userProperties.setProperty("include.schema.changes", "false");
+        userProperties.setProperty(
+                RelationalDatabaseConnectorConfig.INCLUDE_SCHEMA_COMMENTS.name(), "false");
+
+        MySqlSourceConfig sourceConfig =
+                new MySqlSourceConfigFactory()
+                        .hostname("localhost")
+                        .port(3306)
+                        .username("user")
+                        .password("password")
+                        .databaseList("inventory")
+                        .tableList("inventory.student")
+                        .debeziumProperties(userProperties)
+                        .createConfig(0);
+
+        assertThat(sourceConfig.getDbzConfiguration().getBoolean("include.schema.changes"))
+                .isTrue();
+        assertThat(
+                        sourceConfig
+                                .getDbzConfiguration()
+                                .getBoolean(
+                                        RelationalDatabaseConnectorConfig.INCLUDE_SCHEMA_COMMENTS
+                                                .name()))
+                .isTrue();
     }
 }

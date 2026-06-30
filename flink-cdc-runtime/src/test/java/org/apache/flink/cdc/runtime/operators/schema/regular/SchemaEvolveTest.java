@@ -358,6 +358,53 @@ class SchemaEvolveTest {
     }
 
     @Test
+    void testSkipDuplicateAdd() throws Exception {
+        TableId tableId = CUSTOMERS_TABLE_ID;
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", INT)
+                        .physicalColumn("name", STRING)
+                        .physicalColumn("must_have", INT.notNull(), "must have", "8")
+                        .primaryKey("id")
+                        .build();
+        AddColumnEvent addColumnEvent =
+                new AddColumnEvent(
+                        tableId,
+                        Collections.singletonList(
+                                AddColumnEvent.after(
+                                        Column.physicalColumn(
+                                                "must_have", INT.notNull(), "must have", "8"),
+                                        "name")));
+        DataChangeEvent dataChangeEvent =
+                DataChangeEvent.insertEvent(tableId, buildRecord(INT, 1, STRING, "Alice", INT, 8));
+
+        SchemaChangeBehavior behavior = SchemaChangeBehavior.EVOLVE;
+        SchemaOperator schemaOperator =
+                new SchemaOperator(
+                        new ArrayList<>(), RouteMode.ALL_MATCH, Duration.ofSeconds(30), behavior);
+        try (RegularEventOperatorTestHarness<SchemaOperator, Event> harness =
+                RegularEventOperatorTestHarness.withDurationAndBehavior(
+                        schemaOperator, 17, Duration.ofSeconds(3), behavior)) {
+            harness.open();
+
+            processEvent(
+                    schemaOperator,
+                    Arrays.asList(new CreateTableEvent(tableId, schema), addColumnEvent));
+            harness.clearOutputRecords();
+
+            schemaOperator.processElement(new StreamRecord<>(dataChangeEvent));
+
+            Assertions.assertThat(
+                            harness.getOutputRecords().stream()
+                                    .map(StreamRecord::getValue)
+                                    .collect(Collectors.toList()))
+                    .containsExactly(dataChangeEvent);
+            Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schema);
+            Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schema);
+        }
+    }
+
+    @Test
     void testRestoredCreateTableEventWithExpandedSchemaIsNotSkipped() throws Exception {
         TableId tableId = CUSTOMERS_TABLE_ID;
         Schema restoredSchema =

@@ -159,12 +159,23 @@ public class SchemaOperator extends AbstractStreamOperatorAdapter<Event>
     }
 
     private void handleSchemaChangeEvent(SchemaChangeEvent originalEvent) throws Exception {
-        // First, update original schema map unconditionally and it will never fail
         TableId tableId = originalEvent.tableId();
+        schemaOperatorMetrics.increaseSchemaChangeEvents(1);
+        Schema currentOriginalSchema = originalSchemaMap.get(tableId);
+        if (SchemaUtils.isSchemaChangeEventRedundant(currentOriginalSchema, originalEvent)) {
+            LOG.info(
+                    "{}> Schema change event {} is redundant for current original schema {}, just skip it.",
+                    subTaskId,
+                    originalEvent,
+                    currentOriginalSchema);
+            schemaOperatorMetrics.increaseIgnoredSchemaChangeEvents(1);
+            return;
+        }
+
+        // The original schema cache tracks source-side schema after each non-redundant change.
         originalSchemaMap.compute(
                 tableId,
                 (tId, schema) -> SchemaUtils.applySchemaChangeEvent(schema, originalEvent));
-        schemaOperatorMetrics.increaseSchemaChangeEvents(1);
 
         // First, send FlushEvent or it might be blocked later
         List<TableId> sinkTables = router.route(tableId);

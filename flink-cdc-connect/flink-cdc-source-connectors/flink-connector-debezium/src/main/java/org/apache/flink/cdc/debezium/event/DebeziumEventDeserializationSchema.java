@@ -188,10 +188,14 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
                 DataType dataType = createTableEvent.getSchema().toRowDataType();
                 return (RecordData) getOrCreateConverter(dataType).convert(value, valueSchema);
             } catch (CachedSchemaMismatchException e) {
-                LOG.info(
-                        "Cached schema for {} is incompatible with the current record schema, falling back to value inference: {}",
-                        tableId,
-                        e.getMessage());
+                throw new IllegalStateException(
+                        "Cached schema for "
+                                + tableId
+                                + " is incompatible with the current record schema. "
+                                + "The data record cannot be decoded safely until the cached schema "
+                                + "is updated by a schema change event. Mismatch: "
+                                + e.getMessage(),
+                        e);
             }
         }
 
@@ -535,12 +539,8 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
         Object[] fields = new Object[arity];
         for (int i = 0; i < arity; i++) {
             String fieldName = fieldNames[i];
-            Field field = schema.field(fieldName);
-            if (field == null) {
-                throw new CachedSchemaMismatchException(
-                        "Missing field '" + fieldName + "' in current record schema.");
-            }
-            Object fieldValue = struct.getWithoutDefault(fieldName);
+            Field field = resolveField(schema, fieldName, fieldName);
+            Object fieldValue = struct.getWithoutDefault(field.name());
             Schema fieldSchema = field.schema();
             String incompatibility =
                     findCachedFieldIncompatibility(fieldName, rowType.getTypeAt(i), fieldSchema);
@@ -611,7 +611,7 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
                         ? null
                         : formatCachedFieldMismatch(fieldPath, expectedType, actualSchema);
             case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
-                return isLocalTimeZoneTimestampSchemaCompatible(actualSchema)
+                return isLocalZonedTsCompatible(actualSchema)
                         ? null
                         : formatCachedFieldMismatch(fieldPath, expectedType, actualSchema);
             case ARRAY:
@@ -649,19 +649,16 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
                     return unexpectedField;
                 }
                 for (DataField nestedField : expectedRowType.getFields()) {
-                    Field actualField = actualSchema.field(nestedField.getName());
-                    if (actualField == null) {
-                        return "Missing field '"
-                                + fieldPath
-                                + "."
-                                + nestedField.getName()
-                                + "' in current record schema.";
+                    String nestedPath = qualifyFieldPath(fieldPath, nestedField.getName());
+                    String fieldError =
+                            fieldMatchError(actualSchema, nestedField.getName(), nestedPath);
+                    if (fieldError != null) {
+                        return fieldError;
                     }
+                    Field actualField = findField(actualSchema, nestedField.getName());
                     String nestedMismatch =
                             findCachedFieldIncompatibility(
-                                    fieldPath + "." + nestedField.getName(),
-                                    nestedField.getType(),
-                                    actualField.schema());
+                                    nestedPath, nestedField.getType(), actualField.schema());
                     if (nestedMismatch != null) {
                         return nestedMismatch;
                     }
@@ -679,10 +676,53 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
             String fieldPath, RowType expectedRowType, Schema actualSchema) {
         List<String> expectedFieldNames = expectedRowType.getFieldNames();
         for (Field actualField : actualSchema.fields()) {
-            if (!expectedFieldNames.contains(actualField.name())) {
+            if (expectedFieldNames.stream()
+                    .noneMatch(
+                            expectedFieldName ->
+                                    expectedFieldName.equalsIgnoreCase(actualField.name()))) {
                 return "Unexpected field '"
                         + qualifyFieldPath(fieldPath, actualField.name())
                         + "' in current record schema.";
+            }
+        }
+        return null;
+    }
+
+    private static Field resolveField(Schema schema, String expectedName, String fieldPath)
+            throws CachedSchemaMismatchException {
+        String error = fieldMatchError(schema, expectedName, fieldPath);
+        if (error != null) {
+            throw new CachedSchemaMismatchException(error);
+        }
+        return findField(schema, expectedName);
+    }
+
+    private static String fieldMatchError(Schema schema, String expectedName, String fieldPath) {
+        int matches = 0;
+        for (Field field : schema.fields()) {
+            if (field.name().equalsIgnoreCase(expectedName)) {
+                matches++;
+            }
+        }
+        if (matches == 0) {
+            return "Missing field '" + fieldPath + "' in current record schema.";
+        }
+        if (matches > 1) {
+            return "Ambiguous field '"
+                    + fieldPath
+                    + "' in current record schema: multiple fields differ only by case.";
+        }
+        return null;
+    }
+
+    private static Field findField(Schema schema, String expectedName) {
+        Field exactField = schema.field(expectedName);
+        if (exactField != null) {
+            return exactField;
+        }
+        for (Field field : schema.fields()) {
+            if (field.name().equalsIgnoreCase(expectedName)) {
+                return field;
             }
         }
         return null;
@@ -816,7 +856,7 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
                 || org.apache.kafka.connect.data.Timestamp.LOGICAL_NAME.equals(schema.name());
     }
 
-    private static boolean isLocalTimeZoneTimestampSchemaCompatible(Schema schema) {
+    private static boolean isLocalZonedTsCompatible(Schema schema) {
         return schema.type() == Schema.Type.STRING
                 && ZonedTimestamp.SCHEMA_NAME.equals(schema.name());
     }
@@ -979,6 +1019,11 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
 
         CreateTableEvent existing = createTableEventCache.get(debeziumTableId);
         if (existing == null) {
+            return;
+        }
+
+        if (SchemaUtils.isSchemaChangeEventRedundant(
+                existing.getSchema(), (SchemaChangeEvent) changeEvent)) {
             return;
         }
 

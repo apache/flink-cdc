@@ -68,6 +68,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import static java.util.Locale.ROOT;
@@ -90,6 +91,8 @@ public class DorisMetadataApplier implements MetadataApplier {
     private static final String DORIS_STRING_TYPE = "STRING";
     private static final String DORIS_STRING_KEY_TYPE = "VARCHAR(65533)";
     private static final String DORIS_DELETE_SIGN = "__DORIS_DELETE_SIGN__";
+    private static final long DORIS_SCHEMA_REFRESH_MAX_WAIT_MILLIS = TimeUnit.MINUTES.toMillis(1);
+    private static final long DORIS_SCHEMA_REFRESH_RETRY_MILLIS = 500L;
 
     private static final DorisSchemaFetcher DEFAULT_DORIS_SCHEMA_FETCHER =
             (dorisOptions, tableId) ->
@@ -237,9 +240,9 @@ public class DorisMetadataApplier implements MetadataApplier {
                         schemaChangeManager.createTable(buildTableSchema(tableId, schema)),
                         "create table",
                         tableId);
-                updateDorisColumnOrderCache(tableId, schema.getColumnNames());
+                updateDorisOrderCache(tableId, schema.getColumnNames());
             } else {
-                updateDorisColumnOrderCache(
+                updateDorisOrderCache(
                         tableId, reconcileAndGetColumnOrder(tableId, schema, existingDorisSchema));
             }
             schemaCache.put(tableId, schema);
@@ -333,7 +336,7 @@ public class DorisMetadataApplier implements MetadataApplier {
 
         Schema currentSchema =
                 buildCurrentSchemaFromExistingTable(desiredSchema, existingDorisSchema);
-        List<String> currentColumnNames = extractDorisColumnNames(existingDorisSchema);
+        List<String> currentColumnNames = extractDorisNames(existingDorisSchema);
         List<AddColumnEvent.ColumnWithPosition> missingColumns =
                 resolveMissingColumns(tableId, desiredSchema, existingDorisSchema, currentSchema);
 
@@ -353,7 +356,8 @@ public class DorisMetadataApplier implements MetadataApplier {
         for (AddColumnEvent.ColumnWithPosition missingColumn : missingColumns) {
             Column column = missingColumn.getAddColumn();
             AddColumnPlacement placement =
-                    resolveAddColumnPosition(missingColumn, currentSchema, currentColumnNames);
+                    resolveAddColumnPosition(
+                            tableId, missingColumn, currentSchema, currentColumnNames);
             ensureSchemaChangeSucceeded(
                     schemaChangeManager.addColumn(
                             tableId.getSchemaName(),
@@ -362,7 +366,9 @@ public class DorisMetadataApplier implements MetadataApplier {
                             placement.dorisPosition),
                     "add missing column " + column.getName(),
                     tableId);
-            currentColumnNames = addColumnToOrder(currentColumnNames, column.getName(), placement);
+            currentColumnNames =
+                    tryRefreshOrderAfterAdd(
+                            tableId, column.getName(), "add missing column " + column.getName());
             currentSchema =
                     SchemaUtils.applySchemaChangeEvent(
                             currentSchema,
@@ -586,7 +592,7 @@ public class DorisMetadataApplier implements MetadataApplier {
             for (AddColumnEvent.ColumnWithPosition col : addedColumns) {
                 Column column = col.getAddColumn();
                 AddColumnPlacement placement =
-                        resolveAddColumnPosition(col, currentSchema, currentColumnNames);
+                        resolveAddColumnPosition(tableId, col, currentSchema, currentColumnNames);
                 ensureSchemaChangeSucceeded(
                         schemaChangeManager.addColumn(
                                 tableId.getSchemaName(),
@@ -595,16 +601,9 @@ public class DorisMetadataApplier implements MetadataApplier {
                                 placement.dorisPosition),
                         "add column " + column.getName(),
                         tableId);
-                if (currentColumnNames != null) {
-                    if (placement.hasKnownIndex()) {
-                        currentColumnNames =
-                                addColumnToOrder(currentColumnNames, column.getName(), placement);
-                        updateDorisColumnOrderCache(tableId, currentColumnNames);
-                    } else {
-                        updateDorisColumnOrderCache(tableId, null);
-                        currentColumnNames = null;
-                    }
-                }
+                currentColumnNames =
+                        tryRefreshOrderAfterAdd(
+                                tableId, column.getName(), "add column " + column.getName());
                 if (currentSchema != null) {
                     currentSchema =
                             tryApplySchemaChangeToCache(
@@ -629,6 +628,7 @@ public class DorisMetadataApplier implements MetadataApplier {
     }
 
     private AddColumnPlacement resolveAddColumnPosition(
+            TableId tableId,
             AddColumnEvent.ColumnWithPosition columnWithPosition,
             Schema currentSchema,
             List<String> currentColumnNames) {
@@ -637,7 +637,7 @@ public class DorisMetadataApplier implements MetadataApplier {
                 return firstValuePosition(currentSchema, currentColumnNames);
             case AFTER:
                 return resolveAfterPosition(
-                        columnWithPosition.getExistedColumnName(), currentColumnNames);
+                        tableId, columnWithPosition.getExistedColumnName(), currentColumnNames);
             case BEFORE:
                 return resolveBeforePosition(
                         columnWithPosition.getExistedColumnName(),
@@ -645,7 +645,7 @@ public class DorisMetadataApplier implements MetadataApplier {
                         currentColumnNames);
             case LAST:
             default:
-                return AddColumnPlacement.last(currentColumnNames);
+                return AddColumnPlacement.last();
         }
     }
 
@@ -666,7 +666,7 @@ public class DorisMetadataApplier implements MetadataApplier {
         if (lastKeyIndex < 0) {
             return AddColumnPlacement.first();
         }
-        return AddColumnPlacement.after(currentColumnNames.get(lastKeyIndex), lastKeyIndex + 1);
+        return AddColumnPlacement.after(currentColumnNames.get(lastKeyIndex));
     }
 
     private List<String> columnOrderForAdd(
@@ -676,15 +676,25 @@ public class DorisMetadataApplier implements MetadataApplier {
             return new ArrayList<>(cachedDorisColumnNames);
         }
         if (needsColumnOrderFetch(event)) {
-            List<String> fetchedDorisColumnNames = fetchDorisColumnNames(tableId);
-            updateDorisColumnOrderCache(tableId, fetchedDorisColumnNames);
-            return fetchedDorisColumnNames;
+            try {
+                return refreshDorisOrder(
+                        tableId,
+                        DorisPhysicalSchemaExpectation.any(),
+                        "resolve add-column position");
+            } catch (RuntimeException e) {
+                LOG.warn(
+                        "Failed to resolve Doris physical schema before translating ADD COLUMN "
+                                + "position for {}. Falling back to current CDC schema order; "
+                                + "CSV serialization will still resolve Doris physical schema before writes.",
+                        tableId.identifier(),
+                        e);
+            }
         }
 
         return currentSchema == null ? null : new ArrayList<>(currentSchema.getColumnNames());
     }
 
-    private List<String> fetchDorisColumnNames(TableId tableId) {
+    private List<Field> fetchDorisFieldsOnce(TableId tableId) {
         try {
             org.apache.doris.flink.rest.models.Schema dorisSchema =
                     dorisSchemaFetcher.fetch(dorisOptions, tableId);
@@ -693,38 +703,60 @@ public class DorisMetadataApplier implements MetadataApplier {
                         "Doris physical schema lookup returned no column properties for "
                                 + tableId.identifier());
             }
-            return extractDorisColumnNames(dorisSchema);
+            return new ArrayList<>(dorisSchema.getProperties());
         } catch (Exception e) {
             throw new IllegalStateException(
                     "Failed to resolve Doris physical schema of "
                             + tableId.identifier()
-                            + " for ADD COLUMN position translation.",
+                            + " for Doris physical column-name resolution.",
                     e);
         }
     }
 
     private boolean needsColumnOrderFetch(AddColumnEvent event) {
         for (AddColumnEvent.ColumnWithPosition columnWithPosition : event.getAddedColumns()) {
-            if (AddColumnEvent.ColumnPosition.BEFORE.equals(columnWithPosition.getPosition())) {
-                return true;
+            switch (columnWithPosition.getPosition()) {
+                case FIRST:
+                case BEFORE:
+                case AFTER:
+                    return true;
+                case LAST:
+                default:
+                    break;
             }
         }
         return false;
     }
 
     private AddColumnPlacement resolveAfterPosition(
-            String referenceColumn, List<String> currentColumnNames) {
+            TableId tableId, String referenceColumn, List<String> currentColumnNames) {
         if (referenceColumn == null) {
-            return AddColumnPlacement.last(currentColumnNames);
+            return AddColumnPlacement.last();
         }
         if (currentColumnNames == null) {
-            return AddColumnPlacement.after(referenceColumn, -1);
+            // The physical column-order cache was invalidated (e.g. a prior Doris FE refresh did
+            // not catch up within the budget). Resolve the physical name of the reference column
+            // best-effort so the ADD COLUMN AFTER position targets the real Doris column even when
+            // the CDC logical name differs in case. Fall back to the raw CDC name if the physical
+            // name still cannot be resolved, preserving the previous behavior.
+            try {
+                return AddColumnPlacement.after(resolveDorisColumnName(tableId, referenceColumn));
+            } catch (RuntimeException e) {
+                LOG.warn(
+                        "Could not resolve Doris physical name for reference column {} of {} before "
+                                + "translating ADD COLUMN AFTER position; falling back to the CDC "
+                                + "column name.",
+                        referenceColumn,
+                        tableId.identifier(),
+                        e);
+                return AddColumnPlacement.after(referenceColumn);
+            }
         }
         int referenceIndex = findColumnIndex(currentColumnNames, referenceColumn);
         if (referenceIndex < 0) {
-            return AddColumnPlacement.after(referenceColumn, -1);
+            return AddColumnPlacement.after(referenceColumn);
         }
-        return AddColumnPlacement.after(referenceColumn, referenceIndex + 1);
+        return AddColumnPlacement.after(currentColumnNames.get(referenceIndex));
     }
 
     private AddColumnPlacement resolveBeforePosition(
@@ -735,9 +767,11 @@ public class DorisMetadataApplier implements MetadataApplier {
                             + "without reference column.");
         }
         if (currentColumnNames == null) {
-            throw new IllegalStateException(
-                    "Cannot translate CDC BEFORE column position to Doris ADD COLUMN position "
-                            + "without current column order.");
+            LOG.warn(
+                    "Cannot translate CDC BEFORE column position for reference column {} "
+                            + "without current Doris physical column order. Falling back to ADD COLUMN LAST.",
+                    referenceColumn);
+            return AddColumnPlacement.last();
         }
 
         int referenceIndex = findColumnIndex(currentColumnNames, referenceColumn);
@@ -750,7 +784,7 @@ public class DorisMetadataApplier implements MetadataApplier {
         if (referenceIndex == 0 || isDorisKeyColumn(currentSchema, referenceColumn)) {
             return firstValuePosition(currentSchema, currentColumnNames);
         }
-        return AddColumnPlacement.after(currentColumnNames.get(referenceIndex - 1), referenceIndex);
+        return AddColumnPlacement.after(currentColumnNames.get(referenceIndex - 1));
     }
 
     private boolean isDorisKeyColumn(Schema currentSchema, String columnName) {
@@ -759,48 +793,23 @@ public class DorisMetadataApplier implements MetadataApplier {
                         .anyMatch(key -> key.equalsIgnoreCase(columnName));
     }
 
-    private List<String> addColumnToOrder(
-            List<String> currentColumnNames, String addedColumnName, AddColumnPlacement placement) {
-        List<String> updatedColumnNames = new ArrayList<>(currentColumnNames);
-        int insertionIndex = placement.insertionIndex;
-        if (insertionIndex < 0 || insertionIndex > updatedColumnNames.size()) {
-            throw new IllegalStateException(
-                    "Invalid Doris column-order insertion index "
-                            + insertionIndex
-                            + " for column "
-                            + addedColumnName
-                            + ". Current column order: "
-                            + currentColumnNames);
-        }
-        updatedColumnNames.add(insertionIndex, addedColumnName);
-        return updatedColumnNames;
-    }
-
     private static final class AddColumnPlacement {
         private final AddColumnPosition dorisPosition;
-        private final int insertionIndex;
 
-        private AddColumnPlacement(AddColumnPosition dorisPosition, int insertionIndex) {
+        private AddColumnPlacement(AddColumnPosition dorisPosition) {
             this.dorisPosition = dorisPosition;
-            this.insertionIndex = insertionIndex;
         }
 
         private static AddColumnPlacement first() {
-            return new AddColumnPlacement(AddColumnPosition.first(), 0);
+            return new AddColumnPlacement(AddColumnPosition.first());
         }
 
-        private static AddColumnPlacement after(String referenceColumn, int insertionIndex) {
-            return new AddColumnPlacement(AddColumnPosition.after(referenceColumn), insertionIndex);
+        private static AddColumnPlacement after(String referenceColumn) {
+            return new AddColumnPlacement(AddColumnPosition.after(referenceColumn));
         }
 
-        private static AddColumnPlacement last(List<String> currentColumnNames) {
-            return new AddColumnPlacement(
-                    AddColumnPosition.last(),
-                    currentColumnNames == null ? -1 : currentColumnNames.size());
-        }
-
-        private boolean hasKnownIndex() {
-            return insertionIndex >= 0;
+        private static AddColumnPlacement last() {
+            return new AddColumnPlacement(AddColumnPosition.last());
         }
     }
 
@@ -841,15 +850,20 @@ public class DorisMetadataApplier implements MetadataApplier {
             TableId tableId = event.tableId();
             Schema currentSchema = schemaCache.get(tableId);
             List<String> droppedColumns = resolveDroppedColumnNames(currentSchema, event);
-            for (String col : droppedColumns) {
+            List<String> physicalDroppedColumns =
+                    resolveDorisColumnNamesForDrop(tableId, droppedColumns);
+            for (String col : physicalDroppedColumns) {
                 ensureSchemaChangeSucceeded(
                         schemaChangeManager.dropColumn(
                                 tableId.getSchemaName(), tableId.getTableName(), col),
                         "drop column " + col,
                         tableId);
             }
+            refreshDorisOrder(
+                    tableId,
+                    DorisPhysicalSchemaExpectation.excludesAll(droppedColumns),
+                    "drop column event");
             updateCacheAfterSchemaChange(tableId, event, "drop column event");
-            updateDorisColumnOrderCacheAfterDrop(tableId, droppedColumns);
         } catch (Exception e) {
             throw new SchemaEvolveException(event, "fail to apply drop column event", e);
         }
@@ -860,7 +874,24 @@ public class DorisMetadataApplier implements MetadataApplier {
             TableId tableId = event.tableId();
             Schema currentSchema = schemaCache.get(tableId);
             Map<String, String> nameMapping = resolveRenameColumnNameMapping(currentSchema, event);
-            for (Map.Entry<String, String> entry : nameMapping.entrySet()) {
+            Map<String, String> physicalNameMapping = new LinkedHashMap<>();
+            nameMapping.forEach(
+                    (oldColumnName, newColumnName) -> {
+                        String oldPhysicalColumnName =
+                                resolveDorisColumnName(tableId, oldColumnName);
+                        if (isDorisNoOpRename(oldPhysicalColumnName, newColumnName)) {
+                            LOG.info(
+                                    "Skip Doris rename for {}.{} from {} to {} because Doris"
+                                            + " treats these names as the same physical column.",
+                                    tableId.getSchemaName(),
+                                    tableId.getTableName(),
+                                    oldPhysicalColumnName,
+                                    newColumnName);
+                        } else {
+                            physicalNameMapping.put(oldPhysicalColumnName, newColumnName);
+                        }
+                    });
+            for (Map.Entry<String, String> entry : physicalNameMapping.entrySet()) {
                 ensureSchemaChangeSucceeded(
                         schemaChangeManager.renameColumn(
                                 tableId.getSchemaName(),
@@ -870,11 +901,23 @@ public class DorisMetadataApplier implements MetadataApplier {
                         "rename column " + entry.getKey() + " to " + entry.getValue(),
                         tableId);
             }
+            if (!physicalNameMapping.isEmpty()) {
+                refreshDorisOrder(
+                        tableId,
+                        DorisPhysicalSchemaExpectation.containsAll(
+                                new ArrayList<>(physicalNameMapping.values())),
+                        "rename column event");
+            }
             updateCacheAfterSchemaChange(tableId, event, "rename column event");
-            updateDorisColumnOrderCacheAfterRename(tableId, nameMapping);
         } catch (Exception e) {
             throw new SchemaEvolveException(event, "fail to apply rename column event", e);
         }
+    }
+
+    private static boolean isDorisNoOpRename(String oldColumnName, String newColumnName) {
+        return oldColumnName != null
+                && newColumnName != null
+                && oldColumnName.equalsIgnoreCase(newColumnName);
     }
 
     private void applyAlterColumnTypeEvent(AlterColumnTypeEvent event)
@@ -892,21 +935,55 @@ public class DorisMetadataApplier implements MetadataApplier {
                             ? event.getComments()
                             : SchemaUtils.resolveExistingColumnNameMap(
                                     currentSchema, event.getComments());
-
-            for (String columnName : typeMapping.keySet()) {
-                DataType columnType = typeMapping.get(columnName);
+            Map<String, DataType> effectiveTypeMapping =
+                    resolveEffectiveTypeMapping(currentSchema, typeMapping);
+            Map<String, DataType> oldTypeMapping =
+                    currentSchema == null
+                            ? event.getOldTypeMapping()
+                            : SchemaUtils.resolveExistingColumnNameMap(
+                                    currentSchema, event.getOldTypeMapping());
+            Map<String, DataType> effectiveOldTypeMapping =
+                    oldTypeMapping.entrySet().stream()
+                            .filter(entry -> effectiveTypeMapping.containsKey(entry.getKey()))
+                            .collect(
+                                    Collectors.toMap(
+                                            Map.Entry::getKey,
+                                            Map.Entry::getValue,
+                                            (left, right) -> right,
+                                            LinkedHashMap::new));
+            List<String> modifiedPhysicalColumnNames = new ArrayList<>();
+            for (String columnName : effectiveTypeMapping.keySet()) {
+                DataType columnType = effectiveTypeMapping.get(columnName);
+                boolean applyCommentWithType =
+                        comments.containsKey(columnName)
+                                && canApplyCommentWithTypeChange(comments.get(columnName));
+                String physicalColumnName = resolveDorisColumnName(tableId, columnName);
+                modifiedPhysicalColumnNames.add(physicalColumnName);
+                FieldSchema fieldSchema =
+                        new FieldSchema(
+                                physicalColumnName,
+                                resolveColumnType(columnName, columnType, null, false),
+                                getCurrentColumnDefaultValue(currentSchema, columnName),
+                                applyCommentWithType
+                                        ? comments.get(columnName)
+                                        : getCurrentColumnComment(currentSchema, columnName));
                 ensureSchemaChangeSucceeded(
                         schemaChangeManager.modifyColumnDataType(
-                                tableId.getSchemaName(),
-                                tableId.getTableName(),
-                                new FieldSchema(
-                                        columnName,
-                                        resolveColumnType(columnName, columnType, null, false),
-                                        getCurrentColumnComment(currentSchema, columnName))),
+                                tableId.getSchemaName(), tableId.getTableName(), fieldSchema),
                         "alter column type " + columnName,
                         tableId);
             }
+            if (!effectiveTypeMapping.isEmpty()) {
+                tryRefreshDorisOrder(
+                        tableId,
+                        DorisPhysicalSchemaExpectation.containsAll(modifiedPhysicalColumnNames),
+                        "alter column type event");
+            }
             for (String columnName : comments.keySet()) {
+                if (effectiveTypeMapping.containsKey(columnName)
+                        && canApplyCommentWithTypeChange(comments.get(columnName))) {
+                    continue;
+                }
                 String comment = comments.get(columnName);
                 if (!isColumnCommentChanged(currentSchema, columnName, comment)) {
                     continue;
@@ -915,15 +992,40 @@ public class DorisMetadataApplier implements MetadataApplier {
                         schemaChangeManager.modifyColumnComment(
                                 tableId.getSchemaName(),
                                 tableId.getTableName(),
-                                columnName,
+                                resolveDorisColumnName(tableId, columnName),
                                 comment == null ? "" : comment),
                         "alter column comment " + columnName,
                         tableId);
             }
-            updateCacheAfterSchemaChange(tableId, event, "alter column type event");
+            updateCacheAfterSchemaChange(
+                    tableId,
+                    new AlterColumnTypeEvent(
+                            tableId, effectiveTypeMapping, effectiveOldTypeMapping, comments),
+                    "alter column type event");
         } catch (Exception e) {
             throw new SchemaEvolveException(event, "fail to apply alter column type event", e);
         }
+    }
+
+    private static boolean canApplyCommentWithTypeChange(String comment) {
+        return comment != null && !comment.trim().isEmpty();
+    }
+
+    private static Map<String, DataType> resolveEffectiveTypeMapping(
+            Schema currentSchema, Map<String, DataType> typeMapping) {
+        if (currentSchema == null) {
+            return typeMapping;
+        }
+        Map<String, DataType> effectiveTypeMapping = new LinkedHashMap<>();
+        typeMapping.forEach(
+                (columnName, newType) -> {
+                    Column currentColumn = currentSchema.getColumn(columnName).orElse(null);
+                    if (currentColumn == null
+                            || !Objects.equals(currentColumn.getType(), newType)) {
+                        effectiveTypeMapping.put(columnName, newType);
+                    }
+                });
+        return effectiveTypeMapping;
     }
 
     private static boolean isColumnCommentChanged(
@@ -940,6 +1042,16 @@ public class DorisMetadataApplier implements MetadataApplier {
             return null;
         }
         return currentSchema.getColumn(columnName).map(Column::getComment).orElse(null);
+    }
+
+    private String getCurrentColumnDefaultValue(Schema currentSchema, String columnName) {
+        if (currentSchema == null) {
+            return null;
+        }
+        return currentSchema
+                .getColumn(columnName)
+                .map(this::resolveColumnDefaultValue)
+                .orElse(null);
     }
 
     private void applyTruncateTableEvent(TruncateTableEvent truncateTableEvent)
@@ -998,10 +1110,13 @@ public class DorisMetadataApplier implements MetadataApplier {
         schemaCache.put(tableId, schema);
     }
 
-    private List<String> extractDorisColumnNames(
-            org.apache.doris.flink.rest.models.Schema dorisSchema) {
+    private List<String> extractDorisNames(org.apache.doris.flink.rest.models.Schema dorisSchema) {
+        return extractDorisNames(dorisSchema.getProperties());
+    }
+
+    private List<String> extractDorisNames(List<Field> fields) {
         List<String> columnNames = new ArrayList<>();
-        for (Field field : dorisSchema.getProperties()) {
+        for (Field field : fields) {
             if (!DORIS_DELETE_SIGN.equals(field.getName())) {
                 columnNames.add(field.getName());
             }
@@ -1009,7 +1124,7 @@ public class DorisMetadataApplier implements MetadataApplier {
         return columnNames;
     }
 
-    private void updateDorisColumnOrderCache(TableId tableId, List<String> columnNames) {
+    private void updateDorisOrderCache(TableId tableId, List<String> columnNames) {
         if (columnNames == null) {
             dorisColumnOrderCache.remove(tableId);
             return;
@@ -1017,36 +1132,143 @@ public class DorisMetadataApplier implements MetadataApplier {
         dorisColumnOrderCache.put(tableId, new ArrayList<>(columnNames));
     }
 
-    private void updateDorisColumnOrderCacheAfterDrop(
+    private String resolveDorisColumnName(TableId tableId, String columnName) {
+        List<String> columnNames = dorisColumnOrderCache.get(tableId);
+        if (columnNames == null || findColumnIndex(columnNames, columnName) < 0) {
+            columnNames =
+                    refreshDorisOrder(
+                            tableId,
+                            DorisPhysicalSchemaExpectation.contains(columnName),
+                            "resolve Doris physical column name " + columnName);
+        }
+        int columnIndex = findColumnIndex(columnNames, columnName);
+        if (columnIndex < 0) {
+            throw new IllegalStateException(
+                    "Failed to resolve Doris physical column name for "
+                            + tableId.identifier()
+                            + "."
+                            + columnName);
+        }
+        return columnNames.get(columnIndex);
+    }
+
+    private List<String> resolveDorisColumnNamesForDrop(
             TableId tableId, List<String> droppedColumns) {
         List<String> columnNames = dorisColumnOrderCache.get(tableId);
         if (columnNames == null) {
-            return;
+            columnNames =
+                    refreshDorisOrder(
+                            tableId,
+                            DorisPhysicalSchemaExpectation.any(),
+                            "resolve Doris physical column names for drop");
         }
-        List<String> updatedColumnNames = new ArrayList<>(columnNames);
+
+        List<String> physicalDroppedColumns = new ArrayList<>();
         for (String droppedColumn : droppedColumns) {
-            int droppedIndex = findColumnIndex(updatedColumnNames, droppedColumn);
-            if (droppedIndex >= 0) {
-                updatedColumnNames.remove(droppedIndex);
+            int columnIndex = findColumnIndex(columnNames, droppedColumn);
+            if (columnIndex >= 0) {
+                physicalDroppedColumns.add(columnNames.get(columnIndex));
+            } else {
+                LOG.info(
+                        "Skip Doris DROP COLUMN for {}.{} because the column is already absent.",
+                        tableId.identifier(),
+                        droppedColumn);
             }
         }
-        updateDorisColumnOrderCache(tableId, updatedColumnNames);
+        return physicalDroppedColumns;
     }
 
-    private void updateDorisColumnOrderCacheAfterRename(
-            TableId tableId, Map<String, String> nameMapping) {
-        List<String> columnNames = dorisColumnOrderCache.get(tableId);
-        if (columnNames == null) {
-            return;
+    private List<String> tryRefreshOrderAfterAdd(
+            TableId tableId, String addedColumnName, String operation) {
+        return tryRefreshDorisOrder(
+                tableId, DorisPhysicalSchemaExpectation.contains(addedColumnName), operation);
+    }
+
+    private List<String> tryRefreshDorisOrder(
+            TableId tableId, DorisPhysicalSchemaExpectation expectation, String operation) {
+        try {
+            return refreshDorisOrder(tableId, expectation, operation);
+        } catch (RuntimeException e) {
+            updateDorisOrderCache(tableId, null);
+            LOG.warn(
+                    "Could not confirm Doris physical schema after {} on {} within the metadata "
+                            + "refresh budget. Invalidated the physical column-order cache; later "
+                            + "schema changes and sink serialization will resolve Doris physical schema again.",
+                    operation,
+                    tableId.identifier(),
+                    e);
+            return null;
         }
-        List<String> updatedColumnNames = new ArrayList<>(columnNames);
-        for (Map.Entry<String, String> entry : nameMapping.entrySet()) {
-            int renamedIndex = findColumnIndex(updatedColumnNames, entry.getKey());
-            if (renamedIndex >= 0) {
-                updatedColumnNames.set(renamedIndex, entry.getValue());
+    }
+
+    private List<String> refreshDorisOrder(
+            TableId tableId, DorisPhysicalSchemaExpectation expectation, String operation) {
+        long waitStartNanos = System.nanoTime();
+        long deadlineNanos =
+                waitStartNanos + TimeUnit.MILLISECONDS.toNanos(dorisRefreshMaxWaitMillis());
+        RuntimeException lastFailure = null;
+        boolean waitingLogged = false;
+
+        while (true) {
+            try {
+                List<Field> fields = fetchDorisFieldsOnce(tableId);
+                List<String> columnNames = extractDorisNames(fields);
+                if (expectation == null || expectation.matches(fields, this)) {
+                    updateDorisOrderCache(tableId, columnNames);
+                    return new ArrayList<>(columnNames);
+                }
+                lastFailure =
+                        new IllegalStateException(
+                                "Doris physical schema of "
+                                        + tableId.identifier()
+                                        + " does not satisfy "
+                                        + expectation.description
+                                        + ". Current columns: "
+                                        + columnNames);
+            } catch (RuntimeException e) {
+                lastFailure = e;
             }
+
+            long nowNanos = System.nanoTime();
+            if (nowNanos >= deadlineNanos) {
+                updateDorisOrderCache(tableId, null);
+                throw new IllegalStateException(
+                        "Failed to refresh Doris physical column-order cache for "
+                                + tableId.identifier()
+                                + " after "
+                                + operation
+                                + ". Unknown Doris physical schema cannot be used safely for "
+                                + "following schema changes or CSV writes.",
+                        lastFailure);
+            }
+            if (!waitingLogged) {
+                waitingLogged = true;
+                LOG.info(
+                        "Waiting for Doris physical schema to catch up after {} on {}. expectation={}",
+                        operation,
+                        tableId.identifier(),
+                        expectation == null ? "any schema" : expectation.description);
+            }
+            sleepBeforeDorisRetry();
         }
-        updateDorisColumnOrderCache(tableId, updatedColumnNames);
+    }
+
+    protected void sleepBeforeDorisRetry() {
+        try {
+            Thread.sleep(dorisRefreshRetryMillis());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(
+                    "Interrupted while waiting for Doris physical schema refresh.", e);
+        }
+    }
+
+    protected long dorisRefreshMaxWaitMillis() {
+        return DORIS_SCHEMA_REFRESH_MAX_WAIT_MILLIS;
+    }
+
+    protected long dorisRefreshRetryMillis() {
+        return DORIS_SCHEMA_REFRESH_RETRY_MILLIS;
     }
 
     private void updateCacheAfterSchemaChange(
@@ -1062,13 +1284,55 @@ public class DorisMetadataApplier implements MetadataApplier {
                 operation);
     }
 
-    private Schema getSchemaOrThrow(TableId tableId) {
-        Schema schema = schemaCache.get(tableId);
-        if (schema == null) {
-            throw new IllegalStateException(
-                    "Schema cache of " + tableId + " is not initialized before schema evolution.");
+    private static final class DorisPhysicalSchemaExpectation {
+        private final List<String> includedColumns;
+        private final List<String> excludedColumns;
+        private final String description;
+
+        private DorisPhysicalSchemaExpectation(
+                List<String> includedColumns, List<String> excludedColumns, String description) {
+            this.includedColumns = includedColumns;
+            this.excludedColumns = excludedColumns;
+            this.description = description;
         }
-        return schema;
+
+        private static DorisPhysicalSchemaExpectation any() {
+            return new DorisPhysicalSchemaExpectation(
+                    Collections.emptyList(), Collections.emptyList(), "any physical schema");
+        }
+
+        private static DorisPhysicalSchemaExpectation contains(String columnName) {
+            return containsAll(Collections.singletonList(columnName));
+        }
+
+        private static DorisPhysicalSchemaExpectation containsAll(List<String> columnNames) {
+            return new DorisPhysicalSchemaExpectation(
+                    new ArrayList<>(columnNames),
+                    Collections.emptyList(),
+                    "contains columns " + columnNames);
+        }
+
+        private static DorisPhysicalSchemaExpectation excludesAll(List<String> columnNames) {
+            return new DorisPhysicalSchemaExpectation(
+                    Collections.emptyList(),
+                    new ArrayList<>(columnNames),
+                    "excludes columns " + columnNames);
+        }
+
+        private boolean matches(List<Field> fields, DorisMetadataApplier applier) {
+            List<String> columnNames = applier.extractDorisNames(fields);
+            for (String includedColumn : includedColumns) {
+                if (applier.findColumnIndex(columnNames, includedColumn) < 0) {
+                    return false;
+                }
+            }
+            for (String excludedColumn : excludedColumns) {
+                if (applier.findColumnIndex(columnNames, excludedColumn) >= 0) {
+                    return false;
+                }
+            }
+            return true;
+        }
     }
 
     @VisibleForTesting

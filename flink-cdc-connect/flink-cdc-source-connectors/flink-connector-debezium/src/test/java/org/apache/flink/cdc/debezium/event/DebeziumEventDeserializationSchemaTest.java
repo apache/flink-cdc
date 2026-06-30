@@ -59,7 +59,7 @@ class DebeziumEventDeserializationSchemaTest {
     private static final TableId TABLE_ID = TableId.tableId("test_db", "orders");
 
     @Test
-    void testCachedSchemaMismatchFallsBackToValueInference() throws Exception {
+    void testCachedSchemaMismatchFailsFast() throws Exception {
         TestingDebeziumEventDeserializationSchema deserializer =
                 new TestingDebeziumEventDeserializationSchema();
         deserializer.applyChangeEvent(
@@ -71,25 +71,25 @@ class DebeziumEventDeserializationSchemaTest {
                                 .primaryKey("id")
                                 .build()));
 
-        List<? extends Event> events =
-                deserializer.deserialize(
-                        insertRecord(
-                                SchemaBuilder.struct()
-                                        .field(
-                                                "name",
-                                                org.apache.kafka.connect.data.Schema.STRING_SCHEMA)
-                                        .build(),
-                                Collections.singletonMap("name", "alice")));
-
-        DataChangeEvent event = (DataChangeEvent) events.get(0);
-        RecordData after = event.after();
-
-        assertThat(after.getArity()).isEqualTo(1);
-        assertThat(after.getString(0)).isEqualTo(BinaryStringData.fromString("alice"));
+        assertThatThrownBy(
+                        () ->
+                                deserializer.deserialize(
+                                        insertRecord(
+                                                SchemaBuilder.struct()
+                                                        .field(
+                                                                "name",
+                                                                org.apache.kafka.connect.data.Schema
+                                                                        .STRING_SCHEMA)
+                                                        .build(),
+                                                Collections.singletonMap("name", "alice"))))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Cached schema")
+                .hasMessageContaining("cannot be decoded safely")
+                .hasMessageContaining("Missing field 'id'");
     }
 
     @Test
-    void testCachedFieldTypeMismatchFallsBackToValueInference() throws Exception {
+    void testCachedFieldTypeMismatchFailsFast() throws Exception {
         TestingDebeziumEventDeserializationSchema deserializer =
                 new TestingDebeziumEventDeserializationSchema();
         deserializer.applyChangeEvent(
@@ -101,25 +101,24 @@ class DebeziumEventDeserializationSchemaTest {
                                 .primaryKey("id")
                                 .build()));
 
-        List<? extends Event> events =
-                deserializer.deserialize(
-                        insertRecord(
-                                SchemaBuilder.struct()
-                                        .field(
-                                                "id",
-                                                org.apache.kafka.connect.data.Schema.STRING_SCHEMA)
-                                        .field(
-                                                "name",
-                                                org.apache.kafka.connect.data.Schema.STRING_SCHEMA)
-                                        .build(),
-                                Map.of("id", "abc", "name", "alice")));
-
-        DataChangeEvent event = (DataChangeEvent) events.get(0);
-        RecordData after = event.after();
-
-        assertThat(after.getArity()).isEqualTo(2);
-        assertThat(after.getString(0)).isEqualTo(BinaryStringData.fromString("abc"));
-        assertThat(after.getString(1)).isEqualTo(BinaryStringData.fromString("alice"));
+        assertThatThrownBy(
+                        () ->
+                                deserializer.deserialize(
+                                        insertRecord(
+                                                SchemaBuilder.struct()
+                                                        .field(
+                                                                "id",
+                                                                org.apache.kafka.connect.data.Schema
+                                                                        .STRING_SCHEMA)
+                                                        .field(
+                                                                "name",
+                                                                org.apache.kafka.connect.data.Schema
+                                                                        .STRING_SCHEMA)
+                                                        .build(),
+                                                Map.of("id", "abc", "name", "alice"))))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Cached schema")
+                .hasMessageContaining("Field 'id' expects cached type");
     }
 
     @Test
@@ -204,8 +203,7 @@ class DebeziumEventDeserializationSchemaTest {
     }
 
     @Test
-    void testRegularPrecisionDecimalSchemaIncompatibleWithCachedStringFallsBackToValueInference()
-            throws Exception {
+    void testRegularPrecisionDecimalSchemaIncompatibleWithCachedStringFailsFast() {
         TestingDebeziumEventDeserializationSchema deserializer =
                 new TestingDebeziumEventDeserializationSchema();
         deserializer.applyChangeEvent(
@@ -219,22 +217,22 @@ class DebeziumEventDeserializationSchemaTest {
                 org.apache.kafka.connect.data.Decimal.builder(1)
                         .parameter(DebeziumSchemaDataTypeInference.PRECISION_PARAMETER_KEY, "10")
                         .build();
-        List<? extends Event> events =
-                deserializer.deserialize(
-                        insertRecord(
-                                SchemaBuilder.struct().field("left_value", decimalSchema).build(),
-                                Collections.singletonMap("left_value", new BigDecimal("12345.6"))));
-
-        DataChangeEvent event = (DataChangeEvent) events.get(0);
-        RecordData after = event.after();
-
-        assertThat(after.getArity()).isEqualTo(1);
-        assertThat(after.getDecimal(0, 10, 1).toBigDecimal()).isEqualByComparingTo("12345.6");
+        assertThatThrownBy(
+                        () ->
+                                deserializer.deserialize(
+                                        insertRecord(
+                                                SchemaBuilder.struct()
+                                                        .field("left_value", decimalSchema)
+                                                        .build(),
+                                                Collections.singletonMap(
+                                                        "left_value", new BigDecimal("12345.6")))))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Cached schema")
+                .hasMessageContaining("left_value");
     }
 
     @Test
-    void testLogicalDateSchemaIncompatibleWithCachedIntegerFallsBackToValueInference()
-            throws Exception {
+    void testLogicalDateSchemaIncompatibleWithCachedIntegerFailsFast() {
         TestingDebeziumEventDeserializationSchema deserializer =
                 new TestingDebeziumEventDeserializationSchema();
         deserializer.applyChangeEvent(
@@ -247,26 +245,28 @@ class DebeziumEventDeserializationSchemaTest {
         org.apache.kafka.connect.data.Schema dateSchema =
                 org.apache.kafka.connect.data.Date.builder().build();
         LocalDate expectedDate = LocalDate.of(2026, 4, 10);
-        List<? extends Event> events =
-                deserializer.deserialize(
-                        insertRecord(
-                                SchemaBuilder.struct().field("created_on", dateSchema).build(),
-                                Collections.singletonMap(
-                                        "created_on",
-                                        org.apache.kafka.connect.data.Date.toLogical(
-                                                dateSchema,
-                                                Math.toIntExact(expectedDate.toEpochDay())))));
-
-        DataChangeEvent event = (DataChangeEvent) events.get(0);
-        RecordData after = event.after();
-
-        assertThat(after.getArity()).isEqualTo(1);
-        assertThat(after.getDate(0).toLocalDate()).isEqualTo(expectedDate);
+        assertThatThrownBy(
+                        () ->
+                                deserializer.deserialize(
+                                        insertRecord(
+                                                SchemaBuilder.struct()
+                                                        .field("created_on", dateSchema)
+                                                        .build(),
+                                                Collections.singletonMap(
+                                                        "created_on",
+                                                        org.apache.kafka.connect.data.Date
+                                                                .toLogical(
+                                                                        dateSchema,
+                                                                        Math.toIntExact(
+                                                                                expectedDate
+                                                                                        .toEpochDay()))))))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Cached schema")
+                .hasMessageContaining("created_on");
     }
 
     @Test
-    void testLogicalTimestampSchemaIncompatibleWithCachedBigintFallsBackToValueInference()
-            throws Exception {
+    void testLogicalTimestampSchemaIncompatibleWithCachedBigintFailsFast() {
         TestingDebeziumEventDeserializationSchema deserializer =
                 new TestingDebeziumEventDeserializationSchema();
         deserializer.applyChangeEvent(
@@ -279,28 +279,30 @@ class DebeziumEventDeserializationSchemaTest {
         org.apache.kafka.connect.data.Schema timestampSchema =
                 org.apache.kafka.connect.data.Timestamp.builder().build();
         LocalDateTime expectedTimestamp = LocalDateTime.of(2026, 4, 10, 10, 5, 6, 789_000_000);
-        List<? extends Event> events =
-                deserializer.deserialize(
-                        insertRecord(
-                                SchemaBuilder.struct().field("created_at", timestampSchema).build(),
-                                Collections.singletonMap(
-                                        "created_at",
-                                        org.apache.kafka.connect.data.Timestamp.toLogical(
-                                                timestampSchema,
-                                                expectedTimestamp
-                                                        .toInstant(ZoneOffset.UTC)
-                                                        .toEpochMilli()))));
-
-        DataChangeEvent event = (DataChangeEvent) events.get(0);
-        RecordData after = event.after();
-
-        assertThat(after.getArity()).isEqualTo(1);
-        assertThat(after.getTimestamp(0, 3).toLocalDateTime()).isEqualTo(expectedTimestamp);
+        assertThatThrownBy(
+                        () ->
+                                deserializer.deserialize(
+                                        insertRecord(
+                                                SchemaBuilder.struct()
+                                                        .field("created_at", timestampSchema)
+                                                        .build(),
+                                                Collections.singletonMap(
+                                                        "created_at",
+                                                        org.apache.kafka.connect.data.Timestamp
+                                                                .toLogical(
+                                                                        timestampSchema,
+                                                                        expectedTimestamp
+                                                                                .toInstant(
+                                                                                        ZoneOffset
+                                                                                                .UTC)
+                                                                                .toEpochMilli())))))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Cached schema")
+                .hasMessageContaining("created_at");
     }
 
     @Test
-    void testDecimalLogicalBytesSchemaIncompatibleWithCachedBinaryFallsBackToValueInference()
-            throws Exception {
+    void testDecimalLogicalBytesSchemaIncompatibleWithCachedBinaryFailsFast() {
         TestingDebeziumEventDeserializationSchema deserializer =
                 new TestingDebeziumEventDeserializationSchema();
         deserializer.applyChangeEvent(
@@ -314,17 +316,18 @@ class DebeziumEventDeserializationSchemaTest {
                 org.apache.kafka.connect.data.Decimal.builder(1)
                         .parameter(DebeziumSchemaDataTypeInference.PRECISION_PARAMETER_KEY, "10")
                         .build();
-        List<? extends Event> events =
-                deserializer.deserialize(
-                        insertRecord(
-                                SchemaBuilder.struct().field("amount", decimalSchema).build(),
-                                Collections.singletonMap("amount", new BigDecimal("12345.6"))));
-
-        DataChangeEvent event = (DataChangeEvent) events.get(0);
-        RecordData after = event.after();
-
-        assertThat(after.getArity()).isEqualTo(1);
-        assertThat(after.getDecimal(0, 10, 1).toBigDecimal()).isEqualByComparingTo("12345.6");
+        assertThatThrownBy(
+                        () ->
+                                deserializer.deserialize(
+                                        insertRecord(
+                                                SchemaBuilder.struct()
+                                                        .field("amount", decimalSchema)
+                                                        .build(),
+                                                Collections.singletonMap(
+                                                        "amount", new BigDecimal("12345.6")))))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Cached schema")
+                .hasMessageContaining("amount");
     }
 
     @Test
@@ -359,7 +362,7 @@ class DebeziumEventDeserializationSchemaTest {
     }
 
     @Test
-    void testUnexpectedActualFieldFallsBackToValueInference() throws Exception {
+    void testUnexpectedActualFieldFailsFastWithCachedSchema() {
         TestingDebeziumEventDeserializationSchema deserializer =
                 new TestingDebeziumEventDeserializationSchema();
         deserializer.applyChangeEvent(
@@ -370,29 +373,28 @@ class DebeziumEventDeserializationSchemaTest {
                                 .primaryKey("id")
                                 .build()));
 
-        List<? extends Event> events =
-                deserializer.deserialize(
-                        insertRecord(
-                                SchemaBuilder.struct()
-                                        .field(
-                                                "id",
-                                                org.apache.kafka.connect.data.Schema.INT32_SCHEMA)
-                                        .field(
-                                                "name",
-                                                org.apache.kafka.connect.data.Schema.STRING_SCHEMA)
-                                        .build(),
-                                Map.of("id", 1, "name", "alice")));
-
-        DataChangeEvent event = (DataChangeEvent) events.get(0);
-        RecordData after = event.after();
-
-        assertThat(after.getArity()).isEqualTo(2);
-        assertThat(after.getInt(0)).isEqualTo(1);
-        assertThat(after.getString(1)).isEqualTo(BinaryStringData.fromString("alice"));
+        assertThatThrownBy(
+                        () ->
+                                deserializer.deserialize(
+                                        insertRecord(
+                                                SchemaBuilder.struct()
+                                                        .field(
+                                                                "id",
+                                                                org.apache.kafka.connect.data.Schema
+                                                                        .INT32_SCHEMA)
+                                                        .field(
+                                                                "name",
+                                                                org.apache.kafka.connect.data.Schema
+                                                                        .STRING_SCHEMA)
+                                                        .build(),
+                                                Map.of("id", 1, "name", "alice"))))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Cached schema")
+                .hasMessageContaining("Unexpected field 'name'");
     }
 
     @Test
-    void testUnexpectedNestedActualFieldFallsBackToValueInference() throws Exception {
+    void testUnexpectedNestedActualFieldFailsFastWithCachedSchema() {
         TestingDebeziumEventDeserializationSchema deserializer =
                 new TestingDebeziumEventDeserializationSchema();
         deserializer.applyChangeEvent(
@@ -411,6 +413,101 @@ class DebeziumEventDeserializationSchemaTest {
                         .build();
         Struct payload = new Struct(payloadSchema).put("id", 1).put("name", "alice");
 
+        assertThatThrownBy(
+                        () ->
+                                deserializer.deserialize(
+                                        insertRecord(
+                                                SchemaBuilder.struct()
+                                                        .field("payload", payloadSchema)
+                                                        .build(),
+                                                Collections.singletonMap("payload", payload))))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Cached schema")
+                .hasMessageContaining("Unexpected field 'payload.name'");
+    }
+
+    @Test
+    void testCachedSchemaAcceptsCaseOnlyFieldName() throws Exception {
+        TestingDebeziumEventDeserializationSchema deserializer =
+                new TestingDebeziumEventDeserializationSchema();
+        deserializer.applyChangeEvent(
+                new CreateTableEvent(
+                        TABLE_ID,
+                        Schema.newBuilder()
+                                .physicalColumn("id", DataTypes.INT().notNull())
+                                .physicalColumn("job", DataTypes.STRING())
+                                .primaryKey("id")
+                                .build()));
+
+        List<? extends Event> events =
+                deserializer.deserialize(
+                        insertRecord(
+                                SchemaBuilder.struct()
+                                        .field(
+                                                "id",
+                                                org.apache.kafka.connect.data.Schema.INT32_SCHEMA)
+                                        .field(
+                                                "JOB",
+                                                org.apache.kafka.connect.data.Schema.STRING_SCHEMA)
+                                        .build(),
+                                Map.of("id", 1, "JOB", "engineer")));
+
+        DataChangeEvent event = (DataChangeEvent) events.get(0);
+        RecordData after = event.after();
+
+        assertThat(after.getArity()).isEqualTo(2);
+        assertThat(after.getInt(0)).isEqualTo(1);
+        assertThat(after.getString(1)).isEqualTo(BinaryStringData.fromString("engineer"));
+    }
+
+    @Test
+    void testCachedSchemaRejectsAmbiguousCaseFields() {
+        TestingDebeziumEventDeserializationSchema deserializer =
+                new TestingDebeziumEventDeserializationSchema();
+        deserializer.applyChangeEvent(
+                new CreateTableEvent(
+                        TABLE_ID,
+                        Schema.newBuilder().physicalColumn("job", DataTypes.STRING()).build()));
+
+        assertThatThrownBy(
+                        () ->
+                                deserializer.deserialize(
+                                        insertRecord(
+                                                SchemaBuilder.struct()
+                                                        .field(
+                                                                "job",
+                                                                org.apache.kafka.connect.data.Schema
+                                                                        .STRING_SCHEMA)
+                                                        .field(
+                                                                "JOB",
+                                                                org.apache.kafka.connect.data.Schema
+                                                                        .STRING_SCHEMA)
+                                                        .build(),
+                                                Map.of("job", "engineer", "JOB", "architect"))))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Cached schema")
+                .hasMessageContaining("Ambiguous field 'job'");
+    }
+
+    @Test
+    void testCachedSchemaAcceptsNestedCaseOnlyFieldName() throws Exception {
+        TestingDebeziumEventDeserializationSchema deserializer =
+                new TestingDebeziumEventDeserializationSchema();
+        deserializer.applyChangeEvent(
+                new CreateTableEvent(
+                        TABLE_ID,
+                        Schema.newBuilder()
+                                .physicalColumn(
+                                        "payload",
+                                        DataTypes.ROW(DataTypes.FIELD("job", DataTypes.STRING())))
+                                .build()));
+
+        org.apache.kafka.connect.data.Schema payloadSchema =
+                SchemaBuilder.struct()
+                        .field("JOB", org.apache.kafka.connect.data.Schema.STRING_SCHEMA)
+                        .build();
+        Struct payload = new Struct(payloadSchema).put("JOB", "engineer");
+
         List<? extends Event> events =
                 deserializer.deserialize(
                         insertRecord(
@@ -419,12 +516,9 @@ class DebeziumEventDeserializationSchemaTest {
 
         DataChangeEvent event = (DataChangeEvent) events.get(0);
         RecordData after = event.after();
-        RecordData nested = after.getRow(0, 2);
+        RecordData nested = after.getRow(0, 1);
 
-        assertThat(after.getArity()).isEqualTo(1);
-        assertThat(nested.getArity()).isEqualTo(2);
-        assertThat(nested.getInt(0)).isEqualTo(1);
-        assertThat(nested.getString(1)).isEqualTo(BinaryStringData.fromString("alice"));
+        assertThat(nested.getString(0)).isEqualTo(BinaryStringData.fromString("engineer"));
     }
 
     @Test
@@ -478,11 +572,10 @@ class DebeziumEventDeserializationSchemaTest {
     }
 
     @Test
-    void testFallbackPathDoubleMismatchIsWrappedWithClearMessage() throws Exception {
-        // If a future Debezium logical name makes the validator reject BOTH the cached type
-        // and the freshly-inferred type, the second exception used to escape the operator
-        // uncaught with confusing "cached type" wording. The fallback is now wrapped so the
-        // underlying validator gap surfaces clearly instead.
+    void testFallbackPathDoubleMismatchIsWrappedWithClearMessage() {
+        // With no cached CreateTableEvent, value inference is still the only available path.
+        // If a future logical name makes the validator reject a freshly-inferred type, surface
+        // that as a validator gap rather than a stale-cache problem.
         TestingDebeziumEventDeserializationSchema deserializer =
                 new TestingDebeziumEventDeserializationSchema(
                         new DebeziumSchemaDataTypeInference() {
@@ -672,6 +765,63 @@ class DebeziumEventDeserializationSchemaTest {
         assertThat(after.getArity()).isEqualTo(2);
         assertThat(after.getInt(0)).isEqualTo(1);
         assertThat(after.getString(1)).isEqualTo(BinaryStringData.fromString("alice"));
+    }
+
+    @Test
+    void testRepeatedSchemaChangeEventDoesNotDuplicateCachedColumns() throws Exception {
+        TestingDebeziumEventDeserializationSchema deserializer =
+                new TestingDebeziumEventDeserializationSchema();
+        deserializer.applyChangeEvent(
+                new CreateTableEvent(
+                        TABLE_ID,
+                        Schema.newBuilder()
+                                .physicalColumn("id", DataTypes.INT().notNull())
+                                .physicalColumn("description", DataTypes.STRING())
+                                .primaryKey("id")
+                                .build()));
+        AddColumnEvent addNameColumn =
+                new AddColumnEvent(
+                        TABLE_ID,
+                        Collections.singletonList(
+                                AddColumnEvent.after(
+                                        Column.physicalColumn("name", DataTypes.STRING()),
+                                        "description")));
+        deserializer.setSchemaChangeEvents(Collections.singletonList(addNameColumn));
+
+        deserializer.deserialize(schemaChangeRecord());
+        deserializer.applyChangeEvent(addNameColumn);
+
+        assertThat(
+                        deserializer
+                                .getCreateTableEventCache()
+                                .get(new io.debezium.relational.TableId(null, "test_db", "orders"))
+                                .getSchema()
+                                .getColumnNames())
+                .containsExactly("id", "description", "name");
+
+        List<? extends Event> dataEvents =
+                deserializer.deserialize(
+                        insertRecord(
+                                SchemaBuilder.struct()
+                                        .field(
+                                                "id",
+                                                org.apache.kafka.connect.data.Schema.INT32_SCHEMA)
+                                        .field(
+                                                "description",
+                                                org.apache.kafka.connect.data.Schema.STRING_SCHEMA)
+                                        .field(
+                                                "name",
+                                                org.apache.kafka.connect.data.Schema.STRING_SCHEMA)
+                                        .build(),
+                                Map.of("id", 1, "description", "desc", "name", "alice")));
+
+        DataChangeEvent event = (DataChangeEvent) dataEvents.get(0);
+        RecordData after = event.after();
+
+        assertThat(after.getArity()).isEqualTo(3);
+        assertThat(after.getInt(0)).isEqualTo(1);
+        assertThat(after.getString(1)).isEqualTo(BinaryStringData.fromString("desc"));
+        assertThat(after.getString(2)).isEqualTo(BinaryStringData.fromString("alice"));
     }
 
     private static SourceRecord insertRecord(

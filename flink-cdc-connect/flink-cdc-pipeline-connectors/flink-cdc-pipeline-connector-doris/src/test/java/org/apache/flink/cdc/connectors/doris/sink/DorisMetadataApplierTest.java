@@ -43,6 +43,7 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -194,15 +195,12 @@ public class DorisMetadataApplierTest {
     public void testCreateTableEventReconcilesMissingColumnsForExistingTable() {
         RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
         DorisMetadataApplier applier =
-                new DorisMetadataApplier(
-                        createDorisOptions(),
-                        Configuration.fromMap(Collections.emptyMap()),
+                createApplierForExistingDorisSchema(
                         schemaChangeManager,
-                        (dorisOptions, tableId) ->
-                                createDorisSchema(
-                                        dorisField("DEPLOY_MODE", "INT"),
-                                        dorisField("project_id", "BIGINT"),
-                                        dorisVarcharField("job_name", 51)));
+                        createDorisSchema(
+                                dorisField("DEPLOY_MODE", "INT"),
+                                dorisField("project_id", "BIGINT"),
+                                dorisVarcharField("job_name", 51)));
 
         Schema targetSchema =
                 Schema.newBuilder()
@@ -221,6 +219,9 @@ public class DorisMetadataApplierTest {
         Assertions.assertThat(schemaChangeManager.addedColumns.get(0).columnType)
                 .isEqualTo("DATETIMEV2(3)");
         Assertions.assertThat(applier.getCachedSchema(TABLE_ID)).isEqualTo(targetSchema);
+        Assertions.assertThat(applier.getCachedDorisColumnOrder(TABLE_ID))
+                .containsExactly(
+                        "DEPLOY_MODE", "project_id", "job_name", "CONFLUENT__LAST_UPDATED");
     }
 
     @Test
@@ -762,14 +763,13 @@ public class DorisMetadataApplierTest {
     @Test
     public void testCreateTableEventCreatesTableWhenDatabaseIsAbsent() {
         RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
+        schemaChangeManager.seedDorisSchema(TABLE_ID, createDorisSchema());
         DorisMetadataApplier applier =
-                new DorisMetadataApplier(
+                new TestDorisMetadataApplier(
                         createDorisOptions(),
                         Configuration.fromMap(Collections.emptyMap()),
                         schemaChangeManager,
-                        (dorisOptions, tableId) -> {
-                            throw new AssertionError("schema fetch should not be called");
-                        },
+                        (dorisOptions, tableId) -> schemaChangeManager.getDorisSchema(tableId),
                         (dorisOptions, tableId) ->
                                 DorisTableExistenceChecker.Existence.DATABASE_ABSENT);
 
@@ -784,19 +784,20 @@ public class DorisMetadataApplierTest {
         Assertions.assertThat(schemaChangeManager.createTableInvocations).isEqualTo(1);
         Assertions.assertThat(schemaChangeManager.addedColumns).isEmpty();
         Assertions.assertThat(applier.getCachedSchema(TABLE_ID)).isEqualTo(targetSchema);
+        Assertions.assertThat(applier.getCachedDorisColumnOrder(TABLE_ID))
+                .containsExactly("id", "name");
     }
 
     @Test
     public void testCreateTableEventCreatesTableWhenTableIsAbsent() {
         RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
+        schemaChangeManager.seedDorisSchema(TABLE_ID, createDorisSchema());
         DorisMetadataApplier applier =
-                new DorisMetadataApplier(
+                new TestDorisMetadataApplier(
                         createDorisOptions(),
                         Configuration.fromMap(Collections.emptyMap()),
                         schemaChangeManager,
-                        (dorisOptions, tableId) -> {
-                            throw new AssertionError("schema fetch should not be called");
-                        },
+                        (dorisOptions, tableId) -> schemaChangeManager.getDorisSchema(tableId),
                         (dorisOptions, tableId) ->
                                 DorisTableExistenceChecker.Existence.TABLE_ABSENT);
 
@@ -811,6 +812,8 @@ public class DorisMetadataApplierTest {
         Assertions.assertThat(schemaChangeManager.createTableInvocations).isEqualTo(1);
         Assertions.assertThat(schemaChangeManager.addedColumns).isEmpty();
         Assertions.assertThat(applier.getCachedSchema(TABLE_ID)).isEqualTo(targetSchema);
+        Assertions.assertThat(applier.getCachedDorisColumnOrder(TABLE_ID))
+                .containsExactly("id", "name");
     }
 
     @Test
@@ -968,15 +971,12 @@ public class DorisMetadataApplierTest {
     public void testCreateTableEventReconcileKeepsNotNullColumnInCache() {
         RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
         DorisMetadataApplier applier =
-                new DorisMetadataApplier(
-                        createDorisOptions(),
-                        Configuration.fromMap(Collections.emptyMap()),
+                createApplierForExistingDorisSchema(
                         schemaChangeManager,
-                        (dorisOptions, tableId) ->
-                                createDorisSchema(
-                                        dorisField("DEPLOY_MODE", "INT"),
-                                        dorisField("project_id", "BIGINT"),
-                                        dorisVarcharField("job_name", 51)));
+                        createDorisSchema(
+                                dorisField("DEPLOY_MODE", "INT"),
+                                dorisField("project_id", "BIGINT"),
+                                dorisVarcharField("job_name", 51)));
 
         Schema targetSchema =
                 Schema.newBuilder()
@@ -1406,6 +1406,47 @@ public class DorisMetadataApplierTest {
     }
 
     @Test
+    public void testAddColumnAfterPositionResolvesPhysicalNameWhenOrderCacheInvalidated()
+            throws Exception {
+        // When a prior add-column refresh times out (Doris FE has not reflected the new column
+        // within the refresh budget), the physical column-order cache is invalidated and
+        // currentColumnNames becomes null for the following column. The AFTER position must still
+        // resolve the Doris physical reference name instead of leaking the raw CDC logical name.
+        // Doris physical columns are [ID, JOB]; the event references the existing column by its
+        // logical name "job", which must be translated to the physical name "JOB".
+        // The fixed fetcher never reflects the added columns, simulating a slow Doris FE so the
+        // first add invalidates the order cache for the second.
+        RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
+        schemaChangeManager.seedDorisSchema(
+                TABLE_ID, createDorisSchema(dorisField("ID", "INT"), dorisField("JOB", "STRING")));
+        final org.apache.doris.flink.rest.models.Schema fixedDorisSchema =
+                createDorisSchema(dorisField("ID", "INT"), dorisField("JOB", "STRING"));
+        DorisMetadataApplier applier =
+                new TestDorisMetadataApplier(
+                        createDorisOptions(),
+                        Configuration.fromMap(Collections.emptyMap()),
+                        schemaChangeManager,
+                        (dorisOptions, tableId) -> fixedDorisSchema);
+
+        applier.applySchemaChange(
+                new AddColumnEvent(
+                        TABLE_ID,
+                        Arrays.asList(
+                                AddColumnEvent.last(
+                                        Column.physicalColumn("c1", DataTypes.INT(), null, null)),
+                                AddColumnEvent.after(
+                                        Column.physicalColumn("c2", DataTypes.INT(), null, null),
+                                        "job"))));
+
+        Assertions.assertThat(schemaChangeManager.addedColumns).hasSize(2);
+        AddedColumn secondAdd = schemaChangeManager.addedColumns.get(1);
+        Assertions.assertThat(secondAdd.columnName).isEqualTo("c2");
+        Assertions.assertThat(secondAdd.positionType)
+                .isEqualTo(AddColumnPosition.PositionType.AFTER);
+        Assertions.assertThat(secondAdd.referenceColumn).isEqualTo("JOB");
+    }
+
+    @Test
     public void testAddColumnEventSkipsDefaultValueWhenDisabled() {
         RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
         Map<String, String> configMap = new HashMap<>();
@@ -1652,6 +1693,103 @@ public class DorisMetadataApplierTest {
     }
 
     @Test
+    public void testAddColumnEventRefreshesActualDorisOrderAfterPositionFallback() {
+        RecordingSchemaChangeManager schemaChangeManager =
+                new PositionFallbackRecordingSchemaChangeManager();
+        DorisMetadataApplier applier =
+                createApplierForExistingDorisSchema(
+                        schemaChangeManager,
+                        createDorisSchema(
+                                dorisField("id", "INT"),
+                                dorisField("name", "STRING"),
+                                dorisField("score", "INT")));
+
+        applier.applySchemaChange(
+                new AddColumnEvent(
+                        TABLE_ID,
+                        Collections.singletonList(
+                                AddColumnEvent.before(
+                                        Column.physicalColumn("age", DataTypes.INT()), "score"))));
+
+        Assertions.assertThat(schemaChangeManager.addedColumns).hasSize(1);
+        Assertions.assertThat(schemaChangeManager.addedColumns.get(0).referenceColumn)
+                .isEqualTo("name");
+        Assertions.assertThat(applier.getCachedDorisColumnOrder(TABLE_ID))
+                .containsExactly("id", "name", "score", "age");
+
+        applier.applySchemaChange(
+                new AddColumnEvent(
+                        TABLE_ID,
+                        Collections.singletonList(
+                                AddColumnEvent.before(
+                                        Column.physicalColumn("level", DataTypes.INT()), "age"))));
+
+        Assertions.assertThat(schemaChangeManager.addedColumns).hasSize(2);
+        Assertions.assertThat(schemaChangeManager.addedColumns.get(1).referenceColumn)
+                .isEqualTo("score");
+        Assertions.assertThat(applier.getCachedDorisColumnOrder(TABLE_ID))
+                .containsExactly("id", "name", "score", "level", "age");
+    }
+
+    @Test
+    public void testAddColumnEventRefreshesActualDorisOrderWhenColumnAlreadyExists() {
+        RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
+        DorisMetadataApplier applier =
+                createApplierForExistingDorisSchema(
+                        schemaChangeManager,
+                        createDorisSchema(
+                                dorisField("id", "INT"),
+                                dorisField("name", "STRING"),
+                                dorisField("score", "INT"),
+                                dorisField("age", "INT")));
+
+        applier.applySchemaChange(
+                new AddColumnEvent(
+                        TABLE_ID,
+                        Collections.singletonList(
+                                AddColumnEvent.before(
+                                        Column.physicalColumn("age", DataTypes.INT()), "score"))));
+
+        Assertions.assertThat(schemaChangeManager.addedColumns).hasSize(1);
+        Assertions.assertThat(applier.getCachedDorisColumnOrder(TABLE_ID))
+                .containsExactly("id", "name", "score", "age");
+
+        applier.applySchemaChange(
+                new AddColumnEvent(
+                        TABLE_ID,
+                        Collections.singletonList(
+                                AddColumnEvent.before(
+                                        Column.physicalColumn("level", DataTypes.INT()), "age"))));
+
+        Assertions.assertThat(schemaChangeManager.addedColumns).hasSize(2);
+        Assertions.assertThat(schemaChangeManager.addedColumns.get(1).referenceColumn)
+                .isEqualTo("score");
+        Assertions.assertThat(applier.getCachedDorisColumnOrder(TABLE_ID))
+                .containsExactly("id", "name", "score", "level", "age");
+    }
+
+    @Test
+    public void testAddColumnEventInvalidatesPhysicalOrderCacheWhenDorisSchemaDoesNotCatchUp() {
+        RecordingSchemaChangeManager schemaChangeManager =
+                new StaleAddColumnRecordingSchemaChangeManager();
+        DorisMetadataApplier applier =
+                createApplierForExistingDorisSchema(
+                        schemaChangeManager,
+                        createDorisSchema(dorisField("id", "INT"), dorisField("name", "STRING")));
+
+        applier.applySchemaChange(
+                new AddColumnEvent(
+                        TABLE_ID,
+                        Collections.singletonList(
+                                AddColumnEvent.last(
+                                        Column.physicalColumn("age", DataTypes.INT())))));
+
+        Assertions.assertThat(schemaChangeManager.addedColumns).hasSize(1);
+        Assertions.assertThat(applier.getCachedDorisColumnOrder(TABLE_ID)).isNull();
+        Assertions.assertThat(applier.getCachedSchema(TABLE_ID)).isNull();
+    }
+
+    @Test
     public void testAddColumnEventUsesFirstPositionWhenUpdatingColumnOrderWithMissingSchemaCache() {
         RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
         DorisMetadataApplier applier =
@@ -1756,11 +1894,42 @@ public class DorisMetadataApplierTest {
     }
 
     @Test
-    public void testAlterColumnTypeEventAppliesDorisDdlWhenSchemaCacheIsMissing() {
-        RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
+    public void testAlterColumnTypeEventDoesNotFailWhenRestSchemaTypeLags() {
+        RecordingSchemaChangeManager schemaChangeManager =
+                new StaleModifyColumnRecordingSchemaChangeManager();
         DorisMetadataApplier applier =
                 createApplierForAbsentTable(
                         schemaChangeManager, Configuration.fromMap(Collections.emptyMap()));
+
+        Schema initialSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.VARCHAR(17))
+                        .build();
+        applier.applySchemaChange(new CreateTableEvent(TABLE_ID, initialSchema));
+
+        Map<String, DataType> typeMapping = new HashMap<>();
+        typeMapping.put("name", DataTypes.VARCHAR(64));
+
+        applier.applySchemaChange(new AlterColumnTypeEvent(TABLE_ID, typeMapping));
+
+        Assertions.assertThat(schemaChangeManager.modifiedColumns).hasSize(1);
+        Assertions.assertThat(applier.getCachedDorisColumnOrder(TABLE_ID))
+                .containsExactly("id", "name");
+        Assertions.assertThat(applier.getCachedSchema(TABLE_ID).getColumn("name"))
+                .hasValueSatisfying(
+                        column ->
+                                Assertions.assertThat(column.getType())
+                                        .isEqualTo(DataTypes.VARCHAR(64)));
+    }
+
+    @Test
+    public void testAlterColumnTypeEventAppliesDorisDdlWhenSchemaCacheIsMissing() {
+        RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
+        DorisMetadataApplier applier =
+                createApplierForExistingDorisSchema(
+                        schemaChangeManager,
+                        createDorisSchema(dorisField("zyb_ticket_code", "VARCHAR")));
 
         Map<String, DataType> typeMapping = new HashMap<>();
         typeMapping.put("zyb_ticket_code", DataTypes.VARCHAR(64));
@@ -1773,6 +1942,31 @@ public class DorisMetadataApplierTest {
         Assertions.assertThat(schemaChangeManager.modifiedColumns.get(0).columnType)
                 .isEqualTo("VARCHAR(192)");
         Assertions.assertThat(applier.getCachedSchema(TABLE_ID)).isNull();
+    }
+
+    @Test
+    public void testAlterColumnTypeEventResolvesDorisPhysicalNameWhenSchemaCacheIsMissing() {
+        RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
+        DorisMetadataApplier applier =
+                createApplierForExistingDorisSchema(
+                        schemaChangeManager,
+                        createDorisSchema(dorisField("ID", "INT"), dorisField("JOB", "STRING")));
+
+        applier.applySchemaChange(
+                new AlterColumnTypeEvent(
+                        TABLE_ID,
+                        Collections.singletonMap("job", DataTypes.VARCHAR(64)),
+                        Collections.emptyMap(),
+                        Collections.singletonMap("job", "new job")));
+
+        Assertions.assertThat(schemaChangeManager.modifiedColumns).hasSize(1);
+        Assertions.assertThat(schemaChangeManager.modifiedColumns.get(0).columnName)
+                .isEqualTo("JOB");
+        Assertions.assertThat(schemaChangeManager.modifiedColumns.get(0).comment)
+                .isEqualTo("new job");
+        Assertions.assertThat(applier.getCachedSchema(TABLE_ID)).isNull();
+        Assertions.assertThat(applier.getCachedDorisColumnOrder(TABLE_ID))
+                .containsExactly("ID", "JOB");
     }
 
     @Test
@@ -1828,7 +2022,47 @@ public class DorisMetadataApplierTest {
     }
 
     @Test
-    public void testAlterColumnTypeEventAppliesTypeAndCommentDdlSeparately() {
+    public void testAlterColumnTypeEventCombinesTypeAndCommentDdl() {
+        RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
+        DorisMetadataApplier applier =
+                createApplierForAbsentTable(
+                        schemaChangeManager, Configuration.fromMap(Collections.emptyMap()));
+
+        Schema initialSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.VARCHAR(17), "old comment", "unknown")
+                        .build();
+        applier.applySchemaChange(new CreateTableEvent(TABLE_ID, initialSchema));
+
+        applier.applySchemaChange(
+                new AlterColumnTypeEvent(
+                        TABLE_ID,
+                        Collections.singletonMap("name", DataTypes.VARCHAR(64)),
+                        Collections.emptyMap(),
+                        Collections.singletonMap("name", "new comment")));
+
+        Assertions.assertThat(schemaChangeManager.modifiedColumns).hasSize(1);
+        Assertions.assertThat(schemaChangeManager.modifiedColumns.get(0).columnName)
+                .isEqualTo("name");
+        Assertions.assertThat(schemaChangeManager.modifiedColumns.get(0).columnType)
+                .isEqualTo("VARCHAR(192)");
+        Assertions.assertThat(schemaChangeManager.modifiedColumns.get(0).defaultValue)
+                .isEqualTo("unknown");
+        Assertions.assertThat(schemaChangeManager.modifiedColumns.get(0).comment)
+                .isEqualTo("new comment");
+        Assertions.assertThat(schemaChangeManager.modifiedColumnComments).isEmpty();
+        Assertions.assertThat(applier.getCachedSchema(TABLE_ID).getColumn("name"))
+                .hasValueSatisfying(
+                        column -> {
+                            Assertions.assertThat(column.getType())
+                                    .isEqualTo(DataTypes.VARCHAR(64));
+                            Assertions.assertThat(column.getComment()).isEqualTo("new comment");
+                        });
+    }
+
+    @Test
+    public void testAlterColumnTypeEventClearsCommentWhenTypeChangesWithNullComment() {
         RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
         DorisMetadataApplier applier =
                 createApplierForAbsentTable(
@@ -1846,23 +2080,87 @@ public class DorisMetadataApplierTest {
                         TABLE_ID,
                         Collections.singletonMap("name", DataTypes.VARCHAR(64)),
                         Collections.emptyMap(),
-                        Collections.singletonMap("name", "new comment")));
+                        Collections.singletonMap("name", null)));
 
         Assertions.assertThat(schemaChangeManager.modifiedColumns).hasSize(1);
-        Assertions.assertThat(schemaChangeManager.modifiedColumns.get(0).columnName)
-                .isEqualTo("name");
-        Assertions.assertThat(schemaChangeManager.modifiedColumns.get(0).columnType)
-                .isEqualTo("VARCHAR(192)");
         Assertions.assertThat(schemaChangeManager.modifiedColumns.get(0).comment)
                 .isEqualTo("old comment");
         Assertions.assertThat(schemaChangeManager.modifiedColumnComments)
-                .containsExactly(Collections.singletonMap("name", "new comment"));
+                .containsExactly(Collections.singletonMap("name", ""));
         Assertions.assertThat(applier.getCachedSchema(TABLE_ID).getColumn("name"))
                 .hasValueSatisfying(
                         column -> {
                             Assertions.assertThat(column.getType())
                                     .isEqualTo(DataTypes.VARCHAR(64));
-                            Assertions.assertThat(column.getComment()).isEqualTo("new comment");
+                            Assertions.assertThat(column.getComment()).isNull();
+                        });
+    }
+
+    @Test
+    public void testAlterColumnTypeEventClearsCommentWhenTypeChangesWithEmptyComment() {
+        RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
+        DorisMetadataApplier applier =
+                createApplierForAbsentTable(
+                        schemaChangeManager, Configuration.fromMap(Collections.emptyMap()));
+
+        Schema initialSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.VARCHAR(17), "old comment")
+                        .build();
+        applier.applySchemaChange(new CreateTableEvent(TABLE_ID, initialSchema));
+
+        applier.applySchemaChange(
+                new AlterColumnTypeEvent(
+                        TABLE_ID,
+                        Collections.singletonMap("name", DataTypes.VARCHAR(64)),
+                        Collections.emptyMap(),
+                        Collections.singletonMap("name", "")));
+
+        Assertions.assertThat(schemaChangeManager.modifiedColumns).hasSize(1);
+        Assertions.assertThat(schemaChangeManager.modifiedColumns.get(0).comment)
+                .isEqualTo("old comment");
+        Assertions.assertThat(schemaChangeManager.modifiedColumnComments)
+                .containsExactly(Collections.singletonMap("name", ""));
+        Assertions.assertThat(applier.getCachedSchema(TABLE_ID).getColumn("name"))
+                .hasValueSatisfying(
+                        column -> {
+                            Assertions.assertThat(column.getType())
+                                    .isEqualTo(DataTypes.VARCHAR(64));
+                            Assertions.assertThat(column.getComment()).isEmpty();
+                        });
+    }
+
+    @Test
+    public void testAlterColumnTypeEventClearsCommentWhenTypeIsUnchangedWithNullComment() {
+        RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
+        DorisMetadataApplier applier =
+                createApplierForAbsentTable(
+                        schemaChangeManager, Configuration.fromMap(Collections.emptyMap()));
+
+        Schema initialSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.VARCHAR(64), "old comment")
+                        .build();
+        applier.applySchemaChange(new CreateTableEvent(TABLE_ID, initialSchema));
+
+        applier.applySchemaChange(
+                new AlterColumnTypeEvent(
+                        TABLE_ID,
+                        Collections.singletonMap("name", DataTypes.VARCHAR(64)),
+                        Collections.emptyMap(),
+                        Collections.singletonMap("name", null)));
+
+        Assertions.assertThat(schemaChangeManager.modifiedColumns).isEmpty();
+        Assertions.assertThat(schemaChangeManager.modifiedColumnComments)
+                .containsExactly(Collections.singletonMap("name", ""));
+        Assertions.assertThat(applier.getCachedSchema(TABLE_ID).getColumn("name"))
+                .hasValueSatisfying(
+                        column -> {
+                            Assertions.assertThat(column.getType())
+                                    .isEqualTo(DataTypes.VARCHAR(64));
+                            Assertions.assertThat(column.getComment()).isNull();
                         });
     }
 
@@ -1943,6 +2241,124 @@ public class DorisMetadataApplierTest {
     }
 
     @Test
+    public void testRenameColumnEventSkipsDorisDdlForCaseOnlyRename() {
+        RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
+        DorisMetadataApplier applier =
+                createApplierForAbsentTable(
+                        schemaChangeManager, Configuration.fromMap(Collections.emptyMap()));
+
+        Schema initialSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("JOB", DataTypes.VARCHAR(64))
+                        .physicalColumn("age", DataTypes.INT())
+                        .build();
+        applier.applySchemaChange(new CreateTableEvent(TABLE_ID, initialSchema));
+
+        applier.applySchemaChange(
+                new RenameColumnEvent(TABLE_ID, Collections.singletonMap("JOB", "job")));
+
+        Assertions.assertThat(schemaChangeManager.renamedColumns).isEmpty();
+        Assertions.assertThat(applier.getCachedSchema(TABLE_ID).getColumnNames())
+                .containsExactly("id", "job", "age");
+    }
+
+    @Test
+    public void testAddColumnAfterCaseOnlyRenameKeepsDorisPhysicalReferenceColumn() {
+        RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
+        DorisMetadataApplier applier =
+                createApplierForAbsentTable(
+                        schemaChangeManager, Configuration.fromMap(Collections.emptyMap()));
+
+        Schema initialSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("JOB", DataTypes.VARCHAR(64))
+                        .physicalColumn("age", DataTypes.INT())
+                        .build();
+        applier.applySchemaChange(new CreateTableEvent(TABLE_ID, initialSchema));
+        applier.applySchemaChange(
+                new RenameColumnEvent(TABLE_ID, Collections.singletonMap("JOB", "job")));
+
+        applier.applySchemaChange(
+                new AddColumnEvent(
+                        TABLE_ID,
+                        Collections.singletonList(
+                                AddColumnEvent.after(
+                                        Column.physicalColumn("score", DataTypes.INT()), "job"))));
+
+        Assertions.assertThat(schemaChangeManager.renamedColumns).isEmpty();
+        Assertions.assertThat(schemaChangeManager.addedColumns).hasSize(1);
+        Assertions.assertThat(schemaChangeManager.addedColumns.get(0).referenceColumn)
+                .isEqualTo("JOB");
+        Assertions.assertThat(applier.getCachedSchema(TABLE_ID).getColumnNames())
+                .containsExactly("id", "job", "score", "age");
+    }
+
+    @Test
+    public void testAlterAfterCaseOnlyRenameKeepsDorisPhysicalColumnName() {
+        RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
+        DorisMetadataApplier applier =
+                createApplierForAbsentTable(
+                        schemaChangeManager, Configuration.fromMap(Collections.emptyMap()));
+
+        Schema initialSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("JOB", DataTypes.VARCHAR(64), "old job")
+                        .build();
+        applier.applySchemaChange(new CreateTableEvent(TABLE_ID, initialSchema));
+        applier.applySchemaChange(
+                new RenameColumnEvent(TABLE_ID, Collections.singletonMap("JOB", "job")));
+
+        applier.applySchemaChange(
+                new AlterColumnTypeEvent(
+                        TABLE_ID,
+                        Collections.singletonMap("job", DataTypes.VARCHAR(128)),
+                        Collections.emptyMap(),
+                        Collections.singletonMap("job", "new job")));
+
+        Assertions.assertThat(schemaChangeManager.modifiedColumns).hasSize(1);
+        Assertions.assertThat(schemaChangeManager.modifiedColumns.get(0).columnName)
+                .isEqualTo("JOB");
+        Assertions.assertThat(schemaChangeManager.modifiedColumns.get(0).comment)
+                .isEqualTo("new job");
+        Assertions.assertThat(applier.getCachedSchema(TABLE_ID).getColumn("job"))
+                .hasValueSatisfying(
+                        column -> {
+                            Assertions.assertThat(column.getType())
+                                    .isEqualTo(DataTypes.VARCHAR(128));
+                            Assertions.assertThat(column.getComment()).isEqualTo("new job");
+                        });
+    }
+
+    @Test
+    public void testDropAfterCaseOnlyRenameKeepsDorisPhysicalColumnName() {
+        RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
+        DorisMetadataApplier applier =
+                createApplierForAbsentTable(
+                        schemaChangeManager, Configuration.fromMap(Collections.emptyMap()));
+
+        Schema initialSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("JOB", DataTypes.VARCHAR(64))
+                        .physicalColumn("age", DataTypes.INT())
+                        .build();
+        applier.applySchemaChange(new CreateTableEvent(TABLE_ID, initialSchema));
+        applier.applySchemaChange(
+                new RenameColumnEvent(TABLE_ID, Collections.singletonMap("JOB", "job")));
+
+        applier.applySchemaChange(new DropColumnEvent(TABLE_ID, Collections.singletonList("job")));
+
+        Assertions.assertThat(schemaChangeManager.droppedColumns).containsExactly("JOB");
+        Assertions.assertThat(applier.getCachedSchema(TABLE_ID).getColumnNames())
+                .containsExactly("id", "age");
+        Assertions.assertThat(applier.getCachedDorisColumnOrder(TABLE_ID))
+                .containsExactly("id", "age");
+    }
+
+    @Test
     public void testCommentRemovalResolvesColumnNameCaseInsensitively() {
         RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
         DorisMetadataApplier applier =
@@ -1996,6 +2412,34 @@ public class DorisMetadataApplierTest {
     }
 
     @Test
+    public void testDropFailsIfDorisSchemaStale() {
+        RecordingSchemaChangeManager schemaChangeManager =
+                new StaleDropColumnRecordingSchemaChangeManager();
+        DorisMetadataApplier applier =
+                createApplierForAbsentTable(
+                        schemaChangeManager, Configuration.fromMap(Collections.emptyMap()));
+
+        Schema initialSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("job", DataTypes.VARCHAR(64))
+                        .build();
+        applier.applySchemaChange(new CreateTableEvent(TABLE_ID, initialSchema));
+
+        Assertions.assertThatThrownBy(
+                        () ->
+                                applier.applySchemaChange(
+                                        new DropColumnEvent(
+                                                TABLE_ID, Collections.singletonList("job"))))
+                .isInstanceOf(SchemaEvolveException.class)
+                .hasStackTraceContaining("Failed to refresh Doris physical column-order cache")
+                .hasStackTraceContaining("excludes columns [job]");
+        Assertions.assertThat(schemaChangeManager.droppedColumns).containsExactly("job");
+        Assertions.assertThat(applier.getCachedSchema(TABLE_ID)).isEqualTo(initialSchema);
+        Assertions.assertThat(applier.getCachedDorisColumnOrder(TABLE_ID)).isNull();
+    }
+
+    @Test
     public void testRenameColumnEventFailsAndKeepsPreviousCacheWhenDorisReturnsFalse() {
         RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
         DorisMetadataApplier applier =
@@ -2023,11 +2467,42 @@ public class DorisMetadataApplierTest {
     }
 
     @Test
-    public void testDropColumnEventAppliesDorisDdlWhenSchemaCacheIsMissing() {
-        RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
+    public void testRenameFailsIfDorisSchemaStale() {
+        RecordingSchemaChangeManager schemaChangeManager =
+                new StaleRenameColumnRecordingSchemaChangeManager();
         DorisMetadataApplier applier =
                 createApplierForAbsentTable(
                         schemaChangeManager, Configuration.fromMap(Collections.emptyMap()));
+
+        Schema initialSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("job", DataTypes.VARCHAR(64))
+                        .build();
+        applier.applySchemaChange(new CreateTableEvent(TABLE_ID, initialSchema));
+
+        Assertions.assertThatThrownBy(
+                        () ->
+                                applier.applySchemaChange(
+                                        new RenameColumnEvent(
+                                                TABLE_ID,
+                                                Collections.singletonMap("job", "job_name"))))
+                .isInstanceOf(SchemaEvolveException.class)
+                .hasStackTraceContaining("Failed to refresh Doris physical column-order cache")
+                .hasStackTraceContaining("contains columns [job_name]");
+        Assertions.assertThat(schemaChangeManager.renamedColumns)
+                .containsExactly(Collections.singletonMap("job", "job_name"));
+        Assertions.assertThat(applier.getCachedSchema(TABLE_ID)).isEqualTo(initialSchema);
+        Assertions.assertThat(applier.getCachedDorisColumnOrder(TABLE_ID)).isNull();
+    }
+
+    @Test
+    public void testDropColumnEventAppliesDorisDdlWhenSchemaCacheIsMissing() {
+        RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
+        DorisMetadataApplier applier =
+                createApplierForExistingDorisSchema(
+                        schemaChangeManager,
+                        createDorisSchema(dorisField("legacy_column", "STRING")));
 
         applier.applySchemaChange(
                 new DropColumnEvent(TABLE_ID, Collections.singletonList("legacy_column")));
@@ -2037,11 +2512,40 @@ public class DorisMetadataApplierTest {
     }
 
     @Test
+    public void testDropColumnEventResolvesDorisPhysicalNameWhenSchemaCacheIsMissing() {
+        RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
+        DorisMetadataApplier applier =
+                createApplierForExistingDorisSchema(
+                        schemaChangeManager,
+                        createDorisSchema(dorisField("ID", "INT"), dorisField("JOB", "STRING")));
+
+        applier.applySchemaChange(new DropColumnEvent(TABLE_ID, Collections.singletonList("job")));
+
+        Assertions.assertThat(schemaChangeManager.droppedColumns).containsExactly("JOB");
+        Assertions.assertThat(applier.getCachedSchema(TABLE_ID)).isNull();
+        Assertions.assertThat(applier.getCachedDorisColumnOrder(TABLE_ID)).containsExactly("ID");
+    }
+
+    @Test
+    public void testDropColumnEventIsIdempotentWhenDorisColumnIsAlreadyAbsent() {
+        RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
+        DorisMetadataApplier applier =
+                createApplierForExistingDorisSchema(
+                        schemaChangeManager, createDorisSchema(dorisField("ID", "INT")));
+
+        applier.applySchemaChange(new DropColumnEvent(TABLE_ID, Collections.singletonList("job")));
+
+        Assertions.assertThat(schemaChangeManager.droppedColumns).isEmpty();
+        Assertions.assertThat(applier.getCachedSchema(TABLE_ID)).isNull();
+        Assertions.assertThat(applier.getCachedDorisColumnOrder(TABLE_ID)).containsExactly("ID");
+    }
+
+    @Test
     public void testRenameColumnEventAppliesDorisDdlWhenSchemaCacheIsMissing() {
         RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
         DorisMetadataApplier applier =
-                createApplierForAbsentTable(
-                        schemaChangeManager, Configuration.fromMap(Collections.emptyMap()));
+                createApplierForExistingDorisSchema(
+                        schemaChangeManager, createDorisSchema(dorisField("old_column", "STRING")));
 
         applier.applySchemaChange(
                 new RenameColumnEvent(
@@ -2050,6 +2554,42 @@ public class DorisMetadataApplierTest {
         Assertions.assertThat(schemaChangeManager.renamedColumns)
                 .containsExactly(Collections.singletonMap("old_column", "new_column"));
         Assertions.assertThat(applier.getCachedSchema(TABLE_ID)).isNull();
+    }
+
+    @Test
+    public void testRenameColumnEventResolvesDorisPhysicalNameWhenSchemaCacheIsMissing() {
+        RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
+        DorisMetadataApplier applier =
+                createApplierForExistingDorisSchema(
+                        schemaChangeManager,
+                        createDorisSchema(dorisField("ID", "INT"), dorisField("JOB", "STRING")));
+
+        applier.applySchemaChange(
+                new RenameColumnEvent(TABLE_ID, Collections.singletonMap("job", "job_name")));
+
+        Assertions.assertThat(schemaChangeManager.renamedColumns)
+                .containsExactly(Collections.singletonMap("JOB", "job_name"));
+        Assertions.assertThat(applier.getCachedSchema(TABLE_ID)).isNull();
+        Assertions.assertThat(applier.getCachedDorisColumnOrder(TABLE_ID))
+                .containsExactly("ID", "job_name");
+    }
+
+    @Test
+    public void testRenameColumnEventFailsWhenPhysicalColumnNameCannotBeResolved() {
+        RecordingSchemaChangeManager schemaChangeManager = new RecordingSchemaChangeManager();
+        DorisMetadataApplier applier =
+                createApplierForExistingDorisSchema(
+                        schemaChangeManager, createDorisSchema(dorisField("ID", "INT")));
+
+        Assertions.assertThatThrownBy(
+                        () ->
+                                applier.applySchemaChange(
+                                        new RenameColumnEvent(
+                                                TABLE_ID,
+                                                Collections.singletonMap("job", "job_name"))))
+                .isInstanceOf(SchemaEvolveException.class)
+                .hasStackTraceContaining("Failed to refresh Doris physical column-order cache");
+        Assertions.assertThat(schemaChangeManager.renamedColumns).isEmpty();
     }
 
     @Test
@@ -2112,24 +2652,63 @@ public class DorisMetadataApplierTest {
 
     private static DorisMetadataApplier createApplierForAbsentTable(
             RecordingSchemaChangeManager schemaChangeManager, Configuration config) {
-        return new DorisMetadataApplier(
+        schemaChangeManager.seedDorisSchema(TABLE_ID, createDorisSchema());
+        return new TestDorisMetadataApplier(
                 createDorisOptions(),
                 config,
                 schemaChangeManager,
-                (dorisOptions, tableId) -> {
-                    throw new AssertionError("schema fetch should not be called");
-                },
+                (dorisOptions, tableId) -> schemaChangeManager.getDorisSchema(tableId),
                 (dorisOptions, tableId) -> DorisTableExistenceChecker.Existence.TABLE_ABSENT);
     }
 
     private static DorisMetadataApplier createApplierForExistingDorisSchema(
             RecordingSchemaChangeManager schemaChangeManager,
             org.apache.doris.flink.rest.models.Schema dorisSchema) {
-        return new DorisMetadataApplier(
+        schemaChangeManager.seedDorisSchema(TABLE_ID, dorisSchema);
+        return new TestDorisMetadataApplier(
                 createDorisOptions(),
                 Configuration.fromMap(Collections.emptyMap()),
                 schemaChangeManager,
-                (dorisOptions, tableId) -> dorisSchema);
+                (dorisOptions, tableId) -> schemaChangeManager.getDorisSchema(tableId));
+    }
+
+    private static class TestDorisMetadataApplier extends DorisMetadataApplier {
+        private TestDorisMetadataApplier(
+                DorisOptions dorisOptions,
+                Configuration config,
+                DorisSchemaChangeManager schemaChangeManager,
+                DorisSchemaFetcher dorisSchemaFetcher) {
+            super(dorisOptions, config, schemaChangeManager, dorisSchemaFetcher);
+        }
+
+        private TestDorisMetadataApplier(
+                DorisOptions dorisOptions,
+                Configuration config,
+                DorisSchemaChangeManager schemaChangeManager,
+                DorisSchemaFetcher dorisSchemaFetcher,
+                DorisTableExistenceChecker tableExistenceChecker) {
+            super(
+                    dorisOptions,
+                    config,
+                    schemaChangeManager,
+                    dorisSchemaFetcher,
+                    tableExistenceChecker);
+        }
+
+        @Override
+        protected void sleepBeforeDorisRetry() {
+            // The recording schema manager applies schema changes synchronously.
+        }
+
+        @Override
+        protected long dorisRefreshMaxWaitMillis() {
+            return 0L;
+        }
+
+        @Override
+        protected long dorisRefreshRetryMillis() {
+            return 1L;
+        }
     }
 
     private static org.apache.doris.flink.rest.models.Schema createDorisSchema(
@@ -2191,15 +2770,41 @@ public class DorisMetadataApplierTest {
         private final List<Map<String, String>> modifiedColumnComments = new ArrayList<>();
         private final List<String> droppedColumns = new ArrayList<>();
         private final List<Map<String, String>> renamedColumns = new ArrayList<>();
+        private final Map<String, List<org.apache.doris.flink.rest.models.Field>> physicalSchemas =
+                new HashMap<>();
 
         private RecordingSchemaChangeManager() {
             super(createDorisOptions(), null);
+        }
+
+        private void seedDorisSchema(
+                TableId tableId, org.apache.doris.flink.rest.models.Schema dorisSchema) {
+            physicalSchemas.put(tableKey(tableId), copyFields(dorisSchema.getProperties()));
+        }
+
+        private org.apache.doris.flink.rest.models.Schema getDorisSchema(TableId tableId) {
+            List<org.apache.doris.flink.rest.models.Field> fields =
+                    physicalSchemas.get(tableKey(tableId));
+            if (fields == null) {
+                throw new IllegalStateException("No Doris schema is recorded for " + tableId);
+            }
+            return createDorisSchema(
+                    copyFields(fields).toArray(new org.apache.doris.flink.rest.models.Field[0]));
         }
 
         @Override
         public boolean createTable(org.apache.doris.flink.catalog.doris.TableSchema tableSchema) {
             createTableInvocations++;
             createdTableSchema = tableSchema;
+            if (createTableResult) {
+                List<org.apache.doris.flink.rest.models.Field> fields = new ArrayList<>();
+                tableSchema
+                        .getFields()
+                        .values()
+                        .forEach(fieldSchema -> fields.add(dorisField(fieldSchema)));
+                physicalSchemas.put(
+                        tableKey(tableSchema.getDatabase(), tableSchema.getTable()), fields);
+            }
             return createTableResult;
         }
 
@@ -2207,6 +2812,10 @@ public class DorisMetadataApplierTest {
         public boolean addColumn(
                 String databaseName, String tableName, FieldSchema addFieldSchema) {
             addedColumns.add(new AddedColumn(addFieldSchema, AddColumnPosition.last()));
+            if (addColumnResult) {
+                applySuccessfulAddColumn(
+                        databaseName, tableName, addFieldSchema, AddColumnPosition.last());
+            }
             return addColumnResult;
         }
 
@@ -2217,6 +2826,9 @@ public class DorisMetadataApplierTest {
                 FieldSchema addFieldSchema,
                 AddColumnPosition position) {
             addedColumns.add(new AddedColumn(addFieldSchema, position));
+            if (addColumnResult) {
+                applySuccessfulAddColumn(databaseName, tableName, addFieldSchema, position);
+            }
             return addColumnResult;
         }
 
@@ -2224,27 +2836,66 @@ public class DorisMetadataApplierTest {
         public boolean modifyColumnDataType(
                 String databaseName, String tableName, FieldSchema field) {
             modifiedColumns.add(new ModifiedColumn(field));
+            if (modifyColumnDataTypeResult) {
+                applySuccessfulModifyColumn(databaseName, tableName, field);
+            }
             return modifyColumnDataTypeResult;
+        }
+
+        protected void applySuccessfulModifyColumn(
+                String databaseName, String tableName, FieldSchema field) {
+            int index = findPhysicalColumnIndex(databaseName, tableName, field.getName());
+            if (index >= 0) {
+                physicalSchema(databaseName, tableName).set(index, dorisField(field));
+            }
         }
 
         @Override
         public boolean modifyColumnComment(
                 String databaseName, String tableName, String columnName, String newComment) {
             modifiedColumnComments.add(Collections.singletonMap(columnName, newComment));
+            if (modifyColumnCommentResult) {
+                int index = findPhysicalColumnIndex(databaseName, tableName, columnName);
+                if (index >= 0) {
+                    physicalSchema(databaseName, tableName).get(index).setComment(newComment);
+                }
+            }
             return modifyColumnCommentResult;
         }
 
         @Override
         public boolean dropColumn(String databaseName, String tableName, String columnName) {
             droppedColumns.add(columnName);
+            if (dropColumnResult) {
+                applySuccessfulDropColumn(databaseName, tableName, columnName);
+            }
             return dropColumnResult;
+        }
+
+        protected void applySuccessfulDropColumn(
+                String databaseName, String tableName, String columnName) {
+            int index = findPhysicalColumnIndex(databaseName, tableName, columnName);
+            if (index >= 0) {
+                physicalSchema(databaseName, tableName).remove(index);
+            }
         }
 
         @Override
         public boolean renameColumn(
                 String databaseName, String tableName, String oldColumnName, String newColumnName) {
             renamedColumns.add(Collections.singletonMap(oldColumnName, newColumnName));
+            if (renameColumnResult) {
+                applySuccessfulRenameColumn(databaseName, tableName, oldColumnName, newColumnName);
+            }
             return renameColumnResult;
+        }
+
+        protected void applySuccessfulRenameColumn(
+                String databaseName, String tableName, String oldColumnName, String newColumnName) {
+            int index = findPhysicalColumnIndex(databaseName, tableName, oldColumnName);
+            if (index >= 0) {
+                physicalSchema(databaseName, tableName).get(index).setName(newColumnName);
+            }
         }
 
         @Override
@@ -2254,6 +2905,9 @@ public class DorisMetadataApplierTest {
 
         @Override
         public boolean dropTable(String databaseName, String tableName) {
+            if (dropTableResult) {
+                physicalSchemas.remove(tableKey(databaseName, tableName));
+            }
             return dropTableResult;
         }
 
@@ -2261,16 +2915,159 @@ public class DorisMetadataApplierTest {
         public boolean alterTableComment(String databaseName, String tableName, String comment) {
             return alterTableCommentResult;
         }
+
+        protected void applySuccessfulAddColumn(
+                String databaseName,
+                String tableName,
+                FieldSchema addFieldSchema,
+                AddColumnPosition position) {
+            List<org.apache.doris.flink.rest.models.Field> fields =
+                    physicalSchema(databaseName, tableName);
+            if (findPhysicalColumnIndex(fields, addFieldSchema.getName()) >= 0) {
+                return;
+            }
+            int insertIndex = fields.size();
+            if (AddColumnPosition.PositionType.FIRST.equals(position.getPositionType())) {
+                insertIndex = 0;
+            } else if (AddColumnPosition.PositionType.AFTER.equals(position.getPositionType())) {
+                int referenceIndex = findPhysicalColumnIndex(fields, position.getReferenceColumn());
+                insertIndex = referenceIndex < 0 ? fields.size() : referenceIndex + 1;
+            }
+            fields.add(insertIndex, dorisField(addFieldSchema));
+        }
+
+        private List<org.apache.doris.flink.rest.models.Field> physicalSchema(
+                String databaseName, String tableName) {
+            return physicalSchemas.computeIfAbsent(
+                    tableKey(databaseName, tableName), ignored -> new ArrayList<>());
+        }
+
+        private int findPhysicalColumnIndex(
+                String databaseName, String tableName, String columnName) {
+            return findPhysicalColumnIndex(physicalSchema(databaseName, tableName), columnName);
+        }
+
+        private int findPhysicalColumnIndex(
+                List<org.apache.doris.flink.rest.models.Field> fields, String columnName) {
+            for (int i = 0; i < fields.size(); i++) {
+                if (fields.get(i).getName().equals(columnName)) {
+                    return i;
+                }
+            }
+            for (int i = 0; i < fields.size(); i++) {
+                if (fields.get(i).getName().equalsIgnoreCase(columnName)) {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
+        private String tableKey(TableId tableId) {
+            return tableKey(tableId.getSchemaName(), tableId.getTableName());
+        }
+
+        private String tableKey(String databaseName, String tableName) {
+            return databaseName + "." + tableName;
+        }
+
+        private static List<org.apache.doris.flink.rest.models.Field> copyFields(
+                List<org.apache.doris.flink.rest.models.Field> fields) {
+            List<org.apache.doris.flink.rest.models.Field> copiedFields = new ArrayList<>();
+            for (org.apache.doris.flink.rest.models.Field field : fields) {
+                copiedFields.add(
+                        new org.apache.doris.flink.rest.models.Field(
+                                field.getName(),
+                                field.getType(),
+                                field.getComment(),
+                                field.getPrecision(),
+                                field.getScale(),
+                                field.getAggregationType()));
+            }
+            return copiedFields;
+        }
+
+        private static org.apache.doris.flink.rest.models.Field dorisField(
+                FieldSchema fieldSchema) {
+            return new org.apache.doris.flink.rest.models.Field(
+                    fieldSchema.getName(),
+                    fieldSchema.getTypeString(),
+                    fieldSchema.getComment(),
+                    0,
+                    0,
+                    null);
+        }
+    }
+
+    private static class PositionFallbackRecordingSchemaChangeManager
+            extends RecordingSchemaChangeManager {
+        private boolean fallbackNextAddColumn = true;
+
+        @Override
+        protected void applySuccessfulAddColumn(
+                String databaseName,
+                String tableName,
+                FieldSchema addFieldSchema,
+                AddColumnPosition position) {
+            if (fallbackNextAddColumn) {
+                fallbackNextAddColumn = false;
+                super.applySuccessfulAddColumn(
+                        databaseName, tableName, addFieldSchema, AddColumnPosition.last());
+            } else {
+                super.applySuccessfulAddColumn(databaseName, tableName, addFieldSchema, position);
+            }
+        }
+    }
+
+    private static class StaleAddColumnRecordingSchemaChangeManager
+            extends RecordingSchemaChangeManager {
+        @Override
+        protected void applySuccessfulAddColumn(
+                String databaseName,
+                String tableName,
+                FieldSchema addFieldSchema,
+                AddColumnPosition position) {
+            // Simulates Doris accepting the DDL but FE schema lookup never showing the new column.
+        }
+    }
+
+    private static class StaleModifyColumnRecordingSchemaChangeManager
+            extends RecordingSchemaChangeManager {
+        @Override
+        protected void applySuccessfulModifyColumn(
+                String databaseName, String tableName, FieldSchema field) {
+            // Simulates Doris accepting the DDL but FE schema lookup still returning the old type.
+        }
+    }
+
+    private static class StaleDropColumnRecordingSchemaChangeManager
+            extends RecordingSchemaChangeManager {
+        @Override
+        protected void applySuccessfulDropColumn(
+                String databaseName, String tableName, String columnName) {
+            // Simulates Doris accepting the DDL but FE schema lookup still returning the old
+            // column.
+        }
+    }
+
+    private static class StaleRenameColumnRecordingSchemaChangeManager
+            extends RecordingSchemaChangeManager {
+        @Override
+        protected void applySuccessfulRenameColumn(
+                String databaseName, String tableName, String oldColumnName, String newColumnName) {
+            // Simulates Doris accepting the DDL but FE schema lookup still returning the old name.
+        }
     }
 
     private static class ModifiedColumn {
         private final String columnName;
         private final String columnType;
+        private final String defaultValue;
         private final String comment;
 
         private ModifiedColumn(FieldSchema fieldSchema) {
             this.columnName = fieldSchema.getName();
             this.columnType = fieldSchema.getTypeString();
+            this.defaultValue = fieldSchema.getDefaultValue();
             this.comment = fieldSchema.getComment();
         }
     }

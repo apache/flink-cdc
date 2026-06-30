@@ -373,18 +373,6 @@ public class MySqlSourceConfigFactory implements Serializable {
         props.setProperty("database.history.skip.unparseable.ddl", String.valueOf(true));
         props.setProperty("database.history.refer.ddl", String.valueOf(true));
         props.setProperty("connect.timeout.ms", String.valueOf(connectTimeout.toMillis()));
-        // the underlying debezium reader should always capture the schema changes and forward them.
-        // Note: the includeSchemaChanges parameter is used to control emitting the schema record,
-        // only DataStream API program need to emit the schema record, the Table API need not
-        props.setProperty("include.schema.changes", String.valueOf(true));
-        // Persist table and column comments in the parsed table metadata so that downstream
-        // CreateTableEvent / AlterColumnTypeEvent can carry column comments all the way to
-        // the sink metadata applier. Debezium defaults this to false to save memory, but
-        // flink-cdc needs it on so that COMMENT / MODIFY COLUMN COMMENT DDL events
-        // propagate column comments through the schema change pipeline.
-        props.setProperty(
-                RelationalDatabaseConnectorConfig.INCLUDE_SCHEMA_COMMENTS.name(),
-                String.valueOf(true));
         // enable transaction metadata if includeTransactionMetadataEvents is true
         props.setProperty(
                 CommonConnectorConfig.PROVIDE_TRANSACTION_METADATA.name(),
@@ -417,6 +405,7 @@ public class MySqlSourceConfigFactory implements Serializable {
         if (dbzProperties != null) {
             props.putAll(dbzProperties);
         }
+        setRequiredDebeziumProperties(props);
 
         if (jdbcProperties == null) {
             jdbcProperties = new Properties();
@@ -454,5 +443,17 @@ public class MySqlSourceConfigFactory implements Serializable {
                 treatTinyInt1AsBoolean,
                 useLegacyJsonFormat,
                 assignUnboundedChunkFirst);
+    }
+
+    private void setRequiredDebeziumProperties(Properties props) {
+        // The underlying Debezium reader must always capture schema changes. The
+        // includeSchemaChanges option only controls whether Flink CDC emits those records
+        // downstream.
+        props.setProperty("include.schema.changes", String.valueOf(true));
+        // Comments are schema metadata in pipeline mode. Keeping them in Debezium's table model is
+        // required for CREATE TABLE and ALTER COLUMN COMMENT events to reach the schema pipeline.
+        props.setProperty(
+                RelationalDatabaseConnectorConfig.INCLUDE_SCHEMA_COMMENTS.name(),
+                String.valueOf(true));
     }
 }

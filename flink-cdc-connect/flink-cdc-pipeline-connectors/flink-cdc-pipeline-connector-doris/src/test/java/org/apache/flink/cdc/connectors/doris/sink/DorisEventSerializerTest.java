@@ -55,9 +55,12 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -467,6 +470,94 @@ public class DorisEventSerializerTest {
                                         })));
         Assertions.assertThat(new String(evolvedInsertRecord.getRow(), StandardCharsets.UTF_8))
                 .isEqualTo("2|stream|18|0");
+    }
+
+    @Test
+    public void testCsvSerializationWaitsForDorisPhysicalSchemaAfterSchemaChange()
+            throws IOException {
+        TableId tableId = TableId.parse("doris_database.csv_schema_retry_table");
+        Schema baseSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+        AddColumnEvent addColumnEvent =
+                new AddColumnEvent(
+                        tableId,
+                        Arrays.asList(
+                                AddColumnEvent.last(
+                                        Column.physicalColumn("age", DataTypes.INT()))));
+        Schema evolvedSchema = SchemaUtils.applySchemaChangeEvent(baseSchema, addColumnEvent);
+        BinaryRecordDataGenerator evolvedGenerator =
+                new BinaryRecordDataGenerator(((RowType) evolvedSchema.toRowDataType()));
+        AtomicInteger fetchAttempts = new AtomicInteger();
+        DorisEventSerializer.CsvOutputSchemaResolver csvOutputSchemaResolver =
+                DorisEventSerializer.createDorisPhysicalSchemaResolver(
+                        createDorisOptions(),
+                        (options, requestedTableId) -> {
+                            int attempt = fetchAttempts.incrementAndGet();
+                            return attempt < 3
+                                    ? createDorisSchema("id", "name")
+                                    : createDorisSchema("name", "id", "age");
+                        });
+        DorisEventSerializer serializer = createCsvSerializer(csvOutputSchemaResolver);
+
+        serializer.serialize(new CreateTableEvent(tableId, baseSchema));
+        serializer.serialize(addColumnEvent);
+
+        DorisRecord evolvedRecord =
+                serializer.serialize(
+                        DataChangeEvent.insertEvent(
+                                tableId,
+                                evolvedGenerator.generate(
+                                        new Object[] {2, BinaryStringData.fromString("Bob"), 18})));
+
+        Assertions.assertThat(fetchAttempts.get()).isEqualTo(3);
+        Assertions.assertThat(new String(evolvedRecord.getRow(), StandardCharsets.UTF_8))
+                .isEqualTo("Bob|2|18|0");
+    }
+
+    @Test
+    public void testCsvSerializationWaitsForDroppedColumnToDisappearFromDorisSchema()
+            throws IOException {
+        TableId tableId = TableId.parse("doris_database.csv_drop_schema_retry_table");
+        Schema baseSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .physicalColumn("age", DataTypes.INT())
+                        .primaryKey("id")
+                        .build();
+        DropColumnEvent dropColumnEvent = new DropColumnEvent(tableId, Arrays.asList("age"));
+        Schema evolvedSchema = SchemaUtils.applySchemaChangeEvent(baseSchema, dropColumnEvent);
+        BinaryRecordDataGenerator evolvedGenerator =
+                new BinaryRecordDataGenerator(((RowType) evolvedSchema.toRowDataType()));
+        AtomicInteger fetchAttempts = new AtomicInteger();
+        DorisEventSerializer.CsvOutputSchemaResolver csvOutputSchemaResolver =
+                DorisEventSerializer.createDorisPhysicalSchemaResolver(
+                        createDorisOptions(),
+                        (options, requestedTableId) -> {
+                            int attempt = fetchAttempts.incrementAndGet();
+                            return attempt < 3
+                                    ? createDorisSchema("id", "name", "age")
+                                    : createDorisSchema("name", "id");
+                        });
+        DorisEventSerializer serializer = createCsvSerializer(csvOutputSchemaResolver);
+
+        serializer.serialize(new CreateTableEvent(tableId, baseSchema));
+        serializer.serialize(dropColumnEvent);
+
+        DorisRecord evolvedRecord =
+                serializer.serialize(
+                        DataChangeEvent.insertEvent(
+                                tableId,
+                                evolvedGenerator.generate(
+                                        new Object[] {2, BinaryStringData.fromString("Bob")})));
+
+        Assertions.assertThat(fetchAttempts.get()).isEqualTo(3);
+        Assertions.assertThat(new String(evolvedRecord.getRow(), StandardCharsets.UTF_8))
+                .isEqualTo("Bob|2|0");
     }
 
     @Test
@@ -907,7 +998,7 @@ public class DorisEventSerializerTest {
                         new Configuration(),
                         DorisExecutionOptions.defaults(),
                         null,
-                        (resolvedTableId, inputSchema) -> {
+                        (resolvedTableId, inputSchema, oldColumns) -> {
                             LinkedHashMap<String, String> mapping = new LinkedHashMap<>();
                             mapping.put("ID", "ID");
                             mapping.put("deploy_mode", "deploy_mode");
@@ -945,7 +1036,7 @@ public class DorisEventSerializerTest {
                         new Configuration(),
                         DorisExecutionOptions.defaults(),
                         null,
-                        (resolvedTableId, inputSchema) -> {
+                        (resolvedTableId, inputSchema, oldColumns) -> {
                             LinkedHashMap<String, String> mapping = new LinkedHashMap<>();
                             mapping.put("ID", "ID");
                             mapping.put("DEPLOY_MODE", "DEPLOY_MODE");
@@ -984,7 +1075,7 @@ public class DorisEventSerializerTest {
                         new Configuration(),
                         DorisExecutionOptions.defaults(),
                         null,
-                        (resolvedTableId, inputSchema) -> {
+                        (resolvedTableId, inputSchema, oldColumns) -> {
                             LinkedHashMap<String, String> mapping = new LinkedHashMap<>();
                             mapping.put("id", "ID");
                             mapping.put("agreement_code", "AGREEMENT_CODE");
@@ -1028,7 +1119,7 @@ public class DorisEventSerializerTest {
                         new Configuration(),
                         DorisExecutionOptions.defaults(),
                         null,
-                        (resolvedTableId, inputSchema) -> {
+                        (resolvedTableId, inputSchema, oldColumns) -> {
                             LinkedHashMap<String, String> mapping = new LinkedHashMap<>();
                             mapping.put("id", "id");
                             mapping.put("name", "name");
@@ -1195,6 +1286,216 @@ public class DorisEventSerializerTest {
     }
 
     @Test
+    public void testJsonWaitsForDroppedColumn() throws IOException {
+        TableId tableId = TableId.parse("doris_database.json_drop_wait_table");
+        Schema baseSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("old_name", DataTypes.STRING())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+        DropColumnEvent dropColumnEvent = new DropColumnEvent(tableId, Arrays.asList("old_name"));
+        Schema evolvedSchema = SchemaUtils.applySchemaChangeEvent(baseSchema, dropColumnEvent);
+        BinaryRecordDataGenerator evolvedGenerator =
+                new BinaryRecordDataGenerator(((RowType) evolvedSchema.toRowDataType()));
+        AtomicInteger fetchAttempts = new AtomicInteger();
+
+        DorisEventSerializer serializer =
+                new DorisEventSerializer(
+                        ZoneId.of("UTC"),
+                        new Configuration(),
+                        DorisExecutionOptions.defaults(),
+                        null,
+                        DorisEventSerializer.createJsonFieldMappingResolver(
+                                createDorisOptions(),
+                                (options, requestedTableId) -> {
+                                    int attempt = fetchAttempts.incrementAndGet();
+                                    return attempt < 3
+                                            ? createDorisSchema("id", "old_name", "name")
+                                            : createDorisSchema("id", "name");
+                                },
+                                100L,
+                                1L));
+        serializer.serialize(new CreateTableEvent(tableId, baseSchema));
+        serializer.serialize(dropColumnEvent);
+
+        DorisRecord dorisRecord =
+                serializer.serialize(
+                        DataChangeEvent.insertEvent(
+                                tableId,
+                                evolvedGenerator.generate(
+                                        new Object[] {2, BinaryStringData.fromString("Bob")})));
+
+        JsonNode jsonNode = objectMapper.readTree(dorisRecord.getRow());
+        Assertions.assertThat(fetchAttempts.get()).isEqualTo(3);
+        Assertions.assertThat(jsonNode.get("id").asInt()).isEqualTo(2);
+        Assertions.assertThat(jsonNode.get("name").asText()).isEqualTo("Bob");
+        Assertions.assertThat(jsonNode.has("old_name")).isFalse();
+    }
+
+    @Test
+    public void testJsonDropLateDelete() throws IOException {
+        TableId tableId = TableId.parse("doris_database.json_drop_late_delete_table");
+        Schema baseSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("old_name", DataTypes.STRING())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+        DropColumnEvent dropColumnEvent = new DropColumnEvent(tableId, Arrays.asList("old_name"));
+        Schema evolvedSchema = SchemaUtils.applySchemaChangeEvent(baseSchema, dropColumnEvent);
+        BinaryRecordDataGenerator evolvedGenerator =
+                new BinaryRecordDataGenerator(((RowType) evolvedSchema.toRowDataType()));
+        BinaryRecordDataGenerator baseGenerator =
+                new BinaryRecordDataGenerator(((RowType) baseSchema.toRowDataType()));
+
+        DorisEventSerializer serializer =
+                new DorisEventSerializer(
+                        ZoneId.of("UTC"),
+                        new Configuration(),
+                        DorisExecutionOptions.defaults(),
+                        null,
+                        DorisEventSerializer.createJsonFieldMappingResolver(
+                                createDorisOptions(),
+                                (options, requestedTableId) -> createDorisSchema("id", "name"),
+                                10L,
+                                1L));
+        serializer.serialize(new CreateTableEvent(tableId, baseSchema));
+        serializer.serialize(dropColumnEvent);
+
+        serializer.serialize(
+                DataChangeEvent.insertEvent(
+                        tableId,
+                        evolvedGenerator.generate(
+                                new Object[] {2, BinaryStringData.fromString("Bob")})));
+        DorisRecord lateDelete =
+                serializer.serialize(
+                        DataChangeEvent.deleteEvent(
+                                tableId,
+                                baseGenerator.generate(
+                                        new Object[] {
+                                            1,
+                                            BinaryStringData.fromString("old"),
+                                            BinaryStringData.fromString("Alice")
+                                        })));
+
+        JsonNode jsonNode = objectMapper.readTree(lateDelete.getRow());
+        Assertions.assertThat(jsonNode.get("id").asInt()).isEqualTo(1);
+        Assertions.assertThat(jsonNode.get("name").asText()).isEqualTo("Alice");
+        Assertions.assertThat(jsonNode.has("old_name")).isFalse();
+        Assertions.assertThat(jsonNode.get("__DORIS_DELETE_SIGN__").asText()).isEqualTo("1");
+    }
+
+    @Test
+    public void testJsonWaitsForRenamedOldColumn() throws IOException {
+        TableId tableId = TableId.parse("doris_database.json_rename_wait_table");
+        Schema baseSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("old_name", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+        RenameColumnEvent renameColumnEvent =
+                new RenameColumnEvent(tableId, Collections.singletonMap("old_name", "name"));
+        Schema evolvedSchema = SchemaUtils.applySchemaChangeEvent(baseSchema, renameColumnEvent);
+        BinaryRecordDataGenerator evolvedGenerator =
+                new BinaryRecordDataGenerator(((RowType) evolvedSchema.toRowDataType()));
+        AtomicInteger fetchAttempts = new AtomicInteger();
+
+        DorisEventSerializer serializer =
+                new DorisEventSerializer(
+                        ZoneId.of("UTC"),
+                        new Configuration(),
+                        DorisExecutionOptions.defaults(),
+                        null,
+                        DorisEventSerializer.createJsonFieldMappingResolver(
+                                createDorisOptions(),
+                                (options, requestedTableId) -> {
+                                    int attempt = fetchAttempts.incrementAndGet();
+                                    return attempt < 3
+                                            ? createDorisSchema("id", "old_name")
+                                            : createDorisSchema("id", "name");
+                                },
+                                100L,
+                                1L));
+        serializer.serialize(new CreateTableEvent(tableId, baseSchema));
+        serializer.serialize(renameColumnEvent);
+
+        DorisRecord dorisRecord =
+                serializer.serialize(
+                        DataChangeEvent.insertEvent(
+                                tableId,
+                                evolvedGenerator.generate(
+                                        new Object[] {2, BinaryStringData.fromString("Bob")})));
+
+        JsonNode jsonNode = objectMapper.readTree(dorisRecord.getRow());
+        Assertions.assertThat(fetchAttempts.get()).isEqualTo(3);
+        Assertions.assertThat(jsonNode.get("id").asInt()).isEqualTo(2);
+        Assertions.assertThat(jsonNode.get("name").asText()).isEqualTo("Bob");
+        Assertions.assertThat(jsonNode.has("old_name")).isFalse();
+    }
+
+    @Test
+    public void testJsonReaddClearsOldColumn() throws IOException {
+        TableId tableId = TableId.parse("doris_database.json_readd_table");
+        Schema baseSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("old_name", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+        DropColumnEvent dropColumnEvent = new DropColumnEvent(tableId, Arrays.asList("old_name"));
+        AddColumnEvent addColumnEvent =
+                new AddColumnEvent(
+                        tableId,
+                        Arrays.asList(
+                                AddColumnEvent.last(
+                                        Column.physicalColumn("old_name", DataTypes.STRING()))));
+        Schema readdedSchema =
+                SchemaUtils.applySchemaChangeEvent(
+                        SchemaUtils.applySchemaChangeEvent(baseSchema, dropColumnEvent),
+                        addColumnEvent);
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(((RowType) readdedSchema.toRowDataType()));
+        List<List<String>> oldColumnsHistory = new ArrayList<>();
+
+        DorisEventSerializer serializer =
+                new DorisEventSerializer(
+                        ZoneId.of("UTC"),
+                        new Configuration(),
+                        DorisExecutionOptions.defaults(),
+                        null,
+                        (resolvedTableId, inputSchema, oldColumns) -> {
+                            oldColumnsHistory.add(new ArrayList<>(oldColumns));
+                            LinkedHashMap<String, String> mapping = new LinkedHashMap<>();
+                            for (Column column : inputSchema.getColumns()) {
+                                mapping.put(column.getName(), column.getName());
+                            }
+                            return mapping;
+                        });
+        serializer.serialize(new CreateTableEvent(tableId, baseSchema));
+        serializer.serialize(dropColumnEvent);
+        serializer.serialize(addColumnEvent);
+
+        DorisRecord dorisRecord =
+                serializer.serialize(
+                        DataChangeEvent.insertEvent(
+                                tableId,
+                                generator.generate(
+                                        new Object[] {
+                                            2, BinaryStringData.fromString("new value")
+                                        })));
+
+        JsonNode jsonNode = objectMapper.readTree(dorisRecord.getRow());
+        Assertions.assertThat(oldColumnsHistory).hasSize(1);
+        Assertions.assertThat(oldColumnsHistory.get(0)).isEmpty();
+        Assertions.assertThat(jsonNode.get("id").asInt()).isEqualTo(2);
+        Assertions.assertThat(jsonNode.get("old_name").asText()).isEqualTo("new value");
+    }
+
+    @Test
     public void testJsonSerializationSkipsNullInputFieldMappings() throws IOException {
         TableId tableId = TableId.parse("doris_database.json_null_mapping_table");
         Schema inputSchema =
@@ -1212,7 +1513,7 @@ public class DorisEventSerializerTest {
                         new Configuration(),
                         DorisExecutionOptions.defaults(),
                         null,
-                        (requestedTableId, schema) -> {
+                        (requestedTableId, schema, oldColumns) -> {
                             LinkedHashMap<String, String> mapping = new LinkedHashMap<>();
                             mapping.put("confluent__last_updated", null);
                             mapping.put("id", "id");
@@ -1253,7 +1554,7 @@ public class DorisEventSerializerTest {
         AtomicInteger fetchAttempts = new AtomicInteger();
 
         org.apache.doris.flink.rest.models.Schema dorisSchema =
-                DorisEventSerializer.waitUntilDorisSchemaCoversInputSchema(
+                DorisEventSerializer.waitDorisSchemaCovers(
                         createDorisOptions(),
                         tableId,
                         evolvedSchema,
@@ -1291,7 +1592,7 @@ public class DorisEventSerializerTest {
 
         Assertions.assertThatThrownBy(
                         () ->
-                                DorisEventSerializer.waitUntilDorisSchemaCoversInputSchema(
+                                DorisEventSerializer.waitDorisSchemaCovers(
                                         createDorisOptions(),
                                         tableId,
                                         evolvedSchema,
@@ -1322,7 +1623,7 @@ public class DorisEventSerializerTest {
         AtomicInteger fetchAttempts = new AtomicInteger();
 
         org.apache.doris.flink.rest.models.Schema dorisSchema =
-                DorisEventSerializer.waitUntilDorisSchemaCoversInputSchema(
+                DorisEventSerializer.waitDorisSchemaCovers(
                         createDorisOptions(),
                         tableId,
                         evolvedSchema,
@@ -1361,7 +1662,7 @@ public class DorisEventSerializerTest {
 
         Assertions.assertThatThrownBy(
                         () ->
-                                DorisEventSerializer.waitUntilDorisSchemaCoversInputSchema(
+                                DorisEventSerializer.waitDorisSchemaCovers(
                                         createDorisOptions(),
                                         tableId,
                                         evolvedSchema,
@@ -1396,7 +1697,7 @@ public class DorisEventSerializerTest {
         try {
             Assertions.assertThatThrownBy(
                             () ->
-                                    DorisEventSerializer.waitUntilDorisSchemaCoversInputSchema(
+                                    DorisEventSerializer.waitDorisSchemaCovers(
                                             createDorisOptions(),
                                             tableId,
                                             evolvedSchema,

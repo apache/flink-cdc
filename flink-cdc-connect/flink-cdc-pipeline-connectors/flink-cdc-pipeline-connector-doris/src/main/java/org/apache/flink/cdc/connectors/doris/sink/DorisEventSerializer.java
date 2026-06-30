@@ -22,9 +22,11 @@ import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
+import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.OperationType;
+import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Column;
@@ -98,7 +100,8 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
 
     @FunctionalInterface
     interface JsonFieldMappingResolver extends Serializable {
-        LinkedHashMap<String, String> resolve(TableId tableId, Schema inputSchema);
+        LinkedHashMap<String, String> resolve(
+                TableId tableId, Schema inputSchema, List<String> oldColumns);
     }
 
     @FunctionalInterface
@@ -126,6 +129,7 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final Map<TableId, Schema> inputSchemaMaps = new HashMap<>();
     private final Map<TableId, List<Schema>> inputSchemaHistoryMaps = new HashMap<>();
+    private final Map<TableId, List<String>> oldInputColumnMaps = new HashMap<>();
     private final Map<TableId, Schema> csvOutputSchemaMaps = new HashMap<>();
     private final Map<TableId, Map<Schema, LinkedHashMap<String, String>>> jsonFieldMappings =
             new HashMap<>();
@@ -219,6 +223,7 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
         if (schemaChangeEvent instanceof DropTableEvent) {
             inputSchemaMaps.remove(tableId);
             inputSchemaHistoryMaps.remove(tableId);
+            oldInputColumnMaps.remove(tableId);
             csvOutputSchemaMaps.remove(tableId);
             jsonFieldMappings.remove(tableId);
             return;
@@ -227,15 +232,18 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
         Schema inputSchema;
         if (schemaChangeEvent instanceof CreateTableEvent) {
             inputSchema = ((CreateTableEvent) schemaChangeEvent).getSchema();
+            oldInputColumnMaps.remove(tableId);
         } else {
             Preconditions.checkState(
                     inputSchemaMaps.containsKey(tableId),
                     "schema of " + tableId + " is not existed.");
+            rememberOldColumns(tableId, inputSchemaMaps.get(tableId), schemaChangeEvent);
             inputSchema =
                     SchemaUtils.applySchemaChangeEvent(
                             inputSchemaMaps.get(tableId), schemaChangeEvent);
         }
         inputSchemaMaps.put(tableId, inputSchema);
+        pruneOldColumns(tableId, inputSchema);
         rememberInputSchema(tableId, inputSchema);
 
         if (CSV.equals(streamLoadFormat)) {
@@ -411,6 +419,66 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
         }
     }
 
+    private void rememberOldColumns(
+            TableId tableId, Schema previousInputSchema, SchemaChangeEvent schemaChangeEvent) {
+        if (schemaChangeEvent instanceof DropColumnEvent) {
+            DropColumnEvent dropColumnEvent = (DropColumnEvent) schemaChangeEvent;
+            for (String droppedColumn : dropColumnEvent.getDroppedColumnNames()) {
+                addOldColumn(
+                        tableId,
+                        SchemaUtils.resolveExistingColumnName(previousInputSchema, droppedColumn));
+            }
+            return;
+        }
+
+        if (schemaChangeEvent instanceof RenameColumnEvent) {
+            RenameColumnEvent renameColumnEvent = (RenameColumnEvent) schemaChangeEvent;
+            renameColumnEvent
+                    .getNameMapping()
+                    .forEach(
+                            (oldColumnName, newColumnName) -> {
+                                if (oldColumnName.equalsIgnoreCase(newColumnName)) {
+                                    return;
+                                }
+                                addOldColumn(
+                                        tableId,
+                                        SchemaUtils.resolveExistingColumnName(
+                                                previousInputSchema, oldColumnName));
+                            });
+        }
+    }
+
+    private void addOldColumn(TableId tableId, String columnName) {
+        List<String> oldColumns =
+                oldInputColumnMaps.computeIfAbsent(tableId, ignored -> new ArrayList<>());
+        for (String oldColumn : oldColumns) {
+            if (oldColumn.equalsIgnoreCase(columnName)) {
+                return;
+            }
+        }
+        oldColumns.add(columnName);
+    }
+
+    private void pruneOldColumns(TableId tableId, Schema inputSchema) {
+        List<String> oldColumns = oldInputColumnMaps.get(tableId);
+        if (oldColumns == null) {
+            return;
+        }
+        oldColumns.removeIf(columnName -> hasInputColumn(inputSchema, columnName));
+        if (oldColumns.isEmpty()) {
+            oldInputColumnMaps.remove(tableId);
+        }
+    }
+
+    private boolean hasInputColumn(Schema inputSchema, String columnName) {
+        for (Column column : inputSchema.getColumns()) {
+            if (column.getName().equalsIgnoreCase(columnName)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private Schema getCsvOutputSchema(TableId tableId, Schema inputSchema) {
         return csvOutputSchemaMaps.computeIfAbsent(
                 tableId, ignored -> resolveCsvOutputSchema(tableId, inputSchema));
@@ -425,8 +493,11 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
         return tableMappings.computeIfAbsent(
                 inputSchema,
                 ignored -> {
+                    List<String> oldColumns =
+                            oldInputColumnMaps.getOrDefault(tableId, new ArrayList<>());
                     LinkedHashMap<String, String> mapping =
-                            jsonFieldMappingResolver.resolve(tableId, inputSchema);
+                            jsonFieldMappingResolver.resolve(
+                                    tableId, inputSchema, new ArrayList<>(oldColumns));
                     Preconditions.checkNotNull(
                             mapping, "JSON field mapping resolver returned null for " + tableId);
                     return mapping;
@@ -506,12 +577,14 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
         }
         return (tableId, inputSchema) -> {
             org.apache.doris.flink.rest.models.Schema dorisSchema =
-                    dorisSchemaFetcher.fetch(dorisOptions, tableId);
-            Preconditions.checkNotNull(
-                    dorisSchema, "Failed to resolve Doris physical schema for " + tableId);
-            Preconditions.checkNotNull(
-                    dorisSchema.getProperties(),
-                    "Failed to resolve Doris physical schema properties for " + tableId);
+                    waitDorisSchemaMatches(
+                            dorisOptions,
+                            tableId,
+                            inputSchema,
+                            dorisSchemaFetcher,
+                            DORIS_SCHEMA_CATCH_UP_MAX_WAIT_MILLIS,
+                            DORIS_SCHEMA_FETCH_RETRY_MILLIS,
+                            false);
 
             List<Column> outputColumns = new ArrayList<>(dorisSchema.getProperties().size());
             for (Field field : dorisSchema.getProperties()) {
@@ -553,15 +626,17 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
         if (dorisOptions == null) {
             return null;
         }
-        return (tableId, inputSchema) -> {
+        return (tableId, inputSchema, oldColumns) -> {
             org.apache.doris.flink.rest.models.Schema dorisSchema =
-                    waitUntilDorisSchemaCoversInputSchema(
+                    waitDorisSchemaMatches(
                             dorisOptions,
                             tableId,
                             inputSchema,
                             dorisSchemaFetcher,
                             maxWaitMillis,
-                            schemaFetchRetryMillis);
+                            schemaFetchRetryMillis,
+                            true,
+                            oldColumns);
 
             LinkedHashMap<String, String> mapping = new LinkedHashMap<>();
             for (Field field : dorisSchema.getProperties()) {
@@ -587,13 +662,52 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
      * The sink keeps this strict wait instead of degrading to stale schema writes, because
      * correctness is more important than short-term throughput during schema transitions.
      */
-    static org.apache.doris.flink.rest.models.Schema waitUntilDorisSchemaCoversInputSchema(
+    static org.apache.doris.flink.rest.models.Schema waitDorisSchemaCovers(
             DorisOptions dorisOptions,
             TableId tableId,
             Schema inputSchema,
             DorisSchemaFetcher dorisSchemaFetcher,
             long maxWaitMillis,
             long schemaFetchRetryMillis) {
+        return waitDorisSchemaMatches(
+                dorisOptions,
+                tableId,
+                inputSchema,
+                dorisSchemaFetcher,
+                maxWaitMillis,
+                schemaFetchRetryMillis,
+                true,
+                new ArrayList<>());
+    }
+
+    static org.apache.doris.flink.rest.models.Schema waitDorisSchemaMatches(
+            DorisOptions dorisOptions,
+            TableId tableId,
+            Schema inputSchema,
+            DorisSchemaFetcher dorisSchemaFetcher,
+            long maxWaitMillis,
+            long schemaFetchRetryMillis,
+            boolean allowDorisOnlyColumns) {
+        return waitDorisSchemaMatches(
+                dorisOptions,
+                tableId,
+                inputSchema,
+                dorisSchemaFetcher,
+                maxWaitMillis,
+                schemaFetchRetryMillis,
+                allowDorisOnlyColumns,
+                new ArrayList<>());
+    }
+
+    static org.apache.doris.flink.rest.models.Schema waitDorisSchemaMatches(
+            DorisOptions dorisOptions,
+            TableId tableId,
+            Schema inputSchema,
+            DorisSchemaFetcher dorisSchemaFetcher,
+            long maxWaitMillis,
+            long schemaFetchRetryMillis,
+            boolean allowDorisOnlyColumns,
+            List<String> disallowedColumns) {
         Preconditions.checkArgument(maxWaitMillis >= 0, "maxWaitMillis >= 0");
         Preconditions.checkArgument(schemaFetchRetryMillis > 0, "schemaFetchRetryMillis > 0");
 
@@ -640,7 +754,8 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
                 continue;
             }
 
-            if (dorisSchemaCoversInputSchema(dorisSchema, inputSchema)) {
+            if (dorisSchemaMatches(
+                    dorisSchema, inputSchema, allowDorisOnlyColumns, disallowedColumns)) {
                 if (waitingLogged) {
                     long elapsedMs =
                             TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - waitStartNanos);
@@ -722,8 +837,11 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
         }
     }
 
-    private static boolean dorisSchemaCoversInputSchema(
-            org.apache.doris.flink.rest.models.Schema dorisSchema, Schema inputSchema) {
+    private static boolean dorisSchemaMatches(
+            org.apache.doris.flink.rest.models.Schema dorisSchema,
+            Schema inputSchema,
+            boolean allowDorisOnlyColumns,
+            List<String> disallowedColumns) {
         List<String> dorisColumns = getDorisPhysicalColumnNames(dorisSchema);
         for (Column inputColumn : inputSchema.getColumns()) {
             boolean matched = false;
@@ -733,11 +851,41 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
                     break;
                 }
             }
-            if (!matched) {
+            if (!matched && !hasColumnIgnoreCase(disallowedColumns, inputColumn.getName())) {
+                return false;
+            }
+        }
+        for (String dorisColumn : dorisColumns) {
+            if (hasColumnIgnoreCase(disallowedColumns, dorisColumn)) {
+                return false;
+            }
+            boolean matched = false;
+            for (Column inputColumn : inputSchema.getColumns()) {
+                if (dorisColumn.equalsIgnoreCase(inputColumn.getName())) {
+                    matched = true;
+                    break;
+                }
+            }
+            if (matched) {
+                continue;
+            }
+            if (!allowDorisOnlyColumns || hasColumnIgnoreCase(disallowedColumns, dorisColumn)) {
                 return false;
             }
         }
         return true;
+    }
+
+    private static boolean hasColumnIgnoreCase(List<String> columns, String columnName) {
+        if (columns == null) {
+            return false;
+        }
+        for (String column : columns) {
+            if (column.equalsIgnoreCase(columnName)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static List<String> getInputColumnNames(Schema inputSchema) {

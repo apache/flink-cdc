@@ -198,8 +198,8 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                 databaseName,
                 "products",
                 Arrays.asList(
-                        "id | INT | Yes | true | null",
-                        "name | VARCHAR(765) | Yes | false | flink",
+                        "id | INT | No | true | null",
+                        "name | VARCHAR(765) | No | false | flink",
                         "description | VARCHAR(1536) | Yes | false | null",
                         "weight | FLOAT | Yes | false | null",
                         "enum_c | TEXT | Yes | false | red",
@@ -224,8 +224,8 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                 databaseName,
                 "customers",
                 Arrays.asList(
-                        "id | INT | Yes | true | null",
-                        "name | VARCHAR(765) | Yes | false | flink",
+                        "id | INT | No | true | null",
+                        "name | VARCHAR(765) | No | false | flink",
                         "address | VARCHAR(3072) | Yes | false | null",
                         "phone_number | VARCHAR(1536) | Yes | false | null"));
         validateSinkResult(
@@ -292,8 +292,8 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                     databaseName,
                     "products",
                     Arrays.asList(
-                            "id | INT | Yes | true | null",
-                            "name | VARCHAR(765) | Yes | false | flink",
+                            "id | INT | No | true | null",
+                            "name | VARCHAR(765) | No | false | flink",
                             "description | VARCHAR(1536) | Yes | false | null",
                             "weight | FLOAT | Yes | false | null",
                             "enum_c | TEXT | Yes | false | red",
@@ -370,7 +370,7 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                     databaseName,
                     "mixed_case_customer",
                     Arrays.asList(
-                            "ID | INT | Yes | true | null",
+                            "ID | INT | No | true | null",
                             "Name | VARCHAR(765) | Yes | false | null",
                             "phone_Number | VARCHAR(765) | Yes | false | null"));
             validateSinkResult(
@@ -383,7 +383,7 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                     databaseName,
                     "upper_case_customer",
                     Arrays.asList(
-                            "ID | INT | Yes | true | null",
+                            "ID | INT | No | true | null",
                             "NAME | VARCHAR(765) | Yes | false | null",
                             "PHONE_NUMBER | VARCHAR(765) | Yes | false | null"));
             validateSinkResult(
@@ -396,7 +396,7 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                     databaseName,
                     "lower_case_customer",
                     Arrays.asList(
-                            "id | INT | Yes | true | null",
+                            "id | INT | No | true | null",
                             "name | VARCHAR(765) | Yes | false | null",
                             "phone_number | VARCHAR(765) | Yes | false | null"));
             validateSinkResult(
@@ -501,7 +501,7 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                     databaseName,
                     "mixed_case_customer",
                     Arrays.asList(
-                            "ID | INT | Yes | true | null",
+                            "ID | INT | No | true | null",
                             "NAME | VARCHAR(765) | Yes | false | null",
                             "PHONE_NUMBER | VARCHAR(765) | Yes | false | null"));
             validateSinkResult(
@@ -514,7 +514,7 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                     databaseName,
                     "upper_case_customer",
                     Arrays.asList(
-                            "ID | INT | Yes | true | null",
+                            "ID | INT | No | true | null",
                             "NAME | VARCHAR(765) | Yes | false | null",
                             "PHONE_NUMBER | VARCHAR(765) | Yes | false | null"));
             validateSinkResult(
@@ -527,7 +527,7 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                     databaseName,
                     "lower_case_customer",
                     Arrays.asList(
-                            "ID | INT | Yes | true | null",
+                            "ID | INT | No | true | null",
                             "NAME | VARCHAR(765) | Yes | false | null",
                             "PHONE_NUMBER | VARCHAR(765) | Yes | false | null"));
             validateSinkResult(
@@ -634,7 +634,7 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                     databaseName,
                     "customer",
                     Arrays.asList(
-                            "MY_ID | INT | Yes | true | null",
+                            "MY_ID | INT | No | true | null",
                             "name | VARCHAR(765) | Yes | false | null",
                             "AGE | INT | Yes | false | null"));
             validateSinkResult(
@@ -705,7 +705,7 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                     databaseName,
                     "customer",
                     Arrays.asList(
-                            "my_id | INT | Yes | true | null",
+                            "my_id | INT | No | true | null",
                             "name | VARCHAR(765) | Yes | false | null",
                             "AGE | INT | Yes | false | null"));
             validateSinkResult(
@@ -777,14 +777,14 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                     databaseName,
                     "lower_case_customer",
                     Arrays.asList(
-                            "id | INT | Yes | true | null",
+                            "id | INT | No | true | null",
                             "name | VARCHAR(765) | Yes | false | null",
                             "phone_number | VARCHAR(765) | Yes | false | null"));
             validateSinkSchema(
                     databaseName,
                     "customer",
                     Arrays.asList(
-                            "id | INT | Yes | true | null",
+                            "id | INT | No | true | null",
                             "NAME | VARCHAR(765) | Yes | false | null",
                             "age | INT | Yes | false | null",
                             "address | VARCHAR(765) | Yes | false | null",
@@ -812,7 +812,7 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                         databaseName,
                         "customer",
                         Arrays.asList(
-                                "id | INT | Yes | true | null",
+                                "id | INT | No | true | null",
                                 "NAME | VARCHAR(765) | Yes | false | null",
                                 "age | INT | Yes | false | null",
                                 "address | VARCHAR(765) | Yes | false | null",
@@ -861,7 +861,7 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                     databaseName,
                     "customer",
                     Arrays.asList(
-                            "id | INT | Yes | true | null",
+                            "id | INT | No | true | null",
                             "NAME | VARCHAR(765) | Yes | false | null",
                             "age | INT | Yes | false | null",
                             "address | VARCHAR(765) | Yes | false | null"));
@@ -888,7 +888,7 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                     databaseName,
                     "customer",
                     Arrays.asList(
-                            "id | INT | Yes | true | null",
+                            "id | INT | No | true | null",
                             "NAME | VARCHAR(765) | Yes | false | null",
                             "age | INT | Yes | false | null",
                             "address | VARCHAR(765) | Yes | false | null",
@@ -979,8 +979,8 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                 databaseName,
                 "products",
                 Arrays.asList(
-                        "id | INT | Yes | true | null",
-                        "name | VARCHAR(765) | Yes | false | flink",
+                        "id | INT | No | true | null",
+                        "name | VARCHAR(765) | No | false | flink",
                         "description | VARCHAR(1536) | Yes | false | null",
                         "weight | FLOAT | Yes | false | null",
                         "enum_c | TEXT | Yes | false | red",
@@ -991,8 +991,8 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                 databaseName,
                 "customers",
                 Arrays.asList(
-                        "id | INT | Yes | true | null",
-                        "name | VARCHAR(765) | Yes | false | flink",
+                        "id | INT | No | true | null",
+                        "name | VARCHAR(765) | No | false | flink",
                         "address | VARCHAR(3072) | Yes | false | null",
                         "phone_number | VARCHAR(1536) | Yes | false | null"));
 
@@ -1072,7 +1072,7 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                 databaseName,
                 sinkTableName,
                 Arrays.asList(
-                        "id | INT | Yes | true | null",
+                        "id | INT | No | true | null",
                         "tiny_c | TINYINT | Yes | false | null",
                         "tiny_un_c | SMALLINT | Yes | false | null",
                         "tiny_un_z_c | SMALLINT | Yes | false | null",
@@ -1235,7 +1235,7 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                 databaseName,
                 sinkTableName,
                 Arrays.asList(
-                        "id | INT | Yes | true | null",
+                        "id | INT | No | true | null",
                         "tiny_c | TINYINT | Yes | false | null",
                         "tiny_un_c | SMALLINT | Yes | false | null",
                         "tiny_un_z_c | SMALLINT | Yes | false | null",
@@ -1340,8 +1340,8 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                 databaseName,
                 "products",
                 Arrays.asList(
-                        "id | INT | Yes | true | null",
-                        "name | VARCHAR(765) | Yes | false | flink",
+                        "id | INT | No | true | null",
+                        "name | VARCHAR(765) | No | false | flink",
                         "description | VARCHAR(1536) | Yes | false | null",
                         "weight | FLOAT | Yes | false | null",
                         "enum_c | TEXT | Yes | false | red",
@@ -1367,8 +1367,8 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                 databaseName,
                 "customers",
                 Arrays.asList(
-                        "id | INT | Yes | true | null",
-                        "name | VARCHAR(765) | Yes | false | flink",
+                        "id | INT | No | true | null",
+                        "name | VARCHAR(765) | No | false | flink",
                         "address | VARCHAR(3072) | Yes | false | null",
                         "phone_number | VARCHAR(1536) | Yes | false | null"));
         validateSinkResult(
@@ -1419,8 +1419,8 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                     databaseName,
                     "products",
                     Arrays.asList(
-                            "id | INT | Yes | true | null",
-                            "name | VARCHAR(765) | Yes | false | flink",
+                            "id | INT | No | true | null",
+                            "name | VARCHAR(765) | No | false | flink",
                             "description | VARCHAR(1536) | Yes | false | null",
                             "weight | FLOAT | Yes | false | null",
                             "enum_c | TEXT | Yes | false | red",
@@ -1453,8 +1453,8 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                     databaseName,
                     "products",
                     Arrays.asList(
-                            "id | INT | Yes | true | null",
-                            "name | VARCHAR(765) | Yes | false | flink",
+                            "id | INT | No | true | null",
+                            "name | VARCHAR(765) | No | false | flink",
                             "description | VARCHAR(1536) | Yes | false | null",
                             "weight | FLOAT | Yes | false | null",
                             "enum_c | TEXT | Yes | false | red",
@@ -1488,8 +1488,8 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                     databaseName,
                     "products",
                     Arrays.asList(
-                            "id | INT | Yes | true | null",
-                            "name | VARCHAR(765) | Yes | false | flink",
+                            "id | INT | No | true | null",
+                            "name | VARCHAR(765) | No | false | flink",
                             "description | VARCHAR(1536) | Yes | false | null",
                             "weight | FLOAT | Yes | false | null",
                             "enum_c | TEXT | Yes | false | red",
@@ -1524,8 +1524,8 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                     databaseName,
                     "products",
                     Arrays.asList(
-                            "id | INT | Yes | true | null",
-                            "name | VARCHAR(765) | Yes | false | flink",
+                            "id | INT | No | true | null",
+                            "name | VARCHAR(765) | No | false | flink",
                             "description | VARCHAR(1536) | Yes | false | null",
                             "weight | FLOAT | Yes | false | null",
                             "enum_c | TEXT | Yes | false | red",
@@ -1958,7 +1958,7 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
      * downstream Doris column name.
      */
     @Test
-    public void testSchemaChangeWithColumnReferenceAndCommentAcrossCase() throws Exception {
+    public void testSchemaChangeCaseComments() throws Exception {
         commentDatabase.createAndInitialize();
         createDorisDatabase(commentDatabase.getDatabaseName());
         try {
@@ -2000,12 +2000,12 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                     databaseName,
                     "student",
                     Arrays.asList(
-                            "id | BIGINT | Yes | true | null",
+                            "id | BIGINT | No | true | null",
                             "name | VARCHAR(192) | No | false | null",
                             "JOB | VARCHAR(192) | Yes | false | null",
-                            "create_time | DATETIME(0) | Yes | false | null",
-                            "AGE | INT | Yes | false | null",
-                            "flag | INT | Yes | false | null"));
+                            "create_time | DATETIME | Yes | false | null",
+                            "AGE | INT | Yes | false | 30",
+                            "flag | INT | Yes | false | 1"));
             validateSinkComments(
                     databaseName,
                     "student",
@@ -2025,21 +2025,24 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                                     mysqlUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
                     Statement stat = conn.createStatement()) {
 
-                // ---- (1) Modify column TYPE with unchanged comment: comment must be preserved
-                // through the alter. This is the new behavior introduced by the PR's
-                // "comment-only path" refactor. ----
-                LOG.info("[Step 1] MODIFY COLUMN AGE type-only; expect comment preserved.");
-                stat.execute("ALTER TABLE student MODIFY COLUMN AGE BIGINT;");
+                // ---- (1) Modify column TYPE while keeping the full MySQL column definition:
+                // default value and comment must be preserved through the alter. ----
+                LOG.info(
+                        "[Step 1] MODIFY COLUMN AGE type with unchanged default/comment; expect"
+                                + " both preserved.");
+                stat.execute(
+                        "ALTER TABLE student MODIFY COLUMN AGE BIGINT DEFAULT 30 COMMENT 'old age"
+                                + " comment';");
                 validateSinkSchema(
                         databaseName,
                         "student",
                         Arrays.asList(
-                                "id | BIGINT | Yes | true | null",
+                                "id | BIGINT | No | true | null",
                                 "name | VARCHAR(192) | No | false | null",
                                 "JOB | VARCHAR(192) | Yes | false | null",
-                                "create_time | DATETIME(0) | Yes | false | null",
-                                "AGE | BIGINT | Yes | false | null",
-                                "flag | INT | Yes | false | null"));
+                                "create_time | DATETIME | Yes | false | null",
+                                "AGE | BIGINT | Yes | false | 30",
+                                "flag | INT | Yes | false | 1"));
                 validateSinkComments(
                         databaseName,
                         "student",
@@ -2058,12 +2061,12 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                         databaseName,
                         "student",
                         Arrays.asList(
-                                "id | BIGINT | Yes | true | null",
+                                "id | BIGINT | No | true | null",
                                 "name | VARCHAR(192) | No | false | null",
-                                "JOB | VARCHAR(768) | Yes | false | null",
-                                "create_time | DATETIME(0) | Yes | false | null",
-                                "AGE | BIGINT | Yes | false | null",
-                                "flag | INT | Yes | false | null"));
+                                "JOB | VARCHAR(765) | Yes | false | null",
+                                "create_time | DATETIME | Yes | false | null",
+                                "AGE | BIGINT | Yes | false | 30",
+                                "flag | INT | Yes | false | 1"));
                 validateSinkComments(
                         databaseName,
                         "student",
@@ -2077,17 +2080,18 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                 // ---- (3) Comment-only alter: must propagate to Doris. ----
                 LOG.info("[Step 3] MODIFY COLUMN comment-only; expect comment-only alter.");
                 stat.execute(
-                        "ALTER TABLE student MODIFY COLUMN AGE INT COMMENT 'updated age comment';");
+                        "ALTER TABLE student MODIFY COLUMN AGE BIGINT DEFAULT 30 COMMENT 'updated"
+                                + " age comment';");
                 validateSinkSchema(
                         databaseName,
                         "student",
                         Arrays.asList(
-                                "id | BIGINT | Yes | true | null",
+                                "id | BIGINT | No | true | null",
                                 "name | VARCHAR(192) | No | false | null",
-                                "JOB | VARCHAR(768) | Yes | false | null",
-                                "create_time | DATETIME(0) | Yes | false | null",
-                                "AGE | INT | Yes | false | null",
-                                "flag | INT | Yes | false | null"));
+                                "JOB | VARCHAR(765) | Yes | false | null",
+                                "create_time | DATETIME | Yes | false | null",
+                                "AGE | BIGINT | Yes | false | 30",
+                                "flag | INT | Yes | false | 1"));
                 validateSinkComments(
                         databaseName,
                         "student",
@@ -2103,7 +2107,7 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                 LOG.info(
                         "[Step 4] MODIFY COLUMN comment-removed; expect comment to be cleared in"
                                 + " Doris.");
-                stat.execute("ALTER TABLE student MODIFY COLUMN AGE INT;");
+                stat.execute("ALTER TABLE student MODIFY COLUMN AGE BIGINT DEFAULT 30;");
                 validateSinkComments(
                         databaseName,
                         "student",
@@ -2111,6 +2115,7 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                                 .put("id", "student id")
                                 .put("name", "student name")
                                 .put("JOB", "new job")
+                                .put("AGE", "")
                                 .build());
 
                 // ---- (5) ADD column AFTER a referenced column: validates the new
@@ -2123,13 +2128,13 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                         databaseName,
                         "student",
                         Arrays.asList(
-                                "id | BIGINT | Yes | true | null",
+                                "id | BIGINT | No | true | null",
                                 "name | VARCHAR(192) | No | false | null",
                                 "score | INT | Yes | false | null",
-                                "JOB | VARCHAR(768) | Yes | false | null",
-                                "create_time | DATETIME(0) | Yes | false | null",
-                                "AGE | INT | Yes | false | null",
-                                "flag | INT | Yes | false | null"));
+                                "JOB | VARCHAR(765) | Yes | false | null",
+                                "create_time | DATETIME | Yes | false | null",
+                                "AGE | BIGINT | Yes | false | 30",
+                                "flag | INT | Yes | false | 1"));
                 validateSinkComments(
                         databaseName,
                         "student",
@@ -2140,21 +2145,21 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                                 .put("JOB", "new job")
                                 .build());
 
-                // ---- (6) RENAME column: validates new resolver against upstream casing
-                // difference. ----
-                LOG.info("[Step 6] RENAME COLUMN JOB TO job; expect Doris column renamed.");
+                // ---- (6) Case-only RENAME column: Doris treats these names as the same physical
+                // column, so the sink must keep running and skip the physical rename. ----
+                LOG.info("[Step 6] RENAME COLUMN JOB TO job; expect Doris physical no-op.");
                 stat.execute("ALTER TABLE student RENAME COLUMN JOB TO job;");
                 validateSinkSchema(
                         databaseName,
                         "student",
                         Arrays.asList(
-                                "id | BIGINT | Yes | true | null",
+                                "id | BIGINT | No | true | null",
                                 "name | VARCHAR(192) | No | false | null",
                                 "score | INT | Yes | false | null",
-                                "job | VARCHAR(768) | Yes | false | null",
-                                "create_time | DATETIME(0) | Yes | false | null",
-                                "AGE | INT | Yes | false | null",
-                                "flag | INT | Yes | false | null"));
+                                "JOB | VARCHAR(765) | Yes | false | null",
+                                "create_time | DATETIME | Yes | false | null",
+                                "AGE | BIGINT | Yes | false | 30",
+                                "flag | INT | Yes | false | 1"));
 
                 // ---- (7) DROP column: validates post-transform drop rewrite. ----
                 LOG.info("[Step 7] DROP COLUMN flag; expect column removed.");
@@ -2163,12 +2168,12 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                         databaseName,
                         "student",
                         Arrays.asList(
-                                "id | BIGINT | Yes | true | null",
+                                "id | BIGINT | No | true | null",
                                 "name | VARCHAR(192) | No | false | null",
                                 "score | INT | Yes | false | null",
-                                "job | VARCHAR(768) | Yes | false | null",
-                                "create_time | DATETIME(0) | Yes | false | null",
-                                "AGE | INT | Yes | false | null"));
+                                "JOB | VARCHAR(765) | Yes | false | null",
+                                "create_time | DATETIME | Yes | false | null",
+                                "AGE | BIGINT | Yes | false | 30"));
 
                 // ---- (8) COMMENT-only after DROP/RENAME: ensures rename→alter chain still works.
                 LOG.info("[Step 8] MODIFY comment-only after rename; expect comment preserved.");
@@ -2181,7 +2186,7 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                                 .put("id", "student id")
                                 .put("name", "student name")
                                 .put("score", "updated score")
-                                .put("job", "new job")
+                                .put("JOB", "new job")
                                 .build());
 
                 // ---- Final insert validates data flow after the full chain of schema changes.
@@ -2197,6 +2202,293 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                                 "1 | Alice | null | engineer | 2024-01-01 00:00:00 | 18",
                                 "2 | Bob | null | doctor | 2024-01-02 00:00:00 | 19",
                                 "3 | Carol | 95 | scientist | 2024-01-03 00:00:00 | 20"));
+                validateAllSinkComments(
+                        databaseName,
+                        "student",
+                        ImmutableMap.<String, String>builder()
+                                .put("id", "student id")
+                                .put("name", "student name")
+                                .put("score", "updated score")
+                                .put("JOB", "new job")
+                                .put("create_time", "")
+                                .put("AGE", "")
+                                .build());
+            }
+        } finally {
+            commentDatabase.dropDatabase();
+            dropDorisDatabase(commentDatabase.getDatabaseName());
+        }
+    }
+
+    /**
+     * End-to-end regression for schema-change DDL switches. Validates that disabling nullability
+     * and default-value sync affects both CREATE TABLE and later ADD/MODIFY COLUMN DDLs while the
+     * data pipeline remains usable.
+     */
+    @Test
+    public void testDdlOptionToggles() throws Exception {
+        commentDatabase.createAndInitialize();
+        createDorisDatabase(commentDatabase.getDatabaseName());
+        try {
+            String databaseName = commentDatabase.getDatabaseName();
+            String pipelineJob =
+                    String.format(
+                            "source:\n"
+                                    + "  type: mysql\n"
+                                    + "  hostname: mysql\n"
+                                    + "  port: 3306\n"
+                                    + "  username: %s\n"
+                                    + "  password: %s\n"
+                                    + "  tables: %s.student\n"
+                                    + "  server-id: 5400-5404\n"
+                                    + "  server-time-zone: UTC\n"
+                                    + "\n"
+                                    + "sink:\n"
+                                    + "  type: doris\n"
+                                    + "  fenodes: doris:8030\n"
+                                    + "  benodes: doris:8040\n"
+                                    + "  username: %s\n"
+                                    + "  password: \"%s\"\n"
+                                    + "  table.create.properties.replication_num: 1\n"
+                                    + "  sink.properties.format: json\n"
+                                    + "  schema.change.null_enable: false\n"
+                                    + "  schema.change.default_value: false\n"
+                                    + "\n"
+                                    + "pipeline:\n"
+                                    + "  schema.change.behavior: evolve\n"
+                                    + "  parallelism: %d",
+                            MYSQL_TEST_USER,
+                            MYSQL_TEST_PASSWORD,
+                            databaseName,
+                            DORIS.getUsername(),
+                            DORIS.getPassword(),
+                            parallelism);
+            submitMysqlToDorisJob(pipelineJob);
+
+            validateSinkSchema(
+                    databaseName,
+                    "student",
+                    Arrays.asList(
+                            "id | BIGINT | Yes | true | null",
+                            "name | VARCHAR(192) | Yes | false | null",
+                            "JOB | VARCHAR(192) | Yes | false | null",
+                            "create_time | DATETIME | Yes | false | null",
+                            "AGE | INT | Yes | false | null",
+                            "flag | INT | Yes | false | null"));
+
+            String mysqlUrl =
+                    String.format(
+                            "jdbc:mysql://%s:%s/%s",
+                            MYSQL.getHost(), MYSQL.getDatabasePort(), databaseName);
+            try (Connection conn =
+                            DriverManager.getConnection(
+                                    mysqlUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
+                    Statement stat = conn.createStatement()) {
+                stat.execute(
+                        "ALTER TABLE student ADD COLUMN must_have INT NOT NULL DEFAULT 8 COMMENT"
+                                + " 'must have' AFTER name;");
+                validateSinkSchema(
+                        databaseName,
+                        "student",
+                        Arrays.asList(
+                                "id | BIGINT | Yes | true | null",
+                                "name | VARCHAR(192) | Yes | false | null",
+                                "must_have | INT | Yes | false | null",
+                                "JOB | VARCHAR(192) | Yes | false | null",
+                                "create_time | DATETIME | Yes | false | null",
+                                "AGE | INT | Yes | false | null",
+                                "flag | INT | Yes | false | null"));
+                validateSinkComments(
+                        databaseName,
+                        "student",
+                        ImmutableMap.<String, String>builder()
+                                .put("must_have", "must have")
+                                .build());
+
+                stat.execute(
+                        "ALTER TABLE student MODIFY COLUMN AGE BIGINT NOT NULL DEFAULT 9 COMMENT"
+                                + " 'age updated';");
+                validateSinkSchema(
+                        databaseName,
+                        "student",
+                        Arrays.asList(
+                                "id | BIGINT | Yes | true | null",
+                                "name | VARCHAR(192) | Yes | false | null",
+                                "must_have | INT | Yes | false | null",
+                                "JOB | VARCHAR(192) | Yes | false | null",
+                                "create_time | DATETIME | Yes | false | null",
+                                "AGE | BIGINT | Yes | false | null",
+                                "flag | INT | Yes | false | null"));
+                validateSinkComments(
+                        databaseName,
+                        "student",
+                        ImmutableMap.<String, String>builder().put("AGE", "age updated").build());
+
+                stat.execute(
+                        "INSERT INTO student VALUES (3, 'Carol', 8, 'scientist', '2024-01-03"
+                                + " 00:00:00', 20, 9);");
+                stat.execute(
+                        "INSERT INTO student VALUES (4, 'Dave', 10, 'analyst', '2024-01-04"
+                                + " 00:00:00', 21, 10);");
+                validateSinkResult(
+                        databaseName,
+                        "student",
+                        7,
+                        Arrays.asList(
+                                "1 | Alice | null | engineer | 2024-01-01 00:00:00 | 18 | 100",
+                                "2 | Bob | null | doctor | 2024-01-02 00:00:00 | 19 | 200",
+                                "3 | Carol | 8 | scientist | 2024-01-03 00:00:00 | 20 | 9",
+                                "4 | Dave | 10 | analyst | 2024-01-04 00:00:00 | 21 | 10"));
+            }
+        } finally {
+            commentDatabase.dropDatabase();
+            dropDorisDatabase(commentDatabase.getDatabaseName());
+        }
+    }
+
+    /**
+     * End-to-end regression for Doris physical schema cache correctness. The target Doris table
+     * already exists with a physical column order different from the upstream MySQL schema and is
+     * missing one upstream column. CSV Stream Load is intentionally used because it is sensitive to
+     * the Doris physical column order.
+     */
+    @Test
+    public void testCsvPhysicalOrderCache() throws Exception {
+        commentDatabase.createAndInitialize();
+        createDorisDatabase(commentDatabase.getDatabaseName());
+        try {
+            String databaseName = commentDatabase.getDatabaseName();
+            createDorisCacheTable(databaseName);
+            String pipelineJob =
+                    String.format(
+                            "source:\n"
+                                    + "  type: mysql\n"
+                                    + "  hostname: mysql\n"
+                                    + "  port: 3306\n"
+                                    + "  username: %s\n"
+                                    + "  password: %s\n"
+                                    + "  tables: %s.student\n"
+                                    + "  server-id: 5400-5404\n"
+                                    + "  server-time-zone: UTC\n"
+                                    + "\n"
+                                    + "sink:\n"
+                                    + "  type: doris\n"
+                                    + "  fenodes: doris:8030\n"
+                                    + "  benodes: doris:8040\n"
+                                    + "  username: %s\n"
+                                    + "  password: \"%s\"\n"
+                                    + "  table.create.properties.replication_num: 1\n"
+                                    + "  sink.properties.format: csv\n"
+                                    + "  sink.properties.column_separator: \"|\"\n"
+                                    + "\n"
+                                    + "pipeline:\n"
+                                    + "  schema.change.behavior: evolve\n"
+                                    + "  parallelism: %d",
+                            MYSQL_TEST_USER,
+                            MYSQL_TEST_PASSWORD,
+                            databaseName,
+                            DORIS.getUsername(),
+                            DORIS.getPassword(),
+                            parallelism);
+            submitMysqlToDorisJob(pipelineJob);
+
+            validateSinkSchema(
+                    databaseName,
+                    "student",
+                    Arrays.asList(
+                            "id | BIGINT | No | true | null",
+                            "AGE | INT | Yes | false | 30",
+                            "flag | INT | Yes | false | 1",
+                            "name | VARCHAR(192) | No | false | null",
+                            "JOB | VARCHAR(192) | Yes | false | null",
+                            "create_time | DATETIME | Yes | false | null"));
+            validateSinkResult(
+                    databaseName,
+                    "student",
+                    6,
+                    Arrays.asList(
+                            "1 | 18 | 100 | Alice | engineer | 2024-01-01 00:00:00",
+                            "2 | 19 | 200 | Bob | doctor | 2024-01-02 00:00:00"));
+
+            String mysqlUrl =
+                    String.format(
+                            "jdbc:mysql://%s:%s/%s",
+                            MYSQL.getHost(), MYSQL.getDatabasePort(), databaseName);
+            try (Connection conn =
+                            DriverManager.getConnection(
+                                    mysqlUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
+                    Statement stat = conn.createStatement()) {
+                stat.execute("ALTER TABLE student ADD COLUMN score INT AFTER name;");
+                validateSinkSchema(
+                        databaseName,
+                        "student",
+                        Arrays.asList(
+                                "id | BIGINT | No | true | null",
+                                "AGE | INT | Yes | false | 30",
+                                "flag | INT | Yes | false | 1",
+                                "name | VARCHAR(192) | No | false | null",
+                                "score | INT | Yes | false | null",
+                                "JOB | VARCHAR(192) | Yes | false | null",
+                                "create_time | DATETIME | Yes | false | null"));
+
+                stat.execute("ALTER TABLE student ADD COLUMN level_no INT FIRST;");
+                validateSinkSchema(
+                        databaseName,
+                        "student",
+                        Arrays.asList(
+                                "id | BIGINT | No | true | null",
+                                "level_no | INT | Yes | false | null",
+                                "AGE | INT | Yes | false | 30",
+                                "flag | INT | Yes | false | 1",
+                                "name | VARCHAR(192) | No | false | null",
+                                "score | INT | Yes | false | null",
+                                "JOB | VARCHAR(192) | Yes | false | null",
+                                "create_time | DATETIME | Yes | false | null"));
+
+                stat.execute("ALTER TABLE student RENAME COLUMN JOB TO job;");
+                stat.execute(
+                        "ALTER TABLE student MODIFY COLUMN job VARCHAR(255) COMMENT 'new job';");
+                validateSinkSchema(
+                        databaseName,
+                        "student",
+                        Arrays.asList(
+                                "id | BIGINT | No | true | null",
+                                "level_no | INT | Yes | false | null",
+                                "AGE | INT | Yes | false | 30",
+                                "flag | INT | Yes | false | 1",
+                                "name | VARCHAR(192) | No | false | null",
+                                "score | INT | Yes | false | null",
+                                "JOB | VARCHAR(765) | Yes | false | null",
+                                "create_time | DATETIME | Yes | false | null"));
+                validateSinkComments(
+                        databaseName,
+                        "student",
+                        ImmutableMap.<String, String>builder().put("JOB", "new job").build());
+
+                stat.execute("ALTER TABLE student DROP COLUMN flag;");
+                validateSinkSchema(
+                        databaseName,
+                        "student",
+                        Arrays.asList(
+                                "id | BIGINT | No | true | null",
+                                "level_no | INT | Yes | false | null",
+                                "AGE | INT | Yes | false | 30",
+                                "name | VARCHAR(192) | No | false | null",
+                                "score | INT | Yes | false | null",
+                                "JOB | VARCHAR(765) | Yes | false | null",
+                                "create_time | DATETIME | Yes | false | null"));
+
+                stat.execute(
+                        "INSERT INTO student VALUES (7, 3, 'Carol', 95, 'scientist', '2024-01-03"
+                                + " 00:00:00', 20);");
+                validateSinkResult(
+                        databaseName,
+                        "student",
+                        7,
+                        Arrays.asList(
+                                "1 | null | 18 | Alice | null | engineer | 2024-01-01 00:00:00",
+                                "2 | null | 19 | Bob | null | doctor | 2024-01-02 00:00:00",
+                                "3 | 7 | 20 | Carol | 95 | scientist | 2024-01-03 00:00:00"));
             }
         } finally {
             commentDatabase.dropDatabase();
@@ -2210,8 +2502,7 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
      * every schema-change event reaching Doris.
      */
     @Test
-    public void testSchemaChangeWithColumnReferenceAndCommentAcrossCaseAndLowerTransform()
-            throws Exception {
+    public void testLowerCaseSchemaChange() throws Exception {
         commentDatabase.createAndInitialize();
         createDorisDatabase(commentDatabase.getDatabaseName());
         try {
@@ -2254,12 +2545,12 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                     databaseName,
                     "student",
                     Arrays.asList(
-                            "id | BIGINT | Yes | true | null",
+                            "id | BIGINT | No | true | null",
                             "name | VARCHAR(192) | No | false | null",
                             "job | VARCHAR(192) | Yes | false | null",
-                            "create_time | DATETIME(0) | Yes | false | null",
-                            "age | INT | Yes | false | null",
-                            "flag | INT | Yes | false | null"));
+                            "create_time | DATETIME | Yes | false | null",
+                            "age | INT | Yes | false | 30",
+                            "flag | INT | Yes | false | 1"));
             validateSinkComments(
                     databaseName,
                     "student",
@@ -2283,8 +2574,9 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                 // rewrite path through Bug #1. ----
                 LOG.info("[Step 1] LOWER transform: MODIFY COLUMN drop comment; expect cleared.");
                 stat.execute(
-                        "ALTER TABLE student MODIFY COLUMN AGE BIGINT COMMENT 'temp comment';");
-                stat.execute("ALTER TABLE student MODIFY COLUMN AGE BIGINT;");
+                        "ALTER TABLE student MODIFY COLUMN AGE BIGINT DEFAULT 30 COMMENT 'temp"
+                                + " comment';");
+                stat.execute("ALTER TABLE student MODIFY COLUMN AGE BIGINT DEFAULT 30;");
                 validateSinkComments(
                         databaseName,
                         "student",
@@ -2292,6 +2584,7 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                                 .put("id", "student id")
                                 .put("name", "student name")
                                 .put("job", "old job")
+                                .put("age", "")
                                 .build());
 
                 // ---- (2) Comment-only alter through transform. ----
@@ -2316,13 +2609,13 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                         databaseName,
                         "student",
                         Arrays.asList(
-                                "id | BIGINT | Yes | true | null",
+                                "id | BIGINT | No | true | null",
                                 "name | VARCHAR(192) | No | false | null",
                                 "score | INT | Yes | false | null",
-                                "job | VARCHAR(768) | Yes | false | null",
-                                "create_time | DATETIME(0) | Yes | false | null",
-                                "age | BIGINT | Yes | false | null",
-                                "flag | INT | Yes | false | null"));
+                                "job | VARCHAR(765) | Yes | false | null",
+                                "create_time | DATETIME | Yes | false | null",
+                                "age | BIGINT | Yes | false | 30",
+                                "flag | INT | Yes | false | 1"));
                 validateSinkComments(
                         databaseName,
                         "student",
@@ -2341,13 +2634,13 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                         databaseName,
                         "student",
                         Arrays.asList(
-                                "id | BIGINT | Yes | true | null",
+                                "id | BIGINT | No | true | null",
                                 "name | VARCHAR(192) | No | false | null",
                                 "score | INT | Yes | false | null",
-                                "job | VARCHAR(768) | Yes | false | null",
-                                "create_time | DATETIME(0) | Yes | false | null",
-                                "age | BIGINT | Yes | false | null",
-                                "flag | INT | Yes | false | null"));
+                                "job | VARCHAR(765) | Yes | false | null",
+                                "create_time | DATETIME | Yes | false | null",
+                                "age | BIGINT | Yes | false | 30",
+                                "flag | INT | Yes | false | 1"));
 
                 // ---- (5) DROP column through transform. ----
                 LOG.info("[Step 5] LOWER transform: DROP COLUMN; expect column removed.");
@@ -2356,12 +2649,12 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                         databaseName,
                         "student",
                         Arrays.asList(
-                                "id | BIGINT | Yes | true | null",
+                                "id | BIGINT | No | true | null",
                                 "name | VARCHAR(192) | No | false | null",
                                 "score | INT | Yes | false | null",
-                                "job | VARCHAR(768) | Yes | false | null",
-                                "create_time | DATETIME(0) | Yes | false | null",
-                                "age | BIGINT | Yes | false | null"));
+                                "job | VARCHAR(765) | Yes | false | null",
+                                "create_time | DATETIME | Yes | false | null",
+                                "age | BIGINT | Yes | false | 30"));
 
                 // ---- Final insert validates data flow through transform after all DDLs. ----
                 stat.execute(
@@ -2375,6 +2668,17 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                                 "1 | Alice | null | engineer | 2024-01-01 00:00:00 | 18",
                                 "2 | Bob | null | doctor | 2024-01-02 00:00:00 | 19",
                                 "3 | Carol | 95 | scientist | 2024-01-03 00:00:00 | 20"));
+                validateAllSinkComments(
+                        databaseName,
+                        "student",
+                        ImmutableMap.<String, String>builder()
+                                .put("id", "student id")
+                                .put("name", "student name")
+                                .put("score", "student score")
+                                .put("job", "new job")
+                                .put("create_time", "")
+                                .put("age", "")
+                                .build());
             }
         } finally {
             commentDatabase.dropDatabase();
@@ -2382,8 +2686,45 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
         }
     }
 
+    private void createDorisCacheTable(String databaseName) throws SQLException {
+        try (Connection conn =
+                        DriverManager.getConnection(
+                                DORIS.getJdbcUrl(databaseName, DORIS.getUsername()));
+                Statement stat = conn.createStatement()) {
+            stat.execute(
+                    "CREATE TABLE student ("
+                            + "id BIGINT NOT NULL COMMENT 'student id',"
+                            + "AGE INT DEFAULT '30' COMMENT 'old age comment',"
+                            + "name VARCHAR(192) NOT NULL COMMENT 'student name',"
+                            + "JOB VARCHAR(192) COMMENT 'old job',"
+                            + "create_time DATETIME"
+                            + ") UNIQUE KEY(id) DISTRIBUTED BY HASH(id) BUCKETS 1 "
+                            + "PROPERTIES ('replication_num' = '1')");
+        }
+    }
+
     /** Fetch (column-name → column-comment) pairs from Doris and compare to the expected map. */
     private void validateSinkComments(
+            String databaseName, String tableName, Map<String, String> expected) throws Exception {
+        String expectedColumns =
+                expected.keySet().stream()
+                        .map(columnName -> "'" + columnName.replace("'", "''") + "'")
+                        .collect(Collectors.joining(", "));
+        String sql =
+                String.format(
+                        "SELECT COLUMN_NAME, IFNULL(COLUMN_COMMENT, '') FROM"
+                                + " INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '%s' AND"
+                                + " TABLE_NAME = '%s' AND COLUMN_NAME IN (%s) ORDER BY"
+                                + " ORDINAL_POSITION",
+                        databaseName, tableName, expectedColumns);
+        List<String> expectedRows = new ArrayList<>();
+        expected.forEach(
+                (col, comment) -> expectedRows.add(col + " | " + (comment == null ? "" : comment)));
+        waitAndVerify(databaseName, sql, 2, expectedRows, EVENT_WAITING_TIMEOUT.toMillis(), false);
+    }
+
+    /** Fetch all Doris column comments and compare them to the expected final table state. */
+    private void validateAllSinkComments(
             String databaseName, String tableName, Map<String, String> expected) throws Exception {
         String sql =
                 String.format(
