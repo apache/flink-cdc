@@ -169,6 +169,31 @@ class MongoE2eITCase extends FlinkContainerTestEnvironment {
         submitSQLJob(sqlLines, mongoCdcJar, jdbcJar, mysqlDriverJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
 
+        String mysqlUrl =
+                String.format(
+                        "jdbc:mysql://%s:%s/%s",
+                        MYSQL.getHost(),
+                        MYSQL.getDatabasePort(),
+                        mysqlInventoryDatabase.getDatabaseName());
+        JdbcProxy proxy =
+                new JdbcProxy(mysqlUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD, MYSQL_DRIVER_CLASS);
+        List<String> initialSnapshotResult =
+                Arrays.asList(
+                        "100000000000000000000101,scooter,Small 2-wheel scooter,3.14",
+                        "100000000000000000000102,car battery,12V car battery,8.1",
+                        "100000000000000000000103,12-pack drill bits,12-pack of drill bits with sizes ranging from #40 to #3,0.8",
+                        "100000000000000000000104,hammer,12oz carpenter's hammer,0.75",
+                        "100000000000000000000105,hammer,14oz carpenter's hammer,0.875",
+                        "100000000000000000000106,hammer,12oz carpenter's hammer,1.0",
+                        "100000000000000000000107,rocks,box of assorted rocks,5.3",
+                        "100000000000000000000108,jacket,water resistent black wind breaker,0.1",
+                        "100000000000000000000109,spare tire,24 inch spare tire,22.2");
+        proxy.checkResultWithTimeout(
+                initialSnapshotResult,
+                "mongodb_products_sink",
+                new String[] {"id", "name", "description", "weight"},
+                150000L);
+
         // generate binlogs
         MongoCollection<Document> products =
                 mongoClient.getDatabase(dbName).getCollection("products");
@@ -197,14 +222,6 @@ class MongoE2eITCase extends FlinkContainerTestEnvironment {
         products.deleteOne(Filters.eq("_id", new ObjectId("100000000000000000000111")));
 
         // assert final results
-        String mysqlUrl =
-                String.format(
-                        "jdbc:mysql://%s:%s/%s",
-                        MYSQL.getHost(),
-                        MYSQL.getDatabasePort(),
-                        mysqlInventoryDatabase.getDatabaseName());
-        JdbcProxy proxy =
-                new JdbcProxy(mysqlUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD, MYSQL_DRIVER_CLASS);
         List<String> expectResult =
                 Arrays.asList(
                         "100000000000000000000101,scooter,Small 2-wheel scooter,3.14",
