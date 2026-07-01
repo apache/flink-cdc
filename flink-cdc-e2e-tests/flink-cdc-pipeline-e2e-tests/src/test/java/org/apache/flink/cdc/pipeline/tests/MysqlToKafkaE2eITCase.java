@@ -17,11 +17,13 @@
 
 package org.apache.flink.cdc.pipeline.tests;
 
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.test.utils.TestUtils;
 import org.apache.flink.cdc.connectors.kafka.sink.KafkaUtil;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
+import org.apache.flink.core.execution.CheckpointType;
 
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonProcessingException;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
@@ -152,7 +154,7 @@ class MysqlToKafkaE2eITCase extends PipelineTestEnvironment {
                         topic,
                         parallelism);
         Path kafkaCdcJar = TestUtils.getResource("kafka-cdc-pipeline-connector.jar");
-        submitPipelineJob(pipelineJob, kafkaCdcJar);
+        JobID jobId = submitPipelineJob(pipelineJob, kafkaCdcJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
         List<ConsumerRecord<byte[], byte[]>> collectedRecords = new ArrayList<>();
@@ -161,6 +163,7 @@ class MysqlToKafkaE2eITCase extends PipelineTestEnvironment {
         List<String> expectedRecords =
                 getExpectedRecords("expectedEvents/mysqlToKafka/debezium-json.txt");
         assertThat(expectedRecords).containsAll(deserializeValues(collectedRecords));
+        waitUntilStreamSplitReady(jobId, parallelism);
         LOG.info("Begin incremental reading stage.");
         // generate binlogs
         String mysqlJdbcUrl =
@@ -226,7 +229,7 @@ class MysqlToKafkaE2eITCase extends PipelineTestEnvironment {
                         topic,
                         parallelism);
         Path kafkaCdcJar = TestUtils.getResource("kafka-cdc-pipeline-connector.jar");
-        submitPipelineJob(pipelineJob, kafkaCdcJar);
+        JobID jobId = submitPipelineJob(pipelineJob, kafkaCdcJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
         List<ConsumerRecord<byte[], byte[]>> collectedRecords = new ArrayList<>();
@@ -235,6 +238,7 @@ class MysqlToKafkaE2eITCase extends PipelineTestEnvironment {
         List<String> expectedRecords =
                 getExpectedRecords("expectedEvents/mysqlToKafka/canal-json.txt");
         assertThat(expectedRecords).containsAll(deserializeValues(collectedRecords));
+        waitUntilStreamSplitReady(jobId, parallelism);
         LOG.info("Begin incremental reading stage.");
         // generate binlogs
         String mysqlJdbcUrl =
@@ -302,7 +306,7 @@ class MysqlToKafkaE2eITCase extends PipelineTestEnvironment {
         Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path kafkaCdcJar = TestUtils.getResource("kafka-cdc-pipeline-connector.jar");
         Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
-        submitPipelineJob(pipelineJob, mysqlCdcJar, kafkaCdcJar, mysqlDriverJar);
+        JobID jobId = submitPipelineJob(pipelineJob, mysqlCdcJar, kafkaCdcJar, mysqlDriverJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
         List<ConsumerRecord<byte[], byte[]>> collectedRecords = new ArrayList<>();
@@ -311,6 +315,7 @@ class MysqlToKafkaE2eITCase extends PipelineTestEnvironment {
         List<String> expectedRecords =
                 getExpectedRecords("expectedEvents/mysqlToKafka/debezium-json-with-schema.txt");
         assertThat(expectedRecords).containsAll(deserializeValues(collectedRecords));
+        waitUntilStreamSplitReady(jobId, parallelism);
         LOG.info("Begin incremental reading stage.");
         // generate binlogs
         String mysqlJdbcUrl =
@@ -345,6 +350,28 @@ class MysqlToKafkaE2eITCase extends PipelineTestEnvironment {
         waitUntilSpecificEventCount(collectedRecords, expectedEventCount);
         assertThat(expectedRecords)
                 .containsExactlyInAnyOrderElementsOf(deserializeValues(collectedRecords));
+    }
+
+    private void waitUntilStreamSplitReady(JobID jobId, int parallelism) throws Exception {
+        Duration readinessTimeout = Duration.ofMinutes(5);
+        if (parallelism == 1) {
+            waitUntilLogContains(
+                    jobManagerConsumer,
+                    "Snapshot split assigner received all splits finished and the job parallelism is 1, snapshot split assigner is turn into finished status.",
+                    readinessTimeout);
+        } else {
+            waitUntilLogContains(
+                    jobManagerConsumer,
+                    "Snapshot split assigner received all splits finished, waiting for a complete checkpoint to mark the assigner finished.",
+                    readinessTimeout);
+            getRestClusterClient().triggerCheckpoint(jobId, CheckpointType.CONFIGURED).get();
+            waitUntilLogContains(
+                    jobManagerConsumer,
+                    "Snapshot split assigner is turn into finished status.",
+                    readinessTimeout);
+        }
+        waitUntilLogContains(
+                jobManagerConsumer, "for the binlog split assignment.", readinessTimeout);
     }
 
     private void waitUntilSpecificEventCount(
