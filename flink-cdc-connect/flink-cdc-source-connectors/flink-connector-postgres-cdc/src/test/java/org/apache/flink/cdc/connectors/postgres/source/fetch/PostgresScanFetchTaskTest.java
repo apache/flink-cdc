@@ -300,14 +300,10 @@ class PostgresScanFetchTaskTest extends PostgresTestBase {
         PostgresSourceConfigFactory sourceConfigFactory =
                 getMockPostgresSourceConfigFactory(
                         customDatabase, schemaName, tableName, null, 10, true);
-        Properties properties = new Properties();
-        properties.setProperty("snapshot.fetch.size", "2");
-        sourceConfigFactory.debeziumProperties(properties);
+        sourceConfigFactory.fetchSize(2);
         PostgresSourceConfig sourceConfig = sourceConfigFactory.create(0);
         PostgresDialect postgresDialect = new PostgresDialect(sourceConfigFactory.create(0));
         SnapshotSplit snapshotSplit = getSnapshotSplits(sourceConfig, postgresDialect).get(0);
-        PostgresSourceFetchTaskContext postgresSourceFetchTaskContext =
-                new PostgresSourceFetchTaskContext(sourceConfig, postgresDialect);
         final String selectSql =
                 PostgresQueryUtils.buildSplitScanQuery(
                         snapshotSplit.getTableId(),
@@ -326,9 +322,7 @@ class PostgresScanFetchTaskTest extends PostgresTestBase {
                                 snapshotSplit.getSplitStart(),
                                 snapshotSplit.getSplitEnd(),
                                 snapshotSplit.getSplitKeyType().getFieldCount(),
-                                postgresSourceFetchTaskContext
-                                        .getDbzConnectorConfig()
-                                        .getSnapshotFetchSize());
+                                sourceConfig.getFetchSize());
                 ResultSet rs = selectStatement.executeQuery()) {
             assertThat(rs.getFetchSize()).isEqualTo(2);
         }
