@@ -59,6 +59,8 @@ public class SqlServerTestBase extends AbstractTestBase {
 
     private static final String STATEMENTS_PLACEHOLDER = "#";
 
+    private static final long SINK_WAIT_TIMEOUT_SECONDS = 90;
+
     private static final String DISABLE_DB_CDC =
             "IF EXISTS(select 1 from sys.databases where name='#' AND is_cdc_enabled=1)\n"
                     + "EXEC sys.sp_cdc_disable_db";
@@ -175,6 +177,10 @@ public class SqlServerTestBase extends AbstractTestBase {
      * connection.
      */
     protected void initializeSqlServerTable(String sqlFile) {
+        initializeSqlServerTable(sqlFile, sqlFile);
+    }
+
+    protected void initializeSqlServerTable(String sqlFile, String databaseName) {
         final String ddlFile = String.format("ddl/%s.sql", sqlFile);
         final InputStream ddlTestFile =
                 SqlServerTestBase.class.getClassLoader().getResourceAsStream(ddlFile);
@@ -185,7 +191,7 @@ public class SqlServerTestBase extends AbstractTestBase {
                                 new InputStreamReader(inputStream, StandardCharsets.UTF_8));
                 Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
-            dropTestDatabase(connection, sqlFile);
+            dropTestDatabase(connection, databaseName);
             final List<String> statements =
                     Arrays.stream(
                                     reader.lines()
@@ -198,6 +204,7 @@ public class SqlServerTestBase extends AbstractTestBase {
                                                         return m.matches() ? m.group(1) : x;
                                                     })
                                             .collect(Collectors.joining("\n"))
+                                            .replace(sqlFile, databaseName)
                                             .split(";"))
                             .collect(Collectors.toList());
             for (String stmt : statements) {
@@ -209,16 +216,21 @@ public class SqlServerTestBase extends AbstractTestBase {
     }
 
     protected static void waitForSnapshotStarted(String sinkName) throws InterruptedException {
-        while (sinkSize(sinkName) == 0) {
-            Thread.sleep(100);
-        }
+        // Bound the wait so that a stalled source (e.g. a record that never converges because a
+        // streaming conversion failed) fails this single test fast instead of hanging the whole
+        // suite until the job-level timeout.
+        Awaitility.await(String.format("Snapshot of %s to start", sinkName))
+                .atMost(SINK_WAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                .pollInterval(100, TimeUnit.MILLISECONDS)
+                .until(() -> sinkSize(sinkName) > 0);
     }
 
     protected static void waitForSinkSize(String sinkName, int expectedSize)
             throws InterruptedException {
-        while (sinkSize(sinkName) < expectedSize) {
-            Thread.sleep(100);
-        }
+        Awaitility.await(String.format("Sink %s to reach size %d", sinkName, expectedSize))
+                .atMost(SINK_WAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                .pollInterval(100, TimeUnit.MILLISECONDS)
+                .until(() -> sinkSize(sinkName) >= expectedSize);
     }
 
     protected static int sinkSize(String sinkName) {
