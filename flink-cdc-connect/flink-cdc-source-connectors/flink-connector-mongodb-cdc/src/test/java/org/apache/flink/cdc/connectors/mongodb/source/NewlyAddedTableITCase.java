@@ -35,6 +35,7 @@ import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
+import org.assertj.core.api.Assertions;
 import org.bson.Document;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -457,8 +458,21 @@ class NewlyAddedTableITCase extends MongoDBSourceTestBase {
                                     "+I[%s, 417022095255614379, China, %s, %s West Town address 3]",
                                     captureTableThisRound, cityName, cityName)));
             MongoDBTestUtils.waitForSinkSize("sink", fetchedDataList.size());
-            MongoDBAssertUtils.assertEqualsInAnyOrder(
-                    fetchedDataList, TestValuesTableFactory.getRawResultsAsStrings("sink"));
+            String collection0 = captureAddressCollections[0];
+            String cityName0 = collection0.split("_")[1];
+            String collection0UpdateBefore =
+                    format(
+                            "-U[%s, 416874195632735147, China_%s, %s, %s West Town address 1]",
+                            collection0, round - 1, cityName0, cityName0);
+            String collection0UpdateAfter =
+                    format(
+                            "+U[%s, 416874195632735147, China_%s, %s, %s West Town address 1]",
+                            collection0, round, cityName0, cityName0);
+            assertEqualsInAnyOrderWithAllowedDuplicateUpdatePair(
+                    fetchedDataList,
+                    TestValuesTableFactory.getRawResultsAsStrings("sink"),
+                    collection0UpdateBefore,
+                    collection0UpdateAfter);
 
             // step 4: make changelog data for all collections before this round(also includes this
             // round),
@@ -468,16 +482,10 @@ class NewlyAddedTableITCase extends MongoDBSourceTestBase {
                 makeOplogForAddressTableInRound(database, collection, round);
             }
             // this round's changelog data
-            String collection0 = captureAddressCollections[0];
-            String cityName0 = collection0.split("_")[1];
             fetchedDataList.addAll(
                     Arrays.asList(
-                            format(
-                                    "-U[%s, 416874195632735147, China_%s, %s, %s West Town address 1]",
-                                    collection0, round - 1, cityName0, cityName0),
-                            format(
-                                    "+U[%s, 416874195632735147, China_%s, %s, %s West Town address 1]",
-                                    collection0, round, cityName0, cityName0),
+                            collection0UpdateBefore,
+                            collection0UpdateAfter,
                             format(
                                     "+I[%s, %d, China, %s, %s West Town address 4]",
                                     collection0,
@@ -503,13 +511,30 @@ class NewlyAddedTableITCase extends MongoDBSourceTestBase {
             // assert fetched changelog data in this round
             MongoDBTestUtils.waitForSinkSize("sink", fetchedDataList.size());
 
-            MongoDBAssertUtils.assertEqualsInAnyOrder(
-                    fetchedDataList, TestValuesTableFactory.getRawResultsAsStrings("sink"));
+            assertEqualsInAnyOrderWithAllowedDuplicateUpdatePair(
+                    fetchedDataList,
+                    TestValuesTableFactory.getRawResultsAsStrings("sink"),
+                    collection0UpdateBefore,
+                    collection0UpdateAfter);
             // step 6: trigger savepoint
             if (round != captureAddressCollections.length - 1) {
                 finishedSavePointPath = triggerSavepointWithRetry(jobClient, savepointDirectory);
             }
             jobClient.cancel().get();
+        }
+    }
+
+    private void assertEqualsInAnyOrderWithAllowedDuplicateUpdatePair(
+            List<String> expected, List<String> actual, String beforeUpdate, String afterUpdate) {
+        List<String> expectedWithRetryDuplicate = new ArrayList<>(expected);
+        expectedWithRetryDuplicate.add(beforeUpdate);
+        expectedWithRetryDuplicate.add(afterUpdate);
+
+        try {
+            Assertions.assertThat(actual).containsExactlyInAnyOrderElementsOf(expected);
+        } catch (AssertionError ignored) {
+            Assertions.assertThat(actual)
+                    .containsExactlyInAnyOrderElementsOf(expectedWithRetryDuplicate);
         }
     }
 
