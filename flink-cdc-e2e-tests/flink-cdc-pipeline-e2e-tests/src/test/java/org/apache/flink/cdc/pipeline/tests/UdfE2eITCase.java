@@ -17,9 +17,11 @@
 
 package org.apache.flink.cdc.pipeline.tests;
 
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.cdc.common.test.utils.TestUtils;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
+import org.apache.flink.core.execution.CheckpointType;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -125,25 +127,38 @@ class UdfE2eITCase extends PipelineTestEnvironment {
                         language);
         Path udfJar = TestUtils.getResource("udf-examples.jar");
         Path scalaLibJar = TestUtils.getResource("scala-library.jar");
-        submitPipelineJob(pipelineJob, udfJar, scalaLibJar);
+        JobID jobId = submitPipelineJob(pipelineJob, udfJar, scalaLibJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
         waitUntilSpecificEvent("[ LifecycleFunction ] opened.");
 
-        validateResult(
-                dbNameFormatter,
-                "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`INC_ID` STRING,`FMT_VER` STRING}, primaryKeys=ID, options=()}",
-                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1009, 8.1, 1011, <8.1>], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1010, 10, 1012, <10>], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1011, 11, 1013, <11>], op=INSERT, meta=()}",
-                "CreateTableEvent{tableId=%s.TABLEBETA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`ANS` STRING,`TYP` STRING}, primaryKeys=ID, options=()}",
-                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2011, 11, Forty-two, Integer: 2011], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2012, 12, Forty-two, Integer: 2012], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2013, 13, Forty-two, Integer: 2013], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2014, 14, Forty-two, Integer: 2014], op=INSERT, meta=()}");
+        waitUntilLogContains(
+                taskManagerConsumer,
+                dbNameFormatter.apply(
+                        "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`INC_ID` STRING,`FMT_VER` STRING}, primaryKeys=ID, options=()}"));
+        waitUntilLogContains(
+                taskManagerConsumer,
+                dbNameFormatter.apply(
+                        "CreateTableEvent{tableId=%s.TABLEBETA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`ANS` STRING,`TYP` STRING}, primaryKeys=ID, options=()}"));
+
+        for (String event :
+                Stream.of(
+                                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1009, 8.1, 1011, <8.1>], op=INSERT, meta=()}",
+                                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1010, 10, 1012, <10>], op=INSERT, meta=()}",
+                                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1011, 11, 1013, <11>], op=INSERT, meta=()}",
+                                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2011, 11, Forty-two, Integer: 2011], op=INSERT, meta=()}",
+                                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2012, 12, Forty-two, Integer: 2012], op=INSERT, meta=()}",
+                                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2013, 13, Forty-two, Integer: 2013], op=INSERT, meta=()}",
+                                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2014, 14, Forty-two, Integer: 2014], op=INSERT, meta=()}")
+                        .map(dbNameFormatter)
+                        .toArray(String[]::new)) {
+            waitUntilLogContains(taskManagerConsumer, event);
+        }
 
         if (batchMode) {
             return;
         }
+
+        waitUntilStreamSplitReady(jobId, parallelism);
 
         String mysqlJdbcUrl =
                 String.format(
@@ -163,11 +178,15 @@ class UdfE2eITCase extends PipelineTestEnvironment {
             throw e;
         }
 
-        validateResult(
-                dbNameFormatter,
-                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[1009, 8.1, 1011, <8.1>], after=[1009, 100, 1011, <100>], op=UPDATE, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[3007, 7, 3009, <7>], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEBETA, before=[2011, 11, Forty-two, Integer: 2011], after=[], op=DELETE, meta=()}");
+        for (String event :
+                Stream.of(
+                                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[1009, 8.1, 1011, <8.1>], after=[1009, 100, 1011, <100>], op=UPDATE, meta=()}",
+                                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[3007, 7, 3009, <7>], op=INSERT, meta=()}",
+                                "DataChangeEvent{tableId=%s.TABLEBETA, before=[2011, 11, Forty-two, Integer: 2011], after=[], op=DELETE, meta=()}")
+                        .map(dbNameFormatter)
+                        .toArray(String[]::new)) {
+            waitUntilLogContains(taskManagerConsumer, event);
+        }
     }
 
     @ParameterizedTest(name = "language: {0}, batchMode: {1}")
@@ -221,7 +240,7 @@ class UdfE2eITCase extends PipelineTestEnvironment {
                         language);
         Path udfJar = TestUtils.getResource("udf-examples.jar");
         Path scalaLibJar = TestUtils.getResource("scala-library.jar");
-        submitPipelineJob(pipelineJob, udfJar, scalaLibJar);
+        JobID jobId = submitPipelineJob(pipelineJob, udfJar, scalaLibJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
         validateResult(
                 dbNameFormatter,
@@ -238,6 +257,8 @@ class UdfE2eITCase extends PipelineTestEnvironment {
         if (batchMode) {
             return;
         }
+
+        waitUntilStreamSplitReady(jobId, parallelism);
 
         String mysqlJdbcUrl =
                 String.format(
@@ -262,5 +283,22 @@ class UdfE2eITCase extends PipelineTestEnvironment {
                 "DataChangeEvent{tableId=%s.TABLEALPHA, before=[1009, 8.1, 1011, <8.1>], after=[1009, 100, 1011, <100>], op=UPDATE, meta=()}",
                 "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[3007, 7, 3009, <7>], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId=%s.TABLEBETA, before=[2011, 11, Integer: 2011], after=[], op=DELETE, meta=()}");
+    }
+
+    private void waitUntilStreamSplitReady(JobID jobId, int parallelism) throws Exception {
+        if (parallelism == 1) {
+            return;
+        }
+
+        waitUntilLogContains(
+                jobManagerConsumer,
+                "Snapshot split assigner received all splits finished, waiting for a complete checkpoint to mark the assigner finished.");
+        getRestClusterClient().triggerCheckpoint(jobId, CheckpointType.CONFIGURED).get();
+        waitUntilLogContains(
+                jobManagerConsumer, "Snapshot split assigner is turn into finished status.");
+        waitUntilLogContains(
+                jobManagerConsumer,
+                "The enumerator assigns split MySqlBinlogSplit{splitId='binlog-split'");
+        waitUntilLogContains(jobManagerConsumer, "for the binlog split assignment.");
     }
 }
