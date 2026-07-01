@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.pipeline.tests;
 
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.cdc.common.test.utils.TestUtils;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
@@ -168,7 +169,9 @@ public class MySqlToIcebergE2eITCase extends PipelineTestEnvironment {
         Path icebergCdcConnector = TestUtils.getResource("iceberg-cdc-pipeline-connector.jar");
         Path hadoopJar = TestUtils.getResource("flink-shade-hadoop.jar");
         Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
-        submitPipelineJob(pipelineJob, mysqlCdcJar, icebergCdcConnector, mysqlDriverJar, hadoopJar);
+        JobID jobId =
+                submitPipelineJob(
+                        pipelineJob, mysqlCdcJar, icebergCdcConnector, mysqlDriverJar, hadoopJar);
         waitUntilJobRunning(Duration.ofSeconds(60));
         LOG.info("Pipeline job is running");
         validateSinkResult(
@@ -236,7 +239,25 @@ public class MySqlToIcebergE2eITCase extends PipelineTestEnvironment {
                     "INSERT INTO products VALUES (default,'Eleven','Kryo',5.18, null, null);"); // 111
             stat.execute(
                     "INSERT INTO products VALUES (default,'Twelve', 'Lily', 2.14, null, null);"); // 112
+
+            validateSinkResult(
+                    warehouse,
+                    database,
+                    "products",
+                    Arrays.asList(
+                            "102, Two, Bob v2, 1.125, white, {\"key2\":\"value2\"}",
+                            "104, Four, Reborn, 9.875, white, null",
+                            "105, Five, Evelyn, 5.211, red, {\"K\": \"V\", \"k\": \"v\"}",
+                            "106, Six, Fay, 9.813, null, null",
+                            "107, Seven, Grace, 5.125, null, null",
+                            "108, Eight, Hesse, 6.819, null, null",
+                            "109, Nine, IINA, 5.223, null, null",
+                            "110, Ten, Jukebox, 0.2, null, null",
+                            "111, Eleven, Kryo, 5.18, null, null",
+                            "112, Twelve, Lily, 2.14, null, null"));
+
             recordsInIncrementalPhase = createChangesAndValidate(stat);
+            triggerCheckpointWithRetry(jobId);
         } catch (SQLException e) {
             LOG.error("Update table for CDC failed.", e);
             throw e;
@@ -349,14 +370,16 @@ public class MySqlToIcebergE2eITCase extends PipelineTestEnvironment {
         runInContainerAsRoot(jobManager, "chmod", "0777", "-R", warehouse);
         LOG.info("Verifying Iceberg {}::{}::{} results...", warehouse, database, table);
         long deadline = System.currentTimeMillis() + EVENT_WAITING_TIMEOUT.toMillis();
+        List<String> expectedResults = expected.stream().sorted().collect(Collectors.toList());
         List<String> results = Collections.emptyList();
         while (System.currentTimeMillis() < deadline) {
             try {
                 results = fetchIcebergTableRows(warehouse, database, table);
                 results = results.stream().sorted().collect(Collectors.toList());
-                for (int recordIndex = 0; recordIndex < results.size(); recordIndex++) {
+                Assertions.assertThat(results).hasSameSizeAs(expectedResults);
+                for (int recordIndex = 0; recordIndex < expectedResults.size(); recordIndex++) {
                     Assertions.assertThat(results.get(recordIndex))
-                            .isEqualTo(expected.get(recordIndex));
+                            .isEqualTo(expectedResults.get(recordIndex));
                 }
                 LOG.info(
                         "Successfully verified {} records in {} seconds.",
@@ -375,6 +398,6 @@ public class MySqlToIcebergE2eITCase extends PipelineTestEnvironment {
             }
             Thread.sleep(10000L);
         }
-        Assertions.assertThat(results).containsExactlyInAnyOrderElementsOf(expected);
+        Assertions.assertThat(results).containsExactlyInAnyOrderElementsOf(expectedResults);
     }
 }
