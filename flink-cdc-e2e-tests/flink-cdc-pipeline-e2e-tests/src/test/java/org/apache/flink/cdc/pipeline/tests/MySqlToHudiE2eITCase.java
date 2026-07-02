@@ -289,18 +289,39 @@ public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
                     "INSERT INTO products VALUES (default,'Ten','Jukebox',0.2, null, null, null);"); // 110
             stat.execute("UPDATE products SET description='Fay' WHERE id=106;");
             stat.execute("UPDATE products SET weight='5.125' WHERE id=107;");
-
-            // Keep this Hudi E2E focused on DML and MOR compaction. Hudi 1.1.0 internal schema
-            // commits are flaky on local Docker volumes; schema evolution is covered by other E2Es.
+            stat.execute("ALTER TABLE products DROP COLUMN point_c;");
             stat.execute("DELETE FROM products WHERE id=101;");
 
             stat.execute(
-                    "INSERT INTO products VALUES (default,'Eleven','Kryo',5.18, null, null, null);"); // 111
+                    "INSERT INTO products VALUES (default,'Eleven','Kryo',5.18, null, null);"); // 111
             stat.execute(
-                    "INSERT INTO products VALUES (default,'Twelve', 'Lily', 2.14, null, null, null);"); // 112
+                    "INSERT INTO products VALUES (default,'Twelve', 'Lily', 2.14, null, null);"); // 112
 
             Thread.sleep(2000L);
-            triggerCheckpointOrDescribeFailure(pipelineJobID, "post-incremental checkpoint");
+            triggerCheckpointOrDescribeFailure(pipelineJobID, "post-drop-column checkpoint");
+            initialProductInstants =
+                    waitUntilCompletedHudiInstants(
+                            warehouse, database, "products", initialProductInstants + 1);
+            validateSinkResultWithCheckpointProgress(
+                    pipelineJobID,
+                    "post-drop-column convergence",
+                    warehouse,
+                    database,
+                    "products",
+                    getProductsExpectedAfterDropSinkResults());
+
+            stat.execute("ALTER TABLE products ADD COLUMN point_c_0 VARCHAR(10);");
+            stat.execute(
+                    "INSERT INTO products VALUES (default,'Thirteen','Mila',3.14, null, null, 'A');"); // 113
+            stat.execute("ALTER TABLE products ADD COLUMN point_c_1 VARCHAR(10);");
+            stat.execute(
+                    "INSERT INTO products VALUES (default,'Fourteen','Nora',4.14, null, null, 'B', 'C');"); // 114
+            stat.execute("ALTER TABLE products MODIFY point_c_0 VARCHAR(20);");
+            stat.execute(
+                    "INSERT INTO products VALUES (default,'Fifteen','Olive',5.14, null, null, 'point-zero-long', 'D');"); // 115
+
+            Thread.sleep(2000L);
+            triggerCheckpointOrDescribeFailure(pipelineJobID, "post-schema-evolution checkpoint");
             initialProductInstants =
                     waitUntilCompletedHudiInstants(
                             warehouse, database, "products", initialProductInstants + 1);
@@ -311,11 +332,11 @@ public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
 
         validateSinkResultWithCheckpointProgress(
                 pipelineJobID,
-                "final incremental convergence",
+                "final schema evolution convergence",
                 warehouse,
                 database,
                 "products",
-                getProductsExpectedAfterIncrementalSinkResults());
+                getProductsExpectedAfterSchemaEvolutionSinkResults());
 
         if (TABLE_TYPE.equals(HoodieTableType.MERGE_ON_READ.name())) {
             waitUntilCompactionScheduled(warehouse, database, "products");
@@ -969,19 +990,37 @@ public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
                 "109, Nine, IINA, 5.223, null, null, null");
     }
 
-    private static List<String> getProductsExpectedAfterIncrementalSinkResults() {
+    private static List<String> getProductsExpectedAfterDropSinkResults() {
         return Arrays.asList(
-                "102, Two, Bob, 1.703, white, {\"key2\": \"value2\"}, null",
-                "103, Three, Cecily, 4.105, red, {\"key3\": \"value3\"}, null",
-                "104, Four, Derrida, 1.857, white, {\"key4\": \"value4\"}, null",
-                "105, Five, Evelyn, 5.211, red, {\"K\": \"V\", \"k\": \"v\"}, null",
-                "106, Six, Fay, 9.813, null, null, null",
-                "107, Seven, Grace, 5.125, null, null, null",
-                "108, Eight, Hesse, 6.819, null, null, null",
-                "109, Nine, IINA, 5.223, null, null, null",
-                "110, Ten, Jukebox, 0.2, null, null, null",
-                "111, Eleven, Kryo, 5.18, null, null, null",
-                "112, Twelve, Lily, 2.14, null, null, null");
+                "102, Two, Bob, 1.703, white, {\"key2\": \"value2\"}",
+                "103, Three, Cecily, 4.105, red, {\"key3\": \"value3\"}",
+                "104, Four, Derrida, 1.857, white, {\"key4\": \"value4\"}",
+                "105, Five, Evelyn, 5.211, red, {\"K\": \"V\", \"k\": \"v\"}",
+                "106, Six, Fay, 9.813, null, null",
+                "107, Seven, Grace, 5.125, null, null",
+                "108, Eight, Hesse, 6.819, null, null",
+                "109, Nine, IINA, 5.223, null, null",
+                "110, Ten, Jukebox, 0.2, null, null",
+                "111, Eleven, Kryo, 5.18, null, null",
+                "112, Twelve, Lily, 2.14, null, null");
+    }
+
+    private static List<String> getProductsExpectedAfterSchemaEvolutionSinkResults() {
+        return Arrays.asList(
+                "102, Two, Bob, 1.703, white, {\"key2\": \"value2\"}, null, null",
+                "103, Three, Cecily, 4.105, red, {\"key3\": \"value3\"}, null, null",
+                "104, Four, Derrida, 1.857, white, {\"key4\": \"value4\"}, null, null",
+                "105, Five, Evelyn, 5.211, red, {\"K\": \"V\", \"k\": \"v\"}, null, null",
+                "106, Six, Fay, 9.813, null, null, null, null",
+                "107, Seven, Grace, 5.125, null, null, null, null",
+                "108, Eight, Hesse, 6.819, null, null, null, null",
+                "109, Nine, IINA, 5.223, null, null, null, null",
+                "110, Ten, Jukebox, 0.2, null, null, null, null",
+                "111, Eleven, Kryo, 5.18, null, null, null, null",
+                "112, Twelve, Lily, 2.14, null, null, null, null",
+                "113, Thirteen, Mila, 3.14, null, null, A, null",
+                "114, Fourteen, Nora, 4.14, null, null, B, C",
+                "115, Fifteen, Olive, 5.14, null, null, point-zero-long, D");
     }
 
     private static List<String> getCustomersExpectedSinkResults() {

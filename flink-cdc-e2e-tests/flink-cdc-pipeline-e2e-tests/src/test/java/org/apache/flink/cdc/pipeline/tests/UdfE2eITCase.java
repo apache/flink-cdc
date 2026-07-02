@@ -286,19 +286,24 @@ class UdfE2eITCase extends PipelineTestEnvironment {
     }
 
     private void waitUntilStreamSplitReady(JobID jobId, int parallelism) throws Exception {
+        Duration readinessTimeout = Duration.ofMinutes(5);
         if (parallelism == 1) {
-            return;
+            waitUntilLogContains(
+                    jobManagerConsumer,
+                    "Snapshot split assigner received all splits finished and the job parallelism is 1, snapshot split assigner is turn into finished status.",
+                    readinessTimeout);
+        } else {
+            waitUntilLogContains(
+                    jobManagerConsumer,
+                    "Snapshot split assigner received all splits finished, waiting for a complete checkpoint to mark the assigner finished.",
+                    readinessTimeout);
+            getRestClusterClient().triggerCheckpoint(jobId, CheckpointType.CONFIGURED).get();
+            waitUntilLogContains(
+                    jobManagerConsumer,
+                    "Snapshot split assigner is turn into finished status.",
+                    readinessTimeout);
         }
-
         waitUntilLogContains(
-                jobManagerConsumer,
-                "Snapshot split assigner received all splits finished, waiting for a complete checkpoint to mark the assigner finished.");
-        getRestClusterClient().triggerCheckpoint(jobId, CheckpointType.CONFIGURED).get();
-        waitUntilLogContains(
-                jobManagerConsumer, "Snapshot split assigner is turn into finished status.");
-        waitUntilLogContains(
-                jobManagerConsumer,
-                "The enumerator assigns split MySqlBinlogSplit{splitId='binlog-split'");
-        waitUntilLogContains(jobManagerConsumer, "for the binlog split assignment.");
+                jobManagerConsumer, "for the binlog split assignment.", readinessTimeout);
     }
 }

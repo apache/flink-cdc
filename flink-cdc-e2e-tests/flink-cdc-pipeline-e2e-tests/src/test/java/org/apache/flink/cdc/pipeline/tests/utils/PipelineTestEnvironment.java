@@ -358,15 +358,22 @@ public abstract class PipelineTestEnvironment extends TestLogger {
                 Optional<FlinkJobNotFoundException> jobNotFoundException =
                         ExceptionUtils.findThrowable(e, FlinkJobNotFoundException.class);
                 String errorMessage = ExceptionUtils.stringifyException(e);
+                if (jobNotFoundException.isPresent()
+                        || errorMessage.contains("Could not find Flink job")) {
+                    throw new IllegalStateException(
+                            "Failed to trigger checkpoint for job "
+                                    + jobID
+                                    + " because the job was not found. "
+                                    + describeCheckpointTarget(jobID),
+                            e);
+                }
                 if ((checkpointException.isPresent()
                                 && checkpointException
                                         .get()
                                         .getMessage()
                                         .contains("Checkpoint triggering task"))
                         || errorMessage.contains("is not being executed at the moment")
-                        || errorMessage.contains("Not all required tasks are currently running")
-                        || errorMessage.contains("Could not find Flink job")
-                        || jobNotFoundException.isPresent()) {
+                        || errorMessage.contains("Not all required tasks are currently running")) {
                     Thread.sleep(100L);
                     retryTimes++;
                 } else {
@@ -375,6 +382,15 @@ public abstract class PipelineTestEnvironment extends TestLogger {
             }
         }
         throw new TimeoutException("Timed out waiting to trigger checkpoint for job " + jobID);
+    }
+
+    private String describeCheckpointTarget(JobID jobID) {
+        try {
+            JobStatus status = getRestClusterClient().getJobStatus(jobID).get(10, TimeUnit.SECONDS);
+            return "Current job status: " + status + '.';
+        } catch (Exception statusError) {
+            return "Job status is unavailable: " + ExceptionUtils.stringifyException(statusError);
+        }
     }
 
     /**
