@@ -257,7 +257,6 @@ public class MySqlToIcebergE2eITCase extends PipelineTestEnvironment {
                             "112, Twelve, Lily, 2.14, null, null"));
 
             recordsInIncrementalPhase = createChangesAndValidate(stat);
-            triggerCheckpointWithRetry(jobId);
         } catch (SQLException e) {
             LOG.error("Update table for CDC failed.", e);
             throw e;
