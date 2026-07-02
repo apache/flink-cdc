@@ -142,6 +142,9 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
 
     @Override
     protected SourceSplitState initializedState(SourceSplitBase split) {
+        if (recordEmitter instanceof IncrementalSourceRecordEmitter) {
+            ((IncrementalSourceRecordEmitter<?>) recordEmitter).applySplit(split);
+        }
         if (split.isSnapshotSplit()) {
             return new SnapshotSplitState(split.asSnapshotSplit());
         } else {
