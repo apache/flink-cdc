@@ -468,11 +468,8 @@ class NewlyAddedTableITCase extends MongoDBSourceTestBase {
                     format(
                             "+U[%s, 416874195632735147, China_%s, %s, %s West Town address 1]",
                             collection0, round, cityName0, cityName0);
-            assertEqualsInAnyOrderWithAllowedDuplicateUpdatePair(
-                    fetchedDataList,
-                    TestValuesTableFactory.getRawResultsAsStrings("sink"),
-                    collection0UpdateBefore,
-                    collection0UpdateAfter);
+            MongoDBAssertUtils.assertEqualsInAnyOrder(
+                    fetchedDataList, TestValuesTableFactory.getRawResultsAsStrings("sink"));
 
             // step 4: make changelog data for all collections before this round(also includes this
             // round),
