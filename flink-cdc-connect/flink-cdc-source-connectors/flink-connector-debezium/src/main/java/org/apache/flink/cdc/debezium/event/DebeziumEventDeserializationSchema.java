@@ -155,11 +155,22 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
 
     private RecordData extractDataRecord(Struct value, Schema valueSchema) throws Exception {
         DataType dataType = schemaDataTypeInference.infer(value, valueSchema);
-        return (RecordData) getOrCreateConverter(dataType).convert(value, valueSchema);
+        return convertDataRecord(value, valueSchema, dataType);
     }
 
     private DeserializationRuntimeConverter getOrCreateConverter(DataType type) {
         return CONVERTERS.computeIfAbsent(type, this::createConverter);
+    }
+
+    /**
+     * Converts a Debezium row struct with a precomputed {@link DataType}.
+     *
+     * <p>Subclasses can reuse this helper when they cache or otherwise derive the row type outside
+     * of the default per-record inference path.
+     */
+    protected final RecordData convertDataRecord(
+            Struct value, Schema valueSchema, DataType dataType) throws Exception {
+        return (RecordData) getOrCreateConverter(dataType).convert(value, valueSchema);
     }
 
     // -------------------------------------------------------------------------------------
