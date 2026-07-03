@@ -45,8 +45,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.tikv.common.TiConfiguration;
 
-import java.time.Instant;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -61,9 +61,7 @@ public class TiDBStreamSplitReaderTest extends TiDBTestBase {
     private static final String tableName = "customers";
     private static final String STREAM_SPLIT_ID = "stream-split";
 
-    private static final int USE_POST_LOWWATERMARK_HOOK = 1;
-    private static final int USE_PRE_HIGHWATERMARK_HOOK = 2;
-    private static final int MAX_RETRY_TIMES = 100;
+    private static final int MAX_RETRY_TIMES = 600;
 
     private TiDBSourceConfig sourceConfig;
     private TiDBDialect tiDBDialect;
@@ -73,12 +71,19 @@ public class TiDBStreamSplitReaderTest extends TiDBTestBase {
     public void before() {
         initializeTidbTable("customer");
         TiDBSourceConfigFactory tiDBSourceConfigFactory = new TiDBSourceConfigFactory();
-        String pdAddress = PD.getContainerIpAddress() + ":" + PD.getMappedPort(PD_PORT_ORIGIN);
+        String pdHost = PD.getHost();
+        String tikvHost = TIKV.getHost();
+        String pdAddress = pdHost + ":" + PD.getMappedPort(PD_PORT_ORIGIN);
+
+        String hostMapping = "pd0:" + pdHost + ";tikv0:" + tikvHost;
+
+        TiConfiguration tiConfiguration =
+                TiDBSourceOptions.getTiConfiguration(
+                        pdAddress, hostMapping, Collections.emptyMap());
         tiDBSourceConfigFactory
                 .pdAddresses(pdAddress)
-                .tiConfiguration(
-                        TiDBSourceOptions.getTiConfiguration(
-                                pdAddress, "", Collections.emptyMap()));
+                .hostMapping(hostMapping)
+                .tiConfiguration(tiConfiguration);
         tiDBSourceConfigFactory.hostname(TIDB.getHost());
         tiDBSourceConfigFactory.port(TIDB.getMappedPort(TIDB_PORT));
         tiDBSourceConfigFactory.username(TiDBTestBase.TIDB_USER);
@@ -89,7 +94,7 @@ public class TiDBStreamSplitReaderTest extends TiDBTestBase {
         tiDBSourceConfigFactory.skipSnapshotBackfill(true);
         tiDBSourceConfigFactory.scanNewlyAddedTableEnabled(true);
         this.sourceConfig = tiDBSourceConfigFactory.create(0);
-        this.tiDBDialect = new TiDBDialect(tiDBSourceConfigFactory.create(0));
+        this.tiDBDialect = new TiDBDialect(sourceConfig);
         this.cdcEventOffsetFactory = new EventOffsetFactory();
     }
 
@@ -106,7 +111,7 @@ public class TiDBStreamSplitReaderTest extends TiDBTestBase {
                         incrementalSourceReaderContext,
                         SnapshotPhaseHooks.empty());
         try {
-            EventOffset startOffset = new EventOffset(Instant.now().toEpochMilli());
+            EventOffset startOffset = (EventOffset) tiDBDialect.displayCurrentOffset(sourceConfig);
             String[] insertDataSql =
                     new String[] {
                         "INSERT INTO "
@@ -127,8 +132,8 @@ public class TiDBStreamSplitReaderTest extends TiDBTestBase {
                     new FinishedSnapshotSplitInfo(
                             tableIds,
                             STREAM_SPLIT_ID,
-                            new Object[] {startOffset},
-                            new Object[] {EventOffset.NO_STOPPING_OFFSET},
+                            null,
+                            null,
                             startOffset,
                             cdcEventOffsetFactory);
             StreamSplit streamSplit =
@@ -138,7 +143,9 @@ public class TiDBStreamSplitReaderTest extends TiDBTestBase {
                             cdcEventOffsetFactory.createNoStoppingOffset(),
                             Collections.singletonList(finishedSnapshotSplitInfo),
                             tableSchemas,
-                            0);
+                            1,
+                            false,
+                            true);
             Assertions.assertThat(streamSplitReader.canAssignNextSplit()).isTrue();
             streamSplitReader.handleSplitsChanges(new SplitsAddition<>(singletonList(streamSplit)));
             int retry = 0;
