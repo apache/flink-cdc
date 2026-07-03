@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.mysql.source.utils;
 
+import org.apache.flink.cdc.connectors.mysql.source.config.ChunkKeyCompareMode;
 import org.apache.flink.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
 import org.apache.flink.table.types.logical.RowType;
 
@@ -33,18 +34,24 @@ public class SplitKeyUtils {
     /** Returns the specific key contains in the split key range or not. */
     public static boolean splitKeyRangeContains(
             Object[] key, Object[] splitKeyStart, Object[] splitKeyEnd) {
-        return compareKeyWithRange(key, splitKeyStart, splitKeyEnd) == RangePosition.WITHIN;
+        return splitKeyRangeContains(key, splitKeyStart, splitKeyEnd, ChunkKeyCompareMode.DEFAULT);
     }
 
-    @SuppressWarnings("unchecked")
-    private static int compareObjects(Object o1, Object o2) {
-        if (o1 instanceof Comparable && o1.getClass().equals(o2.getClass())) {
-            return ((Comparable) o1).compareTo(o2);
-        } else if (isNumericObject(o1) && isNumericObject(o2)) {
+    /** Returns the specific key contains in the split key range or not. */
+    public static boolean splitKeyRangeContains(
+            Object[] key,
+            Object[] splitKeyStart,
+            Object[] splitKeyEnd,
+            ChunkKeyCompareMode compareMode) {
+        return compareKeyWithRange(key, splitKeyStart, splitKeyEnd, compareMode)
+                == RangePosition.WITHIN;
+    }
+
+    private static int compareObjects(Object o1, Object o2, ChunkKeyCompareMode compareMode) {
+        if (isNumericObject(o1) && isNumericObject(o2)) {
             return toBigDecimal(o1).compareTo(toBigDecimal(o2));
-        } else {
-            return o1.toString().compareTo(o2.toString());
         }
+        return ObjectUtils.compare(o1, o2, compareMode);
     }
 
     private static boolean isNumericObject(Object obj) {
@@ -84,6 +91,26 @@ public class SplitKeyUtils {
      * @param splits List of splits to be sorted (sorted in-place)
      */
     public static void sortFinishedSplitInfos(List<FinishedSnapshotSplitInfo> splits) {
+        sortFinishedSplitInfos(splits, ChunkKeyCompareMode.DEFAULT);
+    }
+
+    /**
+     * Sorts the list of FinishedSnapshotSplitInfo by splitStart in ascending order. This is
+     * required for binary search to work correctly.
+     *
+     * <p>Handles special cases: - Splits with null splitStart are considered as MIN value (sorted
+     * to front) - Splits with null splitEnd are considered as MAX value (sorted to back)
+     *
+     * <p>NOTE: Current implementation assumes single-field split keys (as indicated by
+     * getSplitKey()). If multi-field split keys are supported in the future, the comparison logic
+     * should be reviewed to ensure consistency with {@link
+     * #splitKeyRangeContains(Object[],Object[],Object[],ChunkKeyCompareMode)}.
+     *
+     * @param splits List of splits to be sorted (sorted in-place)
+     * @param compareMode The compare mode for string chunk key comparison
+     */
+    public static void sortFinishedSplitInfos(
+            List<FinishedSnapshotSplitInfo> splits, ChunkKeyCompareMode compareMode) {
         if (splits == null || splits.size() <= 1) {
             return;
         }
@@ -105,7 +132,7 @@ public class SplitKeyUtils {
                     }
 
                     // Compare split starts
-                    return compareSplit(leftSplitStart, rightSplitStart);
+                    return compareSplit(leftSplitStart, rightSplitStart, compareMode);
                 });
     }
 
@@ -125,6 +152,28 @@ public class SplitKeyUtils {
      */
     public static FinishedSnapshotSplitInfo findSplitByKeyBinary(
             List<FinishedSnapshotSplitInfo> sortedSplits, Object[] key) {
+        return findSplitByKeyBinary(sortedSplits, key, ChunkKeyCompareMode.DEFAULT);
+    }
+
+    /**
+     * Uses binary search to find the split containing the specified key in a sorted split list.
+     *
+     * <p>IMPORTANT: The splits list MUST be sorted by splitStart before calling this method. Use
+     * sortFinishedSplitInfos() to sort the list if needed.
+     *
+     * <p>To leverage data locality for append-heavy workloads (e.g. auto-increment PKs), this
+     * method checks the first and last splits before applying binary search to the remaining
+     * subset.
+     *
+     * @param sortedSplits List of splits sorted by splitStart (MUST be sorted!)
+     * @param key The chunk key to search for
+     * @param compareMode The compare mode for string chunk key comparison
+     * @return The split containing the key, or null if not found
+     */
+    public static FinishedSnapshotSplitInfo findSplitByKeyBinary(
+            List<FinishedSnapshotSplitInfo> sortedSplits,
+            Object[] key,
+            ChunkKeyCompareMode compareMode) {
 
         if (sortedSplits == null || sortedSplits.isEmpty()) {
             return null;
@@ -134,7 +183,8 @@ public class SplitKeyUtils {
 
         FinishedSnapshotSplitInfo firstSplit = sortedSplits.get(0);
         RangePosition firstPosition =
-                compareKeyWithRange(key, firstSplit.getSplitStart(), firstSplit.getSplitEnd());
+                compareKeyWithRange(
+                        key, firstSplit.getSplitStart(), firstSplit.getSplitEnd(), compareMode);
         if (firstPosition == RangePosition.WITHIN) {
             return firstSplit;
         }
@@ -147,7 +197,8 @@ public class SplitKeyUtils {
 
         FinishedSnapshotSplitInfo lastSplit = sortedSplits.get(size - 1);
         RangePosition lastPosition =
-                compareKeyWithRange(key, lastSplit.getSplitStart(), lastSplit.getSplitEnd());
+                compareKeyWithRange(
+                        key, lastSplit.getSplitStart(), lastSplit.getSplitEnd(), compareMode);
         if (lastPosition == RangePosition.WITHIN) {
             return lastSplit;
         }
@@ -166,7 +217,8 @@ public class SplitKeyUtils {
             FinishedSnapshotSplitInfo split = sortedSplits.get(mid);
 
             RangePosition position =
-                    compareKeyWithRange(key, split.getSplitStart(), split.getSplitEnd());
+                    compareKeyWithRange(
+                            key, split.getSplitStart(), split.getSplitEnd(), compareMode);
 
             if (position == RangePosition.WITHIN) {
                 return split;
@@ -192,29 +244,29 @@ public class SplitKeyUtils {
      * returns where the key lies relative to that interval.
      */
     private static RangePosition compareKeyWithRange(
-            Object[] key, Object[] splitStart, Object[] splitEnd) {
+            Object[] key, Object[] splitStart, Object[] splitEnd, ChunkKeyCompareMode compareMode) {
         if (splitStart == null) {
             if (splitEnd == null) {
                 return RangePosition.WITHIN; // Full range split
             }
             // key < splitEnd ?
-            int cmp = compareSplit(key, splitEnd);
+            int cmp = compareSplit(key, splitEnd, compareMode);
             return cmp < 0 ? RangePosition.WITHIN : RangePosition.AFTER;
         }
 
         if (splitEnd == null) {
             // key >= splitStart ?
-            int cmp = compareSplit(key, splitStart);
+            int cmp = compareSplit(key, splitStart, compareMode);
             return cmp >= 0 ? RangePosition.WITHIN : RangePosition.BEFORE;
         }
 
         // Normal case: [splitStart, splitEnd)
-        int cmpStart = compareSplit(key, splitStart);
+        int cmpStart = compareSplit(key, splitStart, compareMode);
         if (cmpStart < 0) {
             return RangePosition.BEFORE; // key < splitStart
         }
 
-        int cmpEnd = compareSplit(key, splitEnd);
+        int cmpEnd = compareSplit(key, splitEnd, compareMode);
         if (cmpEnd >= 0) {
             return RangePosition.AFTER; // key >= splitEnd
         }
@@ -222,7 +274,8 @@ public class SplitKeyUtils {
         return RangePosition.WITHIN; // splitStart <= key < splitEnd
     }
 
-    private static int compareSplit(Object[] leftSplit, Object[] rightSplit) {
+    private static int compareSplit(
+            Object[] leftSplit, Object[] rightSplit, ChunkKeyCompareMode compareMode) {
         // Ensure both splits have the same length
         if (leftSplit.length != rightSplit.length) {
             throw new IllegalArgumentException(
@@ -233,7 +286,7 @@ public class SplitKeyUtils {
 
         int compareResult = 0;
         for (int i = 0; i < leftSplit.length; i++) {
-            compareResult = compareObjects(leftSplit[i], rightSplit[i]);
+            compareResult = compareObjects(leftSplit[i], rightSplit[i], compareMode);
             if (compareResult != 0) {
                 break;
             }

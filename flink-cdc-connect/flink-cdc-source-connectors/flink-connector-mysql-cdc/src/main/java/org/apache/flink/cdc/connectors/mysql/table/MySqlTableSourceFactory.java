@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.mysql.table;
 
+import org.apache.flink.cdc.connectors.mysql.source.config.ChunkKeyCompareMode;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOptions;
 import org.apache.flink.cdc.connectors.mysql.source.config.ServerIdRange;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
@@ -106,6 +107,11 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         boolean useLegacyJsonFormat = config.get(MySqlSourceOptions.USE_LEGACY_JSON_FORMAT);
         boolean assignUnboundedChunkFirst =
                 config.get(MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST);
+        ChunkKeyCompareMode chunkKeyCompareMode =
+                ChunkKeyCompareMode.fromValue(
+                        config.get(
+                                MySqlSourceOptions
+                                        .SCAN_INCREMENTAL_SNAPSHOT_STRING_KEY_COMPARE_MODE));
 
         boolean appendOnly =
                 config.get(MySqlSourceOptions.SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED);
@@ -156,6 +162,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                 parseOnLineSchemaChanges,
                 useLegacyJsonFormat,
                 assignUnboundedChunkFirst,
+                chunkKeyCompareMode,
                 appendOnly);
     }
 
@@ -205,6 +212,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         options.add(MySqlSourceOptions.PARSE_ONLINE_SCHEMA_CHANGES);
         options.add(MySqlSourceOptions.USE_LEGACY_JSON_FORMAT);
         options.add(MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST);
+        options.add(MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_STRING_KEY_COMPARE_MODE);
         options.add(MySqlSourceOptions.SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED);
         return options;
     }

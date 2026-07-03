@@ -152,7 +152,11 @@ public class MySqlChunkSplitter implements ChunkSplitter {
                     ChunkUtils.getChunkKeyColumnType(
                             splitColumn, sourceConfig.isTreatTinyInt1AsBoolean());
             minMaxOfSplitColumn =
-                    StatementUtils.queryMinMax(jdbcConnection, tableId, splitColumn.name());
+                    StatementUtils.queryMinMax(
+                            jdbcConnection,
+                            tableId,
+                            splitColumn.name(),
+                            sourceConfig.getChunkKeyCompareMode());
             approximateRowCnt = StatementUtils.queryApproximateRowCnt(jdbcConnection, tableId);
         } catch (Exception e) {
             throw new RuntimeException("Fail to analyze table in chunk splitter.", e);
@@ -184,7 +188,12 @@ public class MySqlChunkSplitter implements ChunkSplitter {
                         chunkSize);
         // may sleep a while to avoid DDOS on MySQL server
         maySleep(nextChunkId, tableId);
-        if (chunkEnd != null && ObjectUtils.compare(chunkEnd, minMaxOfSplitColumn[1]) <= 0) {
+        if (chunkEnd != null
+                && ObjectUtils.compare(
+                                chunkEnd,
+                                minMaxOfSplitColumn[1],
+                                sourceConfig.getChunkKeyCompareMode())
+                        <= 0) {
             nextChunkStart = ChunkSplitterState.ChunkBound.middleOf(chunkEnd);
             return createSnapshotSplit(
                     jdbcConnection,
@@ -306,7 +315,7 @@ public class MySqlChunkSplitter implements ChunkSplitter {
         final List<ChunkRange> splits = new ArrayList<>();
         Object chunkStart = null;
         Object chunkEnd = ObjectUtils.plus(min, dynamicChunkSize);
-        while (ObjectUtils.compare(chunkEnd, max) <= 0) {
+        while (ObjectUtils.compare(chunkEnd, max, sourceConfig.getChunkKeyCompareMode()) <= 0) {
             splits.add(ChunkRange.of(chunkStart, chunkEnd));
             chunkStart = chunkEnd;
             try {
@@ -322,8 +331,7 @@ public class MySqlChunkSplitter implements ChunkSplitter {
         return splits;
     }
 
-    @VisibleForTesting
-    Object nextChunkEnd(
+    private Object nextChunkEnd(
             JdbcConnection jdbc,
             Object previousChunkEnd,
             TableId tableId,
@@ -334,14 +342,22 @@ public class MySqlChunkSplitter implements ChunkSplitter {
         // chunk end might be null when max values are removed
         Object chunkEnd =
                 StatementUtils.queryNextChunkMax(
-                        jdbc, tableId, splitColumnName, chunkSize, previousChunkEnd);
-        if (chunkEnd == null) {
-            return null;
-        }
+                        jdbc,
+                        tableId,
+                        splitColumnName,
+                        chunkSize,
+                        previousChunkEnd,
+                        sourceConfig.getChunkKeyCompareMode());
         if (Objects.equals(previousChunkEnd, chunkEnd)) {
             // we don't allow equal chunk start and end,
             // should query the next one larger than chunkEnd
-            chunkEnd = StatementUtils.queryMin(jdbc, tableId, splitColumnName, chunkEnd);
+            chunkEnd =
+                    StatementUtils.queryMin(
+                            jdbc,
+                            tableId,
+                            splitColumnName,
+                            chunkEnd,
+                            sourceConfig.getChunkKeyCompareMode());
 
             // queryMin will return null when the chunkEnd is the max value,
             // this will happen when the mysql table ignores the capitalization.
@@ -355,7 +371,7 @@ public class MySqlChunkSplitter implements ChunkSplitter {
                 return null;
             }
         }
-        if (ObjectUtils.compare(chunkEnd, max) >= 0) {
+        if (ObjectUtils.compare(chunkEnd, max, sourceConfig.getChunkKeyCompareMode()) >= 0) {
             return null;
         } else {
             return chunkEnd;
