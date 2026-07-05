@@ -42,6 +42,7 @@ public class HudiDataSinkFactory implements DataSinkFactory {
     private static final Logger LOG = LoggerFactory.getLogger(HudiDataSinkFactory.class);
 
     public static final String IDENTIFIER = "hudi";
+    private static final String SCHEMA_OPERATOR_UID_SUFFIX = "schema-operator";
 
     @Override
     public String identifier() {
@@ -70,9 +71,7 @@ public class HudiDataSinkFactory implements DataSinkFactory {
         }
         config.set(HudiConfig.INDEX_TYPE, HoodieIndex.IndexType.BUCKET.name());
 
-        String schemaOperatorUid =
-                context.getPipelineConfiguration()
-                        .get(PipelineOptions.PIPELINE_SCHEMA_OPERATOR_UID);
+        String schemaOperatorUid = getSchemaOperatorUid(context.getPipelineConfiguration());
 
         return new HudiDataSink(config, schemaOperatorUid);
     }
@@ -90,5 +89,15 @@ public class HudiDataSinkFactory implements DataSinkFactory {
         options.add(HudiConfig.TABLE_TYPE);
         options.add(HudiConfig.INDEX_TYPE);
         return options;
+    }
+
+    private static String getSchemaOperatorUid(Configuration pipelineConfig) {
+        if (pipelineConfig.contains(PipelineOptions.PIPELINE_OPERATOR_UID_PREFIX)) {
+            return String.format(
+                    "%s-%s",
+                    pipelineConfig.get(PipelineOptions.PIPELINE_OPERATOR_UID_PREFIX),
+                    SCHEMA_OPERATOR_UID_SUFFIX);
+        }
+        return pipelineConfig.get(PipelineOptions.PIPELINE_SCHEMA_OPERATOR_UID);
     }
 }

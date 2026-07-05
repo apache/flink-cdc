@@ -21,8 +21,11 @@ import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.factories.DataSinkFactory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
+import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.sink.DataSink;
+import org.apache.flink.cdc.common.sink.FlinkSinkProvider;
 import org.apache.flink.cdc.composer.utils.FactoryDiscoveryUtils;
+import org.apache.flink.cdc.connectors.hudi.sink.v2.HudiSink;
 import org.apache.flink.table.api.ValidationException;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
@@ -31,6 +34,7 @@ import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -57,6 +61,34 @@ class HudiDataSinkFactoryTest {
                         new FactoryHelper.DefaultContext(
                                 conf, conf, Thread.currentThread().getContextClassLoader()));
         Assertions.assertThat(dataSink).isInstanceOf(HudiDataSink.class);
+    }
+
+    @Test
+    void testSchemaOperatorUidFollowsOperatorUidPrefix() throws Exception {
+        DataSinkFactory sinkFactory =
+                FactoryDiscoveryUtils.getFactoryByIdentifier("hudi", DataSinkFactory.class);
+        Assertions.assertThat(sinkFactory).isInstanceOf(HudiDataSinkFactory.class);
+
+        Configuration sinkConfig =
+                Configuration.fromMap(
+                        ImmutableMap.<String, String>builder()
+                                .put(HudiConfig.PATH.key(), temporaryFolder.toString())
+                                .build());
+        Configuration pipelineConfig = new Configuration();
+        pipelineConfig.set(
+                PipelineOptions.PIPELINE_OPERATOR_UID_PREFIX, "mysql_hudi_user_behavior");
+
+        DataSink dataSink =
+                sinkFactory.createDataSink(
+                        new FactoryHelper.DefaultContext(
+                                sinkConfig,
+                                pipelineConfig,
+                                Thread.currentThread().getContextClassLoader()));
+        FlinkSinkProvider sinkProvider = (FlinkSinkProvider) dataSink.getEventSinkProvider();
+        HudiSink hudiSink = (HudiSink) sinkProvider.getSink();
+
+        Assertions.assertThat(getSchemaOperatorUid(hudiSink))
+                .isEqualTo("mysql_hudi_user_behavior-schema-operator");
     }
 
     @Test
@@ -140,5 +172,11 @@ class HudiDataSinkFactoryTest {
                         new FactoryHelper.DefaultContext(
                                 conf, conf, Thread.currentThread().getContextClassLoader()));
         Assertions.assertThat(dataSink).isInstanceOf(HudiDataSink.class);
+    }
+
+    private static String getSchemaOperatorUid(HudiSink hudiSink) throws Exception {
+        Field field = HudiSink.class.getDeclaredField("schemaOperatorUid");
+        field.setAccessible(true);
+        return (String) field.get(hudiSink);
     }
 }
