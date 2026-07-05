@@ -43,8 +43,6 @@ import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
 import org.apache.flink.util.CollectionUtil;
 import org.apache.flink.util.FlinkRuntimeException;
 
-import org.apache.flink.shaded.guava31.com.google.common.collect.Lists;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -311,8 +309,7 @@ public class IncrementalSourceEnumerator
                         "The assigner offer empty finished split information, this should not happen");
             }
             finishedSnapshotSplitMeta =
-                    Lists.partition(
-                            finishedSnapshotSplitInfos, sourceConfig.getSplitMetaGroupSize());
+                    partition(finishedSnapshotSplitInfos, sourceConfig.getSplitMetaGroupSize());
         }
         final int requestMetaGroupId = requestEvent.getRequestMetaGroupId();
         final int totalFinishedSplitSizeOfReader = requestEvent.getTotalFinishedSplitSize();
@@ -360,5 +357,17 @@ public class IncrementalSourceEnumerator
                     new LatestFinishedSplitsNumberEvent(
                             splitAssigner.getFinishedSplitInfos().size()));
         }
+    }
+
+    private static <T> List<List<T>> partition(List<T> list, int partitionSize) {
+        if (partitionSize <= 0) {
+            throw new IllegalArgumentException("Partition size must be positive");
+        }
+        List<List<T>> partitions =
+                new ArrayList<>((list.size() + partitionSize - 1) / partitionSize);
+        for (int start = 0; start < list.size(); start += partitionSize) {
+            partitions.add(list.subList(start, Math.min(start + partitionSize, list.size())));
+        }
+        return partitions;
     }
 }

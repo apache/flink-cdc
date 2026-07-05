@@ -32,8 +32,6 @@ import org.apache.flink.cdc.connectors.base.source.metrics.SourceEnumeratorMetri
 import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.Preconditions;
 
-import org.apache.flink.shaded.guava31.com.google.common.util.concurrent.ThreadFactoryBuilder;
-
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges;
 import org.slf4j.Logger;
@@ -339,7 +337,11 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
         if (chunkSplitter.hasNextChunk() || !remainingTables.isEmpty()) {
             if (splittingExecutorService == null) {
                 ThreadFactory threadFactory =
-                        new ThreadFactoryBuilder().setNameFormat("snapshot-splitting").build();
+                        runnable -> {
+                            Thread thread = Executors.defaultThreadFactory().newThread(runnable);
+                            thread.setName("snapshot-splitting");
+                            return thread;
+                        };
                 this.splittingExecutorService = Executors.newSingleThreadExecutor(threadFactory);
             }
             splittingExecutorService.submit(this::splitChunksForRemainingTables);
