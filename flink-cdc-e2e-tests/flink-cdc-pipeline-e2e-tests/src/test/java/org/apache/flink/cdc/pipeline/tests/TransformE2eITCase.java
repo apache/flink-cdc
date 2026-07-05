@@ -24,7 +24,6 @@ import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
 import org.apache.flink.cdc.runtime.operators.transform.PostTransformOperator;
 import org.apache.flink.cdc.runtime.operators.transform.PreTransformOperator;
-import org.apache.flink.core.execution.CheckpointType;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -1319,28 +1318,6 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                 "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1st, 3009, 9, 9.0, 90, 18, Keka, ascii test!?, 大五, 测试数据, ひびぴ, 죠주쥬, ÀÆÉ, ÓÔŐÖ, αβγδε, בבקשה, твой, ภาษาไทย, piedzimst brīvi], op=INSERT, meta=()}",
                 "DropColumnEvent{tableId=%s.TABLEALPHA, droppedColumnNames=[CODE_NAME_EX]}",
                 "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[Beginning, 3010, 10, 10, 97, Lemon, ascii test!?, 大五, 测试数据, ひびぴ, 죠주쥬, ÀÆÉ, ÓÔŐÖ, αβγδε, בבקשה, твой, ภาษาไทย, piedzimst brīvi], op=INSERT, meta=()}");
-    }
-
-    private void waitUntilStreamSplitReady(JobID jobId, int parallelism) throws Exception {
-        Duration readinessTimeout = Duration.ofMinutes(5);
-        if (parallelism == 1) {
-            waitUntilLogContains(
-                    jobManagerConsumer,
-                    "Snapshot split assigner received all splits finished and the job parallelism is 1, snapshot split assigner is turn into finished status.",
-                    readinessTimeout);
-        } else {
-            waitUntilLogContains(
-                    jobManagerConsumer,
-                    "Snapshot split assigner received all splits finished, waiting for a complete checkpoint to mark the assigner finished.",
-                    readinessTimeout);
-            getRestClusterClient().triggerCheckpoint(jobId, CheckpointType.CONFIGURED).get();
-            waitUntilLogContains(
-                    jobManagerConsumer,
-                    "Snapshot split assigner is turn into finished status.",
-                    readinessTimeout);
-        }
-        waitUntilLogContains(
-                jobManagerConsumer, "for the binlog split assignment.", readinessTimeout);
     }
 
     private void validateEventsWithPattern(String... patterns) throws Exception {

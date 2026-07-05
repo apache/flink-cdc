@@ -384,6 +384,32 @@ public abstract class PipelineTestEnvironment extends TestLogger {
         throw new TimeoutException("Timed out waiting to trigger checkpoint for job " + jobID);
     }
 
+    protected void waitUntilStreamSplitReady(JobID jobId, int parallelism) throws Exception {
+        waitUntilStreamSplitReady(jobId, parallelism, "for the binlog split assignment.");
+    }
+
+    protected void waitUntilStreamSplitReady(
+            JobID jobId, int parallelism, String streamSplitAssignmentLog) throws Exception {
+        Duration readinessTimeout = Duration.ofMinutes(5);
+        if (parallelism == 1) {
+            waitUntilLogContains(
+                    jobManagerConsumer,
+                    "Snapshot split assigner received all splits finished and the job parallelism is 1, snapshot split assigner is turn into finished status.",
+                    readinessTimeout);
+        } else {
+            waitUntilLogContains(
+                    jobManagerConsumer,
+                    "Snapshot split assigner received all splits finished, waiting for a complete checkpoint to mark the assigner finished.",
+                    readinessTimeout);
+            triggerCheckpointWithRetry(jobId);
+            waitUntilLogContains(
+                    jobManagerConsumer,
+                    "Snapshot split assigner is turn into finished status.",
+                    readinessTimeout);
+        }
+        waitUntilLogContains(jobManagerConsumer, streamSplitAssignmentLog, readinessTimeout);
+    }
+
     private String describeCheckpointTarget(JobID jobID) {
         try {
             JobStatus status = getRestClusterClient().getJobStatus(jobID).get(10, TimeUnit.SECONDS);

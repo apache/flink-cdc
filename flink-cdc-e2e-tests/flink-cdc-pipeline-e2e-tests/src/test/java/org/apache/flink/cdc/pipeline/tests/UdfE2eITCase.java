@@ -21,7 +21,6 @@ import org.apache.flink.api.common.JobID;
 import org.apache.flink.cdc.common.test.utils.TestUtils;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
-import org.apache.flink.core.execution.CheckpointType;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -283,27 +282,5 @@ class UdfE2eITCase extends PipelineTestEnvironment {
                 "DataChangeEvent{tableId=%s.TABLEALPHA, before=[1009, 8.1, 1011, <8.1>], after=[1009, 100, 1011, <100>], op=UPDATE, meta=()}",
                 "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[3007, 7, 3009, <7>], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId=%s.TABLEBETA, before=[2011, 11, Integer: 2011], after=[], op=DELETE, meta=()}");
-    }
-
-    private void waitUntilStreamSplitReady(JobID jobId, int parallelism) throws Exception {
-        Duration readinessTimeout = Duration.ofMinutes(5);
-        if (parallelism == 1) {
-            waitUntilLogContains(
-                    jobManagerConsumer,
-                    "Snapshot split assigner received all splits finished and the job parallelism is 1, snapshot split assigner is turn into finished status.",
-                    readinessTimeout);
-        } else {
-            waitUntilLogContains(
-                    jobManagerConsumer,
-                    "Snapshot split assigner received all splits finished, waiting for a complete checkpoint to mark the assigner finished.",
-                    readinessTimeout);
-            getRestClusterClient().triggerCheckpoint(jobId, CheckpointType.CONFIGURED).get();
-            waitUntilLogContains(
-                    jobManagerConsumer,
-                    "Snapshot split assigner is turn into finished status.",
-                    readinessTimeout);
-        }
-        waitUntilLogContains(
-                jobManagerConsumer, "for the binlog split assignment.", readinessTimeout);
     }
 }
