@@ -21,7 +21,6 @@ import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.time.Deadline;
 import org.apache.flink.cdc.common.test.utils.TestUtils;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
-import org.apache.flink.core.execution.CheckpointType;
 
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
@@ -132,7 +131,7 @@ public class SqlServerE2eITCase extends PipelineTestEnvironment {
 
         LOG.info("Begin incremental reading stage.");
 
-        waitUntilStreamSplitReady(jobId, parallelism);
+        waitUntilStreamSplitReady(jobId, parallelism, "for the stream split assignment.");
 
         try (Connection conn = getSqlServerJdbcConnection();
                 Statement stat = conn.createStatement()) {
@@ -199,28 +198,6 @@ public class SqlServerE2eITCase extends PipelineTestEnvironment {
                 SQL_SERVER_CONTAINER.getJdbcUrl(),
                 SQL_SERVER_CONTAINER.getUsername(),
                 SQL_SERVER_CONTAINER.getPassword());
-    }
-
-    private void waitUntilStreamSplitReady(JobID jobId, int parallelism) throws Exception {
-        Duration readinessTimeout = Duration.ofMinutes(5);
-        if (parallelism == 1) {
-            waitUntilLogContains(
-                    jobManagerConsumer,
-                    "Snapshot split assigner received all splits finished and the job parallelism is 1, snapshot split assigner is turn into finished status.",
-                    readinessTimeout);
-        } else {
-            waitUntilLogContains(
-                    jobManagerConsumer,
-                    "Snapshot split assigner received all splits finished, waiting for a complete checkpoint to mark the assigner finished.",
-                    readinessTimeout);
-            getRestClusterClient().triggerCheckpoint(jobId, CheckpointType.CONFIGURED).get();
-            waitUntilLogContains(
-                    jobManagerConsumer,
-                    "Snapshot split assigner is turn into finished status.",
-                    readinessTimeout);
-        }
-        waitUntilLogContains(
-                jobManagerConsumer, "for the stream split assignment.", readinessTimeout);
     }
 
     private void waitUntilJobRunningFromClusterCli(JobID jobId, Duration timeout) throws Exception {
