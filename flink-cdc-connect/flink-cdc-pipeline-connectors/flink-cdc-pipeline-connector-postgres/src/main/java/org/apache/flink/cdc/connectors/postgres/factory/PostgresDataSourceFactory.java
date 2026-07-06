@@ -24,6 +24,7 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.factories.DataSourceFactory;
 import org.apache.flink.cdc.common.factories.Factory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
+import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.common.utils.StringUtils;
@@ -31,6 +32,7 @@ import org.apache.flink.cdc.connectors.base.options.SourceOptions;
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.connectors.postgres.source.PostgresDataSource;
 import org.apache.flink.cdc.connectors.postgres.source.PostgresSourceBuilder;
+import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfig;
 import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfigFactory;
 import org.apache.flink.cdc.connectors.postgres.table.PostgreSQLReadableMetadata;
 import org.apache.flink.cdc.connectors.postgres.utils.PostgresSchemaUtils;
@@ -38,6 +40,7 @@ import org.apache.flink.cdc.debezium.table.DebeziumChangelogMode;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.data.RowData;
 
+import io.debezium.connector.postgresql.connection.PostgresConnection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -205,22 +208,42 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
         String metadataList = config.get(METADATA_LIST);
         List<PostgreSQLReadableMetadata> readableMetadataList = listReadableMetadata(metadataList);
 
-        String changelogModeRaw = config.get(CHANGELOG_MODE);
-        DebeziumChangelogMode changelogMode;
-        switch (changelogModeRaw.toLowerCase()) {
-            case "upsert":
-                changelogMode = DebeziumChangelogMode.UPSERT;
-                break;
-            case "all":
-                changelogMode = DebeziumChangelogMode.ALL;
-                break;
-            default:
-                throw new IllegalArgumentException(
-                        "Invalid value for option 'changelog-mode'. Supported: [all, upsert]. Got: "
-                                + changelogModeRaw);
+        DebeziumChangelogMode changelogMode = config.get(CHANGELOG_MODE);
+        if (changelogMode == DebeziumChangelogMode.UPSERT) {
+            Set<String> capturedTableSet = new HashSet<>(capturedTables);
+            List<TableId> capturedTableIds =
+                    tableIds.stream()
+                            .filter(tableId -> capturedTableSet.contains(tableId.toString()))
+                            .collect(Collectors.toList());
+            validateUpsertModePrimaryKeys(configFactory.create(0), capturedTableIds);
         }
 
         return new PostgresDataSource(configFactory, readableMetadataList, changelogMode);
+    }
+
+    /**
+     * Validates that all captured tables have a primary key, which upsert changelog mode relies on
+     * to describe idempotent updates on a key. Mirrors the validation the SQL connector performs in
+     * PostgreSQLTableFactory.
+     */
+    private static void validateUpsertModePrimaryKeys(
+            PostgresSourceConfig sourceConfig, List<TableId> capturedTableIds) {
+        List<String> tablesWithoutPrimaryKey = new ArrayList<>();
+        try (PostgresConnection jdbc =
+                PostgresSchemaUtils.getPostgresDialect(sourceConfig).openJdbcConnection()) {
+            for (TableId tableId : capturedTableIds) {
+                Schema schema = PostgresSchemaUtils.getTableSchema(tableId, sourceConfig, jdbc);
+                if (schema.primaryKeys().isEmpty()) {
+                    tablesWithoutPrimaryKey.add(tableId.toString());
+                }
+            }
+        }
+        if (!tablesWithoutPrimaryKey.isEmpty()) {
+            throw new ValidationException(
+                    String.format(
+                            "Primary key must be present when '%s' is 'upsert', but these tables have no primary key: %s.",
+                            CHANGELOG_MODE.key(), tablesWithoutPrimaryKey));
+        }
     }
 
     private List<PostgreSQLReadableMetadata> listReadableMetadata(String metadataList) {

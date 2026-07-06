@@ -108,6 +108,11 @@ public class PostgresDataSource implements DataSource {
         return postgresSourceConfig;
     }
 
+    @VisibleForTesting
+    public DebeziumChangelogMode getChangelogMode() {
+        return changelogMode;
+    }
+
     @Override
     public SupportedMetadataColumn[] supportedMetadataColumns() {
         return new SupportedMetadataColumn[] {

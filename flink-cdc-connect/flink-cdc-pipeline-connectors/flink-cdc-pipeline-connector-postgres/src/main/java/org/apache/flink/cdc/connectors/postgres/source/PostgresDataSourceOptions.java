@@ -21,6 +21,7 @@ import org.apache.flink.cdc.common.annotation.Experimental;
 import org.apache.flink.cdc.common.annotation.PublicEvolving;
 import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.configuration.ConfigOptions;
+import org.apache.flink.cdc.debezium.table.DebeziumChangelogMode;
 
 import java.time.Duration;
 
@@ -283,15 +284,13 @@ public class PostgresDataSourceOptions {
                             "Whether to infer CDC column types when processing pgoutput Relation messages.");
 
     @Experimental
-    public static final ConfigOption<String> CHANGELOG_MODE =
+    public static final ConfigOption<DebeziumChangelogMode> CHANGELOG_MODE =
             ConfigOptions.key("changelog-mode")
-                    .stringType()
-                    .defaultValue("all")
+                    .enumType(DebeziumChangelogMode.class)
+                    .defaultValue(DebeziumChangelogMode.ALL)
                     .withDescription(
-                            "The changelog mode used for encoding streaming changes. "
-                                    + "Supported values: 'all' (default) emits both before-image and after-image "
-                                    + "for UPDATE events; 'upsert' emits only the after-image (before is null), "
-                                    + "which lets the pipeline work with REPLICA IDENTITY DEFAULT on the source — "
-                                    + "avoiding the WAL overhead of REPLICA IDENTITY FULL and sidestepping the "
-                                    + "NullPointerException reported in FLINK-38647.");
+                            "The changelog mode used for encoding streaming changes.\n"
+                                    + "\"all\": Encodes changes as retract stream using all RowKinds. This is the default mode.\n"
+                                    + "\"upsert\": Encodes changes as upsert stream that describes idempotent updates on a key. "
+                                    + "It can be used for tables with primary keys when replica identity FULL is not an option.");
 }
