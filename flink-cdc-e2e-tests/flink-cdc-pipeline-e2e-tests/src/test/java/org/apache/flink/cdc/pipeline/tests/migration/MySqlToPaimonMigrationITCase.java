@@ -262,6 +262,97 @@ class MySqlToPaimonMigrationITCase extends PipelineTestEnvironment {
 
     @ParameterizedTest(name = "{0} -> SNAPSHOT")
     @EnumSource(names = {"SNAPSHOT"})
+    void testStartingJobFromSavepointWithRescaledParallelism(
+            TarballFetcher.CdcVersion migrateFromVersion) throws Exception {
+        TarballFetcher.fetch(jobManager, migrateFromVersion);
+
+        String warehouse = sharedVolume.toString() + "/" + "paimon_" + UUID.randomUUID();
+        String originalContent =
+                String.format(
+                        "source:\n"
+                                + "  type: mysql\n"
+                                + "  hostname: %s\n"
+                                + "  port: %d\n"
+                                + "  username: %s\n"
+                                + "  password: %s\n"
+                                + "  tables: %s.products\n"
+                                + "  server-id: 5400-5404\n"
+                                + "  server-time-zone: UTC\n"
+                                + "\n"
+                                + "sink:\n"
+                                + "  type: paimon\n"
+                                + "  catalog.properties.warehouse: %s\n"
+                                + "  catalog.properties.metastore: filesystem\n"
+                                + "  catalog.properties.cache-enabled: false\n"
+                                + "\n"
+                                + "pipeline:\n"
+                                + "  parallelism: %d\n",
+                        INTER_CONTAINER_MYSQL_ALIAS,
+                        MySqlContainer.MYSQL_PORT,
+                        MYSQL_TEST_USER,
+                        MYSQL_TEST_PASSWORD,
+                        mysqlInventoryDatabase.getDatabaseName(),
+                        warehouse,
+                        /* parallelism */ 2);
+
+        Path paimonCdcConnector = TestUtils.getResource("paimon-cdc-pipeline-connector.jar");
+        Path hadoopJar = TestUtils.getResource("flink-shade-hadoop.jar");
+        JobID jobID = submitPipelineJob(originalContent, paimonCdcConnector, hadoopJar);
+        Assertions.assertThat(jobID).isNotNull();
+
+        // 1) Snapshot + initial incremental events (parallelism = 2)
+        validateSinkResult(
+                warehouse,
+                mysqlInventoryDatabase.getDatabaseName(),
+                "products",
+                Arrays.asList(
+                        "101, scooter, Small 2-wheel scooter, 3.14, red, {\"key1\": \"value1\"}, {\"coordinates\":[1,1],\"type\":\"Point\",\"srid\":0}",
+                        "102, car battery, 12V car battery, 8.1, white, {\"key2\": \"value2\"}, {\"coordinates\":[2,2],\"type\":\"Point\",\"srid\":0}",
+                        "103, 12-pack drill bits, 12-pack of drill bits with sizes ranging from #40 to #3, 0.8, red, {\"key3\": \"value3\"}, {\"coordinates\":[3,3],\"type\":\"Point\",\"srid\":0}",
+                        "104, hammer, 12oz carpenter's hammer, 0.75, white, {\"key4\": \"value4\"}, {\"coordinates\":[4,4],\"type\":\"Point\",\"srid\":0}",
+                        "105, hammer, 14oz carpenter's hammer, 0.875, red, {\"k1\": \"v1\", \"k2\": \"v2\"}, {\"coordinates\":[5,5],\"type\":\"Point\",\"srid\":0}",
+                        "106, hammer, 16oz carpenter's hammer, 1.0, null, null, null",
+                        "107, rocks, box of assorted rocks, 5.3, null, null, null",
+                        "108, jacket, water resistent black wind breaker, 0.1, null, null, null",
+                        "109, spare tire, 24 inch spare tire, 22.2, null, null, null"));
+
+        generateIncrementalEventsPhaseOne();
+        // (validate phase 1 result ...)
+
+        // 2) Stop with savepoint
+        String savepointPath = stopJobWithSavepoint(jobID);
+        LOG.info("Stopped Job {} and created a savepoint at {}.", jobID, savepointPath);
+
+        // 3) Modify YAML: bump parallelism from 2 to 4
+        String rescaledContent = originalContent.replace("parallelism: 2", "parallelism: 4");
+
+        // 4) Resume from savepoint with higher parallelism  <-- was failing pre-fix
+        JobID newJobID =
+                submitPipelineJob(
+                        rescaledContent, savepointPath, true, paimonCdcConnector, hadoopJar);
+        LOG.info("Reincarnated Job {} has been submitted successfully.", newJobID);
+
+        // 5) Verify state preserved and writes continue correctly under new parallelism
+        generateIncrementalEventsPhaseThree();
+        validateSinkResult(
+                warehouse,
+                mysqlInventoryDatabase.getDatabaseName(),
+                "products",
+                Arrays.asList(
+                        "101, scooter, Small 2-wheel scooter, 3.14, red, {\"key1\": \"value1\"}, {\"coordinates\":[1,1],\"type\":\"Point\",\"srid\":0}",
+                        "102, car battery, 12V car battery, 8.1, white, {\"key2\": \"value2\"}, {\"coordinates\":[2,2],\"type\":\"Point\",\"srid\":0}",
+                        "103, 12-pack drill bits, 12-pack of drill bits with sizes ranging from #40 to #3, 0.8, red, {\"key3\": \"value3\"}, {\"coordinates\":[3,3],\"type\":\"Point\",\"srid\":0}",
+                        "104, hammer, 12oz carpenter's hammer, 0.75, white, {\"key4\": \"value4\"}, {\"coordinates\":[4,4],\"type\":\"Point\",\"srid\":0}",
+                        "105, hammer, 14oz carpenter's hammer, 0.875, red, {\"k1\": \"v1\", \"k2\": \"v2\"}, {\"coordinates\":[5,5],\"type\":\"Point\",\"srid\":0}",
+                        "106, hammer, 18oz carpenter hammer, 1.0, null, null, null",
+                        "107, rocks, box of assorted rocks, 5.1, null, null, null",
+                        "108, jacket, water resistent black wind breaker, 0.1, null, null, null",
+                        "109, spare tire, 24 inch spare tire, 22.2, null, null, null"));
+        cancelJob(newJobID);
+    }
+
+    @ParameterizedTest(name = "{0} -> SNAPSHOT")
+    @EnumSource(names = {"SNAPSHOT"})
     void testStartingJobFromSavepointWithSchemaChange(TarballFetcher.CdcVersion migrateFromVersion)
             throws Exception {
         TarballFetcher.fetch(jobManager, migrateFromVersion);
