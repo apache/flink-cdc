@@ -102,7 +102,7 @@ Write unit tests and integration tests in the corresponding submodules. End-to-e
   - `com.google.common.*` — use `flink-shaded-guava` instead
   - `com.google.common.base.Preconditions` — use Flink CDC's `Preconditions`
   - `com.google.common.annotations.VisibleForTesting` — use `@VisibleForTesting` from `org.apache.flink.cdc.common.annotation`
-- **API stability annotations:** Every user-facing class and method must carry one of the annotations from `org.apache.flink.cdc.common.annotation`:
+- **API stability annotations:** User-facing API types should carry stability annotations, and methods/fields/constructors only need explicit annotations when they differ from the enclosing type or when needed.
   - `@Public` — stable across major versions
   - `@PublicEvolving` — may change in minor versions
   - `@Experimental` — may change at any time
