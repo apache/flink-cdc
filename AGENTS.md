@@ -33,7 +33,7 @@ This file provides guidance for AI coding agents working with the Apache Flink C
 
 ### Build
 
-- Fast dev build (skip tests and format checks): `mvn clean install -DskipTests`
+- Fast dev build (skip tests and format checks): `mvn clean install -DskipTests -Dspotless.check.skip=true -Dcheckstyle.skip=true`
 - Full build against Flink 1.x (default): `mvn clean package -DskipTests`
 - Full build against Flink 2.x: `mvn clean package -DskipTests -Pflink2`
 - Single module (e.g. `flink-cdc-common`): `mvn clean package -DskipTests -pl flink-cdc-common -am`
