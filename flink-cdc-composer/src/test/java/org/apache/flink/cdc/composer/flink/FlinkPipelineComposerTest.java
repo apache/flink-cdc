@@ -18,11 +18,17 @@
 package org.apache.flink.cdc.composer.flink;
 
 import org.apache.flink.cdc.common.configuration.ConfigOption;
+import org.apache.flink.cdc.common.configuration.ConfigOptions;
 import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.cdc.common.event.DataChangeEvent;
+import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.factories.DataSinkFactory;
 import org.apache.flink.cdc.common.factories.DataSourceFactory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
+import org.apache.flink.cdc.common.function.HashFunctionProvider;
+import org.apache.flink.cdc.common.pipeline.HashFunctionStrategy;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
+import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.common.sink.EventSinkProvider;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
@@ -102,14 +108,28 @@ class FlinkPipelineComposerTest {
     public static class TestDataSinkFactory implements DataSinkFactory {
 
         public static final String IDENTIFIER = "test-sink-factory";
+        public static final ConfigOption<Boolean> CUSTOM_HASH_PROVIDER =
+                ConfigOptions.key("custom-hash-provider").booleanType().defaultValue(false);
 
         @Override
         public DataSink createDataSink(Context context) {
-            // This option has no default value.
             String target = context.getFlinkConf().get(DeploymentOptions.TARGET);
             if (!"local".equals(target)) {
                 throw new IllegalArgumentException(
                         "The flink configuration is invalid. Please check the pipeline configuration.");
+            }
+            if (!context.getFactoryConfiguration().get(CUSTOM_HASH_PROVIDER)) {
+                return new DataSink() {
+                    @Override
+                    public EventSinkProvider getEventSinkProvider() {
+                        return null;
+                    }
+
+                    @Override
+                    public MetadataApplier getMetadataApplier() {
+                        return schemaChangeEvent -> {};
+                    }
+                };
             }
             return new DataSink() {
                 @Override
@@ -120,6 +140,12 @@ class FlinkPipelineComposerTest {
                 @Override
                 public MetadataApplier getMetadataApplier() {
                     return schemaChangeEvent -> {};
+                }
+
+                @Override
+                public HashFunctionProvider<DataChangeEvent> getDataChangeEventHashFunctionProvider(
+                        int parallelism) {
+                    return new TestHashFunctionProvider();
                 }
             };
         }
@@ -136,7 +162,17 @@ class FlinkPipelineComposerTest {
 
         @Override
         public Set<ConfigOption<?>> optionalOptions() {
-            return new HashSet<>();
+            Set<ConfigOption<?>> options = new HashSet<>();
+            options.add(CUSTOM_HASH_PROVIDER);
+            return options;
+        }
+    }
+
+    private static class TestHashFunctionProvider implements HashFunctionProvider<DataChangeEvent> {
+        @Override
+        public org.apache.flink.cdc.common.function.HashFunction<DataChangeEvent> getHashFunction(
+                TableId tableId, Schema schema) {
+            return event -> 0;
         }
     }
 
@@ -193,6 +229,45 @@ class FlinkPipelineComposerTest {
 
     @ParameterizedTest
     @MethodSource
+    void testSinkDefinedOnlyPartitioningStrategyConfiguration(
+            HashFunctionStrategy partitioningStrategy) {
+        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+        Configuration pipelineConfig = new Configuration();
+        pipelineConfig.set(PipelineOptions.PIPELINE_PARTITIONING_STRATEGY, partitioningStrategy);
+        Configuration sinkConfig = new Configuration();
+        sinkConfig.set(TestDataSinkFactory.CUSTOM_HASH_PROVIDER, true);
+        PipelineDef pipelineDef =
+                buildPipelineDefinitionFromConfiguration(
+                        TestDataSinkFactory.IDENTIFIER, sinkConfig, pipelineConfig);
+
+        assertThatThrownBy(() -> composer.compose(pipelineDef))
+                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Sink type '" + TestDataSinkFactory.IDENTIFIER + "'")
+                .hasMessageContaining(PipelineOptions.PIPELINE_PARTITIONING_STRATEGY.key())
+                .hasMessageContaining(HashFunctionStrategy.SINK_DEFINED.name())
+                .hasMessageContaining(partitioningStrategy.name());
+    }
+
+    static Stream<Arguments> testSinkDefinedOnlyPartitioningStrategyConfiguration() {
+        return Stream.of(
+                Arguments.of(HashFunctionStrategy.PRIMARY_KEY),
+                Arguments.of(HashFunctionStrategy.TABLE_ID));
+    }
+
+    @Test
+    void testSinkDefinedOnlyPartitioningStrategyDefaultConfiguration() {
+        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+        Configuration sinkConfig = new Configuration();
+        sinkConfig.set(TestDataSinkFactory.CUSTOM_HASH_PROVIDER, true);
+        PipelineDef pipelineDef =
+                buildPipelineDefinitionFromConfiguration(
+                        TestDataSinkFactory.IDENTIFIER, sinkConfig, new Configuration());
+
+        assertThatCode(() -> composer.compose(pipelineDef)).doesNotThrowAnyException();
+    }
+
+    @ParameterizedTest
+    @MethodSource
     void testValidPipelineConfiguration(Configuration pipelineConfig) {
         FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
         PipelineDef pipelineDef = buildPipelineDefinitionFromConfiguration(pipelineConfig);
@@ -208,16 +283,39 @@ class FlinkPipelineComposerTest {
         Configuration configuration3 = new Configuration();
         configuration3.set(PipelineOptions.PIPELINE_OPERATOR_UID_PREFIX, "junit");
 
+        // Test HashFunctionStrategy configurations
+        Configuration configuration4 = new Configuration();
+        configuration4.set(
+                PipelineOptions.PIPELINE_PARTITIONING_STRATEGY, HashFunctionStrategy.PRIMARY_KEY);
+
+        Configuration configuration5 = new Configuration();
+        configuration5.set(
+                PipelineOptions.PIPELINE_PARTITIONING_STRATEGY, HashFunctionStrategy.TABLE_ID);
+
         return Stream.of(
                 Arguments.of(configuration1),
                 Arguments.of(configuration2),
-                Arguments.of(configuration3));
+                Arguments.of(configuration3),
+                Arguments.of(configuration4),
+                Arguments.of(configuration5));
     }
 
     PipelineDef buildPipelineDefinitionFromConfiguration(Configuration pipelineConfig) {
+        return buildPipelineDefinitionFromConfiguration(
+                ValuesDataFactory.IDENTIFIER, new Configuration(), pipelineConfig);
+    }
+
+    PipelineDef buildPipelineDefinitionFromConfiguration(
+            String sinkType, Configuration pipelineConfig) {
+        return buildPipelineDefinitionFromConfiguration(
+                sinkType, new Configuration(), pipelineConfig);
+    }
+
+    PipelineDef buildPipelineDefinitionFromConfiguration(
+            String sinkType, Configuration sinkConfig, Configuration pipelineConfig) {
         return new PipelineDef(
                 new SourceDef(ValuesDataFactory.IDENTIFIER, null, new Configuration()),
-                new SinkDef(ValuesDataFactory.IDENTIFIER, null, new Configuration()),
+                new SinkDef(sinkType, null, sinkConfig),
                 Collections.emptyList(),
                 Collections.emptyList(),
                 Collections.emptyList(),

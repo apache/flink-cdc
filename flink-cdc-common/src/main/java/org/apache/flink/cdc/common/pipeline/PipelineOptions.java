@@ -136,5 +136,25 @@ public class PipelineOptions {
                     .withDescription(
                             "The timeout time for SchemaOperator to wait downstream SchemaChangeEvent applying finished, the default value is 3 minutes.");
 
+    public static final ConfigOption<HashFunctionStrategy> PIPELINE_PARTITIONING_STRATEGY =
+            ConfigOptions.key("sink.partitioning.strategy")
+                    .enumType(HashFunctionStrategy.class)
+                    .defaultValue(HashFunctionStrategy.SINK_DEFINED)
+                    .withDescription(
+                            Description.builder()
+                                    .text(
+                                            "Partitioning strategy for DataChangeEvent routing. Defaults to SINK_DEFINED. "
+                                                    + "Paimon, Fluss, and MaxCompute sinks only support SINK_DEFINED.")
+                                    .linebreak()
+                                    .add(
+                                            ListElement.list(
+                                                    text(
+                                                            "SINK_DEFINED: Use the HashFunctionProvider defined by the sink (default). This is the only supported strategy for paimon, fluss, and maxcompute sinks."),
+                                                    text(
+                                                            "PRIMARY_KEY: Hash by TableId and primary keys. Events from the same table may be distributed across multiple subtasks for load balancing. This strategy is not supported for paimon, fluss, or maxcompute sinks."),
+                                                    text(
+                                                            "TABLE_ID: Hash by TableId only. All events from the same table will land on the same subtask, ensuring per-table ordering semantics. This strategy is not supported for paimon, fluss, or maxcompute sinks.")))
+                                    .build());
+
     private PipelineOptions() {}
 }

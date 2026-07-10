@@ -438,6 +438,7 @@ class YamlPipelineDefinitionParserTest {
                             ImmutableMap.<String, String>builder()
                                     .put("name", "source-database-sync-pipe")
                                     .put("parallelism", "4")
+                                    .put("sink.partitioning.strategy", "TABLE_ID")
                                     .put("execution.runtime-mode", "STREAMING")
                                     .put("schema.change.behavior", "evolve")
                                     .put("schema-operator.rpc-timeout", "1 h")
@@ -488,6 +489,7 @@ class YamlPipelineDefinitionParserTest {
                         + "pipeline:\n"
                         + "  name: source-database-sync-pipe\n"
                         + "  parallelism: 4\n"
+                        + "  sink.partitioning.strategy: TABLE_ID\n"
                         + "  schema.change.behavior: evolve\n"
                         + "  schema-operator.rpc-timeout: 1 h\n"
                         + "  execution.runtime-mode: STREAMING\n"
@@ -576,6 +578,7 @@ class YamlPipelineDefinitionParserTest {
                             ImmutableMap.<String, String>builder()
                                     .put("name", "source-database-sync-pipe")
                                     .put("parallelism", "4")
+                                    .put("sink.partitioning.strategy", "TABLE_ID")
                                     .put("schema.change.behavior", "evolve")
                                     .put("schema-operator.rpc-timeout", "1 h")
                                     .put("execution.runtime-mode", "STREAMING")
@@ -706,6 +709,7 @@ class YamlPipelineDefinitionParserTest {
                             ImmutableMap.<String, String>builder()
                                     .put("name", "source-database-sync-pipe")
                                     .put("parallelism", "4")
+                                    .put("sink.partitioning.strategy", "TABLE_ID")
                                     .put("schema.change.behavior", "evolve")
                                     .put("schema-operator.rpc-timeout", "1 h")
                                     .build()));

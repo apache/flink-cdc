@@ -137,35 +137,17 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
 
     @Test
     void testSyncWholeDatabase() throws Exception {
+        testSyncWholeDatabase("");
+    }
+
+    @Test
+    void testSyncWholeDatabaseWithTableIdPartitioning() throws Exception {
+        testSyncWholeDatabase("\n  sink.partitioning.strategy: TABLE_ID");
+    }
+
+    private void testSyncWholeDatabase(String extraPipelineConfig) throws Exception {
         String databaseName = mysqlInventoryDatabase.getDatabaseName();
-        String pipelineJob =
-                String.format(
-                        "source:\n"
-                                + "  type: mysql\n"
-                                + "  hostname: mysql\n"
-                                + "  port: 3306\n"
-                                + "  username: %s\n"
-                                + "  password: %s\n"
-                                + "  tables: %s.\\.*\n"
-                                + "  server-id: 5400-5404\n"
-                                + "  server-time-zone: UTC\n"
-                                + "\n"
-                                + "sink:\n"
-                                + "  type: doris\n"
-                                + "  fenodes: doris:8030\n"
-                                + "  benodes: doris:8040\n"
-                                + "  username: %s\n"
-                                + "  password: \"%s\"\n"
-                                + "  table.create.properties.replication_num: 1\n"
-                                + "\n"
-                                + "pipeline:\n"
-                                + "  parallelism: %d",
-                        MYSQL_TEST_USER,
-                        MYSQL_TEST_PASSWORD,
-                        databaseName,
-                        DORIS.getUsername(),
-                        DORIS.getPassword(),
-                        parallelism);
+        String pipelineJob = buildWholeDatabasePipelineJob(databaseName, extraPipelineConfig);
         Path dorisCdcConnector = TestUtils.getResource("doris-cdc-pipeline-connector.jar");
         submitPipelineJob(pipelineJob, dorisCdcConnector);
         waitUntilJobRunning(Duration.ofSeconds(30));
@@ -301,6 +283,37 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
             LOG.error("Update table for CDC failed.", e);
             throw e;
         }
+    }
+
+    private String buildWholeDatabasePipelineJob(String databaseName, String extraPipelineConfig) {
+        return String.format(
+                "source:\n"
+                        + "  type: mysql\n"
+                        + "  hostname: mysql\n"
+                        + "  port: 3306\n"
+                        + "  username: %s\n"
+                        + "  password: %s\n"
+                        + "  tables: %s.\\.*\n"
+                        + "  server-id: 5400-5404\n"
+                        + "  server-time-zone: UTC\n"
+                        + "\n"
+                        + "sink:\n"
+                        + "  type: doris\n"
+                        + "  fenodes: doris:8030\n"
+                        + "  benodes: doris:8040\n"
+                        + "  username: %s\n"
+                        + "  password: \"%s\"\n"
+                        + "  table.create.properties.replication_num: 1\n"
+                        + "\n"
+                        + "pipeline:\n"
+                        + "  parallelism: %d%s",
+                MYSQL_TEST_USER,
+                MYSQL_TEST_PASSWORD,
+                databaseName,
+                DORIS.getUsername(),
+                DORIS.getPassword(),
+                parallelism,
+                extraPipelineConfig);
     }
 
     @Test
