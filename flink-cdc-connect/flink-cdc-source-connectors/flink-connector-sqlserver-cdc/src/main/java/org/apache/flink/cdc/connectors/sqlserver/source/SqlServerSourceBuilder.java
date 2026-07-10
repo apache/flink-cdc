@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.sqlserver.source;
 
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.connectors.base.source.jdbc.JdbcIncrementalSource;
+import org.apache.flink.cdc.connectors.sqlserver.source.config.SqlServerSourceConfig;
 import org.apache.flink.cdc.connectors.sqlserver.source.config.SqlServerSourceConfigFactory;
 import org.apache.flink.cdc.connectors.sqlserver.source.dialect.SqlServerDialect;
 import org.apache.flink.cdc.connectors.sqlserver.source.offset.LsnFactory;
@@ -39,10 +40,6 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
 public class SqlServerSourceBuilder<T> {
 
     private final SqlServerSourceConfigFactory configFactory = new SqlServerSourceConfigFactory();
-
-    private LsnFactory offsetFactory;
-
-    private SqlServerDialect dialect;
 
     private DebeziumDeserializationSchema<T> deserializer;
 
@@ -244,9 +241,10 @@ public class SqlServerSourceBuilder<T> {
      * @return a SqlSeverParallelSource with the settings made for this builder.
      */
     public SqlServerIncrementalSource<T> build() {
-        this.offsetFactory = new LsnFactory();
-        this.dialect = new SqlServerDialect(configFactory.create(0));
-        return new SqlServerIncrementalSource<T>(
+        SqlServerSourceConfig sourceConfig = configFactory.create(0);
+        LsnFactory offsetFactory = new LsnFactory(sourceConfig);
+        SqlServerDialect dialect = new SqlServerDialect(sourceConfig);
+        return new SqlServerIncrementalSource<>(
                 configFactory, checkNotNull(deserializer), offsetFactory, dialect);
     }
 

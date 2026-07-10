@@ -83,6 +83,11 @@ public abstract class OceanBaseSourceTestBase extends AbstractTestBase {
             new GenericContainer<>("quay.io/oceanbase/obbinlog-ce:4.2.5-test")
                     .withNetwork(NETWORK)
                     .withStartupTimeout(WAITING_TIMEOUT)
+                    // The observer occasionally aborts cluster initialization on CI with
+                    // "ob clog disk hang", leaving the container dead before "OBBinlog is ready!".
+                    // Recreate the container from scratch a few times so a single transient disk
+                    // stall does not fail the whole job.
+                    .withStartupAttempts(3)
                     .withExposedPorts(2881, 2883)
                     .withLogConsumer(new Slf4jLogConsumer(LOG))
                     .waitingFor(

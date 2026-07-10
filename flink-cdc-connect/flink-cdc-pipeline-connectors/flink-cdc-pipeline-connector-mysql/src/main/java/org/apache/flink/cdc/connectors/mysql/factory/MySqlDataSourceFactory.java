@@ -139,7 +139,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
                 && !StartupOptions.snapshot().equals(startupOptions)) {
             throw new IllegalArgumentException(
                     String.format(
-                            "Only \"snapshot\" of MySQLDataSource StartupOption is supported in BATCH pipeline, but actual MySQLDataSource StartupOption is {}.",
+                            "Only \"snapshot\" of MySQLDataSource StartupOption is supported in BATCH pipeline, but actual MySQLDataSource StartupOption is %s.",
                             startupOptions.startupMode));
         }
         boolean includeSchemaChanges = config.get(SCHEMA_CHANGE_ENABLED);
@@ -512,8 +512,6 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
                         1.0d,
                         distributionFactorLower));
     }
-
-    private static final String DOT_PLACEHOLDER = "_$dot_placeholder$_";
 
     /** Replaces the default timezone placeholder with session timezone, if applicable. */
     private static ZoneId getServerTimeZone(Configuration config) {

@@ -124,7 +124,9 @@ class SqlServerTimezoneITCase extends SqlServerTestBase {
         TimeZone aDefault = TimeZone.getDefault();
         try {
             TimeZone.setDefault(TimeZone.getTimeZone(jvmTimeZone));
-            initializeSqlServerTable("column_type_test");
+            String databaseName =
+                    getDatabaseName(localTimeZone, serverTimeZone, jvmTimeZone, castTimeStampLtz);
+            initializeSqlServerTable("column_type_test", databaseName);
 
             String sourceDDL =
                     String.format(
@@ -151,7 +153,7 @@ class SqlServerTimezoneITCase extends SqlServerTestBase {
                             MSSQL_SERVER_CONTAINER.getMappedPort(MS_SQL_SERVER_PORT),
                             MSSQL_SERVER_CONTAINER.getUsername(),
                             MSSQL_SERVER_CONTAINER.getPassword(),
-                            "column_type_test",
+                            databaseName,
                             "dbo.full_types",
                             serverTimeZone);
             String sinkDDL =
@@ -189,5 +191,24 @@ class SqlServerTimezoneITCase extends SqlServerTestBase {
         } finally {
             TimeZone.setDefault(aDefault);
         }
+    }
+
+    private String getDatabaseName(
+            String localTimeZone,
+            String serverTimeZone,
+            String jvmTimeZone,
+            boolean castTimeStampLtz) {
+        return "column_type_test_"
+                + normalizeTimeZoneName(localTimeZone)
+                + "_"
+                + normalizeTimeZoneName(serverTimeZone)
+                + "_"
+                + normalizeTimeZoneName(jvmTimeZone)
+                + "_"
+                + castTimeStampLtz;
+    }
+
+    private String normalizeTimeZoneName(String timeZone) {
+        return timeZone.replaceAll("[^A-Za-z0-9]", "_");
     }
 }

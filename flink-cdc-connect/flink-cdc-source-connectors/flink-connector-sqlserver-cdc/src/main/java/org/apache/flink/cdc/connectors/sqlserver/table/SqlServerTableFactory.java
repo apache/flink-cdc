@@ -17,11 +17,11 @@
 
 package org.apache.flink.cdc.connectors.sqlserver.table;
 
+import org.apache.flink.cdc.connectors.base.options.StartupMode;
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.connectors.base.utils.OptionUtils;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
-import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.ResolvedSchema;
@@ -107,7 +107,14 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
                     .defaultValue("initial")
                     .withDescription(
                             "Optional startup mode for SqlServer CDC consumer, valid enumerations are "
-                                    + "\"initial\" and \"latest-offset\"");
+                                    + "\"initial\", \"latest-offset\" and \"timestamp\"");
+
+    public static final ConfigOption<Long> SCAN_STARTUP_TIMESTAMP_MILLIS =
+            ConfigOptions.key("scan.startup.timestamp-millis")
+                    .longType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "Optional timestamp used in case of \"timestamp\" startup mode");
 
     @Override
     public DynamicTableSource createDynamicTableSource(Context context) {
@@ -124,10 +131,11 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
         ZoneId serverTimeZone = ZoneId.of(config.get(SERVER_TIME_ZONE));
         int port = config.get(PORT);
         StartupOptions startupOptions = getStartupOptions(config);
+        boolean enableParallelRead = config.get(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
+        validateStartupOptions(startupOptions, enableParallelRead);
         ResolvedSchema physicalSchema =
                 getPhysicalSchema(context.getCatalogTable().getResolvedSchema());
 
-        boolean enableParallelRead = config.get(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
         int splitSize = config.get(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE);
         int splitMetaGroupSize = config.get(CHUNK_META_GROUP_SIZE);
         int fetchSize = config.get(SCAN_SNAPSHOT_FETCH_SIZE);
@@ -153,7 +161,7 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
             validateDistributionFactorLower(distributionFactorLower);
         }
 
-        OptionUtils.printOptions(IDENTIFIER, ((Configuration) config).toMap());
+        OptionUtils.printOptions(IDENTIFIER, config.toMap());
 
         return new SqlServerTableSource(
                 physicalSchema,
@@ -203,6 +211,7 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
         options.add(PORT);
         options.add(SERVER_TIME_ZONE);
         options.add(SCAN_STARTUP_MODE);
+        options.add(SCAN_STARTUP_TIMESTAMP_MILLIS);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE);
         options.add(CHUNK_META_GROUP_SIZE);
@@ -221,6 +230,7 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
 
     private static final String SCAN_STARTUP_MODE_VALUE_INITIAL = "initial";
     private static final String SCAN_STARTUP_MODE_VALUE_LATEST = "latest-offset";
+    private static final String SCAN_STARTUP_MODE_VALUE_TIMESTAMP = "timestamp";
 
     private static StartupOptions getStartupOptions(ReadableConfig config) {
         String modeString = config.get(SCAN_STARTUP_MODE);
@@ -232,14 +242,39 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
             case SCAN_STARTUP_MODE_VALUE_LATEST:
                 return StartupOptions.latest();
 
+            case SCAN_STARTUP_MODE_VALUE_TIMESTAMP:
+                Long startupTimestampMillis = config.get(SCAN_STARTUP_TIMESTAMP_MILLIS);
+                if (startupTimestampMillis == null) {
+                    throw new ValidationException(
+                            String.format(
+                                    "To use timestamp startup mode, the startup timestamp millis '%s' must be set.",
+                                    SCAN_STARTUP_TIMESTAMP_MILLIS.key()));
+                }
+                return StartupOptions.timestamp(startupTimestampMillis);
+
             default:
                 throw new ValidationException(
                         String.format(
-                                "Invalid value for option '%s'. Supported values are [%s, %s], but was: %s",
+                                "Invalid value for option '%s'. Supported values are [%s, %s, %s], but was: %s",
                                 SCAN_STARTUP_MODE.key(),
                                 SCAN_STARTUP_MODE_VALUE_INITIAL,
                                 SCAN_STARTUP_MODE_VALUE_LATEST,
+                                SCAN_STARTUP_MODE_VALUE_TIMESTAMP,
                                 modeString));
+        }
+    }
+
+    private static void validateStartupOptions(
+            StartupOptions startupOptions, boolean enableParallelRead) {
+        if (startupOptions.startupMode == StartupMode.TIMESTAMP && !enableParallelRead) {
+            throw new ValidationException(
+                    String.format(
+                            "Option '%s'='%s' requires '%s'='true' because timestamp startup "
+                                    + "is only supported by the incremental SQL Server source; "
+                                    + "the legacy non-parallel source does not support it.",
+                            SCAN_STARTUP_MODE.key(),
+                            SCAN_STARTUP_MODE_VALUE_TIMESTAMP,
+                            SCAN_INCREMENTAL_SNAPSHOT_ENABLED.key()));
         }
     }
 

@@ -20,6 +20,7 @@ package org.apache.flink.cdc.connectors.oracle.source;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
@@ -38,6 +39,7 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.source.FlinkSourceProvider;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
+import org.apache.flink.cdc.common.types.DecimalType;
 import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
@@ -71,6 +73,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.testcontainers.lifecycle.Startables;
 
+import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -400,7 +403,10 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
                             tableId,
                             Collections.singletonList(
                                     new AddColumnEvent.ColumnWithPosition(
-                                            Column.physicalColumn("COLS27", DataTypes.BIGINT())))));
+                                            Column.physicalColumn(
+                                                    "COLS27",
+                                                    DataTypes.DECIMAL(
+                                                            DecimalType.MAX_PRECISION, 19))))));
             statement.execute(
                     String.format("ALTER TABLE %s.PRODUCTS ADD COLS28 TIMESTAMP(2)", "DEBEZIUM"));
             expected.add(
@@ -983,7 +989,9 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
                 new CreateTableEvent(
                         TableId.tableId("DEBEZIUM", "MYLAKE"),
                         Schema.newBuilder()
-                                .physicalColumn("FEATURE_ID", DataTypes.BIGINT().notNull())
+                                .physicalColumn(
+                                        "FEATURE_ID",
+                                        DataTypes.DECIMAL(DecimalType.MAX_PRECISION, 19).notNull())
                                 .physicalColumn("NAME", DataTypes.VARCHAR(32))
                                 .physicalColumn("SHAPE", DataTypes.STRING())
                                 .primaryKey(Arrays.asList("FEATURE_ID"))
@@ -992,7 +1000,9 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
         RowType rowType =
                 RowType.of(
                         new DataType[] {
-                            DataTypes.BIGINT(), DataTypes.VARCHAR(32), DataTypes.STRING()
+                            DataTypes.DECIMAL(DecimalType.MAX_PRECISION, 19),
+                            DataTypes.VARCHAR(32),
+                            DataTypes.STRING()
                         },
                         new String[] {"FEATURE_ID", "NAME", "SHAPE"});
         BinaryRecordDataGenerator generator = new BinaryRecordDataGenerator(rowType);
@@ -1004,7 +1014,7 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
                         tableId,
                         generator.generate(
                                 new Object[] {
-                                    1L,
+                                    DecimalData.fromBigDecimal(new BigDecimal(1), 38, 19),
                                     BinaryStringData.fromString("center"),
                                     BinaryStringData.fromString(
                                             "{\"coordinates\":\"[[116.6,24.343]]\",\"type\":\"Point\",\"srid\":4326}")
@@ -1014,7 +1024,7 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
                         tableId,
                         generator.generate(
                                 new Object[] {
-                                    2L,
+                                    DecimalData.fromBigDecimal(new BigDecimal(2), 38, 19),
                                     BinaryStringData.fromString("two-dimensional point"),
                                     BinaryStringData.fromString(
                                             "{\"coordinates\":\"[[10.0,5.0]]\",\"type\":\"Point\",\"srid\":4326}")
@@ -1024,7 +1034,7 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
                         tableId,
                         generator.generate(
                                 new Object[] {
-                                    3L,
+                                    DecimalData.fromBigDecimal(new BigDecimal(3), 38, 19),
                                     BinaryStringData.fromString("straight line segment"),
                                     BinaryStringData.fromString(
                                             "{\"coordinates\":\"[[10.0,10.0],[20.0,20.0],[30.0,30.0]]\",\"type\":\"LineString\",\"srid\":4326}")
@@ -1034,7 +1044,7 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
                         tableId,
                         generator.generate(
                                 new Object[] {
-                                    4L,
+                                    DecimalData.fromBigDecimal(new BigDecimal(4), 38, 19),
                                     BinaryStringData.fromString("polyline"),
                                     BinaryStringData.fromString(
                                             "{\"coordinates\":\"[[5.0,5.0],[15.0,10.0],[25.0,5.0],[35.0,10.0]]\",\"type\":\"LineString\",\"srid\":4326}")
@@ -1044,7 +1054,7 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
                         tableId,
                         generator.generate(
                                 new Object[] {
-                                    5L,
+                                    DecimalData.fromBigDecimal(new BigDecimal(5), 38, 19),
                                     BinaryStringData.fromString("rectangle"),
                                     BinaryStringData.fromString(
                                             "{\"coordinates\":\"[[0.0,0.0],[10.0,0.0],[10.0,10.0],[0.0,10.0],[0.0,0.0]]\",\"type\":\"Polygon\",\"srid\":4326}")
@@ -1054,7 +1064,7 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
                         tableId,
                         generator.generate(
                                 new Object[] {
-                                    6L,
+                                    DecimalData.fromBigDecimal(new BigDecimal(6), 38, 19),
                                     BinaryStringData.fromString("Multi-Point"),
                                     BinaryStringData.fromString(
                                             "{\"coordinates\":\"[[10.0,10.0],[20.0,20.0],[30.0,30.0]]\",\"type\":\"MultiPoint\",\"srid\":4326}")
@@ -1064,7 +1074,7 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
                         tableId,
                         generator.generate(
                                 new Object[] {
-                                    7L,
+                                    DecimalData.fromBigDecimal(new BigDecimal(7), 38, 19),
                                     BinaryStringData.fromString("Multi line collection"),
                                     BinaryStringData.fromString(
                                             "{\"coordinates\":\"[[10.0,10.0],[20.0,10.0],[10.0,20.0],[20.0,20.0]]\",\"type\":\"MultiLineString\",\"srid\":4326}")
@@ -1075,7 +1085,7 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
                         tableId,
                         generator.generate(
                                 new Object[] {
-                                    8L,
+                                    DecimalData.fromBigDecimal(new BigDecimal(8), 38, 19),
                                     BinaryStringData.fromString("Multi-Polygon"),
                                     BinaryStringData.fromString(
                                             "{\"coordinates\":\"[[0.0,0.0],[10.0,0.0],[10.0,10.0],[0.0,10.0],[0.0,0.0],[15.0,15.0],[25.0,15.0],[25.0,25.0],[15.0,25.0],[15.0,15.0]]\",\"type\":\"MultiPolygon\",\"srid\":4326}")
@@ -1085,7 +1095,7 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
                         tableId,
                         generator.generate(
                                 new Object[] {
-                                    9L,
+                                    DecimalData.fromBigDecimal(new BigDecimal(9), 38, 19),
                                     BinaryStringData.fromString("Geometry Collection"),
                                     BinaryStringData.fromString(
                                             "{\"geometries\":\"GEOMETRYCOLLECTION (POINT (25 25), LINESTRING (30 30, 35 25), POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0)))\",\"type\":\"GeometryCollection\",\"srid\":4326}")

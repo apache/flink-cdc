@@ -45,7 +45,7 @@ public class OceanBaseContainer extends JdbcDatabaseContainer<OceanBaseContainer
     public OceanBaseContainer(String version) {
         super(DockerImageName.parse(IMAGE + ":" + version));
         addExposedPorts(SQL_PORT, RPC_PORT);
-        setWaitStrategy(Wait.forLogMessage(".*boot success!.*", 1));
+        setWaitStrategy(Wait.forLogMessage(".*(boot success!|Start observer ok).*", 1));
     }
 
     @Override
@@ -61,10 +61,6 @@ public class OceanBaseContainer extends JdbcDatabaseContainer<OceanBaseContainer
         if (!DEFAULT_PASSWORD.equals(tenantPassword)) {
             addEnv("OB_TENANT_PASSWORD", tenantPassword);
         }
-    }
-
-    protected void waitUntilContainerStarted() {
-        this.getWaitStrategy().waitUntilReady(this);
     }
 
     public @NotNull Set<Integer> getLivenessCheckPortNumbers() {

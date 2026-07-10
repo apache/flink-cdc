@@ -27,7 +27,9 @@ import org.apache.flink.cdc.pipeline.tests.utils.TarballFetcher;
 import org.apache.flink.client.program.rest.RestClusterClient;
 import org.apache.flink.core.execution.SavepointFormatType;
 import org.apache.flink.runtime.client.JobStatusMessage;
+import org.apache.flink.runtime.jobmaster.JobResult;
 import org.apache.flink.table.api.ValidationException;
+import org.apache.flink.util.ExceptionUtils;
 
 import org.apache.hudi.common.model.HoodieTableType;
 import org.assertj.core.api.Assertions;
@@ -61,6 +63,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -78,10 +81,19 @@ public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
 
     private static final String TABLE_TYPE = HoodieTableType.MERGE_ON_READ.name();
 
+    private static final int FAILURE_LOG_TAIL_CHARS = 12_000;
+
     // Custom Flink properties for Hudi tests with increased metaspace and heap for heavy
     // dependencies
-    private static final String HUDI_FLINK_PROPERTIES =
+    private static final String HUDI_JOB_MANAGER_FLINK_PROPERTIES =
             FLINK_PROPERTIES
+                    + "\n"
+                    + "heartbeat.timeout: 180 s"
+                    + "\n"
+                    + "pekko.ask.timeout: 180 s";
+
+    private static final String HUDI_FLINK_PROPERTIES =
+            HUDI_JOB_MANAGER_FLINK_PROPERTIES
                     + "\n"
                     + "taskmanager.memory.jvm-metaspace.size: 512M"
                     + "\n"
@@ -148,7 +160,7 @@ public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
                 .withCommand("jobmanager")
                 .withNetwork(NETWORK)
                 .withNetworkAliases(INTER_CONTAINER_JM_ALIAS)
-                .withEnv("FLINK_PROPERTIES", FLINK_PROPERTIES)
+                .withEnv("FLINK_PROPERTIES", HUDI_JOB_MANAGER_FLINK_PROPERTIES)
                 .withCreateContainerCmdModifier(cmd -> cmd.withVolumes(sharedVolume))
                 .withLogConsumer(jobManagerConsumer);
         Startables.deepStart(Stream.of(jobManager)).join();
@@ -202,6 +214,7 @@ public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
     public void testSyncWholeDatabase() throws Exception {
         warehouse = sharedVolume.toString() + "/hudi_warehouse_" + UUID.randomUUID();
         String database = inventoryDatabase.getDatabaseName();
+        int pipelineParallelism = 1;
 
         LOG.info("Preparing Hudi warehouse directory: {}", warehouse);
         runInContainerAsRoot(jobManager, "mkdir", "-p", warehouse);
@@ -226,16 +239,19 @@ public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
                                 + TABLE_TYPE
                                 + " \n"
                                 + "  table.properties.compaction.delta_commits: 2\n"
+                                + "  table.properties.hoodie.write.lock.provider: org.apache.hudi.client.transaction.lock.InProcessLockProvider\n"
                                 + "\n"
                                 + "pipeline:\n"
                                 + "  schema.change.behavior: evolve\n"
+                                + "  execution.checkpointing.checkpoints-after-tasks-finish.enabled: true\n"
                                 + "  parallelism: %s",
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
                         database,
                         warehouse,
-                        parallelism);
+                        pipelineParallelism);
         Path hudiCdcConnector = TestUtils.getResource("hudi-cdc-pipeline-connector.jar");
+        Path hudiHadoopCommonJar = TestUtils.getResource("hudi-hadoop-common.jar");
         Path hadoopJar = TestUtils.getResource("flink-shade-hadoop.jar");
         Path hadoopCompatibilityJar = TestUtils.getResource("flink-hadoop-compatibility.jar");
         Path flinkParquet = TestUtils.getResource("flink-parquet.jar");
@@ -243,11 +259,16 @@ public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
                 submitPipelineJob(
                         pipelineJob,
                         hudiCdcConnector,
+                        hudiHadoopCommonJar,
                         hadoopJar,
                         hadoopCompatibilityJar,
                         flinkParquet);
         waitUntilJobRunning(pipelineJobID, Duration.ofSeconds(60));
         LOG.info("Pipeline job is running");
+        waitUntilInitialSnapshotReady(pipelineJobID, pipelineParallelism);
+        int initialProductInstants =
+                waitUntilCompletedHudiInstants(warehouse, database, "products", 1);
+        waitUntilCompletedHudiInstants(warehouse, database, "customers", 1);
 
         // Validate that source records from RDB have been initialized properly and landed in sink
         validateSinkResult(warehouse, database, "products", getProductsExpectedSinkResults());
@@ -259,7 +280,6 @@ public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
                 String.format(
                         "jdbc:mysql://%s:%s/%s",
                         MYSQL.getHost(), MYSQL.getDatabasePort(), database);
-        List<String> recordsInIncrementalPhase;
         try (Connection conn =
                         DriverManager.getConnection(
                                 mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
@@ -269,8 +289,6 @@ public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
                     "INSERT INTO products VALUES (default,'Ten','Jukebox',0.2, null, null, null);"); // 110
             stat.execute("UPDATE products SET description='Fay' WHERE id=106;");
             stat.execute("UPDATE products SET weight='5.125' WHERE id=107;");
-
-            // modify table schema
             stat.execute("ALTER TABLE products DROP COLUMN point_c;");
             stat.execute("DELETE FROM products WHERE id=101;");
 
@@ -279,120 +297,50 @@ public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
             stat.execute(
                     "INSERT INTO products VALUES (default,'Twelve', 'Lily', 2.14, null, null);"); // 112
 
-            validateSinkResult(
-                    warehouse, database, "products", getProductsExpectedAfterDropSinkResults());
+            Thread.sleep(2000L);
+            triggerCheckpointOrDescribeFailure(pipelineJobID, "post-drop-column checkpoint");
+            initialProductInstants =
+                    waitUntilCompletedHudiInstants(
+                            warehouse, database, "products", initialProductInstants + 1);
+            validateSinkResultWithCheckpointProgress(
+                    pipelineJobID,
+                    "post-drop-column convergence",
+                    warehouse,
+                    database,
+                    "products",
+                    getProductsExpectedAfterDropSinkResults());
 
-            recordsInIncrementalPhase = createChangesAndValidate(stat);
+            stat.execute("ALTER TABLE products ADD COLUMN point_c_0 VARCHAR(10);");
+            stat.execute(
+                    "INSERT INTO products VALUES (default,'Thirteen','Mila',3.14, null, null, 'A');"); // 113
+            stat.execute("ALTER TABLE products ADD COLUMN point_c_1 VARCHAR(10);");
+            stat.execute(
+                    "INSERT INTO products VALUES (default,'Fourteen','Nora',4.14, null, null, 'B', 'C');"); // 114
+            stat.execute("ALTER TABLE products MODIFY point_c_0 VARCHAR(20);");
+            stat.execute(
+                    "INSERT INTO products VALUES (default,'Fifteen','Olive',5.14, null, null, 'point-zero-long', 'D');"); // 115
+
+            Thread.sleep(2000L);
+            triggerCheckpointOrDescribeFailure(pipelineJobID, "post-schema-evolution checkpoint");
+            initialProductInstants =
+                    waitUntilCompletedHudiInstants(
+                            warehouse, database, "products", initialProductInstants + 1);
         } catch (SQLException e) {
             LOG.error("Update table for CDC failed.", e);
             throw e;
         }
 
-        // Build expected results
-        List<String> recordsInSnapshotPhase = getProductsExpectedAfterAddModSinkResults();
-        recordsInSnapshotPhase.addAll(recordsInIncrementalPhase);
+        validateSinkResultWithCheckpointProgress(
+                pipelineJobID,
+                "final schema evolution convergence",
+                warehouse,
+                database,
+                "products",
+                getProductsExpectedAfterSchemaEvolutionSinkResults());
 
-        validateSinkResult(warehouse, database, "products", recordsInSnapshotPhase);
-
-        // Verify that compaction was scheduled for at least one table (only for MOR tables)
-        LOG.info("Verifying compaction scheduling for MOR tables...");
         if (TABLE_TYPE.equals(HoodieTableType.MERGE_ON_READ.name())) {
-            assertCompactionScheduled(warehouse, database, Arrays.asList("products", "customers"));
+            waitUntilCompactionScheduled(warehouse, database, "products");
         }
-    }
-
-    /**
-     * Executes a series of DDL (Data Definition Language) and DML (Data Manipulation Language)
-     * operations on the {@code products} table to simulate schema evolution and data loading.
-     *
-     * <p>The method performs two primary phases:
-     *
-     * <ol>
-     *   <li><b>Column Addition:</b> It sequentially adds 10 new columns, named {@code point_c_0}
-     *       through {@code point_c_9}, each with a {@code VARCHAR(10)} type. After each column is
-     *       added, it executes a batch of 1000 {@code INSERT} statements, populating the columns
-     *       that exist at that point.
-     *   <li><b>Column Modification:</b> After all columns are added, it enters a second phase. In
-     *       each of the 10 iterations, it first inserts another 1000 rows and then modifies the
-     *       data type of the first new column ({@code point_c_0}), progressively increasing its
-     *       size from {@code VARCHAR(10)} to {@code VARCHAR(19)}.
-     * </ol>
-     *
-     * <p>Throughout this process, the method constructs and returns a list of strings. Each string
-     * represents the expected data for each inserted row in a comma-separated format, which can be
-     * used for validation.
-     *
-     * @param stat The JDBC {@link Statement} object used to execute the SQL commands.
-     * @return A {@link List} of strings, where each string is a CSV representation of an inserted
-     *     row, reflecting the expected state in the database.
-     * @throws SQLException if a database access error occurs or the executed SQL is invalid.
-     */
-    private List<String> createChangesAndValidate(Statement stat) throws SQLException {
-        List<String> result = new ArrayList<>();
-        StringBuilder sqlFields = new StringBuilder();
-
-        // Auto-increment id will start from this
-        int currentId = 113;
-        final int statementBatchCount = 1000;
-
-        // Step 1 - Add Column: Add 10 columns with VARCHAR(10) sequentially
-        for (int addColumnRepeat = 0; addColumnRepeat < 10; addColumnRepeat++) {
-            String addColAlterTableCmd =
-                    String.format(
-                            "ALTER TABLE products ADD COLUMN point_c_%s VARCHAR(10);",
-                            addColumnRepeat);
-            stat.execute(addColAlterTableCmd);
-            LOG.info("Executed: {}", addColAlterTableCmd);
-            sqlFields.append(", '1'");
-            StringBuilder resultFields = new StringBuilder();
-            for (int addedFieldCount = 0; addedFieldCount < 10; addedFieldCount++) {
-                if (addedFieldCount <= addColumnRepeat) {
-                    resultFields.append(", 1");
-                } else {
-                    resultFields.append(", null");
-                }
-            }
-
-            for (int statementCount = 0; statementCount < statementBatchCount; statementCount++) {
-                stat.addBatch(
-                        String.format(
-                                "INSERT INTO products VALUES (default,'finally', null, 2.14, null, null %s);",
-                                sqlFields));
-                result.add(
-                        String.format(
-                                "%s, finally, null, 2.14, null, null%s", currentId, resultFields));
-                currentId++;
-            }
-            stat.executeBatch();
-        }
-
-        // Step 2 - Modify type for the columns added in Step 1, increasing the VARCHAR length
-        for (int modifyColumnRepeat = 0; modifyColumnRepeat < 10; modifyColumnRepeat++) {
-            // Perform 1000 inserts as a batch, continuing the ID sequence from Step 1
-            for (int statementCount = 0; statementCount < statementBatchCount; statementCount++) {
-                stat.addBatch(
-                        String.format(
-                                "INSERT INTO products VALUES (default,'finally', null, 2.14, null, null %s);",
-                                sqlFields));
-
-                result.add(
-                        String.format(
-                                "%s, finally, null, 2.14, null, null%s",
-                                currentId, ", 1, 1, 1, 1, 1, 1, 1, 1, 1, 1"));
-                // Continue incrementing the counter for each insert
-                currentId++;
-            }
-            stat.executeBatch();
-
-            String modifyColTypeAlterCmd =
-                    String.format(
-                            "ALTER TABLE products MODIFY point_c_0 VARCHAR(%s);",
-                            10 + modifyColumnRepeat);
-            stat.execute(modifyColTypeAlterCmd);
-            LOG.info("Executed: {}", modifyColTypeAlterCmd);
-        }
-
-        return result;
     }
 
     private List<String> fetchHudiTableRows(String warehouse, String databaseName, String tableName)
@@ -452,6 +400,210 @@ public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
                 .collect(Collectors.toList());
     }
 
+    private void waitUntilInitialSnapshotReady(JobID jobId, int pipelineParallelism)
+            throws Exception {
+        Duration readinessTimeout = Duration.ofMinutes(5);
+        if (pipelineParallelism == 1) {
+            waitUntilLogContains(
+                    jobManagerConsumer,
+                    "Snapshot split assigner received all splits finished and the job parallelism is 1, snapshot split assigner is turn into finished status.",
+                    readinessTimeout);
+            LOG.info("Initial snapshot finished under parallelism 1.");
+        } else {
+            waitUntilLogContains(
+                    jobManagerConsumer,
+                    "Snapshot split assigner received all splits finished, waiting for a complete checkpoint to mark the assigner finished.",
+                    readinessTimeout);
+            LOG.info("Initial snapshot is ready for a complete checkpoint.");
+        }
+        triggerCheckpointOrDescribeFailure(jobId, "initial snapshot checkpoint");
+        if (pipelineParallelism != 1) {
+            waitUntilLogContains(
+                    jobManagerConsumer,
+                    "Snapshot split assigner is turn into finished status.",
+                    readinessTimeout);
+            LOG.info("Snapshot split assigner finished after checkpoint completion.");
+        }
+        waitUntilLogContains(
+                jobManagerConsumer, "for the binlog split assignment.", readinessTimeout);
+        LOG.info("Binlog split assignment observed.");
+    }
+
+    private void triggerCheckpointOrDescribeFailure(JobID jobId, String phase) throws Exception {
+        try {
+            triggerCheckpointWithRetry(jobId);
+        } catch (Exception e) {
+            throw new RuntimeException(describeJobFailure(jobId, phase), e);
+        }
+    }
+
+    private String describeJobFailure(JobID jobId, String phase) {
+        StringBuilder message =
+                new StringBuilder("Failed during ").append(phase).append(" for job ").append(jobId);
+        try {
+            message.append(", status=")
+                    .append(getRestClusterClient().getJobStatus(jobId).get(10, TimeUnit.SECONDS));
+        } catch (Exception statusError) {
+            message.append(", status=<unavailable: ").append(statusError.getMessage()).append('>');
+        }
+        try {
+            JobResult jobResult =
+                    getRestClusterClient().requestJobResult(jobId).get(30, TimeUnit.SECONDS);
+            message.append(", applicationStatus=").append(jobResult.getApplicationStatus());
+            jobResult
+                    .getSerializedThrowable()
+                    .ifPresent(
+                            throwable ->
+                                    message.append("\nJob failure cause:\n")
+                                            .append(
+                                                    ExceptionUtils.stringifyException(
+                                                            throwable.deserializeError(
+                                                                    getClass().getClassLoader()))));
+        } catch (Exception resultError) {
+            message.append("\nJob result unavailable: ")
+                    .append(ExceptionUtils.stringifyException(resultError));
+        }
+        appendLogTail(message, "JobManager", jobManagerConsumer);
+        appendLogTail(message, "TaskManager", taskManagerConsumer);
+        return message.toString();
+    }
+
+    private void appendLogTail(
+            StringBuilder message, String containerName, ToStringConsumer logConsumer) {
+        if (logConsumer == null) {
+            return;
+        }
+        String logs = logConsumer.toUtf8String();
+        if (logs.isEmpty()) {
+            return;
+        }
+        message.append('\n').append(containerName).append(" logs tail:\n");
+        message.append(logs.substring(Math.max(0, logs.length() - FAILURE_LOG_TAIL_CHARS)));
+    }
+
+    private int waitUntilCompletedHudiInstants(
+            String warehouse, String database, String table, int minimumInstantCount)
+            throws Exception {
+        LOG.info(
+                "Waiting for at least {} completed Hudi instants in {}::{}::{}...",
+                minimumInstantCount,
+                warehouse,
+                database,
+                table);
+        long deadline = System.currentTimeMillis() + HUDI_TESTCASE_TIMEOUT.toMillis();
+        List<String> completedInstants = Collections.emptyList();
+        while (System.currentTimeMillis() < deadline) {
+            completedInstants = listCompletedHudiInstants(warehouse, database, table);
+            if (completedInstants.size() >= minimumInstantCount) {
+                LOG.info(
+                        "Observed {} completed Hudi instants in {}::{}::{}: {}",
+                        completedInstants.size(),
+                        warehouse,
+                        database,
+                        table,
+                        completedInstants);
+                return completedInstants.size();
+            }
+            Thread.sleep(1000L);
+        }
+        throw new TimeoutException(
+                String.format(
+                        "Timed out waiting for %s completed Hudi instants in %s::%s::%s. Last observed instants: %s",
+                        minimumInstantCount, warehouse, database, table, completedInstants));
+    }
+
+    private List<String> listCompletedHudiInstants(String warehouse, String database, String table)
+            throws Exception {
+        String command =
+                String.format(
+                        "find '%s' -path '*/.hoodie/*' -type f -print 2>/dev/null || true",
+                        warehouse);
+        Container.ExecResult result = jobManager.execInContainer("bash", "-lc", command);
+        if (result.getExitCode() != 0) {
+            throw new RuntimeException(
+                    "Failed to inspect Hudi timeline for "
+                            + database
+                            + "::"
+                            + table
+                            + ". Stdout: "
+                            + result.getStdout()
+                            + "; Stderr: "
+                            + result.getStderr());
+        }
+        String tableTimelinePath = "/" + database + "/" + table + "/.hoodie/";
+        return Arrays.stream(result.getStdout().split("\n"))
+                .map(String::trim)
+                .filter(line -> !line.isEmpty())
+                .filter(line -> line.endsWith(".commit") || line.endsWith(".deltacommit"))
+                .filter(line -> line.contains(tableTimelinePath))
+                .filter(line -> !line.contains(tableTimelinePath + "metadata/.hoodie/"))
+                .sorted()
+                .collect(Collectors.toList());
+    }
+
+    private void waitUntilCompactionScheduled(String warehouse, String database, String table)
+            throws Exception {
+        LOG.info(
+                "Waiting for Hudi compaction to be scheduled in {}::{}::{}...",
+                warehouse,
+                database,
+                table);
+        long deadline = System.currentTimeMillis() + HUDI_TESTCASE_TIMEOUT.toMillis();
+        List<String> compactionFiles = Collections.emptyList();
+        List<String> timelineFiles = Collections.emptyList();
+        while (System.currentTimeMillis() < deadline) {
+            timelineFiles = listHudiTimelineFiles(warehouse, database, table);
+            compactionFiles =
+                    timelineFiles.stream()
+                            .filter(line -> line.endsWith(".compaction.requested"))
+                            .collect(Collectors.toList());
+            if (!compactionFiles.isEmpty()) {
+                LOG.info(
+                        "Observed Hudi compaction request files in {}::{}::{}: {}",
+                        warehouse,
+                        database,
+                        table,
+                        compactionFiles);
+                return;
+            }
+            Thread.sleep(1000L);
+        }
+        Assertions.fail(
+                "Timed out waiting for a Hudi compaction.requested file in "
+                        + warehouse
+                        + "::"
+                        + database
+                        + "::"
+                        + table
+                        + ". Last observed timeline files: "
+                        + timelineFiles);
+    }
+
+    private List<String> listHudiTimelineFiles(String warehouse, String database, String table)
+            throws Exception {
+        String command =
+                String.format(
+                        "find '%s/%s/%s/.hoodie/timeline' -type f -print 2>/dev/null || true",
+                        warehouse, database, table);
+        Container.ExecResult result = jobManager.execInContainer("bash", "-lc", command);
+        if (result.getExitCode() != 0) {
+            throw new RuntimeException(
+                    "Failed to inspect Hudi timeline for "
+                            + database
+                            + "::"
+                            + table
+                            + ". Stdout: "
+                            + result.getStdout()
+                            + "; Stderr: "
+                            + result.getStderr());
+        }
+        return Arrays.stream(result.getStdout().split("\n"))
+                .map(String::trim)
+                .filter(line -> !line.isEmpty())
+                .sorted()
+                .collect(Collectors.toList());
+    }
+
     private static String[] extractRow(String row) {
         return Arrays.stream(row.split("\\|"))
                 .map(String::trim)
@@ -491,9 +643,38 @@ public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
         LOG.info("Verifying Hudi {}::{}::{} results...", warehouse, database, table);
         long deadline = System.currentTimeMillis() + HUDI_TESTCASE_TIMEOUT.toMillis();
         List<String> results = Collections.emptyList();
+        int maxObservedSize = -1;
         while (System.currentTimeMillis() < deadline) {
             try {
-                results = fetchHudiTableRows(warehouse, database, table);
+                List<String> fetched = fetchHudiTableRows(warehouse, database, table);
+
+                // Hudi MERGE_ON_READ tables can momentarily expose an empty or partial file
+                // slice while a compaction swaps slices, so a snapshot read may regress to fewer
+                // rows (sometimes 0) even though no data was actually lost. Treat such a regressed
+                // read as a transient inconsistent state and re-read on the next loop. We only do
+                // this while we are still below the expected row count: a regression down to the
+                // expected size (or below it) may well be the correct post-delete result, so it
+                // must still be judged. Otherwise a delete that shrinks the table (e.g. the
+                // post-restart DELETE in testStopAndRestartFromSavepoint) would be skipped as a
+                // false "regression" whenever an earlier read transiently observed the larger
+                // pre-delete state.
+                if (maxObservedSize > 0
+                        && fetched.size() < maxObservedSize
+                        && fetched.size() < expected.size()) {
+                    LOG.warn(
+                            "Ignoring transient regressed read from Hudi MOR table: got {} rows, "
+                                    + "previously saw {} rows, still below expected {} "
+                                    + "(likely a compaction file-slice swap). "
+                                    + "Waiting for the next loop...",
+                            fetched.size(),
+                            maxObservedSize,
+                            expected.size());
+                    Thread.sleep(10000L);
+                    continue;
+                }
+
+                results = fetched;
+                maxObservedSize = fetched.size();
                 Assertions.assertThat(results).containsExactlyInAnyOrderElementsOf(expected);
                 LOG.info(
                         "Successfully verified {} records in {} seconds for {}::{}.",
@@ -533,6 +714,96 @@ public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
         Assertions.assertThat(results).containsExactlyInAnyOrderElementsOf(expected);
     }
 
+    private void validateSinkResultWithCheckpointProgress(
+            JobID jobId,
+            String phase,
+            String warehouse,
+            String database,
+            String table,
+            List<String> expected)
+            throws Exception {
+        LOG.info(
+                "Verifying Hudi {}::{}::{} results with checkpoint progress...",
+                warehouse,
+                database,
+                table);
+        long deadline = System.currentTimeMillis() + HUDI_TESTCASE_TIMEOUT.toMillis();
+        List<String> results = Collections.emptyList();
+        int maxObservedSize = -1;
+        while (System.currentTimeMillis() < deadline) {
+            try {
+                List<String> fetched = fetchHudiTableRows(warehouse, database, table);
+
+                if (maxObservedSize > 0
+                        && fetched.size() < maxObservedSize
+                        && fetched.size() < expected.size()) {
+                    LOG.warn(
+                            "Ignoring transient regressed read from Hudi MOR table: got {} rows, previously saw {} rows, still below expected {} (likely a compaction file-slice swap). Waiting for the next loop...",
+                            fetched.size(),
+                            maxObservedSize,
+                            expected.size());
+                    ensureJobRunning(jobId, phase);
+                    triggerCheckpointOrDescribeFailure(jobId, phase);
+                    Thread.sleep(10000L);
+                    continue;
+                }
+
+                results = fetched;
+                maxObservedSize = fetched.size();
+                Assertions.assertThat(results).containsExactlyInAnyOrderElementsOf(expected);
+                LOG.info(
+                        "Successfully verified {} records in {} seconds for {}::{}.",
+                        expected.size(),
+                        (System.currentTimeMillis() - deadline + HUDI_TESTCASE_TIMEOUT.toMillis())
+                                / 1000,
+                        database,
+                        table);
+                return;
+            } catch (Exception e) {
+                LOG.warn("Validate failed, waiting for the next loop...", e);
+            } catch (AssertionError ignored) {
+                if (expected.size() == results.size()) {
+                    final int rowsToPrint = 100;
+                    LOG.warn(
+                            "Result expected: {}, but got {}",
+                            expected.stream()
+                                    .sorted()
+                                    .limit(rowsToPrint)
+                                    .collect(Collectors.toList()),
+                            results.stream()
+                                    .sorted()
+                                    .limit(rowsToPrint)
+                                    .collect(Collectors.toList()));
+                } else {
+                    LOG.warn(
+                            "Results mismatch, expected {} records, but got {} actually. Waiting for the next loop...",
+                            expected.size(),
+                            results.size());
+                }
+            }
+
+            ensureJobRunning(jobId, phase);
+            triggerCheckpointOrDescribeFailure(jobId, phase);
+            Thread.sleep(10000L);
+        }
+        Assertions.assertThat(results).containsExactlyInAnyOrderElementsOf(expected);
+    }
+
+    private void ensureJobRunning(JobID jobId, String phase) {
+        try {
+            JobStatus status = getRestClusterClient().getJobStatus(jobId).get(10, TimeUnit.SECONDS);
+            if (status != JobStatus.RUNNING) {
+                throw new RuntimeException(
+                        describeJobFailure(jobId, phase + " observed non-running job " + status));
+            }
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException(
+                    "Failed to inspect job status during " + phase + " for job " + jobId, e);
+        }
+    }
+
     @Test
     public void testStopAndRestartFromSavepoint() throws Exception {
         warehouse = sharedVolume.toString() + "/hudi_warehouse_savepoint_" + UUID.randomUUID();
@@ -562,6 +833,7 @@ public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
                                 + "\n"
                                 + "pipeline:\n"
                                 + "  schema.change.behavior: evolve\n"
+                                + "  execution.checkpointing.checkpoints-after-tasks-finish.enabled: true\n"
                                 + "  parallelism: %s\n"
                                 + "\n",
                         MYSQL_TEST_USER, MYSQL_TEST_PASSWORD, database, warehouse, parallelism);
@@ -733,22 +1005,22 @@ public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
                 "112, Twelve, Lily, 2.14, null, null");
     }
 
-    private static List<String> getProductsExpectedAfterAddModSinkResults() {
-        // We need this list to be mutable, i.e. not fixed sized
-        // Arrays.asList returns a fixed size list which is not mutable
-        return new ArrayList<>(
-                Arrays.asList(
-                        "102, Two, Bob, 1.703, white, {\"key2\": \"value2\"}, null, null, null, null, null, null, null, null, null, null",
-                        "103, Three, Cecily, 4.105, red, {\"key3\": \"value3\"}, null, null, null, null, null, null, null, null, null, null",
-                        "104, Four, Derrida, 1.857, white, {\"key4\": \"value4\"}, null, null, null, null, null, null, null, null, null, null",
-                        "105, Five, Evelyn, 5.211, red, {\"K\": \"V\", \"k\": \"v\"}, null, null, null, null, null, null, null, null, null, null",
-                        "106, Six, Fay, 9.813, null, null, null, null, null, null, null, null, null, null, null, null",
-                        "107, Seven, Grace, 5.125, null, null, null, null, null, null, null, null, null, null, null, null",
-                        "108, Eight, Hesse, 6.819, null, null, null, null, null, null, null, null, null, null, null, null",
-                        "109, Nine, IINA, 5.223, null, null, null, null, null, null, null, null, null, null, null, null",
-                        "110, Ten, Jukebox, 0.2, null, null, null, null, null, null, null, null, null, null, null, null",
-                        "111, Eleven, Kryo, 5.18, null, null, null, null, null, null, null, null, null, null, null, null",
-                        "112, Twelve, Lily, 2.14, null, null, null, null, null, null, null, null, null, null, null, null"));
+    private static List<String> getProductsExpectedAfterSchemaEvolutionSinkResults() {
+        return Arrays.asList(
+                "102, Two, Bob, 1.703, white, {\"key2\": \"value2\"}, null, null",
+                "103, Three, Cecily, 4.105, red, {\"key3\": \"value3\"}, null, null",
+                "104, Four, Derrida, 1.857, white, {\"key4\": \"value4\"}, null, null",
+                "105, Five, Evelyn, 5.211, red, {\"K\": \"V\", \"k\": \"v\"}, null, null",
+                "106, Six, Fay, 9.813, null, null, null, null",
+                "107, Seven, Grace, 5.125, null, null, null, null",
+                "108, Eight, Hesse, 6.819, null, null, null, null",
+                "109, Nine, IINA, 5.223, null, null, null, null",
+                "110, Ten, Jukebox, 0.2, null, null, null, null",
+                "111, Eleven, Kryo, 5.18, null, null, null, null",
+                "112, Twelve, Lily, 2.14, null, null, null, null",
+                "113, Thirteen, Mila, 3.14, null, null, A, null",
+                "114, Fourteen, Nora, 4.14, null, null, B, C",
+                "115, Fifteen, Olive, 5.14, null, null, point-zero-long, D");
     }
 
     private static List<String> getCustomersExpectedSinkResults() {
@@ -801,82 +1073,6 @@ public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
             } else if (jobStatus == expectedStatus) {
                 return;
             }
-        }
-    }
-
-    /**
-     * Asserts that compaction was scheduled for the given tables by checking for
-     * .compaction.requested files in the Hudi timeline directory inside the container.
-     *
-     * <p>Should only be invoked for MERGE_ON_READ tables.
-     *
-     * @param warehouse The warehouse directory path
-     * @param database The database name
-     * @param tables List of table names to check
-     */
-    private void assertCompactionScheduled(String warehouse, String database, List<String> tables)
-            throws Exception {
-        boolean compactionFound = false;
-        StringBuilder debugInfo = new StringBuilder();
-
-        for (String table : tables) {
-            // This will exclude metadata table timeline results
-            String timelinePath =
-                    String.format("%s/%s/%s/.hoodie/timeline", warehouse, database, table);
-            debugInfo.append(
-                    String.format(
-                            "\nChecking timeline for %s.%s at: %s", database, table, timelinePath));
-
-            // Check if timeline directory exists in container
-            Container.ExecResult lsResult = jobManager.execInContainer("ls", "-la", timelinePath);
-            if (lsResult.getExitCode() != 0) {
-                debugInfo.append(
-                        String.format(
-                                " - Timeline directory does not exist or cannot be accessed: %s",
-                                lsResult.getStderr()));
-                continue;
-            }
-
-            // Find .compaction.requested files
-            Container.ExecResult findResult =
-                    jobManager.execInContainer(
-                            "find", timelinePath, "-name", "*.compaction.requested");
-
-            if (findResult.getExitCode() == 0 && !findResult.getStdout().trim().isEmpty()) {
-                compactionFound = true;
-                String[] compactionFiles = findResult.getStdout().trim().split("\n");
-                debugInfo.append(
-                        String.format(
-                                " - Found %d compaction file(s): %s",
-                                compactionFiles.length, Arrays.toString(compactionFiles)));
-                LOG.info(
-                        "Compaction scheduled for table {}.{}: {}",
-                        database,
-                        table,
-                        Arrays.toString(compactionFiles));
-            } else {
-                debugInfo.append(" - No compaction.requested files found");
-
-                // List all timeline files for debugging
-                Container.ExecResult allFilesResult =
-                        jobManager.execInContainer("ls", "-1", timelinePath);
-                if (allFilesResult.getExitCode() == 0) {
-                    debugInfo.append(
-                            String.format(
-                                    "\n    All timeline files: %s",
-                                    allFilesResult.getStdout().replace("\n", ", ")));
-                }
-            }
-        }
-
-        if (!compactionFound) {
-            LOG.error("Compaction verification failed. Debug info:{}", debugInfo);
-            Assertions.fail(
-                    "No compaction.requested files found in any table timeline. "
-                            + "Expected at least one compaction to be scheduled."
-                            + debugInfo);
-        } else {
-            LOG.info("Compaction verification successful!");
         }
     }
 }

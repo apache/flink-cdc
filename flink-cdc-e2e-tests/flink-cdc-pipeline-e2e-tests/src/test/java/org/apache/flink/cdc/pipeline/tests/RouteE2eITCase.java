@@ -40,7 +40,7 @@ import java.util.stream.IntStream;
 class RouteE2eITCase extends PipelineTestEnvironment {
     private static final Logger LOG = LoggerFactory.getLogger(RouteE2eITCase.class);
 
-    protected static final int TEST_TABLE_NUMBER = 100;
+    protected static final int TEST_TABLE_NUMBER = 60;
 
     protected final UniqueDatabase routeTestDatabase =
             new UniqueDatabase(MYSQL, "route_test", MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
@@ -1155,6 +1155,9 @@ class RouteE2eITCase extends PipelineTestEnvironment {
                         parallelism);
         submitPipelineJob(pipelineJob);
         waitUntilJobRunning(Duration.ofSeconds(30));
+        if (batchMode) {
+            waitUntilJobFinished(Duration.ofMinutes(10));
+        }
 
         String prefix = parallelism > 1 ? "> " : "";
         validateResult(

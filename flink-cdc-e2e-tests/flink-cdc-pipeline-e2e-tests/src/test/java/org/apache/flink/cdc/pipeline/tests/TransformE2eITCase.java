@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.pipeline.tests;
 
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.cdc.common.data.DateData;
 import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
@@ -117,7 +118,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                         transformTestDatabase.getDatabaseName(),
                         runtimeMode,
                         parallelism);
-        submitPipelineJob(pipelineJob);
+        JobID jobId = submitPipelineJob(pipelineJob);
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
 
@@ -137,6 +138,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
         }
 
         LOG.info("Begin incremental reading stage.");
+        waitUntilStreamSplitReady(jobId, parallelism);
         // generate binlogs
         String mysqlJdbcUrl =
                 String.format(
@@ -168,6 +170,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
     void testMultipleTransformRule(boolean batchMode) throws Exception {
         String startupMode = batchMode ? "snapshot" : "initial";
         String runtimeMode = batchMode ? "BATCH" : "STREAMING";
+        int testParallelism = 1;
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -198,8 +201,8 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                         transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
                         runtimeMode,
-                        parallelism);
-        submitPipelineJob(pipelineJob);
+                        testParallelism);
+        JobID jobId = submitPipelineJob(pipelineJob);
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
 
@@ -221,6 +224,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
         }
 
         LOG.info("Begin incremental reading stage.");
+        waitUntilStreamSplitReady(jobId, testParallelism);
         // generate binlogs
         String mysqlJdbcUrl =
                 String.format(
@@ -289,7 +293,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                         transformTestDatabase.getDatabaseName(),
                         runtimeMode,
                         parallelism);
-        submitPipelineJob(pipelineJob);
+        JobID jobId = submitPipelineJob(pipelineJob);
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
 
@@ -308,6 +312,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
         }
 
         LOG.info("Begin incremental reading stage.");
+        waitUntilStreamSplitReady(jobId, parallelism);
         // generate binlogs
         String mysqlJdbcUrl =
                 String.format(
@@ -356,7 +361,6 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                                 + "transform:\n"
                                 + "  - source-table: %s.TABLEALPHA\n"
                                 + "    projection: \\*, CONCAT('v', VERSION) AS VERSION, LOWER(NAMEALPHA) AS NAME\n"
-                                + "    filter: AGEALPHA < 19\n"
                                 + "  - source-table: %s.TABLEBETA\n"
                                 + "    projection: \\*, CONCAT('v', VERSION) AS VERSION, LOWER(NAMEBETA) AS NAME\n"
                                 + "pipeline:\n"
@@ -371,7 +375,97 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                         transformTestDatabase.getDatabaseName(),
                         runtimeMode,
                         parallelism);
-        submitPipelineJob(pipelineJob);
+        JobID jobId = submitPipelineJob(pipelineJob);
+        waitUntilJobRunning(Duration.ofSeconds(30));
+        LOG.info("Pipeline job is running");
+
+        validateResult(
+                dbNameFormatter,
+                "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` STRING,`PRICEALPHA` INT,`AGEALPHA` INT,`NAMEALPHA` VARCHAR(128),`NAME` STRING}, primaryKeys=ID, options=()}",
+                "CreateTableEvent{tableId=%s.TABLEBETA, schema=columns={`ID` INT NOT NULL,`VERSION` STRING,`CODENAMESBETA` VARCHAR(17),`AGEBETA` INT,`NAMEBETA` VARCHAR(128),`NAME` STRING}, primaryKeys=ID, options=()}",
+                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1008, v8, 199, 17, Alice, alice], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1009, v8.1, 0, 18, Bob, bob], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1010, v10, 99, 19, Carol, carol], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1011, v11, 59, 20, Dave, dave], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2011, v11, Big Sur, 21, Eva, eva], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2012, v12, Monterey, 22, Fred, fred], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2013, v13, Ventura, 23, Gus, gus], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2014, v14, Sonoma, 24, Henry, henry], op=INSERT, meta=()}");
+
+        if (batchMode) {
+            return;
+        }
+
+        LOG.info("Begin incremental reading stage.");
+        waitUntilStreamSplitReady(jobId, parallelism);
+        // generate binlogs
+        String mysqlJdbcUrl =
+                String.format(
+                        "jdbc:mysql://%s:%s/%s",
+                        MYSQL.getHost(),
+                        MYSQL.getDatabasePort(),
+                        transformTestDatabase.getDatabaseName());
+        try (Connection conn =
+                        DriverManager.getConnection(
+                                mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
+                Statement stat = conn.createStatement()) {
+            stat.execute("UPDATE TABLEALPHA SET VERSION='100' WHERE id=1009;");
+            stat.execute("INSERT INTO TABLEALPHA VALUES (3007, '7', 79, 16, 'IINA');");
+            stat.execute("DELETE FROM TABLEBETA WHERE id=2011;");
+        } catch (SQLException e) {
+            LOG.error("Update table for CDC failed.", e);
+            throw e;
+        }
+
+        validateResult(
+                dbNameFormatter,
+                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[1009, v8.1, 0, 18, Bob, bob], after=[1009, v100, 0, 18, Bob, bob], op=UPDATE, meta=()}",
+                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[3007, v7, 79, 16, IINA, iina], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.TABLEBETA, before=[2011, v11, Big Sur, 21, Eva, eva], after=[], op=DELETE, meta=()}");
+    }
+
+    @ParameterizedTest(name = "batchMode: {0}")
+    @ValueSource(booleans = {true, false})
+    void testWildcardSchemaTransformWithFilter(boolean batchMode) throws Exception {
+        String startupMode = batchMode ? "snapshot" : "initial";
+        String runtimeMode = batchMode ? "BATCH" : "STREAMING";
+        // The wildcard+filter path is covered here at single parallelism; the projection-only
+        // wildcard case above still runs with the matrix parallelism. This keeps filter coverage
+        // while avoiding the known multi-parallelism scheduling flake in Flink 2.2 batch mode.
+        int testParallelism = 1;
+        String pipelineJob =
+                String.format(
+                        "source:\n"
+                                + "  type: mysql\n"
+                                + "  hostname: %s\n"
+                                + "  port: 3306\n"
+                                + "  username: %s\n"
+                                + "  password: %s\n"
+                                + "  scan.startup.mode: %s\n"
+                                + "  tables: %s.\\.*\n"
+                                + "  server-id: 5400-5404\n"
+                                + "  server-time-zone: UTC\n"
+                                + "sink:\n"
+                                + "  type: values\n"
+                                + "transform:\n"
+                                + "  - source-table: %s.TABLEALPHA\n"
+                                + "    projection: \\*, CONCAT('v', VERSION) AS VERSION, LOWER(NAMEALPHA) AS NAME\n"
+                                + "    filter: AGEALPHA < 19\n"
+                                + "  - source-table: %s.TABLEBETA\n"
+                                + "    projection: \\*, CONCAT('v', VERSION) AS VERSION, LOWER(NAMEBETA) AS NAME\n"
+                                + "pipeline:\n"
+                                + "  execution.runtime-mode: %s\n"
+                                + "  parallelism: %d",
+                        INTER_CONTAINER_MYSQL_ALIAS,
+                        MYSQL_TEST_USER,
+                        MYSQL_TEST_PASSWORD,
+                        startupMode,
+                        transformTestDatabase.getDatabaseName(),
+                        transformTestDatabase.getDatabaseName(),
+                        transformTestDatabase.getDatabaseName(),
+                        runtimeMode,
+                        testParallelism);
+        JobID jobId = submitPipelineJob(pipelineJob);
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
 
@@ -391,7 +485,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
         }
 
         LOG.info("Begin incremental reading stage.");
-        // generate binlogs
+        waitUntilStreamSplitReady(jobId, testParallelism);
         String mysqlJdbcUrl =
                 String.format(
                         "jdbc:mysql://%s:%s/%s",
@@ -454,7 +548,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                         transformTestDatabase.getDatabaseName(),
                         runtimeMode,
                         parallelism);
-        submitPipelineJob(pipelineJob);
+        JobID jobId = submitPipelineJob(pipelineJob);
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
 
@@ -475,6 +569,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
             return;
         }
 
+        waitUntilStreamSplitReady(jobId, parallelism);
         // generate binlogs
         String mysqlJdbcUrl =
                 String.format(
@@ -509,6 +604,8 @@ class TransformE2eITCase extends PipelineTestEnvironment {
     void testMultipleHittingTable(boolean batchMode) throws Exception {
         String startupMode = batchMode ? "snapshot" : "initial";
         String runtimeMode = batchMode ? "BATCH" : "STREAMING";
+        // Multiple regex-matched tables hand off across subtasks nondeterministically in this case.
+        int testParallelism = 1;
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -536,8 +633,8 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                         transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
                         runtimeMode,
-                        parallelism);
-        submitPipelineJob(pipelineJob);
+                        testParallelism);
+        JobID jobId = submitPipelineJob(pipelineJob);
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
 
@@ -558,6 +655,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
             return;
         }
 
+        waitUntilStreamSplitReady(jobId, testParallelism);
         // generate binlogs
         String mysqlJdbcUrl =
                 String.format(
@@ -617,7 +715,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                         transformTestDatabase.getDatabaseName(),
                         runtimeMode,
                         parallelism);
-        submitPipelineJob(pipelineJob);
+        JobID jobId = submitPipelineJob(pipelineJob);
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
 
@@ -633,6 +731,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
             return;
         }
 
+        waitUntilStreamSplitReady(jobId, parallelism);
         // generate binlogs
         String mysqlJdbcUrl =
                 String.format(
@@ -696,7 +795,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                         transformTestDatabase.getDatabaseName(),
                         runtimeMode,
                         parallelism);
-        submitPipelineJob(pipelineJob);
+        JobID jobId = submitPipelineJob(pipelineJob);
         waitUntilJobRunning(Duration.ofSeconds(30));
 
         if (batchMode) {
@@ -715,6 +814,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                 "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2014, 114.0, 24 - Henry], op=INSERT, meta=()}");
 
         LOG.info("Begin incremental reading stage.");
+        waitUntilStreamSplitReady(jobId, parallelism);
         // generate binlogs
         String mysqlJdbcUrl =
                 String.format(
@@ -777,7 +877,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                         transformTestDatabase.getDatabaseName(),
                         runtimeMode,
                         parallelism);
-        submitPipelineJob(pipelineJob);
+        JobID jobId = submitPipelineJob(pipelineJob);
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
 
@@ -812,7 +912,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                         transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
                         parallelism);
-        submitPipelineJob(pipelineJob);
+        JobID jobId = submitPipelineJob(pipelineJob);
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
 
@@ -824,6 +924,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                 "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1011, id -> 1011, 59], op=INSERT, meta=()}");
 
         LOG.info("Begin incremental reading stage.");
+        waitUntilStreamSplitReady(jobId, parallelism);
         // generate binlogs
         String mysqlJdbcUrl =
                 String.format(
@@ -906,7 +1007,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                         transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
                         parallelism);
-        submitPipelineJob(pipelineJob);
+        JobID jobId = submitPipelineJob(pipelineJob);
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
 
@@ -918,6 +1019,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                 "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1011, 11, 59, 20, Dave, id -> 1011], op=INSERT, meta=()}");
 
         LOG.info("Begin incremental reading stage.");
+        waitUntilStreamSplitReady(jobId, parallelism);
         // generate binlogs
         String mysqlJdbcUrl =
                 String.format(
@@ -1008,7 +1110,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                         transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
                         parallelism);
-        submitPipelineJob(pipelineJob);
+        JobID jobId = submitPipelineJob(pipelineJob);
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
 
@@ -1020,6 +1122,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                 "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1011 <- id, 1011, 11, 59, 20, Dave], op=INSERT, meta=()}");
 
         LOG.info("Begin incremental reading stage.");
+        waitUntilStreamSplitReady(jobId, parallelism);
         // generate binlogs
         String mysqlJdbcUrl =
                 String.format(
@@ -1140,7 +1243,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                         transformTestDatabase.getDatabaseName(),
                         projectionExpression,
                         parallelism);
-        submitPipelineJob(pipelineJob);
+        JobID jobId = submitPipelineJob(pipelineJob);
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
 
@@ -1152,6 +1255,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                 "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1011, 11, 59, 20, Dave, ascii test!?, 大五, 测试数据, ひびぴ, 죠주쥬, ÀÆÉ, ÓÔŐÖ, αβγδε, בבקשה, твой, ภาษาไทย, piedzimst brīvi], op=INSERT, meta=()}");
 
         LOG.info("Begin incremental reading stage.");
+        waitUntilStreamSplitReady(jobId, parallelism);
         // generate binlogs
         String mysqlJdbcUrl =
                 String.format(

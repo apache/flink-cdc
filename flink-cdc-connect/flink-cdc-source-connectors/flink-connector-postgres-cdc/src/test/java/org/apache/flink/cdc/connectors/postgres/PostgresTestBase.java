@@ -53,7 +53,7 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -131,9 +131,7 @@ public abstract class PostgresTestBase extends AbstractTestBase {
     }
 
     public static String getSlotName() {
-        final Random random = new Random();
-        int id = random.nextInt(10000);
-        return "flink_" + id;
+        return "flink_" + UUID.randomUUID().toString().replace("-", "");
     }
 
     /**

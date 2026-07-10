@@ -383,7 +383,7 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
                     tableNameParts.length == 3,
                     String.format(
                             "Tables format must db.schema.table, can not 'tables' = %s",
-                            TABLES.key()));
+                            trimmedTableName));
             String currentDbName = tableNameParts[0];
 
             checkState(

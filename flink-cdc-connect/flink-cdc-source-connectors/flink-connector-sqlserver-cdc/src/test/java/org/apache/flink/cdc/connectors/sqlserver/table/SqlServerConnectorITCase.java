@@ -27,6 +27,7 @@ import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.table.utils.LegacyRowResource;
 
 import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -36,6 +37,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Arrays;
 import java.util.List;
+import java.util.TimeZone;
 import java.util.concurrent.ExecutionException;
 
 import static org.apache.flink.api.common.JobStatus.RUNNING;
@@ -275,6 +277,84 @@ class SqlServerConnectorITCase extends SqlServerTestBase {
         result.getJobClient().get().cancel().get();
     }
 
+    @Test
+    void testStartupFromTimestampWithServerTimeZone() throws Exception {
+        TimeZone defaultTimeZone = TimeZone.getDefault();
+        try {
+            TimeZone.setDefault(TimeZone.getTimeZone("Asia/Shanghai"));
+            setup(true);
+            initializeSqlServerTable("inventory");
+
+            long startupTimestampMillis = System.currentTimeMillis();
+
+            String sourceDDL =
+                    String.format(
+                            "CREATE TABLE debezium_source ("
+                                    + " id INT NOT NULL,"
+                                    + " name STRING,"
+                                    + " description STRING,"
+                                    + " weight DECIMAL(10,3)"
+                                    + ") WITH ("
+                                    + " 'connector' = 'sqlserver-cdc',"
+                                    + " 'hostname' = '%s',"
+                                    + " 'port' = '%s',"
+                                    + " 'username' = '%s',"
+                                    + " 'password' = '%s',"
+                                    + " 'database-name' = '%s',"
+                                    + " 'table-name' = '%s',"
+                                    + " 'server-time-zone' = 'UTC',"
+                                    + " 'scan.startup.mode' = 'timestamp',"
+                                    + " 'scan.startup.timestamp-millis' = '%s',"
+                                    + " 'scan.incremental.snapshot.enabled' = 'true'"
+                                    + ")",
+                            MSSQL_SERVER_CONTAINER.getHost(),
+                            MSSQL_SERVER_CONTAINER.getMappedPort(MS_SQL_SERVER_PORT),
+                            MSSQL_SERVER_CONTAINER.getUsername(),
+                            MSSQL_SERVER_CONTAINER.getPassword(),
+                            "inventory",
+                            "dbo.products",
+                            startupTimestampMillis);
+            String sinkDDL =
+                    "CREATE TABLE sink "
+                            + " WITH ("
+                            + " 'connector' = 'values',"
+                            + " 'sink-insert-only' = 'false'"
+                            + ") LIKE debezium_source (EXCLUDING OPTIONS)";
+            tEnv.executeSql(sourceDDL);
+            tEnv.executeSql(sinkDDL);
+
+            TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM debezium_source");
+
+            do {
+                Thread.sleep(5000L);
+            } while (result.getJobClient().get().getJobStatus().get() != RUNNING);
+            Thread.sleep(5000L);
+
+            try (Connection connection = getJdbcConnection();
+                    Statement statement = connection.createStatement()) {
+                statement.execute(
+                        "INSERT INTO inventory.dbo.products (name,description,weight) VALUES ('hammer','18oz carpenters hammer',1.2);");
+                statement.execute(
+                        "INSERT INTO inventory.dbo.products (name,description,weight) VALUES ('scooter','Big 3-wheel scooter',5.20);");
+            }
+
+            waitForSinkSize("sink", 2);
+
+            String[] expected =
+                    new String[] {
+                        "110,hammer,18oz carpenters hammer,1.200",
+                        "111,scooter,Big 3-wheel scooter,5.200"
+                    };
+
+            List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
+            Assertions.assertThat(actual).containsExactlyInAnyOrder(expected);
+
+            result.getJobClient().get().cancel().get();
+        } finally {
+            TimeZone.setDefault(defaultTimeZone);
+        }
+    }
+
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
     void testAllTypes(boolean parallelismSnapshot) throws Throwable {
@@ -367,24 +447,27 @@ class SqlServerConnectorITCase extends SqlServerTestBase {
         // async submit job
         TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM full_types");
 
-        waitForSnapshotStarted("sink");
+        try {
+            waitForSnapshotStarted("sink");
 
-        try (Connection connection = getJdbcConnection();
-                Statement statement = connection.createStatement()) {
-            statement.execute(
-                    "UPDATE column_type_test.dbo.full_types SET val_int=8888 WHERE id=0;");
+            try (Connection connection = getJdbcConnection();
+                    Statement statement = connection.createStatement()) {
+                statement.execute(
+                        "UPDATE column_type_test.dbo.full_types SET val_int=8888 WHERE id=0;");
+            }
+
+            waitForSinkSize("sink", 2);
+
+            String expectedSnapshotRecord =
+                    "+I(0,cc ,vcc,tc,cč ,vcč,tč,1.123,2,3.323,4.323,5,6,true,22,333,4444,55555,2018-07-13,10:23:45.680,10:23:45.678,2018-07-13T11:23:45.340,2018-07-13T01:23:45.456Z,2018-07-13T13:23:45.780,2018-07-13T14:24,<a>b</a>)";
+            String expectedUpdatedRecord =
+                    "+U(0,cc ,vcc,tc,cč ,vcč,tč,1.123,2,3.323,4.323,5,6,true,22,333,8888,55555,2018-07-13,10:23:45.680,10:23:45.679,2018-07-13T11:23:45.340,2018-07-13T01:23:45.456Z,2018-07-13T13:23:45.780,2018-07-13T14:24,<a>b</a>)";
+            List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
+            Assertions.assertThat(actual)
+                    .containsExactlyInAnyOrder(expectedSnapshotRecord, expectedUpdatedRecord);
+        } finally {
+            result.getJobClient().get().cancel().get();
         }
-
-        waitForSinkSize("sink", 2);
-
-        List<String> expected =
-                Arrays.asList(
-                        "+I(0,cc ,vcc,tc,cč ,vcč,tč,1.123,2,3.323,4.323,5,6,true,22,333,4444,55555,2018-07-13,10:23:45.680,10:23:45.678,2018-07-13T11:23:45.340,2018-07-13T01:23:45.456Z,2018-07-13T13:23:45.780,2018-07-13T14:24,<a>b</a>)",
-                        "+U(0,cc ,vcc,tc,cč ,vcč,tč,1.123,2,3.323,4.323,5,6,true,22,333,8888,55555,2018-07-13,10:23:45.680,10:23:45.679,2018-07-13T11:23:45.340,2018-07-13T01:23:45.456Z,2018-07-13T13:23:45.780,2018-07-13T14:24,<a>b</a>)");
-        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
-        Assertions.assertThat(actual).containsExactlyInAnyOrderElementsOf(expected);
-
-        result.getJobClient().get().cancel().get();
     }
 
     @ParameterizedTest

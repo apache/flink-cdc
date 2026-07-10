@@ -18,6 +18,8 @@
 package org.apache.flink.cdc.connectors.oceanbase;
 
 import org.apache.flink.api.common.JobID;
+import org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils;
+import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
 import org.apache.flink.cdc.connectors.utils.ExternalResourceProxy;
 import org.apache.flink.runtime.minicluster.RpcServiceSharing;
 import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
@@ -30,6 +32,7 @@ import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 import org.apache.flink.util.StringUtils;
 
+import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.jdbc.JdbcConnection;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
@@ -83,6 +86,31 @@ public class OceanBaseFailoverITCase extends OceanBaseSourceTestBase {
                     "+I[2002, user_23, Shanghai, 123567891234]",
                     "+I[2003, user_24, Shanghai, 123567891234]",
                     "+U[1010, user_11, Hangzhou, 123567891234]");
+
+    /** The snapshot rows expected from a single customer table, rendered as collect() strings. */
+    private static final List<String> SNAPSHOT_ROWS_FOR_SINGLE_TABLE =
+            Arrays.asList(
+                    "+I[101, user_1, Shanghai, 123567891234]",
+                    "+I[102, user_2, Shanghai, 123567891234]",
+                    "+I[103, user_3, Shanghai, 123567891234]",
+                    "+I[109, user_4, Shanghai, 123567891234]",
+                    "+I[110, user_5, Shanghai, 123567891234]",
+                    "+I[111, user_6, Shanghai, 123567891234]",
+                    "+I[118, user_7, Shanghai, 123567891234]",
+                    "+I[121, user_8, Shanghai, 123567891234]",
+                    "+I[123, user_9, Shanghai, 123567891234]",
+                    "+I[1009, user_10, Shanghai, 123567891234]",
+                    "+I[1010, user_11, Shanghai, 123567891234]",
+                    "+I[1011, user_12, Shanghai, 123567891234]",
+                    "+I[1012, user_13, Shanghai, 123567891234]",
+                    "+I[1013, user_14, Shanghai, 123567891234]",
+                    "+I[1014, user_15, Shanghai, 123567891234]",
+                    "+I[1015, user_16, Shanghai, 123567891234]",
+                    "+I[1016, user_17, Shanghai, 123567891234]",
+                    "+I[1017, user_18, Shanghai, 123567891234]",
+                    "+I[1018, user_19, Shanghai, 123567891234]",
+                    "+I[1019, user_20, Shanghai, 123567891234]",
+                    "+I[2000, user_21, Shanghai, 123567891234]");
 
     public static Stream<Arguments> parameters() {
         return Stream.of(
@@ -385,6 +413,12 @@ public class OceanBaseFailoverITCase extends OceanBaseSourceTestBase {
                                                                         e.getKey(), e.getValue()))
                                                 .collect(Collectors.joining(",")));
         tEnv.executeSql(sourceDDL);
+        if (!DEFAULT_SCAN_STARTUP_MODE.equals(scanStartupMode)) {
+            // In latest-offset mode the job must not resolve its start offset before the rows
+            // written during setup() are materialized by the OceanBase binlog service,
+            // otherwise they are read back as +I events and break the assertions.
+            waitForBinlogServiceCaughtUp();
+        }
         TableResult tableResult = tEnv.executeSql("select * from customers");
 
         // first step: check the snapshot data
@@ -405,34 +439,9 @@ public class OceanBaseFailoverITCase extends OceanBaseSourceTestBase {
             FailoverPhase failoverPhase,
             String[] captureCustomerTables)
             throws Exception {
-        String[] snapshotForSingleTable =
-                new String[] {
-                    "+I[101, user_1, Shanghai, 123567891234]",
-                    "+I[102, user_2, Shanghai, 123567891234]",
-                    "+I[103, user_3, Shanghai, 123567891234]",
-                    "+I[109, user_4, Shanghai, 123567891234]",
-                    "+I[110, user_5, Shanghai, 123567891234]",
-                    "+I[111, user_6, Shanghai, 123567891234]",
-                    "+I[118, user_7, Shanghai, 123567891234]",
-                    "+I[121, user_8, Shanghai, 123567891234]",
-                    "+I[123, user_9, Shanghai, 123567891234]",
-                    "+I[1009, user_10, Shanghai, 123567891234]",
-                    "+I[1010, user_11, Shanghai, 123567891234]",
-                    "+I[1011, user_12, Shanghai, 123567891234]",
-                    "+I[1012, user_13, Shanghai, 123567891234]",
-                    "+I[1013, user_14, Shanghai, 123567891234]",
-                    "+I[1014, user_15, Shanghai, 123567891234]",
-                    "+I[1015, user_16, Shanghai, 123567891234]",
-                    "+I[1016, user_17, Shanghai, 123567891234]",
-                    "+I[1017, user_18, Shanghai, 123567891234]",
-                    "+I[1018, user_19, Shanghai, 123567891234]",
-                    "+I[1019, user_20, Shanghai, 123567891234]",
-                    "+I[2000, user_21, Shanghai, 123567891234]"
-                };
-
         List<String> expectedSnapshotData = new ArrayList<>();
         for (int i = 0; i < captureCustomerTables.length; i++) {
-            expectedSnapshotData.addAll(Arrays.asList(snapshotForSingleTable));
+            expectedSnapshotData.addAll(SNAPSHOT_ROWS_FOR_SINGLE_TABLE);
         }
 
         CloseableIterator<Row> iterator = tableResult.collect();
@@ -447,8 +456,41 @@ public class OceanBaseFailoverITCase extends OceanBaseSourceTestBase {
                     () -> sleepMs(100));
         }
 
-        assertEqualsInAnyOrder(
-                expectedSnapshotData, fetchRows(iterator, expectedSnapshotData.size()));
+        boolean capturedTableHasNoPrimaryKey =
+                Arrays.stream(captureCustomerTables).anyMatch(table -> table.contains("no_pk"));
+        if (capturedTableHasNoPrimaryKey) {
+            // Tables without a primary key only provide at-least-once delivery across a failover,
+            // so the snapshot stream may replay duplicate +I rows after the TaskManager restarts.
+            // Verify every expected row is observed with at least its expected multiplicity and
+            // that no unexpected row ever appears, instead of requiring an exact 1:1 row count.
+            // Any trailing replayed rows are consumed later by the binlog phase (see
+            // fetchBinlogRowsSkippingReplayedSnapshotRows), so no draining is needed here.
+            assertSnapshotDataAllowingDuplicates(iterator, expectedSnapshotData);
+        } else {
+            assertEqualsInAnyOrder(
+                    expectedSnapshotData, fetchRows(iterator, expectedSnapshotData.size()));
+        }
+    }
+
+    private void assertSnapshotDataAllowingDuplicates(
+            CloseableIterator<Row> iterator, List<String> expectedSnapshotData) {
+        Map<String, Long> outstanding =
+                expectedSnapshotData.stream()
+                        .collect(Collectors.groupingBy(row -> row, Collectors.counting()));
+        long remaining = expectedSnapshotData.size();
+        // Blocking reads: the restarted snapshot re-reads each split in full, so every expected
+        // row is guaranteed to (re)appear, which makes this loop terminate.
+        while (remaining > 0) {
+            String value = iterator.next().toString();
+            Assertions.assertThat(outstanding)
+                    .withFailMessage("Unexpected snapshot row: %s", value)
+                    .containsKey(value);
+            long left = outstanding.get(value);
+            if (left > 0) {
+                outstanding.put(value, left - 1);
+                remaining--;
+            }
+        }
     }
 
     private void checkBinlogData(
@@ -486,8 +528,41 @@ public class OceanBaseFailoverITCase extends OceanBaseSourceTestBase {
             expectedBinlogData.addAll(secondPartBinlogEvents);
         }
         sleepMs(3_000);
-        assertEqualsInAnyOrder(expectedBinlogData, fetchRows(iterator, expectedBinlogData.size()));
+        boolean capturedTableHasNoPrimaryKey =
+                Arrays.stream(captureCustomerTables).anyMatch(table -> table.contains("no_pk"));
+        List<String> binlogData =
+                capturedTableHasNoPrimaryKey
+                        ? fetchBinlogRowsSkippingReplayedSnapshotRows(
+                                iterator, expectedBinlogData.size())
+                        : fetchRows(iterator, expectedBinlogData.size());
+        assertEqualsInAnyOrder(expectedBinlogData, binlogData);
         Assertions.assertThat(hasNextData(iterator)).isFalse();
+    }
+
+    /**
+     * For tables without a primary key the snapshot re-read triggered by an at-least-once failover
+     * may replay duplicate +I rows. These replayed snapshot rows always precede the changelog
+     * events, because the source finishes the whole snapshot phase before reading binlog. Drop the
+     * leading rows that match a snapshot row, then collect the expected binlog changelog. This runs
+     * entirely on the calling thread, so it never leaves an in-flight {@code hasNext()} racing with
+     * subsequent reads of the same collect iterator.
+     */
+    private List<String> fetchBinlogRowsSkippingReplayedSnapshotRows(
+            CloseableIterator<Row> iterator, int size) {
+        List<String> rows = new ArrayList<>(size);
+        boolean skippingReplayedSnapshotRows = true;
+        while (rows.size() < size) {
+            String value = iterator.next().toString();
+            if (skippingReplayedSnapshotRows && SNAPSHOT_ROWS_FOR_SINGLE_TABLE.contains(value)) {
+                continue;
+            }
+            // The first changelog event (a -U/-D/+U, or a +I that is not a snapshot row) marks the
+            // end of any replayed snapshot rows; from here on every row belongs to the binlog
+            // phase.
+            skippingReplayedSnapshotRows = false;
+            rows.add(value);
+        }
+        return rows;
     }
 
     private void waitUntilJobRunning(TableResult tableResult)
@@ -553,6 +628,47 @@ public class OceanBaseFailoverITCase extends OceanBaseSourceTestBase {
                             + " (2002, 'user_23','Shanghai','123567891234'),"
                             + "(2003, 'user_24','Shanghai','123567891234')");
             connection.commit();
+        } finally {
+            connection.close();
+        }
+    }
+
+    /**
+     * The OceanBase binlog service materializes committed transactions asynchronously. In
+     * latest-offset mode the source must not resolve its start offset before the rows written
+     * during {@link #setup()} are materialized, otherwise they are read back as +I events and break
+     * the assertions. This writes a marker into a non-captured table and waits until the binlog
+     * offset moves past it and stops advancing, which guarantees all earlier writes are visible.
+     */
+    private void waitForBinlogServiceCaughtUp() throws Exception {
+        String markerTable = testDatabase + ".binlog_sync_marker";
+        MySqlConnection connection = getConnection();
+        try {
+            BinlogOffset before = DebeziumUtils.currentBinlogOffset(connection);
+            connection.setAutoCommit(false);
+            connection.execute("CREATE TABLE IF NOT EXISTS " + markerTable + " (id INT)");
+            connection.execute("INSERT INTO " + markerTable + " VALUES (1)");
+            connection.commit();
+
+            long deadline = System.currentTimeMillis() + 60_000L;
+            BinlogOffset previous = null;
+            int stableTimes = 0;
+            while (System.currentTimeMillis() < deadline) {
+                Thread.sleep(500L);
+                BinlogOffset current = DebeziumUtils.currentBinlogOffset(connection);
+                if (previous != null
+                        && current.isAfter(before)
+                        && current.compareTo(previous) == 0) {
+                    if (++stableTimes >= 2) {
+                        return;
+                    }
+                } else {
+                    stableTimes = 0;
+                }
+                previous = current;
+            }
+            throw new IllegalStateException(
+                    "OceanBase binlog service did not catch up with setup writes in time.");
         } finally {
             connection.close();
         }

@@ -311,30 +311,34 @@ public class PostgresSourceReaderTest extends PostgresTestBase {
                     "INSERT INTO customer.\"Customers\" VALUES (3002, 'after_ddl', 'Shanghai', '222', 'after@test.com')");
         }
 
-        // Wait for the schema change event to be processed
-        Thread.sleep(1000L);
-
-        // Poll records so the emitter processes all events
+        // Poll until the reader captures both stream records in order.
         final SimpleReaderOutput output = new SimpleReaderOutput();
-        for (int i = 0; i < 10; i++) {
-            reader.pollNext(output);
-        }
-
-        // Verify the emitted records contain data before and after DDL in correct order
-        List<SourceRecord> results = output.getResults();
         int beforeDdlPos = -1;
         int afterDdlPos = -1;
-        for (int i = 0; i < results.size(); i++) {
-            SourceRecord record = results.get(i);
-            if (record.value() != null) {
-                String value = record.value().toString();
-                if (value.contains("before_ddl")) {
-                    beforeDdlPos = i;
-                } else if (value.contains("after_ddl")) {
-                    afterDdlPos = i;
+        long recordDeadline = System.currentTimeMillis() + 10_000L;
+        while (System.currentTimeMillis() < recordDeadline) {
+            reader.pollNext(output);
+
+            List<SourceRecord> results = output.getResults();
+            beforeDdlPos = -1;
+            afterDdlPos = -1;
+            for (int i = 0; i < results.size(); i++) {
+                SourceRecord record = results.get(i);
+                if (record.value() != null) {
+                    String value = record.value().toString();
+                    if (value.contains("before_ddl")) {
+                        beforeDdlPos = i;
+                    } else if (value.contains("after_ddl")) {
+                        afterDdlPos = i;
+                    }
                 }
             }
+            if (beforeDdlPos >= 0 && afterDdlPos >= 0 && beforeDdlPos < afterDdlPos) {
+                break;
+            }
+            Thread.sleep(100L);
         }
+
         assertThat(beforeDdlPos)
                 .as("Should capture the INSERT before DDL")
                 .isGreaterThanOrEqualTo(0);
@@ -343,22 +347,31 @@ public class PostgresSourceReaderTest extends PostgresTestBase {
                 .as("INSERT before DDL should appear before INSERT after DDL")
                 .isLessThan(afterDdlPos);
 
-        // Verify that snapshotState returns splits with updated table schema
-        List<SourceSplitBase> splits = reader.snapshotState(1L);
-        assertThat(splits).isNotEmpty();
-
+        // Verify that snapshotState returns splits with updated table schema.
+        List<SourceSplitBase> splits = Collections.emptyList();
         boolean foundUpdatedSchema = false;
-        for (SourceSplitBase split : splits) {
-            if (split.isStreamSplit()) {
-                Map<TableId, TableChanges.TableChange> schemas =
-                        split.asStreamSplit().getTableSchemas();
-                if (schemas.containsKey(tableId)
-                        && schemas.get(tableId).getTable().columnWithName("email") != null) {
-                    foundUpdatedSchema = true;
-                    break;
+        long schemaDeadline = System.currentTimeMillis() + 10_000L;
+        while (System.currentTimeMillis() < schemaDeadline) {
+            splits = reader.snapshotState(1L);
+            foundUpdatedSchema = false;
+            for (SourceSplitBase split : splits) {
+                if (split.isStreamSplit()) {
+                    Map<TableId, TableChanges.TableChange> schemas =
+                            split.asStreamSplit().getTableSchemas();
+                    if (schemas.containsKey(tableId)
+                            && schemas.get(tableId).getTable().columnWithName("email") != null) {
+                        foundUpdatedSchema = true;
+                        break;
+                    }
                 }
             }
+            if (foundUpdatedSchema) {
+                break;
+            }
+            Thread.sleep(100L);
         }
+
+        assertThat(splits).isNotEmpty();
         assertThat(foundUpdatedSchema)
                 .as("The snapshotState should contain the updated table schema with 'email' column")
                 .isTrue();

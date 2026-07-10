@@ -27,8 +27,12 @@ import org.apache.flink.client.deployment.StandaloneClusterId;
 import org.apache.flink.client.program.rest.RestClusterClient;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.RestOptions;
+import org.apache.flink.core.execution.CheckpointType;
+import org.apache.flink.runtime.checkpoint.CheckpointException;
 import org.apache.flink.runtime.client.JobStatusMessage;
+import org.apache.flink.runtime.messages.FlinkJobNotFoundException;
 import org.apache.flink.table.api.ValidationException;
+import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.TestLogger;
 
 import com.github.dockerjava.api.DockerClient;
@@ -67,6 +71,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
@@ -341,6 +346,79 @@ public abstract class PipelineTestEnvironment extends TestLogger {
         executeAndCheck(jobManager, "flink", "cancel", jobID.toHexString());
     }
 
+    public void triggerCheckpointWithRetry(JobID jobID) throws Exception {
+        int retryTimes = 0;
+        while (retryTimes < 600) {
+            try {
+                getRestClusterClient().triggerCheckpoint(jobID, CheckpointType.CONFIGURED).get();
+                return;
+            } catch (Exception e) {
+                Optional<CheckpointException> checkpointException =
+                        ExceptionUtils.findThrowable(e, CheckpointException.class);
+                Optional<FlinkJobNotFoundException> jobNotFoundException =
+                        ExceptionUtils.findThrowable(e, FlinkJobNotFoundException.class);
+                String errorMessage = ExceptionUtils.stringifyException(e);
+                if (jobNotFoundException.isPresent()
+                        || errorMessage.contains("Could not find Flink job")) {
+                    throw new IllegalStateException(
+                            "Failed to trigger checkpoint for job "
+                                    + jobID
+                                    + " because the job was not found. "
+                                    + describeCheckpointTarget(jobID),
+                            e);
+                }
+                if ((checkpointException.isPresent()
+                                && checkpointException
+                                        .get()
+                                        .getMessage()
+                                        .contains("Checkpoint triggering task"))
+                        || errorMessage.contains("is not being executed at the moment")
+                        || errorMessage.contains("Not all required tasks are currently running")) {
+                    Thread.sleep(100L);
+                    retryTimes++;
+                } else {
+                    throw e;
+                }
+            }
+        }
+        throw new TimeoutException("Timed out waiting to trigger checkpoint for job " + jobID);
+    }
+
+    protected void waitUntilStreamSplitReady(JobID jobId, int parallelism) throws Exception {
+        waitUntilStreamSplitReady(jobId, parallelism, "for the binlog split assignment.");
+    }
+
+    protected void waitUntilStreamSplitReady(
+            JobID jobId, int parallelism, String streamSplitAssignmentLog) throws Exception {
+        Duration readinessTimeout = Duration.ofMinutes(5);
+        if (parallelism == 1) {
+            waitUntilLogContains(
+                    jobManagerConsumer,
+                    "Snapshot split assigner received all splits finished and the job parallelism is 1, snapshot split assigner is turn into finished status.",
+                    readinessTimeout);
+        } else {
+            waitUntilLogContains(
+                    jobManagerConsumer,
+                    "Snapshot split assigner received all splits finished, waiting for a complete checkpoint to mark the assigner finished.",
+                    readinessTimeout);
+            triggerCheckpointWithRetry(jobId);
+            waitUntilLogContains(
+                    jobManagerConsumer,
+                    "Snapshot split assigner is turn into finished status.",
+                    readinessTimeout);
+        }
+        waitUntilLogContains(jobManagerConsumer, streamSplitAssignmentLog, readinessTimeout);
+    }
+
+    private String describeCheckpointTarget(JobID jobID) {
+        try {
+            JobStatus status = getRestClusterClient().getJobStatus(jobID).get(10, TimeUnit.SECONDS);
+            return "Current job status: " + status + '.';
+        } catch (Exception statusError) {
+            return "Job status is unavailable: " + ExceptionUtils.stringifyException(statusError);
+        }
+    }
+
     /**
      * Get {@link RestClusterClient} connected to this FlinkContainer.
      *
@@ -475,9 +553,7 @@ public abstract class PipelineTestEnvironment extends TestLogger {
 
     protected void validateResult(ToStringConsumer consumer, String... expectedEvents)
             throws Exception {
-        for (String event : expectedEvents) {
-            waitUntilSpecificEvent(consumer, event);
-        }
+        validateResult(consumer, EVENT_WAITING_TIMEOUT, expectedEvents);
     }
 
     protected void validateResult(
@@ -486,17 +562,30 @@ public abstract class PipelineTestEnvironment extends TestLogger {
         validateResult(consumer, Stream.of(expectedEvents).map(mapper).toArray(String[]::new));
     }
 
+    protected void validateResult(
+            ToStringConsumer consumer, Duration timeout, String... expectedEvents)
+            throws Exception {
+        for (String event : expectedEvents) {
+            waitUntilSpecificEvent(consumer, event, timeout);
+        }
+    }
+
     protected void waitUntilSpecificEvent(String event) throws Exception {
-        waitUntilSpecificEvent(taskManagerConsumer, event);
+        waitUntilSpecificEvent(taskManagerConsumer, event, EVENT_WAITING_TIMEOUT);
     }
 
     protected void waitUntilSpecificEvent(ToStringConsumer consumer, String event)
             throws Exception {
+        waitUntilSpecificEvent(consumer, event, EVENT_WAITING_TIMEOUT);
+    }
+
+    protected void waitUntilSpecificEvent(ToStringConsumer consumer, String event, Duration timeout)
+            throws Exception {
         boolean result = false;
-        long endTimeout = System.currentTimeMillis() + EVENT_WAITING_TIMEOUT.toMillis();
+        long endTimeout = System.currentTimeMillis() + timeout.toMillis();
         while (System.currentTimeMillis() < endTimeout) {
             String stdout = consumer.toUtf8String();
-            if (stdout.contains(event + "\n")) {
+            if (containsEventLine(stdout, event)) {
                 result = true;
                 break;
             }
@@ -506,6 +595,35 @@ public abstract class PipelineTestEnvironment extends TestLogger {
             throw new TimeoutException(
                     "failed to get specific event: "
                             + event
+                            + " from stdout: "
+                            + consumer.toUtf8String());
+        }
+    }
+
+    protected boolean containsEventLine(String stdout, String event) {
+        return stdout.contains(event + "\n") || stdout.endsWith(event);
+    }
+
+    protected void waitUntilLogContains(ToStringConsumer consumer, String fragment)
+            throws Exception {
+        waitUntilLogContains(consumer, fragment, EVENT_WAITING_TIMEOUT);
+    }
+
+    protected void waitUntilLogContains(
+            ToStringConsumer consumer, String fragment, Duration timeout) throws Exception {
+        boolean result = false;
+        long endTimeout = System.currentTimeMillis() + timeout.toMillis();
+        while (System.currentTimeMillis() < endTimeout) {
+            if (consumer.toUtf8String().contains(fragment)) {
+                result = true;
+                break;
+            }
+            Thread.sleep(1000);
+        }
+        if (!result) {
+            throw new TimeoutException(
+                    "failed to get log fragment: "
+                            + fragment
                             + " from stdout: "
                             + consumer.toUtf8String());
         }
