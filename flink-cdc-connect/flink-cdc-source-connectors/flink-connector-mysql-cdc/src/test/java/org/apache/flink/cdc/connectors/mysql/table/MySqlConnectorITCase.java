@@ -1749,29 +1749,29 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
     }
 
     /**
-     * Integration test for the <b>snapshot</b> code path when a table is created with columns
-     * whose {@code DEFAULT} clause carries a character-set introducer plus padding spaces inside
-     * the quotes (both single-quoted {@code _utf8mb4' 0 '} and double-quoted {@code _UTF8MB4" 0 "}
+     * Integration test for the <b>snapshot</b> code path when a table is created with columns whose
+     * {@code DEFAULT} clause carries a character-set introducer plus padding spaces inside the
+     * quotes (both single-quoted {@code _utf8mb4' 0 '} and double-quoted {@code _UTF8MB4" 0 "}
      * forms).
      *
      * <p>Default values are parsed in two different code paths inside the connector: during the
      * snapshot phase the schema is discovered by {@code SHOW CREATE TABLE} whose output is
      * re-parsed by the Debezium Antlr parser, and during the incremental phase the {@code ALTER
-     * TABLE} statements coming from the binlog are parsed on the fly. Both eventually flow
-     * through {@link io.debezium.connector.mysql.MySqlDefaultValueConverter#convert}.
+     * TABLE} statements coming from the binlog are parsed on the fly. Both eventually flow through
+     * {@link io.debezium.connector.mysql.MySqlDefaultValueConverter#convert}.
      *
      * <p>Empirically the MySQL server <b>normalizes</b> such default value expressions on the
      * server side before persisting them, so {@code SHOW CREATE TABLE} returns the fully
      * canonicalized form (e.g. {@code DEFAULT '0'}) regardless of what the user originally wrote.
      * That means the snapshot path never actually observes the introducer / padding shape and
-     * cannot serve as a reverse reproduction for this bug (the reverse reproduction is
-     * exclusively covered by {@link #testAlterWithCharsetIntroducerDefaultValue()} which feeds
-     * the raw DDL to Debezium via the binlog). This case therefore acts as a <b>positive
-     * verification</b> that the current fix does not introduce any side effect on the snapshot
-     * schema discovery path: the source must reach RUNNING, the snapshot must yield the initial
-     * rows, and a subsequent binlog INSERT relying on server-side defaults must also flow
-     * through, wiring both parsing paths end to end. Combined with the no-restart strategy, any
-     * regression on the snapshot side would fail the case via {@code fetchRows} timing out.
+     * cannot serve as a reverse reproduction for this bug (the reverse reproduction is exclusively
+     * covered by {@link #testAlterWithCharsetIntroducerDefaultValue()} which feeds the raw DDL to
+     * Debezium via the binlog). This case therefore acts as a <b>positive verification</b> that the
+     * current fix does not introduce any side effect on the snapshot schema discovery path: the
+     * source must reach RUNNING, the snapshot must yield the initial rows, and a subsequent binlog
+     * INSERT relying on server-side defaults must also flow through, wiring both parsing paths end
+     * to end. Combined with the no-restart strategy, any regression on the snapshot side would fail
+     * the case via {@code fetchRows} timing out.
      */
     @Test
     void testSnapshotWithCharsetIntroducerDefaultValue() throws Exception {
@@ -1874,8 +1874,7 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
             statement.execute("INSERT INTO snapshot_cs_default_test (id) VALUES (3);");
         }
 
-        String[] expected =
-                new String[] {"+I[1, 0, 0]", "+I[2, 0, 0]", "+I[3, 0, 0]"};
+        String[] expected = new String[] {"+I[1, 0, 0]", "+I[2, 0, 0]", "+I[3, 0, 0]"};
         actualRows.addAll(fetchRows(iterator, expected.length - 2));
         assertEqualsInAnyOrder(Arrays.asList(expected), actualRows);
         jobClient.cancel().get();
