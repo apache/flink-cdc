@@ -29,6 +29,7 @@ limitations under the License.
     <artifactId>flink-cdc-pipeline-connector-postgres</artifactId>
 
     <properties>
+        <jts.version>1.19.0</jts.version>
     </properties>
 
     <dependencies>
@@ -37,6 +38,12 @@ limitations under the License.
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-connector-postgres-cdc</artifactId>
             <version>${project.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.locationtech.jts</groupId>
+            <artifactId>jts-core</artifactId>
+            <version>${jts.version}</version>
         </dependency>
 
         <dependency>
@@ -181,6 +188,7 @@ limitations under the License.
                                     <include>com.google.guava:*</include>
                                     <include>org.apache.kafka:*</include>
                                     <include>org.postgresql:postgresql</include>
+                                    <include>org.locationtech.jts:jts-core</include>
                                     <include>com.fasterxml.*:*</include>
                                     <!--  Include fixed version 30.1.1-jre-14.0 of flink shaded guava  -->
                                     <include>org.apache.flink:flink-shaded-guava</include>
