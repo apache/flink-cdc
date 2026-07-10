@@ -32,7 +32,6 @@ import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.Factory;
 import org.apache.flink.table.factories.FactoryUtil;
 
-import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -58,6 +57,8 @@ import static org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOpt
 import static org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST;
 import static org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
 import static org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOptions.USE_LEGACY_JSON_FORMAT;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Test for {@link MySqlTableSource} created by {@link MySqlTableSourceFactory}. */
 class MySqlTableSourceFactoryTest {
@@ -129,8 +130,9 @@ class MySqlTableSourceFactoryTest {
                         PARSE_ONLINE_SCHEMA_CHANGES.defaultValue(),
                         USE_LEGACY_JSON_FORMAT.defaultValue(),
                         SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST.defaultValue(),
-                        false);
-        Assertions.assertThat(actualSource).isEqualTo(expectedSource);
+                        false,
+                        "auto");
+        assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
@@ -179,8 +181,9 @@ class MySqlTableSourceFactoryTest {
                         PARSE_ONLINE_SCHEMA_CHANGES.defaultValue(),
                         USE_LEGACY_JSON_FORMAT.defaultValue(),
                         SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST.defaultValue(),
-                        false);
-        Assertions.assertThat(actualSource).isEqualTo(expectedSource);
+                        false,
+                        "auto");
+        assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
@@ -225,8 +228,9 @@ class MySqlTableSourceFactoryTest {
                         PARSE_ONLINE_SCHEMA_CHANGES.defaultValue(),
                         USE_LEGACY_JSON_FORMAT.defaultValue(),
                         SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST.defaultValue(),
-                        false);
-        Assertions.assertThat(actualSource).isEqualTo(expectedSource);
+                        false,
+                        "auto");
+        assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
@@ -269,8 +273,9 @@ class MySqlTableSourceFactoryTest {
                         PARSE_ONLINE_SCHEMA_CHANGES.defaultValue(),
                         USE_LEGACY_JSON_FORMAT.defaultValue(),
                         SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST.defaultValue(),
-                        false);
-        Assertions.assertThat(actualSource).isEqualTo(expectedSource);
+                        false,
+                        "auto");
+        assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
@@ -330,14 +335,13 @@ class MySqlTableSourceFactoryTest {
                         PARSE_ONLINE_SCHEMA_CHANGES.defaultValue(),
                         true,
                         SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST.defaultValue(),
-                        false);
-        Assertions.assertThat(actualSource)
-                .isEqualTo(expectedSource)
-                .isInstanceOf(MySqlTableSource.class);
+                        false,
+                        "auto");
+        assertThat(actualSource).isEqualTo(expectedSource).isInstanceOf(MySqlTableSource.class);
         MySqlTableSource actualMySqlTableSource = (MySqlTableSource) actualSource;
         Properties parellelProperties = new Properties();
         parellelProperties.put("test", "test");
-        Assertions.assertThat(
+        assertThat(
                         actualMySqlTableSource.getParallelDbzProperties(
                                 actualMySqlTableSource.getDbzProperties()))
                 .isEqualTo(parellelProperties);
@@ -389,8 +393,9 @@ class MySqlTableSourceFactoryTest {
                         PARSE_ONLINE_SCHEMA_CHANGES.defaultValue(),
                         USE_LEGACY_JSON_FORMAT.defaultValue(),
                         SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST.defaultValue(),
-                        false);
-        Assertions.assertThat(actualSource).isEqualTo(expectedSource);
+                        false,
+                        "auto");
+        assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
@@ -431,8 +436,9 @@ class MySqlTableSourceFactoryTest {
                         PARSE_ONLINE_SCHEMA_CHANGES.defaultValue(),
                         USE_LEGACY_JSON_FORMAT.defaultValue(),
                         SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST.defaultValue(),
-                        false);
-        Assertions.assertThat(actualSource).isEqualTo(expectedSource);
+                        false,
+                        "auto");
+        assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
@@ -474,8 +480,9 @@ class MySqlTableSourceFactoryTest {
                         PARSE_ONLINE_SCHEMA_CHANGES.defaultValue(),
                         USE_LEGACY_JSON_FORMAT.defaultValue(),
                         SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST.defaultValue(),
-                        false);
-        Assertions.assertThat(actualSource).isEqualTo(expectedSource);
+                        false,
+                        "auto");
+        assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
@@ -518,8 +525,9 @@ class MySqlTableSourceFactoryTest {
                         PARSE_ONLINE_SCHEMA_CHANGES.defaultValue(),
                         USE_LEGACY_JSON_FORMAT.defaultValue(),
                         SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST.defaultValue(),
-                        false);
-        Assertions.assertThat(actualSource).isEqualTo(expectedSource);
+                        false,
+                        "auto");
+        assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
@@ -560,8 +568,9 @@ class MySqlTableSourceFactoryTest {
                         PARSE_ONLINE_SCHEMA_CHANGES.defaultValue(),
                         USE_LEGACY_JSON_FORMAT.defaultValue(),
                         SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST.defaultValue(),
-                        false);
-        Assertions.assertThat(actualSource).isEqualTo(expectedSource);
+                        false,
+                        "auto");
+        assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
@@ -607,17 +616,81 @@ class MySqlTableSourceFactoryTest {
                         PARSE_ONLINE_SCHEMA_CHANGES.defaultValue(),
                         USE_LEGACY_JSON_FORMAT.defaultValue(),
                         SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST.defaultValue(),
-                        false);
+                        false,
+                        "auto");
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys = Arrays.asList("op_ts", "database_name");
 
-        Assertions.assertThat(actualSource).isEqualTo(expectedSource);
+        assertThat(actualSource).isEqualTo(expectedSource);
+    }
+
+    @Test
+    void testDialectOptions() {
+        Map<String, String> properties = getAllOptions();
+        // The MariaDB dialect is only supported by the incremental-snapshot source, so the
+        // dialect option is exercised on that (supported) path.
+        properties.put("scan.incremental.snapshot.enabled", "true");
+        properties.put("scan.dialect", "mariadb");
+
+        DynamicTableSource actualSource = createTableSource(properties);
+        MySqlTableSource expectedSource =
+                new MySqlTableSource(
+                        SCHEMA,
+                        3306,
+                        MY_LOCALHOST,
+                        MY_DATABASE,
+                        MY_TABLE,
+                        MY_USERNAME,
+                        MY_PASSWORD,
+                        ZoneId.systemDefault(),
+                        PROPERTIES,
+                        null,
+                        true,
+                        SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
+                        CHUNK_META_GROUP_SIZE.defaultValue(),
+                        SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
+                        CONNECT_TIMEOUT.defaultValue(),
+                        CONNECT_MAX_RETRIES.defaultValue(),
+                        CONNECTION_POOL_SIZE.defaultValue(),
+                        CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
+                        CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
+                        StartupOptions.initial(),
+                        false,
+                        false,
+                        new Properties(),
+                        HEARTBEAT_INTERVAL.defaultValue(),
+                        null,
+                        SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
+                        PARSE_ONLINE_SCHEMA_CHANGES.defaultValue(),
+                        USE_LEGACY_JSON_FORMAT.defaultValue(),
+                        SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST.defaultValue(),
+                        false,
+                        "mariadb");
+        assertThat(actualSource).isEqualTo(expectedSource);
+    }
+
+    @Test
+    void testDialectMariadbRejectedWithoutIncrementalSnapshot() {
+        Map<String, String> properties = getAllOptions();
+        properties.put("scan.dialect", "mariadb");
+        assertThatThrownBy(() -> createTableSource(properties))
+                .hasStackTraceContaining(
+                        "Option 'scan.dialect' = 'mariadb' requires 'scan.incremental.snapshot.enabled' = 'true'");
+    }
+
+    @Test
+    void testInvalidDialect() {
+        Map<String, String> properties = getAllOptions();
+        properties.put("scan.dialect", "postgres");
+        assertThatThrownBy(() -> createTableSource(properties))
+                .hasRootCauseMessage(
+                        "Invalid value for option 'scan.dialect'. Supported values are [mysql, mariadb, auto], but was: postgres");
     }
 
     @Test
     void testValidation() {
         // validate illegal port
-        Assertions.assertThatThrownBy(
+        assertThatThrownBy(
                         () -> {
                             Map<String, String> properties = getAllOptions();
                             properties.put("port", "123b");
@@ -626,7 +699,7 @@ class MySqlTableSourceFactoryTest {
                 .hasStackTraceContaining("Could not parse value '123b' for key 'port'.");
 
         // validate illegal server id
-        Assertions.assertThatThrownBy(
+        assertThatThrownBy(
                         () -> {
                             Map<String, String> properties = getAllOptions();
                             properties.put("server-id", "123b");
@@ -636,7 +709,7 @@ class MySqlTableSourceFactoryTest {
                 .hasStackTraceContaining("The server id 123b is not a valid numeric.");
 
         // validate illegal connect.timeout
-        Assertions.assertThatThrownBy(
+        assertThatThrownBy(
                         () -> {
                             Map<String, String> properties = getAllOptions();
                             properties.put("scan.incremental.snapshot.enabled", "true");
@@ -647,7 +720,7 @@ class MySqlTableSourceFactoryTest {
                         "The value of option 'connect.timeout' cannot be less than PT0.25S, but actual is PT0.24S");
 
         // validate illegal split size
-        Assertions.assertThatThrownBy(
+        assertThatThrownBy(
                         () -> {
                             Map<String, String> properties = getAllOptions();
                             properties.put("scan.incremental.snapshot.enabled", "true");
@@ -660,7 +733,7 @@ class MySqlTableSourceFactoryTest {
 
         // validate illegal fetch size
 
-        Assertions.assertThatThrownBy(
+        assertThatThrownBy(
                         () -> {
                             Map<String, String> properties = getAllOptions();
                             properties.put("scan.incremental.snapshot.enabled", "true");
@@ -671,7 +744,7 @@ class MySqlTableSourceFactoryTest {
                         "The value of option 'scan.snapshot.fetch.size' must larger than 1, but is 1");
 
         // validate illegal split meta group size
-        Assertions.assertThatThrownBy(
+        assertThatThrownBy(
                         () -> {
                             Map<String, String> properties = getAllOptions();
                             properties.put("scan.incremental.snapshot.enabled", "true");
@@ -682,7 +755,7 @@ class MySqlTableSourceFactoryTest {
                         "The value of option 'chunk-meta.group.size' must larger than 1, but is 1");
 
         // validate illegal split meta group size
-        Assertions.assertThatThrownBy(
+        assertThatThrownBy(
                         () -> {
                             Map<String, String> properties = getAllOptions();
                             properties.put("scan.incremental.snapshot.enabled", "true");
@@ -693,7 +766,7 @@ class MySqlTableSourceFactoryTest {
                         "The value of option 'chunk-key.even-distribution.factor.upper-bound' must larger than or equals 1.0, but is 0.8");
 
         // validate illegal connection pool size
-        Assertions.assertThatThrownBy(
+        assertThatThrownBy(
                         () -> {
                             Map<String, String> properties = getAllOptions();
                             properties.put("scan.incremental.snapshot.enabled", "true");
@@ -704,7 +777,7 @@ class MySqlTableSourceFactoryTest {
                         "The value of option 'connection.pool.size' must larger than 1, but is 1");
 
         // validate illegal connect max retry times
-        Assertions.assertThatThrownBy(
+        assertThatThrownBy(
                         () -> {
                             Map<String, String> properties = getAllOptions();
                             properties.put("scan.incremental.snapshot.enabled", "true");
@@ -719,13 +792,13 @@ class MySqlTableSourceFactoryTest {
         for (ConfigOption<?> requiredOption : factory.requiredOptions()) {
             Map<String, String> properties = getAllOptions();
             properties.remove(requiredOption.key());
-            Assertions.assertThatThrownBy(() -> createTableSource(properties))
+            assertThatThrownBy(() -> createTableSource(properties))
                     .hasStackTraceContaining(
                             "Missing required options are:\n\n" + requiredOption.key());
         }
 
         // validate unsupported option
-        Assertions.assertThatThrownBy(
+        assertThatThrownBy(
                         () -> {
                             Map<String, String> properties = getAllOptions();
                             properties.put("unknown", "abc");
@@ -734,7 +807,7 @@ class MySqlTableSourceFactoryTest {
                 .hasStackTraceContaining("Unsupported options:\n\nunknown");
 
         // validate unsupported option
-        Assertions.assertThatThrownBy(
+        assertThatThrownBy(
                         () -> {
                             Map<String, String> properties = getAllOptions();
                             properties.put("scan.startup.mode", "abc");
@@ -746,7 +819,7 @@ class MySqlTableSourceFactoryTest {
                                 + "but was: abc");
 
         // validate invalid database-name
-        Assertions.assertThatThrownBy(
+        assertThatThrownBy(
                         () -> {
                             Map<String, String> properties = getAllOptions();
                             properties.put("database-name", "*_invalid_db");
@@ -758,7 +831,7 @@ class MySqlTableSourceFactoryTest {
                                 "*_invalid_db"));
 
         // validate invalid table-name
-        Assertions.assertThatThrownBy(
+        assertThatThrownBy(
                         () -> {
                             Map<String, String> properties = getAllOptions();
                             properties.put("table-name", "*_invalid_table");
@@ -810,8 +883,9 @@ class MySqlTableSourceFactoryTest {
                         true,
                         true,
                         true,
-                        false);
-        Assertions.assertThat(actualSource).isEqualTo(expectedSource);
+                        false,
+                        "auto");
+        assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     private Map<String, String> getAllOptions() {

@@ -21,7 +21,6 @@ import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.annotation.PublicEvolving;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 
-import io.debezium.connector.mysql.GtidSet;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.connect.errors.ConnectException;
 
@@ -188,9 +187,11 @@ public class BinlogOffset implements Comparable<BinlogOffset>, Serializable {
             // The target offset uses GTIDs, so we ideally compare using GTIDs ...
             if (StringUtils.isNotEmpty(gtidSetStr)) {
                 // Both have GTIDs, so base the comparison entirely on the GTID sets.
-                GtidSet gtidSet = new GtidSet(gtidSetStr);
-                GtidSet targetGtidSet = new GtidSet(targetGtidSetStr);
-                if (gtidSet.equals(targetGtidSet)) {
+                // The dialect is recovered from the GTID text,
+                // so MariaDB sets compare with server-id-ignoring semantics
+                // while MySQL keeps its uuid:interval behavior.
+                GtidStrategy strategy = GtidStrategies.detect(targetGtidSetStr);
+                if (strategy.isEqual(gtidSetStr, targetGtidSetStr)) {
                     long restartSkipEvents = this.getRestartSkipEvents();
                     long targetRestartSkipEvents = that.getRestartSkipEvents();
                     if (restartSkipEvents != targetRestartSkipEvents) {
@@ -202,7 +203,7 @@ public class BinlogOffset implements Comparable<BinlogOffset>, Serializable {
                 // The GTIDs are not an exact match, so figure out if this is a subset of the target
                 // offset
                 // ...
-                return gtidSet.isContainedWithin(targetGtidSet) ? -1 : 1;
+                return strategy.isContainedWithin(gtidSetStr, targetGtidSetStr) ? -1 : 1;
             }
             // The target offset did use GTIDs while this did not use GTIDs. So, we assume
             // that this offset is older since GTIDs are often enabled but rarely disabled.

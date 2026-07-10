@@ -23,6 +23,10 @@ import org.apache.flink.cdc.connectors.mysql.debezium.dispatcher.EventDispatcher
 import org.apache.flink.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
+import org.apache.flink.cdc.connectors.mysql.source.offset.GtidStrategies;
+import org.apache.flink.cdc.connectors.mysql.source.offset.GtidStrategy;
+import org.apache.flink.cdc.connectors.mysql.source.offset.MariaDbGtidStrategy;
+import org.apache.flink.cdc.connectors.mysql.source.offset.MysqlGtidStrategy;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplit;
 
 import com.github.shyiko.mysql.binlog.BinaryLogClient;
@@ -53,6 +57,7 @@ import io.debezium.schema.TopicSelector;
 import io.debezium.util.Clock;
 import io.debezium.util.Collect;
 import io.debezium.util.SchemaNameAdjuster;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.connect.data.Struct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -84,6 +89,8 @@ public class StatefulTaskContext implements AutoCloseable {
     private final MySqlConnection connection;
     private final BinaryLogClient binaryLogClient;
 
+    private String resolvedDialect = MysqlGtidStrategy.DIALECT;
+
     private MySqlDatabaseSchema databaseSchema;
     private MySqlTaskContextImpl taskContext;
     private MySqlOffsetContext offsetContext;
@@ -112,6 +119,9 @@ public class StatefulTaskContext implements AutoCloseable {
     public void configure(MySqlSplit mySqlSplit) {
         // initial stateful objects
         final boolean tableIdCaseInsensitive = connection.isTableIdCaseSensitive();
+        // Resolve the effective dialect once; reused by the offset initialization,
+        // GTID restore check, and the streaming connect path.
+        this.resolvedDialect = DebeziumUtils.discoverDialect(connection, sourceConfig.getDialect());
         this.topicSelector = MySqlTopicSelector.defaultSelector(connectorConfig);
         EmbeddedFlinkDatabaseHistory.registerHistory(
                 sourceConfig
@@ -195,7 +205,8 @@ public class StatefulTaskContext implements AutoCloseable {
                         : initializeEffectiveOffset(
                                 mySqlSplit.asBinlogSplit().getStartingOffset(),
                                 connection,
-                                sourceConfig);
+                                sourceConfig,
+                                resolvedDialect);
 
         LOG.info("Starting offset is initialized to {}", offset);
 
@@ -225,6 +236,10 @@ public class StatefulTaskContext implements AutoCloseable {
 
         if (gtidStr.trim().isEmpty()) {
             return true; // start at beginning ...
+        }
+
+        if (MariaDbGtidStrategy.DIALECT.equalsIgnoreCase(resolvedDialect)) {
+            return checkMariadbGtidSet(gtidStr);
         }
 
         String availableGtidStr = connection.knownGtidSet();
@@ -273,6 +288,27 @@ public class StatefulTaskContext implements AutoCloseable {
         }
         LOG.info("Connector last known GTIDs are {}, but MySQL has {}", gtidSet, availableGtidSet);
         return false;
+    }
+
+    private boolean checkMariadbGtidSet(String restoredGtid) {
+        String available = connection.mariadbGtidExecuted();
+        if (StringUtils.isBlank(available)) {
+            LOG.warn(
+                    "Connector used MariaDB GTID previously, but the server reports no @@gtid_binlog_pos");
+            return false;
+        }
+
+        GtidStrategy strategy = GtidStrategies.of(MariaDbGtidStrategy.DIALECT);
+        String fixed = strategy.fixRestoredGtidSet(available, restoredGtid);
+        boolean contained = strategy.isContainedWithin(fixed, available);
+        if (!contained) {
+            LOG.info(
+                    "MariaDB restored GTID set {} (fixed {}) is not contained within server set {}",
+                    restoredGtid,
+                    fixed,
+                    available);
+        }
+        return contained;
     }
 
     private boolean checkBinlogFilename(MySqlOffsetContext offset) {
@@ -386,6 +422,10 @@ public class StatefulTaskContext implements AutoCloseable {
 
     public MySqlConnection getConnection() {
         return connection;
+    }
+
+    public String getResolvedDialect() {
+        return resolvedDialect;
     }
 
     public BinaryLogClient getBinaryLogClient() {

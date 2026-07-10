@@ -305,6 +305,26 @@ public class MySqlConnection extends JdbcConnection {
     }
 
     /**
+     * return the GTID set present in MariaDB's binary log "@@gtid_binlog_pos" Empty string if none.
+     */
+    public String mariadbGtidExecuted() {
+        try {
+            return queryAndMap(
+                    "SELECT @@gtid_binlog_pos",
+                    rs -> {
+                        if (rs.next() && rs.getMetaData().getColumnCount() > 0) {
+                            String v = rs.getString(1);
+                            return v == null ? "" : v;
+                        }
+                        return "";
+                    });
+        } catch (SQLException e) {
+            throw new DebeziumException(
+                    "Unexpect error while reading MariaDB @@gtid_binlog_pos: ", e);
+        }
+    }
+
+    /**
      * Determine the difference between two sets.
      *
      * @return a subtraction of two GTID sets; never null
