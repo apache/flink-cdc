@@ -75,7 +75,8 @@ public class MariaDbGtidStrategy implements GtidStrategy {
         Map<Long, Long> serverSeq = toDomainSequence(server);
         // Preserver the restored tuples (domain-server-sequence); only lower the sequence where the
         // server is behind for that domain. Domains absent from the server are kept verbatim.
-        // The server id from the restored tuple is preserved failover correctness keys on the domain.
+        // The server id from the restored tuple is preserved failover correctness keys on the
+        // domain.
         StringBuilder sb = new StringBuilder();
         for (String tuple : splitTuples(restored)) {
             String[] parts = tuple.split("-");
