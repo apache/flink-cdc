@@ -248,8 +248,8 @@ public class BucketAssignOperator extends AbstractStreamOperatorAdapter<Event>
                         catalog.getTable(PaimonWriterHelper.identifierFromTableId(tableId)));
         MixedSchemaInfo mixedSchemaInfo =
                 new MixedSchemaInfo(
-                        new TableSchemaInfo(upstreamSchema, zoneId),
-                        new TableSchemaInfo(physicalSchema, zoneId));
+                        new TableSchemaInfo(upstreamSchema, zoneId, null),
+                        new TableSchemaInfo(physicalSchema, zoneId, null));
         if (!mixedSchemaInfo.isSameColumnsIgnoringCommentAndDefaultValue()) {
             LOGGER.warn(
                     "Upstream schema of {} is {}, which is different with paimon physical table schema {}. Data precision loss and truncation may occur.",
@@ -276,13 +276,14 @@ public class BucketAssignOperator extends AbstractStreamOperatorAdapter<Event>
             if (schema.isPresent()) {
                 MixedSchemaInfo mixedSchemaInfo =
                         new MixedSchemaInfo(
-                                new TableSchemaInfo(schema.get(), zoneId),
+                                new TableSchemaInfo(schema.get(), zoneId, null),
                                 new TableSchemaInfo(
                                         PaimonWriterHelper.deduceSchemaForPaimonTable(
                                                 catalog.getTable(
                                                         PaimonWriterHelper.identifierFromTableId(
                                                                 tableId))),
-                                        zoneId));
+                                        zoneId,
+                                        null));
                 if (!mixedSchemaInfo.isSameColumnsIgnoringCommentAndDefaultValue()) {
                     LOGGER.warn(
                             "Upstream schema of {} is {}, which is different with paimon physical table schema {}. Data precision loss and truncation may occur.",

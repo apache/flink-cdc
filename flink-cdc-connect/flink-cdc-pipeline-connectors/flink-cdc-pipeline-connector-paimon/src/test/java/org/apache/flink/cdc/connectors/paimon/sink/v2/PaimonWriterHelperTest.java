@@ -35,12 +35,15 @@ import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.common.types.variant.BinaryVariantInternalBuilder;
 import org.apache.flink.cdc.connectors.paimon.sink.PaimonMetadataApplier;
+import org.apache.flink.cdc.connectors.paimon.sink.v2.blob.BlobWriteContext;
 import org.apache.flink.cdc.runtime.serializer.data.MapDataSerializer;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 
+import org.apache.paimon.CoreOptions;
 import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.catalog.Identifier;
 import org.apache.paimon.data.BinaryString;
+import org.apache.paimon.data.Blob;
 import org.apache.paimon.data.Decimal;
 import org.apache.paimon.data.GenericRow;
 import org.apache.paimon.data.InternalMap;
@@ -50,6 +53,7 @@ import org.apache.paimon.data.variant.GenericVariant;
 import org.apache.paimon.flink.FlinkCatalogFactory;
 import org.apache.paimon.options.Options;
 import org.apache.paimon.table.Table;
+import org.apache.paimon.types.DataTypeRoot;
 import org.apache.paimon.types.RowKind;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -473,6 +477,365 @@ class PaimonWriterHelperTest {
                         PaimonWriterHelper.sameColumnsIgnoreCommentAndDefaultValue(
                                 deducedSchema, allTypeSchema))
                 .isTrue();
+    }
+
+    // ========== BLOB type support tests ==========
+
+    @Test
+    void testCreateFieldGettersWithBlobWriteContext() throws IOException {
+        RowType rowType =
+                RowType.of(DataTypes.INT(), DataTypes.VARBINARY(100), DataTypes.VARBINARY(50));
+        Object[] testData =
+                new Object[] {1, new byte[] {1, 2, 3, 4, 5}, new byte[] {6, 7, 8, 9, 10}};
+        BinaryRecordData recordData = new BinaryRecordDataGenerator(rowType).generate(testData);
+        Schema schema = Schema.newBuilder().fromRowDataType(rowType).build();
+
+        // Create BlobWriteContext with "col2" as blob field
+        BlobWriteContext blobWriteContext = BlobWriteContext.empty();
+        // Note: We can't directly set blob fields, but we can test the empty case
+        List<RecordData.FieldGetter> fieldGettersNoBlob =
+                PaimonWriterHelper.createFieldGetters(schema, ZoneId.of("UTC+8"), blobWriteContext);
+
+        DataChangeEvent dataChangeEvent =
+                DataChangeEvent.insertEvent(TableId.parse("database.table"), recordData);
+        GenericRow genericRow =
+                PaimonWriterHelper.convertEventToGenericRow(dataChangeEvent, fieldGettersNoBlob);
+
+        // Without BlobWriteContext, VARBINARY should remain as byte[]
+        Assertions.assertThat(genericRow.getField(1)).isInstanceOf(byte[].class);
+        Assertions.assertThat(genericRow.getField(2)).isInstanceOf(byte[].class);
+    }
+
+    @Test
+    void testDeduceSchemaForPaimonTableWithBlobType() throws Catalog.TableNotExistException {
+        Options catalogOptions = new Options();
+        String warehouse =
+                new File(temporaryFolder.toFile(), UUID.randomUUID().toString()).toString();
+        catalogOptions.setString("warehouse", warehouse);
+        catalogOptions.setString("cache-enabled", "false");
+
+        // Create an append-only table with BLOB column using PaimonMetadataApplier
+        Map<String, String> tableOptions = new HashMap<>();
+        tableOptions.put(CoreOptions.BLOB_FIELD.key(), "blob_col");
+        tableOptions.put(CoreOptions.ROW_TRACKING_ENABLED.key(), "true");
+        tableOptions.put(CoreOptions.DATA_EVOLUTION_ENABLED.key(), "true");
+
+        PaimonMetadataApplier metadataApplier =
+                new PaimonMetadataApplier(catalogOptions, tableOptions, new HashMap<>());
+
+        Schema cdcSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT().notNull())
+                        .physicalColumn("blob_col", DataTypes.VARBINARY(100))
+                        .physicalColumn("normal_varbinary", DataTypes.VARBINARY(50))
+                        .build();
+
+        CreateTableEvent createTableEvent =
+                new CreateTableEvent(TableId.parse("test.blob_table"), cdcSchema);
+        metadataApplier.applySchemaChange(createTableEvent);
+
+        Catalog catalog = FlinkCatalogFactory.createPaimonCatalog(catalogOptions);
+        Table table = catalog.getTable(Identifier.fromString("test.blob_table"));
+
+        // Verify the table has BLOB type for blob_col
+        org.apache.paimon.types.RowType paimonRowType = table.rowType();
+        Assertions.assertThat(paimonRowType.getField("blob_col").type().getTypeRoot())
+                .isEqualTo(DataTypeRoot.BLOB);
+        Assertions.assertThat(paimonRowType.getField("normal_varbinary").type().getTypeRoot())
+                .isEqualTo(DataTypeRoot.VARBINARY);
+
+        // Verify deduceSchemaForPaimonTable converts BLOB back to VARBINARY
+        // (raw data mode: no blob-descriptor-field configured)
+        Schema deducedSchema = PaimonWriterHelper.deduceSchemaForPaimonTable(table);
+        Assertions.assertThat(deducedSchema.getColumns().get(1).getType().getTypeRoot())
+                .isEqualTo(org.apache.flink.cdc.common.types.DataTypeRoot.VARBINARY);
+        Assertions.assertThat(deducedSchema.getColumns().get(2).getType().getTypeRoot())
+                .isEqualTo(org.apache.flink.cdc.common.types.DataTypeRoot.VARBINARY);
+    }
+
+    @Test
+    void testDeduceSchemaForPaimonTableWithBlobDescriptorField()
+            throws Catalog.TableNotExistException {
+        Options catalogOptions = new Options();
+        String warehouse =
+                new File(temporaryFolder.toFile(), UUID.randomUUID().toString()).toString();
+        catalogOptions.setString("warehouse", warehouse);
+        catalogOptions.setString("cache-enabled", "false");
+
+        // Create table with blob-descriptor-field configuration (descriptor mode)
+        // In descriptor mode, blob column stores URI/path string instead of raw bytes
+        Map<String, String> tableOptions = new HashMap<>();
+        tableOptions.put(CoreOptions.BLOB_FIELD.key(), "descriptor_blob,raw_blob");
+        tableOptions.put(CoreOptions.BLOB_DESCRIPTOR_FIELD.key(), "descriptor_blob");
+        tableOptions.put(CoreOptions.ROW_TRACKING_ENABLED.key(), "true");
+        tableOptions.put(CoreOptions.DATA_EVOLUTION_ENABLED.key(), "true");
+        tableOptions.put(CoreOptions.BUCKET.key(), "-1");
+
+        PaimonMetadataApplier metadataApplier =
+                new PaimonMetadataApplier(catalogOptions, tableOptions, new HashMap<>());
+
+        Schema cdcSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT().notNull())
+                        .physicalColumn("descriptor_blob", DataTypes.STRING()) // URI path string
+                        .physicalColumn("raw_blob", DataTypes.VARBINARY(100)) // Raw bytes
+                        .build();
+
+        CreateTableEvent createTableEvent =
+                new CreateTableEvent(TableId.parse("test.blob_descriptor_schema_table"), cdcSchema);
+        metadataApplier.applySchemaChange(createTableEvent);
+
+        Catalog catalog = FlinkCatalogFactory.createPaimonCatalog(catalogOptions);
+        Table table = catalog.getTable(Identifier.fromString("test.blob_descriptor_schema_table"));
+
+        // Verify both columns become BLOB type in Paimon table
+        org.apache.paimon.types.RowType paimonRowType = table.rowType();
+        Assertions.assertThat(paimonRowType.getField("descriptor_blob").type().getTypeRoot())
+                .isEqualTo(DataTypeRoot.BLOB);
+        Assertions.assertThat(paimonRowType.getField("raw_blob").type().getTypeRoot())
+                .isEqualTo(DataTypeRoot.BLOB);
+
+        // Verify deduceSchemaForPaimonTable correctly converts:
+        // - descriptor_blob (blob-descriptor-field) → STRING
+        // - raw_blob (no blob-descriptor-field) → VARBINARY
+        Schema deducedSchema = PaimonWriterHelper.deduceSchemaForPaimonTable(table);
+        Assertions.assertThat(deducedSchema.getColumns().get(1).getName())
+                .isEqualTo("descriptor_blob");
+        Assertions.assertThat(deducedSchema.getColumns().get(1).getType().getTypeRoot())
+                .isEqualTo(org.apache.flink.cdc.common.types.DataTypeRoot.VARCHAR);
+        Assertions.assertThat(deducedSchema.getColumns().get(2).getName()).isEqualTo("raw_blob");
+        Assertions.assertThat(deducedSchema.getColumns().get(2).getType().getTypeRoot())
+                .isEqualTo(org.apache.flink.cdc.common.types.DataTypeRoot.VARBINARY);
+    }
+
+    @Test
+    void testBlobWriteContextCreateBlobFromBytes() {
+        BlobWriteContext context = BlobWriteContext.empty();
+
+        // Test createBlob(byte[]) - 方式A: direct data storage
+        byte[] testData = new byte[] {1, 2, 3, 4, 5};
+        Blob blob = context.createBlob(testData);
+
+        Assertions.assertThat(blob).isNotNull();
+        Assertions.assertThat(blob.toData()).isEqualTo(testData);
+
+        // Test createBlob with null bytes
+        Blob nullBlob = context.createBlob((byte[]) null);
+        Assertions.assertThat(nullBlob).isNull();
+    }
+
+    @Test
+    void testBlobWriteContextFromTableWithBlobDescriptorField()
+            throws Catalog.TableNotExistException, IOException {
+        Options catalogOptions = new Options();
+        String warehouse =
+                new File(temporaryFolder.toFile(), UUID.randomUUID().toString()).toString();
+        catalogOptions.setString("warehouse", warehouse);
+        catalogOptions.setString("cache-enabled", "false");
+
+        // Create an append-only table with blob-descriptor-field
+        Map<String, String> tableOptions = new HashMap<>();
+        tableOptions.put(CoreOptions.BLOB_FIELD.key(), "blob_col");
+        tableOptions.put(CoreOptions.BLOB_DESCRIPTOR_FIELD.key(), "blob_col"); // descriptor mode
+        tableOptions.put(CoreOptions.ROW_TRACKING_ENABLED.key(), "true");
+        tableOptions.put(CoreOptions.DATA_EVOLUTION_ENABLED.key(), "true");
+        tableOptions.put(CoreOptions.BUCKET.key(), "-1");
+
+        PaimonMetadataApplier metadataApplier =
+                new PaimonMetadataApplier(catalogOptions, tableOptions, new HashMap<>());
+
+        Schema cdcSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT().notNull())
+                        .physicalColumn("blob_col", DataTypes.STRING()) // String path
+                        .build();
+
+        CreateTableEvent createTableEvent =
+                new CreateTableEvent(TableId.parse("test.blob_descriptor_field_table"), cdcSchema);
+        metadataApplier.applySchemaChange(createTableEvent);
+
+        Catalog catalog = FlinkCatalogFactory.createPaimonCatalog(catalogOptions);
+        org.apache.paimon.table.FileStoreTable table =
+                (org.apache.paimon.table.FileStoreTable)
+                        catalog.getTable(Identifier.fromString("test.blob_descriptor_field_table"));
+
+        // Create BlobWriteContext from table (case-sensitive mode)
+        BlobWriteContext blobWriteContext = BlobWriteContext.fromTable(true, table);
+
+        // Verify blob-descriptor-field is parsed correctly
+        Assertions.assertThat(blobWriteContext.isBlobDescriptorField("blob_col")).isTrue();
+        Assertions.assertThat(blobWriteContext.isBlobDescriptorField("BLOB_COL"))
+                .isFalse(); // case-sensitive
+        Assertions.assertThat(blobWriteContext.getBlobDescriptorFields()).contains("blob_col");
+        Assertions.assertThat(blobWriteContext.isBlobField("blob_col")).isTrue();
+        Assertions.assertThat(blobWriteContext.isBlobField("BLOB_COL")).isFalse(); // case-sensitive
+
+        // Test createBlobRef works correctly - stores descriptor info only
+        String externalPath = "oss://bucket/data/video.mp4";
+        Blob blobRef = blobWriteContext.createBlobRef(externalPath);
+        Assertions.assertThat(blobRef).isNotNull();
+        org.apache.paimon.data.BlobDescriptor descriptor = blobRef.toDescriptor();
+        Assertions.assertThat(descriptor.uri()).isEqualTo(externalPath);
+    }
+
+    @Test
+    void testBlobWriteContextMixedDescriptorAndRawBlobFields()
+            throws Catalog.TableNotExistException, IOException {
+        Options catalogOptions = new Options();
+        String warehouse =
+                new File(temporaryFolder.toFile(), UUID.randomUUID().toString()).toString();
+        catalogOptions.setString("warehouse", warehouse);
+        catalogOptions.setString("cache-enabled", "false");
+
+        // Create table with multiple blob fields: some descriptor, some raw
+        Map<String, String> tableOptions = new HashMap<>();
+        tableOptions.put(CoreOptions.BLOB_FIELD.key(), "descriptor_blob,raw_blob");
+        tableOptions.put(
+                CoreOptions.BLOB_DESCRIPTOR_FIELD.key(),
+                "descriptor_blob"); // Only descriptor_blob preserves path
+        tableOptions.put(CoreOptions.ROW_TRACKING_ENABLED.key(), "true");
+        tableOptions.put(CoreOptions.DATA_EVOLUTION_ENABLED.key(), "true");
+        tableOptions.put(CoreOptions.BUCKET.key(), "-1");
+
+        PaimonMetadataApplier metadataApplier =
+                new PaimonMetadataApplier(catalogOptions, tableOptions, new HashMap<>());
+
+        Schema cdcSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT().notNull())
+                        .physicalColumn("descriptor_blob", DataTypes.STRING()) // Path string
+                        .physicalColumn("raw_blob", DataTypes.VARBINARY(100)) // Raw bytes
+                        .build();
+
+        CreateTableEvent createTableEvent =
+                new CreateTableEvent(TableId.parse("test.mixed_blob_table"), cdcSchema);
+        metadataApplier.applySchemaChange(createTableEvent);
+
+        Catalog catalog = FlinkCatalogFactory.createPaimonCatalog(catalogOptions);
+        org.apache.paimon.table.FileStoreTable table =
+                (org.apache.paimon.table.FileStoreTable)
+                        catalog.getTable(Identifier.fromString("test.mixed_blob_table"));
+
+        // Create BlobWriteContext from table (case-sensitive mode)
+        BlobWriteContext blobWriteContext = BlobWriteContext.fromTable(true, table);
+
+        // Verify correct classification
+        Assertions.assertThat(blobWriteContext.isBlobField("descriptor_blob")).isTrue();
+        Assertions.assertThat(blobWriteContext.isBlobField("raw_blob")).isTrue();
+        Assertions.assertThat(blobWriteContext.isBlobField("Descriptor_Blob"))
+                .isFalse(); // case-sensitive
+        Assertions.assertThat(blobWriteContext.isBlobDescriptorField("descriptor_blob")).isTrue();
+        Assertions.assertThat(blobWriteContext.isBlobDescriptorField("raw_blob")).isFalse();
+        Assertions.assertThat(blobWriteContext.isBlobDescriptorField("Descriptor_Blob"))
+                .isFalse(); // case-sensitive
+
+        // Verify createBlobRef for descriptor field
+        String externalPath = "file:///data/image.png";
+        Blob descriptorBlob = blobWriteContext.createBlobRef(externalPath);
+        Assertions.assertThat(descriptorBlob).isNotNull();
+        org.apache.paimon.data.BlobDescriptor descriptor = descriptorBlob.toDescriptor();
+        Assertions.assertThat(descriptor.uri()).isEqualTo(externalPath);
+
+        // Verify createBlob(byte[]) for raw field
+        byte[] rawData = new byte[] {1, 2, 3, 4, 5};
+        Blob rawBlob = blobWriteContext.createBlob(rawData);
+        Assertions.assertThat(rawBlob).isNotNull();
+        Assertions.assertThat(rawBlob.toData()).isEqualTo(rawData);
+    }
+
+    @Test
+    void testBlobWriteContextCaseInsensitive() throws Catalog.TableNotExistException, IOException {
+        Options catalogOptions = new Options();
+        String warehouse =
+                new File(temporaryFolder.toFile(), UUID.randomUUID().toString()).toString();
+        catalogOptions.setString("warehouse", warehouse);
+        catalogOptions.setString("cache-enabled", "false");
+
+        // Create table with blob fields (use lowercase in config, matching CDC schema column name)
+        Map<String, String> tableOptions = new HashMap<>();
+        tableOptions.put(CoreOptions.BLOB_FIELD.key(), "blob_col");
+        tableOptions.put(CoreOptions.BLOB_DESCRIPTOR_FIELD.key(), "blob_col");
+        tableOptions.put(CoreOptions.ROW_TRACKING_ENABLED.key(), "true");
+        tableOptions.put(CoreOptions.DATA_EVOLUTION_ENABLED.key(), "true");
+        tableOptions.put(CoreOptions.BUCKET.key(), "-1");
+
+        PaimonMetadataApplier metadataApplier =
+                new PaimonMetadataApplier(catalogOptions, tableOptions, new HashMap<>());
+
+        Schema cdcSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT().notNull())
+                        .physicalColumn("blob_col", DataTypes.STRING())
+                        .build();
+
+        CreateTableEvent createTableEvent =
+                new CreateTableEvent(TableId.parse("test.case_insensitive_blob_table"), cdcSchema);
+        metadataApplier.applySchemaChange(createTableEvent);
+
+        Catalog catalog = FlinkCatalogFactory.createPaimonCatalog(catalogOptions);
+        org.apache.paimon.table.FileStoreTable table =
+                (org.apache.paimon.table.FileStoreTable)
+                        catalog.getTable(Identifier.fromString("test.case_insensitive_blob_table"));
+
+        // Create BlobWriteContext with case-insensitive mode
+        BlobWriteContext blobWriteContext = BlobWriteContext.fromTable(false, table);
+
+        // Verify field names can match both uppercase and lowercase queries when case-insensitive
+        Assertions.assertThat(blobWriteContext.isBlobField("blob_col")).isTrue();
+        Assertions.assertThat(blobWriteContext.isBlobField("BLOB_COL")).isTrue();
+        Assertions.assertThat(blobWriteContext.isBlobField("Blob_Col")).isTrue();
+        Assertions.assertThat(blobWriteContext.isBlobDescriptorField("blob_col")).isTrue();
+        Assertions.assertThat(blobWriteContext.isBlobDescriptorField("BLOB_COL")).isTrue();
+        Assertions.assertThat(blobWriteContext.isBlobDescriptorField("Blob_Col")).isTrue();
+
+        // Verify internal storage is lowercase
+        Assertions.assertThat(blobWriteContext.getBlobFields()).contains("blob_col");
+        Assertions.assertThat(blobWriteContext.getBlobDescriptorFields()).contains("blob_col");
+    }
+
+    @Test
+    void testBlobWriteContextCaseSensitiveMismatch()
+            throws Catalog.TableNotExistException, IOException {
+        Options catalogOptions = new Options();
+        String warehouse =
+                new File(temporaryFolder.toFile(), UUID.randomUUID().toString()).toString();
+        catalogOptions.setString("warehouse", warehouse);
+        catalogOptions.setString("cache-enabled", "false");
+
+        // Create table with blob fields in lowercase config
+        Map<String, String> tableOptions = new HashMap<>();
+        tableOptions.put(CoreOptions.BLOB_FIELD.key(), "blob_col");
+        tableOptions.put(CoreOptions.BLOB_DESCRIPTOR_FIELD.key(), "blob_col");
+        tableOptions.put(CoreOptions.ROW_TRACKING_ENABLED.key(), "true");
+        tableOptions.put(CoreOptions.DATA_EVOLUTION_ENABLED.key(), "true");
+        tableOptions.put(CoreOptions.BUCKET.key(), "-1");
+
+        PaimonMetadataApplier metadataApplier =
+                new PaimonMetadataApplier(catalogOptions, tableOptions, new HashMap<>());
+
+        Schema cdcSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT().notNull())
+                        .physicalColumn("blob_col", DataTypes.STRING())
+                        .build();
+
+        CreateTableEvent createTableEvent =
+                new CreateTableEvent(TableId.parse("test.case_sensitive_blob_table"), cdcSchema);
+        metadataApplier.applySchemaChange(createTableEvent);
+
+        Catalog catalog = FlinkCatalogFactory.createPaimonCatalog(catalogOptions);
+        org.apache.paimon.table.FileStoreTable table =
+                (org.apache.paimon.table.FileStoreTable)
+                        catalog.getTable(Identifier.fromString("test.case_sensitive_blob_table"));
+
+        // Create BlobWriteContext with case-sensitive mode
+        BlobWriteContext blobWriteContext = BlobWriteContext.fromTable(true, table);
+
+        // Verify only exact case match works
+        Assertions.assertThat(blobWriteContext.isBlobField("blob_col")).isTrue();
+        Assertions.assertThat(blobWriteContext.isBlobField("BLOB_COL")).isFalse();
+        Assertions.assertThat(blobWriteContext.isBlobDescriptorField("blob_col")).isTrue();
+        Assertions.assertThat(blobWriteContext.isBlobDescriptorField("BLOB_COL")).isFalse();
     }
 
     private static Map<BinaryString, BinaryString> extractMap(InternalMap internalMap) {

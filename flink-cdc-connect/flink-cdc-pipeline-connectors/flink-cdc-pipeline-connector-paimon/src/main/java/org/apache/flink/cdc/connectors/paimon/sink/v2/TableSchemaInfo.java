@@ -19,6 +19,9 @@ package org.apache.flink.cdc.connectors.paimon.sink.v2;
 
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.connectors.paimon.sink.v2.blob.BlobWriteContext;
+
+import javax.annotation.Nullable;
 
 import java.time.ZoneId;
 import java.util.List;
@@ -28,13 +31,17 @@ public class TableSchemaInfo {
 
     private final Schema schema;
 
-    private final List<RecordData.FieldGetter> fieldGetters;
+    private List<RecordData.FieldGetter> fieldGetters;
 
     private final boolean hasPrimaryKey;
 
-    public TableSchemaInfo(Schema schema, ZoneId zoneId) {
+    @Nullable private BlobWriteContext blobWriteContext;
+
+    public TableSchemaInfo(
+            Schema schema, ZoneId zoneId, @Nullable BlobWriteContext blobWriteContext) {
         this.schema = schema;
-        this.fieldGetters = PaimonWriterHelper.createFieldGetters(schema, zoneId);
+        this.blobWriteContext = blobWriteContext;
+        this.fieldGetters = PaimonWriterHelper.createFieldGetters(schema, zoneId, blobWriteContext);
         this.hasPrimaryKey = !schema.primaryKeys().isEmpty();
     }
 
@@ -48,5 +55,10 @@ public class TableSchemaInfo {
 
     public boolean hasPrimaryKey() {
         return hasPrimaryKey;
+    }
+
+    @Nullable
+    public BlobWriteContext getBlobWriteContext() {
+        return blobWriteContext;
     }
 }

@@ -156,6 +156,7 @@ public class PaimonWriter<InputT>
         if (paimonEvent.getGenericRows() != null) {
             FileStoreTable table;
             table = getTable(tableId);
+
             if (memoryPoolFactory == null) {
                 memoryPoolFactory =
                         new MemoryPoolFactory(

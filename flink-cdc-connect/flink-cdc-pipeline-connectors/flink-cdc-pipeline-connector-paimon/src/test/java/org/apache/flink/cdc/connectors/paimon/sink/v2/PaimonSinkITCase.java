@@ -278,7 +278,8 @@ public class PaimonSinkITCase {
         initialize(metastore);
         PaimonSink<Event> paimonSink =
                 new PaimonSink<>(
-                        catalogOptions, new PaimonRecordEventSerializer(ZoneId.systemDefault()));
+                        catalogOptions,
+                        new PaimonRecordEventSerializer(ZoneId.systemDefault(), catalogOptions));
         PaimonWriter<Event> writer = paimonSink.createWriter(new MockInitContext());
         Committer<MultiTableCommittable> committer =
                 paimonSink.createCommitter(new MockCommitterInitContext());
@@ -340,7 +341,8 @@ public class PaimonSinkITCase {
         initialize(metastore);
         PaimonSink<Event> paimonSink =
                 new PaimonSink<>(
-                        catalogOptions, new PaimonRecordEventSerializer(ZoneId.systemDefault()));
+                        catalogOptions,
+                        new PaimonRecordEventSerializer(ZoneId.systemDefault(), catalogOptions));
         PaimonWriter<Event> writer = paimonSink.createWriter(new MockInitContext());
         Committer<MultiTableCommittable> committer =
                 paimonSink.createCommitter(new MockCommitterInitContext());
@@ -406,7 +408,8 @@ public class PaimonSinkITCase {
         initialize(metastore);
         PaimonSink<Event> paimonSink =
                 new PaimonSink<>(
-                        catalogOptions, new PaimonRecordEventSerializer(ZoneId.systemDefault()));
+                        catalogOptions,
+                        new PaimonRecordEventSerializer(ZoneId.systemDefault(), catalogOptions));
         PaimonWriter<Event> writer = paimonSink.createWriter(new MockInitContext());
         Committer<MultiTableCommittable> committer =
                 paimonSink.createCommitter(new MockCommitterInitContext());
@@ -512,7 +515,8 @@ public class PaimonSinkITCase {
         initialize("filesystem");
         PaimonSink<Event> paimonSink =
                 new PaimonSink<>(
-                        catalogOptions, new PaimonRecordEventSerializer(ZoneId.systemDefault()));
+                        catalogOptions,
+                        new PaimonRecordEventSerializer(ZoneId.systemDefault(), catalogOptions));
         PaimonWriter<Event> writer = paimonSink.createWriter(new MockInitContext());
         Committer<MultiTableCommittable> committer =
                 paimonSink.createCommitter(new MockCommitterInitContext());
@@ -724,7 +728,8 @@ public class PaimonSinkITCase {
         initialize(metastore);
         PaimonSink<Event> paimonSink =
                 new PaimonSink<>(
-                        catalogOptions, new PaimonRecordEventSerializer(ZoneId.systemDefault()));
+                        catalogOptions,
+                        new PaimonRecordEventSerializer(ZoneId.systemDefault(), catalogOptions));
         PaimonWriter<Event> writer = paimonSink.createWriter(new MockInitContext());
         Committer<MultiTableCommittable> committer =
                 paimonSink.createCommitter(new MockCommitterInitContext());
@@ -855,7 +860,8 @@ public class PaimonSinkITCase {
         initialize(metastore);
         PaimonSink<Event> paimonSink =
                 new PaimonSink<>(
-                        catalogOptions, new PaimonRecordEventSerializer(ZoneId.systemDefault()));
+                        catalogOptions,
+                        new PaimonRecordEventSerializer(ZoneId.systemDefault(), catalogOptions));
         PaimonWriter<Event> writer = paimonSink.createWriter(new MockInitContext());
         Committer<MultiTableCommittable> committer =
                 paimonSink.createCommitter(new MockCommitterInitContext());

@@ -31,12 +31,15 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypeChecks;
 import org.apache.flink.cdc.common.types.DataTypeRoot;
+import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.variant.BinaryVariant;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.connectors.paimon.sink.utils.TypeUtils;
+import org.apache.flink.cdc.connectors.paimon.sink.v2.blob.BlobWriteContext;
 import org.apache.flink.cdc.connectors.paimon.sink.v2.bucket.BucketAssignOperator;
 import org.apache.flink.core.memory.MemorySegment;
 
+import org.apache.paimon.CoreOptions;
 import org.apache.paimon.catalog.Identifier;
 import org.apache.paimon.data.BinaryRow;
 import org.apache.paimon.data.BinaryString;
@@ -50,10 +53,13 @@ import org.apache.paimon.table.Table;
 import org.apache.paimon.types.RowKind;
 import org.apache.paimon.types.RowType;
 
+import javax.annotation.Nullable;
+
 import java.nio.ByteBuffer;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.common.types.DataTypeChecks.getFieldCount;
@@ -66,10 +72,26 @@ public class PaimonWriterHelper {
 
     /** create a list of {@link RecordData.FieldGetter} for {@link PaimonWriter}. */
     public static List<RecordData.FieldGetter> createFieldGetters(Schema schema, ZoneId zoneId) {
+        return createFieldGetters(schema, zoneId, null);
+    }
+
+    /**
+     * create a list of {@link RecordData.FieldGetter} for {@link PaimonWriter} with BLOB support.
+     *
+     * @param schema The CDC schema containing column definitions.
+     * @param zoneId The timezone for timestamp conversion.
+     * @param blobWriteContext Optional context for BLOB field handling.
+     * @return List of FieldGetter for converting CDC data to Paimon data.
+     */
+    public static List<RecordData.FieldGetter> createFieldGetters(
+            Schema schema, ZoneId zoneId, @Nullable BlobWriteContext blobWriteContext) {
         List<Column> columns = schema.getColumns();
         List<RecordData.FieldGetter> fieldGetters = new ArrayList<>(columns.size());
         for (int i = 0; i < columns.size(); i++) {
-            fieldGetters.add(createFieldGetter(columns.get(i).getType(), i, zoneId));
+            Column column = columns.get(i);
+            fieldGetters.add(
+                    createFieldGetter(
+                            column.getType(), i, zoneId, blobWriteContext, column.getName()));
         }
         return fieldGetters;
     }
@@ -101,19 +123,64 @@ public class PaimonWriterHelper {
 
     private static RecordData.FieldGetter createFieldGetter(
             DataType fieldType, int fieldPos, ZoneId zoneId) {
+        return createFieldGetter(fieldType, fieldPos, zoneId, null, null);
+    }
+
+    private static RecordData.FieldGetter createFieldGetter(
+            DataType fieldType,
+            int fieldPos,
+            ZoneId zoneId,
+            @Nullable BlobWriteContext blobWriteContext,
+            @Nullable String fieldName) {
         final RecordData.FieldGetter fieldGetter;
         // ordered by type root definition
         switch (fieldType.getTypeRoot()) {
             case CHAR:
             case VARCHAR:
-                fieldGetter = row -> BinaryString.fromString(row.getString(fieldPos).toString());
+                // Check if this field should be converted to BLOB type
+                if (blobWriteContext != null
+                        && fieldName != null
+                        && blobWriteContext.isBlobField(fieldName)) {
+                    if (blobWriteContext.isBlobDescriptorField(fieldName)) {
+                        // blob-descriptor-field mode: Create BlobRef that stores descriptor info.
+                        // Only descriptor (uri, offset, length) is stored inline, external data is
+                        // NOT read or copied. Actual data reading happens on Paimon read side.
+                        fieldGetter =
+                                row -> {
+                                    String path = row.getString(fieldPos).toString();
+                                    return blobWriteContext.createBlobRef(path);
+                                };
+                    } else {
+                        throw new IllegalArgumentException(
+                                String.format(
+                                        "VARCHAR/CHAR blob field '%s' must be configured in 'blob-descriptor-field'. "
+                                                + "For VARCHAR/CHAR fields configured in 'blob-field', you must also configure "
+                                                + "'blob-descriptor-field' to specify which fields store serialized BlobDescriptor bytes inline. "
+                                                + "If you want to write raw blob data from string path, please use VARBINARY/BINARY type instead.",
+                                        fieldName));
+                    }
+                } else {
+                    fieldGetter =
+                            row -> BinaryString.fromString(row.getString(fieldPos).toString());
+                }
                 break;
             case BOOLEAN:
                 fieldGetter = row -> row.getBoolean(fieldPos);
                 break;
             case BINARY:
             case VARBINARY:
-                fieldGetter = row -> row.getBinary(fieldPos);
+                // Check if this field should be converted to BLOB type
+                if (blobWriteContext != null
+                        && fieldName != null
+                        && blobWriteContext.isBlobField(fieldName)) {
+                    fieldGetter =
+                            row -> {
+                                byte[] bytes = row.getBinary(fieldPos);
+                                return blobWriteContext.createBlob(bytes);
+                            };
+                } else {
+                    fieldGetter = row -> row.getBinary(fieldPos);
+                }
                 break;
             case DECIMAL:
                 final int decimalPrecision = DataTypeChecks.getPrecision(fieldType);
@@ -296,11 +363,45 @@ public class PaimonWriterHelper {
         builder.setColumns(
                 rowType.getFields().stream()
                         .map(
-                                column ->
-                                        Column.physicalColumn(
-                                                column.name(),
-                                                TypeUtils.toCDCDataType(column.type()),
-                                                column.description()))
+                                column -> {
+                                    org.apache.flink.cdc.common.types.DataType cdcType;
+                                    // Handle BLOB type: Paimon BLOB → CDC VARBINARY or STRING
+                                    //
+                                    // Paimon supports two blob storage modes:
+                                    // 1. Raw data mode: VARBINARY/BINARY → BlobData → written to
+                                    // .blob files
+                                    // 2. Descriptor mode: STRING → BlobRef → only descriptor (uri,
+                                    // offset, length)
+                                    //    stored inline, actual data remains in external storage
+                                    //
+                                    // For descriptor mode fields (configured via
+                                    // blob-descriptor-field option),
+                                    // the upstream provides URI/path strings, so CDC type should be
+                                    // STRING.
+                                    // For raw data mode fields, the upstream provides raw bytes, so
+                                    // CDC type
+                                    // should be VARBINARY.
+                                    if (column.type().getTypeRoot()
+                                            == org.apache.paimon.types.DataTypeRoot.BLOB) {
+                                        CoreOptions coreOptions =
+                                                CoreOptions.fromMap(table.options());
+                                        Set<String> blobDescriptorFields =
+                                                coreOptions.blobDescriptorField();
+                                        if (blobDescriptorFields.contains(column.name())) {
+                                            // Descriptor mode: upstream provides URI string
+                                            cdcType = DataTypes.STRING();
+                                        } else {
+                                            // Raw data mode: upstream provides raw bytes
+                                            cdcType = DataTypes.VARBINARY(Integer.MAX_VALUE);
+                                        }
+                                    } else {
+                                        // Use TypeUtils.toCDCDataType which handles VARIANT type
+                                        // properly
+                                        cdcType = TypeUtils.toCDCDataType(column.type());
+                                    }
+                                    return Column.physicalColumn(
+                                            column.name(), cdcType, column.description());
+                                })
                         .collect(Collectors.toList()));
         builder.primaryKey(table.primaryKeys());
         table.comment().ifPresent(builder::comment);
