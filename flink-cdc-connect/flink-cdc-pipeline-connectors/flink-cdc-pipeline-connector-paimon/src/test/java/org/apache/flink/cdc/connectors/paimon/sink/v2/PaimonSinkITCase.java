@@ -216,7 +216,18 @@ public class PaimonSinkITCase {
                         .physicalColumn("col2", STRING())
                         .option("deletion-vectors.enabled", String.valueOf(enableDeleteVectors))
                         .build();
-        CreateTableEvent createTableEvent = new CreateTableEvent(table1, schema);
+
+        Schema upstreamSchema = schema;
+        if (schemaChange == SchemaChange.COMPATIBLE_NOT_NULL_PRIMARY_KEY_COLUMN) {
+            upstreamSchema =
+                    schema.copy(
+                            Schema.newBuilder()
+                                    .physicalColumn("col1", VARCHAR(64).notNull())
+                                    .physicalColumn("col2", STRING())
+                                    .build()
+                                    .getColumns());
+        }
+        CreateTableEvent createTableEvent = new CreateTableEvent(table1, upstreamSchema);
         testEvents.add(createTableEvent);
         PaimonMetadataApplier metadataApplier = new PaimonMetadataApplier(catalogOptions);
         if (schemaChange != null) {
@@ -261,6 +272,18 @@ public class PaimonSinkITCase {
                 {
                     builder.physicalColumn("col1", STRING().notNull())
                             .physicalColumn("col2", VARCHAR(10));
+                    break;
+                }
+            case INCOMPATIBLE_PRIMARY_KEY_COLUMN:
+                {
+                    builder.physicalColumn("col1", INT().notNull())
+                            .physicalColumn("col2", STRING());
+                    break;
+                }
+            case COMPATIBLE_NOT_NULL_PRIMARY_KEY_COLUMN:
+                {
+                    builder.physicalColumn("col1", STRING().notNull())
+                            .physicalColumn("col2", STRING());
                     break;
                 }
         }
@@ -503,7 +526,9 @@ public class PaimonSinkITCase {
         ADD_COLUMN,
         REMOVE_COLUMN,
         REORDER_COLUMN,
-        MODIFY_COLUMN;
+        MODIFY_COLUMN,
+        INCOMPATIBLE_PRIMARY_KEY_COLUMN,
+        COMPATIBLE_NOT_NULL_PRIMARY_KEY_COLUMN;
     }
 
     @ParameterizedTest
@@ -523,6 +548,34 @@ public class PaimonSinkITCase {
                 .thenReturn(Optional.empty());
         bucketAssignOperator.setSchemaEvolutionClient(schemaEvolutionClient);
         bucketAssignOperator.open(new TaskInfoImpl("test_TaskInfo", 1, 0, 1, 0));
+
+        if (schemaChange == SchemaChange.INCOMPATIBLE_PRIMARY_KEY_COLUMN) {
+            Assertions.assertThatThrownBy(
+                            () ->
+                                    writeAndCommit(
+                                            bucketAssignOperator,
+                                            writer,
+                                            committer,
+                                            createTestEvents(false, false, true, schemaChange)
+                                                    .toArray(new Event[0])))
+                    .isExactlyInstanceOf(IllegalStateException.class)
+                    .hasMessage(
+                            "The primary key column col1 of test.table1 is INT NOT NULL, which is not compatible with upstream column type STRING NOT NULL.");
+            return;
+        }
+
+        if (schemaChange == SchemaChange.COMPATIBLE_NOT_NULL_PRIMARY_KEY_COLUMN) {
+            writeAndCommit(
+                    bucketAssignOperator,
+                    writer,
+                    committer,
+                    createTestEvents(false, false, true, schemaChange).toArray(new Event[0]));
+            Assertions.assertThat(fetchResults(table1))
+                    .containsExactlyInAnyOrder(
+                            Row.ofKind(RowKind.INSERT, "1", "1"),
+                            Row.ofKind(RowKind.INSERT, "2", "2"));
+            return;
+        }
 
         // 1. receive only DataChangeEvents during one checkpoint
         writeAndCommit(
