@@ -424,12 +424,11 @@ class MySqlSourceReaderTest extends MySqlSourceTestBase {
 
     @Test
     void testReaderEchoesBinlogAssignmentGenerationInAssembledEvent() throws Exception {
-        // A binlog split assembled from divided meta groups must echo the binlog
-        // assignment generation it was served under, so the coordinator can reject a stale
-        // assembled
-        // event from a failed attempt. Drive the divided-meta path: give the reader an incomplete
-        // binlog split, answer its meta request with a group stamped with a generation, and assert
-        // the assembled event the reader sends back carries that same generation.
+        // A binlog split assembled from divided meta groups must echo the binlog assignment
+        // generation it was served under, so the coordinator can reject a stale assembled event
+        // from a failed attempt. Drive the divided-meta path: give the reader an incomplete binlog
+        // split, answer its meta request with a group stamped with a generation, and assert the
+        // assembled event the reader sends back carries that same generation.
         customerDatabase.createAndInitialize();
         final MySqlSourceConfig sourceConfig = getConfig(new String[] {"customers"});
         final TableId tableId = TableId.parse(customerDatabase.getDatabaseName() + ".customers");
@@ -452,8 +451,7 @@ class MySqlSourceReaderTest extends MySqlSourceTestBase {
         reader.addSplits(Collections.singletonList(incompleteSplit));
 
         // the coordinator answers the reader's meta request with the outstanding group, stamped
-        // with
-        // the current binlog assignment generation
+        // with the current binlog assignment generation
         long generation = 7L;
         FinishedSnapshotSplitInfo finishedInfo =
                 new FinishedSnapshotSplitInfo(

@@ -309,6 +309,19 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
     }
 
     private void sendBinlogMeta(int subTask, BinlogSplitMetaRequestEvent requestEvent) {
+        // After the snapshot metadata has been released, the finished-split infos are gone. A meta
+        // request arriving now can only come from a failed reader attempt: a live reader that has
+        // assembled the binlog split recovers it from its own checkpointed state and never
+        // re-requests. Ignore it instead of rebuilding from an emptied assigner, which would throw
+        // FlinkRuntimeException and fail the job.
+        if (splitAssigner instanceof MySqlHybridSplitAssigner
+                && ((MySqlHybridSplitAssigner) splitAssigner).isSnapshotMetaReleased()) {
+            LOG.info(
+                    "Ignoring a stale binlog split meta request from subtask {} received after the "
+                            + "snapshot metadata was released.",
+                    subTask);
+            return;
+        }
         // initialize once
         if (binlogSplitMeta == null) {
             final List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos =
