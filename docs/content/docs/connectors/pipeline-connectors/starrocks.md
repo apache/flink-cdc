@@ -223,6 +223,13 @@ pipeline:
           cause the sink failure. </td>
     </tr>
     <tr>
+      <td>unicode-char.max-bytes</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">3</td>
+      <td>Integer</td>
+      <td>The maximum number of bytes allocated for each upstream character when mapping CHAR and VARCHAR types to StarRocks, whose length is measured in bytes. If the upstream source uses utf8mb4, set this option to 4 to avoid underestimating column lengths. The default value of 3 is retained for backward compatibility.</td>
+    </tr>
+    <tr>
       <td>sink.socket.timeout-ms</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">-1</td>
@@ -329,24 +336,19 @@ pipeline:
       <td></td>
     </tr>
     <tr>
-      <td>CHAR(n) where n <= 85</td>
-      <td>CHAR(n * 3)</td>
-      <td>CDC defines the length by characters, and StarRocks defines it by bytes. According to UTF-8, one Chinese 
-        character is equal to three bytes, so the length for StarRocks is n * 3. Because the max length of StarRocks
-        CHAR is 255, map CDC CHAR to StarRocks CHAR only when the CDC length is no larger than 85.</td>
+      <td>CHAR(n) where n * unicode-char.max-bytes <= 255 and not primary key</td>
+      <td>CHAR(n * unicode-char.max-bytes)</td>
+      <td>CDC defines the length by characters, and StarRocks defines it by bytes. The StarRocks length is calculated as n * unicode-char.max-bytes. Because the max length of StarRocks CHAR is 255, map CDC CHAR to StarRocks CHAR only when the calculated length is no larger than 255. If the column is part of the primary key, it is mapped to VARCHAR instead.</td>
     </tr>
     <tr>
-      <td>CHAR(n) where n > 85</td>
-      <td>VARCHAR(n * 3)</td>
-      <td>CDC defines the length by characters, and StarRocks defines it by bytes. According to UTF-8, one Chinese 
-        character is equal to three bytes, so the length for StarRocks is n * 3. Because the max length of StarRocks
-        CHAR is 255, map CDC CHAR to StarRocks VARCHAR if the CDC length is larger than 85.</td>
+      <td>CHAR(n) where n * unicode-char.max-bytes > 255, or primary key</td>
+      <td>VARCHAR(min(n * unicode-char.max-bytes, 1048576))</td>
+      <td>CDC defines the length by characters, and StarRocks defines it by bytes. The StarRocks length is calculated as n * unicode-char.max-bytes. Because the max length of StarRocks CHAR is 255, map CDC CHAR to StarRocks VARCHAR when the calculated length exceeds 255. Primary key CHAR columns are also mapped to VARCHAR.</td>
     </tr>
     <tr>
       <td>VARCHAR(n)</td>
-      <td>VARCHAR(n * 3)</td>
-      <td>CDC defines the length by characters, and StarRocks defines it by bytes. According to UTF-8, one Chinese 
-        character is equal to three bytes, so the length for StarRocks is n * 3.</td>
+      <td>VARCHAR(min(n * unicode-char.max-bytes, 1048576))</td>
+      <td>CDC defines the length by characters, and StarRocks defines it by bytes. The StarRocks length is calculated as n * unicode-char.max-bytes and capped at 1048576.</td>
     </tr>
     <tr>
       <td>BINARY(n)</td>

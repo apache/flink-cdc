@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.pipeline.tests;
 
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.test.utils.TestUtils;
 import org.apache.flink.cdc.connectors.kafka.sink.KafkaUtil;
@@ -152,7 +153,7 @@ class MysqlToKafkaE2eITCase extends PipelineTestEnvironment {
                         topic,
                         parallelism);
         Path kafkaCdcJar = TestUtils.getResource("kafka-cdc-pipeline-connector.jar");
-        submitPipelineJob(pipelineJob, kafkaCdcJar);
+        JobID jobId = submitPipelineJob(pipelineJob, kafkaCdcJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
         List<ConsumerRecord<byte[], byte[]>> collectedRecords = new ArrayList<>();
@@ -161,6 +162,7 @@ class MysqlToKafkaE2eITCase extends PipelineTestEnvironment {
         List<String> expectedRecords =
                 getExpectedRecords("expectedEvents/mysqlToKafka/debezium-json.txt");
         assertThat(expectedRecords).containsAll(deserializeValues(collectedRecords));
+        waitUntilStreamSplitReady(jobId, parallelism);
         LOG.info("Begin incremental reading stage.");
         // generate binlogs
         String mysqlJdbcUrl =
@@ -226,7 +228,7 @@ class MysqlToKafkaE2eITCase extends PipelineTestEnvironment {
                         topic,
                         parallelism);
         Path kafkaCdcJar = TestUtils.getResource("kafka-cdc-pipeline-connector.jar");
-        submitPipelineJob(pipelineJob, kafkaCdcJar);
+        JobID jobId = submitPipelineJob(pipelineJob, kafkaCdcJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
         List<ConsumerRecord<byte[], byte[]>> collectedRecords = new ArrayList<>();
@@ -235,6 +237,7 @@ class MysqlToKafkaE2eITCase extends PipelineTestEnvironment {
         List<String> expectedRecords =
                 getExpectedRecords("expectedEvents/mysqlToKafka/canal-json.txt");
         assertThat(expectedRecords).containsAll(deserializeValues(collectedRecords));
+        waitUntilStreamSplitReady(jobId, parallelism);
         LOG.info("Begin incremental reading stage.");
         // generate binlogs
         String mysqlJdbcUrl =
@@ -302,7 +305,7 @@ class MysqlToKafkaE2eITCase extends PipelineTestEnvironment {
         Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path kafkaCdcJar = TestUtils.getResource("kafka-cdc-pipeline-connector.jar");
         Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
-        submitPipelineJob(pipelineJob, mysqlCdcJar, kafkaCdcJar, mysqlDriverJar);
+        JobID jobId = submitPipelineJob(pipelineJob, mysqlCdcJar, kafkaCdcJar, mysqlDriverJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
         List<ConsumerRecord<byte[], byte[]>> collectedRecords = new ArrayList<>();
@@ -311,6 +314,7 @@ class MysqlToKafkaE2eITCase extends PipelineTestEnvironment {
         List<String> expectedRecords =
                 getExpectedRecords("expectedEvents/mysqlToKafka/debezium-json-with-schema.txt");
         assertThat(expectedRecords).containsAll(deserializeValues(collectedRecords));
+        waitUntilStreamSplitReady(jobId, parallelism);
         LOG.info("Begin incremental reading stage.");
         // generate binlogs
         String mysqlJdbcUrl =

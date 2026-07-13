@@ -233,11 +233,10 @@ public class PostgresPipelineITCase extends PostgresTestBase {
         // Wait for the pipeline to process the insert events
         Thread.sleep(5000);
 
-        // Trigger a savepoint and cancel the job
+        // Trigger a savepoint and stop the job with that savepoint
         LOG.info("Triggering savepoint");
         finishedSavePointPath = triggerSavepointWithRetry(jobClient, savepointDirectory);
         LOG.info("Savepoint created at: {}", finishedSavePointPath);
-        jobClient.cancel().get();
         iterator.close();
 
         // Restore from savepoint

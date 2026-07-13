@@ -171,49 +171,49 @@ public class OracleE2eITCase extends PipelineTestEnvironment {
                     "DataChangeEvent{tableId=DEBEZIUM.PRODUCTS, before=[], after=[105, hammer, 14oz carpenters hammer, 0.875], op=INSERT, meta=()}");
 
             waitUntilSpecificEvent(
-                    "CreateTableEvent{tableId=DEBEZIUM.CUSTOMERS, schema=columns={`ID` BIGINT NOT NULL,`NAME` VARCHAR(255) NOT NULL,`ADDRESS` VARCHAR(1024),`PHONE_NUMBER` VARCHAR(512)}, primaryKeys=ID, options=()}");
+                    "CreateTableEvent{tableId=DEBEZIUM.CUSTOMERS, schema=columns={`ID` DECIMAL(38, 0) NOT NULL,`NAME` VARCHAR(255) NOT NULL,`ADDRESS` VARCHAR(1024),`PHONE_NUMBER` VARCHAR(512)}, primaryKeys=ID, options=()}");
             waitUntilSpecificEvent(
-                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS, before=[], after=[171798691841, user_1, Shanghai, 123567891234], op=INSERT, meta=()}");
+                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS, before=[], after=[101, user_1, Shanghai, 123567891234], op=INSERT, meta=()}");
             waitUntilSpecificEvent(
-                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS, before=[], after=[171798691841, user_4, Shanghai, 123567891234], op=INSERT, meta=()}");
+                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS, before=[], after=[109, user_4, Shanghai, 123567891234], op=INSERT, meta=()}");
             waitUntilSpecificEvent(
-                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS, before=[], after=[171798691841, user_3, Shanghai, 123567891234], op=INSERT, meta=()}");
+                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS, before=[], after=[103, user_3, Shanghai, 123567891234], op=INSERT, meta=()}");
             waitUntilSpecificEvent(
-                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS, before=[], after=[171798691841, user_2, Shanghai, 123567891234], op=INSERT, meta=()}");
+                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS, before=[], after=[102, user_2, Shanghai, 123567891234], op=INSERT, meta=()}");
             waitUntilSpecificEvent(
-                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS, before=[], after=[171798691842, user_13, Shanghai, 123567891234], op=INSERT, meta=()}");
+                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS, before=[], after=[1012, user_13, Shanghai, 123567891234], op=INSERT, meta=()}");
             waitUntilSpecificEvent(
-                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS, before=[], after=[171798691842, user_14, Shanghai, 123567891234], op=INSERT, meta=()}");
+                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS, before=[], after=[1013, user_14, Shanghai, 123567891234], op=INSERT, meta=()}");
             waitUntilSpecificEvent(
-                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS, before=[], after=[171798691842, user_11, Shanghai, 123567891234], op=INSERT, meta=()}");
+                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS, before=[], after=[1010, user_11, Shanghai, 123567891234], op=INSERT, meta=()}");
             waitUntilSpecificEvent(
-                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS, before=[], after=[171798691842, user_12, Shanghai, 123567891234], op=INSERT, meta=()}");
+                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS, before=[], after=[1011, user_12, Shanghai, 123567891234], op=INSERT, meta=()}");
             waitUntilSpecificEvent(
-                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS, before=[], after=[171798691842, user_21, Shanghai, 123567891234], op=INSERT, meta=()}");
+                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS, before=[], after=[2000, user_21, Shanghai, 123567891234], op=INSERT, meta=()}");
             waitUntilSpecificEvent(
-                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS, before=[], after=[171798691842, user_10, Shanghai, 123567891234], op=INSERT, meta=()}");
+                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS, before=[], after=[1009, user_10, Shanghai, 123567891234], op=INSERT, meta=()}");
             waitUntilSpecificEvent(
-                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS, before=[], after=[171798691841, user_6, Shanghai, 123567891234], op=INSERT, meta=()}");
+                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS, before=[], after=[111, user_6, Shanghai, 123567891234], op=INSERT, meta=()}");
             waitUntilSpecificEvent(
-                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS, before=[], after=[171798691841, user_5, Shanghai, 123567891234], op=INSERT, meta=()}");
+                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS, before=[], after=[110, user_5, Shanghai, 123567891234], op=INSERT, meta=()}");
             waitUntilSpecificEvent(
-                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS, before=[], after=[171798691841, user_9, Shanghai, 123567891234], op=INSERT, meta=()}");
+                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS, before=[], after=[123, user_9, Shanghai, 123567891234], op=INSERT, meta=()}");
             waitUntilSpecificEvent(
-                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS, before=[], after=[171798691842, user_19, Shanghai, 123567891234], op=INSERT, meta=()}");
+                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS, before=[], after=[1018, user_19, Shanghai, 123567891234], op=INSERT, meta=()}");
             waitUntilSpecificEvent(
-                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS, before=[], after=[171798691842, user_20, Shanghai, 123567891234], op=INSERT, meta=()}");
+                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS, before=[], after=[1019, user_20, Shanghai, 123567891234], op=INSERT, meta=()}");
             waitUntilSpecificEvent(
-                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS, before=[], after=[171798691841, user_8, Shanghai, 123567891234], op=INSERT, meta=()}");
+                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS, before=[], after=[121, user_8, Shanghai, 123567891234], op=INSERT, meta=()}");
             waitUntilSpecificEvent(
-                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS, before=[], after=[171798691842, user_17, Shanghai, 123567891234], op=INSERT, meta=()}");
+                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS, before=[], after=[1016, user_17, Shanghai, 123567891234], op=INSERT, meta=()}");
             waitUntilSpecificEvent(
-                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS, before=[], after=[171798691842, user_18, Shanghai, 123567891234], op=INSERT, meta=()}");
+                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS, before=[], after=[1017, user_18, Shanghai, 123567891234], op=INSERT, meta=()}");
             waitUntilSpecificEvent(
-                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS, before=[], after=[171798691842, user_15, Shanghai, 123567891234], op=INSERT, meta=()}");
+                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS, before=[], after=[1014, user_15, Shanghai, 123567891234], op=INSERT, meta=()}");
             waitUntilSpecificEvent(
-                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS, before=[], after=[171798691841, user_7, Shanghai, 123567891234], op=INSERT, meta=()}");
+                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS, before=[], after=[118, user_7, Shanghai, 123567891234], op=INSERT, meta=()}");
             waitUntilSpecificEvent(
-                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS, before=[], after=[171798691842, user_16, Shanghai, 123567891234], op=INSERT, meta=()}");
+                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS, before=[], after=[1015, user_16, Shanghai, 123567891234], op=INSERT, meta=()}");
 
             stat.execute(
                     "UPDATE DEBEZIUM.PRODUCTS SET DESCRIPTION='18oz carpenter hammer' WHERE ID=106 ");
@@ -225,49 +225,49 @@ public class OracleE2eITCase extends PipelineTestEnvironment {
             waitUntilSpecificEvent(
                     "DataChangeEvent{tableId=DEBEZIUM.PRODUCTS, before=[107, rocks, box of assorted rocks, 5.3], after=[107, rocks, box of assorted rocks, 5.1], op=UPDATE, meta=()}");
             waitUntilSpecificEvent(
-                    "CreateTableEvent{tableId=DEBEZIUM.CUSTOMERS_1, schema=columns={`ID` BIGINT NOT NULL,`NAME` VARCHAR(255) NOT NULL,`ADDRESS` VARCHAR(1024),`PHONE_NUMBER` VARCHAR(512)}, primaryKeys=ID, options=()}");
+                    "CreateTableEvent{tableId=DEBEZIUM.CUSTOMERS_1, schema=columns={`ID` DECIMAL(38, 0) NOT NULL,`NAME` VARCHAR(255) NOT NULL,`ADDRESS` VARCHAR(1024),`PHONE_NUMBER` VARCHAR(512)}, primaryKeys=ID, options=()}");
             waitUntilSpecificEvent(
-                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS_1, before=[], after=[171798691842, user_10, Shanghai, 123567891234], op=INSERT, meta=()}");
+                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS_1, before=[], after=[1009, user_10, Shanghai, 123567891234], op=INSERT, meta=()}");
             waitUntilSpecificEvent(
-                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS_1, before=[], after=[171798691842, user_21, Shanghai, 123567891234], op=INSERT, meta=()}");
+                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS_1, before=[], after=[2000, user_21, Shanghai, 123567891234], op=INSERT, meta=()}");
             waitUntilSpecificEvent(
-                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS_1, before=[], after=[171798691841, user_5, Shanghai, 123567891234], op=INSERT, meta=()}");
+                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS_1, before=[], after=[110, user_5, Shanghai, 123567891234], op=INSERT, meta=()}");
             waitUntilSpecificEvent(
-                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS_1, before=[], after=[171798691842, user_14, Shanghai, 123567891234], op=INSERT, meta=()}");
+                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS_1, before=[], after=[1013, user_14, Shanghai, 123567891234], op=INSERT, meta=()}");
             waitUntilSpecificEvent(
-                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS_1, before=[], after=[171798691841, user_6, Shanghai, 123567891234], op=INSERT, meta=()}");
+                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS_1, before=[], after=[111, user_6, Shanghai, 123567891234], op=INSERT, meta=()}");
             waitUntilSpecificEvent(
-                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS_1, before=[], after=[171798691842, user_13, Shanghai, 123567891234], op=INSERT, meta=()}");
+                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS_1, before=[], after=[1012, user_13, Shanghai, 123567891234], op=INSERT, meta=()}");
             waitUntilSpecificEvent(
-                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS_1, before=[], after=[171798691842, user_12, Shanghai, 123567891234], op=INSERT, meta=()}");
+                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS_1, before=[], after=[1011, user_12, Shanghai, 123567891234], op=INSERT, meta=()}");
             waitUntilSpecificEvent(
-                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS_1, before=[], after=[171798691842, user_11, Shanghai, 123567891234], op=INSERT, meta=()}");
+                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS_1, before=[], after=[1010, user_11, Shanghai, 123567891234], op=INSERT, meta=()}");
             waitUntilSpecificEvent(
-                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS_1, before=[], after=[171798691841, user_4, Shanghai, 123567891234], op=INSERT, meta=()}");
+                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS_1, before=[], after=[109, user_4, Shanghai, 123567891234], op=INSERT, meta=()}");
             waitUntilSpecificEvent(
-                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS_1, before=[], after=[171798691841, user_2, Shanghai, 123567891234], op=INSERT, meta=()}");
+                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS_1, before=[], after=[102, user_2, Shanghai, 123567891234], op=INSERT, meta=()}");
             waitUntilSpecificEvent(
-                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS_1, before=[], after=[171798691841, user_3, Shanghai, 123567891234], op=INSERT, meta=()}");
+                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS_1, before=[], after=[103, user_3, Shanghai, 123567891234], op=INSERT, meta=()}");
             waitUntilSpecificEvent(
-                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS_1, before=[], after=[171798691841, user_1, Shanghai, 123567891234], op=INSERT, meta=()}");
+                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS_1, before=[], after=[101, user_1, Shanghai, 123567891234], op=INSERT, meta=()}");
             waitUntilSpecificEvent(
-                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS_1, before=[], after=[171798691842, user_18, Shanghai, 123567891234], op=INSERT, meta=()}");
+                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS_1, before=[], after=[1017, user_18, Shanghai, 123567891234], op=INSERT, meta=()}");
             waitUntilSpecificEvent(
-                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS_1, before=[], after=[171798691841, user_9, Shanghai, 123567891234], op=INSERT, meta=()}");
+                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS_1, before=[], after=[123, user_9, Shanghai, 123567891234], op=INSERT, meta=()}");
             waitUntilSpecificEvent(
-                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS_1, before=[], after=[171798691842, user_17, Shanghai, 123567891234], op=INSERT, meta=()}");
+                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS_1, before=[], after=[1016, user_17, Shanghai, 123567891234], op=INSERT, meta=()}");
             waitUntilSpecificEvent(
-                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS_1, before=[], after=[171798691842, user_16, Shanghai, 123567891234], op=INSERT, meta=()}");
+                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS_1, before=[], after=[1015, user_16, Shanghai, 123567891234], op=INSERT, meta=()}");
             waitUntilSpecificEvent(
-                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS_1, before=[], after=[171798691842, user_15, Shanghai, 123567891234], op=INSERT, meta=()}");
+                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS_1, before=[], after=[1014, user_15, Shanghai, 123567891234], op=INSERT, meta=()}");
             waitUntilSpecificEvent(
-                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS_1, before=[], after=[171798691841, user_7, Shanghai, 123567891234], op=INSERT, meta=()}");
+                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS_1, before=[], after=[118, user_7, Shanghai, 123567891234], op=INSERT, meta=()}");
             waitUntilSpecificEvent(
-                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS_1, before=[], after=[171798691842, user_20, Shanghai, 123567891234], op=INSERT, meta=()}");
+                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS_1, before=[], after=[1019, user_20, Shanghai, 123567891234], op=INSERT, meta=()}");
             waitUntilSpecificEvent(
-                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS_1, before=[], after=[171798691841, user_8, Shanghai, 123567891234], op=INSERT, meta=()}");
+                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS_1, before=[], after=[121, user_8, Shanghai, 123567891234], op=INSERT, meta=()}");
             waitUntilSpecificEvent(
-                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS_1, before=[], after=[171798691842, user_19, Shanghai, 123567891234], op=INSERT, meta=()}");
+                    "DataChangeEvent{tableId=DEBEZIUM.CUSTOMERS_1, before=[], after=[1018, user_19, Shanghai, 123567891234], op=INSERT, meta=()}");
         } catch (Exception e) {
             LOG.error("Update table for CDC failed.", e);
             throw new RuntimeException(e);

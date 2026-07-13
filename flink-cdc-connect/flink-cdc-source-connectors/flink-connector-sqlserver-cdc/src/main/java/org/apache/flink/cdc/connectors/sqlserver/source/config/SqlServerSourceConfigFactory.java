@@ -18,6 +18,8 @@
 package org.apache.flink.cdc.connectors.sqlserver.source.config;
 
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfigFactory;
+import org.apache.flink.cdc.connectors.base.options.StartupMode;
+import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.connectors.base.source.EmbeddedFlinkDatabaseHistory;
 
 import io.debezium.config.Configuration;
@@ -34,6 +36,19 @@ public class SqlServerSourceConfigFactory extends JdbcSourceConfigFactory {
 
     private static final String DATABASE_SERVER_NAME = "sqlserver_transaction_log_source";
     private static final String DRIVER_ClASS_NAME = "com.microsoft.sqlserver.jdbc.SQLServerDriver";
+
+    @Override
+    public SqlServerSourceConfigFactory startupOptions(StartupOptions startupOptions) {
+        if (startupOptions.startupMode != StartupMode.INITIAL
+                && startupOptions.startupMode != StartupMode.SNAPSHOT
+                && startupOptions.startupMode != StartupMode.LATEST_OFFSET
+                && startupOptions.startupMode != StartupMode.TIMESTAMP) {
+            throw new UnsupportedOperationException(
+                    "Unsupported startup mode: " + startupOptions.startupMode);
+        }
+        this.startupOptions = startupOptions;
+        return this;
+    }
 
     @Override
     public SqlServerSourceConfig create(int subtask) {
@@ -68,7 +83,16 @@ public class SqlServerSourceConfigFactory extends JdbcSourceConfigFactory {
             case INITIAL:
                 props.setProperty("snapshot.mode", "initial");
                 break;
+            case SNAPSHOT:
+                // Debezium snapshot only; do not start the streaming phase
+                props.setProperty("snapshot.mode", "initial_only");
+                break;
             case LATEST_OFFSET:
+                props.setProperty("snapshot.mode", "schema_only");
+                break;
+            case TIMESTAMP:
+                // We recover stream reading from timestamp-mapped LSN and only need schema
+                // snapshot.
                 props.setProperty("snapshot.mode", "schema_only");
                 break;
             default:
@@ -104,6 +128,7 @@ public class SqlServerSourceConfigFactory extends JdbcSourceConfigFactory {
                 connectionPoolSize,
                 chunkKeyColumn,
                 skipSnapshotBackfill,
+                scanNewlyAddedTableEnabled,
                 assignUnboundedChunkFirst);
     }
 }
