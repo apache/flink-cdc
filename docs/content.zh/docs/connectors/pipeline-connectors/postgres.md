@@ -294,6 +294,18 @@ pipeline:
         默认值为 false。
       </td>
     </tr>
+    <tr>
+      <td>changelog-mode</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">all</td>
+      <td>String</td>
+      <td>
+        用于编码流式变更的 changelog 模式。<br>
+        <code>all</code>：发送同时携带变更前镜像和变更后镜像的 UPDATE 事件。这是默认模式，要求表的 <code>REPLICA IDENTITY</code> 为 <code>FULL</code>。<br>
+        <code>upsert</code>：发送仅携带变更后镜像的 REPLACE 事件，描述基于主键的幂等更新。适用于无法开启 <code>REPLICA IDENTITY FULL</code> 的主键表。<br>
+        实验性选项，默认值为 all。
+      </td>
+    </tr>
     </tbody>
 </table>
 </div>

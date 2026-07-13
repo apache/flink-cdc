@@ -20,7 +20,6 @@ package org.apache.flink.cdc.runtime.serializer.event;
 import org.apache.flink.api.common.typeutils.SimpleTypeSerializerSnapshot;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.common.typeutils.TypeSerializerSnapshot;
-import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.OperationType;
 import org.apache.flink.cdc.common.event.TableId;
@@ -45,8 +44,6 @@ public class DataChangeEventSerializer extends TypeSerializerSingleton<DataChang
     /** Sharable instance of the TableIdSerializer. */
     public static final DataChangeEventSerializer INSTANCE = new DataChangeEventSerializer();
 
-    private static final int CURRENT_VERSION = 2;
-
     private final TableIdSerializer tableIdSerializer = TableIdSerializer.INSTANCE;
     private final TypeSerializer<Map<String, String>> metaSerializer =
             new NullableSerializerWrapper<>(
@@ -65,16 +62,10 @@ public class DataChangeEventSerializer extends TypeSerializerSingleton<DataChang
         opSerializer.serialize(event.op(), target);
         tableIdSerializer.serialize(event.tableId(), target);
 
-        // Explicit presence flags: before may be null for UPDATE events in upsert changelog
-        // mode (FLINK-38647), so record presence cannot be derived from the operation type.
-        boolean beforePresent = event.before() != null;
-        boolean afterPresent = event.after() != null;
-        target.writeBoolean(beforePresent);
-        target.writeBoolean(afterPresent);
-        if (beforePresent) {
+        if (event.before() != null) {
             recordDataSerializer.serialize(event.before(), target);
         }
-        if (afterPresent) {
+        if (event.after() != null) {
             recordDataSerializer.serialize(event.after(), target);
         }
         metaSerializer.serialize(event.meta(), target);
@@ -82,81 +73,33 @@ public class DataChangeEventSerializer extends TypeSerializerSingleton<DataChang
 
     @Override
     public DataChangeEvent deserialize(DataInputView source) throws IOException {
-        return deserialize(CURRENT_VERSION, source);
-    }
+        OperationType op = opSerializer.deserialize(source);
+        TableId tableId = tableIdSerializer.deserialize(source);
 
-    /**
-     * De-serializes a {@link DataChangeEvent} written with the given serialization version.
-     * Versions 0 and 1 derived record presence from the operation type; version 2 writes explicit
-     * presence flags so UPDATE events with a null before image (upsert changelog mode, FLINK-38647)
-     * round-trip correctly.
-     */
-    public DataChangeEvent deserialize(int version, DataInputView source) throws IOException {
-        switch (version) {
-            case 0:
-            case 1:
-                {
-                    OperationType op = opSerializer.deserialize(source);
-                    TableId tableId = tableIdSerializer.deserialize(source);
-                    switch (op) {
-                        case DELETE:
-                            return DataChangeEvent.deleteEvent(
-                                    tableId,
-                                    recordDataSerializer.deserialize(source),
-                                    metaSerializer.deserialize(source));
-                        case INSERT:
-                            return DataChangeEvent.insertEvent(
-                                    tableId,
-                                    recordDataSerializer.deserialize(source),
-                                    metaSerializer.deserialize(source));
-                        case UPDATE:
-                            return DataChangeEvent.updateEvent(
-                                    tableId,
-                                    recordDataSerializer.deserialize(source),
-                                    recordDataSerializer.deserialize(source),
-                                    metaSerializer.deserialize(source));
-                        case REPLACE:
-                            return DataChangeEvent.replaceEvent(
-                                    tableId,
-                                    recordDataSerializer.deserialize(source),
-                                    metaSerializer.deserialize(source));
-                        default:
-                            throw new IllegalArgumentException(
-                                    "Unsupported data change event: " + op);
-                    }
-                }
-            case 2:
-                {
-                    OperationType op = opSerializer.deserialize(source);
-                    TableId tableId = tableIdSerializer.deserialize(source);
-
-                    boolean beforePresent = source.readBoolean();
-                    boolean afterPresent = source.readBoolean();
-                    RecordData before =
-                            beforePresent ? recordDataSerializer.deserialize(source) : null;
-                    RecordData after =
-                            afterPresent ? recordDataSerializer.deserialize(source) : null;
-
-                    switch (op) {
-                        case DELETE:
-                            return DataChangeEvent.deleteEvent(
-                                    tableId, before, metaSerializer.deserialize(source));
-                        case INSERT:
-                            return DataChangeEvent.insertEvent(
-                                    tableId, after, metaSerializer.deserialize(source));
-                        case UPDATE:
-                            return DataChangeEvent.updateEvent(
-                                    tableId, before, after, metaSerializer.deserialize(source));
-                        case REPLACE:
-                            return DataChangeEvent.replaceEvent(
-                                    tableId, after, metaSerializer.deserialize(source));
-                        default:
-                            throw new IllegalArgumentException(
-                                    "Unsupported data change event: " + op);
-                    }
-                }
+        switch (op) {
+            case DELETE:
+                return DataChangeEvent.deleteEvent(
+                        tableId,
+                        recordDataSerializer.deserialize(source),
+                        metaSerializer.deserialize(source));
+            case INSERT:
+                return DataChangeEvent.insertEvent(
+                        tableId,
+                        recordDataSerializer.deserialize(source),
+                        metaSerializer.deserialize(source));
+            case UPDATE:
+                return DataChangeEvent.updateEvent(
+                        tableId,
+                        recordDataSerializer.deserialize(source),
+                        recordDataSerializer.deserialize(source),
+                        metaSerializer.deserialize(source));
+            case REPLACE:
+                return DataChangeEvent.replaceEvent(
+                        tableId,
+                        recordDataSerializer.deserialize(source),
+                        metaSerializer.deserialize(source));
             default:
-                throw new IOException("Unrecognized serialization version " + version);
+                throw new IllegalArgumentException("Unsupported data change event: " + op);
         }
     }
 
@@ -169,20 +112,28 @@ public class DataChangeEventSerializer extends TypeSerializerSingleton<DataChang
     @Override
     public DataChangeEvent copy(DataChangeEvent from) {
         OperationType op = from.op();
-        // before may be null for UPDATE events in upsert changelog mode (FLINK-38647).
-        RecordData before = from.before() != null ? recordDataSerializer.copy(from.before()) : null;
-        RecordData after = from.after() != null ? recordDataSerializer.copy(from.after()) : null;
-        TableId tableId = tableIdSerializer.copy(from.tableId());
-        Map<String, String> meta = metaSerializer.copy(from.meta());
         switch (op) {
             case DELETE:
-                return DataChangeEvent.deleteEvent(tableId, before, meta);
+                return DataChangeEvent.deleteEvent(
+                        tableIdSerializer.copy(from.tableId()),
+                        recordDataSerializer.copy(from.before()),
+                        metaSerializer.copy(from.meta()));
             case INSERT:
-                return DataChangeEvent.insertEvent(tableId, after, meta);
+                return DataChangeEvent.insertEvent(
+                        tableIdSerializer.copy(from.tableId()),
+                        recordDataSerializer.copy(from.after()),
+                        metaSerializer.copy(from.meta()));
             case UPDATE:
-                return DataChangeEvent.updateEvent(tableId, before, after, meta);
+                return DataChangeEvent.updateEvent(
+                        tableIdSerializer.copy(from.tableId()),
+                        recordDataSerializer.copy(from.before()),
+                        recordDataSerializer.copy(from.after()),
+                        metaSerializer.copy(from.meta()));
             case REPLACE:
-                return DataChangeEvent.replaceEvent(tableId, after, meta);
+                return DataChangeEvent.replaceEvent(
+                        tableIdSerializer.copy(from.tableId()),
+                        recordDataSerializer.copy(from.after()),
+                        metaSerializer.copy(from.meta()));
             default:
                 throw new IllegalArgumentException("Unsupported data change event: " + op);
         }

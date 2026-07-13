@@ -290,7 +290,7 @@ public class PostgresDataSourceOptions {
                     .defaultValue(DebeziumChangelogMode.ALL)
                     .withDescription(
                             "The changelog mode used for encoding streaming changes.\n"
-                                    + "\"all\": Encodes changes as retract stream using all RowKinds. This is the default mode.\n"
-                                    + "\"upsert\": Encodes changes as upsert stream that describes idempotent updates on a key. "
+                                    + "\"all\": Encodes changes as UPDATE events carrying both the before and the after image. This is the default mode.\n"
+                                    + "\"upsert\": Encodes changes as REPLACE events carrying only the after image, describing idempotent updates on a key. "
                                     + "It can be used for tables with primary keys when replica identity FULL is not an option.");
 }
