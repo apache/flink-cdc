@@ -45,6 +45,7 @@ import org.apache.flink.cdc.debezium.utils.TemporalConversions;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.util.Collector;
+import org.apache.flink.util.Preconditions;
 
 import io.debezium.data.Envelope;
 import io.debezium.data.SpecialValueDecimal;
@@ -141,45 +142,23 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
         return new EventTypeInfo();
     }
 
-    private RecordData extractBeforeDataRecord(Struct value, Schema valueSchema) throws Exception {
+    protected RecordData extractBeforeDataRecord(Struct value, Schema valueSchema)
+            throws Exception {
         Schema beforeSchema = fieldSchema(valueSchema, Envelope.FieldName.BEFORE);
         Struct beforeValue = fieldStruct(value, Envelope.FieldName.BEFORE);
-        if (beforeValue == null) {
-            throw new NullPointerException(
-                    "Before data is null for UPDATE/DELETE event. "
-                            + formatHint(getNullBeforeDataHint())
-                            + "Schema name: "
-                            + valueSchema.name());
-        }
+        Preconditions.checkNotNull(
+                beforeValue,
+                "Before data is null for UPDATE/DELETE event. Schema name: " + valueSchema.name());
         return extractDataRecord(beforeValue, beforeSchema);
-    }
-
-    /** Connector-specific hint appended to the error message when before data is null. */
-    protected String getNullBeforeDataHint() {
-        return "";
-    }
-
-    /**
-     * Normalizes the hint string to a single trailing space so that overrides do not need to manage
-     * whitespace themselves. Returns an empty string when the hint is null or blank.
-     */
-    private static String formatHint(String hint) {
-        if (hint == null) {
-            return "";
-        }
-        String trimmed = hint.trim();
-        return trimmed.isEmpty() ? "" : trimmed + " ";
     }
 
     private RecordData extractAfterDataRecord(Struct value, Schema valueSchema) throws Exception {
         Schema afterSchema = fieldSchema(valueSchema, Envelope.FieldName.AFTER);
         Struct afterValue = fieldStruct(value, Envelope.FieldName.AFTER);
-        if (afterValue == null) {
-            throw new NullPointerException(
-                    "After data is null for CREATE/READ/UPDATE event. "
-                            + "Schema name: "
-                            + valueSchema.name());
-        }
+        Preconditions.checkNotNull(
+                afterValue,
+                "After data is null for CREATE/READ/UPDATE event. Schema name: "
+                        + valueSchema.name());
         return extractDataRecord(afterValue, afterSchema);
     }
 
