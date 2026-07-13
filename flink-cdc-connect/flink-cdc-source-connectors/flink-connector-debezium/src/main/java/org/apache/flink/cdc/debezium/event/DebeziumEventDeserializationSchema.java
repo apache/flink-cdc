@@ -128,8 +128,10 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
                 return Collections.singletonList(
                         DataChangeEvent.updateEvent(tableId, before, after, meta));
             }
-            return Collections.singletonList(
-                    DataChangeEvent.updateEvent(tableId, null, after, meta));
+            // In upsert mode the before image may be unavailable (e.g. PostgreSQL with
+            // REPLICA IDENTITY DEFAULT), so emit a REPLACE event which carries the after
+            // image only instead of an UPDATE event with a null before image.
+            return Collections.singletonList(DataChangeEvent.replaceEvent(tableId, after, meta));
         } else {
             LOG.trace("Received {} operation, skip", op);
             return Collections.emptyList();
