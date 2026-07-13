@@ -295,6 +295,45 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
 
     @ParameterizedTest
     @MethodSource("parameters")
+    void testTaskManagerFailoverInBinlogPhaseWithMetadataRelease(
+            String tableName, String chunkColumnName, String assignEndingFirst) throws Exception {
+        // Releasing the snapshot metadata after entering the binlog phase must not lose or
+        // duplicate binlog data across a reader (TaskManager) failover. The released metadata is
+        // checkpoint-covered, so the binlog split is recovered from the reader's own state rather
+        // than re-created from the emptied assigner.
+        Map<String, String> options = new HashMap<>();
+        options.put("scan.incremental.snapshot.unbounded-chunk-first.enabled", assignEndingFirst);
+        options.put("scan.incremental.snapshot.metadata.release.enabled", "true");
+        testMySqlParallelSource(
+                FailoverType.TM,
+                FailoverPhase.BINLOG,
+                new String[] {tableName, "customers_1"},
+                tableName,
+                chunkColumnName,
+                options);
+    }
+
+    @ParameterizedTest
+    @MethodSource("parameters")
+    void testJobManagerFailoverInBinlogPhaseWithMetadataRelease(
+            String tableName, String chunkColumnName, String assignEndingFirst) throws Exception {
+        // Same as above but across a JobManager (coordinator) failover, which restores the
+        // enumerator from a released "light" checkpoint and must not re-discover tables or rebuild
+        // the binlog split from empty metadata.
+        Map<String, String> options = new HashMap<>();
+        options.put("scan.incremental.snapshot.unbounded-chunk-first.enabled", assignEndingFirst);
+        options.put("scan.incremental.snapshot.metadata.release.enabled", "true");
+        testMySqlParallelSource(
+                FailoverType.JM,
+                FailoverPhase.BINLOG,
+                new String[] {tableName, "customers_1"},
+                tableName,
+                chunkColumnName,
+                options);
+    }
+
+    @ParameterizedTest
+    @MethodSource("parameters")
     void testTaskManagerFailoverFromLatestOffset(
             String tableName, String chunkColumnName, String assignEndingFirst) throws Exception {
         testMySqlParallelSource(

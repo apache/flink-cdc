@@ -115,6 +115,21 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
         this.snapshotSplitAssigner = snapshotSplitAssigner;
         this.isBinlogSplitAssigned = isBinlogSplitAssigned;
         this.splitMetaGroupSize = splitMetaGroupSize;
+        // Fail fast on an incompatible restore. A job that released its snapshot metadata cannot
+        // later enable scan.newly-added-table, because the splits and schemas that flow needs are
+        // gone. Reject it loudly instead of silently building an inconsistent binlog split.
+        if (sourceConfig.isScanNewlyAddedTableEnabled()
+                && isBinlogSplitAssigned
+                && snapshotSplitAssigner.isSnapshotMetaReleased()) {
+            throw new IllegalStateException(
+                    "scan.newly-added-table.enabled cannot be turned on for a job that previously "
+                            + "released its snapshot split metadata "
+                            + "(scan.incremental.snapshot.metadata.release.enabled=true). The "
+                            + "assigned splits, finished offsets and table schemas needed to capture "
+                            + "newly added tables are no longer in state. Start the job from a fresh "
+                            + "state, or keep metadata release disabled if newly-added-table scanning "
+                            + "is required.");
+        }
     }
 
     @Override
@@ -192,13 +207,14 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
 
     @Override
     public PendingSplitsState snapshotState(long checkpointId) {
-        // Schedule releasing the snapshot metadata once the binlog split is assigned and the reader
-        // has assembled it; the release happens in notifyCheckpointComplete. Skipped when
-        // newly-added-table scan is on, since that flow may still need the metadata.
+        // Schedule the metadata release once the binlog split is assigned and the reader has
+        // assembled it; it happens in notifyCheckpointComplete. Gated behind the opt-in, and
+        // skipped when newly-added-table scan is on, since that flow may still need the metadata.
         if (isBinlogSplitAssigned
                 && binlogSplitMetaAssembled
                 && checkpointIdToReleaseMeta == null
                 && !snapshotSplitAssigner.isSnapshotMetaReleased()
+                && sourceConfig.isReleaseSnapshotMetadataEnabled()
                 && !sourceConfig.isScanNewlyAddedTableEnabled()) {
             checkpointIdToReleaseMeta = checkpointId;
         }

@@ -184,6 +184,14 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
         this.partition =
                 new MySqlPartition(sourceConfig.getMySqlConnectorConfig().getLogicalName());
         this.enumeratorContext = enumeratorContext;
+        // Reconstruct the released flag when restoring from a released "light" checkpoint
+        // (snapshot finished, heavy metadata maps empty, tables already processed). The flag is
+        // not checkpointed, so recovering it here keeps post-restore behavior consistent with the
+        // run that released.
+        this.snapshotMetaReleased =
+                AssignerStatus.isAssigningFinished(assignerStatus)
+                        && assignedSplits.isEmpty()
+                        && !alreadyProcessedTables.isEmpty();
     }
 
     @Override
