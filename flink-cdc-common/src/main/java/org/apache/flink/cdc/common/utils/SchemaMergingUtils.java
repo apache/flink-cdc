@@ -327,8 +327,12 @@ public class SchemaMergingUtils {
         return coercedRow;
     }
 
-    @VisibleForTesting
-    static boolean isDataTypeCompatible(@Nullable DataType currentType, DataType upcomingType) {
+    /**
+     * Checks whether the upcoming data type can fit into the current data type. A missing current
+     * type is treated as incompatible.
+     */
+    public static boolean isDataTypeCompatible(
+            @Nullable DataType currentType, DataType upcomingType) {
         // If two types are identical, they're compatible of course.
         if (Objects.equals(currentType, upcomingType)) {
             return true;
