@@ -286,6 +286,18 @@ pipeline:
         Defaults to false.
       </td>
     </tr>
+    <tr>
+      <td>changelog-mode</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">all</td>
+      <td>String</td>
+      <td>
+        The changelog mode used for encoding streaming changes.<br>
+        <code>all</code>: Emits UPDATE events carrying both the before and the after image. This is the default mode and requires the table's <code>REPLICA IDENTITY</code> to be <code>FULL</code>.<br>
+        <code>upsert</code>: Emits REPLACE events carrying only the after image, describing idempotent updates on a key. It can be used for tables with primary keys when <code>REPLICA IDENTITY FULL</code> is not an option.<br>
+        Experimental option, defaults to all.
+      </td>
+    </tr>
     </tbody>
 </table>
 </div>

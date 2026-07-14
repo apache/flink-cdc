@@ -28,6 +28,7 @@ import org.apache.flink.cdc.connectors.postgres.source.OpTsMetadataColumn;
 import org.apache.flink.cdc.connectors.postgres.source.PostgresDataSource;
 import org.apache.flink.cdc.connectors.postgres.source.SchemaNameMetadataColumn;
 import org.apache.flink.cdc.connectors.postgres.source.TableNameMetadataColumn;
+import org.apache.flink.cdc.debezium.table.DebeziumChangelogMode;
 import org.apache.flink.table.api.ValidationException;
 
 import org.junit.jupiter.api.AfterEach;
@@ -45,6 +46,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.CHANGELOG_MODE;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.HOSTNAME;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.PASSWORD;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.PG_PORT;
@@ -308,6 +310,88 @@ public class PostgresDataSourceFactoryTest extends PostgresTestBase {
         assertThatThrownBy(() -> factory.createDataSource(context))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Cannot find any table by the option 'tables'");
+    }
+
+    @Test
+    public void testChangelogModeDefaultsToAll() {
+        Map<String, String> options = new HashMap<>();
+        options.put(HOSTNAME.key(), POSTGRES_CONTAINER.getHost());
+        options.put(
+                PG_PORT.key(), String.valueOf(POSTGRES_CONTAINER.getMappedPort(POSTGRESQL_PORT)));
+        options.put(USERNAME.key(), TEST_USER);
+        options.put(PASSWORD.key(), TEST_PASSWORD);
+        options.put(TABLES.key(), POSTGRES_CONTAINER.getDatabaseName() + ".inventory.prod\\.*");
+        options.put(SLOT_NAME.key(), slotName);
+        Factory.Context context = new MockContext(Configuration.fromMap(options));
+
+        PostgresDataSourceFactory factory = new PostgresDataSourceFactory();
+        PostgresDataSource dataSource = (PostgresDataSource) factory.createDataSource(context);
+        assertThat(dataSource.getChangelogMode()).isEqualTo(DebeziumChangelogMode.ALL);
+    }
+
+    @Test
+    public void testChangelogModeUpsert() {
+        Map<String, String> options = new HashMap<>();
+        options.put(HOSTNAME.key(), POSTGRES_CONTAINER.getHost());
+        options.put(
+                PG_PORT.key(), String.valueOf(POSTGRES_CONTAINER.getMappedPort(POSTGRESQL_PORT)));
+        options.put(USERNAME.key(), TEST_USER);
+        options.put(PASSWORD.key(), TEST_PASSWORD);
+        options.put(TABLES.key(), POSTGRES_CONTAINER.getDatabaseName() + ".inventory.prod\\.*");
+        options.put(SLOT_NAME.key(), slotName);
+        options.put(CHANGELOG_MODE.key(), "upsert");
+        Factory.Context context = new MockContext(Configuration.fromMap(options));
+
+        PostgresDataSourceFactory factory = new PostgresDataSourceFactory();
+        PostgresDataSource dataSource = (PostgresDataSource) factory.createDataSource(context);
+        assertThat(dataSource.getChangelogMode()).isEqualTo(DebeziumChangelogMode.UPSERT);
+    }
+
+    @Test
+    public void testInvalidChangelogMode() {
+        Map<String, String> options = new HashMap<>();
+        options.put(HOSTNAME.key(), POSTGRES_CONTAINER.getHost());
+        options.put(
+                PG_PORT.key(), String.valueOf(POSTGRES_CONTAINER.getMappedPort(POSTGRESQL_PORT)));
+        options.put(USERNAME.key(), TEST_USER);
+        options.put(PASSWORD.key(), TEST_PASSWORD);
+        options.put(TABLES.key(), POSTGRES_CONTAINER.getDatabaseName() + ".inventory.prod\\.*");
+        options.put(SLOT_NAME.key(), slotName);
+        options.put(CHANGELOG_MODE.key(), "invalid");
+        Factory.Context context = new MockContext(Configuration.fromMap(options));
+
+        PostgresDataSourceFactory factory = new PostgresDataSourceFactory();
+        assertThatThrownBy(() -> factory.createDataSource(context))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Could not parse value 'invalid' for key 'changelog-mode'");
+    }
+
+    @Test
+    public void testChangelogModeUpsertRequiresPrimaryKey() throws SQLException {
+        try (Connection connection =
+                        PostgresTestBase.getJdbcConnection(
+                                POSTGRES_CONTAINER, POSTGRES_CONTAINER.getDatabaseName());
+                Statement statement = connection.createStatement()) {
+            statement.execute("CREATE TABLE inventory.no_pk_table (id INTEGER, name VARCHAR(64))");
+        }
+
+        Map<String, String> options = new HashMap<>();
+        options.put(HOSTNAME.key(), POSTGRES_CONTAINER.getHost());
+        options.put(
+                PG_PORT.key(), String.valueOf(POSTGRES_CONTAINER.getMappedPort(POSTGRESQL_PORT)));
+        options.put(USERNAME.key(), TEST_USER);
+        options.put(PASSWORD.key(), TEST_PASSWORD);
+        options.put(TABLES.key(), POSTGRES_CONTAINER.getDatabaseName() + ".inventory.no_pk_table");
+        options.put(SLOT_NAME.key(), slotName);
+        options.put(CHANGELOG_MODE.key(), "upsert");
+        Factory.Context context = new MockContext(Configuration.fromMap(options));
+
+        PostgresDataSourceFactory factory = new PostgresDataSourceFactory();
+        assertThatThrownBy(() -> factory.createDataSource(context))
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining(
+                        "Primary key must be present when 'changelog-mode' is 'upsert'")
+                .hasMessageContaining("inventory.no_pk_table");
     }
 
     @Test

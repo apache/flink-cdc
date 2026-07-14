@@ -21,6 +21,7 @@ import org.apache.flink.cdc.common.annotation.Experimental;
 import org.apache.flink.cdc.common.annotation.PublicEvolving;
 import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.configuration.ConfigOptions;
+import org.apache.flink.cdc.debezium.table.DebeziumChangelogMode;
 
 import java.time.Duration;
 
@@ -281,4 +282,15 @@ public class PostgresDataSourceOptions {
                     .defaultValue(false)
                     .withDescription(
                             "Whether to infer CDC column types when processing pgoutput Relation messages.");
+
+    @Experimental
+    public static final ConfigOption<DebeziumChangelogMode> CHANGELOG_MODE =
+            ConfigOptions.key("changelog-mode")
+                    .enumType(DebeziumChangelogMode.class)
+                    .defaultValue(DebeziumChangelogMode.ALL)
+                    .withDescription(
+                            "The changelog mode used for encoding streaming changes.\n"
+                                    + "\"all\": Encodes changes as UPDATE events carrying both the before and the after image. This is the default mode.\n"
+                                    + "\"upsert\": Encodes changes as REPLACE events carrying only the after image, describing idempotent updates on a key. "
+                                    + "It can be used for tables with primary keys when replica identity FULL is not an option.");
 }
