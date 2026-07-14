@@ -1219,13 +1219,28 @@ public class PostgresPipelineITCase extends PostgresTestBase {
 
     @Test
     public void testUpdateWithoutReplicaIdentityFullThrowsHelpfulNPE() throws Exception {
-        inventoryDatabase.createAndInitialize();
-        // Downgrade the replica identity so that UPDATE events do not carry a before-data, which
-        // is exactly the situation the user-facing error message should help diagnose.
-        try (Connection connection =
-                        getJdbcConnection(POSTGRES_CONTAINER, inventoryDatabase.getDatabaseName());
+        // Use a dedicated database and a table that is NOT configured with REPLICA IDENTITY FULL.
+        // A freshly created table defaults to REPLICA IDENTITY DEFAULT, and with the pgoutput
+        // plugin UPDATE events do not carry a before-data, which is exactly the situation the
+        // user-facing error message should help diagnose.
+        String dbName = "replica_identity_test";
+        try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
                 Statement statement = connection.createStatement()) {
-            statement.execute("ALTER TABLE inventory.products REPLICA IDENTITY DEFAULT");
+            statement.execute("DROP DATABASE IF EXISTS \"" + dbName + "\"");
+            statement.execute("CREATE DATABASE \"" + dbName + "\"");
+        }
+        String jdbcUrl =
+                String.format(
+                        "jdbc:postgresql://%s:%d/%s",
+                        POSTGRES_CONTAINER.getHost(),
+                        POSTGRES_CONTAINER.getMappedPort(POSTGRESQL_PORT),
+                        dbName);
+        try (Connection connection =
+                        java.sql.DriverManager.getConnection(jdbcUrl, TEST_USER, TEST_PASSWORD);
+                Statement statement = connection.createStatement()) {
+            statement.execute("CREATE TABLE products (id INT PRIMARY KEY, name VARCHAR(100))");
+            statement.execute("ALTER TABLE products REPLICA IDENTITY DEFAULT");
+            statement.execute("INSERT INTO products VALUES (1, 'test_1')");
         }
 
         PostgresSourceConfigFactory configFactory =
@@ -1235,36 +1250,47 @@ public class PostgresPipelineITCase extends PostgresTestBase {
                                 .port(POSTGRES_CONTAINER.getMappedPort(POSTGRESQL_PORT))
                                 .username(TEST_USER)
                                 .password(TEST_PASSWORD)
-                                .databaseList(inventoryDatabase.getDatabaseName())
-                                .tableList("inventory.products")
-                                .startupOptions(StartupOptions.latest())
+                                .databaseList(dbName)
+                                .tableList("public.products")
+                                .startupOptions(StartupOptions.initial())
                                 .serverTimeZone("UTC");
-        configFactory.database(inventoryDatabase.getDatabaseName());
+        configFactory.database(dbName);
         configFactory.slotName(slotName);
         configFactory.decodingPluginName("pgoutput");
+
+        StreamExecutionEnvironment testEnv = StreamExecutionEnvironment.getExecutionEnvironment();
+        testEnv.setParallelism(1);
+        testEnv.enableCheckpointing(1000);
+        RestartStrategyUtils.configureNoRestartStrategy(testEnv);
 
         FlinkSourceProvider sourceProvider =
                 (FlinkSourceProvider)
                         new PostgresDataSource(configFactory).getEventSourceProvider();
-        env.fromSource(
-                sourceProvider.getSource(),
-                WatermarkStrategy.noWatermarks(),
-                PostgresDataSourceFactory.IDENTIFIER,
-                new EventTypeInfo());
+        CloseableIterator<Event> events =
+                testEnv.fromSource(
+                                sourceProvider.getSource(),
+                                WatermarkStrategy.noWatermarks(),
+                                PostgresDataSourceFactory.IDENTIFIER,
+                                new EventTypeInfo())
+                        .executeAndCollect();
 
-        JobClient jobClient = env.executeAsync("UpdateWithoutReplicaIdentityFull");
         Thread.sleep(5000);
 
         try (Connection connection =
-                        getJdbcConnection(POSTGRES_CONTAINER, inventoryDatabase.getDatabaseName());
+                        java.sql.DriverManager.getConnection(jdbcUrl, TEST_USER, TEST_PASSWORD);
                 Statement statement = connection.createStatement()) {
-            statement.execute("UPDATE inventory.products SET description='updated' WHERE id=101");
+            statement.execute("UPDATE products SET name='test_2' WHERE id=1");
         }
 
-        // The pipeline runs in changelog mode ALL, so the UPDATE triggers
-        // extractBeforeDataRecord. With a null before-data, the source should fail with the
-        // REPLICA IDENTITY hint instead of the original unhelpful NullPointerException.
-        assertThatThrownBy(() -> jobClient.getJobExecutionResult().get())
+        // The pipeline runs in changelog mode ALL, so the UPDATE triggers extractBeforeDataRecord.
+        // With a null before-data, the source fails with the REPLICA IDENTITY hint instead of the
+        // original unhelpful NullPointerException.
+        assertThatThrownBy(
+                        () -> {
+                            while (events.hasNext()) {
+                                events.next();
+                            }
+                        })
                 .hasStackTraceContaining("Before data is null")
                 .hasStackTraceContaining("REPLICA IDENTITY FULL");
     }
