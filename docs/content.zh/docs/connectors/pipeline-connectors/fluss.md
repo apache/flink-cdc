@@ -100,6 +100,13 @@ Pipeline Connector Options
       <td>用于建立与 Fluss 集群初始连接的主机/端口对列表。 </td>
     </tr>
     <tr>
+      <td>target.table.create.mode</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">CREATE_IF_NOT_EXISTS</td>
+      <td>Enum</td>
+      <td>目标端建表行为。使用 <code>CREATE_IF_NOT_EXISTS</code> 自动创建缺失的 Fluss 表；使用 <code>ERROR_IF_NOT_EXISTS</code> 要求目标 Fluss 表必须提前存在。</td>
+    </tr>
+    <tr>
       <td>bucket.key</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
@@ -138,6 +145,8 @@ Pipeline Connector Options
 * 支持 Fluss 主键表和日志表。
 
 * 关于自动建表
+  * 默认通过 `target.table.create.mode: CREATE_IF_NOT_EXISTS` 启用自动建表。
+  * 如需在 Flink CDC 外部提前创建目标表，可将 `target.table.create.mode` 设置为 `ERROR_IF_NOT_EXISTS`。该模式下目标表必须已存在；已有的 Fluss schema 兼容性检查仍按原逻辑执行。
   * 没有分区键
   * 桶数量由 `bucket.num` 选项控制
   * 数据分布由 `bucket.key` 选项控制。对于主键表，若未指定分桶键，则分桶键默认为主键（不含分区键）；对于无主键的日志表，若未指定分桶键，则数据将随机分配到各个桶中。 

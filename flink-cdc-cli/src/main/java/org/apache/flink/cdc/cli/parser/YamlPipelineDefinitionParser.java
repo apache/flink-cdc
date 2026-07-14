@@ -21,6 +21,7 @@ import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.SchemaChangeEventTypeFamily;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
+import org.apache.flink.cdc.common.pipeline.TargetTableCreateMode;
 import org.apache.flink.cdc.common.utils.ChangeEventUtils;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.common.utils.StringUtils;
@@ -53,6 +54,7 @@ import java.util.Set;
 import java.util.stream.Stream;
 
 import static org.apache.flink.cdc.common.pipeline.PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR;
+import static org.apache.flink.cdc.common.sink.SinkOptions.TARGET_TABLE_CREATE_MODE;
 import static org.apache.flink.cdc.common.utils.ChangeEventUtils.resolveSchemaEvolutionOptions;
 import static org.apache.flink.cdc.common.utils.Preconditions.checkNotNull;
 
@@ -264,6 +266,10 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         Map<String, String> sinkMap =
                 mapper.convertValue(sinkNode, new TypeReference<Map<String, String>>() {});
 
+        TargetTableCreateMode targetTableCreateMode =
+                Configuration.fromMap(sinkMap).get(TARGET_TABLE_CREATE_MODE);
+        sinkMap.remove(TARGET_TABLE_CREATE_MODE.key());
+
         // "type" field is required
         String type =
                 checkNotNull(
@@ -274,7 +280,8 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         // "name" field is optional
         String name = sinkMap.remove(NAME_KEY);
 
-        return new SinkDef(type, name, Configuration.fromMap(sinkMap), declaredSETypes);
+        return new SinkDef(
+                type, name, Configuration.fromMap(sinkMap), declaredSETypes, targetTableCreateMode);
     }
 
     private RouteDef toRouteDef(JsonNode routeNode) {

@@ -25,10 +25,13 @@ import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.pipeline.RuntimeExecutionMode;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.sink.DataSink;
+import org.apache.flink.cdc.common.sink.MetadataApplier;
+import org.apache.flink.cdc.common.sink.TargetTableCreateModeMetadataApplier;
 import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.composer.PipelineComposer;
 import org.apache.flink.cdc.composer.PipelineExecution;
 import org.apache.flink.cdc.composer.definition.PipelineDef;
+import org.apache.flink.cdc.composer.definition.SinkDef;
 import org.apache.flink.cdc.composer.flink.coordination.OperatorIDGenerator;
 import org.apache.flink.cdc.composer.flink.translator.DataSinkTranslator;
 import org.apache.flink.cdc.composer.flink.translator.DataSourceTranslator;
@@ -168,6 +171,8 @@ public class FlinkPipelineComposer implements PipelineComposer {
                 sourceTranslator.createDataSource(pipelineDef.getSource(), pipelineDefConfig, env);
         DataSink dataSink =
                 sinkTranslator.createDataSink(pipelineDef.getSink(), pipelineDefConfig, env);
+        MetadataApplier metadataApplier =
+                createMetadataApplier(dataSink.getMetadataApplier(), pipelineDef);
 
         boolean isParallelMetadataSource = dataSource.isParallelMetadataSource();
 
@@ -215,11 +220,7 @@ public class FlinkPipelineComposer implements PipelineComposer {
                     schemaOperatorTranslator.translateDistributed(
                             partitionedStream,
                             parallelism,
-                            dataSink.getMetadataApplier()
-                                    .setAcceptedSchemaEvolutionTypes(
-                                            pipelineDef
-                                                    .getSink()
-                                                    .getIncludedSchemaEvolutionTypes()),
+                            metadataApplier,
                             pipelineDef.getRoute(),
                             pipelineDef.getRouteMode());
 
@@ -231,11 +232,7 @@ public class FlinkPipelineComposer implements PipelineComposer {
                             stream,
                             parallelism,
                             isBatchMode,
-                            dataSink.getMetadataApplier()
-                                    .setAcceptedSchemaEvolutionTypes(
-                                            pipelineDef
-                                                    .getSink()
-                                                    .getIncludedSchemaEvolutionTypes()),
+                            metadataApplier,
                             pipelineDef.getRoute(),
                             pipelineDef.getRouteMode());
 
@@ -259,6 +256,14 @@ public class FlinkPipelineComposer implements PipelineComposer {
                 isBatchMode,
                 schemaOperatorIDGenerator.generate(),
                 operatorUidGenerator);
+    }
+
+    private MetadataApplier createMetadataApplier(
+            MetadataApplier metadataApplier, PipelineDef pipelineDef) {
+        SinkDef sinkDef = pipelineDef.getSink();
+        return TargetTableCreateModeMetadataApplier.wrap(
+                        metadataApplier, sinkDef.getTargetTableCreateMode(), sinkDef.getType())
+                .setAcceptedSchemaEvolutionTypes(sinkDef.getIncludedSchemaEvolutionTypes());
     }
 
     private void addFrameworkJars() {

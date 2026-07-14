@@ -101,6 +101,13 @@ Pipeline Connector Options
       <td>The bootstrap servers for the Fluss sink connection. </td>
     </tr>
     <tr>
+      <td>target.table.create.mode</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">CREATE_IF_NOT_EXISTS</td>
+      <td>Enum</td>
+      <td>Behavior for handling target table creation. Use <code>CREATE_IF_NOT_EXISTS</code> to automatically create missing Fluss tables, or <code>ERROR_IF_NOT_EXISTS</code> to require target Fluss tables to already exist.</td>
+    </tr>
+    <tr>
       <td>bucket.key</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
@@ -140,6 +147,8 @@ Pipeline Connector Options
 * Support Fluss primary key table and log table.
 
 * For creating table automatically
+  * Automatic table creation is enabled by default with `target.table.create.mode: CREATE_IF_NOT_EXISTS`.
+  * To require target tables to be created outside Flink CDC, set `target.table.create.mode` to `ERROR_IF_NOT_EXISTS`. In this mode, the target table must already exist. Existing Fluss schema compatibility checks still apply.
   * There is no partition key
   * The number of buckets is controlled by `bucket.num`
   * The distribution keys are controlled by option `bucket.key`. For primary key table and a bucket key is not specified, the bucket key will be used as primary key(excluding the partition key). For log table has no primary key and the bucket key is not specified, the data will be distributed to each bucket randomly. 

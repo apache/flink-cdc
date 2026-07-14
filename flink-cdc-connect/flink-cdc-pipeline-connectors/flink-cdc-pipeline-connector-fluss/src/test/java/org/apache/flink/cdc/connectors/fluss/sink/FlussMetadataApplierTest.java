@@ -21,10 +21,14 @@ import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.pipeline.TargetTableCreateMode;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.common.sink.MetadataApplier;
+import org.apache.flink.cdc.common.sink.TargetTableCreateModeMetadataApplier;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.IntType;
+import org.apache.flink.table.api.ValidationException;
 
 import org.apache.fluss.client.Connection;
 import org.apache.fluss.client.ConnectionFactory;
@@ -602,6 +606,32 @@ public class FlussMetadataApplierTest {
                         Collections.emptyMap(),
                         Collections.emptyMap())) {
             applier.applySchemaChange(new CreateTableEvent(tableId, sameSchema));
+        }
+    }
+
+    @Test
+    void testErrorIfNotExistsModeFailsWhenTargetTableIsMissing() throws Exception {
+        TableId tableId = TableId.tableId("default_namespace", DATABASE_NAME, "table1");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .build();
+        CreateTableEvent createTableEvent = new CreateTableEvent(tableId, schema);
+
+        try (FlussMetaDataApplier applier =
+                new FlussMetaDataApplier(
+                        FLUSS_CLUSTER_EXTENSION.getClientConfig(),
+                        Collections.emptyMap(),
+                        Collections.emptyMap(),
+                        Collections.emptyMap())) {
+            MetadataApplier wrappedApplier =
+                    TargetTableCreateModeMetadataApplier.wrap(
+                            applier, TargetTableCreateMode.ERROR_IF_NOT_EXISTS, "fluss");
+            assertThatThrownBy(() -> wrappedApplier.applySchemaChange(createTableEvent))
+                    .isExactlyInstanceOf(ValidationException.class)
+                    .hasMessageContaining("Target table does not exist");
+            assertThat(admin.databaseExists(DATABASE_NAME).get()).isFalse();
         }
     }
 

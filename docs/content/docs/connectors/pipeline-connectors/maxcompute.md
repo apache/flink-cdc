@@ -94,6 +94,13 @@ pipeline:
       <td>The name of the sink.</td>
     </tr>
     <tr>
+      <td>target.table.create.mode</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">CREATE_IF_NOT_EXISTS</td>
+      <td>Enum</td>
+      <td>Behavior for handling target table creation. Use <code>CREATE_IF_NOT_EXISTS</code> to automatically create missing MaxCompute tables, or <code>ERROR_IF_NOT_EXISTS</code> to require target MaxCompute tables to already exist.</td>
+    </tr>
+    <tr>
       <td>access-id</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
@@ -193,6 +200,8 @@ pipeline:
 ## Usage Instructions
 
 * The connector supports automatic table creation, automatically mapping the location relationship and data types between MaxCompute tables and source tables (see the mapping table below). When the source table has a primary key, a MaxCompute Delta table is automatically created; otherwise, a regular MaxCompute table (Append table) is created.
+  * Automatic table creation is enabled by default with `target.table.create.mode: CREATE_IF_NOT_EXISTS`.
+  * To require target tables to be created outside Flink CDC, set `target.table.create.mode` to `ERROR_IF_NOT_EXISTS`. In this mode, the target table must already exist. Existing MaxCompute schema and primary key compatibility checks still apply.
 * When writing to a regular MaxCompute table (Append table), the delete operation will be ignored, and the update operation will be treated as an insert operation.
 * Currently, only at-least-once is supported. Delta tables can achieve idempotent writes due to their primary key characteristics.
 * For synchronization of table structure changes:
