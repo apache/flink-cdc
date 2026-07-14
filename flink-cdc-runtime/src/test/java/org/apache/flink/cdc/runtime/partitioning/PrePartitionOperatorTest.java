@@ -25,6 +25,7 @@ import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.DefaultDataChangeEventHashFunctionProvider;
+import org.apache.flink.cdc.common.sink.TableIdHashFunctionProvider;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.runtime.testutils.operators.RegularEventOperatorTestHarness;
@@ -144,6 +145,78 @@ class PrePartitionOperatorTest {
                         .getHashFunction(null, schema)
                         .hashcode(dataChangeEvent)
                 % DOWNSTREAM_PARALLELISM;
+    }
+
+    @Test
+    void testPartitioningDataChangeEventWithTableIdStrategy() throws Exception {
+        try (RegularEventOperatorTestHarness<RegularPrePartitionOperator, PartitioningEvent>
+                testHarness = createTableIdStrategyTestHarness()) {
+            // Initialization
+            testHarness.open();
+            testHarness.registerTableSchema(CUSTOMERS, CUSTOMERS_SCHEMA);
+
+            // DataChangeEvent with different primary key values
+            RegularPrePartitionOperator operator = testHarness.getOperator();
+            BinaryRecordDataGenerator recordDataGenerator =
+                    new BinaryRecordDataGenerator(((RowType) CUSTOMERS_SCHEMA.toRowDataType()));
+            DataChangeEvent eventA =
+                    DataChangeEvent.insertEvent(
+                            CUSTOMERS,
+                            recordDataGenerator.generate(
+                                    new Object[] {1, new BinaryStringData("Alice"), 12345678L}));
+            DataChangeEvent eventB =
+                    DataChangeEvent.insertEvent(
+                            CUSTOMERS,
+                            recordDataGenerator.generate(
+                                    new Object[] {2, new BinaryStringData("Bob"), 12345689L}));
+            DataChangeEvent eventC =
+                    DataChangeEvent.insertEvent(
+                            CUSTOMERS,
+                            recordDataGenerator.generate(
+                                    new Object[] {
+                                        100, new BinaryStringData("Charlie"), 99999999L
+                                    }));
+            operator.processElement(new StreamRecord<>(eventA));
+            operator.processElement(new StreamRecord<>(eventB));
+            operator.processElement(new StreamRecord<>(eventC));
+
+            // All events from the same table should be routed to the same subtask
+            StreamRecord<?> recordA = testHarness.getOutputRecords().poll();
+            StreamRecord<?> recordB = testHarness.getOutputRecords().poll();
+            StreamRecord<?> recordC = testHarness.getOutputRecords().poll();
+
+            int targetA = ((PartitioningEvent) recordA.getValue()).getTargetPartition();
+            int targetB = ((PartitioningEvent) recordB.getValue()).getTargetPartition();
+            int targetC = ((PartitioningEvent) recordC.getValue()).getTargetPartition();
+
+            // Verify all events land on the same subtask
+            assertThat(targetA).isEqualTo(targetB);
+            assertThat(targetB).isEqualTo(targetC);
+
+            // Verify the target is calculated based on TableId only
+            int expectedTarget = getTableIdPartitioningTarget(CUSTOMERS);
+            assertThat(targetA).isEqualTo(expectedTarget);
+        }
+    }
+
+    private int getTableIdPartitioningTarget(TableId tableId) {
+        return new TableIdHashFunctionProvider()
+                        .getHashFunction(tableId, CUSTOMERS_SCHEMA)
+                        .hashcode(
+                                DataChangeEvent.insertEvent(
+                                        tableId,
+                                        org.apache.flink.cdc.common.data.GenericRecordData.of()))
+                % DOWNSTREAM_PARALLELISM;
+    }
+
+    private RegularEventOperatorTestHarness<RegularPrePartitionOperator, PartitioningEvent>
+            createTableIdStrategyTestHarness() {
+        RegularPrePartitionOperator operator =
+                new RegularPrePartitionOperator(
+                        TestingSchemaRegistryGateway.SCHEMA_OPERATOR_ID,
+                        DOWNSTREAM_PARALLELISM,
+                        new TableIdHashFunctionProvider());
+        return RegularEventOperatorTestHarness.with(operator, DOWNSTREAM_PARALLELISM);
     }
 
     private RegularEventOperatorTestHarness<RegularPrePartitionOperator, PartitioningEvent>
