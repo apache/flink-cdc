@@ -22,6 +22,8 @@ on:
       - release-*
     paths:
       - 'docs/**'
+      - '.github/workflows/build_docs.yml'
+      - '.github/workflows/docs.sh'
   schedule:
     - cron: '0 0 * * *' # Deploy every day
   workflow_dispatch:
