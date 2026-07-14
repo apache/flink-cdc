@@ -27,6 +27,7 @@ import org.apache.flink.cdc.connectors.mysql.source.assigners.MySqlSnapshotSplit
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
+import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffsetKind;
 import org.apache.flink.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
@@ -1141,6 +1142,77 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
         // Check that the restored reader keeps the event.
         Predicate<Event> eventFilter = binlogReader.getBinlogSplitReadTask().getEventFilter();
         assertThat(eventFilter.test(event)).isTrue();
+    }
+
+    @Test
+    void testRestoreFromEarlyCheckpointWithTimestampStartingOffset() throws Exception {
+        // This covers the "early checkpoint / savepoint" case: the checkpoint is taken before the
+        // binlog split has processed any record, so the restored split's starting offset is still
+        // BinlogOffsetKind.TIMESTAMP with the original submission-time timestamp (T1). The job is
+        // then resubmitted with a config that carries a different, later TIMESTAMP option (T2 >
+        // T1).
+        // The event filter must anchor on the restored split timestamp T1, not the newly submitted
+        // config timestamp T2.
+
+        // Preparations
+        inventoryDatabase8.createAndInitialize();
+        MySqlSourceConfig connectionConfig =
+                getConfig(MYSQL8_CONTAINER, inventoryDatabase8, new String[] {"products"});
+        binaryLogClient = DebeziumUtils.createBinaryClient(connectionConfig.getDbzConfiguration());
+        mySqlConnection = DebeziumUtils.createMySqlConnection(connectionConfig);
+
+        // T1 is the original submission-time timestamp captured in the checkpoint, while T2 is a
+        // different (later) timestamp coming from the resubmitted config. T2 > T1 on purpose so we
+        // can tell which one the filter uses.
+        long restoredTimestampMs = 15_000L;
+        long resubmittedTimestampMs = 30_000L;
+
+        // The resubmitted job config still runs in TIMESTAMP mode, but with a different timestamp.
+        MySqlSourceConfig sourceConfig =
+                getConfig(
+                        MYSQL8_CONTAINER,
+                        inventoryDatabase8,
+                        StartupOptions.timestamp(resubmittedTimestampMs),
+                        new String[] {"products"});
+
+        // The restored split still carries a TIMESTAMP starting offset (T1), which is exactly the
+        // state an early checkpoint / savepoint would hold.
+        BinlogSplitReader binlogReader = createBinlogReader(sourceConfig);
+        MySqlBinlogSplit checkpointSplit =
+                createBinlogSplit(
+                        getConfig(
+                                MYSQL8_CONTAINER,
+                                inventoryDatabase8,
+                                StartupOptions.timestamp(restoredTimestampMs),
+                                new String[] {"products"}));
+        assertThat(checkpointSplit.getStartingOffset().getOffsetKind())
+                .isEqualTo(BinlogOffsetKind.TIMESTAMP);
+        assertThat(checkpointSplit.getStartingOffset().getTimestampSec())
+                .isEqualTo(restoredTimestampMs / 1000);
+
+        // Restore binlog reader from the early checkpoint
+        binlogReader.submitSplit(checkpointSplit);
+
+        Predicate<Event> eventFilter = binlogReader.getBinlogSplitReadTask().getEventFilter();
+
+        // An event between T1 and T2 must be kept, because the filter should use the restored split
+        // timestamp T1 (>= 15000ms) rather than the resubmitted config timestamp T2 (>= 30000ms).
+        Event eventBetweenT1AndT2 =
+                mockWriteRowsEvent(restoredTimestampMs + Duration.ofSeconds(5).toMillis());
+        assertThat(eventFilter.test(eventBetweenT1AndT2)).isTrue();
+
+        // An event before T1 must still be dropped, proving the timestamp filter is actually active
+        // on T1 and did not degrade into a pass-through filter.
+        Event eventBeforeT1 =
+                mockWriteRowsEvent(restoredTimestampMs - Duration.ofSeconds(5).toMillis());
+        assertThat(eventFilter.test(eventBeforeT1)).isFalse();
+    }
+
+    private static Event mockWriteRowsEvent(long timestampMs) {
+        EventHeaderV4 header = new EventHeaderV4();
+        header.setEventType(EventType.WRITE_ROWS);
+        header.setTimestamp(timestampMs);
+        return new Event(header, new WriteRowsEventData());
     }
 
     @Test

@@ -408,6 +408,9 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
                                 + "configuration. ");
             }
             if (startingOffset.getOffsetKind() != BinlogOffsetKind.TIMESTAMP) {
+                LOG.info(
+                        "The starting offset kind is {}, no need to apply timestamp filter",
+                        startingOffset.getOffsetKind());
                 return event -> true;
             }
 
