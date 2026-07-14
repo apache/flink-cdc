@@ -219,10 +219,10 @@ Connector Options
           <td>Boolean</td>
           <td>Incremental snapshot is a new mechanism to read snapshot of a table. Compared to the old snapshot mechanism,
               the incremental snapshot has many advantages, including:
-                (1) source can be parallel during snapshot reading,
-                (2) source can perform checkpoints in the chunk granularity during snapshot reading,
-                (3) source doesn't need to acquire global read lock (FLUSH TABLES WITH READ LOCK) before snapshot reading.
-              Please see <a href="#incremental-snapshot-reading ">Incremental Snapshot Reading</a>section for more detailed information.
+                <br/>(1) source can be parallel during snapshot reading,
+                <br/>(2) source can perform checkpoints in the chunk granularity during snapshot reading,
+                <br/>(3) source doesn't need to acquire global read lock (FLUSH TABLES WITH READ LOCK) before snapshot reading.
+              <br/>Please see <a href="#incremental-snapshot-reading-experimental">Incremental Snapshot Reading</a> section for more detailed information.
           </td>
     </tr>
     <tr>
