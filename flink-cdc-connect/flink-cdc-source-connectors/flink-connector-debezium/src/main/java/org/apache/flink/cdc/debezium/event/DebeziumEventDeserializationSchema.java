@@ -45,7 +45,6 @@ import org.apache.flink.cdc.debezium.utils.TemporalConversions;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.util.Collector;
-import org.apache.flink.util.Preconditions;
 
 import io.debezium.data.Envelope;
 import io.debezium.data.SpecialValueDecimal;
@@ -146,19 +145,12 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
             throws Exception {
         Schema beforeSchema = fieldSchema(valueSchema, Envelope.FieldName.BEFORE);
         Struct beforeValue = fieldStruct(value, Envelope.FieldName.BEFORE);
-        Preconditions.checkNotNull(
-                beforeValue,
-                "Before data is null for UPDATE/DELETE event. Schema name: " + valueSchema.name());
         return extractDataRecord(beforeValue, beforeSchema);
     }
 
     private RecordData extractAfterDataRecord(Struct value, Schema valueSchema) throws Exception {
         Schema afterSchema = fieldSchema(valueSchema, Envelope.FieldName.AFTER);
         Struct afterValue = fieldStruct(value, Envelope.FieldName.AFTER);
-        Preconditions.checkNotNull(
-                afterValue,
-                "After data is null for CREATE/READ/UPDATE event. Schema name: "
-                        + valueSchema.name());
         return extractDataRecord(afterValue, afterSchema);
     }
 

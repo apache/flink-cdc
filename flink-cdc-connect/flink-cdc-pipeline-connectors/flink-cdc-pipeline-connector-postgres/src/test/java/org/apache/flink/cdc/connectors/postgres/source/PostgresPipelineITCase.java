@@ -88,6 +88,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT;
 
 /** Integration tests for Postgres source. */
@@ -1214,5 +1215,57 @@ public class PostgresPipelineITCase extends PostgresTestBase {
                         .physicalColumn("weight", DataTypes.DOUBLE())
                         .primaryKey(Collections.singletonList("id"))
                         .build());
+    }
+
+    @Test
+    public void testUpdateWithoutReplicaIdentityFullThrowsHelpfulNPE() throws Exception {
+        inventoryDatabase.createAndInitialize();
+        // Downgrade the replica identity so that UPDATE events do not carry a before-data, which
+        // is exactly the situation the user-facing error message should help diagnose.
+        try (Connection connection =
+                        getJdbcConnection(POSTGRES_CONTAINER, inventoryDatabase.getDatabaseName());
+                Statement statement = connection.createStatement()) {
+            statement.execute("ALTER TABLE inventory.products REPLICA IDENTITY DEFAULT");
+        }
+
+        PostgresSourceConfigFactory configFactory =
+                (PostgresSourceConfigFactory)
+                        new PostgresSourceConfigFactory()
+                                .hostname(POSTGRES_CONTAINER.getHost())
+                                .port(POSTGRES_CONTAINER.getMappedPort(POSTGRESQL_PORT))
+                                .username(TEST_USER)
+                                .password(TEST_PASSWORD)
+                                .databaseList(inventoryDatabase.getDatabaseName())
+                                .tableList("inventory.products")
+                                .startupOptions(StartupOptions.latest())
+                                .serverTimeZone("UTC");
+        configFactory.database(inventoryDatabase.getDatabaseName());
+        configFactory.slotName(slotName);
+        configFactory.decodingPluginName("pgoutput");
+
+        FlinkSourceProvider sourceProvider =
+                (FlinkSourceProvider)
+                        new PostgresDataSource(configFactory).getEventSourceProvider();
+        env.fromSource(
+                sourceProvider.getSource(),
+                WatermarkStrategy.noWatermarks(),
+                PostgresDataSourceFactory.IDENTIFIER,
+                new EventTypeInfo());
+
+        JobClient jobClient = env.executeAsync("UpdateWithoutReplicaIdentityFull");
+        Thread.sleep(5000);
+
+        try (Connection connection =
+                        getJdbcConnection(POSTGRES_CONTAINER, inventoryDatabase.getDatabaseName());
+                Statement statement = connection.createStatement()) {
+            statement.execute("UPDATE inventory.products SET description='updated' WHERE id=101");
+        }
+
+        // The pipeline runs in changelog mode ALL, so the UPDATE triggers
+        // extractBeforeDataRecord. With a null before-data, the source should fail with the
+        // REPLICA IDENTITY hint instead of the original unhelpful NullPointerException.
+        assertThatThrownBy(() -> jobClient.getJobExecutionResult().get())
+                .hasStackTraceContaining("Before data is null")
+                .hasStackTraceContaining("REPLICA IDENTITY FULL");
     }
 }
