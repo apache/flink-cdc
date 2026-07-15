@@ -128,6 +128,7 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
 
     void setup(boolean incrementalSnapshot) {
         TestValuesTableFactory.clearAllData();
+        tEnv.getConfig().set("table.exec.sink.require-on-conflict", "false");
         if (incrementalSnapshot) {
             env.setParallelism(DEFAULT_PARALLELISM);
             env.enableCheckpointing(200);
