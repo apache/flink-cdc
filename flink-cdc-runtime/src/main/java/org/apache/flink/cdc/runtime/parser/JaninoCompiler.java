@@ -230,7 +230,8 @@ public class JaninoCompiler {
             sqlCaseRvalueTemp =
                     new Java.ConditionalExpression(
                             Location.NOWHERE,
-                            whenAtoms.get(i),
+                            generateFunctionOperation(
+                                    "isTrue", new Java.Rvalue[] {whenAtoms.get(i)}),
                             thenAtoms.get(i),
                             sqlCaseRvalueTemp);
         }
@@ -258,30 +259,41 @@ public class JaninoCompiler {
             Context context, SqlBasicCall sqlBasicCall, Java.Rvalue[] atoms) {
         switch (sqlBasicCall.getKind()) {
             case AND:
-                return generateBinaryOperation(context, sqlBasicCall, atoms, "&&");
+                return generateFunctionOperation("and", atoms);
             case OR:
-                return generateBinaryOperation(context, sqlBasicCall, atoms, "||");
+                return generateFunctionOperation("or", atoms);
             case NOT:
-                return generateUnaryOperation(context, "!", atoms[0]);
+                return generateFunctionOperation("not", atoms);
             case EQUALS:
                 return generateEqualsOperation(context, sqlBasicCall, atoms);
             case NOT_EQUALS:
                 return generateUnaryOperation(
                         context, "!", generateEqualsOperation(context, sqlBasicCall, atoms));
+            case IS_DISTINCT_FROM:
+            case IS_NOT_DISTINCT_FROM:
+                return generateOtherFunctionOperation(context, sqlBasicCall, atoms);
             case IS_NULL:
                 return generateUnaryOperation(context, "null == ", atoms[0]);
             case IS_NOT_NULL:
                 return generateUnaryOperation(context, "null != ", atoms[0]);
             case IS_FALSE:
+                return generateFunctionOperation("isFalse", atoms);
             case IS_NOT_TRUE:
-                return generateUnaryOperation(context, "false == ", atoms[0]);
+                return generateFunctionOperation("isNotTrue", atoms);
             case IS_TRUE:
+                return generateFunctionOperation("isTrue", atoms);
             case IS_NOT_FALSE:
-                return generateUnaryOperation(context, "true == ", atoms[0]);
+                return generateFunctionOperation("isNotFalse", atoms);
+            case IS_UNKNOWN:
+                if (sqlBasicCall.getOperator().getName().equalsIgnoreCase("IS NOT UNKNOWN")) {
+                    return generateFunctionOperation("isNotUnknown", atoms);
+                }
+                return generateFunctionOperation("isUnknown", atoms);
             case BETWEEN:
             case IN:
             case NOT_IN:
             case LIKE:
+            case SIMILAR:
             case CEIL:
             case FLOOR:
             case TRIM:
@@ -320,6 +332,10 @@ public class JaninoCompiler {
     private static Java.Rvalue generateUnaryOperation(
             Context context, String operator, Java.Rvalue atom) {
         return new Java.UnaryOperation(Location.NOWHERE, operator, atom);
+    }
+
+    private static Java.Rvalue generateFunctionOperation(String functionName, Java.Rvalue[] atoms) {
+        return new Java.MethodInvocation(Location.NOWHERE, null, functionName, atoms);
     }
 
     private static final Map<String, String> decimalArithmeticHandlers =
@@ -517,7 +533,10 @@ public class JaninoCompiler {
         if (operationName.equals("IF")) {
             if (atoms.length == 3) {
                 return new Java.ConditionalExpression(
-                        Location.NOWHERE, atoms[0], atoms[1], atoms[2]);
+                        Location.NOWHERE,
+                        generateFunctionOperation("isTrue", new Java.Rvalue[] {atoms[0]}),
+                        atoms[1],
+                        atoms[2]);
             } else {
                 throw new ParseException("Unrecognized expression: " + sqlBasicCall);
             }

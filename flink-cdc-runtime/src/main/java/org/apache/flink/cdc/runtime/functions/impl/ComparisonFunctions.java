@@ -27,6 +27,17 @@ public class ComparisonFunctions {
         return (object1 != null && object2 != null) && object1.equals(object2);
     }
 
+    public static boolean isDistinctFrom(Object object1, Object object2) {
+        if (object1 == null || object2 == null) {
+            return object1 != object2;
+        }
+        return !object1.equals(object2);
+    }
+
+    public static boolean isNotDistinctFrom(Object object1, Object object2) {
+        return !isDistinctFrom(object1, object2);
+    }
+
     private static int universalCompares(Object lhs, Object rhs) {
         Class<?> leftClass = lhs.getClass();
         Class<?> rightClass = rhs.getClass();

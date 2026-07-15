@@ -174,19 +174,23 @@ class TransformParserTest {
     void testTranslateFilterToJaninoExpression() {
         testFilterExpression("id is not null", "null != id");
         testFilterExpression("id is null", "null == id");
-        testFilterExpression("id = 1 and uid = 2", "valueEquals(id, 1) && valueEquals(uid, 2)");
-        testFilterExpression("id = 1 or id = 2", "valueEquals(id, 1) || valueEquals(id, 2)");
-        testFilterExpression("not (id = 1)", "!valueEquals(id, 1)");
+        testFilterExpression("id = 1 and uid = 2", "and(valueEquals(id, 1), valueEquals(uid, 2))");
+        testFilterExpression("id = 1 or id = 2", "or(valueEquals(id, 1), valueEquals(id, 2))");
+        testFilterExpression("not (id = 1)", "not(valueEquals(id, 1))");
         testFilterExpression("id = '1'", "valueEquals(id, \"1\")");
         testFilterExpression("id <> '1'", "!valueEquals(id, \"1\")");
+        testFilterExpression("id is distinct from '1'", "isDistinctFrom(id, \"1\")");
+        testFilterExpression("id is not distinct from '1'", "isNotDistinctFrom(id, \"1\")");
         testFilterExpression("d between d1 and d2", "betweenAsymmetric(d, d1, d2)");
         testFilterExpression("d not between d1 and d2", "notBetweenAsymmetric(d, d1, d2)");
         testFilterExpression("d in (d1, d2)", "in(d, d1, d2)");
         testFilterExpression("d not in (d1, d2)", "notIn(d, d1, d2)");
-        testFilterExpression("id is false", "false == id");
-        testFilterExpression("id is not false", "true == id");
-        testFilterExpression("id is true", "true == id");
-        testFilterExpression("id is not true", "false == id");
+        testFilterExpression("id is false", "isFalse(id)");
+        testFilterExpression("id is not false", "isNotFalse(id)");
+        testFilterExpression("id is true", "isTrue(id)");
+        testFilterExpression("id is not true", "isNotTrue(id)");
+        testFilterExpression("id is unknown", "null == id");
+        testFilterExpression("id is not unknown", "null != id");
         testFilterExpression("a || b", "concat(a, b)");
         testFilterExpression("CHAR_LENGTH(id)", "charLength(id)");
         testFilterExpression("trim(id)", "trim(\"BOTH\", \" \", id)");
@@ -198,6 +202,9 @@ class TransformParserTest {
         testFilterExpression("SUBSTR(a,1)", "substr(a, 1)");
         testFilterExpression("id like '^[a-zA-Z]'", "like(id, \"^[a-zA-Z]\")");
         testFilterExpression("id not like '^[a-zA-Z]'", "notLike(id, \"^[a-zA-Z]\")");
+        testFilterExpression("id like 'A$%' escape '$'", "like(id, \"A$%\", \"$\")");
+        testFilterExpression("id similar to '(A|B)%'", "similarTo(id, \"(A|B)%\")");
+        testFilterExpression("id not similar to '(A|B)%'", "notSimilarTo(id, \"(A|B)%\")");
         testFilterExpression("abs(2)", "abs(2)");
         testFilterExpression("ceil(2)", "ceil(2)");
         testFilterExpression("ceiling(2)", "ceil(2)");
@@ -329,7 +336,7 @@ class TransformParserTest {
                 "TIMESTAMPADD(YEAR, 1, dt)", "timestampadd(\"YEAR\", 1, dt, __time_zone__)");
         testFilterExpression(
                 "timestampadd(year, 1, dt)", "timestampadd(\"YEAR\", 1, dt, __time_zone__)");
-        testFilterExpression("IF(a>b,a,b)", "greaterThan(a, b) ? a : b");
+        testFilterExpression("IF(a>b,a,b)", "isTrue(greaterThan(a, b)) ? a : b");
         testFilterExpression("NULLIF(a,b)", "nullif(a, b)");
         testFilterExpression("COALESCE(a,b,c)", "coalesce(a, b, c)");
         testFilterExpression("id + 2", "id + 2");
@@ -348,19 +355,19 @@ class TransformParserTest {
         testFilterExpression("upper(lower(id))", "upper(lower(id))");
         testFilterExpression(
                 "abs(uniq_id) > 10 and id is not null",
-                "greaterThan(abs(uniq_id), 10) && null != id");
+                "and(greaterThan(abs(uniq_id), 10), null != id)");
         testFilterExpression(
                 "case id when 1 then 'a' when 2 then 'b' else 'c' end",
-                "(valueEquals(id, 1) ? \"a\" : valueEquals(id, 2) ? \"b\" : \"c\")");
+                "(isTrue(valueEquals(id, 1)) ? \"a\" : isTrue(valueEquals(id, 2)) ? \"b\" : \"c\")");
         testFilterExpression(
                 "case when id = 1 then 'a' when id = 2 then 'b' else 'c' end",
-                "(valueEquals(id, 1) ? \"a\" : valueEquals(id, 2) ? \"b\" : \"c\")");
+                "(isTrue(valueEquals(id, 1)) ? \"a\" : isTrue(valueEquals(id, 2)) ? \"b\" : \"c\")");
         testFilterExpression(
                 "case id when 1 then 'a' when 2 then 'b' else 'c' end",
-                "(valueEquals(id, 1) ? \"a\" : valueEquals(id, 2) ? \"b\" : \"c\")");
+                "(isTrue(valueEquals(id, 1)) ? \"a\" : isTrue(valueEquals(id, 2)) ? \"b\" : \"c\")");
         testFilterExpression(
                 "case when id = 1 then 'a' when id = 2 then 'b' else 'c' end",
-                "(valueEquals(id, 1) ? \"a\" : valueEquals(id, 2) ? \"b\" : \"c\")");
+                "(isTrue(valueEquals(id, 1)) ? \"a\" : isTrue(valueEquals(id, 2)) ? \"b\" : \"c\")");
         testFilterExpression("cast(id||'0' as int)", "castToInteger(concat(id, \"0\"))");
         testFilterExpression("cast(1 as string)", "castToString(1)");
         testFilterExpression("cast(1 as boolean)", "castToBoolean(1)");
@@ -596,12 +603,12 @@ class TransformParserTest {
                         "ProjectionColumn{column=`id` INT 'id', expression='id', scriptExpression='$0', originalColumnNames=[id], columnNameMap={id=$0}}",
                         "ProjectionColumn{column=`name2` STRING, expression='UPPER(`TB`.`name`)', scriptExpression='upper($0)', originalColumnNames=[name], columnNameMap={name=$0}}",
                         "ProjectionColumn{column=`sex2` STRING, expression='UPPER(`TB`.`sex`)', scriptExpression='upper($0)', originalColumnNames=[sex], columnNameMap={sex=$0}}",
-                        "ProjectionColumn{column=`address2` BINARY(50), expression='CASE WHEN `TB`.`address` IS NOT NULL THEN `TB`.`address` ELSE `TB`.`address` END', scriptExpression='(null != $0 ? $0 : $0)', originalColumnNames=[address, address, address], columnNameMap={address=$0}}",
-                        "ProjectionColumn{column=`phone2` VARBINARY(50), expression='CASE WHEN `TB`.`phone` IS NOT NULL THEN `TB`.`phone` ELSE `TB`.`phone` END', scriptExpression='(null != $0 ? $0 : $0)', originalColumnNames=[phone, phone, phone], columnNameMap={phone=$0}}",
-                        "ProjectionColumn{column=`deposit2` DECIMAL(10, 2), expression='CASE WHEN `TB`.`deposit` IS NOT NULL THEN `TB`.`deposit` ELSE `TB`.`deposit` END', scriptExpression='(null != $0 ? $0 : $0)', originalColumnNames=[deposit, deposit, deposit], columnNameMap={deposit=$0}}",
-                        "ProjectionColumn{column=`birthday2` TIMESTAMP(3), expression='CASE WHEN `TB`.`birthday` IS NOT NULL THEN `TB`.`birthday` ELSE `TB`.`birthday` END', scriptExpression='(null != $0 ? $0 : $0)', originalColumnNames=[birthday, birthday, birthday], columnNameMap={birthday=$0}}",
-                        "ProjectionColumn{column=`birthday_ltz2` TIMESTAMP_LTZ(3), expression='CASE WHEN `TB`.`birthday_ltz` IS NOT NULL THEN `TB`.`birthday_ltz` ELSE `TB`.`birthday_ltz` END', scriptExpression='(null != $0 ? $0 : $0)', originalColumnNames=[birthday_ltz, birthday_ltz, birthday_ltz], columnNameMap={birthday_ltz=$0}}",
-                        "ProjectionColumn{column=`update_time2` TIME(3), expression='CASE WHEN `TB`.`update_time` IS NOT NULL THEN `TB`.`update_time` ELSE `TB`.`update_time` END', scriptExpression='(null != $0 ? $0 : $0)', originalColumnNames=[update_time, update_time, update_time], columnNameMap={update_time=$0}}");
+                        "ProjectionColumn{column=`address2` BINARY(50), expression='CASE WHEN `TB`.`address` IS NOT NULL THEN `TB`.`address` ELSE `TB`.`address` END', scriptExpression='(isTrue(null != $0) ? $0 : $0)', originalColumnNames=[address, address, address], columnNameMap={address=$0}}",
+                        "ProjectionColumn{column=`phone2` VARBINARY(50), expression='CASE WHEN `TB`.`phone` IS NOT NULL THEN `TB`.`phone` ELSE `TB`.`phone` END', scriptExpression='(isTrue(null != $0) ? $0 : $0)', originalColumnNames=[phone, phone, phone], columnNameMap={phone=$0}}",
+                        "ProjectionColumn{column=`deposit2` DECIMAL(10, 2), expression='CASE WHEN `TB`.`deposit` IS NOT NULL THEN `TB`.`deposit` ELSE `TB`.`deposit` END', scriptExpression='(isTrue(null != $0) ? $0 : $0)', originalColumnNames=[deposit, deposit, deposit], columnNameMap={deposit=$0}}",
+                        "ProjectionColumn{column=`birthday2` TIMESTAMP(3), expression='CASE WHEN `TB`.`birthday` IS NOT NULL THEN `TB`.`birthday` ELSE `TB`.`birthday` END', scriptExpression='(isTrue(null != $0) ? $0 : $0)', originalColumnNames=[birthday, birthday, birthday], columnNameMap={birthday=$0}}",
+                        "ProjectionColumn{column=`birthday_ltz2` TIMESTAMP_LTZ(3), expression='CASE WHEN `TB`.`birthday_ltz` IS NOT NULL THEN `TB`.`birthday_ltz` ELSE `TB`.`birthday_ltz` END', scriptExpression='(isTrue(null != $0) ? $0 : $0)', originalColumnNames=[birthday_ltz, birthday_ltz, birthday_ltz], columnNameMap={birthday_ltz=$0}}",
+                        "ProjectionColumn{column=`update_time2` TIME(3), expression='CASE WHEN `TB`.`update_time` IS NOT NULL THEN `TB`.`update_time` ELSE `TB`.`update_time` END', scriptExpression='(isTrue(null != $0) ? $0 : $0)', originalColumnNames=[update_time, update_time, update_time], columnNameMap={update_time=$0}}");
         Assertions.assertThat(result).hasToString("[" + String.join(", ", expected) + "]");
     }
 
@@ -679,10 +686,10 @@ class TransformParserTest {
                 "typeof(id % 2)", "__instanceOfTypeOfFunctionClass.eval(id % 2)");
         testFilterExpressionWithUdf(
                 "addone(addone(id)) > 4 OR typeof(id) <> 'bool' AND format('from %s to %s is %s', 'a', 'z', 'lie') <> ''",
-                "greaterThan(__instanceOfAddOneFunctionClass.eval(__instanceOfAddOneFunctionClass.eval(id)), 4) || !valueEquals(__instanceOfTypeOfFunctionClass.eval(id), \"bool\") && !valueEquals(__instanceOfFormatFunctionClass.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")");
+                "or(greaterThan(__instanceOfAddOneFunctionClass.eval(__instanceOfAddOneFunctionClass.eval(id)), 4), and(!valueEquals(__instanceOfTypeOfFunctionClass.eval(id), \"bool\"), !valueEquals(__instanceOfFormatFunctionClass.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")))");
         testFilterExpressionWithUdf(
                 "ADDONE(ADDONE(id)) > 4 OR TYPEOF(id) <> 'bool' AND FORMAT('from %s to %s is %s', 'a', 'z', 'lie') <> ''",
-                "greaterThan(__instanceOfAddOneFunctionClass.eval(__instanceOfAddOneFunctionClass.eval(id)), 4) || !valueEquals(__instanceOfTypeOfFunctionClass.eval(id), \"bool\") && !valueEquals(__instanceOfFormatFunctionClass.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")");
+                "or(greaterThan(__instanceOfAddOneFunctionClass.eval(__instanceOfAddOneFunctionClass.eval(id)), 4), and(!valueEquals(__instanceOfTypeOfFunctionClass.eval(id), \"bool\"), !valueEquals(__instanceOfFormatFunctionClass.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")))");
     }
 
     @Test
@@ -740,12 +747,12 @@ class TransformParserTest {
                 columnNameMap);
         testFilterExpressionWithUdf(
                 "addone(addone(`a-b`)) > 4 OR typeof(a-b) <> 'bool' AND format('from %s to %s is %s', 'a', 'z', 'lie') <> ''",
-                "greaterThan(__instanceOfAddOneFunctionClass.eval(__instanceOfAddOneFunctionClass.eval($2)), 4) || !valueEquals(__instanceOfTypeOfFunctionClass.eval($0 - $1), \"bool\") && !valueEquals(__instanceOfFormatFunctionClass.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")",
+                "or(greaterThan(__instanceOfAddOneFunctionClass.eval(__instanceOfAddOneFunctionClass.eval($2)), 4), and(!valueEquals(__instanceOfTypeOfFunctionClass.eval($0 - $1), \"bool\"), !valueEquals(__instanceOfFormatFunctionClass.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")))",
                 columns,
                 columnNameMap);
         testFilterExpressionWithUdf(
                 "ADDONE(ADDONE(`a-b`)) > 4 OR TYPEOF(a-b) <> 'bool' AND FORMAT('from %s to %s is %s', 'a', 'z', 'lie') <> ''",
-                "greaterThan(__instanceOfAddOneFunctionClass.eval(__instanceOfAddOneFunctionClass.eval($2)), 4) || !valueEquals(__instanceOfTypeOfFunctionClass.eval($0 - $1), \"bool\") && !valueEquals(__instanceOfFormatFunctionClass.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")",
+                "or(greaterThan(__instanceOfAddOneFunctionClass.eval(__instanceOfAddOneFunctionClass.eval($2)), 4), and(!valueEquals(__instanceOfTypeOfFunctionClass.eval($0 - $1), \"bool\"), !valueEquals(__instanceOfFormatFunctionClass.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")))",
                 columns,
                 columnNameMap);
     }

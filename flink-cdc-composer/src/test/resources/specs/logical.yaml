@@ -45,4 +45,10 @@
     bool_ IS FALSE AS comp_8
     bool_ IS NOT FALSE AS comp_9
   primary-key: id_
-  expect-error: 'java.lang.RuntimeException: Failed to evaluate projection expression ``TB`.`bool_` OR FALSE` for column `comp_2` in table `foo.bar.baz`.'
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`bool_` BOOLEAN 'George' 'false',`comp_1` BOOLEAN,`comp_2` BOOLEAN,`comp_3` BOOLEAN,`comp_4` BOOLEAN,`comp_5` BOOLEAN,`comp_6` BOOLEAN,`comp_7` BOOLEAN,`comp_8` BOOLEAN,`comp_9` BOOLEAN}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, true, true, true, true, false, false, true, false, false, true], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, true, true, true, true, false, false, true, false, false, true], after=[-1, false, true, false, false, false, true, false, true, true, false], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, false, true, false, false, false, true, false, true, true, false], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, true, null, null, false, null, false, true, false, true], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, true, null, null, false, null, false, true, false, true], after=[], op=DELETE, meta=()}

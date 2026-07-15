@@ -165,6 +165,26 @@
     DataChangeEvent{tableId=foo.bar.baz, before=[-1, 天地玄黄宇宙洪荒, true, true, true, false], after=[], op=DELETE, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, true, false, true, false], op=INSERT, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[0, null, true, false, true, false], after=[], op=DELETE, meta=()}
+- do: IsUnknown Op
+  projection: id_, bool_, bool_ IS UNKNOWN AS comp_1, bool_ IS NOT UNKNOWN AS comp_2, (bool_ AND CAST(NULL AS BOOLEAN)) IS UNKNOWN AS comp_3
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`bool_` BOOLEAN 'George' 'false',`comp_1` BOOLEAN,`comp_2` BOOLEAN,`comp_3` BOOLEAN}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, true, false, true, true], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, true, false, true, true], after=[-1, false, false, true, false], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, false, false, true, false], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, true, false, true], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, true, false, true], after=[], op=DELETE, meta=()}
+- do: Distinct From Op
+  projection: id_, int_ IS DISTINCT FROM 4 AS comp_1, int_ IS NOT DISTINCT FROM 4 AS comp_2, CAST(NULL AS INT) IS DISTINCT FROM int_ AS comp_3, CAST(NULL AS INT) IS NOT DISTINCT FROM int_ AS comp_4
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_1` BOOLEAN,`comp_2` BOOLEAN,`comp_3` BOOLEAN,`comp_4` BOOLEAN}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, false, true, true, false], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, false, true, true, false], after=[-1, true, false, true, false], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, true, false, true, false], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, true, false, false, true], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, true, false, false, true], after=[], op=DELETE, meta=()}
 - do: Between Op
   projection: |-
     id_
@@ -235,6 +255,26 @@
   ignore: FLINK-38905
   projection: id_, char_ NOT LIKE 'A.*' AS comp_1, varchar_ NOT LIKE '.*rro' AS comp_2, string_ NOT LIKE 'From [A-Z] to [A-Z] is Lie' AS comp_3
   primary-key: id_
+- do: String Like Escape Op
+  projection: id_, 'A%' LIKE 'A$%' ESCAPE '$' AS comp_1, 'A_' LIKE 'A$_' ESCAPE '$' AS comp_2, char_ LIKE 'A$%' ESCAPE '$' AS comp_3
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_1` BOOLEAN,`comp_2` BOOLEAN,`comp_3` BOOLEAN}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, true, true, false], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, true, true, false], after=[-1, true, true, false], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, true, true, false], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, true, true, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, true, true, null], after=[], op=DELETE, meta=()}
+- do: String Similar To Op
+  projection: id_, char_ SIMILAR TO 'A%' AS comp_1, varchar_ NOT SIMILAR TO '%rro' AS comp_2, string_ SIMILAR TO 'From (A|B) to (Y|Z) is Lie' AS comp_3, char_ NOT SIMILAR TO 'A%' AS comp_4
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_1` BOOLEAN,`comp_2` BOOLEAN,`comp_3` BOOLEAN,`comp_4` BOOLEAN}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, true, false, true, false], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, true, false, true, false], after=[-1, false, true, false, true], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, false, true, false, true], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null, null, null], after=[], op=DELETE, meta=()}
 - do: In Op
   projection: |-
     id_
