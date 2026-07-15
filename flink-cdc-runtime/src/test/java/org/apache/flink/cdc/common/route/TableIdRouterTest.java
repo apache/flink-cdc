@@ -178,6 +178,60 @@ public class TableIdRouterTest extends SchemaTestBase {
     }
 
     @Test
+    void testRouteWithoutBackReferenceWithMultiDigitSuffix() {
+        // Regression test: when the source-table regex matches multi-digit suffixes (e.g. 10-16)
+        // but the sink-table does NOT contain a `$1` back-reference, every matched source table
+        // should still be routed to the exact sink-table declared in the routing rule. Previously
+        // TableIdRouter.resolveReplacement used Matcher.find(), which only matched a prefix of
+        // the source table ID, leaving the unmatched tail characters to be appended to the
+        // sink-table after replaceAll. As a result, table `db_6.table_13` was wrongly routed to
+        // `db_6.table_3`, `db_6.table_14` to `db_6.table_4`, etc.
+        List<String> sourceTables =
+                List.of(
+                        "db_6.table_1",
+                        "db_6.table_2",
+                        "db_6.table_9",
+                        "db_6.table_10",
+                        "db_6.table_11",
+                        "db_6.table_13",
+                        "db_6.table_14",
+                        "db_6.table_15",
+                        "db_6.table_16");
+        assertThat(
+                        testStdRegExpRoute(
+                                "db_6.table_([1-9]|1[0-6])", "new_db_6.table_merged", sourceTables))
+                .containsExactly(
+                        "[new_db_6.table_merged]",
+                        "[new_db_6.table_merged]",
+                        "[new_db_6.table_merged]",
+                        "[new_db_6.table_merged]",
+                        "[new_db_6.table_merged]",
+                        "[new_db_6.table_merged]",
+                        "[new_db_6.table_merged]",
+                        "[new_db_6.table_merged]",
+                        "[new_db_6.table_merged]");
+    }
+
+    @Test
+    void testRouteWithBackReferenceAndMultiDigitCapture() {
+        // Companion test for the same fix: when the sink-table uses a `$1` back-reference, the
+        // captured group must be the FULL multi-digit value (e.g. `13`), not just a single digit.
+        // Previously the alternation order in `([1-9]|1[0-6])` together with find() caused
+        // `[1-9]` to win against `1[0-6]` for input `13`, capturing only `1` and producing a
+        // sink-table name `..._1` followed by leftover `3`.
+        List<String> sourceTables =
+                List.of("db_6.table_1", "db_6.table_10", "db_6.table_13", "db_6.table_16");
+        assertThat(
+                        testStdRegExpRoute(
+                                "db_6.table_([1-9]|1[0-6])", "new_db_6.table_$1", sourceTables))
+                .containsExactly(
+                        "[new_db_6.table_1]",
+                        "[new_db_6.table_10]",
+                        "[new_db_6.table_13]",
+                        "[new_db_6.table_16]");
+    }
+
+    @Test
     void testRegExpComplexRouting() {
         // Capture the entire database.
         List<String> tablesToRoute =
