@@ -28,7 +28,9 @@ limitations under the License.
     <artifactId>flink-cdc-pipeline-e2e-tests</artifactId>
 
     <properties>
-        <flink-1.20>1.20.3</flink-1.20>
+        <flink-1.20>1.20.5</flink-1.20>
+        <flink-2.2>2.2.1</flink-2.2>
+        <flink-2.3>2.3.0</flink-2.3>
         <flink-major-1.20>1.20</flink-major-1.20>
         <mysql.driver.version>8.0.27</mysql.driver.version>
         <starrocks.connector.version>1.2.14_flink-${flink-major-1.20}</starrocks.connector.version>
@@ -40,6 +42,7 @@ limitations under the License.
         <iceberg.version>1.10.1</iceberg.version>
         <hive.version>2.3.9</hive.version>
         <fluss.version>0.9.0-incubating</fluss.version>
+        <fluss.snapshot.version>1.0-SNAPSHOT</fluss.snapshot.version>
         <jmh.version>1.37</jmh.version>
         <hudi.version>1.1.0</hudi.version>
     </properties>
@@ -169,7 +172,7 @@ limitations under the License.
         </dependency>
         <dependency>
             <groupId>org.apache.paimon</groupId>
-            <artifactId>paimon-flink-${flink.major.version}</artifactId>
+            <artifactId>paimon-flink-${paimon.flink.major.version}</artifactId>
             <version>${paimon.version}</version>
             <scope>test</scope>
         </dependency>
@@ -723,7 +726,16 @@ limitations under the License.
                             <groupId>org.apache.fluss</groupId>
                             <artifactId>fluss-flink-2.2</artifactId>
                             <version>${fluss.version}</version>
-                            <destFileName>fluss-flink-2.2.0.jar</destFileName>
+                            <destFileName>fluss-flink-${flink-2.2}.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+                        <artifactItem>
+                            <groupId>org.apache.fluss</groupId>
+                            <artifactId>fluss-flink-2.3</artifactId>
+                            <version>${fluss.snapshot.version}</version>
+                            <destFileName>fluss-flink-${flink-2.3}.jar</destFileName>
                             <type>jar</type>
                             <outputDirectory>${project.build.directory}/dependencies
                             </outputDirectory>
@@ -802,9 +814,18 @@ limitations under the License.
                         </artifactItem>
                         <artifactItem>
                             <groupId>org.apache.paimon</groupId>
-                            <artifactId>paimon-flink-2.1</artifactId>
+                            <artifactId>paimon-flink-${paimon.flink.major.version}</artifactId>
                             <version>${paimon.version}</version>
-                            <destFileName>paimon-sql-connector-2.2.0.jar</destFileName>
+                            <destFileName>paimon-sql-connector-${flink-2.2}.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+                        <artifactItem>
+                            <groupId>org.apache.paimon</groupId>
+                            <artifactId>paimon-flink-${paimon.flink.major.version}</artifactId>
+                            <version>${paimon.version}</version>
+                            <destFileName>paimon-sql-connector-${flink-2.3}.jar</destFileName>
                             <type>jar</type>
                             <outputDirectory>${project.build.directory}/dependencies
                             </outputDirectory>

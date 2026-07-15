@@ -27,7 +27,7 @@ on:
         description: "Flink versions to test against."
         required: false
         type: string
-        default: "['generic']"
+        default: "['1.20.5']"
       modules:
         description: "Flink CDC modules to test against."
         required: true

@@ -49,6 +49,7 @@ class SqlServerTimezoneITCase extends SqlServerTestBase {
     @BeforeEach
     public void before() {
         TestValuesTableFactory.clearAllData();
+        tEnv.getConfig().set("table.exec.sink.require-on-conflict", "false");
         env.setParallelism(1);
     }
 
@@ -59,7 +60,7 @@ class SqlServerTimezoneITCase extends SqlServerTestBase {
         // timestamp_ltz is not determined by timezones, different local timezone with same value.
         List<String> expected =
                 Collections.singletonList(
-                        "+I[0, 2018-07-13, 10:23:45.680, 10:23:45.678, 2018-07-13T11:23:45.340, 2018-07-13T01:23:45.456Z, 2018-07-13T13:23:45.780, 2018-07-13T14:24]");
+                        "+I[0, 2018-07-13, 23:23:45.680, 23:23:45.678, 2018-07-13T11:23:45.340, 2018-07-13T01:23:45.456Z, 2018-07-13T13:23:45.780, 2018-07-13T14:24]");
 
         Assertions.assertThat(actual).isEqualTo(expected);
     }
@@ -71,7 +72,7 @@ class SqlServerTimezoneITCase extends SqlServerTestBase {
         // timestamp_ltz is not determined by timezones, different server timeZone with same value.
         List<String> expected =
                 Collections.singletonList(
-                        "+I[0, 2018-07-13, 10:23:45.680, 10:23:45.678, 2018-07-13T11:23:45.340, 2018-07-13T01:23:45.456Z, 2018-07-13T13:23:45.780, 2018-07-13T14:24]");
+                        "+I[0, 2018-07-13, 23:23:45.680, 23:23:45.678, 2018-07-13T11:23:45.340, 2018-07-13T01:23:45.456Z, 2018-07-13T13:23:45.780, 2018-07-13T14:24]");
         Assertions.assertThat(actual).isEqualTo(expected);
     }
 
@@ -82,7 +83,7 @@ class SqlServerTimezoneITCase extends SqlServerTestBase {
         // timestamp_ltz is not determined by timezones, different jvm timezone with same value.
         List<String> expected =
                 Collections.singletonList(
-                        "+I[0, 2018-07-13, 10:23:45.680, 10:23:45.678, 2018-07-13T11:23:45.340, 2018-07-13T01:23:45.456Z, 2018-07-13T13:23:45.780, 2018-07-13T14:24]");
+                        "+I[0, 2018-07-13, 23:23:45.680, 23:23:45.678, 2018-07-13T11:23:45.340, 2018-07-13T01:23:45.456Z, 2018-07-13T13:23:45.780, 2018-07-13T14:24]");
         Assertions.assertThat(actual).isEqualTo(expected);
     }
 
@@ -98,17 +99,17 @@ class SqlServerTimezoneITCase extends SqlServerTestBase {
             case "Asia/Shanghai":
                 expected =
                         Collections.singletonList(
-                                "+I[0, 2018-07-13, 10:23:45.680, 10:23:45.678, 2018-07-13T11:23:45.340, 2018-07-13T09:23:45.456, 2018-07-13T13:23:45.780, 2018-07-13T14:24]");
+                                "+I[0, 2018-07-13, 23:23:45.680, 23:23:45.678, 2018-07-13T11:23:45.340, 2018-07-13T09:23:45.456, 2018-07-13T13:23:45.780, 2018-07-13T14:24]");
                 break;
             case "Europe/Berlin":
                 expected =
                         Collections.singletonList(
-                                "+I[0, 2018-07-13, 10:23:45.680, 10:23:45.678, 2018-07-13T11:23:45.340, 2018-07-13T03:23:45.456, 2018-07-13T13:23:45.780, 2018-07-13T14:24]");
+                                "+I[0, 2018-07-13, 23:23:45.680, 23:23:45.678, 2018-07-13T11:23:45.340, 2018-07-13T03:23:45.456, 2018-07-13T13:23:45.780, 2018-07-13T14:24]");
                 break;
             default:
                 expected =
                         Collections.singletonList(
-                                "+I[0, 2018-07-13, 10:23:45.680, 10:23:45.678, 2018-07-13T11:23:45.340, 2018-07-13T01:23:45.456, 2018-07-13T13:23:45.780, 2018-07-13T14:24]");
+                                "+I[0, 2018-07-13, 23:23:45.680, 23:23:45.678, 2018-07-13T11:23:45.340, 2018-07-13T01:23:45.456, 2018-07-13T13:23:45.780, 2018-07-13T14:24]");
                 break;
         }
         Assertions.assertThat(actual).isEqualTo(expected);
