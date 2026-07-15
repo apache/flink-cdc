@@ -21,6 +21,7 @@ import org.apache.flink.api.common.InvalidProgramException;
 import org.apache.flink.api.common.io.ParseException;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.converter.JavaClassConverter;
+import org.apache.flink.cdc.common.pipeline.DecimalPrecisionMode;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.common.types.DataType;
@@ -771,7 +772,8 @@ public class JaninoCompiler {
                             context.columns,
                             sqlBasicCall,
                             context.udfDescriptors,
-                            context.supportedMetadataColumns);
+                            context.supportedMetadataColumns,
+                            context.decimalPrecisionMode);
             if (resultType.is(DataTypeRoot.DECIMAL)) {
                 return new Java.MethodInvocation(Location.NOWHERE, null, handler, atoms);
             }
@@ -950,7 +952,8 @@ public class JaninoCompiler {
                         context.columns,
                         sqlBasicCall,
                         context.udfDescriptors,
-                        context.supportedMetadataColumns);
+                        context.supportedMetadataColumns,
+                        context.decimalPrecisionMode);
 
         // Get the Java class for the result type and add a cast
         // Use getCanonicalName() to correctly handle array types (e.g., byte[] instead of "[B")
@@ -1273,15 +1276,20 @@ public class JaninoCompiler {
         // Readable metadata columns
         public final SupportedMetadataColumn[] supportedMetadataColumns;
 
+        // Maximum precision mode for DECIMAL type evaluation
+        public final DecimalPrecisionMode decimalPrecisionMode;
+
         private Context(
                 List<Column> columns,
                 Map<String, String> columnNameMap,
                 List<UserDefinedFunctionDescriptor> udfDescriptors,
-                SupportedMetadataColumn[] supportedMetadataColumns) {
+                SupportedMetadataColumn[] supportedMetadataColumns,
+                DecimalPrecisionMode decimalPrecisionMode) {
             this.columns = columns;
             this.columnNameMap = columnNameMap;
             this.udfDescriptors = udfDescriptors;
             this.supportedMetadataColumns = supportedMetadataColumns;
+            this.decimalPrecisionMode = decimalPrecisionMode;
         }
 
         public static Context of(
@@ -1289,7 +1297,26 @@ public class JaninoCompiler {
                 Map<String, String> columnNameMap,
                 List<UserDefinedFunctionDescriptor> udfDescriptors,
                 SupportedMetadataColumn[] supportedMetadataColumns) {
-            return new Context(columns, columnNameMap, udfDescriptors, supportedMetadataColumns);
+            return of(
+                    columns,
+                    columnNameMap,
+                    udfDescriptors,
+                    supportedMetadataColumns,
+                    DecimalPrecisionMode.UP_TO_19);
+        }
+
+        public static Context of(
+                List<Column> columns,
+                Map<String, String> columnNameMap,
+                List<UserDefinedFunctionDescriptor> udfDescriptors,
+                SupportedMetadataColumn[] supportedMetadataColumns,
+                DecimalPrecisionMode decimalPrecisionMode) {
+            return new Context(
+                    columns,
+                    columnNameMap,
+                    udfDescriptors,
+                    supportedMetadataColumns,
+                    decimalPrecisionMode);
         }
     }
 }

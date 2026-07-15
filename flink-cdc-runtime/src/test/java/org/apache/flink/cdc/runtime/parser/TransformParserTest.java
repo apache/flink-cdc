@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.runtime.parser;
 
 import org.apache.flink.api.common.io.ParseException;
+import org.apache.flink.cdc.common.pipeline.DecimalPrecisionMode;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
@@ -1090,6 +1091,39 @@ class TransformParserTest {
                         "ProjectionColumn{column=`birthday_ltz2` TIMESTAMP_LTZ(3), expression='CASE WHEN `TB`.`birthday_ltz` IS NOT NULL THEN `TB`.`birthday_ltz` ELSE `TB`.`birthday_ltz` END', scriptExpression='(isTrue(isNotNull($0)) ? $0 : $0)', originalColumnNames=[birthday_ltz, birthday_ltz, birthday_ltz], columnNameMap={birthday_ltz=$0}}",
                         "ProjectionColumn{column=`update_time2` TIME(3), expression='CASE WHEN `TB`.`update_time` IS NOT NULL THEN `TB`.`update_time` ELSE `TB`.`update_time` END', scriptExpression='(isTrue(isNotNull($0)) ? $0 : $0)', originalColumnNames=[update_time, update_time, update_time], columnNameMap={update_time=$0}}");
         Assertions.assertThat(result).hasToString("[" + String.join(", ", expected) + "]");
+    }
+
+    @Test
+    void testGenerateProjectionColumnsWithDecimalPrecisionMode() {
+        List<Column> columns =
+                Arrays.asList(
+                        Column.physicalColumn("id", DataTypes.INT()),
+                        Column.physicalColumn("deposit", DataTypes.DECIMAL(20, 2)));
+        String projection =
+                "deposit + CAST(1 AS DECIMAL(1, 0)) AS amount, "
+                        + "id IS DISTINCT FROM 1 AS changed";
+
+        List<ProjectionColumn> upTo19 =
+                TransformParser.generateProjectionColumns(
+                        projection,
+                        columns,
+                        Collections.emptyList(),
+                        new SupportedMetadataColumn[0],
+                        DecimalPrecisionMode.UP_TO_19);
+        List<ProjectionColumn> upTo38 =
+                TransformParser.generateProjectionColumns(
+                        projection,
+                        columns,
+                        Collections.emptyList(),
+                        new SupportedMetadataColumn[0],
+                        DecimalPrecisionMode.UP_TO_38);
+
+        Assertions.assertThat(upTo19)
+                .extracting(ProjectionColumn::getDataType)
+                .containsExactly(DataTypes.DECIMAL(19, 2), DataTypes.BOOLEAN());
+        Assertions.assertThat(upTo38)
+                .extracting(ProjectionColumn::getDataType)
+                .containsExactly(DataTypes.DECIMAL(21, 2), DataTypes.BOOLEAN());
     }
 
     @Test

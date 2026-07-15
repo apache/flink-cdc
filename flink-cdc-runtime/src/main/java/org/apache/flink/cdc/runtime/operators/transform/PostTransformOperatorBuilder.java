@@ -19,6 +19,7 @@ package org.apache.flink.cdc.runtime.operators.transform;
 
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.cdc.common.model.AiModelClient;
+import org.apache.flink.cdc.common.pipeline.DecimalPrecisionMode;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 
@@ -34,6 +35,7 @@ import java.util.Map;
 public class PostTransformOperatorBuilder {
     private final List<TransformRule> transformRules = new ArrayList<>();
     private String timezone;
+    private DecimalPrecisionMode decimalPrecisionMode = DecimalPrecisionMode.UP_TO_19;
     private final List<Tuple3<String, String, Map<String, String>>> udfFunctions =
             new ArrayList<>();
     private final Map<String, AiModelClient> modelClients = new LinkedHashMap<>();
@@ -108,6 +110,12 @@ public class PostTransformOperatorBuilder {
         return this;
     }
 
+    public PostTransformOperatorBuilder addDecimalPrecisionMode(
+            DecimalPrecisionMode decimalPrecisionMode) {
+        this.decimalPrecisionMode = decimalPrecisionMode;
+        return this;
+    }
+
     public PostTransformOperatorBuilder addUdfFunctions(
             List<Tuple3<String, String, Map<String, String>>> udfFunctions) {
         this.udfFunctions.addAll(udfFunctions);
@@ -120,6 +128,7 @@ public class PostTransformOperatorBuilder {
     }
 
     public PostTransformOperator build() {
-        return new PostTransformOperator(transformRules, timezone, udfFunctions, modelClients);
+        return new PostTransformOperator(
+                transformRules, timezone, decimalPrecisionMode, udfFunctions, modelClients);
     }
 }
