@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.postgres.source;
 
 import org.apache.flink.cdc.common.annotation.Internal;
+import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
@@ -25,6 +26,7 @@ import org.apache.flink.cdc.connectors.postgres.table.PostgreSQLReadableMetadata
 import org.apache.flink.cdc.debezium.event.DebeziumEventDeserializationSchema;
 import org.apache.flink.cdc.debezium.table.DebeziumChangelogMode;
 import org.apache.flink.table.data.TimestampData;
+import org.apache.flink.util.Preconditions;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.debezium.data.Envelope;
@@ -81,6 +83,19 @@ public class PostgresEventDeserializer extends DebeziumEventDeserializationSchem
         this.readableMetadataList = readableMetadataList;
         this.includeDatabaseInTableId = includeDatabaseInTableId;
         this.databaseName = databaseName;
+    }
+
+    @Override
+    protected RecordData extractBeforeDataRecord(Struct value, Schema valueSchema)
+            throws Exception {
+        Struct beforeValue = fieldStruct(value, Envelope.FieldName.BEFORE);
+        Preconditions.checkNotNull(
+                beforeValue,
+                "Before data is null for UPDATE/DELETE event. "
+                        + "This usually happens when the source table is not configured with "
+                        + "REPLICA IDENTITY FULL. Schema name: "
+                        + valueSchema.name());
+        return super.extractBeforeDataRecord(value, valueSchema);
     }
 
     @Override
