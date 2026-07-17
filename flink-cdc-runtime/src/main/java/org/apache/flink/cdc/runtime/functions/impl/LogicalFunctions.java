@@ -17,6 +17,8 @@
 
 package org.apache.flink.cdc.runtime.functions.impl;
 
+import java.util.function.Supplier;
+
 /** Logical built-in functions. */
 public class LogicalFunctions {
 
@@ -38,6 +40,22 @@ public class LogicalFunctions {
             return null;
         }
         return false;
+    }
+
+    public static Boolean and(Boolean left, Supplier<Boolean> rightSupplier) {
+        if (Boolean.FALSE.equals(left)) {
+            return false;
+        }
+        Boolean right = rightSupplier.get();
+        return and(left, right);
+    }
+
+    public static Boolean or(Boolean left, Supplier<Boolean> rightSupplier) {
+        if (Boolean.TRUE.equals(left)) {
+            return true;
+        }
+        Boolean right = rightSupplier.get();
+        return or(left, right);
     }
 
     public static Boolean not(Boolean value) {

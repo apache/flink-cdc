@@ -36,11 +36,17 @@ class ComparisonFunctionsTest {
 
     @Test
     void testThreeValuedLogicalOperators() {
-        assertThat(LogicalFunctions.and(true, null)).isNull();
-        assertThat(LogicalFunctions.and(false, null)).isFalse();
-        assertThat(LogicalFunctions.or(false, null)).isNull();
-        assertThat(LogicalFunctions.or(true, null)).isTrue();
+        assertThat(LogicalFunctions.and(true, (Boolean) null)).isNull();
+        assertThat(LogicalFunctions.and(false, (Boolean) null)).isFalse();
+        assertThat(LogicalFunctions.or(false, (Boolean) null)).isNull();
+        assertThat(LogicalFunctions.or(true, (Boolean) null)).isTrue();
         assertThat(LogicalFunctions.not(null)).isNull();
+    }
+
+    @Test
+    void testLogicalOperatorsShortCircuitRightOperand() {
+        assertThat(LogicalFunctions.and(false, () -> failIfEvaluated())).isFalse();
+        assertThat(LogicalFunctions.or(true, () -> failIfEvaluated())).isTrue();
     }
 
     @Test
@@ -64,5 +70,9 @@ class ComparisonFunctionsTest {
         assertThat(ComparisonFunctions.isDistinctFrom(1, 1)).isFalse();
         assertThat(ComparisonFunctions.isNotDistinctFrom(null, null)).isTrue();
         assertThat(ComparisonFunctions.isNotDistinctFrom(null, 1)).isFalse();
+    }
+
+    private static Boolean failIfEvaluated() {
+        throw new AssertionError("Right operand should not be evaluated.");
     }
 }

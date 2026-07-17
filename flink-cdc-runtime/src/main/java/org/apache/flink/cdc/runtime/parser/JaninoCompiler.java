@@ -259,9 +259,9 @@ public class JaninoCompiler {
             Context context, SqlBasicCall sqlBasicCall, Java.Rvalue[] atoms) {
         switch (sqlBasicCall.getKind()) {
             case AND:
-                return generateFunctionOperation("and", atoms);
+                return generateLazyBinaryFunctionOperation(context, sqlBasicCall, "and", atoms);
             case OR:
-                return generateFunctionOperation("or", atoms);
+                return generateLazyBinaryFunctionOperation(context, sqlBasicCall, "or", atoms);
             case NOT:
                 return generateFunctionOperation("not", atoms);
             case EQUALS:
@@ -336,6 +336,17 @@ public class JaninoCompiler {
 
     private static Java.Rvalue generateFunctionOperation(String functionName, Java.Rvalue[] atoms) {
         return new Java.MethodInvocation(Location.NOWHERE, null, functionName, atoms);
+    }
+
+    private static Java.Rvalue generateLazyBinaryFunctionOperation(
+            Context context, SqlBasicCall sqlBasicCall, String functionName, Java.Rvalue[] atoms) {
+        if (atoms.length != 2) {
+            throw new ParseException("Unrecognized expression: " + sqlBasicCall.toString());
+        }
+        Java.Rvalue rightOperandSupplier =
+                new Java.AmbiguousName(Location.NOWHERE, new String[] {"() -> " + atoms[1]});
+        return generateFunctionOperation(
+                functionName, new Java.Rvalue[] {atoms[0], rightOperandSupplier});
     }
 
     private static final Map<String, String> decimalArithmeticHandlers =
