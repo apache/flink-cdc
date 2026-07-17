@@ -112,7 +112,8 @@ public abstract class JdbcSourceFetchTaskContext implements FetchTask.Context {
                         outputBuffer.put(
                                 (Struct) changeRecord.key(), buildReadRecord(changeRecord));
                     } else {
-                        // For no-PK table: remove the before image, insert the after image
+                        // For a table without a primary key, replace the buffer entry keyed by the
+                        // before image with one keyed by the after image.
                         Struct before = value.getStruct(Envelope.FieldName.BEFORE);
                         Struct after = value.getStruct(Envelope.FieldName.AFTER);
                         if (before != null) {
