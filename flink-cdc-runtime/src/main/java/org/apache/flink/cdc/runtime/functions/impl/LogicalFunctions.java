@@ -44,6 +44,14 @@ public class LogicalFunctions {
         return value == null ? null : !value;
     }
 
+    public static boolean isNull(Object value) {
+        return value == null;
+    }
+
+    public static boolean isNotNull(Object value) {
+        return value != null;
+    }
+
     public static boolean isTrue(Boolean value) {
         return Boolean.TRUE.equals(value);
     }

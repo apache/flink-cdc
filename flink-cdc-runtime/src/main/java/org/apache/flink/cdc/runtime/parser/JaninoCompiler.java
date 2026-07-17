@@ -273,9 +273,9 @@ public class JaninoCompiler {
             case IS_NOT_DISTINCT_FROM:
                 return generateOtherFunctionOperation(context, sqlBasicCall, atoms);
             case IS_NULL:
-                return generateUnaryOperation(context, "null == ", atoms[0]);
+                return generateFunctionOperation("isNull", atoms);
             case IS_NOT_NULL:
-                return generateUnaryOperation(context, "null != ", atoms[0]);
+                return generateFunctionOperation("isNotNull", atoms);
             case IS_FALSE:
                 return generateFunctionOperation("isFalse", atoms);
             case IS_NOT_TRUE:
