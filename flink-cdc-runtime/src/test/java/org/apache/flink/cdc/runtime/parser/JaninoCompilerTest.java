@@ -18,6 +18,9 @@
 package org.apache.flink.cdc.runtime.parser;
 
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.cdc.common.schema.Column;
+import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
+import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.variant.BinaryVariantInternalBuilder;
 import org.apache.flink.cdc.common.types.variant.Variant;
 import org.apache.flink.cdc.common.types.variant.VariantTypeException;
@@ -39,6 +42,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 
 /** Unit tests for the {@link JaninoCompiler}. */
@@ -215,6 +219,23 @@ class JaninoCompilerTest {
     }
 
     @Test
+    void testTranslatedLogicalExpressionCompilesWithJanino() throws InvocationTargetException {
+        List<Column> columns =
+                List.of(
+                        Column.physicalColumn("id", DataTypes.INT()),
+                        Column.physicalColumn("uid", DataTypes.INT()));
+        Map<String, String> columnNameMap = Map.of("id", "$0", "uid", "$1");
+
+        ExpressionEvaluator andEvaluator =
+                compileTranslatedFilterExpression("id = 1 and 1 / uid > 0", columns, columnNameMap);
+        Assertions.assertThat(andEvaluator.evaluate(new Object[] {2, 0})).isEqualTo(false);
+
+        ExpressionEvaluator orEvaluator =
+                compileTranslatedFilterExpression("id = 1 or 1 / uid > 0", columns, columnNameMap);
+        Assertions.assertThat(orEvaluator.evaluate(new Object[] {1, 0})).isEqualTo(true);
+    }
+
+    @Test
     void testLargeNumericLiterals() {
         // Test parsing integer literals
         Stream.of(
@@ -292,5 +313,21 @@ class JaninoCompilerTest {
                                 throw new RuntimeException(e);
                             }
                         });
+    }
+
+    private static ExpressionEvaluator compileTranslatedFilterExpression(
+            String expression, List<Column> columns, Map<String, String> columnNameMap) {
+        String janinoExpression =
+                TransformParser.translateFilterExpressionToJaninoExpression(
+                        expression,
+                        columns,
+                        Collections.emptyList(),
+                        new SupportedMetadataColumn[0],
+                        columnNameMap);
+        return JaninoCompiler.compileExpression(
+                JaninoCompiler.loadSystemFunction(janinoExpression),
+                List.of("$0", "$1"),
+                List.of(Integer.class, Integer.class),
+                Boolean.class);
     }
 }

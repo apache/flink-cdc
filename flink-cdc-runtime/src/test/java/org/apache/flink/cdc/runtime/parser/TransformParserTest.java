@@ -175,9 +175,11 @@ class TransformParserTest {
         testFilterExpression("id is not null", "isNotNull(id)");
         testFilterExpression("id is null", "isNull(id)");
         testFilterExpression(
-                "id = 1 and uid = 2", "and(valueEquals(id, 1), () -> valueEquals(uid, 2))");
+                "id = 1 and uid = 2",
+                lazyLogicalFunction("and", "valueEquals(id, 1)", "valueEquals(uid, 2)"));
         testFilterExpression(
-                "id = 1 or id = 2", "or(valueEquals(id, 1), () -> valueEquals(id, 2))");
+                "id = 1 or id = 2",
+                lazyLogicalFunction("or", "valueEquals(id, 1)", "valueEquals(id, 2)"));
         testFilterExpression("not (id = 1)", "not(valueEquals(id, 1))");
         testFilterExpression("id = '1'", "valueEquals(id, \"1\")");
         testFilterExpression("id <> '1'", "!valueEquals(id, \"1\")");
@@ -357,7 +359,7 @@ class TransformParserTest {
         testFilterExpression("upper(lower(id))", "upper(lower(id))");
         testFilterExpression(
                 "abs(uniq_id) > 10 and id is not null",
-                "and(greaterThan(abs(uniq_id), 10), () -> isNotNull(id))");
+                lazyLogicalFunction("and", "greaterThan(abs(uniq_id), 10)", "isNotNull(id)"));
         testFilterExpression(
                 "case id when 1 then 'a' when 2 then 'b' else 'c' end",
                 "(isTrue(valueEquals(id, 1)) ? \"a\" : isTrue(valueEquals(id, 2)) ? \"b\" : \"c\")");
@@ -688,10 +690,22 @@ class TransformParserTest {
                 "typeof(id % 2)", "__instanceOfTypeOfFunctionClass.eval(id % 2)");
         testFilterExpressionWithUdf(
                 "addone(addone(id)) > 4 OR typeof(id) <> 'bool' AND format('from %s to %s is %s', 'a', 'z', 'lie') <> ''",
-                "or(greaterThan(__instanceOfAddOneFunctionClass.eval(__instanceOfAddOneFunctionClass.eval(id)), 4), () -> and(!valueEquals(__instanceOfTypeOfFunctionClass.eval(id), \"bool\"), () -> !valueEquals(__instanceOfFormatFunctionClass.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")))");
+                lazyLogicalFunction(
+                        "or",
+                        "greaterThan(__instanceOfAddOneFunctionClass.eval(__instanceOfAddOneFunctionClass.eval(id)), 4)",
+                        lazyLogicalFunction(
+                                "and",
+                                "!valueEquals(__instanceOfTypeOfFunctionClass.eval(id), \"bool\")",
+                                "!valueEquals(__instanceOfFormatFunctionClass.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")")));
         testFilterExpressionWithUdf(
                 "ADDONE(ADDONE(id)) > 4 OR TYPEOF(id) <> 'bool' AND FORMAT('from %s to %s is %s', 'a', 'z', 'lie') <> ''",
-                "or(greaterThan(__instanceOfAddOneFunctionClass.eval(__instanceOfAddOneFunctionClass.eval(id)), 4), () -> and(!valueEquals(__instanceOfTypeOfFunctionClass.eval(id), \"bool\"), () -> !valueEquals(__instanceOfFormatFunctionClass.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")))");
+                lazyLogicalFunction(
+                        "or",
+                        "greaterThan(__instanceOfAddOneFunctionClass.eval(__instanceOfAddOneFunctionClass.eval(id)), 4)",
+                        lazyLogicalFunction(
+                                "and",
+                                "!valueEquals(__instanceOfTypeOfFunctionClass.eval(id), \"bool\")",
+                                "!valueEquals(__instanceOfFormatFunctionClass.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")")));
     }
 
     @Test
@@ -749,12 +763,24 @@ class TransformParserTest {
                 columnNameMap);
         testFilterExpressionWithUdf(
                 "addone(addone(`a-b`)) > 4 OR typeof(a-b) <> 'bool' AND format('from %s to %s is %s', 'a', 'z', 'lie') <> ''",
-                "or(greaterThan(__instanceOfAddOneFunctionClass.eval(__instanceOfAddOneFunctionClass.eval($2)), 4), () -> and(!valueEquals(__instanceOfTypeOfFunctionClass.eval($0 - $1), \"bool\"), () -> !valueEquals(__instanceOfFormatFunctionClass.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")))",
+                lazyLogicalFunction(
+                        "or",
+                        "greaterThan(__instanceOfAddOneFunctionClass.eval(__instanceOfAddOneFunctionClass.eval($2)), 4)",
+                        lazyLogicalFunction(
+                                "and",
+                                "!valueEquals(__instanceOfTypeOfFunctionClass.eval($0 - $1), \"bool\")",
+                                "!valueEquals(__instanceOfFormatFunctionClass.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")")),
                 columns,
                 columnNameMap);
         testFilterExpressionWithUdf(
                 "ADDONE(ADDONE(`a-b`)) > 4 OR TYPEOF(a-b) <> 'bool' AND FORMAT('from %s to %s is %s', 'a', 'z', 'lie') <> ''",
-                "or(greaterThan(__instanceOfAddOneFunctionClass.eval(__instanceOfAddOneFunctionClass.eval($2)), 4), () -> and(!valueEquals(__instanceOfTypeOfFunctionClass.eval($0 - $1), \"bool\"), () -> !valueEquals(__instanceOfFormatFunctionClass.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")))",
+                lazyLogicalFunction(
+                        "or",
+                        "greaterThan(__instanceOfAddOneFunctionClass.eval(__instanceOfAddOneFunctionClass.eval($2)), 4)",
+                        lazyLogicalFunction(
+                                "and",
+                                "!valueEquals(__instanceOfTypeOfFunctionClass.eval($0 - $1), \"bool\")",
+                                "!valueEquals(__instanceOfFormatFunctionClass.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")")),
                 columns,
                 columnNameMap);
     }
@@ -894,6 +920,13 @@ class TransformParserTest {
                         new SupportedMetadataColumn[0],
                         Collections.emptyMap());
         Assertions.assertThat(janinoExpression).isEqualTo(expressionExpect);
+    }
+
+    private static String lazyLogicalFunction(
+            String functionName, String leftOperand, String rightOperand) {
+        return String.format(
+                "%s(%s, new java.util.function.Supplier<Boolean>() { public Boolean get() { return %s; } })",
+                functionName, leftOperand, rightOperand);
     }
 
     private void testFilterExpressionWithUdf(String expression, String expressionExpect) {

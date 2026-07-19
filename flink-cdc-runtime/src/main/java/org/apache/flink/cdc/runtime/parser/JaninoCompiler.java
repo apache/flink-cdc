@@ -344,7 +344,13 @@ public class JaninoCompiler {
             throw new ParseException("Unrecognized expression: " + sqlBasicCall.toString());
         }
         Java.Rvalue rightOperandSupplier =
-                new Java.AmbiguousName(Location.NOWHERE, new String[] {"() -> " + atoms[1]});
+                new Java.AmbiguousName(
+                        Location.NOWHERE,
+                        new String[] {
+                            "new java.util.function.Supplier<Boolean>() { public Boolean get() { return "
+                                    + atoms[1]
+                                    + "; } }"
+                        });
         return generateFunctionOperation(
                 functionName, new Java.Rvalue[] {atoms[0], rightOperandSupplier});
     }

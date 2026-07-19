@@ -120,8 +120,8 @@ Flink CDC 使用 [Calcite](https://calcite.apache.org/) 来解析表达式并且
 | value1 >= value2                     | greaterThanOrEqual(value1, value2)           | 如果 value1 大于等于 value2，返回 TRUE；如果 value1 或 value2 为 NULL，返回 FALSE。 |
 | value1 < value2                      | lessThan(value1, value2)                     | 如果 value1 小于 value2，返回 TRUE；如果 value1 或 value2 为 NULL，返回 FALSE。   |
 | value1 <= value2                     | lessThanOrEqual(value1, value2)              | 如果 value1 小于等于 value2，返回 TRUE；如果 value1 或 value2 为 NULL，返回 FALSE。 |
-| value IS NULL                        | null == value                                | 如果 value 为 NULL，返回 TRUE。                                      |
-| value IS NOT NULL                    | null != value                                | 如果 value 不为 NULL，返回 TRUE。                                     |
+| value IS NULL                        | isNull(value)                                | 如果 value 为 NULL，返回 TRUE。                                      |
+| value IS NOT NULL                    | isNotNull(value)                             | 如果 value 不为 NULL，返回 TRUE。                                     |
 | value1 BETWEEN value2 AND value3     | betweenAsymmetric(value1, value2, value3)    | 如果 value1 大于等于 value2 且小于等于 value3，返回 TRUE。                    |
 | value1 NOT BETWEEN value2 AND value3 | notBetweenAsymmetric(value1, value2, value3) | 如果 value1 小于 value2 或大于 value3，返回 TRUE。                        |
 | string1 LIKE string2                 | like(string1, string2)                       | 如果 string1 匹配模式 string2，返回 TRUE。                              |
@@ -131,15 +131,19 @@ Flink CDC 使用 [Calcite](https://calcite.apache.org/) 来解析表达式并且
 
 ## 逻辑函数
 
-| 函数                    | Janino 代码                      | 描述                                        |
-|-----------------------|--------------------------------|-------------------------------------------|
-| boolean1 OR boolean2  | boolean1 &#124;&#124; boolean2 | 如果 BOOLEAN1 为 TRUE 或 BOOLEAN2 为 TRUE，返回 TRUE。 |
-| boolean1 AND boolean2 | boolean1 && boolean2           | 如果 BOOLEAN1 和 BOOLEAN2 都为 TRUE，返回 TRUE。      |
-| NOT boolean           | !boolean                       | 如果 boolean 为 FALSE，返回 TRUE；如果 boolean 为 TRUE，返回 FALSE。 |
-| boolean IS FALSE      | false == boolean               | 如果 boolean 为 FALSE，返回 TRUE；如果 boolean 为 TRUE，返回 FALSE。 |
-| boolean IS NOT FALSE  | true == boolean                | 如果 BOOLEAN 为 TRUE，返回 TRUE；如果 BOOLEAN 为 FALSE，返回 FALSE。 |
-| boolean IS TRUE       | true == boolean                | 如果 BOOLEAN 为 TRUE，返回 TRUE；如果 BOOLEAN 为 FALSE，返回 FALSE。 |
-| boolean IS NOT TRUE   | false == boolean               | 如果 boolean 为 FALSE，返回 TRUE；如果 boolean 为 TRUE，返回 FALSE。 |
+逻辑函数遵循 SQL 的三值逻辑来处理可为 NULL 的 BOOLEAN 值。`AND` 和 `OR` 会在左操作数已经决定结果时短路，不再计算右操作数。
+
+| 函数                     | Janino 代码            | 描述                                                                 |
+|------------------------|----------------------|--------------------------------------------------------------------|
+| boolean1 OR boolean2   | or(boolean1, boolean2)  | 如果任一值为 TRUE，返回 TRUE；如果没有 TRUE 且至少一个值为 NULL，返回 NULL。               |
+| boolean1 AND boolean2  | and(boolean1, boolean2) | 如果任一值为 FALSE，返回 FALSE；如果没有 FALSE 且至少一个值为 NULL，返回 NULL。            |
+| NOT boolean            | not(boolean)           | 如果 boolean 为 FALSE，返回 TRUE；如果 boolean 为 TRUE，返回 FALSE；如果为 NULL，返回 NULL。 |
+| boolean IS FALSE       | isFalse(boolean)       | 如果 boolean 为 FALSE，返回 TRUE；如果 boolean 为 TRUE 或 NULL，返回 FALSE。          |
+| boolean IS NOT FALSE   | isNotFalse(boolean)    | 如果 boolean 为 TRUE 或 NULL，返回 TRUE；如果 boolean 为 FALSE，返回 FALSE。          |
+| boolean IS TRUE        | isTrue(boolean)        | 如果 boolean 为 TRUE，返回 TRUE；如果 boolean 为 FALSE 或 NULL，返回 FALSE。          |
+| boolean IS NOT TRUE    | isNotTrue(boolean)     | 如果 boolean 为 FALSE 或 NULL，返回 TRUE；如果 boolean 为 TRUE，返回 FALSE。          |
+| boolean IS UNKNOWN     | isNull(boolean)        | 如果 boolean 为 NULL，返回 TRUE。                                          |
+| boolean IS NOT UNKNOWN | isNotNull(boolean)     | 如果 boolean 不为 NULL，返回 TRUE。                                         |
 
 ## 数学函数
 
