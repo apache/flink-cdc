@@ -1034,14 +1034,10 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
     }
 
     static void applyHiveSyncTableDefaults(Configuration tableConfig, TableId tableId) {
-        if (FlinkOptions.HIVE_SYNC_DB
-                .defaultValue()
-                .equals(tableConfig.get(FlinkOptions.HIVE_SYNC_DB))) {
+        if (!tableConfig.contains(FlinkOptions.HIVE_SYNC_DB)) {
             tableConfig.set(FlinkOptions.HIVE_SYNC_DB, tableId.getSchemaName());
         }
-        if (FlinkOptions.HIVE_SYNC_TABLE
-                .defaultValue()
-                .equals(tableConfig.get(FlinkOptions.HIVE_SYNC_TABLE))) {
+        if (!tableConfig.contains(FlinkOptions.HIVE_SYNC_TABLE)) {
             tableConfig.set(FlinkOptions.HIVE_SYNC_TABLE, tableId.getTableName());
         }
     }
