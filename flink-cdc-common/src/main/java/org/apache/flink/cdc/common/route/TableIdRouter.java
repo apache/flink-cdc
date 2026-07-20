@@ -178,9 +178,8 @@ public class TableIdRouter {
             // appendTail to perform the `$N` substitution only on the matched region. We cannot
             // use Matcher.replaceAll here because it internally calls reset() + find(), which
             // would only match a prefix of the source table id (when the regex alternation
-            // order matters, e.g. `([1-9]|1[0-6])` matches `1` from `13` and leaves `3` as a
-            // leftover that gets appended to the sink table name, routing
-            // `table_13` to `table_3`).
+            // order matters, e.g. `([1-9]|1[0-6])` matching `1` in `db_6.table_13`), leaving `3` as
+            // a leftover that gets appended to the configured sink-table name (e.g. `...merged3`).
             Matcher matcher = route.f0.matcher(originalTable.toString());
             if (matcher.matches()) {
                 StringBuilder sb = new StringBuilder();
