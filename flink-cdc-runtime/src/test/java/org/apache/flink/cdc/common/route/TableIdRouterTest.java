@@ -185,7 +185,7 @@ public class TableIdRouterTest extends SchemaTestBase {
         // TableIdRouter.resolveReplacement used Matcher.find(), which only matched a prefix of
         // the source table ID, leaving the unmatched tail characters to be appended to the
         // sink-table after replaceAll. As a result, table `db_6.table_13` was wrongly routed to
-        // `db_6.table_3`, `db_6.table_14` to `db_6.table_4`, etc.
+        // `new_db_6.table_merged3` (and similarly `db_6.table_14` to `new_db_6.table_merged4`).
         List<String> sourceTables =
                 List.of(
                         "db_6.table_1",
