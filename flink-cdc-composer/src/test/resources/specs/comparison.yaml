@@ -265,6 +265,57 @@
     DataChangeEvent{tableId=foo.bar.baz, before=[-1, true, true, false], after=[], op=DELETE, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, true, true, null], op=INSERT, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[0, true, true, null], after=[], op=DELETE, meta=()}
+- do: String Not Like Escape Op
+  projection: |-
+    id_
+    'A%' NOT LIKE 'A$%' ESCAPE '$' AS comp_1
+    'A_' NOT LIKE 'A$_' ESCAPE '$' AS comp_2
+    char_ NOT LIKE 'A%' ESCAPE '$' AS comp_3
+    CAST(NULL AS STRING) NOT LIKE 'A%' ESCAPE '$' AS comp_4
+    char_ NOT LIKE CAST(NULL AS STRING) ESCAPE '$' AS comp_5
+    char_ NOT LIKE 'A%' ESCAPE CAST(NULL AS STRING) AS comp_6
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_1` BOOLEAN,`comp_2` BOOLEAN,`comp_3` BOOLEAN,`comp_4` BOOLEAN,`comp_5` BOOLEAN,`comp_6` BOOLEAN}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, false, false, false, null, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, false, false, false, null, null, null], after=[-1, false, false, true, null, null, null], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, false, false, true, null, null, null], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, false, false, null, null, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, false, false, null, null, null, null], after=[], op=DELETE, meta=()}
+- do: String Similar To Escape Op
+  projection: |-
+    id_
+    'A%' SIMILAR TO 'A$%' ESCAPE '$' AS comp_1
+    'A_' SIMILAR TO 'A$_' ESCAPE '$' AS comp_2
+    char_ SIMILAR TO 'A%' ESCAPE '$' AS comp_3
+    CAST(NULL AS STRING) SIMILAR TO 'A%' ESCAPE '$' AS comp_4
+    char_ SIMILAR TO CAST(NULL AS STRING) ESCAPE '$' AS comp_5
+    char_ SIMILAR TO 'A%' ESCAPE CAST(NULL AS STRING) AS comp_6
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_1` BOOLEAN,`comp_2` BOOLEAN,`comp_3` BOOLEAN,`comp_4` BOOLEAN,`comp_5` BOOLEAN,`comp_6` BOOLEAN}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, true, true, true, null, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, true, true, true, null, null, null], after=[-1, true, true, false, null, null, null], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, true, true, false, null, null, null], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, true, true, null, null, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, true, true, null, null, null, null], after=[], op=DELETE, meta=()}
+- do: String Not Similar To Escape Op
+  projection: |-
+    id_
+    'A%' NOT SIMILAR TO 'A$%' ESCAPE '$' AS comp_1
+    'A_' NOT SIMILAR TO 'A$_' ESCAPE '$' AS comp_2
+    char_ NOT SIMILAR TO 'A%' ESCAPE '$' AS comp_3
+    CAST(NULL AS STRING) NOT SIMILAR TO 'A%' ESCAPE '$' AS comp_4
+    char_ NOT SIMILAR TO CAST(NULL AS STRING) ESCAPE '$' AS comp_5
+    char_ NOT SIMILAR TO 'A%' ESCAPE CAST(NULL AS STRING) AS comp_6
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_1` BOOLEAN,`comp_2` BOOLEAN,`comp_3` BOOLEAN,`comp_4` BOOLEAN,`comp_5` BOOLEAN,`comp_6` BOOLEAN}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, false, false, false, null, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, false, false, false, null, null, null], after=[-1, false, false, true, null, null, null], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, false, false, true, null, null, null], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, false, false, null, null, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, false, false, null, null, null, null], after=[], op=DELETE, meta=()}
 - do: String Similar To Op
   projection: id_, char_ SIMILAR TO 'A%' AS comp_1, varchar_ NOT SIMILAR TO '%rro' AS comp_2, string_ SIMILAR TO 'From (A|B) to (Y|Z) is Lie' AS comp_3, char_ NOT SIMILAR TO 'A%' AS comp_4
   primary-key: id_

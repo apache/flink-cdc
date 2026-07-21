@@ -233,6 +233,58 @@ class JaninoCompilerTest {
         ExpressionEvaluator orEvaluator =
                 compileTranslatedFilterExpression("id = 1 or 1 / uid > 0", columns, columnNameMap);
         Assertions.assertThat(orEvaluator.evaluate(new Object[] {1, 0})).isEqualTo(true);
+
+        List<Column> booleanColumns =
+                List.of(
+                        Column.physicalColumn("left_bool", DataTypes.BOOLEAN().notNull()),
+                        Column.physicalColumn("right_bool", DataTypes.BOOLEAN().notNull()),
+                        Column.physicalColumn("divisor", DataTypes.INT()));
+        Map<String, String> booleanColumnNameMap =
+                Map.of("left_bool", "$0", "right_bool", "$1", "divisor", "$2");
+        List<String> booleanColumnNames = List.of("$0", "$1", "$2");
+        List<Class<?>> booleanColumnTypes = List.of(Boolean.class, Boolean.class, Integer.class);
+
+        ExpressionEvaluator nativeAndEvaluator =
+                compileTranslatedFilterExpression(
+                        "left_bool and right_bool",
+                        booleanColumns,
+                        booleanColumnNameMap,
+                        booleanColumnNames,
+                        booleanColumnTypes);
+        Assertions.assertThat(nativeAndEvaluator.evaluate(new Object[] {true, true, 0}))
+                .isEqualTo(true);
+
+        ExpressionEvaluator conditionalAndEvaluator =
+                compileTranslatedFilterExpression(
+                        "left_bool and 1 / divisor > 0",
+                        booleanColumns,
+                        booleanColumnNameMap,
+                        booleanColumnNames,
+                        booleanColumnTypes);
+        Assertions.assertThat(conditionalAndEvaluator.evaluate(new Object[] {false, true, 0}))
+                .isEqualTo(false);
+
+        ExpressionEvaluator conditionalOrEvaluator =
+                compileTranslatedFilterExpression(
+                        "left_bool or 1 / divisor > 0",
+                        booleanColumns,
+                        booleanColumnNameMap,
+                        booleanColumnNames,
+                        booleanColumnTypes);
+        Assertions.assertThat(conditionalOrEvaluator.evaluate(new Object[] {true, false, 0}))
+                .isEqualTo(true);
+
+        List<Column> nullableBooleanColumns =
+                List.of(Column.physicalColumn("nullable_bool", DataTypes.BOOLEAN()));
+        Map<String, String> nullableBooleanColumnNameMap = Map.of("nullable_bool", "$0");
+        ExpressionEvaluator nullableOrEvaluator =
+                compileTranslatedFilterExpression(
+                        "nullable_bool or false",
+                        nullableBooleanColumns,
+                        nullableBooleanColumnNameMap,
+                        List.of("$0"),
+                        List.of(Boolean.class));
+        Assertions.assertThat(nullableOrEvaluator.evaluate(new Object[] {null})).isNull();
     }
 
     @Test
@@ -317,6 +369,20 @@ class JaninoCompilerTest {
 
     private static ExpressionEvaluator compileTranslatedFilterExpression(
             String expression, List<Column> columns, Map<String, String> columnNameMap) {
+        return compileTranslatedFilterExpression(
+                expression,
+                columns,
+                columnNameMap,
+                List.of("$0", "$1"),
+                List.of(Integer.class, Integer.class));
+    }
+
+    private static ExpressionEvaluator compileTranslatedFilterExpression(
+            String expression,
+            List<Column> columns,
+            Map<String, String> columnNameMap,
+            List<String> columnNames,
+            List<Class<?>> columnTypes) {
         String janinoExpression =
                 TransformParser.translateFilterExpressionToJaninoExpression(
                         expression,
@@ -326,8 +392,8 @@ class JaninoCompilerTest {
                         columnNameMap);
         return JaninoCompiler.compileExpression(
                 JaninoCompiler.loadSystemFunction(janinoExpression),
-                List.of("$0", "$1"),
-                List.of(Integer.class, Integer.class),
+                columnNames,
+                columnTypes,
                 Boolean.class);
     }
 }

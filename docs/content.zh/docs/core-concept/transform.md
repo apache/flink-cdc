@@ -122,21 +122,29 @@ Flink CDC 使用 [Calcite](https://calcite.apache.org/) 来解析表达式并且
 | value1 <= value2                     | lessThanOrEqual(value1, value2)              | 如果 value1 小于等于 value2，返回 TRUE；如果 value1 或 value2 为 NULL，返回 FALSE。 |
 | value IS NULL                        | isNull(value)                                | 如果 value 为 NULL，返回 TRUE。                                      |
 | value IS NOT NULL                    | isNotNull(value)                             | 如果 value 不为 NULL，返回 TRUE。                                     |
+| value1 IS DISTINCT FROM value2       | isDistinctFrom(value1, value2)               | 如果 value1 和 value2 是不同的值，返回 TRUE。NULL 会作为普通值参与比较，且不会返回 NULL。 |
+| value1 IS NOT DISTINCT FROM value2   | isNotDistinctFrom(value1, value2)            | 如果 value1 和 value2 不是不同的值，返回 TRUE。NULL 会作为普通值参与比较，且不会返回 NULL。 |
 | value1 BETWEEN value2 AND value3     | betweenAsymmetric(value1, value2, value3)    | 如果 value1 大于等于 value2 且小于等于 value3，返回 TRUE。                    |
 | value1 NOT BETWEEN value2 AND value3 | notBetweenAsymmetric(value1, value2, value3) | 如果 value1 小于 value2 或大于 value3，返回 TRUE。                        |
-| string1 LIKE string2                 | like(string1, string2)                       | 如果 string1 匹配模式 string2，返回 TRUE。                              |
-| string1 NOT LIKE string2             | notLike(string1, string2)                    | 如果 string1 不匹配模式 string2，返回 TRUE。                             |
+| string1 LIKE string2                 | like(string1, string2)                       | 如果 string1 按 Java 正则表达式和子串匹配语义匹配 string2，返回 TRUE。           |
+| string1 NOT LIKE string2             | notLike(string1, string2)                    | 如果 string1 按 Java 正则表达式和子串匹配语义不匹配 string2，返回 TRUE。          |
+| string1 LIKE string2 ESCAPE string3  | like(string1, string2, string3)              | 如果 string1 匹配 SQL LIKE 模式 string2，返回 TRUE。`%` 匹配任意长度字符串，`_` 匹配单个字符，string3 用于转义通配符。如果任一参数为 NULL，返回 NULL。 |
+| string1 NOT LIKE string2 ESCAPE string3 | notLike(string1, string2, string3)        | 如果 string1 不匹配 SQL LIKE 模式 string2，返回 TRUE。如果任一参数为 NULL，返回 NULL。 |
+| string1 SIMILAR TO string2           | similarTo(string1, string2)                  | 如果 string1 匹配 SQL SIMILAR TO 模式 string2，返回 TRUE。如果任一参数为 NULL，返回 NULL。 |
+| string1 NOT SIMILAR TO string2       | notSimilarTo(string1, string2)               | 如果 string1 不匹配 SQL SIMILAR TO 模式 string2，返回 TRUE。如果任一参数为 NULL，返回 NULL。 |
+| string1 SIMILAR TO string2 ESCAPE string3 | similarTo(string1, string2, string3)    | 如果 string1 使用 string3 作为转义字符匹配 SQL SIMILAR TO 模式 string2，返回 TRUE。如果任一参数为 NULL，返回 NULL。 |
+| string1 NOT SIMILAR TO string2 ESCAPE string3 | notSimilarTo(string1, string2, string3) | 如果 string1 使用 string3 作为转义字符不匹配 SQL SIMILAR TO 模式 string2，返回 TRUE。如果任一参数为 NULL，返回 NULL。 |
 | value1 IN (value2 [, value3]* )      | in(value1, value2 [, value3]*)               | 如果 value1 存在于给定列表 (value2, value3, …) 中，返回 TRUE。              |
 | value1 NOT IN (value2 [, value3]* )  | notIn(value1, value2 [, value3]*)            | 如果 value1 不存在于给定列表 (value2, value3, …) 中，返回 TRUE。             |
 
 ## 逻辑函数
 
-逻辑函数遵循 SQL 的三值逻辑来处理可为 NULL 的 BOOLEAN 值。`AND` 和 `OR` 会在左操作数已经决定结果时短路，不再计算右操作数。
+逻辑函数遵循 SQL 的三值逻辑来处理可为 NULL 的 BOOLEAN 值。`AND` 和 `OR` 会在左操作数已经决定结果时短路，不再计算右操作数。生成的 Janino 代码会根据操作数可空性使用原生运算符、条件表达式或惰性函数调用。
 
 | 函数                     | Janino 代码            | 描述                                                                 |
 |------------------------|----------------------|--------------------------------------------------------------------|
-| boolean1 OR boolean2   | or(boolean1, boolean2)  | 如果任一值为 TRUE，返回 TRUE；如果没有 TRUE 且至少一个值为 NULL，返回 NULL。               |
-| boolean1 AND boolean2  | and(boolean1, boolean2) | 如果任一值为 FALSE，返回 FALSE；如果没有 FALSE 且至少一个值为 NULL，返回 NULL。            |
+| boolean1 OR boolean2   | 短路 OR 表达式  | 如果任一值为 TRUE，返回 TRUE；如果没有 TRUE 且至少一个值为 NULL，返回 NULL。               |
+| boolean1 AND boolean2  | 短路 AND 表达式 | 如果任一值为 FALSE，返回 FALSE；如果没有 FALSE 且至少一个值为 NULL，返回 NULL。            |
 | NOT boolean            | not(boolean)           | 如果 boolean 为 FALSE，返回 TRUE；如果 boolean 为 TRUE，返回 FALSE；如果为 NULL，返回 NULL。 |
 | boolean IS FALSE       | isFalse(boolean)       | 如果 boolean 为 FALSE，返回 TRUE；如果 boolean 为 TRUE 或 NULL，返回 FALSE。          |
 | boolean IS NOT FALSE   | isNotFalse(boolean)    | 如果 boolean 为 TRUE 或 NULL，返回 TRUE；如果 boolean 为 FALSE，返回 FALSE。          |

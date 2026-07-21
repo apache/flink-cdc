@@ -28,6 +28,7 @@ import org.apache.flink.cdc.common.types.DataTypeRoot;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.common.utils.StringUtils;
 import org.apache.flink.cdc.runtime.operators.transform.UserDefinedFunctionDescriptor;
+import org.apache.flink.cdc.runtime.parser.metadata.MetadataColumns;
 
 import org.apache.calcite.sql.SqlBasicCall;
 import org.apache.calcite.sql.SqlBasicTypeNameSpec;
@@ -259,9 +260,9 @@ public class JaninoCompiler {
             Context context, SqlBasicCall sqlBasicCall, Java.Rvalue[] atoms) {
         switch (sqlBasicCall.getKind()) {
             case AND:
-                return generateLazyBinaryFunctionOperation(context, sqlBasicCall, "and", atoms);
+                return generateLogicalBinaryOperation(context, sqlBasicCall, atoms, true);
             case OR:
-                return generateLazyBinaryFunctionOperation(context, sqlBasicCall, "or", atoms);
+                return generateLogicalBinaryOperation(context, sqlBasicCall, atoms, false);
             case NOT:
                 return generateFunctionOperation("not", atoms);
             case EQUALS:
@@ -353,6 +354,107 @@ public class JaninoCompiler {
                         });
         return generateFunctionOperation(
                 functionName, new Java.Rvalue[] {atoms[0], rightOperandSupplier});
+    }
+
+    private static Java.Rvalue generateLogicalBinaryOperation(
+            Context context, SqlBasicCall sqlBasicCall, Java.Rvalue[] atoms, boolean isAnd) {
+        if (atoms.length != 2) {
+            throw new ParseException("Unrecognized expression: " + sqlBasicCall.toString());
+        }
+        boolean leftNullable = isExpressionNullable(context, sqlBasicCall.getOperandList().get(0));
+        boolean rightNullable = isExpressionNullable(context, sqlBasicCall.getOperandList().get(1));
+        if (!leftNullable && !rightNullable) {
+            return generateBinaryOperation(context, sqlBasicCall, atoms, isAnd ? "&&" : "||");
+        }
+        if (!leftNullable) {
+            return generateLeftNonNullableLogicalOperation(atoms, isAnd);
+        }
+        return generateLazyBinaryFunctionOperation(
+                context, sqlBasicCall, isAnd ? "and" : "or", atoms);
+    }
+
+    private static Java.Rvalue generateLeftNonNullableLogicalOperation(
+            Java.Rvalue[] atoms, boolean isAnd) {
+        if (isAnd) {
+            return new Java.ConditionalExpression(
+                    Location.NOWHERE,
+                    atoms[0],
+                    atoms[1],
+                    new Java.AmbiguousName(Location.NOWHERE, new String[] {"Boolean.FALSE"}));
+        }
+        return new Java.ConditionalExpression(
+                Location.NOWHERE,
+                atoms[0],
+                new Java.AmbiguousName(Location.NOWHERE, new String[] {"Boolean.TRUE"}),
+                atoms[1]);
+    }
+
+    private static boolean isExpressionNullable(Context context, SqlNode sqlNode) {
+        if (sqlNode instanceof SqlIdentifier) {
+            return isIdentifierNullable(context, (SqlIdentifier) sqlNode);
+        }
+        if (sqlNode instanceof SqlLiteral) {
+            return ((SqlLiteral) sqlNode).getValue() == null;
+        }
+        if (sqlNode instanceof SqlBasicCall) {
+            return isBasicCallNullable(context, (SqlBasicCall) sqlNode);
+        }
+        return true;
+    }
+
+    private static boolean isIdentifierNullable(Context context, SqlIdentifier sqlIdentifier) {
+        String columnName = sqlIdentifier.names.get(sqlIdentifier.names.size() - 1);
+        for (Column column : context.columns) {
+            if (column.getName().equals(columnName)) {
+                return column.getType().isNullable();
+            }
+        }
+        for (SupportedMetadataColumn metadataColumn : context.supportedMetadataColumns) {
+            if (metadataColumn.getName().equals(columnName)) {
+                return metadataColumn.getType().isNullable();
+            }
+        }
+        return MetadataColumns.METADATA_COLUMNS.stream()
+                .filter(column -> column.f0.equals(columnName))
+                .findFirst()
+                .map(column -> column.f1.isNullable())
+                .orElse(true);
+    }
+
+    private static boolean isBasicCallNullable(Context context, SqlBasicCall sqlBasicCall) {
+        switch (sqlBasicCall.getKind()) {
+            case AND:
+            case OR:
+                return sqlBasicCall.getOperandList().stream()
+                        .anyMatch(operand -> isExpressionNullable(context, operand));
+            case NOT:
+                return isExpressionNullable(context, sqlBasicCall.getOperandList().get(0));
+            case IS_NULL:
+            case IS_NOT_NULL:
+            case IS_FALSE:
+            case IS_NOT_TRUE:
+            case IS_TRUE:
+            case IS_NOT_FALSE:
+            case IS_UNKNOWN:
+            case IS_DISTINCT_FROM:
+            case IS_NOT_DISTINCT_FROM:
+            case EQUALS:
+            case NOT_EQUALS:
+            case LESS_THAN:
+            case GREATER_THAN:
+            case LESS_THAN_OR_EQUAL:
+            case GREATER_THAN_OR_EQUAL:
+            case BETWEEN:
+            case IN:
+            case NOT_IN:
+                return false;
+            case LIKE:
+            case SIMILAR:
+                return sqlBasicCall.getOperandList().stream()
+                        .anyMatch(operand -> isExpressionNullable(context, operand));
+            default:
+                return true;
+        }
     }
 
     private static final Map<String, String> decimalArithmeticHandlers =

@@ -174,12 +174,8 @@ class TransformParserTest {
     void testTranslateFilterToJaninoExpression() {
         testFilterExpression("id is not null", "isNotNull(id)");
         testFilterExpression("id is null", "isNull(id)");
-        testFilterExpression(
-                "id = 1 and uid = 2",
-                lazyLogicalFunction("and", "valueEquals(id, 1)", "valueEquals(uid, 2)"));
-        testFilterExpression(
-                "id = 1 or id = 2",
-                lazyLogicalFunction("or", "valueEquals(id, 1)", "valueEquals(id, 2)"));
+        testFilterExpression("id = 1 and uid = 2", "valueEquals(id, 1) && valueEquals(uid, 2)");
+        testFilterExpression("id = 1 or id = 2", "valueEquals(id, 1) || valueEquals(id, 2)");
         testFilterExpression("not (id = 1)", "not(valueEquals(id, 1))");
         testFilterExpression("id = '1'", "valueEquals(id, \"1\")");
         testFilterExpression("id <> '1'", "!valueEquals(id, \"1\")");
@@ -359,7 +355,7 @@ class TransformParserTest {
         testFilterExpression("upper(lower(id))", "upper(lower(id))");
         testFilterExpression(
                 "abs(uniq_id) > 10 and id is not null",
-                lazyLogicalFunction("and", "greaterThan(abs(uniq_id), 10)", "isNotNull(id)"));
+                "greaterThan(abs(uniq_id), 10) && isNotNull(id)");
         testFilterExpression(
                 "case id when 1 then 'a' when 2 then 'b' else 'c' end",
                 "(isTrue(valueEquals(id, 1)) ? \"a\" : isTrue(valueEquals(id, 2)) ? \"b\" : \"c\")");
@@ -400,6 +396,38 @@ class TransformParserTest {
         testFilterExpression("cast(dt as TIMESTAMP)", "castToTimestamp(dt, __time_zone__)");
         testFilterExpression("parse_json(jsonStr)", "parseJson(jsonStr)");
         testFilterExpression("try_parse_json(jsonStr)", "tryParseJson(jsonStr)");
+    }
+
+    @Test
+    void testTranslateLogicalFilterToJaninoExpressionByNullability() {
+        List<Column> columns =
+                List.of(
+                        Column.physicalColumn("left_bool", DataTypes.BOOLEAN().notNull()),
+                        Column.physicalColumn("right_bool", DataTypes.BOOLEAN().notNull()),
+                        Column.physicalColumn("nullable_bool", DataTypes.BOOLEAN()));
+
+        testFilterExpressionWithColumns(
+                "left_bool and right_bool", "left_bool && right_bool", columns);
+        testFilterExpressionWithColumns(
+                "left_bool or right_bool", "left_bool || right_bool", columns);
+        testFilterExpressionWithColumns(
+                "left_bool and nullable_bool",
+                "left_bool ? nullable_bool : Boolean.FALSE",
+                columns);
+        testFilterExpressionWithColumns(
+                "left_bool or nullable_bool", "left_bool ? Boolean.TRUE : nullable_bool", columns);
+        testFilterExpressionWithColumns(
+                "nullable_bool and right_bool",
+                lazyLogicalFunction("and", "nullable_bool", "right_bool"),
+                columns);
+        testFilterExpressionWithColumns(
+                "nullable_bool or right_bool",
+                lazyLogicalFunction("or", "nullable_bool", "right_bool"),
+                columns);
+        testFilterExpressionWithColumns(
+                "nullable_bool or false",
+                lazyLogicalFunction("or", "nullable_bool", "false"),
+                columns);
     }
 
     @Test
@@ -690,22 +718,10 @@ class TransformParserTest {
                 "typeof(id % 2)", "__instanceOfTypeOfFunctionClass.eval(id % 2)");
         testFilterExpressionWithUdf(
                 "addone(addone(id)) > 4 OR typeof(id) <> 'bool' AND format('from %s to %s is %s', 'a', 'z', 'lie') <> ''",
-                lazyLogicalFunction(
-                        "or",
-                        "greaterThan(__instanceOfAddOneFunctionClass.eval(__instanceOfAddOneFunctionClass.eval(id)), 4)",
-                        lazyLogicalFunction(
-                                "and",
-                                "!valueEquals(__instanceOfTypeOfFunctionClass.eval(id), \"bool\")",
-                                "!valueEquals(__instanceOfFormatFunctionClass.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")")));
+                "greaterThan(__instanceOfAddOneFunctionClass.eval(__instanceOfAddOneFunctionClass.eval(id)), 4) || !valueEquals(__instanceOfTypeOfFunctionClass.eval(id), \"bool\") && !valueEquals(__instanceOfFormatFunctionClass.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")");
         testFilterExpressionWithUdf(
                 "ADDONE(ADDONE(id)) > 4 OR TYPEOF(id) <> 'bool' AND FORMAT('from %s to %s is %s', 'a', 'z', 'lie') <> ''",
-                lazyLogicalFunction(
-                        "or",
-                        "greaterThan(__instanceOfAddOneFunctionClass.eval(__instanceOfAddOneFunctionClass.eval(id)), 4)",
-                        lazyLogicalFunction(
-                                "and",
-                                "!valueEquals(__instanceOfTypeOfFunctionClass.eval(id), \"bool\")",
-                                "!valueEquals(__instanceOfFormatFunctionClass.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")")));
+                "greaterThan(__instanceOfAddOneFunctionClass.eval(__instanceOfAddOneFunctionClass.eval(id)), 4) || !valueEquals(__instanceOfTypeOfFunctionClass.eval(id), \"bool\") && !valueEquals(__instanceOfFormatFunctionClass.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")");
     }
 
     @Test
@@ -763,24 +779,12 @@ class TransformParserTest {
                 columnNameMap);
         testFilterExpressionWithUdf(
                 "addone(addone(`a-b`)) > 4 OR typeof(a-b) <> 'bool' AND format('from %s to %s is %s', 'a', 'z', 'lie') <> ''",
-                lazyLogicalFunction(
-                        "or",
-                        "greaterThan(__instanceOfAddOneFunctionClass.eval(__instanceOfAddOneFunctionClass.eval($2)), 4)",
-                        lazyLogicalFunction(
-                                "and",
-                                "!valueEquals(__instanceOfTypeOfFunctionClass.eval($0 - $1), \"bool\")",
-                                "!valueEquals(__instanceOfFormatFunctionClass.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")")),
+                "greaterThan(__instanceOfAddOneFunctionClass.eval(__instanceOfAddOneFunctionClass.eval($2)), 4) || !valueEquals(__instanceOfTypeOfFunctionClass.eval($0 - $1), \"bool\") && !valueEquals(__instanceOfFormatFunctionClass.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")",
                 columns,
                 columnNameMap);
         testFilterExpressionWithUdf(
                 "ADDONE(ADDONE(`a-b`)) > 4 OR TYPEOF(a-b) <> 'bool' AND FORMAT('from %s to %s is %s', 'a', 'z', 'lie') <> ''",
-                lazyLogicalFunction(
-                        "or",
-                        "greaterThan(__instanceOfAddOneFunctionClass.eval(__instanceOfAddOneFunctionClass.eval($2)), 4)",
-                        lazyLogicalFunction(
-                                "and",
-                                "!valueEquals(__instanceOfTypeOfFunctionClass.eval($0 - $1), \"bool\")",
-                                "!valueEquals(__instanceOfFormatFunctionClass.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")")),
+                "greaterThan(__instanceOfAddOneFunctionClass.eval(__instanceOfAddOneFunctionClass.eval($2)), 4) || !valueEquals(__instanceOfTypeOfFunctionClass.eval($0 - $1), \"bool\") && !valueEquals(__instanceOfFormatFunctionClass.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")",
                 columns,
                 columnNameMap);
     }
