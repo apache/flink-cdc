@@ -18,7 +18,6 @@
 package org.apache.flink.cdc.connectors.mysql.source.offset;
 
 import io.debezium.connector.mysql.GtidSet;
-import io.debezium.connector.mysql.GtidUtils;
 import org.junit.jupiter.api.Test;
 
 import java.util.Random;
@@ -41,10 +40,6 @@ class MysqlGtidStrategyTest {
 
     private static boolean oldIsContainedWithin(String sub, String sup) {
         return new GtidSet(sub).isContainedWithin(new GtidSet(sup));
-    }
-
-    private static String oldFixRestoreGtidSet(String server, String restored) {
-        return GtidUtils.fixRestoredGtidSet(new GtidSet(server), new GtidSet(restored)).toString();
     }
 
     @Test
@@ -102,22 +97,6 @@ class MysqlGtidStrategyTest {
     }
 
     @Test
-    void fixRestoreGtidSetMatchesOldImpl() {
-        String[][] pairs = {
-            {"A:1-100,B:1-50", "A:1-40"},
-            {"A:1-100", "A:1-100"},
-            {"A:1-100", "B:1-150"},
-            {"A:1-100", "B:1-50"},
-            {"A:1-100:102-200,B:20-200", "A:1-100,C:1-5"},
-        };
-        for (String[] pair : pairs) {
-            assertThat(strategy.fixRestoredGtidSet(pair[0], pair[1]))
-                    .as("fixRestoredGtidSet(%s,%s)", pair[0], pair[1])
-                    .isEqualTo(oldFixRestoreGtidSet(pair[0], pair[1]));
-        }
-    }
-
-    @Test
     void fuzzCrossValidationAgainstOldImpl() {
         Random random = new Random(42);
         for (int i = 0; i < 2000; i++) {
@@ -130,9 +109,6 @@ class MysqlGtidStrategyTest {
             assertThat(strategy.isContainedWithin(a, b))
                     .as("isContainedWithin(%s,%s)", a, b)
                     .isEqualTo(oldIsContainedWithin(a, b));
-            assertThat(strategy.fixRestoredGtidSet(a, b))
-                    .as("fixRestoredGtidSet(%s,%s)", a, b)
-                    .isEqualTo(oldFixRestoreGtidSet(a, b));
         }
     }
 

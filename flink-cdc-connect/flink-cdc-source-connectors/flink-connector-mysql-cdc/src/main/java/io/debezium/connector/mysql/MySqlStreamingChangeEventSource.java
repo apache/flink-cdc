@@ -6,7 +6,6 @@
 
 package io.debezium.connector.mysql;
 
-import org.apache.flink.cdc.connectors.mysql.source.offset.GtidStrategies;
 import org.apache.flink.cdc.connectors.mysql.source.offset.MariaDbGtidStrategy;
 import org.apache.flink.cdc.connectors.mysql.source.offset.MysqlGtidStrategy;
 
@@ -629,17 +628,14 @@ public class MySqlStreamingChangeEventSource
 
         String restoreGtidStr = effectiveOffsetContext.gtidSet();
         if (StringUtils.isNotBlank(restoreGtidStr)) {
-            String resumeGtidStr =
-                    fixMariadbResumeGtidSet(connection.mariadbGtidExecuted(), restoreGtidStr);
             LOGGER.info(
-                    "MariaDB: resuming binlog from restored GTID set {} (capped resume {})(binlog file={} pos={})",
+                    "MariaDB: resuming binlog from restored GTID set {} (binlog file={} pos={})",
                     restoreGtidStr,
-                    resumeGtidStr,
                     effectiveOffsetContext.getSource().binlogFilename(),
                     effectiveOffsetContext.getSource().binlogPosition());
-            client.setGtidSet(resumeGtidStr);
-            effectiveOffsetContext.setCompletedGtidSet(resumeGtidStr);
-            gtidSet = new MariadbGtidSet(resumeGtidStr);
+            client.setGtidSet(restoreGtidStr);
+            effectiveOffsetContext.setCompletedGtidSet(restoreGtidStr);
+            gtidSet = new MariadbGtidSet(restoreGtidStr);
         } else {
             LOGGER.info(
                     "MariaDB: no restored GTID, starting from binlog file={} position={}",
@@ -677,15 +673,6 @@ public class MySqlStreamingChangeEventSource
                 + header.getServerId()
                 + "-"
                 + gtidEventData.getSequence();
-    }
-
-    static String fixMariadbResumeGtidSet(String availableServerGtidStr, String restoredGtidSet) {
-        if (StringUtils.isBlank(restoredGtidSet)) {
-            return restoredGtidSet;
-        }
-
-        return GtidStrategies.of(MariaDbGtidStrategy.DIALECT)
-                .fixRestoredGtidSet(availableServerGtidStr, restoredGtidSet);
     }
 
     /**

@@ -92,25 +92,4 @@ class MariaDbGtidStrategyTest {
         assertThat(strategy.isContainedWithin("", "0-1-100")).isTrue();
         assertThat(strategy.isContainedWithin("0-1-100", "")).isFalse();
     }
-
-    @Test
-    void fixRestoredCapsPerDomainAtServerSequence() {
-        // domain 0: restored seq 150 capped to server seq 100;
-        // domain 1: absent on server, kept.
-        String server = "0-1-100";
-        String restored = "0-9-150,1-9-7";
-
-        // server id from the restored tuple (9) is preserved; only the sequence is lowered.
-        assertThat(strategy.fixRestoredGtidSet(server, restored)).isEqualTo("0-9-100,1-9-7");
-    }
-
-    @Test
-    void fixRestoredBelowServerIsUnchanged() {
-        assertThat(strategy.fixRestoredGtidSet("0-1-100", "0-1-40")).isEqualTo("0-1-40");
-    }
-
-    @Test
-    void fixRestoredEmptyIfEmpty() {
-        assertThat(strategy.fixRestoredGtidSet("0-1-100", "")).isEqualTo("");
-    }
 }

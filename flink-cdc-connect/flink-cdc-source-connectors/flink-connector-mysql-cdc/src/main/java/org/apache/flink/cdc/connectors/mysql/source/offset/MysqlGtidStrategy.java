@@ -18,7 +18,6 @@
 package org.apache.flink.cdc.connectors.mysql.source.offset;
 
 import io.debezium.connector.mysql.GtidSet;
-import io.debezium.connector.mysql.GtidUtils;
 
 /** MySQL UUID-and-interval GTID strategy. */
 public class MysqlGtidStrategy implements GtidStrategy {
@@ -57,10 +56,5 @@ public class MysqlGtidStrategy implements GtidStrategy {
     @Override
     public boolean isContainedWithin(String sub, String sup) {
         return new GtidSet(sub).isContainedWithin(new GtidSet(sup));
-    }
-
-    @Override
-    public String fixRestoredGtidSet(String server, String restored) {
-        return GtidUtils.fixRestoredGtidSet(new GtidSet(server), new GtidSet(restored)).toString();
     }
 }

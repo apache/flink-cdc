@@ -72,9 +72,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * GTID offset survives a savepoint round trip: the stored {@code @@gtid_binlog_pos} text is
  * recovered as a MariaDB offset (stateless {@link
  * org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset} + {@code
- * GtidStrategies.detect}), and {@code MariaDbGtidStrategy.fixRestoredGtidSet} drives the resume -
- * the restore path that was previously only unit-test. The equivalent MySQL sp/retore path is
- * covered by {@link SpecificStartingOffsetITCase}
+ * GtidStrategies.detect}). The equivalent MySQL sp/retore path is covered by {@link
+ * SpecificStartingOffsetITCase}
  */
 class MariaDbDialectSavepointITCase {
 

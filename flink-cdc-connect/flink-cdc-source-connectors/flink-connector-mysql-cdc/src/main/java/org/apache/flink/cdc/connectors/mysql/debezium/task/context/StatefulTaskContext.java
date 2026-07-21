@@ -299,13 +299,11 @@ public class StatefulTaskContext implements AutoCloseable {
         }
 
         GtidStrategy strategy = GtidStrategies.of(MariaDbGtidStrategy.DIALECT);
-        String fixed = strategy.fixRestoredGtidSet(available, restoredGtid);
-        boolean contained = strategy.isContainedWithin(fixed, available);
+        boolean contained = strategy.isContainedWithin(restoredGtid, available);
         if (!contained) {
             LOG.info(
-                    "MariaDB restored GTID set {} (fixed {}) is not contained within server set {}",
+                    "MariaDB restored GTID set {} is not contained within server set {}",
                     restoredGtid,
-                    fixed,
                     available);
         }
         return contained;

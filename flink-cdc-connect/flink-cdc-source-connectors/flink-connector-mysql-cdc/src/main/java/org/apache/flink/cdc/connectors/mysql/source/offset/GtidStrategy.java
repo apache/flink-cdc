@@ -31,12 +31,4 @@ public interface GtidStrategy extends Serializable {
 
     /** Whether the {@code sub} GTID set is fully contained within {@code sup}. */
     boolean isContainedWithin(String sub, String sup);
-
-    /**
-     * Caps the {@code restored} GTID set so it does not exceed what is currently available on the
-     * server, returning the corrected GTID text. Mirrors the pre-abstraction call
-     * GtidUtils.fixRestoredGtidSet for Mysql; for MariaDB it caps each domain's sequence at the
-     * server's sequence for the domain.
-     */
-    String fixRestoredGtidSet(String server, String restored);
 }

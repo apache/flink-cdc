@@ -24,40 +24,11 @@ import com.github.shyiko.mysql.binlog.event.MariadbGtidEventData;
 import com.github.shyiko.mysql.binlog.event.deserialization.EventDeserializer.EventDataWrapper;
 import org.junit.jupiter.api.Test;
 
-import static io.debezium.connector.mysql.MySqlStreamingChangeEventSource.fixMariadbResumeGtidSet;
 import static io.debezium.connector.mysql.MySqlStreamingChangeEventSource.mariadbGtidOf;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Unit Test for the MariaDB GTID resume/ingest {@link MySqlStreamingChangeEventSource} */
 class MySqlStreamingChangeEventSourceMariaDbGtidTest {
-
-    /**
-     * The restored GTID must be capped to the target server's available set before being handed to
-     * the binlog client, so a failover to a replica that lags the ckp resumes from a position the
-     * server actually has (re-reading a little binlog) instead of requesting a not-yet-existent
-     * GTID.
-     */
-    @Test
-    void fixMariadbResumeGtidSetCapsRestoredToServerAvailable() {
-        assertThat(fixMariadbResumeGtidSet("0-1-19", "0-2-25")).isEqualTo("0-2-19");
-
-        // restored already within the server set
-        assertThat(fixMariadbResumeGtidSet("0-1-19", "0-2-10")).isEqualTo("0-2-10");
-
-        // multi-domain
-        assertThat(fixMariadbResumeGtidSet("0-1-19,1-1-7", "0-2-25,1-2-3"))
-                .isEqualTo("0-2-19,1-2-3");
-    }
-
-    /**
-     * When the server reports no GTID set, capping is impossible so the raw value passes through.
-     */
-    @Test
-    void fixMariadbResumeGtidSetPassesThroughWhenServerHasNotGtid() {
-        assertThat(fixMariadbResumeGtidSet("", "0-2-25")).isEqualTo("0-2-25");
-        assertThat(fixMariadbResumeGtidSet("   ", "0-2-25")).isEqualTo("0-2-25");
-        assertThat(fixMariadbResumeGtidSet(null, "0-2-25")).isEqualTo("0-2-25");
-    }
 
     /**
      * The GTID must use the server id from the event header, not the payload. The shyiko 0.27.2
