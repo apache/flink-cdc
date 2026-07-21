@@ -52,3 +52,18 @@
     DataChangeEvent{tableId=foo.bar.baz, before=[-1, false, true, false, false, false, true, false, true, true, false], after=[], op=DELETE, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, true, null, null, false, null, false, true, false, true], op=INSERT, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[0, null, true, null, null, false, null, false, true, false, true], after=[], op=DELETE, meta=()}
+- do: Logical Operators Short-Circuit
+  projection: |-
+    id_
+    TRUE OR 1 / CAST(0 AS INT) > 0 AS comp_1
+    FALSE AND 1 / CAST(0 AS INT) > 0 AS comp_2
+    CAST(TRUE AS BOOLEAN) OR 1 / CAST(0 AS INT) > 0 AS comp_3
+    CAST(FALSE AS BOOLEAN) AND 1 / CAST(0 AS INT) > 0 AS comp_4
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_1` BOOLEAN,`comp_2` BOOLEAN,`comp_3` BOOLEAN,`comp_4` BOOLEAN}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, true, false, true, false], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, true, false, true, false], after=[-1, true, false, true, false], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, true, false, true, false], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, true, false, true, false], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, true, false, true, false], after=[], op=DELETE, meta=()}
