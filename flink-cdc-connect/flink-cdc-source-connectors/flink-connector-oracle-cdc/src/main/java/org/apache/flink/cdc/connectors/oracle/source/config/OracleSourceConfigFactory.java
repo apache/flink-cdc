@@ -18,7 +18,7 @@
 package org.apache.flink.cdc.connectors.oracle.source.config;
 
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfigFactory;
-import org.apache.flink.cdc.connectors.base.source.EmbeddedFlinkDatabaseHistory;
+import org.apache.flink.cdc.connectors.base.source.EmbeddedFlinkSchemaHistory;
 
 import io.debezium.config.Configuration;
 import io.debezium.connector.oracle.OracleConnector;
@@ -64,24 +64,29 @@ public class OracleSourceConfigFactory extends JdbcSourceConfigFactory {
         checkSupportCheckpointsAfterTasksFinished(closeIdleReaders);
         Properties props = new Properties();
         props.setProperty("connector.class", OracleConnector.class.getCanonicalName());
-        // Logical name that identifies and provides a namespace for the particular Oracle
-        // database server being
-        // monitored. The logical name should be unique across all other connectors, since it is
-        // used as a prefix
-        // for all Kafka topic names emanating from this connector. Only alphanumeric characters
-        // and
-        // underscores should be used.
+        // Debezium 3.4.2: topic.prefix replaces database.server.name as the logical name /
+        // namespace for Kafka topics. Required by AbstractTopicNamingStrategy.configure().
+        props.setProperty("topic.prefix", DATABASE_SERVER_NAME);
         props.setProperty("database.server.name", DATABASE_SERVER_NAME);
         props.setProperty("database.user", checkNotNull(username));
         props.setProperty("database.password", checkNotNull(password));
-        props.setProperty("database.history.skip.unparseable.ddl", String.valueOf(true));
         props.setProperty("database.dbname", checkNotNull(databaseList.get(0)));
-        // database history
+        // Debezium 3.4.2: schema.history.internal replaces database.history as the config key
+        // for the SchemaHistory implementation class.
         props.setProperty(
-                "database.history", EmbeddedFlinkDatabaseHistory.class.getCanonicalName());
-        props.setProperty("database.history.instance.name", UUID.randomUUID() + "_" + subtaskId);
-        props.setProperty("database.history.skip.unparseable.ddl", String.valueOf(true));
+                "schema.history.internal", EmbeddedFlinkSchemaHistory.class.getCanonicalName());
+        String historyInstanceName = UUID.randomUUID() + "_" + subtaskId;
+        props.setProperty("database.history.instance.name", historyInstanceName);
+        // Debezium 3.4.2: getSchemaHistory() passes only schema.history.internal.* keys to
+        // SchemaHistory.configure(). Set instance name with that prefix so it arrives in the
+        // subset.
+        props.setProperty(
+                "schema.history.internal.database.history.instance.name", historyInstanceName);
+        props.setProperty("schema.history.internal.skip.unparseable.ddl", String.valueOf(true));
         props.setProperty("database.history.refer.ddl", String.valueOf(true));
+        // Debezium 3.4.2 added extended headers which require DebeziumHeaderProducer; Flink CDC
+        // does not initialize one, so disable the feature to avoid a NullPointerException.
+        props.setProperty("extended.headers.enabled", String.valueOf(false));
         props.setProperty("connect.timeout.ms", String.valueOf(connectTimeout.toMillis()));
         // disable tombstones
         props.setProperty("tombstones.on.delete", String.valueOf(false));

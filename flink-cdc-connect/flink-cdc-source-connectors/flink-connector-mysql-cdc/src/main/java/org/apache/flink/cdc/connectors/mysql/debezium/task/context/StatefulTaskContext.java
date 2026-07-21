@@ -18,7 +18,7 @@
 package org.apache.flink.cdc.connectors.mysql.debezium.task.context;
 
 import org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils;
-import org.apache.flink.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory;
+import org.apache.flink.cdc.connectors.mysql.debezium.EmbeddedFlinkSchemaHistory;
 import org.apache.flink.cdc.connectors.mysql.debezium.dispatcher.EventDispatcherImpl;
 import org.apache.flink.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
@@ -52,7 +52,7 @@ import io.debezium.schema.DataCollectionId;
 import io.debezium.schema.TopicSelector;
 import io.debezium.util.Clock;
 import io.debezium.util.Collect;
-import io.debezium.util.SchemaNameAdjuster;
+import io.debezium.spi.schema.SchemaNameAdjuster;
 import org.apache.kafka.connect.data.Struct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -113,10 +113,10 @@ public class StatefulTaskContext implements AutoCloseable {
         // initial stateful objects
         final boolean tableIdCaseInsensitive = connection.isTableIdCaseSensitive();
         this.topicSelector = MySqlTopicSelector.defaultSelector(connectorConfig);
-        EmbeddedFlinkDatabaseHistory.registerHistory(
+        EmbeddedFlinkSchemaHistory.registerHistory(
                 sourceConfig
                         .getDbzConfiguration()
-                        .getString(EmbeddedFlinkDatabaseHistory.DATABASE_HISTORY_INSTANCE_NAME),
+                        .getString(EmbeddedFlinkSchemaHistory.DATABASE_HISTORY_INSTANCE_NAME),
                 mySqlSplit.getTableSchemas().values());
 
         Optional.ofNullable(databaseSchema).ifPresent(MySqlDatabaseSchema::close);
@@ -127,7 +127,7 @@ public class StatefulTaskContext implements AutoCloseable {
 
         this.offsetContext =
                 loadStartingOffsetState(new MySqlOffsetContext.Loader(connectorConfig), mySqlSplit);
-        validateAndLoadDatabaseHistory(offsetContext, databaseSchema);
+        validateAndLoadSchemaHistory(offsetContext, databaseSchema);
 
         this.taskContext =
                 new MySqlTaskContextImpl(connectorConfig, databaseSchema, binaryLogClient);
@@ -180,7 +180,7 @@ public class StatefulTaskContext implements AutoCloseable {
                 new MySqlErrorHandler(connectorConfig, queue, taskContext, sourceConfig);
     }
 
-    private void validateAndLoadDatabaseHistory(
+    private void validateAndLoadSchemaHistory(
             MySqlOffsetContext offset, MySqlDatabaseSchema schema) {
         schema.initializeStorage();
         schema.recover(Offsets.of(mySqlPartition, offset));

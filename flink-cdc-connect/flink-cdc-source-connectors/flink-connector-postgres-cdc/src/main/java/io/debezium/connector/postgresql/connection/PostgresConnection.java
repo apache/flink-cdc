@@ -670,7 +670,7 @@ public class PostgresConnection extends JdbcConnection {
             columnName = columnName.replaceAll("\"", "\"\"");
         }
 
-        return super.quotedColumnIdString(columnName);
+        return super.quoteIdentifier(columnName);
     }
 
     @Override
