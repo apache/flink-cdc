@@ -22,21 +22,25 @@ import org.apache.flink.cdc.connectors.oracle.source.OracleSourceValueConverters
 import org.apache.flink.cdc.connectors.oracle.source.meta.offset.RedoLogOffset;
 import org.apache.flink.table.types.logical.RowType;
 
+import io.debezium.config.CommonConnectorConfig;
+import io.debezium.connector.common.CdcSourceTaskContext;
 import io.debezium.connector.oracle.OracleConnectorConfig;
 import io.debezium.connector.oracle.OracleDatabaseSchema;
 import io.debezium.connector.oracle.OracleDefaultValueConverter;
-import io.debezium.connector.oracle.OracleTopicSelector;
 import io.debezium.connector.oracle.OracleValueConverters;
 import io.debezium.connector.oracle.StreamingAdapter;
 import io.debezium.jdbc.JdbcConnection;
+import io.debezium.relational.CustomConverterRegistry;
 import io.debezium.relational.TableId;
-import io.debezium.schema.TopicSelector;
-import io.debezium.util.SchemaNameAdjuster;
+import io.debezium.schema.DefaultTopicNamingStrategy;
+import io.debezium.schema.SchemaNameAdjuster;
+import io.debezium.spi.topic.TopicNamingStrategy;
 import org.apache.kafka.connect.source.SourceRecord;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -50,25 +54,25 @@ public class OracleUtils {
 
     public static long queryApproximateRowCnt(JdbcConnection jdbc, TableId tableId)
             throws SQLException {
-        final String analyzeTable =
-                String.format(
-                        "analyze table %s compute statistics for table",
-                        quoteSchemaAndTable(tableId));
+        // Use cached stats from ALL_TABLES instead of ANALYZE TABLE, which requires the
+        // ANALYZE ANY privilege not granted to CDC users. COALESCE(NUM_ROWS, 0) returns 0
+        // when the table has never been analyzed; the splitter will then use a distribution
+        // factor of 1.0 and produce unevenly-sized chunks rather than a full-table scan.
+        // For accurate chunk sizing, run DBMS_STATS.GATHER_TABLE_STATS on the source tables
+        // before starting the connector.
         final String rowCountQuery =
                 String.format(
-                        "select NUM_ROWS from all_tables where TABLE_NAME = '%s'", tableId.table());
-        return jdbc.execute(analyzeTable)
-                .queryAndMap(
-                        rowCountQuery,
-                        rs -> {
-                            if (!rs.next()) {
-                                throw new SQLException(
-                                        String.format(
-                                                "No result returned after running query [%s]",
-                                                rowCountQuery));
-                            }
-                            return rs.getLong(1);
-                        });
+                        "SELECT COALESCE(NUM_ROWS, 0) FROM ALL_TABLES"
+                                + " WHERE OWNER = '%s' AND TABLE_NAME = '%s'",
+                        tableId.schema(), tableId.table());
+        return jdbc.queryAndMap(
+                rowCountQuery,
+                rs -> {
+                    if (!rs.next()) {
+                        return 0L;
+                    }
+                    return rs.getLong(1);
+                });
     }
 
     public static Object queryNextChunkMax(
@@ -200,8 +204,9 @@ public class OracleUtils {
 
     /** Creates a new {@link OracleDatabaseSchema} to monitor the latest oracle database schemas. */
     public static OracleDatabaseSchema createOracleDatabaseSchema(
-            OracleConnectorConfig dbzOracleConfig, OracleSourceConnection oracleConnection) {
-        TopicSelector<TableId> topicSelector = OracleTopicSelector.defaultSelector(dbzOracleConfig);
+            OracleConnectorConfig dbzOracleConfig,
+            OracleSourceConnection oracleConnection,
+            CdcSourceTaskContext<? extends CommonConnectorConfig> taskContext) {
         SchemaNameAdjuster schemaNameAdjuster = SchemaNameAdjuster.create();
         OracleValueConverters oracleValueConverters =
                 new OracleSourceValueConverters(dbzOracleConfig, oracleConnection);
@@ -209,13 +214,22 @@ public class OracleUtils {
                 new OracleDefaultValueConverter(oracleValueConverters, oracleConnection);
         StreamingAdapter.TableNameCaseSensitivity tableNameCaseSensitivity =
                 dbzOracleConfig.getAdapter().getTableNameCaseSensitivity(oracleConnection);
+        @SuppressWarnings({"unchecked", "rawtypes"})
+        TopicNamingStrategy<TableId> topicNamingStrategy =
+                (TopicNamingStrategy<TableId>)
+                        (TopicNamingStrategy) DefaultTopicNamingStrategy.create(dbzOracleConfig);
+        CustomConverterRegistry customConverterRegistry =
+                new CustomConverterRegistry(Collections.emptyList());
         return new OracleDatabaseSchema(
                 dbzOracleConfig,
                 oracleValueConverters,
                 defaultValueConverter,
                 schemaNameAdjuster,
-                topicSelector,
-                tableNameCaseSensitivity);
+                topicNamingStrategy,
+                tableNameCaseSensitivity,
+                false,
+                customConverterRegistry,
+                taskContext);
     }
 
     public static RedoLogOffset getRedoLogPosition(SourceRecord dataRecord) {

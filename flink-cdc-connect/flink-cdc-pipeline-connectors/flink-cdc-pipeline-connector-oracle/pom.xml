@@ -194,7 +194,7 @@ limitations under the License.
                                     <include>org.apache.flink:flink-connector-debezium</include>
                                     <include>org.apache.flink:flink-connector-oracle-cdc</include>
                                     <include>org.apache.flink:flink-cdc-base</include>
-                                    <include>com.oracle.ojdbc:ojdbc8</include>
+                                    <include>com.oracle.database.jdbc:ojdbc8</include>
                                     <include>cn.easyproject:orai18n</include>
                                     <include>org.antlr:antlr4-runtime</include>
                                     <include>org.apache.kafka:*</include>

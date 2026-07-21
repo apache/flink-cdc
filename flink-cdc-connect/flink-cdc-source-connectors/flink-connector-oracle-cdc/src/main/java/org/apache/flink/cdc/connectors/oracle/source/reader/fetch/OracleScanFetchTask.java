@@ -28,10 +28,11 @@ import io.debezium.connector.oracle.OracleConnectorConfig;
 import io.debezium.connector.oracle.OracleDatabaseSchema;
 import io.debezium.connector.oracle.OracleOffsetContext;
 import io.debezium.connector.oracle.OraclePartition;
-import io.debezium.connector.oracle.logminer.LogMinerOracleOffsetContextLoader;
+import io.debezium.connector.oracle.logminer.buffered.BufferedLogMinerOracleOffsetContextLoader;
 import io.debezium.heartbeat.Heartbeat;
 import io.debezium.pipeline.EventDispatcher;
 import io.debezium.pipeline.source.AbstractSnapshotChangeEventSource;
+import io.debezium.pipeline.source.SnapshottingTask;
 import io.debezium.pipeline.source.spi.SnapshotProgressListener;
 import io.debezium.pipeline.spi.ChangeRecordEmitter;
 import io.debezium.pipeline.spi.SnapshotResult;
@@ -66,26 +67,51 @@ public class OracleScanFetchTask extends AbstractScanFetchTask {
     @Override
     protected void executeDataSnapshot(Context context) throws Exception {
         OracleSourceFetchTaskContext sourceFetchContext = (OracleSourceFetchTaskContext) context;
-        OracleSnapshotSplitReadTask snapshotSplitReadTask =
-                new OracleSnapshotSplitReadTask(
-                        sourceFetchContext.getDbzConnectorConfig(),
-                        sourceFetchContext.getOffsetContext(),
-                        sourceFetchContext.getSnapshotChangeEventSourceMetrics(),
-                        sourceFetchContext.getDatabaseSchema(),
-                        sourceFetchContext.getConnection(),
-                        sourceFetchContext.getEventDispatcher(),
-                        snapshotSplit);
-        StoppableChangeEventSourceContext changeEventSourceContext =
-                new StoppableChangeEventSourceContext();
-        SnapshotResult<OracleOffsetContext> snapshotResult =
-                snapshotSplitReadTask.execute(
-                        changeEventSourceContext,
-                        sourceFetchContext.getPartition(),
-                        sourceFetchContext.getOffsetContext());
-        if (!snapshotResult.isCompletedOrSkipped()) {
-            taskRunning = false;
-            throw new IllegalStateException(
-                    String.format("Read snapshot for oracle split %s fail", snapshotSplit));
+        // When database.pdb.name is set the connection is to the CDB root. The snapshot
+        // SELECT must run against the PDB, so switch context before data reads and reset
+        // to CDB root afterward so that the backfill LogMiner operations work correctly.
+        String pdbName =
+                sourceFetchContext
+                        .getSourceConfig()
+                        .getDbzConfiguration()
+                        .getString("database.pdb.name");
+        if (pdbName != null && !pdbName.isEmpty()) {
+            sourceFetchContext.getConnection().setSessionToPdb(pdbName);
+        }
+        try {
+            OracleSnapshotSplitReadTask snapshotSplitReadTask =
+                    new OracleSnapshotSplitReadTask(
+                            sourceFetchContext.getDbzConnectorConfig(),
+                            sourceFetchContext.getOffsetContext(),
+                            sourceFetchContext.getSnapshotChangeEventSourceMetrics(),
+                            sourceFetchContext.getDatabaseSchema(),
+                            sourceFetchContext.getConnection(),
+                            sourceFetchContext.getEventDispatcher(),
+                            snapshotSplit);
+            StoppableChangeEventSourceContext changeEventSourceContext =
+                    new StoppableChangeEventSourceContext();
+            SnapshottingTask snapshottingTask =
+                    new SnapshottingTask(
+                            false,
+                            true,
+                            java.util.Collections.emptyList(),
+                            java.util.Collections.emptyMap(),
+                            false);
+            SnapshotResult<OracleOffsetContext> snapshotResult =
+                    snapshotSplitReadTask.execute(
+                            changeEventSourceContext,
+                            sourceFetchContext.getPartition(),
+                            sourceFetchContext.getOffsetContext(),
+                            snapshottingTask);
+            if (!snapshotResult.isCompletedOrSkipped()) {
+                taskRunning = false;
+                throw new IllegalStateException(
+                        String.format("Read snapshot for oracle split %s fail", snapshotSplit));
+            }
+        } finally {
+            if (pdbName != null && !pdbName.isEmpty()) {
+                sourceFetchContext.getConnection().resetSessionToCdb();
+            }
         }
     }
 
@@ -93,12 +119,21 @@ public class OracleScanFetchTask extends AbstractScanFetchTask {
     protected void executeBackfillTask(Context context, StreamSplit backfillStreamSplit)
             throws Exception {
         OracleSourceFetchTaskContext sourceFetchContext = (OracleSourceFetchTaskContext) context;
+        // Ensure CDB root context for DBMS_LOGMNR operations (ORA-65040 if in PDB).
+        String pdbName =
+                sourceFetchContext
+                        .getSourceConfig()
+                        .getDbzConfiguration()
+                        .getString("database.pdb.name");
+        if (pdbName != null && !pdbName.isEmpty()) {
+            sourceFetchContext.getConnection().resetSessionToCdb();
+        }
 
         final RedoLogSplitReadTask backfillRedoLogReadTask =
                 createBackfillRedoLogReadTask(backfillStreamSplit, sourceFetchContext);
 
-        final LogMinerOracleOffsetContextLoader loader =
-                new LogMinerOracleOffsetContextLoader(
+        final BufferedLogMinerOracleOffsetContextLoader loader =
+                new BufferedLogMinerOracleOffsetContextLoader(
                         ((OracleSourceFetchTaskContext) context).getDbzConnectorConfig());
         final OracleOffsetContext oracleOffsetContext =
                 loader.load(backfillStreamSplit.getStartingOffset().getOffset());
@@ -130,6 +165,12 @@ public class OracleScanFetchTask extends AbstractScanFetchTask {
                                         snapshotSplit.getTableId().table()))
                         // Disable heartbeat event in snapshot split fetcher
                         .with(Heartbeat.HEARTBEAT_INTERVAL, 0)
+                        // Disable the unbuffered ResumePositionProvider for bounded backfill
+                        // reads: the timer fires every 10 s by default and triggers a secondary
+                        // LogMiner session that can NPE when sessionContext is not yet
+                        // initialized. The resume-position optimization is unnecessary for
+                        // short-lived snapshot backfills.
+                        .with("log.mining.resume.position.interval.ms", Long.MAX_VALUE)
                         .build();
         // task to read redo log and backfill for current split
         return new RedoLogSplitReadTask(
@@ -171,7 +212,7 @@ public class OracleScanFetchTask extends AbstractScanFetchTask {
                 OracleConnection jdbcConnection,
                 EventDispatcher<OraclePartition, TableId> eventDispatcher,
                 SnapshotSplit snapshotSplit) {
-            super(connectorConfig, snapshotProgressListener);
+            super(connectorConfig, snapshotProgressListener, null);
             this.offsetContext = previousOffset;
             this.connectorConfig = connectorConfig;
             this.databaseSchema = databaseSchema;
@@ -186,12 +227,12 @@ public class OracleScanFetchTask extends AbstractScanFetchTask {
         public SnapshotResult<OracleOffsetContext> execute(
                 ChangeEventSourceContext context,
                 OraclePartition partition,
-                OracleOffsetContext previousOffset)
+                OracleOffsetContext previousOffset,
+                SnapshottingTask snapshottingTask)
                 throws InterruptedException {
-            SnapshottingTask snapshottingTask = getSnapshottingTask(partition, previousOffset);
             final SnapshotContext<OraclePartition, OracleOffsetContext> ctx;
             try {
-                ctx = prepare(partition);
+                ctx = prepare(partition, false);
             } catch (Exception e) {
                 LOG.error("Failed to initialize snapshot context.", e);
                 throw new RuntimeException(e);
@@ -204,6 +245,15 @@ public class OracleScanFetchTask extends AbstractScanFetchTask {
             } catch (Exception t) {
                 throw new DebeziumException(t);
             }
+        }
+
+        @Override
+        public SnapshottingTask getBlockingSnapshottingTask(
+                OraclePartition partition,
+                OracleOffsetContext previousOffset,
+                io.debezium.pipeline.signal.actions.snapshotting.SnapshotConfiguration
+                        snapshotConfiguration) {
+            return getSnapshottingTask(partition, previousOffset);
         }
 
         @Override
@@ -220,14 +270,19 @@ public class OracleScanFetchTask extends AbstractScanFetchTask {
         }
 
         @Override
-        protected SnapshottingTask getSnapshottingTask(
+        public SnapshottingTask getSnapshottingTask(
                 OraclePartition partition, OracleOffsetContext previousOffset) {
-            return new SnapshottingTask(false, true);
+            return new SnapshottingTask(
+                    false,
+                    true,
+                    java.util.Collections.emptyList(),
+                    java.util.Collections.emptyMap(),
+                    false);
         }
 
         @Override
         protected SnapshotContext<OraclePartition, OracleOffsetContext> prepare(
-                OraclePartition partition) throws Exception {
+                OraclePartition partition, boolean onDemand) throws Exception {
             return new OracleSnapshotContext(partition);
         }
 
@@ -236,7 +291,7 @@ public class OracleScanFetchTask extends AbstractScanFetchTask {
                         OraclePartition, OracleOffsetContext> {
 
             public OracleSnapshotContext(OraclePartition partition) throws SQLException {
-                super(partition, "");
+                super(partition, "", false);
             }
         }
 
@@ -293,8 +348,7 @@ public class OracleScanFetchTask extends AbstractScanFetchTask {
 
                 while (rs.next()) {
                     rows++;
-                    final Object[] row =
-                            jdbcConnection.rowToArray(table, databaseSchema, rs, columnArray);
+                    final Object[] row = jdbcConnection.rowToArray(table, rs, columnArray);
                     if (logTimer.expired()) {
                         long stop = clock.currentTimeInMillis();
                         LOG.info(
@@ -328,7 +382,7 @@ public class OracleScanFetchTask extends AbstractScanFetchTask {
                 Object[] row) {
             snapshotContext.offset.event(tableId, clock.currentTime());
             return new SnapshotChangeRecordEmitter<>(
-                    snapshotContext.partition, snapshotContext.offset, row, clock);
+                    snapshotContext.partition, snapshotContext.offset, row, clock, connectorConfig);
         }
 
         private Threads.Timer getTableScanLogTimer() {

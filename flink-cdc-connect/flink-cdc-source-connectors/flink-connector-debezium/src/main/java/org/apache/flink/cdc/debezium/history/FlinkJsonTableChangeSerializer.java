@@ -127,7 +127,7 @@ public class FlinkJsonTableChangeSerializer implements TableChanges.TableChanges
             } else if (change.getType() == TableChangeType.ALTER) {
                 tableChanges.alter(change.getTable());
             } else if (change.getType() == TableChangeType.DROP) {
-                tableChanges.drop(change.getTable());
+                tableChanges.drop(change.getId());
             }
         }
 
