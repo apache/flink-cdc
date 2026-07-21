@@ -369,6 +369,9 @@ public class JaninoCompiler {
         if (!leftNullable) {
             return generateLeftNonNullableLogicalOperation(atoms, isAnd);
         }
+        // TODO: This nullable-left path still relies on JIT escape analysis to optimize
+        // per-evaluation Supplier allocation. Introduce statement-level codegen
+        // (for example, GeneratedExpression/ScriptEvaluator) to avoid the potential cost.
         return generateLazyBinaryFunctionOperation(
                 context, sqlBasicCall, isAnd ? "and" : "or", atoms);
     }
