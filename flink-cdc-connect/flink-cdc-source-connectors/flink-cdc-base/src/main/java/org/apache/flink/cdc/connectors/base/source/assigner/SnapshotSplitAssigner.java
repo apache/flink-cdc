@@ -295,7 +295,10 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
         }
     }
 
-    /** This should be invoked after this class's open method. */
+    /**
+     * This must be invoked before this class's {@link #open()} method, because {@code open()}
+     * starts an asynchronous splitting thread that concurrently mutates {@code remainingSplits}.
+     */
     public void initEnumeratorMetrics(SourceEnumeratorMetrics enumeratorMetrics) {
         this.enumeratorMetrics = enumeratorMetrics;
 

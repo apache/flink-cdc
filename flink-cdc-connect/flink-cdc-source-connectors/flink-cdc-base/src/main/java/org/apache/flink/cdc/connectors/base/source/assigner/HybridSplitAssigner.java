@@ -136,9 +136,11 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
             enumeratorMetrics.exitStreamReading();
         }
 
-        snapshotSplitAssigner.open();
-        // init enumerator metrics
+        // Init enumerator metrics before opening the snapshot assigner. Opening the assigner
+        // starts an asynchronous splitting thread that mutates remainingSplits, so metrics must be
+        // initialized first to avoid a ConcurrentModificationException while iterating the splits.
         snapshotSplitAssigner.initEnumeratorMetrics(enumeratorMetrics);
+        snapshotSplitAssigner.open();
     }
 
     @Override
