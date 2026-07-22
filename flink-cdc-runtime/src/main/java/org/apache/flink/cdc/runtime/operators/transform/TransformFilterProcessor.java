@@ -115,7 +115,8 @@ public class TransformFilterProcessor {
         }
 
         try {
-            return (Boolean) expressionEvaluator.evaluate(generateParams(preRow, postRow, context));
+            return Boolean.TRUE.equals(
+                    expressionEvaluator.evaluate(generateParams(preRow, postRow, context)));
         } catch (InvocationTargetException e) {
             throw new RuntimeException(
                     String.format(

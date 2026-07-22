@@ -172,21 +172,25 @@ class TransformParserTest {
 
     @Test
     void testTranslateFilterToJaninoExpression() {
-        testFilterExpression("id is not null", "null != id");
-        testFilterExpression("id is null", "null == id");
+        testFilterExpression("id is not null", "isNotNull(id)");
+        testFilterExpression("id is null", "isNull(id)");
         testFilterExpression("id = 1 and uid = 2", "valueEquals(id, 1) && valueEquals(uid, 2)");
         testFilterExpression("id = 1 or id = 2", "valueEquals(id, 1) || valueEquals(id, 2)");
-        testFilterExpression("not (id = 1)", "!valueEquals(id, 1)");
+        testFilterExpression("not (id = 1)", "not(valueEquals(id, 1))");
         testFilterExpression("id = '1'", "valueEquals(id, \"1\")");
         testFilterExpression("id <> '1'", "!valueEquals(id, \"1\")");
+        testFilterExpression("id is distinct from '1'", "isDistinctFrom(id, \"1\")");
+        testFilterExpression("id is not distinct from '1'", "isNotDistinctFrom(id, \"1\")");
         testFilterExpression("d between d1 and d2", "betweenAsymmetric(d, d1, d2)");
         testFilterExpression("d not between d1 and d2", "notBetweenAsymmetric(d, d1, d2)");
         testFilterExpression("d in (d1, d2)", "in(d, d1, d2)");
         testFilterExpression("d not in (d1, d2)", "notIn(d, d1, d2)");
-        testFilterExpression("id is false", "false == id");
-        testFilterExpression("id is not false", "true == id");
-        testFilterExpression("id is true", "true == id");
-        testFilterExpression("id is not true", "false == id");
+        testFilterExpression("id is false", "isFalse(id)");
+        testFilterExpression("id is not false", "isNotFalse(id)");
+        testFilterExpression("id is true", "isTrue(id)");
+        testFilterExpression("id is not true", "isNotTrue(id)");
+        testFilterExpression("id is unknown", "isNull(id)");
+        testFilterExpression("id is not unknown", "isNotNull(id)");
         testFilterExpression("a || b", "concat(a, b)");
         testFilterExpression("CHAR_LENGTH(id)", "charLength(id)");
         testFilterExpression("trim(id)", "trim(\"BOTH\", \" \", id)");
@@ -198,6 +202,9 @@ class TransformParserTest {
         testFilterExpression("SUBSTR(a,1)", "substr(a, 1)");
         testFilterExpression("id like '^[a-zA-Z]'", "like(id, \"^[a-zA-Z]\")");
         testFilterExpression("id not like '^[a-zA-Z]'", "notLike(id, \"^[a-zA-Z]\")");
+        testFilterExpression("id like 'A$%' escape '$'", "like(id, \"A$%\", \"$\")");
+        testFilterExpression("id similar to '(A|B)%'", "similarTo(id, \"(A|B)%\")");
+        testFilterExpression("id not similar to '(A|B)%'", "notSimilarTo(id, \"(A|B)%\")");
         testFilterExpression("abs(2)", "abs(2)");
         testFilterExpression("ceil(2)", "ceil(2)");
         testFilterExpression("ceiling(2)", "ceil(2)");
@@ -329,7 +336,7 @@ class TransformParserTest {
                 "TIMESTAMPADD(YEAR, 1, dt)", "timestampadd(\"YEAR\", 1, dt, __time_zone__)");
         testFilterExpression(
                 "timestampadd(year, 1, dt)", "timestampadd(\"YEAR\", 1, dt, __time_zone__)");
-        testFilterExpression("IF(a>b,a,b)", "greaterThan(a, b) ? a : b");
+        testFilterExpression("IF(a>b,a,b)", "isTrue(greaterThan(a, b)) ? a : b");
         testFilterExpression("NULLIF(a,b)", "nullif(a, b)");
         testFilterExpression("COALESCE(a,b,c)", "coalesce(a, b, c)");
         testFilterExpression("id + 2", "id + 2");
@@ -348,19 +355,19 @@ class TransformParserTest {
         testFilterExpression("upper(lower(id))", "upper(lower(id))");
         testFilterExpression(
                 "abs(uniq_id) > 10 and id is not null",
-                "greaterThan(abs(uniq_id), 10) && null != id");
+                "greaterThan(abs(uniq_id), 10) && isNotNull(id)");
         testFilterExpression(
                 "case id when 1 then 'a' when 2 then 'b' else 'c' end",
-                "(valueEquals(id, 1) ? \"a\" : valueEquals(id, 2) ? \"b\" : \"c\")");
+                "(isTrue(valueEquals(id, 1)) ? \"a\" : isTrue(valueEquals(id, 2)) ? \"b\" : \"c\")");
         testFilterExpression(
                 "case when id = 1 then 'a' when id = 2 then 'b' else 'c' end",
-                "(valueEquals(id, 1) ? \"a\" : valueEquals(id, 2) ? \"b\" : \"c\")");
+                "(isTrue(valueEquals(id, 1)) ? \"a\" : isTrue(valueEquals(id, 2)) ? \"b\" : \"c\")");
         testFilterExpression(
                 "case id when 1 then 'a' when 2 then 'b' else 'c' end",
-                "(valueEquals(id, 1) ? \"a\" : valueEquals(id, 2) ? \"b\" : \"c\")");
+                "(isTrue(valueEquals(id, 1)) ? \"a\" : isTrue(valueEquals(id, 2)) ? \"b\" : \"c\")");
         testFilterExpression(
                 "case when id = 1 then 'a' when id = 2 then 'b' else 'c' end",
-                "(valueEquals(id, 1) ? \"a\" : valueEquals(id, 2) ? \"b\" : \"c\")");
+                "(isTrue(valueEquals(id, 1)) ? \"a\" : isTrue(valueEquals(id, 2)) ? \"b\" : \"c\")");
         testFilterExpression("cast(id||'0' as int)", "castToInteger(concat(id, \"0\"))");
         testFilterExpression("cast(1 as string)", "castToString(1)");
         testFilterExpression("cast(1 as boolean)", "castToBoolean(1)");
@@ -389,6 +396,38 @@ class TransformParserTest {
         testFilterExpression("cast(dt as TIMESTAMP)", "castToTimestamp(dt, __time_zone__)");
         testFilterExpression("parse_json(jsonStr)", "parseJson(jsonStr)");
         testFilterExpression("try_parse_json(jsonStr)", "tryParseJson(jsonStr)");
+    }
+
+    @Test
+    void testTranslateLogicalFilterToJaninoExpressionByNullability() {
+        List<Column> columns =
+                List.of(
+                        Column.physicalColumn("left_bool", DataTypes.BOOLEAN().notNull()),
+                        Column.physicalColumn("right_bool", DataTypes.BOOLEAN().notNull()),
+                        Column.physicalColumn("nullable_bool", DataTypes.BOOLEAN()));
+
+        testFilterExpressionWithColumns(
+                "left_bool and right_bool", "left_bool && right_bool", columns);
+        testFilterExpressionWithColumns(
+                "left_bool or right_bool", "left_bool || right_bool", columns);
+        testFilterExpressionWithColumns(
+                "left_bool and nullable_bool",
+                "left_bool ? nullable_bool : Boolean.FALSE",
+                columns);
+        testFilterExpressionWithColumns(
+                "left_bool or nullable_bool", "left_bool ? Boolean.TRUE : nullable_bool", columns);
+        testFilterExpressionWithColumns(
+                "nullable_bool and right_bool",
+                lazyLogicalFunction("and", "nullable_bool", "right_bool"),
+                columns);
+        testFilterExpressionWithColumns(
+                "nullable_bool or right_bool",
+                lazyLogicalFunction("or", "nullable_bool", "right_bool"),
+                columns);
+        testFilterExpressionWithColumns(
+                "nullable_bool or false",
+                lazyLogicalFunction("or", "nullable_bool", "false"),
+                columns);
     }
 
     @Test
@@ -596,12 +635,12 @@ class TransformParserTest {
                         "ProjectionColumn{column=`id` INT 'id', expression='id', scriptExpression='$0', originalColumnNames=[id], columnNameMap={id=$0}}",
                         "ProjectionColumn{column=`name2` STRING, expression='UPPER(`TB`.`name`)', scriptExpression='upper($0)', originalColumnNames=[name], columnNameMap={name=$0}}",
                         "ProjectionColumn{column=`sex2` STRING, expression='UPPER(`TB`.`sex`)', scriptExpression='upper($0)', originalColumnNames=[sex], columnNameMap={sex=$0}}",
-                        "ProjectionColumn{column=`address2` BINARY(50), expression='CASE WHEN `TB`.`address` IS NOT NULL THEN `TB`.`address` ELSE `TB`.`address` END', scriptExpression='(null != $0 ? $0 : $0)', originalColumnNames=[address, address, address], columnNameMap={address=$0}}",
-                        "ProjectionColumn{column=`phone2` VARBINARY(50), expression='CASE WHEN `TB`.`phone` IS NOT NULL THEN `TB`.`phone` ELSE `TB`.`phone` END', scriptExpression='(null != $0 ? $0 : $0)', originalColumnNames=[phone, phone, phone], columnNameMap={phone=$0}}",
-                        "ProjectionColumn{column=`deposit2` DECIMAL(10, 2), expression='CASE WHEN `TB`.`deposit` IS NOT NULL THEN `TB`.`deposit` ELSE `TB`.`deposit` END', scriptExpression='(null != $0 ? $0 : $0)', originalColumnNames=[deposit, deposit, deposit], columnNameMap={deposit=$0}}",
-                        "ProjectionColumn{column=`birthday2` TIMESTAMP(3), expression='CASE WHEN `TB`.`birthday` IS NOT NULL THEN `TB`.`birthday` ELSE `TB`.`birthday` END', scriptExpression='(null != $0 ? $0 : $0)', originalColumnNames=[birthday, birthday, birthday], columnNameMap={birthday=$0}}",
-                        "ProjectionColumn{column=`birthday_ltz2` TIMESTAMP_LTZ(3), expression='CASE WHEN `TB`.`birthday_ltz` IS NOT NULL THEN `TB`.`birthday_ltz` ELSE `TB`.`birthday_ltz` END', scriptExpression='(null != $0 ? $0 : $0)', originalColumnNames=[birthday_ltz, birthday_ltz, birthday_ltz], columnNameMap={birthday_ltz=$0}}",
-                        "ProjectionColumn{column=`update_time2` TIME(3), expression='CASE WHEN `TB`.`update_time` IS NOT NULL THEN `TB`.`update_time` ELSE `TB`.`update_time` END', scriptExpression='(null != $0 ? $0 : $0)', originalColumnNames=[update_time, update_time, update_time], columnNameMap={update_time=$0}}");
+                        "ProjectionColumn{column=`address2` BINARY(50), expression='CASE WHEN `TB`.`address` IS NOT NULL THEN `TB`.`address` ELSE `TB`.`address` END', scriptExpression='(isTrue(isNotNull($0)) ? $0 : $0)', originalColumnNames=[address, address, address], columnNameMap={address=$0}}",
+                        "ProjectionColumn{column=`phone2` VARBINARY(50), expression='CASE WHEN `TB`.`phone` IS NOT NULL THEN `TB`.`phone` ELSE `TB`.`phone` END', scriptExpression='(isTrue(isNotNull($0)) ? $0 : $0)', originalColumnNames=[phone, phone, phone], columnNameMap={phone=$0}}",
+                        "ProjectionColumn{column=`deposit2` DECIMAL(10, 2), expression='CASE WHEN `TB`.`deposit` IS NOT NULL THEN `TB`.`deposit` ELSE `TB`.`deposit` END', scriptExpression='(isTrue(isNotNull($0)) ? $0 : $0)', originalColumnNames=[deposit, deposit, deposit], columnNameMap={deposit=$0}}",
+                        "ProjectionColumn{column=`birthday2` TIMESTAMP(3), expression='CASE WHEN `TB`.`birthday` IS NOT NULL THEN `TB`.`birthday` ELSE `TB`.`birthday` END', scriptExpression='(isTrue(isNotNull($0)) ? $0 : $0)', originalColumnNames=[birthday, birthday, birthday], columnNameMap={birthday=$0}}",
+                        "ProjectionColumn{column=`birthday_ltz2` TIMESTAMP_LTZ(3), expression='CASE WHEN `TB`.`birthday_ltz` IS NOT NULL THEN `TB`.`birthday_ltz` ELSE `TB`.`birthday_ltz` END', scriptExpression='(isTrue(isNotNull($0)) ? $0 : $0)', originalColumnNames=[birthday_ltz, birthday_ltz, birthday_ltz], columnNameMap={birthday_ltz=$0}}",
+                        "ProjectionColumn{column=`update_time2` TIME(3), expression='CASE WHEN `TB`.`update_time` IS NOT NULL THEN `TB`.`update_time` ELSE `TB`.`update_time` END', scriptExpression='(isTrue(isNotNull($0)) ? $0 : $0)', originalColumnNames=[update_time, update_time, update_time], columnNameMap={update_time=$0}}");
         Assertions.assertThat(result).hasToString("[" + String.join(", ", expected) + "]");
     }
 
@@ -885,6 +924,13 @@ class TransformParserTest {
                         new SupportedMetadataColumn[0],
                         Collections.emptyMap());
         Assertions.assertThat(janinoExpression).isEqualTo(expressionExpect);
+    }
+
+    private static String lazyLogicalFunction(
+            String functionName, String leftOperand, String rightOperand) {
+        return String.format(
+                "%s(%s, new java.util.function.Supplier<Boolean>() { public Boolean get() { return %s; } })",
+                functionName, leftOperand, rightOperand);
     }
 
     private void testFilterExpressionWithUdf(String expression, String expressionExpect) {

@@ -89,6 +89,9 @@ public class TransformSqlOperatorTable extends ReflectiveSqlOperatorTable {
     // --------------------
     public static final SqlBinaryOperator EQUALS = SqlStdOperatorTable.EQUALS;
     public static final SqlBinaryOperator NOT_EQUALS = SqlStdOperatorTable.NOT_EQUALS;
+    public static final SqlBinaryOperator IS_DISTINCT_FROM = SqlStdOperatorTable.IS_DISTINCT_FROM;
+    public static final SqlBinaryOperator IS_NOT_DISTINCT_FROM =
+            SqlStdOperatorTable.IS_NOT_DISTINCT_FROM;
     public static final SqlBinaryOperator GREATER_THAN = SqlStdOperatorTable.GREATER_THAN;
     public static final SqlBinaryOperator GREATER_THAN_OR_EQUAL =
             SqlStdOperatorTable.GREATER_THAN_OR_EQUAL;
@@ -98,12 +101,16 @@ public class TransformSqlOperatorTable extends ReflectiveSqlOperatorTable {
 
     public static final SqlPostfixOperator IS_NULL = SqlStdOperatorTable.IS_NULL;
     public static final SqlPostfixOperator IS_NOT_NULL = SqlStdOperatorTable.IS_NOT_NULL;
+    public static final SqlPostfixOperator IS_UNKNOWN = SqlStdOperatorTable.IS_UNKNOWN;
+    public static final SqlPostfixOperator IS_NOT_UNKNOWN = SqlStdOperatorTable.IS_NOT_UNKNOWN;
 
     public static final SqlBetweenOperator BETWEEN = SqlStdOperatorTable.BETWEEN;
     public static final SqlBetweenOperator NOT_BETWEEN = SqlStdOperatorTable.NOT_BETWEEN;
 
     public static final SqlSpecialOperator LIKE = SqlStdOperatorTable.LIKE;
     public static final SqlSpecialOperator NOT_LIKE = SqlStdOperatorTable.NOT_LIKE;
+    public static final SqlSpecialOperator SIMILAR_TO = SqlStdOperatorTable.SIMILAR_TO;
+    public static final SqlSpecialOperator NOT_SIMILAR_TO = SqlStdOperatorTable.NOT_SIMILAR_TO;
 
     public static final SqlBinaryOperator IN = SqlStdOperatorTable.IN;
     public static final SqlBinaryOperator NOT_IN = SqlStdOperatorTable.NOT_IN;

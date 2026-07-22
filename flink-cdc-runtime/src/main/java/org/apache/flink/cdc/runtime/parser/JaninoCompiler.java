@@ -28,6 +28,7 @@ import org.apache.flink.cdc.common.types.DataTypeRoot;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.common.utils.StringUtils;
 import org.apache.flink.cdc.runtime.operators.transform.UserDefinedFunctionDescriptor;
+import org.apache.flink.cdc.runtime.parser.metadata.MetadataColumns;
 
 import org.apache.calcite.sql.SqlBasicCall;
 import org.apache.calcite.sql.SqlBasicTypeNameSpec;
@@ -230,7 +231,8 @@ public class JaninoCompiler {
             sqlCaseRvalueTemp =
                     new Java.ConditionalExpression(
                             Location.NOWHERE,
-                            whenAtoms.get(i),
+                            generateFunctionOperation(
+                                    "isTrue", new Java.Rvalue[] {whenAtoms.get(i)}),
                             thenAtoms.get(i),
                             sqlCaseRvalueTemp);
         }
@@ -258,30 +260,41 @@ public class JaninoCompiler {
             Context context, SqlBasicCall sqlBasicCall, Java.Rvalue[] atoms) {
         switch (sqlBasicCall.getKind()) {
             case AND:
-                return generateBinaryOperation(context, sqlBasicCall, atoms, "&&");
+                return generateLogicalBinaryOperation(context, sqlBasicCall, atoms, true);
             case OR:
-                return generateBinaryOperation(context, sqlBasicCall, atoms, "||");
+                return generateLogicalBinaryOperation(context, sqlBasicCall, atoms, false);
             case NOT:
-                return generateUnaryOperation(context, "!", atoms[0]);
+                return generateFunctionOperation("not", atoms);
             case EQUALS:
                 return generateEqualsOperation(context, sqlBasicCall, atoms);
             case NOT_EQUALS:
                 return generateUnaryOperation(
                         context, "!", generateEqualsOperation(context, sqlBasicCall, atoms));
+            case IS_DISTINCT_FROM:
+            case IS_NOT_DISTINCT_FROM:
+                return generateOtherFunctionOperation(context, sqlBasicCall, atoms);
             case IS_NULL:
-                return generateUnaryOperation(context, "null == ", atoms[0]);
+                return generateFunctionOperation("isNull", atoms);
             case IS_NOT_NULL:
-                return generateUnaryOperation(context, "null != ", atoms[0]);
+                return generateFunctionOperation("isNotNull", atoms);
             case IS_FALSE:
+                return generateFunctionOperation("isFalse", atoms);
             case IS_NOT_TRUE:
-                return generateUnaryOperation(context, "false == ", atoms[0]);
+                return generateFunctionOperation("isNotTrue", atoms);
             case IS_TRUE:
+                return generateFunctionOperation("isTrue", atoms);
             case IS_NOT_FALSE:
-                return generateUnaryOperation(context, "true == ", atoms[0]);
+                return generateFunctionOperation("isNotFalse", atoms);
+            case IS_UNKNOWN:
+                if (sqlBasicCall.getOperator().getName().equalsIgnoreCase("IS NOT UNKNOWN")) {
+                    return generateFunctionOperation("isNotUnknown", atoms);
+                }
+                return generateFunctionOperation("isUnknown", atoms);
             case BETWEEN:
             case IN:
             case NOT_IN:
             case LIKE:
+            case SIMILAR:
             case CEIL:
             case FLOOR:
             case TRIM:
@@ -320,6 +333,131 @@ public class JaninoCompiler {
     private static Java.Rvalue generateUnaryOperation(
             Context context, String operator, Java.Rvalue atom) {
         return new Java.UnaryOperation(Location.NOWHERE, operator, atom);
+    }
+
+    private static Java.Rvalue generateFunctionOperation(String functionName, Java.Rvalue[] atoms) {
+        return new Java.MethodInvocation(Location.NOWHERE, null, functionName, atoms);
+    }
+
+    private static Java.Rvalue generateLazyBinaryFunctionOperation(
+            Context context, SqlBasicCall sqlBasicCall, String functionName, Java.Rvalue[] atoms) {
+        if (atoms.length != 2) {
+            throw new ParseException("Unrecognized expression: " + sqlBasicCall.toString());
+        }
+        Java.Rvalue rightOperandSupplier =
+                new Java.AmbiguousName(
+                        Location.NOWHERE,
+                        new String[] {
+                            "new java.util.function.Supplier<Boolean>() { public Boolean get() { return "
+                                    + atoms[1]
+                                    + "; } }"
+                        });
+        return generateFunctionOperation(
+                functionName, new Java.Rvalue[] {atoms[0], rightOperandSupplier});
+    }
+
+    private static Java.Rvalue generateLogicalBinaryOperation(
+            Context context, SqlBasicCall sqlBasicCall, Java.Rvalue[] atoms, boolean isAnd) {
+        if (atoms.length != 2) {
+            throw new ParseException("Unrecognized expression: " + sqlBasicCall.toString());
+        }
+        boolean leftNullable = isExpressionNullable(context, sqlBasicCall.getOperandList().get(0));
+        boolean rightNullable = isExpressionNullable(context, sqlBasicCall.getOperandList().get(1));
+        if (!leftNullable && !rightNullable) {
+            return generateBinaryOperation(context, sqlBasicCall, atoms, isAnd ? "&&" : "||");
+        }
+        if (!leftNullable) {
+            return generateLeftNonNullableLogicalOperation(atoms, isAnd);
+        }
+        // TODO: This nullable-left path still relies on JIT escape analysis to optimize
+        // per-evaluation Supplier allocation. Introduce statement-level codegen
+        // (for example, GeneratedExpression/ScriptEvaluator) to avoid the potential cost.
+        return generateLazyBinaryFunctionOperation(
+                context, sqlBasicCall, isAnd ? "and" : "or", atoms);
+    }
+
+    private static Java.Rvalue generateLeftNonNullableLogicalOperation(
+            Java.Rvalue[] atoms, boolean isAnd) {
+        if (isAnd) {
+            return new Java.ConditionalExpression(
+                    Location.NOWHERE,
+                    atoms[0],
+                    atoms[1],
+                    new Java.AmbiguousName(Location.NOWHERE, new String[] {"Boolean.FALSE"}));
+        }
+        return new Java.ConditionalExpression(
+                Location.NOWHERE,
+                atoms[0],
+                new Java.AmbiguousName(Location.NOWHERE, new String[] {"Boolean.TRUE"}),
+                atoms[1]);
+    }
+
+    private static boolean isExpressionNullable(Context context, SqlNode sqlNode) {
+        if (sqlNode instanceof SqlIdentifier) {
+            return isIdentifierNullable(context, (SqlIdentifier) sqlNode);
+        }
+        if (sqlNode instanceof SqlLiteral) {
+            return ((SqlLiteral) sqlNode).getValue() == null;
+        }
+        if (sqlNode instanceof SqlBasicCall) {
+            return isBasicCallNullable(context, (SqlBasicCall) sqlNode);
+        }
+        return true;
+    }
+
+    private static boolean isIdentifierNullable(Context context, SqlIdentifier sqlIdentifier) {
+        String columnName = sqlIdentifier.names.get(sqlIdentifier.names.size() - 1);
+        for (Column column : context.columns) {
+            if (column.getName().equals(columnName)) {
+                return column.getType().isNullable();
+            }
+        }
+        for (SupportedMetadataColumn metadataColumn : context.supportedMetadataColumns) {
+            if (metadataColumn.getName().equals(columnName)) {
+                return metadataColumn.getType().isNullable();
+            }
+        }
+        return MetadataColumns.METADATA_COLUMNS.stream()
+                .filter(column -> column.f0.equals(columnName))
+                .findFirst()
+                .map(column -> column.f1.isNullable())
+                .orElse(true);
+    }
+
+    private static boolean isBasicCallNullable(Context context, SqlBasicCall sqlBasicCall) {
+        switch (sqlBasicCall.getKind()) {
+            case AND:
+            case OR:
+                return sqlBasicCall.getOperandList().stream()
+                        .anyMatch(operand -> isExpressionNullable(context, operand));
+            case NOT:
+                return isExpressionNullable(context, sqlBasicCall.getOperandList().get(0));
+            case IS_NULL:
+            case IS_NOT_NULL:
+            case IS_FALSE:
+            case IS_NOT_TRUE:
+            case IS_TRUE:
+            case IS_NOT_FALSE:
+            case IS_UNKNOWN:
+            case IS_DISTINCT_FROM:
+            case IS_NOT_DISTINCT_FROM:
+            case EQUALS:
+            case NOT_EQUALS:
+            case LESS_THAN:
+            case GREATER_THAN:
+            case LESS_THAN_OR_EQUAL:
+            case GREATER_THAN_OR_EQUAL:
+            case BETWEEN:
+            case IN:
+            case NOT_IN:
+                return false;
+            case LIKE:
+            case SIMILAR:
+                return sqlBasicCall.getOperandList().stream()
+                        .anyMatch(operand -> isExpressionNullable(context, operand));
+            default:
+                return true;
+        }
     }
 
     private static final Map<String, String> decimalArithmeticHandlers =
@@ -517,7 +655,10 @@ public class JaninoCompiler {
         if (operationName.equals("IF")) {
             if (atoms.length == 3) {
                 return new Java.ConditionalExpression(
-                        Location.NOWHERE, atoms[0], atoms[1], atoms[2]);
+                        Location.NOWHERE,
+                        generateFunctionOperation("isTrue", new Java.Rvalue[] {atoms[0]}),
+                        atoms[1],
+                        atoms[2]);
             } else {
                 throw new ParseException("Unrecognized expression: " + sqlBasicCall);
             }

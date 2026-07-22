@@ -18,6 +18,9 @@
 package org.apache.flink.cdc.runtime.parser;
 
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.cdc.common.schema.Column;
+import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
+import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.variant.BinaryVariantInternalBuilder;
 import org.apache.flink.cdc.common.types.variant.Variant;
 import org.apache.flink.cdc.common.types.variant.VariantTypeException;
@@ -39,6 +42,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 
 /** Unit tests for the {@link JaninoCompiler}. */
@@ -215,6 +219,75 @@ class JaninoCompilerTest {
     }
 
     @Test
+    void testTranslatedLogicalExpressionCompilesWithJanino() throws InvocationTargetException {
+        List<Column> columns =
+                List.of(
+                        Column.physicalColumn("id", DataTypes.INT()),
+                        Column.physicalColumn("uid", DataTypes.INT()));
+        Map<String, String> columnNameMap = Map.of("id", "$0", "uid", "$1");
+
+        ExpressionEvaluator andEvaluator =
+                compileTranslatedFilterExpression("id = 1 and 1 / uid > 0", columns, columnNameMap);
+        Assertions.assertThat(andEvaluator.evaluate(new Object[] {2, 0})).isEqualTo(false);
+
+        ExpressionEvaluator orEvaluator =
+                compileTranslatedFilterExpression("id = 1 or 1 / uid > 0", columns, columnNameMap);
+        Assertions.assertThat(orEvaluator.evaluate(new Object[] {1, 0})).isEqualTo(true);
+
+        List<Column> booleanColumns =
+                List.of(
+                        Column.physicalColumn("left_bool", DataTypes.BOOLEAN().notNull()),
+                        Column.physicalColumn("right_bool", DataTypes.BOOLEAN().notNull()),
+                        Column.physicalColumn("divisor", DataTypes.INT()));
+        Map<String, String> booleanColumnNameMap =
+                Map.of("left_bool", "$0", "right_bool", "$1", "divisor", "$2");
+        List<String> booleanColumnNames = List.of("$0", "$1", "$2");
+        List<Class<?>> booleanColumnTypes = List.of(Boolean.class, Boolean.class, Integer.class);
+
+        ExpressionEvaluator nativeAndEvaluator =
+                compileTranslatedFilterExpression(
+                        "left_bool and right_bool",
+                        booleanColumns,
+                        booleanColumnNameMap,
+                        booleanColumnNames,
+                        booleanColumnTypes);
+        Assertions.assertThat(nativeAndEvaluator.evaluate(new Object[] {true, true, 0}))
+                .isEqualTo(true);
+
+        ExpressionEvaluator conditionalAndEvaluator =
+                compileTranslatedFilterExpression(
+                        "left_bool and 1 / divisor > 0",
+                        booleanColumns,
+                        booleanColumnNameMap,
+                        booleanColumnNames,
+                        booleanColumnTypes);
+        Assertions.assertThat(conditionalAndEvaluator.evaluate(new Object[] {false, true, 0}))
+                .isEqualTo(false);
+
+        ExpressionEvaluator conditionalOrEvaluator =
+                compileTranslatedFilterExpression(
+                        "left_bool or 1 / divisor > 0",
+                        booleanColumns,
+                        booleanColumnNameMap,
+                        booleanColumnNames,
+                        booleanColumnTypes);
+        Assertions.assertThat(conditionalOrEvaluator.evaluate(new Object[] {true, false, 0}))
+                .isEqualTo(true);
+
+        List<Column> nullableBooleanColumns =
+                List.of(Column.physicalColumn("nullable_bool", DataTypes.BOOLEAN()));
+        Map<String, String> nullableBooleanColumnNameMap = Map.of("nullable_bool", "$0");
+        ExpressionEvaluator nullableOrEvaluator =
+                compileTranslatedFilterExpression(
+                        "nullable_bool or false",
+                        nullableBooleanColumns,
+                        nullableBooleanColumnNameMap,
+                        List.of("$0"),
+                        List.of(Boolean.class));
+        Assertions.assertThat(nullableOrEvaluator.evaluate(new Object[] {null})).isNull();
+    }
+
+    @Test
     void testLargeNumericLiterals() {
         // Test parsing integer literals
         Stream.of(
@@ -292,5 +365,35 @@ class JaninoCompilerTest {
                                 throw new RuntimeException(e);
                             }
                         });
+    }
+
+    private static ExpressionEvaluator compileTranslatedFilterExpression(
+            String expression, List<Column> columns, Map<String, String> columnNameMap) {
+        return compileTranslatedFilterExpression(
+                expression,
+                columns,
+                columnNameMap,
+                List.of("$0", "$1"),
+                List.of(Integer.class, Integer.class));
+    }
+
+    private static ExpressionEvaluator compileTranslatedFilterExpression(
+            String expression,
+            List<Column> columns,
+            Map<String, String> columnNameMap,
+            List<String> columnNames,
+            List<Class<?>> columnTypes) {
+        String janinoExpression =
+                TransformParser.translateFilterExpressionToJaninoExpression(
+                        expression,
+                        columns,
+                        Collections.emptyList(),
+                        new SupportedMetadataColumn[0],
+                        columnNameMap);
+        return JaninoCompiler.compileExpression(
+                JaninoCompiler.loadSystemFunction(janinoExpression),
+                columnNames,
+                columnTypes,
+                Boolean.class);
     }
 }

@@ -121,26 +121,38 @@ Flink CDC uses [Calcite](https://calcite.apache.org/) to parse expressions and [
 | value1 >= value2                     | greaterThanOrEqual(value1, value2)           | Returns TRUE if value1 is greater than or equal to value2; returns FALSE if value1 or value2 is NULL. |
 | value1 < value2                      | lessThan(value1, value2)                     | Returns TRUE if value1 is less than value2; returns FALSE if value1 or value2 is NULL.                |
 | value1 <= value2                     | lessThanOrEqual(value1, value2)              | Returns TRUE if value1 is less than or equal to value2; returns FALSE if value1 or value2 is NULL.    |
-| value IS NULL                        | null == value                                | Returns TRUE if value is NULL.                                                                        |
-| value IS NOT NULL                    | null != value                                | Returns TRUE if value is not NULL.                                                                    |
+| value IS NULL                        | isNull(value)                                | Returns TRUE if value is NULL.                                                                        |
+| value IS NOT NULL                    | isNotNull(value)                             | Returns TRUE if value is not NULL.                                                                    |
+| value1 IS DISTINCT FROM value2       | isDistinctFrom(value1, value2)               | Returns TRUE if value1 and value2 are distinct. NULL values are compared as values and never return NULL. |
+| value1 IS NOT DISTINCT FROM value2   | isNotDistinctFrom(value1, value2)            | Returns TRUE if value1 and value2 are not distinct. NULL values are compared as values and never return NULL. |
 | value1 BETWEEN value2 AND value3     | betweenAsymmetric(value1, value2, value3)    | Returns TRUE if value1 is greater than or equal to value2 and less than or equal to value3.           |
 | value1 NOT BETWEEN value2 AND value3 | notBetweenAsymmetric(value1, value2, value3) | Returns TRUE if value1 is less than value2 or greater than value3.                                    |
-| string1 LIKE string2                 | like(string1, string2)                       | Returns TRUE if string1 matches pattern string2.                                                      |
-| string1 NOT LIKE string2             | notLike(string1, string2)                    | Returns TRUE if string1 does not match pattern string2.                                               |
+| string1 LIKE string2                 | like(string1, string2)                       | Returns TRUE if string1 matches Java regular expression string2 using substring matching.             |
+| string1 NOT LIKE string2             | notLike(string1, string2)                    | Returns TRUE if string1 does not match Java regular expression string2 using substring matching.      |
+| string1 LIKE string2 ESCAPE string3  | like(string1, string2, string3)              | Returns TRUE if string1 matches SQL LIKE pattern string2. `%` matches zero or more characters, `_` matches one character, and string3 escapes wildcard characters. Returns NULL if any argument is NULL. |
+| string1 NOT LIKE string2 ESCAPE string3 | notLike(string1, string2, string3)        | Returns TRUE if string1 does not match SQL LIKE pattern string2. Returns NULL if any argument is NULL. |
+| string1 SIMILAR TO string2           | similarTo(string1, string2)                  | Returns TRUE if string1 matches SQL SIMILAR TO pattern string2. Returns NULL if any argument is NULL. |
+| string1 NOT SIMILAR TO string2       | notSimilarTo(string1, string2)               | Returns TRUE if string1 does not match SQL SIMILAR TO pattern string2. Returns NULL if any argument is NULL. |
+| string1 SIMILAR TO string2 ESCAPE string3 | similarTo(string1, string2, string3)    | Returns TRUE if string1 matches SQL SIMILAR TO pattern string2 using string3 as the escape character. Returns NULL if any argument is NULL. |
+| string1 NOT SIMILAR TO string2 ESCAPE string3 | notSimilarTo(string1, string2, string3) | Returns TRUE if string1 does not match SQL SIMILAR TO pattern string2 using string3 as the escape character. Returns NULL if any argument is NULL. |
 | value1 IN (value2 [, value3]* )      | in(value1, value2 [, value3]*)               | Returns TRUE if value1 exists in the given list (value2, value3, …).                                  |
 | value1 NOT IN (value2 [, value3]* )  | notIn(value1, value2 [, value3]*)            | Returns TRUE if value1 does not exist in the given list (value2, value3, …).                          |
 
 ## Logical Functions
 
-| Function              | Janino Code                    | Description                                                         |
-|-----------------------|--------------------------------|---------------------------------------------------------------------|
-| boolean1 OR boolean2  | boolean1 &#124;&#124; boolean2 | Returns TRUE if BOOLEAN1 is TRUE or BOOLEAN2 is TRUE.               |
-| boolean1 AND boolean2 | boolean1 && boolean2           | Returns TRUE if BOOLEAN1 and BOOLEAN2 are both TRUE.                |
-| NOT boolean           | !boolean                       | Returns TRUE if boolean is FALSE; returns FALSE if boolean is TRUE. |
-| boolean IS FALSE      | false == boolean               | Returns TRUE if boolean is FALSE; returns FALSE if boolean is TRUE. |
-| boolean IS NOT FALSE  | true == boolean                | Returns TRUE if BOOLEAN is TRUE; returns FALSE if BOOLEAN is FALSE. |
-| boolean IS TRUE       | true == boolean                | Returns TRUE if BOOLEAN is TRUE; returns FALSE if BOOLEAN is FALSE. |
-| boolean IS NOT TRUE   | false == boolean               | Returns TRUE if boolean is FALSE; returns FALSE if boolean is TRUE. |
+Logical functions follow SQL three-valued logic for nullable BOOLEAN values. `AND` and `OR` short-circuit the right operand when the left operand determines the result. Generated Janino code may use native operators, conditional expressions, or lazy function calls depending on operand nullability.
+
+| Function               | Janino Code           | Description                                                                                                      |
+|------------------------|-----------------------|------------------------------------------------------------------------------------------------------------------|
+| boolean1 OR boolean2   | short-circuit OR expression | Returns TRUE if either value is TRUE; returns NULL if neither value is TRUE and at least one value is NULL.       |
+| boolean1 AND boolean2  | short-circuit AND expression | Returns FALSE if either value is FALSE; returns NULL if neither value is FALSE and at least one value is NULL.    |
+| NOT boolean            | not(boolean)           | Returns TRUE if boolean is FALSE; returns FALSE if boolean is TRUE; returns NULL if boolean is NULL.              |
+| boolean IS FALSE       | isFalse(boolean)       | Returns TRUE if boolean is FALSE; returns FALSE if boolean is TRUE or NULL.                                       |
+| boolean IS NOT FALSE   | isNotFalse(boolean)    | Returns TRUE if boolean is TRUE or NULL; returns FALSE if boolean is FALSE.                                       |
+| boolean IS TRUE        | isTrue(boolean)        | Returns TRUE if boolean is TRUE; returns FALSE if boolean is FALSE or NULL.                                       |
+| boolean IS NOT TRUE    | isNotTrue(boolean)     | Returns TRUE if boolean is FALSE or NULL; returns FALSE if boolean is TRUE.                                       |
+| boolean IS UNKNOWN     | isNull(boolean)        | Returns TRUE if boolean is NULL.                                                                                 |
+| boolean IS NOT UNKNOWN | isNotNull(boolean)     | Returns TRUE if boolean is not NULL.                                                                             |
 
 ## Arithmetic Functions
 

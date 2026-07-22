@@ -62,6 +62,7 @@ import org.apache.calcite.sql.type.InferTypes;
 import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.SqlReturnTypeInference;
 import org.apache.calcite.sql.type.SqlTypeFactoryImpl;
+import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.sql.util.SqlOperatorTables;
 import org.apache.calcite.sql.validate.SqlConformanceEnum;
 import org.apache.calcite.sql.validate.SqlValidator;
@@ -285,13 +286,15 @@ public class TransformParser {
         }
 
         expandWildcard(sqlSelect, columns);
-        RelNode relNode = sqlToRel(columns, sqlSelect, udfDescriptors, supportedMetadataColumns);
-        RelDataType[] relDataTypes =
-                relNode.getRowType().getFieldList().stream()
-                        .map(RelDataTypeField::getType)
-                        .toArray(RelDataType[]::new);
         Map<String, Column> originalColumnMap =
                 columns.stream().collect(Collectors.toMap(Column::getName, column -> column));
+        RelDataType[] relDataTypes =
+                deduceProjectionRelDataTypes(
+                        columns,
+                        originalColumnMap,
+                        sqlSelect,
+                        udfDescriptors,
+                        supportedMetadataColumns);
         List<ProjectionColumn> projectionColumns = new ArrayList<>();
         Map<String, Integer> addedProjectionColumnNames = new HashMap<>();
 
@@ -385,6 +388,146 @@ public class TransformParser {
             }
         }
         return projectionColumns;
+    }
+
+    private static RelDataType[] deduceProjectionRelDataTypes(
+            List<Column> columns,
+            Map<String, Column> originalColumnMap,
+            SqlSelect sqlSelect,
+            List<UserDefinedFunctionDescriptor> udfDescriptors,
+            SupportedMetadataColumn[] supportedMetadataColumns) {
+        try {
+            RelNode relNode =
+                    sqlToRel(columns, sqlSelect, udfDescriptors, supportedMetadataColumns);
+            return relNode.getRowType().getFieldList().stream()
+                    .map(RelDataTypeField::getType)
+                    .toArray(RelDataType[]::new);
+        } catch (RuntimeException e) {
+            try {
+                // Keep Calcite as the primary type inference path. This fallback only covers
+                // transform predicates that Janino can evaluate but Calcite may fail to convert
+                // while building projection columns.
+                SqlTypeFactoryImpl typeFactory = new SqlTypeFactoryImpl(RelDataTypeSystem.DEFAULT);
+                List<RelDataType> relDataTypes = new ArrayList<>();
+                for (SqlNode sqlNode : sqlSelect.getSelectList()) {
+                    relDataTypes.add(
+                            deduceProjectionRelDataType(
+                                    typeFactory,
+                                    columns,
+                                    originalColumnMap,
+                                    unwrapAsExpression(sqlNode),
+                                    udfDescriptors,
+                                    supportedMetadataColumns));
+                }
+                return relDataTypes.toArray(new RelDataType[0]);
+            } catch (RuntimeException fallbackException) {
+                e.addSuppressed(fallbackException);
+                throw e;
+            }
+        }
+    }
+
+    private static SqlNode unwrapAsExpression(SqlNode sqlNode) {
+        if (sqlNode instanceof SqlBasicCall) {
+            SqlBasicCall sqlBasicCall = (SqlBasicCall) sqlNode;
+            if (SqlKind.AS.equals(sqlBasicCall.getOperator().kind)
+                    && !sqlBasicCall.getOperandList().isEmpty()) {
+                return sqlBasicCall.getOperandList().get(0);
+            }
+        }
+        return sqlNode;
+    }
+
+    private static RelDataType deduceProjectionRelDataType(
+            RelDataTypeFactory typeFactory,
+            List<Column> columns,
+            Map<String, Column> originalColumnMap,
+            SqlNode exprNode,
+            List<UserDefinedFunctionDescriptor> udfDescriptors,
+            SupportedMetadataColumn[] supportedMetadataColumns) {
+        if (exprNode instanceof SqlIdentifier) {
+            String columnName =
+                    ((SqlIdentifier) exprNode)
+                            .names.get(((SqlIdentifier) exprNode).names.size() - 1);
+            return toRelDataType(
+                    typeFactory,
+                    findIdentifierDataType(
+                            originalColumnMap, columnName, supportedMetadataColumns));
+        }
+        if (requiresBooleanTypeFallback(exprNode)) {
+            validateReferencedColumns(originalColumnMap, exprNode, supportedMetadataColumns);
+            return typeFactory.createTypeWithNullability(
+                    typeFactory.createSqlType(SqlTypeName.BOOLEAN), true);
+        }
+        return toRelDataType(
+                typeFactory,
+                deduceSubExpressionType(
+                        columns, exprNode, udfDescriptors, supportedMetadataColumns));
+    }
+
+    private static DataType findIdentifierDataType(
+            Map<String, Column> originalColumnMap,
+            String columnName,
+            SupportedMetadataColumn[] supportedMetadataColumns) {
+        if (originalColumnMap.containsKey(columnName)) {
+            return originalColumnMap.get(columnName).getType();
+        }
+        for (SupportedMetadataColumn metadataColumn : supportedMetadataColumns) {
+            if (metadataColumn.getName().equals(columnName)) {
+                return metadataColumn.getType();
+            }
+        }
+        return METADATA_COLUMNS.stream()
+                .filter(column -> column.f0.equals(columnName))
+                .findFirst()
+                .map(column -> column.f1)
+                .orElseThrow(
+                        () ->
+                                new IllegalArgumentException(
+                                        "Referenced column "
+                                                + columnName
+                                                + " is not present in original table."));
+    }
+
+    private static RelDataType toRelDataType(RelDataTypeFactory typeFactory, DataType dataType) {
+        return CalciteDataTypeConverter.convertCalciteRelDataType(
+                        typeFactory,
+                        Collections.singletonList(Column.physicalColumn("__tmp", dataType)))
+                .getFieldList()
+                .get(0)
+                .getType();
+    }
+
+    private static void validateReferencedColumns(
+            Map<String, Column> originalColumnMap,
+            SqlNode exprNode,
+            SupportedMetadataColumn[] supportedMetadataColumns) {
+        for (String columnName : parseColumnNameList(exprNode)) {
+            findIdentifierDataType(originalColumnMap, columnName, supportedMetadataColumns);
+        }
+    }
+
+    private static boolean requiresBooleanTypeFallback(SqlNode sqlNode) {
+        if (!(sqlNode instanceof SqlBasicCall)) {
+            return false;
+        }
+        SqlBasicCall sqlBasicCall = (SqlBasicCall) sqlNode;
+        switch (sqlBasicCall.getKind()) {
+            case AND:
+            case OR:
+            case NOT:
+                return sqlBasicCall.getOperandList().stream()
+                        .anyMatch(TransformParser::requiresBooleanTypeFallback);
+            case IS_DISTINCT_FROM:
+            case IS_NOT_DISTINCT_FROM:
+            case IS_UNKNOWN:
+            case SIMILAR:
+                return true;
+            case LIKE:
+                return sqlBasicCall.getOperandList().size() == 3;
+            default:
+                return false;
+        }
     }
 
     /**
