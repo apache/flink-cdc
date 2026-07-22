@@ -199,9 +199,16 @@ pipeline:
     <tr>
       <td>scan.incremental.snapshot.backfill.skip</td>
       <td>optional</td>
-      <td style="word-wrap: break-word;">true</td>
+      <td style="word-wrap: break-word;">false</td>
       <td>Boolean</td>
       <td>Whether to skip backfill in snapshot reading phase. Skipping backfill may lead to replayed change log events with at-least-once semantics.</td>
+    </tr>
+    <tr>
+      <td>scan.incremental.snapshot.unbounded-chunk-first.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">true</td>
+      <td>Boolean</td>
+      <td>Whether to assign the unbounded chunks first during snapshot reading phase. This might help reduce the risk of the TaskManager experiencing an out-of-memory (OOM) error when taking a snapshot of the largest unbounded chunk.</td>
     </tr>
     <tr>
       <td>connect.timeout</td>
@@ -262,6 +269,8 @@ pipeline:
     </tbody>
 </table>
 </div>
+
+> Compatibility note: To keep the behavior of older Pipeline versions, explicitly configure `scan.incremental.snapshot.backfill.skip: true` and `scan.incremental.snapshot.unbounded-chunk-first.enabled: false`.
 
 ## Available Metadata
 

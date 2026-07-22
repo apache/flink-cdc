@@ -39,7 +39,9 @@ import java.util.stream.Collectors;
 import static org.apache.flink.cdc.connectors.sqlserver.source.SqlServerDataSourceOptions.HOSTNAME;
 import static org.apache.flink.cdc.connectors.sqlserver.source.SqlServerDataSourceOptions.PASSWORD;
 import static org.apache.flink.cdc.connectors.sqlserver.source.SqlServerDataSourceOptions.PORT;
+import static org.apache.flink.cdc.connectors.sqlserver.source.SqlServerDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP;
 import static org.apache.flink.cdc.connectors.sqlserver.source.SqlServerDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN;
+import static org.apache.flink.cdc.connectors.sqlserver.source.SqlServerDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED;
 import static org.apache.flink.cdc.connectors.sqlserver.source.SqlServerDataSourceOptions.SCAN_STARTUP_MODE;
 import static org.apache.flink.cdc.connectors.sqlserver.source.SqlServerDataSourceOptions.SCAN_STARTUP_TIMESTAMP_MILLIS;
 import static org.apache.flink.cdc.connectors.sqlserver.source.SqlServerDataSourceOptions.TABLES;
@@ -74,6 +76,29 @@ public class SqlServerDataSourceFactoryTest extends SqlServerTestBase {
         SqlServerDataSource dataSource = (SqlServerDataSource) factory.createDataSource(context);
         assertThat(dataSource.getSqlServerSourceConfig().getTableList())
                 .isEqualTo(Arrays.asList("dbo.products", "dbo.products_on_hand"));
+    }
+
+    @Test
+    public void testSnapshotBackfillAndUnboundedChunkFirstDefaults() {
+        Map<String, String> options = new HashMap<>();
+        options.put(HOSTNAME.key(), MSSQL_SERVER_CONTAINER.getHost());
+        options.put(
+                PORT.key(),
+                String.valueOf(MSSQL_SERVER_CONTAINER.getMappedPort(MS_SQL_SERVER_PORT)));
+        options.put(USERNAME.key(), MSSQL_SERVER_CONTAINER.getUsername());
+        options.put(PASSWORD.key(), MSSQL_SERVER_CONTAINER.getPassword());
+        options.put(TABLES.key(), DATABASE_NAME + ".dbo.prod\\.*");
+
+        Factory.Context context = new MockContext(Configuration.fromMap(options));
+        SqlServerDataSourceFactory factory = new SqlServerDataSourceFactory();
+
+        assertThat(factory.optionalOptions())
+                .contains(
+                        SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP,
+                        SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED);
+        SqlServerDataSource dataSource = (SqlServerDataSource) factory.createDataSource(context);
+        assertThat(dataSource.getSqlServerSourceConfig().isSkipSnapshotBackfill()).isFalse();
+        assertThat(dataSource.getSqlServerSourceConfig().isAssignUnboundedChunkFirst()).isTrue();
     }
 
     @Test
