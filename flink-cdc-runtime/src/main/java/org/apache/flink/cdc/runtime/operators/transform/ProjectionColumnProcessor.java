@@ -87,12 +87,12 @@ public class ProjectionColumnProcessor {
             throw new RuntimeException(
                     String.format(
                             "Failed to evaluate projection expression `%s` for column `%s` in table `%s`.\n"
-                                    + "\tCompiled expression: %s\n"
+                                    + "\tCompiled script: %s\n"
                                     + "\tColumn name map: {%s}",
                             projectionColumn.getExpression(),
                             projectionColumn.getColumnName(),
                             tableInfo.getName(),
-                            projectionColumn.getScriptExpression(),
+                            projectionColumn.getCompiledScript(),
                             projectionColumn.getColumnNameMapAsString()),
                     e);
         }

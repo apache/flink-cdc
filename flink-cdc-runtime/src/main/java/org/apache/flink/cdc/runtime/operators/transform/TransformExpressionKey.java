@@ -69,20 +69,12 @@ public class TransformExpressionKey implements Serializable {
         return originalExpression;
     }
 
-    public String getCompiledExpression() {
-        return generatedExpression.getResultTerm();
-    }
-
     public GeneratedExpression getGeneratedExpression() {
         return generatedExpression;
     }
 
     public String getCompiledScript() {
         return generatedExpression.asScript();
-    }
-
-    public String getFullExpression() {
-        return JaninoCompiler.loadSystemFunction(getCompiledExpression());
     }
 
     public String getFullScript() {
@@ -166,8 +158,8 @@ public class TransformExpressionKey implements Serializable {
                 + "originalExpression='"
                 + originalExpression
                 + '\''
-                + ", compiledExpression='"
-                + getCompiledExpression()
+                + ", compiledScript='"
+                + getCompiledScript().replace("\n", "\\n")
                 + '\''
                 + ", argumentNames="
                 + argumentNames

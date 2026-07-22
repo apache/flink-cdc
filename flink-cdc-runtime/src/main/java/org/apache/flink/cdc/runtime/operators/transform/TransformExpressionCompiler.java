@@ -77,7 +77,7 @@ public class TransformExpressionCompiler {
                         scriptEvaluator.setReturnType(key.getReturnClass());
 
                         if (LOG.isDebugEnabled()) {
-                            LOG.debug("Going to evaluate expression: {}", key.getFullScript());
+                            LOG.debug("Going to evaluate script: {}", key.getFullScript());
                             LOG.debug("  - Argument names: {}", argumentNames);
                             LOG.debug("  - Argument types: {}", argumentClasses);
                             LOG.debug("  - Returns: {}", key.getReturnClass());
@@ -91,10 +91,10 @@ public class TransformExpressionCompiler {
                                     String.format(
                                             "Expression cannot be compiled. This is a bug. Please file an issue.\n"
                                                     + "\tOriginal expression: %s\n"
-                                                    + "\tCompiled expression: %s\n"
+                                                    + "\tCompiled script: %s\n"
                                                     + "\tColumn name map: {%s}",
                                             key.getOriginalExpression(),
-                                            key.getCompiledExpression(),
+                                            key.getCompiledScript(),
                                             TransformException.prettyPrintColumnNameMap(
                                                     key.getColumnNameMap())),
                                     e);

@@ -396,33 +396,6 @@ public class JaninoCompiler {
     }
 
     private static boolean isExpressionNullable(Context context, SqlNode sqlNode) {
-        boolean fallbackNullable = isExpressionNullableFallback(context, sqlNode);
-        if (!fallbackNullable) {
-            return false;
-        }
-        Optional<Boolean> calciteNullability =
-                deduceExpressionNullableWithCalcite(context, sqlNode);
-        if (calciteNullability.isPresent()) {
-            return calciteNullability.get();
-        }
-        return true;
-    }
-
-    private static Optional<Boolean> deduceExpressionNullableWithCalcite(
-            Context context, SqlNode sqlNode) {
-        try {
-            return Optional.of(
-                    TransformParser.deduceSubExpressionNullable(
-                            context.columns,
-                            sqlNode,
-                            context.udfDescriptors,
-                            context.supportedMetadataColumns));
-        } catch (RuntimeException e) {
-            return Optional.empty();
-        }
-    }
-
-    private static boolean isExpressionNullableFallback(Context context, SqlNode sqlNode) {
         if (sqlNode instanceof SqlIdentifier) {
             return isIdentifierNullable(context, (SqlIdentifier) sqlNode);
         }

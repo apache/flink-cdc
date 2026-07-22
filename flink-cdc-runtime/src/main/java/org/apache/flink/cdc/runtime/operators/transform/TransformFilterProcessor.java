@@ -121,14 +121,14 @@ public class TransformFilterProcessor {
                     String.format(
                             "Failed to evaluate filtering expression for table `%s`.\n"
                                     + "\tOriginal expression: %s\n"
-                                    + "\tCompiled expression: %s\n"
+                                    + "\tCompiled script: %s\n"
                                     + "\tColumn name map: {%s}",
                             tableInfo.getName(),
                             transformExpressionKey != null
                                     ? transformExpressionKey.getOriginalExpression()
                                     : "<no op>",
                             transformExpressionKey != null
-                                    ? transformExpressionKey.getCompiledExpression()
+                                    ? transformExpressionKey.getCompiledScript()
                                     : "<no op>",
                             transformFilter.getColumnNameMapAsString()),
                     e);

@@ -41,8 +41,7 @@ import java.util.Map;
  * <ul>
  *   <li>column: column information parsed from projection.
  *   <li>expression: a string for column expression split from the user-defined projection.
- *   <li>scriptExpression: a string for column script expression compiled from the column
- *       expression.
+ *   <li>generatedExpression: statement-level code generated from the column expression.
  *   <li>originalColumnNames: a list for recording the name of all columns used by the column
  *       expression.
  * </ul>
@@ -94,7 +93,7 @@ public class ProjectionColumn implements Serializable {
     }
 
     public String getScriptExpression() {
-        return generatedExpression.getResultTerm();
+        return getCompiledScript();
     }
 
     public GeneratedExpression getGeneratedExpression() {
@@ -118,7 +117,7 @@ public class ProjectionColumn implements Serializable {
     }
 
     public boolean isValidTransformedProjectionColumn() {
-        return !StringUtils.isNullOrWhitespaceOnly(getScriptExpression());
+        return !StringUtils.isNullOrWhitespaceOnly(generatedExpression.getResultTerm());
     }
 
     /**
@@ -185,8 +184,8 @@ public class ProjectionColumn implements Serializable {
                 + ", expression='"
                 + expression
                 + '\''
-                + ", scriptExpression='"
-                + getScriptExpression()
+                + ", compiledScript='"
+                + getCompiledScript().replace("\n", "\\n")
                 + '\''
                 + ", originalColumnNames="
                 + originalColumnNames

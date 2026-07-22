@@ -785,26 +785,6 @@ public class TransformParser {
             SqlNode subExpression,
             List<UserDefinedFunctionDescriptor> udfDescriptors,
             SupportedMetadataColumn[] supportedMetadataColumns) {
-        return CalciteDataTypeConverter.convertCalciteRelDataTypeToDataType(
-                deduceSubExpressionRelDataType(
-                        columns, subExpression, udfDescriptors, supportedMetadataColumns));
-    }
-
-    static boolean deduceSubExpressionNullable(
-            List<Column> columns,
-            SqlNode subExpression,
-            List<UserDefinedFunctionDescriptor> udfDescriptors,
-            SupportedMetadataColumn[] supportedMetadataColumns) {
-        return deduceSubExpressionRelDataType(
-                        columns, subExpression, udfDescriptors, supportedMetadataColumns)
-                .isNullable();
-    }
-
-    private static RelDataType deduceSubExpressionRelDataType(
-            List<Column> columns,
-            SqlNode subExpression,
-            List<UserDefinedFunctionDescriptor> udfDescriptors,
-            SupportedMetadataColumn[] supportedMetadataColumns) {
         SqlSelect sqlSelect =
                 new SqlSelect(
                         SqlParserPos.QUOTED_ZERO,
@@ -829,6 +809,7 @@ public class TransformParser {
                 "RelDataType %s should be unary from SqlNode %s",
                 relDataTypes,
                 sqlSelect);
-        return relDataTypes[0];
+        RelDataType expressionType = relDataTypes[0];
+        return CalciteDataTypeConverter.convertCalciteRelDataTypeToDataType(expressionType);
     }
 }
