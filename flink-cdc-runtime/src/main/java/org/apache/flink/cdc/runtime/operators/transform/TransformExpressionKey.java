@@ -78,6 +78,7 @@ public class TransformExpressionKey implements Serializable {
     }
 
     public String getFullScript() {
+        validateGeneratedExpression();
         return JaninoCompiler.loadSystemFunction(getCompiledScript());
     }
 
@@ -95,6 +96,13 @@ public class TransformExpressionKey implements Serializable {
 
     public Map<String, String> getColumnNameMap() {
         return Collections.unmodifiableMap(columnNameMap);
+    }
+
+    private void validateGeneratedExpression() {
+        if (generatedExpression.getResultTerm().trim().isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Generated expression result term must not be empty.");
+        }
     }
 
     public static TransformExpressionKey of(

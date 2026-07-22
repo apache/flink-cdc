@@ -24,6 +24,7 @@ import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.variant.BinaryVariantInternalBuilder;
 import org.apache.flink.cdc.common.types.variant.Variant;
 import org.apache.flink.cdc.common.types.variant.VariantTypeException;
+import org.apache.flink.cdc.runtime.operators.transform.TransformExpressionKey;
 
 import org.assertj.core.api.Assertions;
 import org.codehaus.commons.compiler.CompileException;
@@ -337,6 +338,22 @@ class JaninoCompilerTest {
                         compileGeneratedFilterExpression(nullOrFalse, columnNames, columnTypes)
                                 .evaluate(new Object[] {null}))
                 .isNull();
+    }
+
+    @Test
+    void testTransformExpressionKeyRejectsEmptyResultTermForFullScript() {
+        TransformExpressionKey key =
+                TransformExpressionKey.of(
+                        null,
+                        GeneratedExpression.fromExpression("", Boolean.class),
+                        Collections.emptyList(),
+                        Collections.emptyList(),
+                        Collections.emptyMap());
+
+        Assertions.assertThatCode(key::toString).doesNotThrowAnyException();
+        Assertions.assertThatThrownBy(key::getFullScript)
+                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Generated expression result term must not be empty.");
     }
 
     @Test

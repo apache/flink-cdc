@@ -76,8 +76,9 @@ public class TransformExpressionCompiler {
                         // Result type
                         scriptEvaluator.setReturnType(key.getReturnClass());
 
+                        String fullScript = key.getFullScript();
                         if (LOG.isDebugEnabled()) {
-                            LOG.debug("Going to evaluate script: {}", key.getFullScript());
+                            LOG.debug("Going to evaluate script: {}", fullScript);
                             LOG.debug("  - Argument names: {}", argumentNames);
                             LOG.debug("  - Argument types: {}", argumentClasses);
                             LOG.debug("  - Returns: {}", key.getReturnClass());
@@ -85,7 +86,7 @@ public class TransformExpressionCompiler {
 
                         try {
                             // Compile
-                            scriptEvaluator.cook(key.getFullScript());
+                            scriptEvaluator.cook(fullScript);
                         } catch (CompileException e) {
                             throw new InvalidProgramException(
                                     String.format(
