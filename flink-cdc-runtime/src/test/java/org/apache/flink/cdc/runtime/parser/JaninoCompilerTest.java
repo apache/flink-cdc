@@ -32,6 +32,7 @@ import org.codehaus.janino.ExpressionEvaluator;
 import org.codehaus.janino.Java;
 import org.codehaus.janino.Parser;
 import org.codehaus.janino.Scanner;
+import org.codehaus.janino.ScriptEvaluator;
 import org.codehaus.janino.Unparser;
 import org.junit.jupiter.api.Test;
 
@@ -288,6 +289,57 @@ class JaninoCompilerTest {
     }
 
     @Test
+    void testGeneratedLogicalExpressionCompilesWithJanino() throws Exception {
+        List<Column> columns = List.of(Column.physicalColumn("nullable_bool", DataTypes.BOOLEAN()));
+        Map<String, String> columnNameMap = Map.of("nullable_bool", "$0");
+        List<String> columnNames = List.of("$0");
+        List<Class<?>> columnTypes = List.of(Boolean.class);
+
+        GeneratedExpression nullAndFalse =
+                translateGeneratedFilterExpression(
+                        "nullable_bool and false", columns, columnNameMap);
+        Assertions.assertThat(nullAndFalse.asScript())
+                .contains("if (Boolean.FALSE.equals")
+                .doesNotContain("new java.util.function.Supplier");
+        Assertions.assertThat(
+                        compileGeneratedFilterExpression(nullAndFalse, columnNames, columnTypes)
+                                .evaluate(new Object[] {null}))
+                .isEqualTo(false);
+
+        GeneratedExpression nullAndTrue =
+                translateGeneratedFilterExpression(
+                        "nullable_bool and true", columns, columnNameMap);
+        Assertions.assertThat(nullAndTrue.asScript())
+                .contains("if (Boolean.FALSE.equals")
+                .doesNotContain("new java.util.function.Supplier");
+        Assertions.assertThat(
+                        compileGeneratedFilterExpression(nullAndTrue, columnNames, columnTypes)
+                                .evaluate(new Object[] {null}))
+                .isNull();
+
+        GeneratedExpression nullOrTrue =
+                translateGeneratedFilterExpression("nullable_bool or true", columns, columnNameMap);
+        Assertions.assertThat(nullOrTrue.asScript())
+                .contains("if (Boolean.TRUE.equals")
+                .doesNotContain("new java.util.function.Supplier");
+        Assertions.assertThat(
+                        compileGeneratedFilterExpression(nullOrTrue, columnNames, columnTypes)
+                                .evaluate(new Object[] {null}))
+                .isEqualTo(true);
+
+        GeneratedExpression nullOrFalse =
+                translateGeneratedFilterExpression(
+                        "nullable_bool or false", columns, columnNameMap);
+        Assertions.assertThat(nullOrFalse.asScript())
+                .contains("if (Boolean.TRUE.equals")
+                .doesNotContain("new java.util.function.Supplier");
+        Assertions.assertThat(
+                        compileGeneratedFilterExpression(nullOrFalse, columnNames, columnTypes)
+                                .evaluate(new Object[] {null}))
+                .isNull();
+    }
+
+    @Test
     void testLargeNumericLiterals() {
         // Test parsing integer literals
         Stream.of(
@@ -395,5 +447,28 @@ class JaninoCompilerTest {
                 columnNames,
                 columnTypes,
                 Boolean.class);
+    }
+
+    private static GeneratedExpression translateGeneratedFilterExpression(
+            String expression, List<Column> columns, Map<String, String> columnNameMap) {
+        return TransformParser.translateFilterExpressionToGeneratedExpression(
+                expression,
+                columns,
+                Collections.emptyList(),
+                new SupportedMetadataColumn[0],
+                columnNameMap);
+    }
+
+    private static ScriptEvaluator compileGeneratedFilterExpression(
+            GeneratedExpression generatedExpression,
+            List<String> columnNames,
+            List<Class<?>> columnTypes)
+            throws CompileException {
+        ScriptEvaluator scriptEvaluator = new ScriptEvaluator();
+        scriptEvaluator.setParameters(
+                columnNames.toArray(new String[0]), columnTypes.toArray(new Class[0]));
+        scriptEvaluator.setReturnType(Boolean.class);
+        scriptEvaluator.cook(JaninoCompiler.loadSystemFunction(generatedExpression.asScript()));
+        return scriptEvaluator;
     }
 }

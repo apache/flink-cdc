@@ -17,10 +17,12 @@
 
 package org.apache.flink.cdc.runtime.operators.transform;
 
+import org.apache.flink.cdc.common.converter.JavaClassConverter;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.utils.StringUtils;
 import org.apache.flink.cdc.runtime.operators.transform.exceptions.TransformException;
+import org.apache.flink.cdc.runtime.parser.GeneratedExpression;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -49,19 +51,19 @@ public class ProjectionColumn implements Serializable {
     private static final long serialVersionUID = 1L;
     private final Column column;
     private final String expression;
-    private final String scriptExpression;
+    private final GeneratedExpression generatedExpression;
     private final List<String> originalColumnNames;
     private final Map<String, String> columnNameMap;
 
     public ProjectionColumn(
             Column column,
             String expression,
-            String scriptExpression,
+            GeneratedExpression generatedExpression,
             List<String> originalColumnNames,
             Map<String, String> columnNameMap) {
         this.column = column;
         this.expression = expression;
-        this.scriptExpression = scriptExpression;
+        this.generatedExpression = generatedExpression;
         this.originalColumnNames = originalColumnNames;
         this.columnNameMap = columnNameMap;
     }
@@ -70,7 +72,7 @@ public class ProjectionColumn implements Serializable {
         return new ProjectionColumn(
                 column.copy(column.getName()),
                 expression,
-                scriptExpression,
+                generatedExpression,
                 new ArrayList<>(originalColumnNames),
                 new HashMap<>(columnNameMap));
     }
@@ -92,7 +94,15 @@ public class ProjectionColumn implements Serializable {
     }
 
     public String getScriptExpression() {
-        return scriptExpression;
+        return generatedExpression.getResultTerm();
+    }
+
+    public GeneratedExpression getGeneratedExpression() {
+        return generatedExpression;
+    }
+
+    public String getCompiledScript() {
+        return generatedExpression.asScript();
     }
 
     public List<String> getOriginalColumnNames() {
@@ -108,7 +118,7 @@ public class ProjectionColumn implements Serializable {
     }
 
     public boolean isValidTransformedProjectionColumn() {
-        return !StringUtils.isNullOrWhitespaceOnly(scriptExpression);
+        return !StringUtils.isNullOrWhitespaceOnly(getScriptExpression());
     }
 
     /**
@@ -120,7 +130,12 @@ public class ProjectionColumn implements Serializable {
         String name = column.getName();
         Map<String, String> columnNameMap = Collections.singletonMap(name, mappedColumnName);
         return new ProjectionColumn(
-                column, name, mappedColumnName, Collections.singletonList(name), columnNameMap);
+                column,
+                name,
+                GeneratedExpression.fromExpression(
+                        mappedColumnName, JavaClassConverter.toJavaClass(column.getType())),
+                Collections.singletonList(name),
+                columnNameMap);
     }
 
     /**
@@ -136,7 +151,8 @@ public class ProjectionColumn implements Serializable {
         return new ProjectionColumn(
                 column.copy(newName),
                 originalName,
-                mappedColumnName,
+                GeneratedExpression.fromExpression(
+                        mappedColumnName, JavaClassConverter.toJavaClass(column.getType())),
                 Collections.singletonList(originalName),
                 columnNameMap);
     }
@@ -150,13 +166,13 @@ public class ProjectionColumn implements Serializable {
             String columnName,
             DataType dataType,
             String expression,
-            String scriptExpression,
+            GeneratedExpression generatedExpression,
             List<String> originalColumnNames,
             Map<String, String> columnNameMap) {
         return new ProjectionColumn(
                 Column.physicalColumn(columnName, dataType),
                 expression,
-                scriptExpression,
+                generatedExpression,
                 originalColumnNames,
                 columnNameMap);
     }
@@ -170,7 +186,7 @@ public class ProjectionColumn implements Serializable {
                 + expression
                 + '\''
                 + ", scriptExpression='"
-                + scriptExpression
+                + getScriptExpression()
                 + '\''
                 + ", originalColumnNames="
                 + originalColumnNames

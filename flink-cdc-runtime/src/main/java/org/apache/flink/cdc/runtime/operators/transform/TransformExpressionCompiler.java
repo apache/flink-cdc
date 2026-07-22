@@ -25,7 +25,7 @@ import org.apache.flink.shaded.guava31.com.google.common.cache.Cache;
 import org.apache.flink.shaded.guava31.com.google.common.cache.CacheBuilder;
 
 import org.codehaus.commons.compiler.CompileException;
-import org.codehaus.janino.ExpressionEvaluator;
+import org.codehaus.janino.ScriptEvaluator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,8 +40,8 @@ public class TransformExpressionCompiler {
 
     private static final Logger LOG = LoggerFactory.getLogger(TransformExpressionCompiler.class);
 
-    static final Cache<TransformExpressionKey, ExpressionEvaluator> COMPILED_EXPRESSION_CACHE =
-            CacheBuilder.newBuilder().softValues().build();
+    static final Cache<TransformExpressionKey, TransformExpressionEvaluator>
+            COMPILED_EXPRESSION_CACHE = CacheBuilder.newBuilder().softValues().build();
 
     /** Triggers internal garbage collection of expired cache entries. */
     public static void cleanUp() {
@@ -51,14 +51,14 @@ public class TransformExpressionCompiler {
         COMPILED_EXPRESSION_CACHE.invalidateAll();
     }
 
-    /** Compiles an expression code to a janino {@link ExpressionEvaluator}. */
-    public static ExpressionEvaluator compileExpression(
+    /** Compiles an expression script to a janino {@link ScriptEvaluator}. */
+    public static TransformExpressionEvaluator compileExpression(
             TransformExpressionKey key, List<UserDefinedFunctionDescriptor> udfDescriptors) {
         try {
             return COMPILED_EXPRESSION_CACHE.get(
                     key,
                     () -> {
-                        ExpressionEvaluator expressionEvaluator = new ExpressionEvaluator();
+                        ScriptEvaluator scriptEvaluator = new ScriptEvaluator();
 
                         List<String> argumentNames = new ArrayList<>(key.getArgumentNames());
                         List<Class<?>> argumentClasses = new ArrayList<>(key.getArgumentClasses());
@@ -69,15 +69,15 @@ public class TransformExpressionCompiler {
                         }
 
                         // Input args
-                        expressionEvaluator.setParameters(
+                        scriptEvaluator.setParameters(
                                 argumentNames.toArray(new String[0]),
                                 argumentClasses.toArray(new Class[0]));
 
                         // Result type
-                        expressionEvaluator.setExpressionType(key.getReturnClass());
+                        scriptEvaluator.setReturnType(key.getReturnClass());
 
                         if (LOG.isDebugEnabled()) {
-                            LOG.debug("Going to evaluate expression: {}", key.getFullExpression());
+                            LOG.debug("Going to evaluate expression: {}", key.getFullScript());
                             LOG.debug("  - Argument names: {}", argumentNames);
                             LOG.debug("  - Argument types: {}", argumentClasses);
                             LOG.debug("  - Returns: {}", key.getReturnClass());
@@ -85,7 +85,7 @@ public class TransformExpressionCompiler {
 
                         try {
                             // Compile
-                            expressionEvaluator.cook(key.getFullExpression());
+                            scriptEvaluator.cook(key.getFullScript());
                         } catch (CompileException e) {
                             throw new InvalidProgramException(
                                     String.format(
@@ -99,7 +99,7 @@ public class TransformExpressionCompiler {
                                                     key.getColumnNameMap())),
                                     e);
                         }
-                        return expressionEvaluator;
+                        return new TransformExpressionEvaluator(scriptEvaluator);
                     });
         } catch (Exception e) {
             throw new FlinkRuntimeException("Failed to compile expression " + key, e);

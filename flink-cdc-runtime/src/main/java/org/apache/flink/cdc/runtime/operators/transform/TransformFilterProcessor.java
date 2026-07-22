@@ -21,10 +21,9 @@ import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.converter.JavaClassConverter;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
+import org.apache.flink.cdc.runtime.parser.GeneratedExpression;
 import org.apache.flink.cdc.runtime.parser.JaninoCompiler;
 import org.apache.flink.cdc.runtime.parser.TransformParser;
-
-import org.codehaus.janino.ExpressionEvaluator;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
@@ -49,7 +48,7 @@ public class TransformFilterProcessor {
     private final Map<String, SupportedMetadataColumn> supportedMetadataColumns;
 
     private final TransformExpressionKey transformExpressionKey;
-    private final ExpressionEvaluator expressionEvaluator;
+    private final TransformExpressionEvaluator expressionEvaluator;
 
     protected TransformFilterProcessor(
             boolean isNoOp,
@@ -223,8 +222,8 @@ public class TransformFilterProcessor {
         args.f0.add(JaninoCompiler.DEFAULT_EPOCH_TIME);
         args.f1.add(Long.class);
 
-        String scriptExpression =
-                TransformParser.translateFilterExpressionToJaninoExpression(
+        GeneratedExpression generatedExpression =
+                TransformParser.translateFilterExpressionToGeneratedExpression(
                         transformFilter.getExpression(),
                         columns,
                         udfDescriptors,
@@ -233,10 +232,9 @@ public class TransformFilterProcessor {
 
         return TransformExpressionKey.of(
                 transformFilter.getExpression(),
-                scriptExpression,
+                generatedExpression,
                 args.f0,
                 args.f1,
-                Boolean.class,
                 transformFilter.getColumnNameMap());
     }
 }

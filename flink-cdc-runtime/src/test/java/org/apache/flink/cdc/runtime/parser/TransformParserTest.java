@@ -418,16 +418,38 @@ class TransformParserTest {
                 "left_bool or nullable_bool", "left_bool ? Boolean.TRUE : nullable_bool", columns);
         testFilterExpressionWithColumns(
                 "nullable_bool and right_bool",
-                lazyLogicalFunction("and", "nullable_bool", "right_bool"),
+                "isFalse(nullable_bool) ? Boolean.FALSE : and(nullable_bool, right_bool)",
                 columns);
         testFilterExpressionWithColumns(
                 "nullable_bool or right_bool",
-                lazyLogicalFunction("or", "nullable_bool", "right_bool"),
+                "isTrue(nullable_bool) ? Boolean.TRUE : or(nullable_bool, right_bool)",
                 columns);
         testFilterExpressionWithColumns(
                 "nullable_bool or false",
-                lazyLogicalFunction("or", "nullable_bool", "false"),
+                "isTrue(nullable_bool) ? Boolean.TRUE : or(nullable_bool, false)",
                 columns);
+        testFilterExpressionWithColumns(
+                "coalesce(nullable_bool, false) and right_bool",
+                "coalesce(nullable_bool, false) && right_bool",
+                columns);
+    }
+
+    @Test
+    void testTranslateLogicalFilterToGeneratedExpressionByNullability() {
+        List<Column> columns = List.of(Column.physicalColumn("nullable_bool", DataTypes.BOOLEAN()));
+        GeneratedExpression generatedExpression =
+                TransformParser.translateFilterExpressionToGeneratedExpression(
+                        "nullable_bool and false",
+                        columns,
+                        Collections.emptyList(),
+                        new SupportedMetadataColumn[0],
+                        Collections.emptyMap());
+
+        Assertions.assertThat(generatedExpression.getCode())
+                .contains("Boolean result$")
+                .contains("if (Boolean.FALSE.equals")
+                .doesNotContain("new java.util.function.Supplier");
+        Assertions.assertThat(generatedExpression.asScript()).endsWith("return result$0;");
     }
 
     @Test
@@ -635,12 +657,12 @@ class TransformParserTest {
                         "ProjectionColumn{column=`id` INT 'id', expression='id', scriptExpression='$0', originalColumnNames=[id], columnNameMap={id=$0}}",
                         "ProjectionColumn{column=`name2` STRING, expression='UPPER(`TB`.`name`)', scriptExpression='upper($0)', originalColumnNames=[name], columnNameMap={name=$0}}",
                         "ProjectionColumn{column=`sex2` STRING, expression='UPPER(`TB`.`sex`)', scriptExpression='upper($0)', originalColumnNames=[sex], columnNameMap={sex=$0}}",
-                        "ProjectionColumn{column=`address2` BINARY(50), expression='CASE WHEN `TB`.`address` IS NOT NULL THEN `TB`.`address` ELSE `TB`.`address` END', scriptExpression='(isTrue(isNotNull($0)) ? $0 : $0)', originalColumnNames=[address, address, address], columnNameMap={address=$0}}",
-                        "ProjectionColumn{column=`phone2` VARBINARY(50), expression='CASE WHEN `TB`.`phone` IS NOT NULL THEN `TB`.`phone` ELSE `TB`.`phone` END', scriptExpression='(isTrue(isNotNull($0)) ? $0 : $0)', originalColumnNames=[phone, phone, phone], columnNameMap={phone=$0}}",
-                        "ProjectionColumn{column=`deposit2` DECIMAL(10, 2), expression='CASE WHEN `TB`.`deposit` IS NOT NULL THEN `TB`.`deposit` ELSE `TB`.`deposit` END', scriptExpression='(isTrue(isNotNull($0)) ? $0 : $0)', originalColumnNames=[deposit, deposit, deposit], columnNameMap={deposit=$0}}",
-                        "ProjectionColumn{column=`birthday2` TIMESTAMP(3), expression='CASE WHEN `TB`.`birthday` IS NOT NULL THEN `TB`.`birthday` ELSE `TB`.`birthday` END', scriptExpression='(isTrue(isNotNull($0)) ? $0 : $0)', originalColumnNames=[birthday, birthday, birthday], columnNameMap={birthday=$0}}",
-                        "ProjectionColumn{column=`birthday_ltz2` TIMESTAMP_LTZ(3), expression='CASE WHEN `TB`.`birthday_ltz` IS NOT NULL THEN `TB`.`birthday_ltz` ELSE `TB`.`birthday_ltz` END', scriptExpression='(isTrue(isNotNull($0)) ? $0 : $0)', originalColumnNames=[birthday_ltz, birthday_ltz, birthday_ltz], columnNameMap={birthday_ltz=$0}}",
-                        "ProjectionColumn{column=`update_time2` TIME(3), expression='CASE WHEN `TB`.`update_time` IS NOT NULL THEN `TB`.`update_time` ELSE `TB`.`update_time` END', scriptExpression='(isTrue(isNotNull($0)) ? $0 : $0)', originalColumnNames=[update_time, update_time, update_time], columnNameMap={update_time=$0}}");
+                        "ProjectionColumn{column=`address2` BINARY(50), expression='CASE WHEN `TB`.`address` IS NOT NULL THEN `TB`.`address` ELSE `TB`.`address` END', scriptExpression='result$0', originalColumnNames=[address, address, address], columnNameMap={address=$0}}",
+                        "ProjectionColumn{column=`phone2` VARBINARY(50), expression='CASE WHEN `TB`.`phone` IS NOT NULL THEN `TB`.`phone` ELSE `TB`.`phone` END', scriptExpression='result$0', originalColumnNames=[phone, phone, phone], columnNameMap={phone=$0}}",
+                        "ProjectionColumn{column=`deposit2` DECIMAL(10, 2), expression='CASE WHEN `TB`.`deposit` IS NOT NULL THEN `TB`.`deposit` ELSE `TB`.`deposit` END', scriptExpression='result$0', originalColumnNames=[deposit, deposit, deposit], columnNameMap={deposit=$0}}",
+                        "ProjectionColumn{column=`birthday2` TIMESTAMP(3), expression='CASE WHEN `TB`.`birthday` IS NOT NULL THEN `TB`.`birthday` ELSE `TB`.`birthday` END', scriptExpression='result$0', originalColumnNames=[birthday, birthday, birthday], columnNameMap={birthday=$0}}",
+                        "ProjectionColumn{column=`birthday_ltz2` TIMESTAMP_LTZ(3), expression='CASE WHEN `TB`.`birthday_ltz` IS NOT NULL THEN `TB`.`birthday_ltz` ELSE `TB`.`birthday_ltz` END', scriptExpression='result$0', originalColumnNames=[birthday_ltz, birthday_ltz, birthday_ltz], columnNameMap={birthday_ltz=$0}}",
+                        "ProjectionColumn{column=`update_time2` TIME(3), expression='CASE WHEN `TB`.`update_time` IS NOT NULL THEN `TB`.`update_time` ELSE `TB`.`update_time` END', scriptExpression='result$0', originalColumnNames=[update_time, update_time, update_time], columnNameMap={update_time=$0}}");
         Assertions.assertThat(result).hasToString("[" + String.join(", ", expected) + "]");
     }
 
@@ -924,13 +946,6 @@ class TransformParserTest {
                         new SupportedMetadataColumn[0],
                         Collections.emptyMap());
         Assertions.assertThat(janinoExpression).isEqualTo(expressionExpect);
-    }
-
-    private static String lazyLogicalFunction(
-            String functionName, String leftOperand, String rightOperand) {
-        return String.format(
-                "%s(%s, new java.util.function.Supplier<Boolean>() { public Boolean get() { return %s; } })",
-                functionName, leftOperand, rightOperand);
     }
 
     private void testFilterExpressionWithUdf(String expression, String expressionExpect) {
