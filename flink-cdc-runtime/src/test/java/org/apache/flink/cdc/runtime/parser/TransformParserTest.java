@@ -453,6 +453,21 @@ class TransformParserTest {
     }
 
     @Test
+    void testTranslateEmptyFilterToGeneratedExpression() {
+        GeneratedExpression generatedExpression =
+                TransformParser.translateFilterExpressionToGeneratedExpression(
+                        "",
+                        DUMMY_COLUMNS,
+                        Collections.emptyList(),
+                        new SupportedMetadataColumn[0],
+                        Collections.emptyMap());
+
+        Assertions.assertThat(generatedExpression.getCode()).isEmpty();
+        Assertions.assertThat(generatedExpression.getResultTerm()).isEqualTo("Boolean.TRUE");
+        Assertions.assertThat(generatedExpression.asScript()).isEqualTo("return Boolean.TRUE;");
+    }
+
+    @Test
     public void testTranslateItemAccessToJaninoExpression() {
         // Test collection access functions (ARRAY, MAP) with proper column schema
         List<Column> columns =

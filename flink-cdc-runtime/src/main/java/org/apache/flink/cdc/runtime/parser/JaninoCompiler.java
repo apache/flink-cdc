@@ -920,8 +920,10 @@ public class JaninoCompiler {
                 return translateSqlCase((SqlCase) sqlNode, resultClass);
             }
             Java.Rvalue rvalue = translateSqlNodeToJaninoRvalue(context, sqlNode);
-            return GeneratedExpression.fromExpression(
-                    rvalue == null ? "" : rvalue.toString(), resultClass);
+            if (rvalue == null) {
+                throw new ParseException("Unrecognized expression: " + sqlNode);
+            }
+            return GeneratedExpression.fromExpression(rvalue.toString(), resultClass);
         }
 
         private GeneratedExpression translateSqlBasicCall(

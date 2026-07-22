@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.runtime.parser;
 
+import org.apache.flink.api.common.io.ParseException;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
@@ -26,6 +27,7 @@ import org.apache.flink.cdc.common.types.variant.Variant;
 import org.apache.flink.cdc.common.types.variant.VariantTypeException;
 import org.apache.flink.cdc.runtime.operators.transform.TransformExpressionKey;
 
+import org.apache.calcite.sql.SqlNodeList;
 import org.assertj.core.api.Assertions;
 import org.codehaus.commons.compiler.CompileException;
 import org.codehaus.commons.compiler.Location;
@@ -354,6 +356,22 @@ class JaninoCompilerTest {
         Assertions.assertThatThrownBy(key::getFullScript)
                 .isExactlyInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Generated expression result term must not be empty.");
+    }
+
+    @Test
+    void testTranslateSqlNodeToGeneratedExpressionRejectsUnrecognizedSqlNode() {
+        Assertions.assertThatThrownBy(
+                        () ->
+                                JaninoCompiler.translateSqlNodeToGeneratedExpression(
+                                        JaninoCompiler.Context.of(
+                                                Collections.emptyList(),
+                                                Collections.emptyMap(),
+                                                Collections.emptyList(),
+                                                new SupportedMetadataColumn[0]),
+                                        SqlNodeList.EMPTY,
+                                        Boolean.class))
+                .isExactlyInstanceOf(ParseException.class)
+                .hasMessageStartingWith("Unrecognized expression:");
     }
 
     @Test

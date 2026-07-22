@@ -605,11 +605,11 @@ public class TransformParser {
             SupportedMetadataColumn[] supportedMetadataColumns,
             Map<String, String> columnNameMap) {
         if (isNullOrWhitespaceOnly(filterExpression)) {
-            return GeneratedExpression.fromExpression("", Boolean.class);
+            return GeneratedExpression.fromExpression("Boolean.TRUE", Boolean.class);
         }
         SqlSelect sqlSelect = TransformParser.parseFilterExpression(filterExpression);
         if (!sqlSelect.hasWhere()) {
-            return GeneratedExpression.fromExpression("", Boolean.class);
+            return GeneratedExpression.fromExpression("Boolean.TRUE", Boolean.class);
         }
         SqlNode where = sqlSelect.getWhere();
         return JaninoCompiler.translateSqlNodeToGeneratedExpression(
