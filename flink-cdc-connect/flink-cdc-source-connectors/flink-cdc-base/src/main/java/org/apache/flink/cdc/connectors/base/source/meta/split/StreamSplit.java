@@ -28,6 +28,7 @@ import javax.annotation.Nullable;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -42,7 +43,10 @@ public class StreamSplit extends SourceSplitBase {
 
     private final Offset startingOffset;
     private final Offset endingOffset;
+
+    /** Split IDs of all elements must be unique. */
     private final List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos;
+
     private final Map<TableId, TableChange> tableSchemas;
     private final int totalFinishedSplitSize;
 
@@ -66,6 +70,9 @@ public class StreamSplit extends SourceSplitBase {
             boolean isSuspended,
             boolean isSnapshotCompleted) {
         super(splitId);
+
+        ensureNoDuplicates(finishedSnapshotSplitInfos);
+
         this.startingOffset = startingOffset;
         this.endingOffset = endingOffset;
         this.finishedSnapshotSplitInfos = finishedSnapshotSplitInfos;
@@ -82,14 +89,30 @@ public class StreamSplit extends SourceSplitBase {
             List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos,
             Map<TableId, TableChange> tableSchemas,
             int totalFinishedSplitSize) {
-        super(splitId);
-        this.startingOffset = startingOffset;
-        this.endingOffset = endingOffset;
-        this.finishedSnapshotSplitInfos = finishedSnapshotSplitInfos;
-        this.tableSchemas = tableSchemas;
-        this.totalFinishedSplitSize = totalFinishedSplitSize;
-        this.isSuspended = false;
-        this.isSnapshotCompleted = false;
+        this(
+                splitId,
+                startingOffset,
+                endingOffset,
+                finishedSnapshotSplitInfos,
+                tableSchemas,
+                totalFinishedSplitSize,
+                false,
+                false);
+    }
+
+    private static void ensureNoDuplicates(
+            List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos) {
+        Set<String> seenSplitIds = new HashSet<>();
+        for (FinishedSnapshotSplitInfo splitInfo : finishedSnapshotSplitInfos) {
+            if (seenSplitIds.contains(splitInfo.getSplitId())) {
+                throw new IllegalArgumentException(
+                        String.format(
+                                "Found duplicate split ID %s in finished snapshot split infos",
+                                splitInfo.getSplitId()));
+            }
+
+            seenSplitIds.add(splitInfo.getSplitId());
+        }
     }
 
     public Offset getStartingOffset() {
