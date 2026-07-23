@@ -147,3 +147,23 @@
     DataChangeEvent{tableId=foo.bar.baz, before=[-1, 天地玄黄宇宙洪荒, {{天地玄黄宇宙洪荒}}], after=[], op=DELETE, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, {{null}}], op=INSERT, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[0, null, {{null}}], after=[], op=DELETE, meta=()}
+- do: Additional String Search Functions
+  projection: id_, string_, POSITION('Z' IN string_) AS position_, LOCATE('Z', string_) AS locate_, INSTR(string_, 'Z') AS instr_
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`string_` STRING,`position_` INT,`locate_` INT,`instr_` INT}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, From A to Z is Lie, 11, 11, 11], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, From A to Z is Lie, 11, 11, 11], after=[-1, 天地玄黄宇宙洪荒, 0, 0, 0], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, 天地玄黄宇宙洪荒, 0, 0, 0], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null, null, null], after=[], op=DELETE, meta=()}
+- do: Additional String Manipulation Functions
+  projection: id_, OVERLAY(string_ PLACING 'CDC' FROM 1 FOR 4) AS overlaid_, LTRIM(string_) AS ltrimmed_, RTRIM(string_) AS rtrimmed_, BTRIM(string_) AS btrimmed_, CONCAT_WS('|', string_, NULL, 'CDC') AS joined_, LPAD('CDC', 5, '0') AS lpad_, RPAD('CDC', 5, '0') AS rpad_, REPLACE(string_, ' ', '_') AS replaced_, REPEAT('CDC', 2) AS repeated_, LEFT(string_, 2) AS left_, RIGHT(string_, 2) AS right_, STARTSWITH(string_, 'From') AS starts_, ENDSWITH(string_, 'Lie') AS ends_, TO_BASE64(string_) AS encoded_, FROM_BASE64(TO_BASE64(string_)) AS decoded_
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`overlaid_` STRING,`ltrimmed_` STRING,`rtrimmed_` STRING,`btrimmed_` STRING,`joined_` STRING,`lpad_` STRING,`rpad_` STRING,`replaced_` STRING,`repeated_` STRING,`left_` STRING,`right_` STRING,`starts_` BOOLEAN,`ends_` BOOLEAN,`encoded_` STRING,`decoded_` STRING}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, CDC A to Z is Lie, From A to Z is Lie, From A to Z is Lie, From A to Z is Lie, From A to Z is Lie|CDC, 00CDC, CDC00, From_A_to_Z_is_Lie, CDCCDC, Fr, ie, true, true, RnJvbSBBIHRvIFogaXMgTGll, From A to Z is Lie], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, CDC A to Z is Lie, From A to Z is Lie, From A to Z is Lie, From A to Z is Lie, From A to Z is Lie|CDC, 00CDC, CDC00, From_A_to_Z_is_Lie, CDCCDC, Fr, ie, true, true, RnJvbSBBIHRvIFogaXMgTGll, From A to Z is Lie], after=[-1, CDC宇宙洪荒, 天地玄黄宇宙洪荒, 天地玄黄宇宙洪荒, 天地玄黄宇宙洪荒, 天地玄黄宇宙洪荒|CDC, 00CDC, CDC00, 天地玄黄宇宙洪荒, CDCCDC, 天地, 洪荒, false, false, 5aSp5Zyw546E6buE5a6H5a6Z5rSq6I2S, 天地玄黄宇宙洪荒], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, CDC宇宙洪荒, 天地玄黄宇宙洪荒, 天地玄黄宇宙洪荒, 天地玄黄宇宙洪荒, 天地玄黄宇宙洪荒|CDC, 00CDC, CDC00, 天地玄黄宇宙洪荒, CDCCDC, 天地, 洪荒, false, false, 5aSp5Zyw546E6buE5a6H5a6Z5rSq6I2S, 天地玄黄宇宙洪荒], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null, null, null, CDC, 00CDC, CDC00, null, CDCCDC, null, null, null, null, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null, null, null, CDC, 00CDC, CDC00, null, CDCCDC, null, null, null, null, null, null], after=[], op=DELETE, meta=()}

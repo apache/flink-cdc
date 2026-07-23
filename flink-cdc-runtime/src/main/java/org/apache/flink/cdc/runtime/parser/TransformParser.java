@@ -196,9 +196,30 @@ public class TransformParser {
             throw new ParseException("Statements can not be parsed.", e);
         }
         if (sqlNode instanceof SqlSelect) {
+            replaceParserBoundStringOperators(sqlNode);
             return (SqlSelect) sqlNode;
         } else {
             throw new ParseException("Only select statements can be parsed.");
+        }
+    }
+
+    private static void replaceParserBoundStringOperators(SqlNode sqlNode) {
+        if (sqlNode instanceof SqlBasicCall) {
+            SqlBasicCall call = (SqlBasicCall) sqlNode;
+            if ("OVERLAY".equalsIgnoreCase(call.getOperator().getName())) {
+                call.setOperator(TransformSqlOperatorTable.OVERLAY);
+            } else if (call.getKind() == SqlKind.POSITION) {
+                call.setOperator(TransformSqlOperatorTable.POSITION);
+            }
+            call.getOperandList().forEach(TransformParser::replaceParserBoundStringOperators);
+        } else if (sqlNode instanceof SqlCall) {
+            ((SqlCall) sqlNode)
+                    .getOperandList()
+                    .forEach(TransformParser::replaceParserBoundStringOperators);
+        } else if (sqlNode instanceof SqlNodeList) {
+            ((SqlNodeList) sqlNode)
+                    .getList()
+                    .forEach(TransformParser::replaceParserBoundStringOperators);
         }
     }
 
