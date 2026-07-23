@@ -33,8 +33,6 @@ import java.util.Optional;
  *
  * <ul>
  *   <li>expression: a string for filter expression split from the user-defined filter.
- *   <li>scriptExpression: a string for filter script expression compiled from the column
- *       expression.
  *   <li>columnNames: a list for recording the name of all columns used by the filter expression.
  * </ul>
  */

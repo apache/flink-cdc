@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.runtime.parser;
 
 import org.apache.flink.api.common.io.ParseException;
+import org.apache.flink.cdc.common.converter.JavaClassConverter;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.common.types.DataType;
@@ -344,19 +345,22 @@ public class TransformParser {
                 } else {
                     List<String> originalColumnNames = parseColumnNameList(exprNode);
                     Map<String, String> columnNameMap = generateColumnNameMap(originalColumnNames);
+                    DataType projectionType =
+                            CalciteDataTypeConverter.convertCalciteRelDataTypeToDataType(
+                                    relDataType);
                     projectionColumn =
                             ProjectionColumn.ofCalculated(
                                     columnName,
-                                    CalciteDataTypeConverter.convertCalciteRelDataTypeToDataType(
-                                            relDataType),
+                                    projectionType,
                                     exprNode.toString(),
-                                    JaninoCompiler.translateSqlNodeToJaninoExpression(
+                                    JaninoCompiler.translateSqlNodeToGeneratedExpression(
                                             JaninoCompiler.Context.of(
                                                     columns,
                                                     columnNameMap,
                                                     udfDescriptors,
                                                     supportedMetadataColumns),
-                                            exprNode),
+                                            exprNode,
+                                            JavaClassConverter.toJavaClass(projectionType)),
                                     originalColumnNames,
                                     columnNameMap);
                 }
@@ -550,7 +554,12 @@ public class TransformParser {
                     CalciteDataTypeConverter.convertCalciteRelDataTypeToDataType(relDataType)
                             .notNull(),
                     identifier,
-                    columnNameMap.get(identifier),
+                    GeneratedExpression.fromExpression(
+                            columnNameMap.get(identifier),
+                            JavaClassConverter.toJavaClass(
+                                    CalciteDataTypeConverter.convertCalciteRelDataTypeToDataType(
+                                                    relDataType)
+                                            .notNull())),
                     Collections.singletonList(identifier),
                     columnNameMap);
         }
@@ -587,6 +596,27 @@ public class TransformParser {
                 JaninoCompiler.Context.of(
                         columns, columnNameMap, udfDescriptors, supportedMetadataColumns),
                 where);
+    }
+
+    public static GeneratedExpression translateFilterExpressionToGeneratedExpression(
+            String filterExpression,
+            List<Column> columns,
+            List<UserDefinedFunctionDescriptor> udfDescriptors,
+            SupportedMetadataColumn[] supportedMetadataColumns,
+            Map<String, String> columnNameMap) {
+        if (isNullOrWhitespaceOnly(filterExpression)) {
+            return GeneratedExpression.fromExpression("Boolean.TRUE", Boolean.class);
+        }
+        SqlSelect sqlSelect = TransformParser.parseFilterExpression(filterExpression);
+        if (!sqlSelect.hasWhere()) {
+            return GeneratedExpression.fromExpression("Boolean.TRUE", Boolean.class);
+        }
+        SqlNode where = sqlSelect.getWhere();
+        return JaninoCompiler.translateSqlNodeToGeneratedExpression(
+                JaninoCompiler.Context.of(
+                        columns, columnNameMap, udfDescriptors, supportedMetadataColumns),
+                where,
+                Boolean.class);
     }
 
     public static List<String> parseComputedColumnNames(

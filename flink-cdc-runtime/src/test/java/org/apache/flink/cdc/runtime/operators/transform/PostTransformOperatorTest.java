@@ -2134,6 +2134,66 @@ class PostTransformOperatorTest {
     }
 
     @Test
+    void testNullableLogicalTransformUsesStatementLevelCodegen() throws Exception {
+        TableId tableId = TableId.tableId("my_company", "my_branch", "nullable_logical");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.STRING().notNull())
+                        .physicalColumn("nullable_bool", DataTypes.BOOLEAN())
+                        .primaryKey("id")
+                        .build();
+        Schema expectedSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.STRING().notNull())
+                        .physicalColumn("and_false", DataTypes.BOOLEAN())
+                        .physicalColumn("and_true", DataTypes.BOOLEAN())
+                        .physicalColumn("or_true", DataTypes.BOOLEAN())
+                        .physicalColumn("or_false", DataTypes.BOOLEAN())
+                        .primaryKey("id")
+                        .build();
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
+                        .addTransform(
+                                tableId.identifier(),
+                                "id"
+                                        + ", nullable_bool and false as and_false"
+                                        + ", nullable_bool and true as and_true"
+                                        + ", nullable_bool or true as or_true"
+                                        + ", nullable_bool or false as or_false",
+                                "nullable_bool or true")
+                        .build();
+        RegularEventOperatorTestHarness<PostTransformOperator, Event>
+                transformFunctionEventEventOperatorTestHarness =
+                        RegularEventOperatorTestHarness.with(transform, 1);
+        transformFunctionEventEventOperatorTestHarness.open();
+
+        BinaryRecordDataGenerator recordDataGenerator =
+                new BinaryRecordDataGenerator(((RowType) schema.toRowDataType()));
+        BinaryRecordDataGenerator expectedRecordDataGenerator =
+                new BinaryRecordDataGenerator(((RowType) expectedSchema.toRowDataType()));
+        DataChangeEvent insertEvent =
+                DataChangeEvent.insertEvent(
+                        tableId,
+                        recordDataGenerator.generate(
+                                new Object[] {new BinaryStringData("1"), null}));
+        DataChangeEvent insertEventExpect =
+                DataChangeEvent.insertEvent(
+                        tableId,
+                        expectedRecordDataGenerator.generate(
+                                new Object[] {new BinaryStringData("1"), false, null, true, null}));
+
+        transform.processElement(new StreamRecord<>(new CreateTableEvent(tableId, schema)));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(new CreateTableEvent(tableId, expectedSchema)));
+        transform.processElement(new StreamRecord<>(insertEvent));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(insertEventExpect));
+        transformFunctionEventEventOperatorTestHarness.close();
+    }
+
+    @Test
     void testCastTransform() throws Exception {
         PostTransformOperator transform =
                 PostTransformOperator.newBuilder()
@@ -2640,7 +2700,7 @@ class PostTransformOperatorTest {
                 .hasRootCauseInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining(
                         "Failed to evaluate projection expression `CAST(`TB`.`castFloat` AS TIMESTAMP(3))` for column `castTimestamp` in table `my_company.my_branch.data_cast`.\n"
-                                + "\tCompiled expression: castToTimestamp($0, __time_zone__)\n"
+                                + "\tCompiled script: return castToTimestamp($0, __time_zone__);\n"
                                 + "\tColumn name map: {$0 -> castFloat}")
                 .hasRootCauseMessage("Unable to parse given string as timestamp: 1.0");
 
@@ -2971,7 +3031,7 @@ class PostTransformOperatorTest {
                         .addTransform(
                                 REDUCE_TABLEID.identifier(),
                                 "id, upper(id) as uid, age + 1 as newage, lower(ref1) as ref1, 17 as seventeen",
-                                "newage > 17 and ref2 > 17")
+                                "IF(TRUE, newage, 0) + 1 > 18 and ref2 > 17")
                         .addTimezone("GMT")
                         .build();
         RegularEventOperatorTestHarness<PostTransformOperator, Event>
