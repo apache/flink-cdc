@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.runtime.operators.transform;
 
+import org.apache.flink.cdc.common.pipeline.TransformExpressionSemantics;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.runtime.parser.TransformParser;
@@ -51,6 +52,7 @@ public class TransformProjectionProcessor {
     private final List<Object> udfFunctionInstances;
     private final List<ProjectionColumnProcessor> columnProcessors;
     private final SupportedMetadataColumn[] supportedMetadataColumns;
+    private final TransformExpressionSemantics expressionSemantics;
     private final Map<String, SupportedMetadataColumn> supportedMetadataColumnsMap;
 
     public TransformProjectionProcessor(
@@ -59,13 +61,15 @@ public class TransformProjectionProcessor {
             String timezone,
             List<UserDefinedFunctionDescriptor> udfDescriptors,
             List<Object> udfFunctionInstances,
-            SupportedMetadataColumn[] supportedMetadataColumns) {
+            SupportedMetadataColumn[] supportedMetadataColumns,
+            TransformExpressionSemantics expressionSemantics) {
         this.changeInfo = changeInfo;
         this.projectionExpression = projectionExpression;
         this.timezone = timezone;
         this.udfDescriptors = udfDescriptors;
         this.udfFunctionInstances = udfFunctionInstances;
         this.supportedMetadataColumns = supportedMetadataColumns;
+        this.expressionSemantics = expressionSemantics;
 
         // Construct a mapping table ad-hoc to accelerate looking-up
         Map<String, SupportedMetadataColumn> supportedMetadataColumnsMap = new HashMap<>();
@@ -93,7 +97,8 @@ public class TransformProjectionProcessor {
                         projectionExpression,
                         changeInfo.getPreTransformedSchema().getColumns(),
                         udfDescriptors,
-                        supportedMetadataColumns);
+                        supportedMetadataColumns,
+                        expressionSemantics);
 
         List<ProjectionColumnProcessor> columnProcessors =
                 projectionColumns.stream()

@@ -35,6 +35,18 @@ class ComparisonFunctionsTest {
     }
 
     @Test
+    void testFlinkSqlNullComparisonBehavior() {
+        assertThat(ComparisonFunctions.sqlValueEquals(null, 1)).isNull();
+        assertThat(ComparisonFunctions.sqlNotEquals(1, null)).isNull();
+        assertThat(ComparisonFunctions.sqlLessThan(null, 1)).isNull();
+        assertThat(ComparisonFunctions.sqlLessThanOrEqual(1, null)).isNull();
+        assertThat(ComparisonFunctions.sqlGreaterThan(null, 1)).isNull();
+        assertThat(ComparisonFunctions.sqlGreaterThanOrEqual(1, null)).isNull();
+        assertThat(ComparisonFunctions.sqlValueEquals(1, 1)).isTrue();
+        assertThat(ComparisonFunctions.sqlGreaterThan(2, 1)).isTrue();
+    }
+
+    @Test
     void testThreeValuedLogicalOperators() {
         assertThat(LogicalFunctions.and(true, (Boolean) null)).isNull();
         assertThat(LogicalFunctions.and(false, (Boolean) null)).isFalse();
@@ -56,11 +68,28 @@ class ComparisonFunctionsTest {
     }
 
     @Test
+    void testFlinkSqlBetweenNullBehavior() {
+        assertThat(ComparisonFunctions.sqlBetween(null, 1, 3)).isNull();
+        assertThat(ComparisonFunctions.sqlBetween(2, null, 3)).isNull();
+        assertThat(ComparisonFunctions.sqlBetween(4, null, 3)).isFalse();
+        assertThat(ComparisonFunctions.sqlNotBetween(null, 1, 3)).isNull();
+    }
+
+    @Test
     void testLegacyInNullBehavior() {
         assertThat(ComparisonFunctions.in(1, 1, null)).isTrue();
         assertThat(ComparisonFunctions.in(1, 2, null)).isFalse();
         assertThat(ComparisonFunctions.in(null, 1, 2)).isFalse();
         assertThat(ComparisonFunctions.notIn(1, 2, null)).isTrue();
+    }
+
+    @Test
+    void testFlinkSqlInNullBehavior() {
+        assertThat(ComparisonFunctions.sqlIn(1, 1, null)).isTrue();
+        assertThat(ComparisonFunctions.sqlIn(1, 2, null)).isNull();
+        assertThat(ComparisonFunctions.sqlIn(null, 1, 2)).isNull();
+        assertThat(ComparisonFunctions.sqlIn(1, 2, 3)).isFalse();
+        assertThat(ComparisonFunctions.sqlNotIn(1, 2, null)).isNull();
     }
 
     @Test
