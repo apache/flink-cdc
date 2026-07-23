@@ -198,9 +198,16 @@ pipeline:
     <tr>
       <td>scan.incremental.snapshot.backfill.skip</td>
       <td>optional</td>
-      <td style="word-wrap: break-word;">true</td>
+      <td style="word-wrap: break-word;">false</td>
       <td>Boolean</td>
       <td>是否在快照读取阶段跳过 backfill。跳过 backfill 可能导致部分 change log 事件以 at-least-once 语义被重放。</td>
+    </tr>
+    <tr>
+      <td>scan.incremental.snapshot.unbounded-chunk-first.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">true</td>
+      <td>Boolean</td>
+      <td>是否在快照读取阶段优先分配无上界 chunk。这可能有助于降低对最大的无上界 chunk 执行快照时 TaskManager 出现内存溢出（OOM）的风险。</td>
     </tr>
     <tr>
       <td>connect.timeout</td>
@@ -261,6 +268,8 @@ pipeline:
     </tbody>
 </table>
 </div>
+
+> 兼容性说明：如果希望保持旧版本 Pipeline 行为，可以显式配置 `scan.incremental.snapshot.backfill.skip: true` 和 `scan.incremental.snapshot.unbounded-chunk-first.enabled: false`。
 
 ## 可用 Metadata
 
