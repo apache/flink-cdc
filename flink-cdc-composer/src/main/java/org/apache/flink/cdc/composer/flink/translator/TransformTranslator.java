@@ -24,6 +24,7 @@ import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.model.AiModelClient;
 import org.apache.flink.cdc.common.model.AiModelClientFactory;
 import org.apache.flink.cdc.common.model.ModelContext;
+import org.apache.flink.cdc.common.pipeline.TransformExpressionSemantics;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.composer.definition.ModelDef;
 import org.apache.flink.cdc.composer.definition.TransformDef;
@@ -108,6 +109,7 @@ public class TransformTranslator {
             DataStream<Event> input,
             List<TransformDef> transforms,
             String timezone,
+            TransformExpressionSemantics expressionSemantics,
             List<UdfDef> udfFunctions,
             List<ModelDef> models,
             SupportedMetadataColumn[] supportedMetadataColumns,
@@ -130,7 +132,9 @@ public class TransformTranslator {
                     transform.getPostTransformConverter(),
                     supportedMetadataColumns);
         }
-        postTransformFunctionBuilder.addTimezone(timezone);
+        postTransformFunctionBuilder
+                .addTimezone(timezone)
+                .addExpressionSemantics(expressionSemantics);
         postTransformFunctionBuilder.addUdfFunctions(
                 udfFunctions.stream().map(this::udfDefToUDFTuple).collect(Collectors.toList()));
         postTransformFunctionBuilder.addUdfFunctions(

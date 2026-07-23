@@ -20,6 +20,7 @@ package org.apache.flink.cdc.cli.parser;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
+import org.apache.flink.cdc.common.pipeline.TransformExpressionSemantics;
 import org.apache.flink.cdc.composer.definition.ModelDef;
 import org.apache.flink.cdc.composer.definition.PipelineDef;
 import org.apache.flink.cdc.composer.definition.RouteDef;
@@ -103,6 +104,28 @@ class YamlPipelineDefinitionParserTest {
         PipelineDef pipelineDef = parser.parse(new Path(resource.toURI()), new Configuration());
         assertThat(pipelineDef.getConfig().get(PIPELINE_LOCAL_TIME_ZONE))
                 .isNotEqualTo(PIPELINE_LOCAL_TIME_ZONE.defaultValue());
+    }
+
+    @Test
+    void testTransformExpressionSemantics() throws Exception {
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+        PipelineDef pipelineDef =
+                parser.parse(
+                        "source:\n"
+                                + "  type: foo\n"
+                                + "sink:\n"
+                                + "  type: bar\n"
+                                + "pipeline:\n"
+                                + "  transform.expression.semantics: FLINK_SQL\n",
+                        new Configuration());
+
+        assertThat(
+                        pipelineDef
+                                .getConfig()
+                                .get(PipelineOptions.PIPELINE_TRANSFORM_EXPRESSION_SEMANTICS))
+                .isEqualTo(TransformExpressionSemantics.FLINK_SQL);
+        assertThat(new Configuration().get(PipelineOptions.PIPELINE_TRANSFORM_EXPRESSION_SEMANTICS))
+                .isEqualTo(TransformExpressionSemantics.LEGACY);
     }
 
     @Test
