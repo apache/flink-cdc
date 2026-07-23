@@ -22,6 +22,7 @@ import org.apache.flink.api.common.io.ParseException;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.converter.JavaClassConverter;
 import org.apache.flink.cdc.common.pipeline.DecimalPrecisionMode;
+import org.apache.flink.cdc.common.pipeline.TransformExpressionSemantics;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.common.types.DataType;
@@ -428,6 +429,9 @@ public class JaninoCompiler {
             case EQUALS:
                 return generateEqualsOperation(context, sqlBasicCall, atoms);
             case NOT_EQUALS:
+                if (usesFlinkSqlSemantics(context)) {
+                    return generateFunctionOperation("sqlNotEquals", atoms);
+                }
                 return generateUnaryOperation(
                         context, "!", generateEqualsOperation(context, sqlBasicCall, atoms));
             case IS_DISTINCT_FROM:
@@ -454,6 +458,10 @@ public class JaninoCompiler {
             case IN:
             case NOT_IN:
             case LIKE:
+                if (usesFlinkSqlSemantics(context)) {
+                    return generateFlinkSqlPredicateOperation(sqlBasicCall, atoms);
+                }
+                return generateOtherFunctionOperation(context, sqlBasicCall, atoms);
             case SIMILAR:
             case POSITION:
             case CEIL:
@@ -692,6 +700,10 @@ public class JaninoCompiler {
         if (sqlNode instanceof SqlBasicCall) {
             return isBasicCallNullable(context, (SqlBasicCall) sqlNode);
         }
+        if (sqlNode instanceof SqlNodeList) {
+            return ((SqlNodeList) sqlNode)
+                    .getList().stream().anyMatch(operand -> isExpressionNullable(context, operand));
+        }
         return true;
     }
 
@@ -742,6 +754,7 @@ public class JaninoCompiler {
             case IS_UNKNOWN:
             case IS_DISTINCT_FROM:
             case IS_NOT_DISTINCT_FROM:
+                return false;
             case EQUALS:
             case NOT_EQUALS:
             case LESS_THAN:
@@ -751,7 +764,9 @@ public class JaninoCompiler {
             case BETWEEN:
             case IN:
             case NOT_IN:
-                return false;
+                return usesFlinkSqlSemantics(context)
+                        && sqlBasicCall.getOperandList().stream()
+                                .anyMatch(operand -> isExpressionNullable(context, operand));
             case LIKE:
             case SIMILAR:
                 return sqlBasicCall.getOperandList().stream()
@@ -794,8 +809,8 @@ public class JaninoCompiler {
         if (atoms.length != 2) {
             throw new ParseException("Unrecognized expression: " + sqlBasicCall.toString());
         }
-        return new Java.MethodInvocation(
-                Location.NOWHERE, null, StringUtils.convertToCamelCase("VALUE_EQUALS"), atoms);
+        return generateFunctionOperation(
+                usesFlinkSqlSemantics(context) ? "sqlValueEquals" : "valueEquals", atoms);
     }
 
     private static Java.Rvalue generateCastOperation(
@@ -859,7 +874,39 @@ public class JaninoCompiler {
                                 + sqlBasicCall.getKind().toString());
         }
         return new Java.MethodInvocation(
-                Location.NOWHERE, null, StringUtils.convertToCamelCase(compareMethodName), atoms);
+                Location.NOWHERE,
+                null,
+                StringUtils.convertToCamelCase(
+                        (usesFlinkSqlSemantics(context) ? "SQL_" : "") + compareMethodName),
+                atoms);
+    }
+
+    private static Java.Rvalue generateFlinkSqlPredicateOperation(
+            SqlBasicCall sqlBasicCall, Java.Rvalue[] atoms) {
+        String operationName = sqlBasicCall.getOperator().getName().toUpperCase();
+        switch (sqlBasicCall.getKind()) {
+            case BETWEEN:
+                return generateFunctionOperation(
+                        operationName.startsWith("NOT") ? "sqlNotBetween" : "sqlBetween", atoms);
+            case IN:
+                return generateFunctionOperation("sqlIn", atoms);
+            case NOT_IN:
+                return generateFunctionOperation("sqlNotIn", atoms);
+            case LIKE:
+                if (atoms.length == 2) {
+                    return generateFunctionOperation(
+                            operationName.startsWith("NOT") ? "sqlNotLike" : "sqlLike", atoms);
+                }
+                return generateFunctionOperation(
+                        StringUtils.convertToCamelCase(sqlBasicCall.getOperator().getName()),
+                        atoms);
+            default:
+                throw new ParseException("Unsupported Flink SQL predicate: " + sqlBasicCall);
+        }
+    }
+
+    private static boolean usesFlinkSqlSemantics(Context context) {
+        return TransformExpressionSemantics.FLINK_SQL.equals(context.expressionSemantics);
     }
 
     private static Java.Rvalue generateTimestampDiffOperation(
@@ -1279,17 +1326,22 @@ public class JaninoCompiler {
         // Maximum precision mode for DECIMAL type evaluation
         public final DecimalPrecisionMode decimalPrecisionMode;
 
+        // Semantics used to generate supported transform predicates
+        public final TransformExpressionSemantics expressionSemantics;
+
         private Context(
                 List<Column> columns,
                 Map<String, String> columnNameMap,
                 List<UserDefinedFunctionDescriptor> udfDescriptors,
                 SupportedMetadataColumn[] supportedMetadataColumns,
-                DecimalPrecisionMode decimalPrecisionMode) {
+                DecimalPrecisionMode decimalPrecisionMode,
+                TransformExpressionSemantics expressionSemantics) {
             this.columns = columns;
             this.columnNameMap = columnNameMap;
             this.udfDescriptors = udfDescriptors;
             this.supportedMetadataColumns = supportedMetadataColumns;
             this.decimalPrecisionMode = decimalPrecisionMode;
+            this.expressionSemantics = expressionSemantics;
         }
 
         public static Context of(
@@ -1302,7 +1354,8 @@ public class JaninoCompiler {
                     columnNameMap,
                     udfDescriptors,
                     supportedMetadataColumns,
-                    DecimalPrecisionMode.UP_TO_19);
+                    DecimalPrecisionMode.UP_TO_19,
+                    TransformExpressionSemantics.LEGACY);
         }
 
         public static Context of(
@@ -1311,12 +1364,44 @@ public class JaninoCompiler {
                 List<UserDefinedFunctionDescriptor> udfDescriptors,
                 SupportedMetadataColumn[] supportedMetadataColumns,
                 DecimalPrecisionMode decimalPrecisionMode) {
+            return of(
+                    columns,
+                    columnNameMap,
+                    udfDescriptors,
+                    supportedMetadataColumns,
+                    decimalPrecisionMode,
+                    TransformExpressionSemantics.LEGACY);
+        }
+
+        public static Context of(
+                List<Column> columns,
+                Map<String, String> columnNameMap,
+                List<UserDefinedFunctionDescriptor> udfDescriptors,
+                SupportedMetadataColumn[] supportedMetadataColumns,
+                TransformExpressionSemantics expressionSemantics) {
+            return of(
+                    columns,
+                    columnNameMap,
+                    udfDescriptors,
+                    supportedMetadataColumns,
+                    DecimalPrecisionMode.UP_TO_19,
+                    expressionSemantics);
+        }
+
+        public static Context of(
+                List<Column> columns,
+                Map<String, String> columnNameMap,
+                List<UserDefinedFunctionDescriptor> udfDescriptors,
+                SupportedMetadataColumn[] supportedMetadataColumns,
+                DecimalPrecisionMode decimalPrecisionMode,
+                TransformExpressionSemantics expressionSemantics) {
             return new Context(
                     columns,
                     columnNameMap,
                     udfDescriptors,
                     supportedMetadataColumns,
-                    decimalPrecisionMode);
+                    decimalPrecisionMode,
+                    expressionSemantics);
         }
     }
 }

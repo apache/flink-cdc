@@ -21,6 +21,7 @@ import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.cdc.common.model.AiModelClient;
 import org.apache.flink.cdc.common.pipeline.DecimalPrecisionMode;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
+import org.apache.flink.cdc.common.pipeline.TransformExpressionSemantics;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.runtime.operators.transform.TransformRule;
 
@@ -38,6 +39,7 @@ public class AsyncPostTransformFunctionBuilder {
     private final List<TransformRule> transformRules = new ArrayList<>();
     private String timezone;
     private DecimalPrecisionMode decimalPrecisionMode = DecimalPrecisionMode.UP_TO_19;
+    private TransformExpressionSemantics expressionSemantics = TransformExpressionSemantics.LEGACY;
     private final List<Tuple3<String, String, Map<String, String>>> udfFunctions =
             new ArrayList<>();
     private final Map<String, AiModelClient> modelClients = new LinkedHashMap<>();
@@ -109,6 +111,12 @@ public class AsyncPostTransformFunctionBuilder {
         return this;
     }
 
+    public AsyncPostTransformFunctionBuilder addExpressionSemantics(
+            TransformExpressionSemantics expressionSemantics) {
+        this.expressionSemantics = expressionSemantics;
+        return this;
+    }
+
     public AsyncPostTransformFunctionBuilder addModelClients(Map<String, AiModelClient> clients) {
         this.modelClients.putAll(clients);
         return this;
@@ -124,6 +132,7 @@ public class AsyncPostTransformFunctionBuilder {
                 transformRules,
                 timezone,
                 decimalPrecisionMode,
+                expressionSemantics,
                 udfFunctions,
                 modelClients,
                 asyncWorkerThreads);

@@ -119,6 +119,7 @@ under the License.
 | `local-time-zone`             | 作业级别的本地时区。                                                                                                                                                                                                                                                                                                                                                                                                                                                                | optional          |
 | `execution.runtime-mode`      | pipeline 的运行模式，包含 STREAMING 和 BATCH，默认值是 STREAMING。                                                                                                                                                                                                                                                                                                                                                                                                                       | optional          |
 | `route-mode`                  | [路由]({{< ref "docs/core-concept/route" >}}#路由模式)规则的匹配模式。可选值：`ALL_MATCH`（默认，应用所有匹配的规则）或 `FIRST_MATCH`（只应用第一个匹配的规则）。                                                                                                                                                                                                                                                                                                                    | optional          |
+| `transform.expression.semantics` | Transform 表达式的求值语义。可选值：`LEGACY`（默认，保持现有行为）或 `FLINK_SQL`（对支持的谓词使用与 Flink SQL 兼容的语义）。                                                                                                                                                                                                                                                                                                                                                 | optional          |
 | `schema.change.behavior`      | 如何处理 [schema 变更]({{< ref "docs/core-concept/schema-evolution" >}})。可选值：[`exception`]({{< ref "docs/core-concept/schema-evolution" >}}#exception-mode)、[`evolve`]({{< ref "docs/core-concept/schema-evolution" >}}#evolve-mode)、[`try_evolve`]({{< ref "docs/core-concept/schema-evolution" >}}#tryevolve-mode)、[`lenient`]({{< ref "docs/core-concept/schema-evolution" >}}#lenient-mode)（默认值）或 [`ignore`]({{< ref "docs/core-concept/schema-evolution" >}}#ignore-mode)。 | optional          |
 | `schema.operator.uid`         | Schema 算子的唯一 ID。此 ID 用于算子间通信，必须在所有算子中保持唯一。**已废弃**：请使用 `operator.uid.prefix` 代替。                                                                                                                                                                                                                                                                                                                                                                                           | optional          |
 | `schema-operator.rpc-timeout` | SchemaOperator 等待下游 SchemaChangeEvent 应用完成的超时时间，默认值是 3 分钟。                                                                                                                                                                                                                                                                                                                                                                                                                | optional          |
@@ -135,3 +136,19 @@ under the License.
 异步 PostTransform 适用于 AI 模型调用等 I/O 密集型表达式。DataChangeEvent 可能并发调用 UDF 和 AI 模型客户端，但输出和所有 SchemaChangeEvent 仍保持有序，因此 UDF 和 AI 模型客户端实现必须是线程安全的。为保证 schema 状态一致，checkpoint 或 savepoint 前会等待尚未完成的异步请求，长时间运行的请求可能会延长 checkpoint 时间。savepoint 只支持在并行度不变时恢复，并且不能在从已有 savepoint 恢复时开启或关闭此选项。
 
 注意：虽然上述参数都是可选的，但至少需要指定其中一个。`pipeline` 部分是必需的，不能为空。
+
+## Transform 表达式语义
+
+`transform.expression.semantics` 配置项控制行级 Transform 过滤和投影表达式的求值语义：
+
+* `LEGACY` 是默认值，用于保持现有 Pipeline 行为。comparison、`BETWEEN` 和 `IN` 在操作数为 `NULL` 时仍返回布尔值；两参数 `LIKE` 将 pattern 作为 Java 正则表达式，并使用子串匹配。
+* `FLINK_SQL` 将 `=`、`<>`、`<`、`<=`、`>`、`>=`、`BETWEEN` / `NOT BETWEEN`、`IN` / `NOT IN` 和两参数 `LIKE` / `NOT LIKE` 与 Flink SQL 对齐。这些谓词使用 SQL 三值逻辑，因此结果可能为 `UNKNOWN`（以 `NULL` 表示）。两参数 `LIKE` 使用 SQL `%` 和 `_` 通配符，并对整个字符串进行匹配。
+
+配置示例：
+
+```yaml
+pipeline:
+  transform.expression.semantics: FLINK_SQL
+```
+
+该配置会影响行级 Transform 的结果。过滤表达式仅在结果为 `TRUE` 时保留数据行，因此 `FALSE` 和 `UNKNOWN` 都会被过滤；投影表达式会将 `UNKNOWN` 保留为 `NULL`。
