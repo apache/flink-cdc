@@ -3031,7 +3031,7 @@ class PostTransformOperatorTest {
                         .addTransform(
                                 REDUCE_TABLEID.identifier(),
                                 "id, upper(id) as uid, age + 1 as newage, lower(ref1) as ref1, 17 as seventeen",
-                                "newage > 17 and ref2 > 17")
+                                "IF(TRUE, newage, 0) + 1 > 18 and ref2 > 17")
                         .addTimezone("GMT")
                         .build();
         RegularEventOperatorTestHarness<PostTransformOperator, Event>

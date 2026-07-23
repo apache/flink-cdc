@@ -2656,9 +2656,9 @@ class FlinkPipelineTransformITCase {
                 .cause()
                 .isExactlyInstanceOf(FlinkRuntimeException.class)
                 .hasMessage(
-                        "Failed to compile expression TransformExpressionKey{originalExpression='id1 > 0', compiledExpression='greaterThan($0, 0)', argumentNames=[__time_zone__, __epoch_time__], argumentClasses=[class java.lang.String, class java.lang.Long], returnClass=class java.lang.Boolean, columnNameMap={id1=$0}}")
+                        "Failed to compile expression TransformExpressionKey{originalExpression='id1 > 0', compiledScript='return greaterThan($0, 0);', argumentNames=[__time_zone__, __epoch_time__], argumentClasses=[class java.lang.String, class java.lang.Long], returnClass=class java.lang.Boolean, columnNameMap={id1=$0}}")
                 .cause()
-                .hasMessageContaining("Compiled expression: greaterThan($0, 0)")
+                .hasMessageContaining("Compiled script: return greaterThan($0, 0);")
                 .hasMessageContaining("Column name map: {$0 -> id1}")
                 .rootCause()
                 .isExactlyInstanceOf(CompileException.class)
@@ -2724,7 +2724,7 @@ class FlinkPipelineTransformITCase {
                 .hasMessageContaining(
                         "Failed to evaluate filtering expression for table `default_namespace.default_schema.mytable1`.\n"
                                 + "\tOriginal expression: name + 1 > 0\n"
-                                + "\tCompiled expression: greaterThan($0 + 1, 0)\n"
+                                + "\tCompiled script: return greaterThan($0 + 1, 0);\n"
                                 + "\tColumn name map: {$0 -> name}")
                 .rootCause()
                 .isExactlyInstanceOf(RuntimeException.class)

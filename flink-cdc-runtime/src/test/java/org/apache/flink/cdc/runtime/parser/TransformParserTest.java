@@ -399,7 +399,7 @@ class TransformParserTest {
     }
 
     @Test
-    void testTranslateLogicalFilterToJaninoExpressionUsesLazyTernary() {
+    void testTranslateLogicalFilterToJaninoExpressionByNullability() {
         List<Column> columns =
                 List.of(
                         Column.physicalColumn("left_bool", DataTypes.BOOLEAN().notNull()),
@@ -418,19 +418,15 @@ class TransformParserTest {
                 "left_bool or nullable_bool", "left_bool ? Boolean.TRUE : nullable_bool", columns);
         testFilterExpressionWithColumns(
                 "nullable_bool and right_bool",
-                "isFalse(nullable_bool) ? Boolean.FALSE : and(nullable_bool, right_bool)",
+                lazyLogicalFunction("and", "nullable_bool", "right_bool"),
                 columns);
         testFilterExpressionWithColumns(
                 "nullable_bool or right_bool",
-                "isTrue(nullable_bool) ? Boolean.TRUE : or(nullable_bool, right_bool)",
+                lazyLogicalFunction("or", "nullable_bool", "right_bool"),
                 columns);
         testFilterExpressionWithColumns(
                 "nullable_bool or false",
-                "isTrue(nullable_bool) ? Boolean.TRUE : or(nullable_bool, false)",
-                columns);
-        testFilterExpressionWithColumns(
-                "coalesce(nullable_bool, false) and right_bool",
-                "isFalse(coalesce(nullable_bool, false)) ? Boolean.FALSE : and(coalesce(nullable_bool, false), right_bool)",
+                lazyLogicalFunction("or", "nullable_bool", "false"),
                 columns);
     }
 
@@ -939,6 +935,13 @@ class TransformParserTest {
 
     private static final List<Column> DUMMY_COLUMNS =
             List.of(Column.physicalColumn("id", DataTypes.INT()));
+
+    private static String lazyLogicalFunction(
+            String functionName, String leftOperand, String rightOperand) {
+        return String.format(
+                "%s(%s, new java.util.function.Supplier<Boolean>() { public Boolean get() { return %s; } })",
+                functionName, leftOperand, rightOperand);
+    }
 
     private void testFilterExpression(String expression, String expressionExpect) {
         String janinoExpression =

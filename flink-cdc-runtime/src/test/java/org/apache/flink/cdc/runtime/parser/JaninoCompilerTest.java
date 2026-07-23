@@ -25,9 +25,16 @@ import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.variant.BinaryVariantInternalBuilder;
 import org.apache.flink.cdc.common.types.variant.Variant;
 import org.apache.flink.cdc.common.types.variant.VariantTypeException;
+import org.apache.flink.cdc.common.udf.UserDefinedFunction;
 import org.apache.flink.cdc.runtime.operators.transform.TransformExpressionKey;
+import org.apache.flink.cdc.runtime.operators.transform.UserDefinedFunctionDescriptor;
 
+import org.apache.calcite.sql.SqlDynamicParam;
+import org.apache.calcite.sql.SqlLiteral;
+import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlNodeList;
+import org.apache.calcite.sql.fun.SqlStdOperatorTable;
+import org.apache.calcite.sql.parser.SqlParserPos;
 import org.assertj.core.api.Assertions;
 import org.codehaus.commons.compiler.CompileException;
 import org.codehaus.commons.compiler.Location;
@@ -51,6 +58,14 @@ import java.util.stream.Stream;
 
 /** Unit tests for the {@link JaninoCompiler}. */
 class JaninoCompilerTest {
+
+    public static class CounterFunction implements UserDefinedFunction {
+        private int counter;
+
+        public String eval() {
+            return String.valueOf(++counter);
+        }
+    }
 
     @Test
     void testJaninoParser() throws CompileException, IOException, InvocationTargetException {
@@ -343,6 +358,75 @@ class JaninoCompilerTest {
     }
 
     @Test
+    void testGeneratedConditionalExpressionWithNumericTypeCoercion() throws Exception {
+        for (String expression :
+                List.of(
+                        "IF(TRUE, 1, CAST(2 AS BIGINT)) > 0",
+                        "CASE WHEN TRUE THEN 1 ELSE CAST(2 AS BIGINT) END > 0",
+                        "IF(TRUE, CAST(1 AS TINYINT), 2) > 0",
+                        "IF(TRUE, CAST(1 AS FLOAT), CAST(2 AS DOUBLE)) > 0",
+                        "IF(TRUE, 1, CAST(2 AS DECIMAL(10, 2))) > 0",
+                        "CASE WHEN TRUE THEN IF(TRUE, 1, CAST(2 AS BIGINT)) "
+                                + "ELSE CAST(3 AS BIGINT) END > 0",
+                        "IF(FALSE, 1, CAST(NULL AS BIGINT)) IS NULL")) {
+            GeneratedExpression generatedExpression =
+                    translateGeneratedFilterExpression(
+                            expression, Collections.emptyList(), Collections.emptyMap());
+
+            Assertions.assertThat(
+                            compileGeneratedFilterExpression(
+                                            generatedExpression,
+                                            Collections.emptyList(),
+                                            Collections.emptyList())
+                                    .evaluate(new Object[0]))
+                    .as(expression)
+                    .isEqualTo(true);
+        }
+    }
+
+    @Test
+    void testGeneratedConditionalExpressionWithObjectReturningFunction() throws Exception {
+        for (String expression :
+                List.of(
+                        "COALESCE(1, 2) = IF(TRUE, 1, 2)",
+                        "IF(TRUE, COALESCE('a', 'b'), 'c') = 'a'")) {
+            GeneratedExpression generatedExpression =
+                    translateGeneratedFilterExpression(
+                            expression, Collections.emptyList(), Collections.emptyMap());
+
+            Assertions.assertThat(
+                            compileGeneratedFilterExpression(
+                                            generatedExpression,
+                                            Collections.emptyList(),
+                                            Collections.emptyList())
+                                    .evaluate(new Object[0]))
+                    .as(expression)
+                    .isEqualTo(true);
+        }
+    }
+
+    @Test
+    void testGeneratedFunctionOperandsPreserveEvaluationOrder() throws Exception {
+        UserDefinedFunctionDescriptor descriptor =
+                new UserDefinedFunctionDescriptor("counter", CounterFunction.class.getName());
+        GeneratedExpression generatedExpression =
+                TransformParser.translateFilterExpressionToGeneratedExpression(
+                        "CONCAT(counter(), IF(TRUE, counter(), 'x')) = '12'",
+                        Collections.emptyList(),
+                        List.of(descriptor),
+                        new SupportedMetadataColumn[0],
+                        Collections.emptyMap());
+
+        Assertions.assertThat(
+                        compileGeneratedFilterExpression(
+                                        generatedExpression,
+                                        List.of("__instanceOf" + descriptor.getClassName()),
+                                        List.of(CounterFunction.class))
+                                .evaluate(new Object[] {new CounterFunction()}))
+                .isEqualTo(true);
+    }
+
+    @Test
     void testTransformExpressionKeyRejectsEmptyResultTermForFullScript() {
         TransformExpressionKey key =
                 TransformExpressionKey.of(
@@ -372,6 +456,43 @@ class JaninoCompilerTest {
                                         Boolean.class))
                 .isExactlyInstanceOf(ParseException.class)
                 .hasMessageStartingWith("Unrecognized expression:");
+    }
+
+    @Test
+    void testTranslateSqlNodeToGeneratedExpressionRejectsUnrecognizedOperand() {
+        SqlNode expression =
+                SqlStdOperatorTable.COALESCE.createCall(
+                        SqlParserPos.ZERO,
+                        SqlLiteral.createExactNumeric("1", SqlParserPos.ZERO),
+                        new SqlDynamicParam(0, SqlParserPos.ZERO));
+
+        Assertions.assertThatThrownBy(
+                        () ->
+                                JaninoCompiler.translateSqlNodeToGeneratedExpression(
+                                        JaninoCompiler.Context.of(
+                                                Collections.emptyList(),
+                                                Collections.emptyMap(),
+                                                Collections.emptyList(),
+                                                new SupportedMetadataColumn[0]),
+                                        expression,
+                                        Integer.class))
+                .isExactlyInstanceOf(ParseException.class)
+                .hasMessage("Unrecognized expression: ?");
+    }
+
+    @Test
+    void testTranslateSqlNodeToGeneratedExpressionHandlesCastTypeMetadata() throws Exception {
+        GeneratedExpression generatedExpression =
+                translateGeneratedFilterExpression(
+                        "CAST('true' AS BOOLEAN)", Collections.emptyList(), Collections.emptyMap());
+
+        Assertions.assertThat(
+                        compileGeneratedFilterExpression(
+                                        generatedExpression,
+                                        Collections.emptyList(),
+                                        Collections.emptyList())
+                                .evaluate(new Object[0]))
+                .isEqualTo(true);
     }
 
     @Test

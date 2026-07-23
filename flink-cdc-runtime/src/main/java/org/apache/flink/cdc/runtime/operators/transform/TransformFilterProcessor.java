@@ -71,7 +71,6 @@ public class TransformFilterProcessor {
         } else {
             this.transformExpressionKey =
                     generateTransformExpressionKey(
-                            tableInfo.getPreTransformedSchema().getColumns(),
                             udfDescriptors,
                             supportedMetadataColumns
                                     .values()
@@ -141,15 +140,7 @@ public class TransformFilterProcessor {
         List<Class<?>> argTypes = new ArrayList<>();
         String expression = transformFilter.getExpression();
 
-        // Post-transformed columns comes in priority
-        List<Column> columns = new ArrayList<>(tableInfo.getPostTransformedSchema().getColumns());
-        {
-            Set<String> existingColumnNames =
-                    new HashSet<>(tableInfo.getPostTransformedSchema().getColumnNames());
-            tableInfo.getPreTransformedSchema().getColumns().stream()
-                    .filter(col -> !existingColumnNames.contains(col.getName()))
-                    .forEach(columns::add);
-        }
+        List<Column> columns = getAvailableColumns();
 
         Map<String, String> columnNameMap = transformFilter.getColumnNameMap();
         LinkedHashSet<String> columnNames = new LinkedHashSet<>(transformFilter.getColumnNames());
@@ -186,6 +177,17 @@ public class TransformFilterProcessor {
         return Tuple2.of(argNames, argTypes);
     }
 
+    private List<Column> getAvailableColumns() {
+        // Post-transformed columns come in priority.
+        List<Column> columns = new ArrayList<>(tableInfo.getPostTransformedSchema().getColumns());
+        Set<String> existingColumnNames =
+                new HashSet<>(tableInfo.getPostTransformedSchema().getColumnNames());
+        tableInfo.getPreTransformedSchema().getColumns().stream()
+                .filter(column -> !existingColumnNames.contains(column.getName()))
+                .forEach(columns::add);
+        return columns;
+    }
+
     private Object[] generateParams(Object[] preRow, Object[] postRow, TransformContext context) {
         List<Object> params = new ArrayList<>();
 
@@ -212,7 +214,6 @@ public class TransformFilterProcessor {
     }
 
     private TransformExpressionKey generateTransformExpressionKey(
-            List<Column> columns,
             List<UserDefinedFunctionDescriptor> udfDescriptors,
             SupportedMetadataColumn[] supportedMetadataColumns) {
         Tuple2<List<String>, List<Class<?>>> args = generateArguments(true);
@@ -225,7 +226,7 @@ public class TransformFilterProcessor {
         GeneratedExpression generatedExpression =
                 TransformParser.translateFilterExpressionToGeneratedExpression(
                         transformFilter.getExpression(),
-                        columns,
+                        getAvailableColumns(),
                         udfDescriptors,
                         supportedMetadataColumns,
                         transformFilter.getColumnNameMap());
