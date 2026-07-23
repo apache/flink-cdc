@@ -168,6 +168,7 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                                     .with(DROP_SLOT_ON_STOP.name(), false)
                                     .build());
         }
+        dbzConfig = ((PostgresSourceConfig) sourceConfig).applyCaseSensitiveTableFilter(dbzConfig);
         setDbzConnectorConfig(dbzConfig);
         PostgresConnectorConfig.SnapshotMode snapshotMode =
                 PostgresConnectorConfig.SnapshotMode.parse(

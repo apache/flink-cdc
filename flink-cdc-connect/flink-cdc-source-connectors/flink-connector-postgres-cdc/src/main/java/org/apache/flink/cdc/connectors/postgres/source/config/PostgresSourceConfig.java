@@ -22,12 +22,17 @@ import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 
 import io.debezium.config.Configuration;
 import io.debezium.connector.postgresql.PostgresConnectorConfig;
+import io.debezium.relational.RelationalTableFilters;
+import io.debezium.relational.Tables;
+import io.debezium.util.Strings;
 
 import javax.annotation.Nullable;
 
 import java.time.Duration;
 import java.util.List;
 import java.util.Properties;
+import java.util.Set;
+import java.util.regex.Pattern;
 
 import static io.debezium.connector.postgresql.PostgresConnectorConfig.SLOT_NAME;
 
@@ -152,7 +157,31 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
 
     @Override
     public PostgresConnectorConfig getDbzConnectorConfig() {
-        return new PostgresConnectorConfig(getDbzConfiguration());
+        return applyCaseSensitiveTableFilter(new PostgresConnectorConfig(getDbzConfiguration()));
+    }
+
+    /** Applies the case-sensitive Postgres table filter to the connector configuration. */
+    public PostgresConnectorConfig applyCaseSensitiveTableFilter(
+            PostgresConnectorConfig connectorConfig) {
+        String tableIncludeList = connectorConfig.getConfig().getString("table.include.list");
+        if (tableIncludeList != null && !tableIncludeList.trim().isEmpty()) {
+            RelationalTableFilters tableFilters = connectorConfig.getTableFilters();
+            Tables.TableFilter originalTableFilter = tableFilters.dataCollectionFilter();
+            Set<Pattern> tableIncludePatterns = Strings.setOfRegex(tableIncludeList);
+            tableFilters.setDataCollectionFilters(
+                    tableId ->
+                            originalTableFilter.isIncluded(tableId)
+                                    && tableIncludePatterns.stream()
+                                            .anyMatch(
+                                                    pattern ->
+                                                            pattern.matcher(
+                                                                            tableId.schema()
+                                                                                    + "."
+                                                                                    + tableId
+                                                                                            .table())
+                                                                    .matches()));
+        }
+        return connectorConfig;
     }
 
     /** Returns whether to include database in the generated Table ID. */
