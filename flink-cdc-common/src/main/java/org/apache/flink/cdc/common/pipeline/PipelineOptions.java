@@ -156,5 +156,13 @@ public class PipelineOptions {
                                                             "TABLE_ID: Hash by TableId only. All events from the same table will land on the same subtask, ensuring per-table ordering semantics. This strategy is not supported for paimon, fluss, or maxcompute sinks.")))
                                     .build());
 
+    public static final ConfigOption<TransformExpressionSemantics>
+            PIPELINE_TRANSFORM_EXPRESSION_SEMANTICS =
+                    ConfigOptions.key("transform.expression.semantics")
+                            .enumType(TransformExpressionSemantics.class)
+                            .defaultValue(TransformExpressionSemantics.LEGACY)
+                            .withDescription(
+                                    "Semantics used to evaluate transform expressions. LEGACY preserves historical behavior, while FLINK_SQL enables Flink SQL-compatible semantics for supported predicates.");
+
     private PipelineOptions() {}
 }

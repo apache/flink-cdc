@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.runtime.parser;
 
 import org.apache.flink.api.common.io.ParseException;
+import org.apache.flink.cdc.common.pipeline.TransformExpressionSemantics;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
@@ -396,6 +397,23 @@ class TransformParserTest {
         testFilterExpression("cast(dt as TIMESTAMP)", "castToTimestamp(dt, __time_zone__)");
         testFilterExpression("parse_json(jsonStr)", "parseJson(jsonStr)");
         testFilterExpression("try_parse_json(jsonStr)", "tryParseJson(jsonStr)");
+    }
+
+    @Test
+    void testTranslateFilterWithFlinkSqlSemantics() {
+        testFlinkSqlFilterExpression("id = 1", "sqlValueEquals(id, 1)");
+        testFlinkSqlFilterExpression("id <> 1", "sqlNotEquals(id, 1)");
+        testFlinkSqlFilterExpression("id < 1", "sqlLessThan(id, 1)");
+        testFlinkSqlFilterExpression("id <= 1", "sqlLessThanOrEqual(id, 1)");
+        testFlinkSqlFilterExpression("id > 1", "sqlGreaterThan(id, 1)");
+        testFlinkSqlFilterExpression("id >= 1", "sqlGreaterThanOrEqual(id, 1)");
+        testFlinkSqlFilterExpression("id between 1 and 3", "sqlBetween(id, 1, 3)");
+        testFlinkSqlFilterExpression("id not between 1 and 3", "sqlNotBetween(id, 1, 3)");
+        testFlinkSqlFilterExpression("id in (1, 2)", "sqlIn(id, 1, 2)");
+        testFlinkSqlFilterExpression("id not in (1, 2)", "sqlNotIn(id, 1, 2)");
+        testFlinkSqlFilterExpression("id like 'A%'", "sqlLike(id, \"A%\")");
+        testFlinkSqlFilterExpression("id not like 'A%'", "sqlNotLike(id, \"A%\")");
+        testFlinkSqlFilterExpression("id like 'A$%' escape '$'", "like(id, \"A$%\", \"$\")");
     }
 
     @Test
@@ -911,6 +929,18 @@ class TransformParserTest {
                         Collections.emptyList(),
                         new SupportedMetadataColumn[0],
                         Collections.emptyMap());
+        Assertions.assertThat(janinoExpression).isEqualTo(expressionExpect);
+    }
+
+    private void testFlinkSqlFilterExpression(String expression, String expressionExpect) {
+        String janinoExpression =
+                TransformParser.translateFilterExpressionToJaninoExpression(
+                        expression,
+                        DUMMY_COLUMNS,
+                        Collections.emptyList(),
+                        new SupportedMetadataColumn[0],
+                        Collections.emptyMap(),
+                        TransformExpressionSemantics.FLINK_SQL);
         Assertions.assertThat(janinoExpression).isEqualTo(expressionExpect);
     }
 

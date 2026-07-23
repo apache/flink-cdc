@@ -33,6 +33,22 @@ class StringFunctionsTest {
     }
 
     @Test
+    void testFlinkSqlLikeUsesSqlWildcardsAndMatchesWholeString() {
+        assertThat(StringFunctions.sqlLike("Alice", "A%")).isTrue();
+        assertThat(StringFunctions.sqlLike("Alice", "A_i_e")).isTrue();
+        assertThat(StringFunctions.sqlLike("xabcy", "abc")).isFalse();
+        assertThat(StringFunctions.sqlLike("Alice", "A.*")).isFalse();
+        assertThat(StringFunctions.sqlNotLike("Alice", "A%")).isFalse();
+    }
+
+    @Test
+    void testFlinkSqlLikeNullReturnsUnknown() {
+        assertThat(StringFunctions.sqlLike(null, "A%")).isNull();
+        assertThat(StringFunctions.sqlLike("Alice", null)).isNull();
+        assertThat(StringFunctions.sqlNotLike(null, "A%")).isNull();
+    }
+
+    @Test
     void testLikeEscape() {
         assertThat(StringFunctions.like("A%", "A$%", "$")).isTrue();
         assertThat(StringFunctions.like("A_", "A$_", "$")).isTrue();

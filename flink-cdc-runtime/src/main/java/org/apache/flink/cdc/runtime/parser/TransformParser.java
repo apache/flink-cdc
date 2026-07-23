@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.runtime.parser;
 
 import org.apache.flink.api.common.io.ParseException;
+import org.apache.flink.cdc.common.pipeline.TransformExpressionSemantics;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.common.types.DataType;
@@ -277,6 +278,20 @@ public class TransformParser {
             List<Column> columns,
             List<UserDefinedFunctionDescriptor> udfDescriptors,
             SupportedMetadataColumn[] supportedMetadataColumns) {
+        return generateProjectionColumns(
+                projectionExpression,
+                columns,
+                udfDescriptors,
+                supportedMetadataColumns,
+                TransformExpressionSemantics.LEGACY);
+    }
+
+    public static List<ProjectionColumn> generateProjectionColumns(
+            String projectionExpression,
+            List<Column> columns,
+            List<UserDefinedFunctionDescriptor> udfDescriptors,
+            SupportedMetadataColumn[] supportedMetadataColumns,
+            TransformExpressionSemantics expressionSemantics) {
         if (isNullOrWhitespaceOnly(projectionExpression)) {
             return new ArrayList<>();
         }
@@ -355,7 +370,8 @@ public class TransformParser {
                                                     columns,
                                                     columnNameMap,
                                                     udfDescriptors,
-                                                    supportedMetadataColumns),
+                                                    supportedMetadataColumns,
+                                                    expressionSemantics),
                                             exprNode),
                                     originalColumnNames,
                                     columnNameMap);
@@ -575,6 +591,22 @@ public class TransformParser {
             List<UserDefinedFunctionDescriptor> udfDescriptors,
             SupportedMetadataColumn[] supportedMetadataColumns,
             Map<String, String> columnNameMap) {
+        return translateFilterExpressionToJaninoExpression(
+                filterExpression,
+                columns,
+                udfDescriptors,
+                supportedMetadataColumns,
+                columnNameMap,
+                TransformExpressionSemantics.LEGACY);
+    }
+
+    public static String translateFilterExpressionToJaninoExpression(
+            String filterExpression,
+            List<Column> columns,
+            List<UserDefinedFunctionDescriptor> udfDescriptors,
+            SupportedMetadataColumn[] supportedMetadataColumns,
+            Map<String, String> columnNameMap,
+            TransformExpressionSemantics expressionSemantics) {
         if (isNullOrWhitespaceOnly(filterExpression)) {
             return "";
         }
@@ -585,7 +617,11 @@ public class TransformParser {
         SqlNode where = sqlSelect.getWhere();
         return JaninoCompiler.translateSqlNodeToJaninoExpression(
                 JaninoCompiler.Context.of(
-                        columns, columnNameMap, udfDescriptors, supportedMetadataColumns),
+                        columns,
+                        columnNameMap,
+                        udfDescriptors,
+                        supportedMetadataColumns,
+                        expressionSemantics),
                 where);
     }
 

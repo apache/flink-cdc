@@ -19,6 +19,7 @@ package org.apache.flink.cdc.runtime.operators.transform;
 
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.converter.JavaClassConverter;
+import org.apache.flink.cdc.common.pipeline.TransformExpressionSemantics;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.runtime.parser.JaninoCompiler;
@@ -47,6 +48,7 @@ public class TransformFilterProcessor {
     private final String timezone;
     private final List<Object> udfFunctionInstances;
     private final Map<String, SupportedMetadataColumn> supportedMetadataColumns;
+    private final TransformExpressionSemantics expressionSemantics;
 
     private final TransformExpressionKey transformExpressionKey;
     private final ExpressionEvaluator expressionEvaluator;
@@ -58,13 +60,15 @@ public class TransformFilterProcessor {
             String timezone,
             List<UserDefinedFunctionDescriptor> udfDescriptors,
             List<Object> udfFunctionInstances,
-            Map<String, SupportedMetadataColumn> supportedMetadataColumns) {
+            Map<String, SupportedMetadataColumn> supportedMetadataColumns,
+            TransformExpressionSemantics expressionSemantics) {
         this.isNoOp = isNoOp;
         this.tableInfo = tableInfo;
         this.transformFilter = transformFilter;
         this.timezone = timezone;
         this.udfFunctionInstances = udfFunctionInstances;
         this.supportedMetadataColumns = supportedMetadataColumns;
+        this.expressionSemantics = expressionSemantics;
 
         if (isNoOp) {
             this.transformExpressionKey = null;
@@ -84,7 +88,8 @@ public class TransformFilterProcessor {
     }
 
     public static TransformFilterProcessor ofNoOp() {
-        return new TransformFilterProcessor(true, null, null, null, null, null, null);
+        return new TransformFilterProcessor(
+                true, null, null, null, null, null, null, TransformExpressionSemantics.LEGACY);
     }
 
     public static TransformFilterProcessor of(
@@ -93,7 +98,8 @@ public class TransformFilterProcessor {
             String timezone,
             List<UserDefinedFunctionDescriptor> udfDescriptors,
             List<Object> udfFunctionInstances,
-            SupportedMetadataColumn[] supportedMetadataColumns) {
+            SupportedMetadataColumn[] supportedMetadataColumns,
+            TransformExpressionSemantics expressionSemantics) {
         Map<String, SupportedMetadataColumn> supportedMetadataColumnsMap = new HashMap<>();
         for (SupportedMetadataColumn supportedMetadataColumn : supportedMetadataColumns) {
             supportedMetadataColumnsMap.put(
@@ -106,7 +112,8 @@ public class TransformFilterProcessor {
                 timezone,
                 udfDescriptors,
                 udfFunctionInstances,
-                supportedMetadataColumnsMap);
+                supportedMetadataColumnsMap,
+                expressionSemantics);
     }
 
     public boolean test(Object[] preRow, Object[] postRow, TransformContext context) {
@@ -229,7 +236,8 @@ public class TransformFilterProcessor {
                         columns,
                         udfDescriptors,
                         supportedMetadataColumns,
-                        transformFilter.getColumnNameMap());
+                        transformFilter.getColumnNameMap(),
+                        expressionSemantics);
 
         return TransformExpressionKey.of(
                 transformFilter.getExpression(),
