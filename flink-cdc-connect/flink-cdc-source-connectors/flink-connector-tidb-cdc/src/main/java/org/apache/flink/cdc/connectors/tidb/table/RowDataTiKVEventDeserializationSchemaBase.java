@@ -39,6 +39,7 @@ import org.tikv.kvproto.Kvrpcpb;
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
@@ -434,7 +435,7 @@ public class RowDataTiKVEventDeserializationSchemaBase implements Serializable {
                 if (object instanceof byte[]) {
                     return object;
                 } else if (object instanceof String) {
-                    return ((String) object).getBytes();
+                    return ((String) object).getBytes(StandardCharsets.UTF_8);
                 } else if (object instanceof ByteBuffer) {
                     ByteBuffer byteBuffer = (ByteBuffer) object;
                     byte[] bytes = new byte[byteBuffer.remaining()];
