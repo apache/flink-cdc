@@ -21,10 +21,12 @@ import org.apache.flink.cdc.runtime.functions.BuiltInScalarFunction;
 import org.apache.flink.cdc.runtime.functions.BuiltInTimestampFunction;
 
 import org.apache.calcite.sql.SqlBinaryOperator;
+import org.apache.calcite.sql.SqlCallBinding;
 import org.apache.calcite.sql.SqlFunction;
 import org.apache.calcite.sql.SqlFunctionCategory;
 import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.SqlOperandCountRange;
 import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql.SqlPostfixOperator;
 import org.apache.calcite.sql.SqlPrefixOperator;
@@ -32,14 +34,18 @@ import org.apache.calcite.sql.SqlSpecialOperator;
 import org.apache.calcite.sql.SqlSyntax;
 import org.apache.calcite.sql.fun.SqlBetweenOperator;
 import org.apache.calcite.sql.fun.SqlCaseOperator;
+import org.apache.calcite.sql.fun.SqlOverlayFunction;
+import org.apache.calcite.sql.fun.SqlPositionFunction;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.type.InferTypes;
 import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.ReturnTypes;
 import org.apache.calcite.sql.type.SqlOperandCountRanges;
+import org.apache.calcite.sql.type.SqlOperandTypeChecker;
 import org.apache.calcite.sql.type.SqlTypeFamily;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.sql.type.SqlTypeTransforms;
+import org.apache.calcite.sql.type.SqlTypeUtil;
 import org.apache.calcite.sql.util.ReflectiveSqlOperatorTable;
 import org.apache.calcite.sql.validate.SqlNameMatcher;
 import org.apache.calcite.sql.validate.SqlNameMatchers;
@@ -53,7 +59,69 @@ public class TransformSqlOperatorTable extends ReflectiveSqlOperatorTable {
 
     private static TransformSqlOperatorTable instance;
 
+    private static final SqlOperandTypeChecker OVERLAY_OPERAND_TYPES =
+            requireCharacterOperands(
+                    OperandTypes.or(
+                            OperandTypes.family(
+                                    SqlTypeFamily.CHARACTER,
+                                    SqlTypeFamily.CHARACTER,
+                                    SqlTypeFamily.INTEGER),
+                            OperandTypes.family(
+                                    SqlTypeFamily.CHARACTER,
+                                    SqlTypeFamily.CHARACTER,
+                                    SqlTypeFamily.INTEGER,
+                                    SqlTypeFamily.INTEGER)),
+                    0,
+                    1);
+
+    private static final SqlOperandTypeChecker POSITION_OPERAND_TYPES =
+            requireCharacterOperands(
+                    OperandTypes.family(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER), 0, 1);
+
     private TransformSqlOperatorTable() {}
+
+    private static SqlOperandTypeChecker requireCharacterOperands(
+            SqlOperandTypeChecker delegate, int... operandIndexes) {
+        return new SqlOperandTypeChecker() {
+            @Override
+            public boolean checkOperandTypes(SqlCallBinding callBinding, boolean throwOnFailure) {
+                for (int operandIndex : operandIndexes) {
+                    SqlTypeName typeName =
+                            callBinding.getOperandType(operandIndex).getSqlTypeName();
+                    if (typeName != SqlTypeName.NULL
+                            && typeName != SqlTypeName.ANY
+                            && !SqlTypeUtil.inCharFamily(
+                                    callBinding.getOperandType(operandIndex))) {
+                        if (!throwOnFailure) {
+                            return false;
+                        }
+                        throw callBinding.newValidationSignatureError();
+                    }
+                }
+                return delegate.checkOperandTypes(callBinding, throwOnFailure);
+            }
+
+            @Override
+            public SqlOperandCountRange getOperandCountRange() {
+                return delegate.getOperandCountRange();
+            }
+
+            @Override
+            public String getAllowedSignatures(SqlOperator op, String opName) {
+                return delegate.getAllowedSignatures(op, opName);
+            }
+
+            @Override
+            public Consistency getConsistency() {
+                return delegate.getConsistency();
+            }
+
+            @Override
+            public boolean isOptional(int operandIndex) {
+                return delegate.isOptional(operandIndex);
+            }
+        };
+    }
 
     public static synchronized TransformSqlOperatorTable instance() {
         if (instance == null) {
@@ -174,6 +242,38 @@ public class TransformSqlOperatorTable extends ReflectiveSqlOperatorTable {
     public static final SqlFunction UPPER = SqlStdOperatorTable.UPPER;
     public static final SqlFunction LOWER = SqlStdOperatorTable.LOWER;
     public static final SqlFunction TRIM = SqlStdOperatorTable.TRIM;
+    public static final SqlFunction LTRIM =
+            new SqlFunction(
+                    "LTRIM",
+                    SqlKind.OTHER_FUNCTION,
+                    ReturnTypes.ARG0_NULLABLE_VARYING,
+                    null,
+                    OperandTypes.or(
+                            OperandTypes.family(SqlTypeFamily.CHARACTER),
+                            OperandTypes.family(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER)),
+                    SqlFunctionCategory.STRING);
+    public static final SqlFunction RTRIM =
+            new SqlFunction(
+                    "RTRIM",
+                    SqlKind.OTHER_FUNCTION,
+                    ReturnTypes.ARG0_NULLABLE_VARYING,
+                    null,
+                    OperandTypes.or(
+                            OperandTypes.family(SqlTypeFamily.CHARACTER),
+                            OperandTypes.family(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER)),
+                    SqlFunctionCategory.STRING);
+    public static final SqlFunction BTRIM =
+            new SqlFunction(
+                    "BTRIM",
+                    SqlKind.OTHER_FUNCTION,
+                    ReturnTypes.cascade(
+                            ReturnTypes.explicit(SqlTypeName.VARCHAR),
+                            SqlTypeTransforms.TO_NULLABLE),
+                    null,
+                    OperandTypes.or(
+                            OperandTypes.family(SqlTypeFamily.CHARACTER),
+                            OperandTypes.family(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER)),
+                    SqlFunctionCategory.STRING);
     public static final SqlFunction REGEXP_REPLACE =
             new SqlFunction(
                     "REGEXP_REPLACE",
@@ -199,6 +299,168 @@ public class TransformSqlOperatorTable extends ReflectiveSqlOperatorTable {
                                     SqlTypeFamily.INTEGER)),
                     SqlFunctionCategory.STRING);
     public static final SqlFunction SUBSTRING = SqlStdOperatorTable.SUBSTRING;
+    public static final SqlFunction OVERLAY =
+            new SqlOverlayFunction() {
+                @Override
+                public SqlOperandCountRange getOperandCountRange() {
+                    return OVERLAY_OPERAND_TYPES.getOperandCountRange();
+                }
+
+                @Override
+                public boolean checkOperandTypes(
+                        SqlCallBinding callBinding, boolean throwOnFailure) {
+                    return OVERLAY_OPERAND_TYPES.checkOperandTypes(callBinding, throwOnFailure);
+                }
+            };
+    public static final SqlFunction POSITION =
+            new SqlPositionFunction() {
+                @Override
+                public SqlOperandCountRange getOperandCountRange() {
+                    return POSITION_OPERAND_TYPES.getOperandCountRange();
+                }
+
+                @Override
+                public boolean checkOperandTypes(
+                        SqlCallBinding callBinding, boolean throwOnFailure) {
+                    return POSITION_OPERAND_TYPES.checkOperandTypes(callBinding, throwOnFailure);
+                }
+            };
+    public static final SqlFunction LOCATE =
+            new SqlFunction(
+                    "LOCATE",
+                    SqlKind.OTHER_FUNCTION,
+                    ReturnTypes.INTEGER_NULLABLE,
+                    null,
+                    OperandTypes.or(
+                            OperandTypes.family(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER),
+                            OperandTypes.family(
+                                    SqlTypeFamily.CHARACTER,
+                                    SqlTypeFamily.CHARACTER,
+                                    SqlTypeFamily.INTEGER)),
+                    SqlFunctionCategory.STRING);
+    public static final SqlFunction INSTR =
+            new SqlFunction(
+                    "INSTR",
+                    SqlKind.OTHER_FUNCTION,
+                    ReturnTypes.INTEGER_NULLABLE,
+                    null,
+                    OperandTypes.family(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER),
+                    SqlFunctionCategory.STRING);
+    public static final SqlFunction CONCAT_WS =
+            new SqlFunction(
+                    "CONCAT_WS",
+                    SqlKind.OTHER_FUNCTION,
+                    ReturnTypes.cascade(
+                            ReturnTypes.explicit(SqlTypeName.VARCHAR),
+                            SqlTypeTransforms.TO_NULLABLE),
+                    null,
+                    OperandTypes.repeat(SqlOperandCountRanges.from(2), OperandTypes.CHARACTER),
+                    SqlFunctionCategory.STRING);
+    public static final SqlFunction LPAD =
+            new SqlFunction(
+                    "LPAD",
+                    SqlKind.OTHER_FUNCTION,
+                    ReturnTypes.cascade(
+                            ReturnTypes.explicit(SqlTypeName.VARCHAR),
+                            SqlTypeTransforms.TO_NULLABLE),
+                    null,
+                    OperandTypes.family(
+                            SqlTypeFamily.CHARACTER,
+                            SqlTypeFamily.INTEGER,
+                            SqlTypeFamily.CHARACTER),
+                    SqlFunctionCategory.STRING);
+    public static final SqlFunction RPAD =
+            new SqlFunction(
+                    "RPAD",
+                    SqlKind.OTHER_FUNCTION,
+                    ReturnTypes.cascade(
+                            ReturnTypes.explicit(SqlTypeName.VARCHAR),
+                            SqlTypeTransforms.TO_NULLABLE),
+                    null,
+                    OperandTypes.family(
+                            SqlTypeFamily.CHARACTER,
+                            SqlTypeFamily.INTEGER,
+                            SqlTypeFamily.CHARACTER),
+                    SqlFunctionCategory.STRING);
+    public static final SqlFunction REPLACE =
+            new SqlFunction(
+                    "REPLACE",
+                    SqlKind.OTHER_FUNCTION,
+                    ReturnTypes.cascade(
+                            ReturnTypes.explicit(SqlTypeName.VARCHAR),
+                            SqlTypeTransforms.TO_NULLABLE),
+                    null,
+                    OperandTypes.family(
+                            SqlTypeFamily.CHARACTER,
+                            SqlTypeFamily.CHARACTER,
+                            SqlTypeFamily.CHARACTER),
+                    SqlFunctionCategory.STRING);
+    public static final SqlFunction REPEAT =
+            new SqlFunction(
+                    "REPEAT",
+                    SqlKind.OTHER_FUNCTION,
+                    ReturnTypes.cascade(
+                            ReturnTypes.explicit(SqlTypeName.VARCHAR),
+                            SqlTypeTransforms.TO_NULLABLE),
+                    null,
+                    OperandTypes.family(SqlTypeFamily.CHARACTER, SqlTypeFamily.INTEGER),
+                    SqlFunctionCategory.STRING);
+    public static final SqlFunction LEFT =
+            new SqlFunction(
+                    "LEFT",
+                    SqlKind.OTHER_FUNCTION,
+                    ReturnTypes.ARG0_NULLABLE_VARYING,
+                    null,
+                    OperandTypes.family(SqlTypeFamily.CHARACTER, SqlTypeFamily.INTEGER),
+                    SqlFunctionCategory.STRING);
+    public static final SqlFunction RIGHT =
+            new SqlFunction(
+                    "RIGHT",
+                    SqlKind.OTHER_FUNCTION,
+                    ReturnTypes.ARG0_NULLABLE_VARYING,
+                    null,
+                    OperandTypes.family(SqlTypeFamily.CHARACTER, SqlTypeFamily.INTEGER),
+                    SqlFunctionCategory.STRING);
+    public static final SqlFunction STARTSWITH =
+            new SqlFunction(
+                    "STARTSWITH",
+                    SqlKind.OTHER_FUNCTION,
+                    ReturnTypes.BOOLEAN_NULLABLE,
+                    null,
+                    OperandTypes.or(
+                            OperandTypes.family(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER),
+                            OperandTypes.family(SqlTypeFamily.BINARY, SqlTypeFamily.BINARY)),
+                    SqlFunctionCategory.STRING);
+    public static final SqlFunction ENDSWITH =
+            new SqlFunction(
+                    "ENDSWITH",
+                    SqlKind.OTHER_FUNCTION,
+                    ReturnTypes.BOOLEAN_NULLABLE,
+                    null,
+                    OperandTypes.or(
+                            OperandTypes.family(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER),
+                            OperandTypes.family(SqlTypeFamily.BINARY, SqlTypeFamily.BINARY)),
+                    SqlFunctionCategory.STRING);
+    public static final SqlFunction TO_BASE64 =
+            new SqlFunction(
+                    "TO_BASE64",
+                    SqlKind.OTHER_FUNCTION,
+                    ReturnTypes.cascade(
+                            ReturnTypes.explicit(SqlTypeName.VARCHAR),
+                            SqlTypeTransforms.TO_NULLABLE),
+                    null,
+                    OperandTypes.family(SqlTypeFamily.CHARACTER),
+                    SqlFunctionCategory.STRING);
+    public static final SqlFunction FROM_BASE64 =
+            new SqlFunction(
+                    "FROM_BASE64",
+                    SqlKind.OTHER_FUNCTION,
+                    ReturnTypes.cascade(
+                            ReturnTypes.explicit(SqlTypeName.VARCHAR),
+                            SqlTypeTransforms.TO_NULLABLE),
+                    null,
+                    OperandTypes.family(SqlTypeFamily.CHARACTER),
+                    SqlFunctionCategory.STRING);
 
     // ------------------
     // Temporal Functions

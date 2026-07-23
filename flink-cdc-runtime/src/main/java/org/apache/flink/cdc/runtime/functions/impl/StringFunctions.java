@@ -24,6 +24,8 @@ import org.apache.calcite.runtime.SqlFunctions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -64,6 +66,25 @@ public class StringFunctions {
 
     public static String concat(String... str) {
         return String.join("", str);
+    }
+
+    public static String concatWs(String separator, String... str) {
+        if (separator == null || str == null) {
+            return null;
+        }
+        StringBuilder builder = new StringBuilder();
+        boolean first = true;
+        for (String s : str) {
+            if (s == null) {
+                continue;
+            }
+            if (!first) {
+                builder.append(separator);
+            }
+            builder.append(s);
+            first = false;
+        }
+        return builder.toString();
     }
 
     public static boolean like(String str, String regex) {
@@ -176,6 +197,193 @@ public class StringFunctions {
         return str.toLowerCase();
     }
 
+    public static String overlay(String str, String replacement, Number start) {
+        if (replacement == null) {
+            return null;
+        }
+        return overlay(str, replacement, start, replacement.length());
+    }
+
+    public static String overlay(String str, String replacement, Number start, Number length) {
+        if (str == null || replacement == null || start == null || length == null) {
+            return null;
+        }
+        int startPosition = start.intValue();
+        int len = length.intValue();
+        if (startPosition <= 0 || startPosition > str.length()) {
+            return str;
+        }
+
+        StringBuilder builder = new StringBuilder();
+        builder.append(str, 0, startPosition - 1);
+        builder.append(replacement);
+        if (startPosition + len <= str.length() && len > 0) {
+            builder.append(str.substring(startPosition - 1 + len));
+        }
+        return builder.toString();
+    }
+
+    public static Integer position(String seek, String str) {
+        return position(seek, str, 1);
+    }
+
+    public static Integer position(String seek, String str, Number from) {
+        if (seek == null || str == null || from == null) {
+            return null;
+        }
+        if (seek.isEmpty()) {
+            return 1;
+        }
+        int fromCodePoint = Math.max(from.intValue() - 1, 0);
+        int codePointLength = str.codePointCount(0, str.length());
+        if (fromCodePoint > codePointLength) {
+            return 0;
+        }
+        int fromIndex = str.offsetByCodePoints(0, fromCodePoint);
+        int index = str.indexOf(seek, fromIndex);
+        return index < 0 ? 0 : str.codePointCount(0, index) + 1;
+    }
+
+    public static Integer instr(String str, String subString) {
+        if (str == null || subString == null) {
+            return null;
+        }
+        int index = str.indexOf(subString);
+        return index < 0 ? 0 : str.codePointCount(0, index) + 1;
+    }
+
+    public static Integer locate(String seek, String str) {
+        return position(seek, str);
+    }
+
+    public static Integer locate(String seek, String str, Number from) {
+        return position(seek, str, from);
+    }
+
+    public static String ltrim(String str) {
+        return ltrim(str, " ");
+    }
+
+    public static String ltrim(String str, String trimStr) {
+        return trim(str, trimStr, true, false);
+    }
+
+    public static String rtrim(String str) {
+        return rtrim(str, " ");
+    }
+
+    public static String rtrim(String str, String trimStr) {
+        return trim(str, trimStr, false, true);
+    }
+
+    public static String btrim(String str) {
+        return btrim(str, " ");
+    }
+
+    public static String btrim(String str, String trimStr) {
+        return trim(str, trimStr, true, true);
+    }
+
+    public static String lpad(String base, Number len, String pad) {
+        return pad(base, len, pad, true);
+    }
+
+    public static String rpad(String base, Number len, String pad) {
+        return pad(base, len, pad, false);
+    }
+
+    public static String replace(String str, String oldStr, String replacement) {
+        if (str == null || oldStr == null || replacement == null) {
+            return null;
+        }
+        return str.replace(oldStr, replacement);
+    }
+
+    public static String repeat(String str, Number repeat) {
+        if (str == null || repeat == null) {
+            return null;
+        }
+        int count = repeat.intValue();
+        if (count <= 0) {
+            return "";
+        }
+        return str.repeat(count);
+    }
+
+    public static String left(String str, Number length) {
+        if (str == null || length == null) {
+            return null;
+        }
+        int len = length.intValue();
+        if (len <= 0) {
+            return "";
+        }
+        int codePointLength = str.codePointCount(0, str.length());
+        if (len >= codePointLength) {
+            return str;
+        }
+        return str.substring(0, str.offsetByCodePoints(0, len));
+    }
+
+    public static String right(String str, Number length) {
+        if (str == null || length == null) {
+            return null;
+        }
+        int len = length.intValue();
+        if (len <= 0) {
+            return "";
+        }
+        int codePointLength = str.codePointCount(0, str.length());
+        if (len >= codePointLength) {
+            return str;
+        }
+        return str.substring(str.offsetByCodePoints(0, codePointLength - len));
+    }
+
+    public static Boolean startswith(String str, String prefix) {
+        if (str == null || prefix == null) {
+            return null;
+        }
+        return str.startsWith(prefix);
+    }
+
+    public static Boolean startswith(byte[] bytes, byte[] prefix) {
+        if (bytes == null || prefix == null) {
+            return null;
+        }
+        return matchesAt(bytes, prefix, 0);
+    }
+
+    public static Boolean endswith(String str, String suffix) {
+        if (str == null || suffix == null) {
+            return null;
+        }
+        return str.endsWith(suffix);
+    }
+
+    public static Boolean endswith(byte[] bytes, byte[] suffix) {
+        if (bytes == null || suffix == null) {
+            return null;
+        }
+        return matchesAt(bytes, suffix, bytes.length - suffix.length);
+    }
+
+    public static String toBase64(String str) {
+        if (str == null) {
+            return null;
+        }
+        return Base64.getEncoder().encodeToString(str.getBytes(StandardCharsets.UTF_8));
+    }
+
+    public static String fromBase64(String str) {
+        if (str == null) {
+            return null;
+        }
+        return new String(
+                Base64.getDecoder().decode(str.getBytes(StandardCharsets.UTF_8)),
+                StandardCharsets.UTF_8);
+    }
+
     public static String uuid() {
         return UUID.randomUUID().toString();
     }
@@ -215,5 +423,89 @@ public class StringFunctions {
             throw new IllegalArgumentException(
                     String.format("Failed to parse json string: %s", jsonStr), e);
         }
+    }
+
+    private static String trim(
+            String str, String trimStr, boolean trimLeading, boolean trimTrailing) {
+        if (str == null || trimStr == null) {
+            return null;
+        }
+        if (trimStr.isEmpty()) {
+            return str;
+        }
+        int begin = 0;
+        int end = str.length();
+        while (trimLeading && begin < end) {
+            int codePoint = str.codePointAt(begin);
+            if (trimStr.indexOf(codePoint) < 0) {
+                break;
+            }
+            begin += Character.charCount(codePoint);
+        }
+        while (trimTrailing && begin < end) {
+            int codePoint = str.codePointBefore(end);
+            if (trimStr.indexOf(codePoint) < 0) {
+                break;
+            }
+            end -= Character.charCount(codePoint);
+        }
+        return str.substring(begin, end);
+    }
+
+    private static boolean matchesAt(byte[] bytes, byte[] target, int offset) {
+        if (offset < 0 || offset + target.length > bytes.length) {
+            return false;
+        }
+        for (int i = 0; i < target.length; i++) {
+            if (bytes[offset + i] != target[i]) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static String pad(String base, Number length, String pad, boolean leftPad) {
+        if (base == null || length == null || pad == null) {
+            return null;
+        }
+        int len = length.intValue();
+        if (len < 0 || pad.isEmpty()) {
+            return null;
+        } else if (len == 0) {
+            return "";
+        }
+
+        char[] data = new char[len];
+        char[] baseChars = base.toCharArray();
+        char[] padChars = pad.toCharArray();
+
+        if (leftPad) {
+            int pos = Math.max(len - base.length(), 0);
+            for (int i = 0; i < pos; i += pad.length()) {
+                for (int j = 0; j < pad.length() && j < pos - i; j++) {
+                    data[i + j] = padChars[j];
+                }
+            }
+            int i = 0;
+            while (pos + i < len && i < base.length()) {
+                data[pos + i] = baseChars[i];
+                i++;
+            }
+        } else {
+            int pos = 0;
+            while (pos < base.length() && pos < len) {
+                data[pos] = baseChars[pos];
+                pos++;
+            }
+            while (pos < len) {
+                int i = 0;
+                while (i < pad.length() && i < len - pos) {
+                    data[pos + i] = padChars[i];
+                    i++;
+                }
+                pos += pad.length();
+            }
+        }
+        return new String(data);
     }
 }
