@@ -20,8 +20,12 @@ package org.apache.flink.cdc.connectors.mysql.source;
 import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.factories.Factory;
+import org.apache.flink.cdc.common.source.FlinkSourceProvider;
 import org.apache.flink.cdc.connectors.mysql.factory.MySqlDataSourceFactory;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
+import org.apache.flink.streaming.api.lineage.DatasetSchemaFacet;
+import org.apache.flink.streaming.api.lineage.LineageVertexProvider;
+import org.apache.flink.streaming.api.lineage.SourceLineageVertex;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.ObjectPath;
 
@@ -74,6 +78,40 @@ class MySqlDataSourceFactoryTest extends MySqlSourceTestBase {
         MySqlDataSource dataSource = (MySqlDataSource) factory.createDataSource(context);
         assertThat(dataSource.getSourceConfig().getTableList())
                 .isEqualTo(Arrays.asList(inventoryDatabase.getDatabaseName() + ".products"));
+    }
+
+    @Test
+    void testCreateSourceLineage() {
+        inventoryDatabase.createAndInitialize();
+        Map<String, String> options = new HashMap<>();
+        options.put(HOSTNAME.key(), MYSQL_CONTAINER.getHost());
+        options.put(PORT.key(), String.valueOf(MYSQL_CONTAINER.getDatabasePort()));
+        options.put(USERNAME.key(), TEST_USER);
+        options.put(PASSWORD.key(), TEST_PASSWORD);
+        options.put(TABLES.key(), inventoryDatabase.getDatabaseName() + ".prod\\.*");
+        Factory.Context context = new MockContext(Configuration.fromMap(options));
+
+        MySqlDataSourceFactory factory = new MySqlDataSourceFactory();
+        MySqlDataSource dataSource = (MySqlDataSource) factory.createDataSource(context);
+        FlinkSourceProvider sourceProvider =
+                (FlinkSourceProvider) dataSource.getEventSourceProvider();
+        SourceLineageVertex lineageVertex =
+                (SourceLineageVertex)
+                        ((LineageVertexProvider) sourceProvider.getSource()).getLineageVertex();
+
+        assertThat(lineageVertex.datasets()).hasSize(1);
+        assertThat(lineageVertex.datasets().get(0).name())
+                .isEqualTo(inventoryDatabase.getDatabaseName() + ".products");
+        assertThat(lineageVertex.datasets().get(0).namespace())
+                .isEqualTo(
+                        "mysql://"
+                                + MYSQL_CONTAINER.getHost()
+                                + ":"
+                                + MYSQL_CONTAINER.getDatabasePort());
+
+        DatasetSchemaFacet schemaFacet =
+                (DatasetSchemaFacet) lineageVertex.datasets().get(0).facets().get("schema");
+        assertThat(schemaFacet.fields()).containsKeys("id", "name", "description", "weight");
     }
 
     @Test
