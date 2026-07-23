@@ -19,6 +19,7 @@ package org.apache.flink.cdc.composer.flink.translator;
 
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.pipeline.TransformExpressionSemantics;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.composer.definition.ModelDef;
 import org.apache.flink.cdc.composer.definition.TransformDef;
@@ -94,6 +95,7 @@ public class TransformTranslator {
             DataStream<Event> input,
             List<TransformDef> transforms,
             String timezone,
+            TransformExpressionSemantics expressionSemantics,
             List<UdfDef> udfFunctions,
             List<ModelDef> models,
             SupportedMetadataColumn[] supportedMetadataColumns,
@@ -116,7 +118,9 @@ public class TransformTranslator {
                     transform.getPostTransformConverter(),
                     supportedMetadataColumns);
         }
-        postTransformFunctionBuilder.addTimezone(timezone);
+        postTransformFunctionBuilder
+                .addTimezone(timezone)
+                .addExpressionSemantics(expressionSemantics);
         postTransformFunctionBuilder.addUdfFunctions(
                 udfFunctions.stream().map(this::udfDefToUDFTuple).collect(Collectors.toList()));
         postTransformFunctionBuilder.addUdfFunctions(

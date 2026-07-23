@@ -121,6 +121,7 @@ Note that whilst the parameters are each individually optional, at least one of 
 | `local-time-zone`             | The local time zone defines current session time zone id.                                                                                                                                                                                                                                                                                                                                                                                                                                                 | optional          |
 | `execution.runtime-mode`      | The runtime mode of the pipeline includes STREAMING and BATCH, with the default value being STREAMING.                                                                                                                                                                                                                                                                                                                                                                                                    | optional          |
 | `route-mode`                  | The matching mode for [route]({{< ref "docs/core-concept/route" >}}#route-mode) rules. One of: `ALL_MATCH` (default, apply all matching rules) or `FIRST_MATCH` (apply only the first matching rule).                                                                                                                                                                                                                                                                                                   | optional          |
+| `transform.expression.semantics` | The semantics used to evaluate transform expressions. One of: `LEGACY` (default, preserves existing behavior) or `FLINK_SQL` (uses Flink SQL-compatible semantics for supported predicates).                                                                                                                                                                                                                                                                                                         | optional          |
 | `schema.change.behavior`      | How to handle [changes in schema]({{< ref "docs/core-concept/schema-evolution" >}}). One of: [`exception`]({{< ref "docs/core-concept/schema-evolution" >}}#exception-mode), [`evolve`]({{< ref "docs/core-concept/schema-evolution" >}}#evolve-mode), [`try_evolve`]({{< ref "docs/core-concept/schema-evolution" >}}#tryevolve-mode), [`lenient`]({{< ref "docs/core-concept/schema-evolution" >}}#lenient-mode) (default) or [`ignore`]({{< ref "docs/core-concept/schema-evolution" >}}#ignore-mode). | optional          |
 | `schema.operator.uid`         | The unique ID for schema operator. This ID will be used for inter-operator communications and must be unique across operators. **Deprecated**: use `operator.uid.prefix` instead.                                                                                                                                                                                                                                                                                                                         | optional          |
 | `schema-operator.rpc-timeout` | The timeout time for SchemaOperator to wait downstream SchemaChangeEvent applying finished, the default value is 3 minutes.                                                                                                                                                                                                                                                                                                                                                                               | optional          |
@@ -129,3 +130,18 @@ Note that whilst the parameters are each individually optional, at least one of 
 
 NOTE: Whilst the above parameters are each individually optional, at least one of them must be specified. The `pipeline` section is mandatory and cannot be empty.
 
+## Transform Expression Semantics
+
+The `transform.expression.semantics` option controls the evaluation semantics of row-level transform filters and projections:
+
+* `LEGACY` is the default and preserves existing pipeline behavior. Comparisons, `BETWEEN`, and `IN` return a boolean result when an operand is `NULL`. Two-argument `LIKE` treats its pattern as a Java regular expression and uses substring matching.
+* `FLINK_SQL` aligns `=`, `<>`, `<`, `<=`, `>`, `>=`, `BETWEEN` / `NOT BETWEEN`, `IN` / `NOT IN`, and two-argument `LIKE` / `NOT LIKE` with Flink SQL. These predicates use SQL three-valued logic, so a result may be `UNKNOWN` (represented as `NULL`). Two-argument `LIKE` uses SQL `%` and `_` wildcards and matches the entire string.
+
+For example:
+
+```yaml
+pipeline:
+  transform.expression.semantics: FLINK_SQL
+```
+
+This option can change row-level transform results. A filter keeps a row only when its expression evaluates to `TRUE`, so both `FALSE` and `UNKNOWN` are filtered out. A projected predicate preserves `UNKNOWN` as `NULL`.
