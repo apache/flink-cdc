@@ -42,11 +42,14 @@ public class BinlogOffsetUtils {
      *   <li>EARLIEST: binlog filename = "", position = 0
      *   <li>TIMESTAMP: set to earliest, as the current implementation is reading from the earliest
      *       offset and drop events earlier than the specified timestamp.
-     *   <li>LATEST: fetch the current binlog by JDBC
+     *   <li>LATEST: fetch the current binlog by JDBC(dialect-aware for MariaDB GTID)
      * </ul>
      */
     public static BinlogOffset initializeEffectiveOffset(
-            BinlogOffset offset, MySqlConnection connection, MySqlSourceConfig mySqlSourceConfig) {
+            BinlogOffset offset,
+            MySqlConnection connection,
+            MySqlSourceConfig mySqlSourceConfig,
+            String resolvedDialect) {
         BinlogOffsetKind offsetKind = offset.getOffsetKind();
         switch (offsetKind) {
             case EARLIEST:
@@ -55,7 +58,7 @@ public class BinlogOffsetUtils {
                 return DebeziumUtils.findBinlogOffset(
                         offset.getTimestampSec() * 1000, connection, mySqlSourceConfig);
             case LATEST:
-                return DebeziumUtils.currentBinlogOffset(connection);
+                return DebeziumUtils.currentBinlogOffset(connection, resolvedDialect);
             default:
                 return offset;
         }
