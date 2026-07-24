@@ -33,6 +33,7 @@ import org.apache.calcite.jdbc.CalciteSchema;
 import org.apache.calcite.prepare.CalciteCatalogReader;
 import org.apache.calcite.rel.type.RelDataTypeSystem;
 import org.apache.calcite.runtime.CalciteContextException;
+import org.apache.calcite.sql.SqlBasicCall;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlSelect;
 import org.apache.calcite.sql.type.SqlTypeFactoryImpl;
@@ -200,6 +201,41 @@ class TransformParserTest {
         testFilterExpression("lower(id)", "lower(id)");
         testFilterExpression("concat(a,b)", "concat(a, b)");
         testFilterExpression("SUBSTR(a,1)", "substr(a, 1)");
+        testFilterExpression("OVERLAY(id PLACING 'x' FROM 2)", "overlay(id, \"x\", 2)");
+        testFilterExpression("OVERLAY(id PLACING 'x' FROM 2 FOR 3)", "overlay(id, \"x\", 2, 3)");
+        testFilterExpression("POSITION('b' IN id)", "position(\"b\", id)");
+        testFilterExpression("LOCATE('b', id)", "locate(\"b\", id)");
+        testFilterExpression("LOCATE('b', id, 2)", "locate(\"b\", id, 2)");
+        testFilterExpression("INSTR(id, 'b')", "instr(id, \"b\")");
+        testFilterExpression("LTRIM(id)", "ltrim(id)");
+        testFilterExpression("LTRIM(id, 'x')", "ltrim(id, \"x\")");
+        testFilterExpression("RTRIM(id)", "rtrim(id)");
+        testFilterExpression("RTRIM(id, 'x')", "rtrim(id, \"x\")");
+        testFilterExpression("BTRIM(id)", "btrim(id)");
+        testFilterExpression("BTRIM(id, 'x')", "btrim(id, \"x\")");
+        testFilterExpression("CONCAT_WS(',', a, b)", "concatWs(\",\", a, b)");
+        testFilterExpression("LPAD(id, 5, 'x')", "lpad(id, 5, \"x\")");
+        testFilterExpression("RPAD(id, 5, 'x')", "rpad(id, 5, \"x\")");
+        testFilterExpression("REPLACE(id, 'a', 'b')", "replace(id, \"a\", \"b\")");
+        testFilterExpression("REPEAT(id, 2)", "repeat(id, 2)");
+        testFilterExpression("LEFT(id, 2)", "left(id, 2)");
+        testFilterExpression("RIGHT(id, 2)", "right(id, 2)");
+        testFilterExpression("STARTSWITH(id, 'a')", "startswith(id, \"a\")");
+        testFilterExpression("ENDSWITH(id, 'a')", "endswith(id, \"a\")");
+        List<Column> binaryColumns =
+                Arrays.asList(
+                        Column.physicalColumn("binary_value", DataTypes.VARBINARY(16)),
+                        Column.physicalColumn("binary_part", DataTypes.BINARY(2)));
+        testFilterExpressionWithColumns(
+                "STARTSWITH(binary_value, binary_part)",
+                "startswith(binary_value, binary_part)",
+                binaryColumns);
+        testFilterExpressionWithColumns(
+                "ENDSWITH(binary_value, binary_part)",
+                "endswith(binary_value, binary_part)",
+                binaryColumns);
+        testFilterExpression("TO_BASE64(id)", "toBase64(id)");
+        testFilterExpression("FROM_BASE64(id)", "fromBase64(id)");
         testFilterExpression("id like '^[a-zA-Z]'", "like(id, \"^[a-zA-Z]\")");
         testFilterExpression("id not like '^[a-zA-Z]'", "notLike(id, \"^[a-zA-Z]\")");
         testFilterExpression("id like 'A$%' escape '$'", "like(id, \"A$%\", \"$\")");
@@ -396,6 +432,69 @@ class TransformParserTest {
         testFilterExpression("cast(dt as TIMESTAMP)", "castToTimestamp(dt, __time_zone__)");
         testFilterExpression("parse_json(jsonStr)", "parseJson(jsonStr)");
         testFilterExpression("try_parse_json(jsonStr)", "tryParseJson(jsonStr)");
+    }
+
+    @Test
+    void testStringFunctionArgumentValidation() {
+        List<Column> columns =
+                Arrays.asList(
+                        Column.physicalColumn("s", DataTypes.STRING()),
+                        Column.physicalColumn("binary_value", DataTypes.VARBINARY(16)),
+                        Column.physicalColumn("binary_part", DataTypes.BINARY(2)));
+        SqlSelect positionSelect =
+                TransformParser.parseSelect(
+                        "SELECT POSITION(binary_part IN binary_value) AS invalid_value FROM TB");
+        SqlBasicCall positionAlias = (SqlBasicCall) positionSelect.getSelectList().get(0);
+        SqlBasicCall positionCall = (SqlBasicCall) positionAlias.operand(0);
+
+        Assertions.assertThat(positionCall.getOperator())
+                .isSameAs(TransformSqlOperatorTable.POSITION);
+
+        Assertions.assertThatThrownBy(
+                        () ->
+                                TransformParser.generateProjectionColumns(
+                                        "INSTR(s, 'a', 1) AS invalid_value",
+                                        columns,
+                                        Collections.emptyList(),
+                                        new SupportedMetadataColumn[0]))
+                .isExactlyInstanceOf(CalciteContextException.class)
+                .hasMessageContaining("INSTR");
+        Assertions.assertThatThrownBy(
+                        () ->
+                                TransformParser.generateProjectionColumns(
+                                        "LPAD(s, true, 'x') AS invalid_value",
+                                        columns,
+                                        Collections.emptyList(),
+                                        new SupportedMetadataColumn[0]))
+                .isExactlyInstanceOf(CalciteContextException.class)
+                .hasMessageContaining("LPAD");
+        Assertions.assertThatThrownBy(
+                        () ->
+                                TransformParser.generateProjectionColumns(
+                                        "POSITION(binary_part IN binary_value) AS invalid_value",
+                                        columns,
+                                        Collections.emptyList(),
+                                        new SupportedMetadataColumn[0]))
+                .isExactlyInstanceOf(CalciteContextException.class)
+                .hasMessageContaining("POSITION");
+        Assertions.assertThatThrownBy(
+                        () ->
+                                TransformParser.generateProjectionColumns(
+                                        "POSITION('a' IN s FROM 2) AS invalid_value",
+                                        columns,
+                                        Collections.emptyList(),
+                                        new SupportedMetadataColumn[0]))
+                .isExactlyInstanceOf(CalciteContextException.class)
+                .hasMessageContaining("POSITION");
+        Assertions.assertThatThrownBy(
+                        () ->
+                                TransformParser.generateProjectionColumns(
+                                        "OVERLAY(binary_value PLACING binary_part FROM 1) AS invalid_value",
+                                        columns,
+                                        Collections.emptyList(),
+                                        new SupportedMetadataColumn[0]))
+                .isExactlyInstanceOf(CalciteContextException.class)
+                .hasMessageContaining("OVERLAY");
     }
 
     @Test

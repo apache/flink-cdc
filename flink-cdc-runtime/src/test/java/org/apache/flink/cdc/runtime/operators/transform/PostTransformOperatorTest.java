@@ -2859,6 +2859,35 @@ class PostTransformOperatorTest {
         testExpressionConditionTransform("concat('123', 'abc') = '123abc'");
         testExpressionConditionTransform("upper('abc') = 'ABC'");
         testExpressionConditionTransform("lower('ABC') = 'abc'");
+        testExpressionConditionTransform("OVERLAY('abcdef' PLACING 'ZZ' FROM 3) = 'abZZef'");
+        testExpressionConditionTransform("OVERLAY('abcdef' PLACING 'ZZ' FROM 3 FOR 2) = 'abZZef'");
+        testExpressionConditionTransform("POSITION('cd' IN 'abcdef') = 3");
+        testExpressionConditionTransform("POSITION('x' IN '\uD83D\uDE00x') = 2");
+        testExpressionConditionTransform("LOCATE('cd', 'abcdef') = 3");
+        testExpressionConditionTransform("LOCATE('cd', 'abcdef', 4) = 0");
+        testExpressionConditionTransform("LOCATE('', 'abcdef', 4) = 1");
+        testExpressionConditionTransform("INSTR('abcabc', 'bc') = 2");
+        testExpressionConditionTransform("LTRIM('  abc  ') = 'abc  '");
+        testExpressionConditionTransform("RTRIM('  abc  ') = '  abc'");
+        testExpressionConditionTransform("BTRIM('  abc  ') = 'abc'");
+        testExpressionConditionTransform(
+                "LTRIM('\uD83D\uDE01x', '\uD83D\uDE00') = '\uD83D\uDE01x'");
+        testExpressionConditionTransform(
+                "RTRIM('x\uD87D\uDE00', '\uD83D\uDE00') = 'x\uD87D\uDE00'");
+        testExpressionConditionTransform("BTRIM('xyabcxy', 'xy') = 'abc'");
+        testExpressionConditionTransform("CONCAT_WS(',', 'a', null, 'b') = 'a,b'");
+        testExpressionConditionTransform("LPAD('hi', 5, '?') = '???hi'");
+        testExpressionConditionTransform("RPAD('hi', 5, '?') = 'hi???'");
+        testExpressionConditionTransform("REPLACE('hello', 'l', 'x') = 'hexxo'");
+        testExpressionConditionTransform("REPEAT('ab', 3) = 'ababab'");
+        testExpressionConditionTransform("LEFT('abcdef', 2) = 'ab'");
+        testExpressionConditionTransform("RIGHT('abcdef', 2) = 'ef'");
+        testExpressionConditionTransform("LEFT('\uD83D\uDE00x', 1) = '\uD83D\uDE00'");
+        testExpressionConditionTransform("RIGHT('x\uD83D\uDE00', 1) = '\uD83D\uDE00'");
+        testExpressionConditionTransform("STARTSWITH('abcdef', 'abc')");
+        testExpressionConditionTransform("ENDSWITH('abcdef', 'def')");
+        testExpressionConditionTransform("TO_BASE64('hello') = 'aGVsbG8='");
+        testExpressionConditionTransform("FROM_BASE64('aGVsbG8=') = 'hello'");
         testExpressionConditionTransform("SUBSTR('ABC', -1) = 'C'");
         testExpressionConditionTransform("SUBSTR('ABC', -2, 2) = 'BC'");
         testExpressionConditionTransform("SUBSTR('ABC', 0) = 'ABC'");
@@ -2919,6 +2948,49 @@ class PostTransformOperatorTest {
         testExpressionConditionTransform("cast(null as varchar) is null");
         testExpressionConditionTransform("cast(null as DECIMAL(4,2)) is null");
         testExpressionConditionTransform("cast(null as TIMESTAMP(3)) is null");
+    }
+
+    @Test
+    void testBinaryStartsWithAndEndsWithTransform() throws Exception {
+        TableId tableId = TableId.tableId("binary_string_functions");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("value_", DataTypes.VARBINARY(16))
+                        .physicalColumn("prefix_", DataTypes.VARBINARY(4))
+                        .physicalColumn("suffix_", DataTypes.VARBINARY(4))
+                        .build();
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
+                        .addTransform(
+                                tableId.identifier(),
+                                null,
+                                "STARTSWITH(value_, prefix_) AND ENDSWITH(value_, suffix_)")
+                        .addTimezone("UTC")
+                        .build();
+        RegularEventOperatorTestHarness<PostTransformOperator, Event> testHarness =
+                RegularEventOperatorTestHarness.with(transform, 1);
+        testHarness.open();
+
+        CreateTableEvent createTableEvent = new CreateTableEvent(tableId, schema);
+        BinaryRecordDataGenerator recordDataGenerator =
+                new BinaryRecordDataGenerator(((RowType) schema.toRowDataType()));
+        DataChangeEvent insertEvent =
+                DataChangeEvent.insertEvent(
+                        tableId,
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    new byte[] {1, 2, 3, 4},
+                                    new byte[] {1, 2},
+                                    new byte[] {3, 4}
+                                }));
+
+        transform.processElement(new StreamRecord<>(createTableEvent));
+        Assertions.assertThat(testHarness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(createTableEvent));
+        transform.processElement(new StreamRecord<>(insertEvent));
+        Assertions.assertThat(testHarness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(insertEvent));
+        testHarness.close();
     }
 
     private void testExpressionConditionTransform(String expression) throws Exception {
