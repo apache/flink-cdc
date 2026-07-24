@@ -27,6 +27,8 @@ import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSchemalessSnapsho
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges.TableChange;
 
+import javax.annotation.Nullable;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -75,6 +77,14 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
     /** The data structure to record the state of a {@link ChunkSplitter}. */
     private final ChunkSplitterState chunkSplitterState;
 
+    /**
+     * The checkpoint id that, once completed, allows the assigner to transition out of an {@code
+     * *_ASSIGNING} status after all snapshot splits have finished. Persisted across restores so the
+     * state machine can advance without waiting for two additional checkpoint cycles to re-derive
+     * it. {@code null} when the assigner has not yet observed "all snapshot splits finished".
+     */
+    @Nullable private final Long checkpointIdToFinish;
+
     public SnapshotPendingSplitsState(
             List<TableId> alreadyProcessedTables,
             List<MySqlSchemalessSnapshotSplit> remainingSplits,
@@ -86,6 +96,32 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
             boolean isTableIdCaseSensitive,
             boolean isRemainingTablesCheckpointed,
             ChunkSplitterState chunkSplitterState) {
+        this(
+                alreadyProcessedTables,
+                remainingSplits,
+                assignedSplits,
+                tableSchemas,
+                splitFinishedOffsets,
+                assignerStatus,
+                remainingTables,
+                isTableIdCaseSensitive,
+                isRemainingTablesCheckpointed,
+                chunkSplitterState,
+                null);
+    }
+
+    public SnapshotPendingSplitsState(
+            List<TableId> alreadyProcessedTables,
+            List<MySqlSchemalessSnapshotSplit> remainingSplits,
+            LinkedHashMap<String, MySqlSchemalessSnapshotSplit> assignedSplits,
+            Map<TableId, TableChange> tableSchemas,
+            Map<String, BinlogOffset> splitFinishedOffsets,
+            AssignerStatus assignerStatus,
+            List<TableId> remainingTables,
+            boolean isTableIdCaseSensitive,
+            boolean isRemainingTablesCheckpointed,
+            ChunkSplitterState chunkSplitterState,
+            @Nullable Long checkpointIdToFinish) {
         // FLINK-38061: make defensive copy to avoid potential concurrent modification of the
         // collections.
         this.alreadyProcessedTables = new ArrayList<>(alreadyProcessedTables);
@@ -98,6 +134,7 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
         this.isRemainingTablesCheckpointed = isRemainingTablesCheckpointed;
         this.tableSchemas = new HashMap<>(tableSchemas);
         this.chunkSplitterState = chunkSplitterState;
+        this.checkpointIdToFinish = checkpointIdToFinish;
     }
 
     public List<TableId> getAlreadyProcessedTables() {
@@ -140,6 +177,11 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
         return chunkSplitterState;
     }
 
+    @Nullable
+    public Long getCheckpointIdToFinish() {
+        return checkpointIdToFinish;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {
@@ -157,7 +199,8 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
                 && Objects.equals(remainingSplits, that.remainingSplits)
                 && Objects.equals(assignedSplits, that.assignedSplits)
                 && Objects.equals(splitFinishedOffsets, that.splitFinishedOffsets)
-                && Objects.equals(chunkSplitterState, that.chunkSplitterState);
+                && Objects.equals(chunkSplitterState, that.chunkSplitterState)
+                && Objects.equals(checkpointIdToFinish, that.checkpointIdToFinish);
     }
 
     @Override
@@ -171,7 +214,8 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
                 assignerStatus,
                 isTableIdCaseSensitive,
                 isRemainingTablesCheckpointed,
-                chunkSplitterState);
+                chunkSplitterState,
+                checkpointIdToFinish);
     }
 
     @Override
@@ -195,6 +239,8 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
                 + isRemainingTablesCheckpointed
                 + ", chunkSplitterState="
                 + chunkSplitterState
+                + ", checkpointIdToFinish="
+                + checkpointIdToFinish
                 + '}';
     }
 }

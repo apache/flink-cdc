@@ -106,6 +106,46 @@ public interface MySqlSplitAssigner extends Closeable {
     /** Gets the split assigner status, see {@code AssignerStatus}. */
     AssignerStatus getAssignerStatus();
 
+    /**
+     * Returns the number of snapshot splits split but not yet handed out to readers. Used for
+     * metrics; defaults to {@code 0} for assigners that don't track snapshot splits.
+     */
+    default int getRemainingSplitsCount() {
+        return 0;
+    }
+
+    /**
+     * Returns the number of tables yet to be split into snapshot chunks. Used for metrics; defaults
+     * to {@code 0} for assigners that don't track snapshot splits.
+     */
+    default int getRemainingTablesCount() {
+        return 0;
+    }
+
+    /**
+     * Returns the number of snapshot splits that have been handed out to readers. Used for metrics;
+     * defaults to {@code 0} for assigners that don't track snapshot splits.
+     */
+    default int getAssignedSplitsCount() {
+        return 0;
+    }
+
+    /**
+     * Returns the number of snapshot splits that readers have reported as finished. Used for
+     * metrics; defaults to {@code 0} for assigners that don't track snapshot splits.
+     */
+    default int getFinishedSplitsCount() {
+        return 0;
+    }
+
+    /**
+     * Returns the number of tables that have been fully snapshotted at least once. Used for
+     * metrics; defaults to {@code 0} for assigners that don't track snapshot splits.
+     */
+    default int getAlreadyProcessedTablesCount() {
+        return 0;
+    }
+
     /** Starts assign newly added tables. */
     void startAssignNewlyAddedTables();
 

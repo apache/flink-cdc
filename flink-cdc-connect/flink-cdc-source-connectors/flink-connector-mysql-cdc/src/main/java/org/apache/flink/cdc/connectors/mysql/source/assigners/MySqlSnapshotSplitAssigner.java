@@ -127,6 +127,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                 isTableIdCaseSensitive,
                 true,
                 ChunkSplitterState.NO_SPLITTING_TABLE_STATE,
+                null,
                 enumeratorContext);
     }
 
@@ -148,6 +149,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                 checkpoint.isTableIdCaseSensitive(),
                 checkpoint.isRemainingTablesCheckpointed(),
                 checkpoint.getChunkSplitterState(),
+                checkpoint.getCheckpointIdToFinish(),
                 enumeratorContext);
     }
 
@@ -164,6 +166,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
             boolean isTableIdCaseSensitive,
             boolean isRemainingTablesCheckpointed,
             ChunkSplitterState chunkSplitterState,
+            @Nullable Long checkpointIdToFinish,
             SplitEnumeratorContext<MySqlSplit> enumeratorContext) {
         this.sourceConfig = sourceConfig;
         this.currentParallelism = currentParallelism;
@@ -181,6 +184,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
         this.partition =
                 new MySqlPartition(sourceConfig.getMySqlConnectorConfig().getLogicalName());
         this.enumeratorContext = enumeratorContext;
+        this.checkpointIdToFinish = checkpointIdToFinish;
     }
 
     @Override
@@ -451,26 +455,28 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
 
     @Override
     public SnapshotPendingSplitsState snapshotState(long checkpointId) {
-        SnapshotPendingSplitsState state =
-                new SnapshotPendingSplitsState(
-                        alreadyProcessedTables,
-                        remainingSplits,
-                        assignedSplits,
-                        tableSchemas,
-                        splitFinishedOffsets,
-                        assignerStatus,
-                        remainingTables,
-                        isTableIdCaseSensitive,
-                        true,
-                        chunkSplitter.snapshotState(checkpointId));
-        // we need a complete checkpoint before mark this assigner to be finished, to wait for
-        // all records of snapshot splits are completely processed
+        // We need a complete checkpoint before marking this assigner as finished, to wait for
+        // all records of snapshot splits to be completely processed. Set checkpointIdToFinish
+        // *before* building the state so it is included in this checkpoint — otherwise it would
+        // be lost on restore and would need two more checkpoint cycles to be re-derived
+        // (FLINK-39478).
         if (checkpointIdToFinish == null
                 && AssignerStatus.isAssigningSnapshotSplits(assignerStatus)
                 && allSnapshotSplitsFinished()) {
             checkpointIdToFinish = checkpointId;
         }
-        return state;
+        return new SnapshotPendingSplitsState(
+                alreadyProcessedTables,
+                remainingSplits,
+                assignedSplits,
+                tableSchemas,
+                splitFinishedOffsets,
+                assignerStatus,
+                remainingTables,
+                isTableIdCaseSensitive,
+                true,
+                chunkSplitter.snapshotState(checkpointId),
+                checkpointIdToFinish);
     }
 
     @Override
@@ -569,6 +575,31 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
 
     public Map<String, BinlogOffset> getSplitFinishedOffsets() {
         return splitFinishedOffsets;
+    }
+
+    @Override
+    public int getRemainingSplitsCount() {
+        return remainingSplits.size();
+    }
+
+    @Override
+    public int getRemainingTablesCount() {
+        return remainingTables.size();
+    }
+
+    @Override
+    public int getAssignedSplitsCount() {
+        return assignedSplits.size();
+    }
+
+    @Override
+    public int getFinishedSplitsCount() {
+        return splitFinishedOffsets.size();
+    }
+
+    @Override
+    public int getAlreadyProcessedTablesCount() {
+        return alreadyProcessedTables.size();
     }
 
     // -------------------------------------------------------------------------------------------
