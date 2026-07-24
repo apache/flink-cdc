@@ -36,6 +36,7 @@ import org.apache.flink.cdc.runtime.operators.schema.common.SchemaDerivator;
 import org.apache.flink.cdc.runtime.operators.schema.common.metrics.SchemaOperatorMetrics;
 import org.apache.flink.cdc.runtime.operators.schema.regular.event.SchemaChangeRequest;
 import org.apache.flink.cdc.runtime.operators.schema.regular.event.SchemaChangeResponse;
+import org.apache.flink.cdc.source.RuntimeContextAdapter;
 import org.apache.flink.runtime.jobgraph.tasks.TaskOperatorEventGateway;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
 import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
@@ -136,7 +137,7 @@ public class SchemaOperator extends AbstractStreamOperatorAdapter<Event>
         this.schemaOperatorMetrics =
                 new SchemaOperatorMetrics(
                         getRuntimeContext().getMetricGroup(), schemaChangeBehavior);
-        this.subTaskId = getRuntimeContext().getTaskInfo().getIndexOfThisSubtask();
+        this.subTaskId = RuntimeContextAdapter.getIndexOfThisSubtask(getRuntimeContext());
         this.originalSchemaMap = new HashMap<>();
         this.evolvedSchemaMap = new HashMap<>();
         this.router = new TableIdRouter(routingRules, routeMode);
