@@ -447,6 +447,18 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
             assignedSplits.remove(split.splitId());
             splitFinishedOffsets.remove(split.splitId());
         }
+        // Rollback assigner status when failed splits are re-added, to prevent
+        // the hybrid assigner from prematurely creating the binlog split before
+        // all re-added splits are finished again.
+        if (!splits.isEmpty()) {
+            if (assignerStatus == AssignerStatus.INITIAL_ASSIGNING_FINISHED) {
+                assignerStatus = AssignerStatus.INITIAL_ASSIGNING;
+                checkpointIdToFinish = null;
+            } else if (assignerStatus == AssignerStatus.NEWLY_ADDED_ASSIGNING_SNAPSHOT_FINISHED) {
+                assignerStatus = AssignerStatus.NEWLY_ADDED_ASSIGNING;
+                checkpointIdToFinish = null;
+            }
+        }
     }
 
     @Override
