@@ -68,6 +68,7 @@ public class MySqlSourceConfigFactory implements Serializable {
     private boolean includeHeartbeatEvents = false;
     private boolean includeTransactionMetadataEvents = false;
     private boolean scanNewlyAddedTableEnabled = false;
+    private boolean releaseSnapshotMetadataEnabled = false;
     private boolean closeIdleReaders = false;
     private Properties jdbcProperties;
     private Duration heartbeatInterval = MySqlSourceOptions.HEARTBEAT_INTERVAL.defaultValue();
@@ -258,6 +259,17 @@ public class MySqlSourceConfigFactory implements Serializable {
         return this;
     }
 
+    /**
+     * Whether the source coordinator should release the snapshot split metadata after entering the
+     * binlog phase to reduce JobManager memory. Incompatible with {@link
+     * #scanNewlyAddedTableEnabled(boolean)}; disabled by default.
+     */
+    public MySqlSourceConfigFactory releaseSnapshotMetadataEnabled(
+            boolean releaseSnapshotMetadataEnabled) {
+        this.releaseSnapshotMetadataEnabled = releaseSnapshotMetadataEnabled;
+        return this;
+    }
+
     /** Custom properties that will overwrite the default JDBC connection URL. */
     public MySqlSourceConfigFactory jdbcProperties(Properties jdbcProperties) {
         this.jdbcProperties = jdbcProperties;
@@ -444,6 +456,7 @@ public class MySqlSourceConfigFactory implements Serializable {
                 parseOnLineSchemaChanges,
                 treatTinyInt1AsBoolean,
                 useLegacyJsonFormat,
-                assignUnboundedChunkFirst);
+                assignUnboundedChunkFirst,
+                releaseSnapshotMetadataEnabled);
     }
 }

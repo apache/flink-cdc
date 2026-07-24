@@ -28,9 +28,12 @@ import org.apache.flink.cdc.connectors.mysql.source.assigners.MySqlBinlogSplitAs
 import org.apache.flink.cdc.connectors.mysql.source.assigners.MySqlSnapshotSplitAssigner;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
+import org.apache.flink.cdc.connectors.mysql.source.events.BinlogSplitMetaAssembledEvent;
+import org.apache.flink.cdc.connectors.mysql.source.events.BinlogSplitMetaEvent;
 import org.apache.flink.cdc.connectors.mysql.source.events.FinishedSnapshotSplitsAckEvent;
 import org.apache.flink.cdc.connectors.mysql.source.metrics.MySqlSourceReaderMetrics;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
+import org.apache.flink.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplit;
@@ -377,6 +380,106 @@ class MySqlSourceReaderTest extends MySqlSourceTestBase {
         List<String> restRecords = consumeBinlogRecords(restartReader, dataType);
         assertEqualsInOrder(Arrays.asList(expectedRestRecords), restRecords);
         restartReader.close();
+    }
+
+    @Test
+    void testReaderSendsBinlogSplitMetaAssembledEventForCompleteSplit() throws Exception {
+        // When a complete binlog split enters reading, the reader must notify the
+        // enumerator that its finished snapshot split metadata is fully assembled, so the
+        // coordinator can release the retained snapshot metadata.
+        customerDatabase.createAndInitialize();
+        final MySqlSourceConfig sourceConfig = getConfig(new String[] {"customers"});
+        MySqlSplit binlogSplit;
+        try (MySqlConnection jdbc = DebeziumUtils.createMySqlConnection(sourceConfig)) {
+            Map<TableId, TableChanges.TableChange> tableSchemas =
+                    TableDiscoveryUtils.discoverSchemaForCapturedTables(
+                            new MySqlPartition(
+                                    sourceConfig.getMySqlConnectorConfig().getLogicalName()),
+                            sourceConfig,
+                            jdbc);
+            binlogSplit =
+                    MySqlBinlogSplit.fillTableSchemas(
+                            createBinlogSplit(sourceConfig).asBinlogSplit(), tableSchemas);
+        }
+        // a binlog split created from the latest startup offset carries no finished snapshot split
+        // info, so it is already complete on receipt
+        Assertions.assertThat(binlogSplit.asBinlogSplit().isCompletedSplit()).isTrue();
+
+        TestingReaderContext readerContext = new TestingReaderContext();
+        MySqlSourceReader<SourceRecord> reader = createReader(sourceConfig, readerContext, 1);
+        reader.start();
+        reader.addSplits(Collections.singletonList(binlogSplit));
+
+        // the split was complete inline (no meta groups requested), so the reader reports the
+        // COMPLETE_WITHOUT_META_GENERATION sentinel rather than a served generation
+        Assertions.assertThat(readerContext.getSentEvents())
+                .filteredOn(event -> event instanceof BinlogSplitMetaAssembledEvent)
+                .extracting(
+                        event ->
+                                ((BinlogSplitMetaAssembledEvent) event)
+                                        .getBinlogAssignmentGeneration())
+                .containsExactly(BinlogSplitMetaAssembledEvent.COMPLETE_WITHOUT_META_GENERATION);
+        reader.close();
+    }
+
+    @Test
+    void testReaderEchoesBinlogAssignmentGenerationInAssembledEvent() throws Exception {
+        // A binlog split assembled from divided meta groups must echo the binlog assignment
+        // generation it was served under, so the coordinator can reject a stale assembled event
+        // from a failed attempt. Drive the divided-meta path: give the reader an incomplete binlog
+        // split, answer its meta request with a group stamped with a generation, and assert the
+        // assembled event the reader sends back carries that same generation.
+        customerDatabase.createAndInitialize();
+        final MySqlSourceConfig sourceConfig = getConfig(new String[] {"customers"});
+        final TableId tableId = TableId.parse(customerDatabase.getDatabaseName() + ".customers");
+
+        // one finished split info is still outstanding, so the split is incomplete on receipt
+        MySqlBinlogSplit incompleteSplit =
+                new MySqlBinlogSplit(
+                        "binlog-split",
+                        BinlogOffset.ofEarliest(),
+                        null,
+                        new ArrayList<>(),
+                        new HashMap<>(),
+                        1,
+                        false);
+        Assertions.assertThat(incompleteSplit.isCompletedSplit()).isFalse();
+
+        TestingReaderContext readerContext = new TestingReaderContext();
+        MySqlSourceReader<SourceRecord> reader = createReader(sourceConfig, readerContext, 0);
+        reader.start();
+        reader.addSplits(Collections.singletonList(incompleteSplit));
+
+        // the coordinator answers the reader's meta request with the outstanding group, stamped
+        // with the current binlog assignment generation
+        long generation = 7L;
+        FinishedSnapshotSplitInfo finishedInfo =
+                new FinishedSnapshotSplitInfo(
+                        tableId,
+                        tableId + ":0",
+                        new Object[] {0},
+                        new Object[] {100},
+                        BinlogOffset.ofBinlogFilePosition("mysql-bin.000001", 4L));
+        reader.handleSourceEvents(
+                new BinlogSplitMetaEvent(
+                        incompleteSplit.splitId(),
+                        0,
+                        Collections.singletonList(
+                                FinishedSnapshotSplitInfo.serialize(finishedInfo)),
+                        1,
+                        generation));
+
+        BinlogSplitMetaAssembledEvent assembled =
+                readerContext.getSentEvents().stream()
+                        .filter(event -> event instanceof BinlogSplitMetaAssembledEvent)
+                        .map(event -> (BinlogSplitMetaAssembledEvent) event)
+                        .reduce((first, second) -> second)
+                        .orElseThrow(
+                                () ->
+                                        new AssertionError(
+                                                "reader did not send a BinlogSplitMetaAssembledEvent"));
+        Assertions.assertThat(assembled.getBinlogAssignmentGeneration()).isEqualTo(generation);
+        reader.close();
     }
 
     @Test

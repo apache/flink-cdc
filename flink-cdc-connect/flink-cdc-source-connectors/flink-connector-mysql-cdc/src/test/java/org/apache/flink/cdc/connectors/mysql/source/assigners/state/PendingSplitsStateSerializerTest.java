@@ -30,6 +30,7 @@ import io.debezium.relational.TableEditor;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges;
 import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -121,6 +122,25 @@ class PendingSplitsStateSerializerTest {
         Assertions.assertThat(ser1).isEqualTo(ser2);
     }
 
+    @Test
+    void testSerializeAndDeserializeReleasedHybridState() throws Exception {
+        // The "light" state produced after releasing the snapshot metadata must
+        // round-trip with no serializer format change (VERSION is unchanged): it is just a normal
+        // state with empty maps.
+        HybridPendingSplitsState released = getTestReleasedHybridPendingSplitsState();
+        PendingSplitsState roundTripped = serializeAndDeserializeSourceEnumState(released);
+        Assertions.assertThat(roundTripped).isEqualTo(released);
+
+        SnapshotPendingSplitsState snapshot =
+                ((HybridPendingSplitsState) roundTripped).getSnapshotPendingSplits();
+        Assertions.assertThat(snapshot.getAssignedSplits()).isEmpty();
+        Assertions.assertThat(snapshot.getSplitFinishedOffsets()).isEmpty();
+        Assertions.assertThat(snapshot.getTableSchemas()).isEmpty();
+        Assertions.assertThat(snapshot.getAlreadyProcessedTables()).isNotEmpty();
+        Assertions.assertThat(((HybridPendingSplitsState) roundTripped).isBinlogSplitAssigned())
+                .isTrue();
+    }
+
     static PendingSplitsState serializeAndDeserializeSourceEnumState(PendingSplitsState state)
             throws Exception {
         final PendingSplitsStateSerializer serializer =
@@ -201,6 +221,27 @@ class PendingSplitsStateSerializerTest {
             boolean checkpointWhenSplitting) {
         return new HybridPendingSplitsState(
                 getTestSnapshotPendingSplitsState(checkpointWhenSplitting), false);
+    }
+
+    private static HybridPendingSplitsState getTestReleasedHybridPendingSplitsState() {
+        // After releasing the snapshot metadata, the hybrid state is just a normal state
+        // with empty assigned/finished/schema maps and isBinlogSplitAssigned=true.
+        final List<TableId> alreadyProcessedTables = new ArrayList<>();
+        alreadyProcessedTables.add(tableId0);
+        alreadyProcessedTables.add(tableId1);
+        SnapshotPendingSplitsState snapshotState =
+                new SnapshotPendingSplitsState(
+                        alreadyProcessedTables,
+                        new ArrayList<>(),
+                        new LinkedHashMap<>(),
+                        new HashMap<>(),
+                        new HashMap<>(),
+                        AssignerStatus.INITIAL_ASSIGNING_FINISHED,
+                        new ArrayList<>(),
+                        false,
+                        true,
+                        ChunkSplitterState.NO_SPLITTING_TABLE_STATE);
+        return new HybridPendingSplitsState(snapshotState, true);
     }
 
     private static BinlogPendingSplitsState getTestBinlogPendingSplitsState() {
