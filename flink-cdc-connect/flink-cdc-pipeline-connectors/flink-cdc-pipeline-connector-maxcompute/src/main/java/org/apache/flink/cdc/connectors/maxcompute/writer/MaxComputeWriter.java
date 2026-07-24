@@ -35,7 +35,8 @@ public interface MaxComputeWriter {
             MaxComputeWriteOptions writeOptions,
             SessionIdentifier sessionIdentifier)
             throws IOException {
-        if (MaxComputeUtils.isTransactionalTable(options, sessionIdentifier)) {
+        if (MaxComputeUtils.isTransactionalTable(options, sessionIdentifier)
+                && options.getSinkOperation() == MaxComputeOptions.SinkOperation.UPSERT) {
             return new BatchUpsertWriter(options, writeOptions, sessionIdentifier);
         } else {
             return new BatchAppendWriter(options, writeOptions, sessionIdentifier);

@@ -21,6 +21,7 @@ package org.apache.flink.cdc.connectors.maxcompute;
 import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.configuration.ConfigOptions;
 import org.apache.flink.cdc.connectors.maxcompute.options.CompressAlgorithm;
+import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeOptions;
 
 /** Options for MaxCompute Data Sink. */
 public class MaxComputeDataSinkOptions {
@@ -107,4 +108,11 @@ public class MaxComputeDataSinkOptions {
                     .intType()
                     .defaultValue(4)
                     .withDescription("The number of concurrent with flush bucket data.");
+
+    public static final ConfigOption<MaxComputeOptions.SinkOperation> SINK_OPERATION =
+            ConfigOptions.key("sink.operation")
+                    .enumType(MaxComputeOptions.SinkOperation.class)
+                    .defaultValue(MaxComputeOptions.SinkOperation.UPSERT)
+                    .withDescription(
+                            "The sink operation type, support 'upsert' and 'append', default is 'upsert'.");
 }

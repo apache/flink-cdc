@@ -66,6 +66,11 @@ public class EmulatorTestBase {
     public final MaxComputeOptions testOptions =
             MaxComputeOptions.builder("ak", "sk", getEndpoint(), "mocked_mc").build();
 
+    public final MaxComputeOptions appendOptions =
+            MaxComputeOptions.builder("ak", "sk", getEndpoint(), "mocked_mc")
+                    .withSinkOperation(MaxComputeOptions.SinkOperation.APPEND)
+                    .build();
+
     public final Odps odpsInstance = MaxComputeUtils.getOdps(testOptions);
 
     private String getEndpoint() {
