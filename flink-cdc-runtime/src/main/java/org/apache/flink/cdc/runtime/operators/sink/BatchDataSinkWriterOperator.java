@@ -19,10 +19,8 @@ package org.apache.flink.cdc.runtime.operators.sink;
 
 import org.apache.flink.api.common.operators.MailboxExecutor;
 import org.apache.flink.api.connector.sink2.Sink;
-import org.apache.flink.api.connector.sink2.SinkWriter;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.event.Event;
-import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.runtime.operators.AbstractStreamOperatorAdapter;
 import org.apache.flink.cdc.runtime.operators.sink.exception.SinkWrapperException;
 import org.apache.flink.runtime.state.StateInitializationContext;
@@ -42,7 +40,6 @@ import org.apache.flink.streaming.runtime.tasks.StreamTask;
 import org.apache.flink.streaming.runtime.watermarkstatus.WatermarkStatus;
 
 import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
 /**
@@ -68,12 +65,6 @@ public class BatchDataSinkWriterOperator<CommT>
     /** Operator that actually execute sink logic. */
     private Object flinkWriterOperator;
 
-    /**
-     * The internal {@link SinkWriter} of flinkWriterOperator, obtained it through reflection to
-     * deal with {@link FlushEvent}.
-     */
-    private SinkWriter<Event> copySinkWriter;
-
     public BatchDataSinkWriterOperator(
             Sink<Event> sink,
             ProcessingTimeService processingTimeService,
@@ -97,7 +88,6 @@ public class BatchDataSinkWriterOperator<CommT>
     @Override
     public void open() throws Exception {
         this.<AbstractStreamOperator<CommittableMessage<CommT>>>getFlinkWriterOperator().open();
-        copySinkWriter = getFieldValue("sinkWriter");
     }
 
     @Override
@@ -155,12 +145,6 @@ public class BatchDataSinkWriterOperator<CommT>
         this.<BoundedOneInput>getFlinkWriterOperator().endInput();
     }
 
-    // ----------------------------- Helper functions -------------------------------
-
-    private void handleFlushEvent(FlushEvent event) throws Exception {
-        copySinkWriter.flush(false);
-    }
-
     // -------------------------- Reflection helper functions --------------------------
 
     private void invokeSetup(
@@ -215,28 +199,6 @@ public class BatchDataSinkWriterOperator<CommT>
             // Other exceptions (e.g., InvocationTargetException) indicate real failures
             throw new RuntimeException("Failed to create SinkWriterOperator in Flink", e);
         }
-    }
-
-    /**
-     * Finds a field by name from its declaring class. This also searches for the field in super
-     * classes.
-     *
-     * @param fieldName the name of the field to find.
-     * @return the Object value of this field.
-     */
-    @SuppressWarnings("unchecked")
-    private <T> T getFieldValue(String fieldName) throws IllegalAccessException {
-        Class<?> clazz = flinkWriterOperator.getClass();
-        while (clazz != null) {
-            try {
-                Field field = clazz.getDeclaredField(fieldName);
-                field.setAccessible(true);
-                return ((T) field.get(flinkWriterOperator));
-            } catch (NoSuchFieldException e) {
-                clazz = clazz.getSuperclass();
-            }
-        }
-        throw new RuntimeException("failed to get sinkWriter");
     }
 
     @SuppressWarnings("unchecked")
