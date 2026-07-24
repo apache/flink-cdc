@@ -324,6 +324,17 @@ public class MySqlDataSourceOptions {
                                     "Whether to assign the unbounded chunks first during snapshot reading phase. This might help reduce the risk of the TaskManager experiencing an out-of-memory (OOM) error when taking a snapshot of the largest unbounded chunk.  Defaults to false.");
 
     @Experimental
+    public static final ConfigOption<Boolean> SCAN_EMIT_CREATE_TABLE_EVENTS_IN_BATCH_ENABLED =
+            ConfigOptions.key("scan.emit.create-table-events.in-batch.enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Whether to emit all CreateTableEvents in batch during initialization phase. "
+                                    + "When enabled, all CreateTableEvents are collected and emitted together "
+                                    + "before processing data records, significantly reducing schema coordination "
+                                    + "overhead in scenarios with thousands of tables.");
+
+    @Experimental
     public static final ConfigOption<Boolean> SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP =
             ConfigOptions.key("scan.incremental.snapshot.backfill.skip")
                     .booleanType()

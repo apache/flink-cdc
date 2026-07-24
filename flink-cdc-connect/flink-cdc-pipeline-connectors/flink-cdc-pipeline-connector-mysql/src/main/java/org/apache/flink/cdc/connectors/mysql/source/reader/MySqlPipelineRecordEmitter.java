@@ -84,6 +84,8 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
     private boolean isBounded = false;
     private final boolean isTableIdCaseInsensitive;
 
+    private final boolean emitCreateTableEventsInBatch;
+
     private final DebeziumDeserializationSchema<Event> debeziumDeserializationSchema;
 
     private final Map<TableId, CreateTableEvent> createTableEventCache;
@@ -107,12 +109,20 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
                         .getCreateTableEventCache();
         this.isBounded = StartupOptions.snapshot().equals(sourceConfig.getStartupOptions());
         this.isTableIdCaseInsensitive = isTableIdCaseInsensitive;
+        this.emitCreateTableEventsInBatch = sourceConfig.isEmitCreateTableEventsInBatchEnabled();
+    }
+
+    private boolean shouldBatchEmitCreateTableEvents() {
+        return isBounded || emitCreateTableEventsInBatch;
     }
 
     @Override
     public void applySplit(MySqlSplit split) {
-        if ((isBounded) && createTableEventCache.isEmpty() && split instanceof MySqlSnapshotSplit) {
-            // TableSchemas in MySqlSnapshotSplit only contains one table.
+        if (shouldBatchEmitCreateTableEvents()
+                && createTableEventCache.isEmpty()
+                && split instanceof MySqlSnapshotSplit) {
+            // In snapshot mode or batch emit mode: batch emit ALL CreateTableEvent at split
+            // initialization
             createTableEventCache.putAll(generateCreateTableEvent(sourceConfig));
         } else {
             for (TableChanges.TableChange tableChange : split.getTableSchemas().values()) {
@@ -130,11 +140,13 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
     protected void processElement(
             SourceRecord element, SourceOutput<Event> output, MySqlSplitState splitState)
             throws Exception {
-        if (shouldEmitAllCreateTableEventsInSnapshotMode && isBounded) {
-            // In snapshot mode, we simply emit all schemas at once.
+        if (shouldEmitAllCreateTableEventsInSnapshotMode
+                && shouldBatchEmitCreateTableEvents()) {
+            // In snapshot mode or batch emit mode, we emit all schemas at once.
             createTableEventCache.forEach(
                     (tableId, createTableEvent) -> {
                         output.collect(createTableEvent);
+                        alreadySendCreateTableTables.add(tableId);
                     });
             shouldEmitAllCreateTableEventsInSnapshotMode = false;
         } else if (isLowWatermarkEvent(element) && splitState.isSnapshotSplitState()) {
