@@ -20,6 +20,7 @@ package org.apache.flink.cdc.connectors.base.source.assigner.state;
 import org.apache.flink.cdc.connectors.base.source.assigner.AssignerStatus;
 import org.apache.flink.cdc.connectors.base.source.meta.offset.Offset;
 import org.apache.flink.cdc.connectors.base.source.meta.offset.OffsetFactory;
+import org.apache.flink.cdc.connectors.base.source.meta.split.SchemalessSnapshotSplit;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitSerializer;
 import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
@@ -37,6 +38,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -92,7 +95,7 @@ class PendingSplitsStateSerializerTest {
                 new SnapshotPendingSplitsState(
                         Collections.emptyList(),
                         Collections.emptyList(),
-                        Collections.emptyMap(),
+                        new LinkedHashMap<>(),
                         constructTableSchema(),
                         Collections.emptyMap(),
                         AssignerStatus.INITIAL_ASSIGNING,
@@ -105,6 +108,54 @@ class PendingSplitsStateSerializerTest {
 
         assertThat(serializer.deserialize(serializer.getVersion(), serializer.serialize(state)))
                 .isEqualTo(state);
+    }
+
+    @Test
+    void testAssignedSplitsKeepAssignmentOrderAfterSerde() throws Exception {
+        TableId tableId = constructTableId();
+        RowType splitKeyType =
+                new RowType(
+                        Collections.singletonList(new RowType.RowField("id", new BigIntType())));
+        // 10+ splits so that the lexicographic order of split ids differs from the assignment
+        // order, which determines the meta group partitioning of finished snapshot splits
+        List<String> assignmentOrder = new ArrayList<>();
+        LinkedHashMap<String, SchemalessSnapshotSplit> assignedSplits = new LinkedHashMap<>();
+        for (int i = 0; i < 12; i++) {
+            String splitId = tableId + ":" + i;
+            assignmentOrder.add(splitId);
+            assignedSplits.put(
+                    splitId,
+                    new SchemalessSnapshotSplit(
+                            tableId,
+                            splitId,
+                            splitKeyType,
+                            new Object[] {i},
+                            new Object[] {i + 1},
+                            null));
+        }
+        PendingSplitsStateSerializer serializer =
+                new PendingSplitsStateSerializer(constructSourceSplitSerializer());
+        SnapshotPendingSplitsState state =
+                new SnapshotPendingSplitsState(
+                        Collections.singletonList(tableId),
+                        Collections.emptyList(),
+                        assignedSplits,
+                        constructTableSchema(),
+                        Collections.emptyMap(),
+                        AssignerStatus.INITIAL_ASSIGNING_FINISHED,
+                        Collections.emptyList(),
+                        false,
+                        true,
+                        Collections.emptyMap(),
+                        ChunkSplitterState.NO_SPLITTING_TABLE_STATE);
+
+        SnapshotPendingSplitsState restoredState =
+                (SnapshotPendingSplitsState)
+                        serializer.deserialize(
+                                serializer.getVersion(), serializer.serialize(state));
+
+        assertThat(new ArrayList<>(restoredState.getAssignedSplits().keySet()))
+                .isEqualTo(assignmentOrder);
     }
 
     private SourceSplitSerializer constructSourceSplitSerializer() {
