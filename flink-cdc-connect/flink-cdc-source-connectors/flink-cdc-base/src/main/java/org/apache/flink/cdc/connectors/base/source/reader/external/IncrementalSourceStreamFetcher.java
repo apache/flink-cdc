@@ -25,8 +25,6 @@ import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
 import org.apache.flink.cdc.connectors.base.utils.SplitKeyUtils;
 import org.apache.flink.util.FlinkRuntimeException;
 
-import org.apache.flink.shaded.guava31.com.google.common.util.concurrent.ThreadFactoryBuilder;
-
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.relational.TableId;
@@ -76,7 +74,11 @@ public class IncrementalSourceStreamFetcher implements Fetcher<SourceRecords, So
     public IncrementalSourceStreamFetcher(FetchTask.Context taskContext, int subTaskId) {
         this.taskContext = taskContext;
         ThreadFactory threadFactory =
-                new ThreadFactoryBuilder().setNameFormat("debezium-reader-" + subTaskId).build();
+                runnable -> {
+                    Thread thread = Executors.defaultThreadFactory().newThread(runnable);
+                    thread.setName("debezium-reader-" + subTaskId);
+                    return thread;
+                };
         this.executorService = Executors.newSingleThreadExecutor(threadFactory);
         this.pureStreamPhaseTables = new HashSet<>();
         this.isBackfillSkipped = taskContext.getSourceConfig().isSkipSnapshotBackfill();

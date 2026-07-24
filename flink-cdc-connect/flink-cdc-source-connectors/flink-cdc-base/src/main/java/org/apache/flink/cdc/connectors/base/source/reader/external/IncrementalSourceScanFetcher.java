@@ -23,8 +23,6 @@ import org.apache.flink.cdc.connectors.base.source.meta.split.SourceRecords;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.util.FlinkRuntimeException;
 
-import org.apache.flink.shaded.guava31.com.google.common.util.concurrent.ThreadFactoryBuilder;
-
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.pipeline.DataChangeEvent;
 import org.apache.kafka.connect.data.Struct;
@@ -75,11 +73,13 @@ public class IncrementalSourceScanFetcher implements Fetcher<SourceRecords, Sour
     public IncrementalSourceScanFetcher(FetchTask.Context taskContext, int subtaskId) {
         this.taskContext = taskContext;
         ThreadFactory threadFactory =
-                new ThreadFactoryBuilder()
-                        .setNameFormat("debezium-snapshot-reader-" + subtaskId)
-                        .setUncaughtExceptionHandler(
-                                (thread, throwable) -> setReadException(throwable))
-                        .build();
+                runnable -> {
+                    Thread thread = Executors.defaultThreadFactory().newThread(runnable);
+                    thread.setName("debezium-snapshot-reader-" + subtaskId);
+                    thread.setUncaughtExceptionHandler(
+                            (caughtThread, throwable) -> setReadException(throwable));
+                    return thread;
+                };
         this.executorService = Executors.newSingleThreadExecutor(threadFactory);
         this.hasNextElement = new AtomicBoolean(false);
         this.reachEnd = new AtomicBoolean(false);
