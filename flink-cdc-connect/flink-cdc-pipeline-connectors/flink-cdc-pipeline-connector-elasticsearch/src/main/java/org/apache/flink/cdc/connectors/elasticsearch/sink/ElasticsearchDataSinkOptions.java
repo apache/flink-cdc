@@ -74,7 +74,7 @@ public class ElasticsearchDataSinkOptions {
     public static final ConfigOption<Long> MAX_RECORD_SIZE_IN_BYTES =
             ConfigOptions.key("record.size.max.bytes")
                     .longType()
-                    .defaultValue(10L * 1024L * 1024L)
+                    .defaultValue(5L * 1024L * 1024L)
                     .withDescription("The maximum size of a single record in bytes.");
 
     /** The version of Elasticsearch to connect to. */
