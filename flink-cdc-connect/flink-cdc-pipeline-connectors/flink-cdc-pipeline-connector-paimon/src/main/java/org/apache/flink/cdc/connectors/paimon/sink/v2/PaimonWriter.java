@@ -38,6 +38,7 @@ import org.apache.paimon.memory.MemoryPoolFactory;
 import org.apache.paimon.options.Options;
 import org.apache.paimon.table.BucketMode;
 import org.apache.paimon.table.FileStoreTable;
+import org.apache.paimon.table.sink.CommitMessageImpl;
 import org.apache.paimon.utils.ExecutorThreadFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -121,6 +122,21 @@ public class PaimonWriter<InputT>
                                                 .getValue()
                                                 .prepareCommit(false, lastCheckpointId + 1)
                                                 .stream()
+                                                // Filter out empty Committable to avoid unnecessary
+                                                // commit operations.
+                                                .filter(
+                                                        committable -> {
+                                                            Object wrapped =
+                                                                    committable
+                                                                            .wrappedCommittable();
+                                                            if (wrapped
+                                                                    instanceof CommitMessageImpl) {
+                                                                return !((CommitMessageImpl)
+                                                                                wrapped)
+                                                                        .isEmpty();
+                                                            }
+                                                            return true;
+                                                        })
                                                 .map(
                                                         committable ->
                                                                 MultiTableCommittable
