@@ -66,6 +66,8 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.testcontainers.lifecycle.Startables;
 
 import java.sql.Connection;
@@ -145,10 +147,16 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
         customerDatabase.dropDatabase();
     }
 
-    @Test
-    void testReadSingleBinlogSplit() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void testReadSingleBinlogSplit(boolean skipBinlogDeserializationOfUnsubscribedTables)
+            throws Exception {
         customerDatabase.createAndInitialize();
-        MySqlSourceConfig sourceConfig = getConfig(new String[] {"customers_even_dist"});
+        MySqlSourceConfig sourceConfig =
+                getConfig(
+                        new String[] {"customers_even_dist"},
+                        false,
+                        skipBinlogDeserializationOfUnsubscribedTables);
         binaryLogClient = DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
         mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig);
         final DataType dataType =
@@ -180,28 +188,59 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
                         sourceConfig,
                         1,
                         expected.length,
-                        splits.get(splits.size() - 1).getTableId());
+                        splits.get(splits.size() - 1).getTableId(),
+                        customerDatabase.qualifiedTableName("trivial"));
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
     }
 
-    @Test
-    void testSnapshotScanSkipBackfillWithPostHighWatermark() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void testSnapshotScanSkipBackfillWithPostHighWatermark(
+            boolean skipBinlogDeserializationOfUnsubscribedTables) throws Exception {
         String tableName = "customers_even_dist";
         testSnapshotScanSkipBackfill(
-                getSnapshotPhaseHooksWithPostHighWatermark(tableName), tableName);
+                getSnapshotPhaseHooksWithPostHighWatermark(tableName),
+                tableName,
+                true,
+                skipBinlogDeserializationOfUnsubscribedTables);
     }
 
-    @Test
-    void testSnapshotScanSkipBackfillWithPreHighWatermark() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void testSnapshotScanSkipBackfillWithPreHighWatermark(
+            boolean skipBinlogDeserializationOfUnsubscribedTables) throws Exception {
         String tableName = "customers_even_dist";
         testSnapshotScanSkipBackfill(
-                getSnapshotPhaseHooksWithPreHighWatermark(tableName), tableName);
+                getSnapshotPhaseHooksWithPreHighWatermark(tableName),
+                tableName,
+                true,
+                skipBinlogDeserializationOfUnsubscribedTables);
     }
 
-    void testSnapshotScanSkipBackfill(SnapshotPhaseHooks snapshotHooks, String tableName)
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void testSnapshotScanWithBackfillSkipUnsubscribedTableBinlogDeserialization(
+            boolean skipBinlogDeserializationOfUnsubscribedTables) throws Exception {
+        String tableName = "customers_even_dist";
+        testSnapshotScanSkipBackfill(
+                getSnapshotPhaseHooksWithPreHighWatermark(tableName),
+                tableName,
+                false,
+                skipBinlogDeserializationOfUnsubscribedTables);
+    }
+
+    void testSnapshotScanSkipBackfill(
+            SnapshotPhaseHooks snapshotHooks,
+            String tableName,
+            boolean skipSnapshotBackfill,
+            boolean skipBinlogDeserializationOfUnsubscribedTables)
             throws Exception {
         customerDatabase.createAndInitialize();
-        MySqlSourceConfig sourceConfig = getConfig(new String[] {tableName}, true);
+        MySqlSourceConfig sourceConfig =
+                getConfig(
+                        new String[] {tableName},
+                        skipSnapshotBackfill,
+                        skipBinlogDeserializationOfUnsubscribedTables);
         binaryLogClient = DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
         mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig);
 
@@ -212,32 +251,56 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
                         DataTypes.FIELD("address", DataTypes.STRING()),
                         DataTypes.FIELD("phone_number", DataTypes.STRING()));
         List<MySqlSnapshotSplit> splits = getMySqlSplits(new String[] {tableName}, sourceConfig);
-        String[] expected =
-                new String[] {
-                    "+I[101, user_1, Shanghai, 123567891234]",
-                    "+I[102, user_2, Shanghai, 123567891234]",
-                    "+I[103, user_3, Shanghai, 123567891234]",
-                    "+I[104, user_4, Shanghai, 123567891234]",
-                    "+I[105, user_5, Shanghai, 123567891234]",
-                    "+I[106, user_6, Shanghai, 123567891234]",
-                    "+I[107, user_7, Shanghai, 123567891234]",
-                    "+I[108, user_8, Shanghai, 123567891234]",
-                    "-U[103, user_3, Shanghai, 123567891234]",
-                    "+U[103, user_3, Hangzhou, 123567891234]",
-                    "-D[102, user_2, Shanghai, 123567891234]",
-                    "+I[102, user_2, Hangzhou, 123567891234]",
-                    "-U[103, user_3, Hangzhou, 123567891234]",
-                    "+U[103, user_3, Shanghai, 123567891234]",
-                    "-U[103, user_3, Shanghai, 123567891234]",
-                    "+U[103, user_3, Hangzhou, 123567891234]",
-                    "-D[102, user_2, Hangzhou, 123567891234]",
-                    "+I[102, user_2, Shanghai, 123567891234]",
-                    "-U[103, user_3, Hangzhou, 123567891234]",
-                    "+U[103, user_3, Shanghai, 123567891234]",
-                    "+I[2001, user_22, Shanghai, 123567891234]",
-                    "+I[2002, user_23, Shanghai, 123567891234]",
-                    "+I[2003, user_24, Shanghai, 123567891234]"
-                };
+        String[] expected = null;
+        if (skipSnapshotBackfill) {
+            expected =
+                    new String[] {
+                        "+I[101, user_1, Shanghai, 123567891234]",
+                        "+I[102, user_2, Shanghai, 123567891234]",
+                        "+I[103, user_3, Shanghai, 123567891234]",
+                        "+I[104, user_4, Shanghai, 123567891234]",
+                        "+I[105, user_5, Shanghai, 123567891234]",
+                        "+I[106, user_6, Shanghai, 123567891234]",
+                        "+I[107, user_7, Shanghai, 123567891234]",
+                        "+I[108, user_8, Shanghai, 123567891234]",
+                        "-U[103, user_3, Shanghai, 123567891234]",
+                        "+U[103, user_3, Hangzhou, 123567891234]",
+                        "-D[102, user_2, Shanghai, 123567891234]",
+                        "+I[102, user_2, Hangzhou, 123567891234]",
+                        "-U[103, user_3, Hangzhou, 123567891234]",
+                        "+U[103, user_3, Shanghai, 123567891234]",
+                        "-U[103, user_3, Shanghai, 123567891234]",
+                        "+U[103, user_3, Hangzhou, 123567891234]",
+                        "-D[102, user_2, Hangzhou, 123567891234]",
+                        "+I[102, user_2, Shanghai, 123567891234]",
+                        "-U[103, user_3, Hangzhou, 123567891234]",
+                        "+U[103, user_3, Shanghai, 123567891234]",
+                        "+I[2001, user_22, Shanghai, 123567891234]",
+                        "+I[2002, user_23, Shanghai, 123567891234]",
+                        "+I[2003, user_24, Shanghai, 123567891234]"
+                    };
+        } else {
+            expected =
+                    new String[] {
+                        "+I[101, user_1, Shanghai, 123567891234]",
+                        "+I[102, user_2, Hangzhou, 123567891234]",
+                        "+I[103, user_3, Shanghai, 123567891234]",
+                        "+I[104, user_4, Shanghai, 123567891234]",
+                        "+I[105, user_5, Shanghai, 123567891234]",
+                        "+I[106, user_6, Shanghai, 123567891234]",
+                        "+I[107, user_7, Shanghai, 123567891234]",
+                        "+I[108, user_8, Shanghai, 123567891234]",
+                        "-U[103, user_3, Shanghai, 123567891234]",
+                        "+U[103, user_3, Hangzhou, 123567891234]",
+                        "-D[102, user_2, Hangzhou, 123567891234]",
+                        "+I[102, user_2, Shanghai, 123567891234]",
+                        "-U[103, user_3, Hangzhou, 123567891234]",
+                        "+U[103, user_3, Shanghai, 123567891234]",
+                        "+I[2001, user_22, Shanghai, 123567891234]",
+                        "+I[2002, user_23, Shanghai, 123567891234]",
+                        "+I[2003, user_24, Shanghai, 123567891234]"
+                    };
+        }
 
         // skip snapshot backfill makes highwatermark equal lowwatermark, so need 2 splits to
         List<String> actual =
@@ -246,8 +309,9 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
                         dataType,
                         sourceConfig,
                         2,
-                        23,
+                        expected.length,
                         splits.get(splits.size() - 1).getTableId(),
+                        customerDatabase.qualifiedTableName("trivial"),
                         snapshotHooks);
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
     }
@@ -255,16 +319,11 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
     @NotNull
     private SnapshotPhaseHooks getSnapshotPhaseHooksWithPreHighWatermark(String tableName) {
         String tableId = customerDatabase.getDatabaseName() + "." + tableName;
-        String[] changingDataSql =
-                new String[] {
-                    "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 103",
-                    "DELETE FROM " + tableId + " where id = 102",
-                    "INSERT INTO " + tableId + " VALUES(102, 'user_2','Hangzhou','123567891234')",
-                    "UPDATE " + tableId + " SET address = 'Shanghai' where id = 103",
-                };
+        String trivialTableId = customerDatabase.getDatabaseName() + ".trivial";
+        String[] changingDataSql = produceBinlogSqls(tableId, trivialTableId);
 
         SnapshotPhaseHooks snapshotHooks = new SnapshotPhaseHooks();
-        snapshotHooks.setPostHighWatermarkAction(
+        snapshotHooks.setPreHighWatermarkAction(
                 (mySqlConnection, split) -> {
                     if (split.splitId().equals(tableId + ":0")) {
                         mySqlConnection.execute(changingDataSql);
@@ -277,13 +336,8 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
     @NotNull
     private SnapshotPhaseHooks getSnapshotPhaseHooksWithPostHighWatermark(String tableName) {
         String tableId = customerDatabase.getDatabaseName() + "." + tableName;
-        String[] changingDataSql =
-                new String[] {
-                    "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 103",
-                    "DELETE FROM " + tableId + " where id = 102",
-                    "INSERT INTO " + tableId + " VALUES(102, 'user_2','Hangzhou','123567891234')",
-                    "UPDATE " + tableId + " SET address = 'Shanghai' where id = 103",
-                };
+        String trivialTableId = customerDatabase.getDatabaseName() + ".trivial";
+        String[] changingDataSql = produceBinlogSqls(tableId, trivialTableId);
 
         SnapshotPhaseHooks snapshotHooks = new SnapshotPhaseHooks();
         snapshotHooks.setPostHighWatermarkAction(
@@ -296,10 +350,16 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
         return snapshotHooks;
     }
 
-    @Test
-    void testReadAllBinlogSplitsForOneTable() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void testReadAllBinlogSplitsForOneTable(boolean skipBinlogDeserializationOfUnsubscribedTables)
+            throws Exception {
         customerDatabase.createAndInitialize();
-        MySqlSourceConfig sourceConfig = getConfig(new String[] {"customers_even_dist"});
+        MySqlSourceConfig sourceConfig =
+                getConfig(
+                        new String[] {"customers_even_dist"},
+                        false,
+                        skipBinlogDeserializationOfUnsubscribedTables);
         binaryLogClient = DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
         mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig);
         final DataType dataType =
@@ -340,7 +400,8 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
                         sourceConfig,
                         splits.size(),
                         expected.length,
-                        splits.get(splits.size() - 1).getTableId());
+                        splits.get(splits.size() - 1).getTableId(),
+                        customerDatabase.qualifiedTableName("trivial"));
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
     }
 
@@ -375,7 +436,8 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
                         sourceConfig,
                         splits.size(),
                         expected.length,
-                        splits.get(splits.size() - 1).getTableId());
+                        splits.get(splits.size() - 1).getTableId(),
+                        customerDatabase.qualifiedTableName("trivial"));
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
     }
 
@@ -432,15 +494,21 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
                         TableId.parse(
                                 customerDatabase.getDatabaseName()
                                         + "."
-                                        + "customer_card_single_line"));
+                                        + "customer_card_single_line"),
+                        customerDatabase.qualifiedTableName("trivial"));
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
     }
 
-    @Test
-    void testReadBinlogFromLatestOffset() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void testReadBinlogFromLatestOffset(boolean skipBinlogDeserializationOfUnsubscribedTables)
+            throws Exception {
         customerDatabase.createAndInitialize();
         MySqlSourceConfig sourceConfig =
-                getConfig(StartupOptions.latest(), new String[] {"customers"});
+                getConfig(
+                        StartupOptions.latest(),
+                        new String[] {"customers"},
+                        skipBinlogDeserializationOfUnsubscribedTables);
         binaryLogClient = DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
         mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig);
 
@@ -451,7 +519,10 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
 
         // Create some binlog events
         makeCustomersBinlogEvents(
-                mySqlConnection, customerDatabase.qualifiedTableName("customers"), false);
+                mySqlConnection,
+                customerDatabase.qualifiedTableName("customers"),
+                customerDatabase.qualifiedTableName("trivial"),
+                false);
 
         final DataType dataType =
                 DataTypes.ROW(
@@ -479,15 +550,18 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
         reader.close();
     }
 
-    @Test
-    void testReadBinlogWithoutGtidFromLatestOffset() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void testReadBinlogWithoutGtidFromLatestOffset(
+            boolean skipBinlogDeserializationOfUnsubscribedTables) throws Exception {
         customerDatabaseNoGtid.createAndInitialize();
         MySqlSourceConfig sourceConfig =
                 getConfig(
                         MYSQL_CONTAINER_NOGTID,
                         customerDatabaseNoGtid,
                         StartupOptions.latest(),
-                        new String[] {"customers"});
+                        new String[] {"customers"},
+                        skipBinlogDeserializationOfUnsubscribedTables);
         binaryLogClient = DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
         mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig);
 
@@ -498,7 +572,10 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
 
         // Create some binlog events
         makeCustomersBinlogEvents(
-                mySqlConnection, customerDatabaseNoGtid.qualifiedTableName("customers"), false);
+                mySqlConnection,
+                customerDatabaseNoGtid.qualifiedTableName("customers"),
+                customerDatabaseNoGtid.qualifiedTableName("trivial"),
+                false);
 
         final DataType dataType =
                 DataTypes.ROW(
@@ -526,11 +603,16 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
         reader.close();
     }
 
-    @Test
-    void testReadBinlogFromEarliestOffset() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void testReadBinlogFromEarliestOffset(boolean skipBinlogDeserializationOfUnsubscribedTables)
+            throws Exception {
         customerDatabase.createAndInitialize();
         MySqlSourceConfig sourceConfig =
-                getConfig(StartupOptions.earliest(), new String[] {"customers"});
+                getConfig(
+                        StartupOptions.earliest(),
+                        new String[] {"customers"},
+                        skipBinlogDeserializationOfUnsubscribedTables);
         binaryLogClient = DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
         mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig);
 
@@ -541,7 +623,10 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
 
         // Create some binlog events
         makeCustomersBinlogEvents(
-                mySqlConnection, customerDatabase.qualifiedTableName("customers"), false);
+                mySqlConnection,
+                customerDatabase.qualifiedTableName("customers"),
+                customerDatabase.qualifiedTableName("trivial"),
+                false);
 
         final DataType dataType =
                 DataTypes.ROW(
@@ -624,11 +709,17 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
                                 + "binlog offset, which is not supported when startup mode is set to EARLIEST_OFFSET");
     }
 
-    @Test
-    void testReadBinlogFromBinlogFilePosition() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void testReadBinlogFromBinlogFilePosition(boolean skipBinlogDeserializationOfUnsubscribedTables)
+            throws Exception {
         // Preparations
         customerDatabase.createAndInitialize();
-        MySqlSourceConfig connectionConfig = getConfig(new String[] {"customers"});
+        MySqlSourceConfig connectionConfig =
+                getConfig(
+                        new String[] {"customers"},
+                        false,
+                        skipBinlogDeserializationOfUnsubscribedTables);
         binaryLogClient = DebeziumUtils.createBinaryClient(connectionConfig.getDbzConfiguration());
         mySqlConnection = DebeziumUtils.createMySqlConnection(connectionConfig);
         DataType dataType =
@@ -646,7 +737,8 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
                 getConfig(
                         StartupOptions.specificOffset(
                                 startingOffset.getFilename(), startingOffset.getPosition()),
-                        new String[] {"customers"});
+                        new String[] {"customers"},
+                        skipBinlogDeserializationOfUnsubscribedTables);
 
         // Create reader and submit splits
         MySqlBinlogSplit split = createBinlogSplit(sourceConfig);
@@ -655,7 +747,10 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
 
         // Create some binlog events
         makeCustomersBinlogEvents(
-                mySqlConnection, customerDatabase.qualifiedTableName("customers"), false);
+                mySqlConnection,
+                customerDatabase.qualifiedTableName("customers"),
+                customerDatabase.qualifiedTableName("trivial"),
+                false);
 
         // Read with binlog split reader and validate
         String[] expected =
@@ -733,11 +828,17 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
         assertEqualsInOrder(Arrays.asList(expected), actual);
     }
 
-    @Test
-    void testReadBinlogFromGtidSet() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void testReadBinlogFromGtidSet(boolean skipBinlogDeserializationOfUnsubscribedTables)
+            throws Exception {
         // Preparations
         customerDatabase.createAndInitialize();
-        MySqlSourceConfig connectionConfig = getConfig(new String[] {"customers"});
+        MySqlSourceConfig connectionConfig =
+                getConfig(
+                        new String[] {"customers"},
+                        false,
+                        skipBinlogDeserializationOfUnsubscribedTables);
         binaryLogClient = DebeziumUtils.createBinaryClient(connectionConfig.getDbzConfiguration());
         mySqlConnection = DebeziumUtils.createMySqlConnection(connectionConfig);
         DataType dataType =
@@ -754,7 +855,8 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
         MySqlSourceConfig sourceConfig =
                 getConfig(
                         StartupOptions.specificOffset(startingOffset.getGtidSet()),
-                        new String[] {"customers"});
+                        new String[] {"customers"},
+                        skipBinlogDeserializationOfUnsubscribedTables);
 
         // Create reader and submit splits
         MySqlBinlogSplit split = createBinlogSplit(sourceConfig);
@@ -763,7 +865,10 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
 
         // Create some binlog events
         makeCustomersBinlogEvents(
-                mySqlConnection, customerDatabase.qualifiedTableName("customers"), false);
+                mySqlConnection,
+                customerDatabase.qualifiedTableName("customers"),
+                customerDatabase.qualifiedTableName("trivial"),
+                false);
 
         // Read with binlog split reader and validate
         String[] expected =
@@ -869,11 +974,17 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
         assertEqualsInOrder(Arrays.asList(expected), actual);
     }
 
-    @Test
-    void testReadBinlogFromTimestamp() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void testReadBinlogFromTimestamp(boolean skipBinlogDeserializationOfUnsubscribedTables)
+            throws Exception {
         // Preparations
         customerDatabase.createAndInitialize();
-        MySqlSourceConfig connectionConfig = getConfig(new String[] {"customers"});
+        MySqlSourceConfig connectionConfig =
+                getConfig(
+                        new String[] {"customers"},
+                        false,
+                        skipBinlogDeserializationOfUnsubscribedTables);
         binaryLogClient = DebeziumUtils.createBinaryClient(connectionConfig.getDbzConfiguration());
         mySqlConnection = DebeziumUtils.createMySqlConnection(connectionConfig);
         DataType dataType =
@@ -892,7 +1003,10 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
 
         // Create a new config to start reading from the offset captured above
         MySqlSourceConfig sourceConfig =
-                getConfig(StartupOptions.timestamp(startTimestamp), new String[] {"customers"});
+                getConfig(
+                        StartupOptions.timestamp(startTimestamp),
+                        new String[] {"customers"},
+                        skipBinlogDeserializationOfUnsubscribedTables);
 
         // Create reader and submit splits
         MySqlBinlogSplit split = createBinlogSplit(sourceConfig);
@@ -901,7 +1015,10 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
 
         // Create some binlog events
         makeCustomersBinlogEvents(
-                mySqlConnection, customerDatabase.qualifiedTableName("customers"), false);
+                mySqlConnection,
+                customerDatabase.qualifiedTableName("customers"),
+                customerDatabase.qualifiedTableName("trivial"),
+                false);
 
         // Read with binlog split reader and validate
         String[] expected =
@@ -984,8 +1101,10 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
         assertEqualsInOrder(Arrays.asList(expected), actual);
     }
 
-    @Test
-    void testHeartbeatEvent() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void testHeartbeatEvent(boolean skipBinlogDeserializationOfUnsubscribedTables)
+            throws Exception {
         // Initialize database
         customerDatabase.createAndInitialize();
 
@@ -1006,7 +1125,8 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
                                 MYSQL_CONTAINER,
                                 customerDatabase,
                                 new String[] {"customers"},
-                                false)
+                                false,
+                                skipBinlogDeserializationOfUnsubscribedTables)
                         .startupOptions(StartupOptions.latest())
                         .heartbeatInterval(heartbeatInterval)
                         .debeziumProperties(dbzProps)
@@ -1023,6 +1143,7 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
         makeCustomersBinlogEvents(
                 mySqlConnection,
                 binlogSplit.getTableSchemas().keySet().iterator().next().toString(),
+                customerDatabase.qualifiedTableName("trivial"),
                 false);
 
         // Keep polling until we receive heartbeat. We don't validate offset of heartbeat here
@@ -1330,7 +1451,8 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
             MySqlSourceConfig sourceConfig,
             int scanSplitsNum,
             int expectedSize,
-            TableId binlogChangeTableId)
+            TableId binlogChangeTableId,
+            String trivialTableName)
             throws Exception {
         return readBinlogSplitsFromSnapshotSplits(
                 sqlSplits,
@@ -1339,6 +1461,7 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
                 scanSplitsNum,
                 expectedSize,
                 binlogChangeTableId,
+                trivialTableName,
                 SnapshotPhaseHooks.empty());
     }
 
@@ -1349,6 +1472,7 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
             int scanSplitsNum,
             int expectedSize,
             TableId binlogChangeTableId,
+            String trivialTableName,
             SnapshotPhaseHooks snapshotHooks)
             throws Exception {
         final StatefulTaskContext statefulTaskContext =
@@ -1405,6 +1529,7 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
             makeCustomersBinlogEvents(
                     statefulTaskContext.getConnection(),
                     binlogChangeTableId.toString(),
+                    trivialTableName,
                     scanSplitsNum == 1);
         } else {
             makeCustomerCardsBinlogEvents(
@@ -1438,19 +1563,38 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
     }
 
     private void makeCustomersBinlogEvents(
-            JdbcConnection connection, String tableId, boolean firstSplitOnly) throws SQLException {
+            JdbcConnection connection,
+            String tableId,
+            String trivialTableId,
+            boolean firstSplitOnly)
+            throws SQLException {
         // make binlog events for the first split
         connection.setAutoCommit(false);
         connection.execute(
+                "UPDATE " + trivialTableId + " SET address = 'Chengdu' where id = 102",
                 "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 103",
+                "INSERT INTO "
+                        + trivialTableId
+                        + " VALUES(10001, 'user_11','Wuhan','123567891234')",
                 "DELETE FROM " + tableId + " where id = 102",
+                "UPDATE " + trivialTableId + " SET address = 'Beijing' where id = 103",
+                "DELETE FROM " + trivialTableId + " where id = 10001",
                 "INSERT INTO " + tableId + " VALUES(102, 'user_2','Shanghai','123567891234')",
-                "UPDATE " + tableId + " SET address = 'Shanghai' where id = 103");
+                "INSERT INTO "
+                        + trivialTableId
+                        + " VALUES(10002, 'user_22','Guangzhou','123567891234')",
+                "UPDATE " + tableId + " SET address = 'Shanghai' where id = 103",
+                "UPDATE " + trivialTableId + " SET address = 'Tianjin' where id = 10002",
+                "DELETE FROM " + trivialTableId + " where id = 10002");
         connection.commit();
 
         if (!firstSplitOnly) {
             // make binlog events for split-1
             connection.execute("UPDATE " + tableId + " SET name = 'Hangzhou' where id = 1010");
+            connection.commit();
+
+            connection.execute(
+                    "UPDATE " + trivialTableId + " SET name = 'Shanghai' where id = 1010");
             connection.commit();
 
             // make binlog events for the last split
@@ -1460,10 +1604,22 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
                             + " VALUES(2001, 'user_22','Shanghai','123567891234')");
             connection.commit();
 
+            connection.execute(
+                    "INSERT INTO "
+                            + trivialTableId
+                            + " VALUES(2001, 'user_22','Beijing','123567891234')");
+            connection.commit();
+
             // make schema change binlog events
             connection.execute(
                     "ALTER TABLE "
                             + tableId
+                            + " ADD COLUMN email VARCHAR(128) DEFAULT 'user@flink.apache.org'");
+            connection.commit();
+
+            connection.execute(
+                    "ALTER TABLE "
+                            + trivialTableId
                             + " ADD COLUMN email VARCHAR(128) DEFAULT 'user@flink.apache.org'");
             connection.commit();
 
@@ -1474,10 +1630,22 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
                             + " VALUES(2002, 'user_23','Shanghai','123567891234', 'test1@gmail.com')");
             connection.commit();
 
+            connection.execute(
+                    "INSERT INTO "
+                            + trivialTableId
+                            + " VALUES(2002, 'user_23','Shanghai','123567891234', 'test1@gmail.com')");
+            connection.commit();
+
             // make binlog again
             connection.execute(
                     "INSERT INTO "
                             + tableId
+                            + " VALUES(2003, 'user_24','Shanghai','123567891234', 'test2@gmail.com')");
+            connection.commit();
+
+            connection.execute(
+                    "INSERT INTO "
+                            + trivialTableId
                             + " VALUES(2003, 'user_24','Shanghai','123567891234', 'test2@gmail.com')");
             connection.commit();
         }
@@ -1593,7 +1761,19 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
     }
 
     private MySqlSourceConfig getConfig(StartupOptions startupOptions, String[] captureTables) {
-        return getConfig(MYSQL_CONTAINER, customerDatabase, startupOptions, captureTables);
+        return getConfig(startupOptions, captureTables, false);
+    }
+
+    private MySqlSourceConfig getConfig(
+            StartupOptions startupOptions,
+            String[] captureTables,
+            boolean skipBinlogDeserializationOfUnsubscribedTables) {
+        return getConfig(
+                MYSQL_CONTAINER,
+                customerDatabase,
+                startupOptions,
+                captureTables,
+                skipBinlogDeserializationOfUnsubscribedTables);
     }
 
     private MySqlSourceConfig getConfig(
@@ -1601,31 +1781,53 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
             UniqueDatabase database,
             StartupOptions startupOptions,
             String[] captureTables) {
-        return getConfigFactory(container, database, captureTables, false)
+        return getConfig(container, database, startupOptions, captureTables, false);
+    }
+
+    private MySqlSourceConfig getConfig(
+            MySqlContainer container,
+            UniqueDatabase database,
+            StartupOptions startupOptions,
+            String[] captureTables,
+            boolean skipBinlogDeserializationOfUnsubscribedTables) {
+        return getConfigFactory(
+                        container,
+                        database,
+                        captureTables,
+                        false,
+                        skipBinlogDeserializationOfUnsubscribedTables)
                 .startupOptions(startupOptions)
                 .createConfig(0);
     }
 
     private MySqlSourceConfig getConfig(String[] captureTables) {
-        return getConfig(captureTables, false);
+        return getConfig(captureTables, false, false);
     }
 
-    private MySqlSourceConfig getConfig(String[] captureTables, boolean skipSnapshotBackfill) {
+    private MySqlSourceConfig getConfig(
+            String[] captureTables,
+            boolean skipSnapshotBackfill,
+            boolean skipBinlogDeserializationOfUnsubscribedTables) {
         return getConfigFactory(
-                        MYSQL_CONTAINER, customerDatabase, captureTables, skipSnapshotBackfill)
+                        MYSQL_CONTAINER,
+                        customerDatabase,
+                        captureTables,
+                        skipSnapshotBackfill,
+                        skipBinlogDeserializationOfUnsubscribedTables)
                 .createConfig(0);
     }
 
     private MySqlSourceConfig getConfig(
             MySqlContainer container, UniqueDatabase database, String[] captureTables) {
-        return getConfigFactory(container, database, captureTables, false).createConfig(0);
+        return getConfigFactory(container, database, captureTables, false, false).createConfig(0);
     }
 
     private MySqlSourceConfigFactory getConfigFactory(
             MySqlContainer container,
             UniqueDatabase database,
             String[] captureTables,
-            boolean skipSnapshotBackfill) {
+            boolean skipSnapshotBackfill,
+            boolean skipBinlogDeserializationOfUnsubscribedTables) {
         String[] captureTableIds =
                 Arrays.stream(captureTables)
                         .map(tableName -> database.getDatabaseName() + "." + tableName)
@@ -1640,6 +1842,8 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
                 .splitSize(4)
                 .fetchSize(2)
                 .skipSnapshotBackfill(skipSnapshotBackfill)
+                .skipBinlogDeserializationOfUnsubscribedTables(
+                        skipBinlogDeserializationOfUnsubscribedTables)
                 .password(database.getPassword());
     }
 
@@ -1647,6 +1851,32 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
         connection.execute(
                 "ALTER TABLE " + tableId + " ADD COLUMN new_int_column INT DEFAULT 15213");
         connection.commit();
+    }
+
+    /**
+     * To produce binlog of both tableId and trivialTableId, where table id is the target read table
+     * and trivialTableId is not relevant.
+     *
+     * @param tableId target table to read.
+     * @param trivialTableId irrelevant table that not being subscribed.
+     * @return sqls of both table to produce binlog data.
+     */
+    private static String[] produceBinlogSqls(String tableId, String trivialTableId) {
+        return new String[] {
+            "UPDATE " + trivialTableId + " SET address = 'Chengdu' where id = 102",
+            "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 103",
+            "INSERT INTO " + trivialTableId + " VALUES(10001, 'user_11','Wuhan','123567891234')",
+            "DELETE FROM " + tableId + " where id = 102",
+            "UPDATE " + trivialTableId + " SET address = 'Beijing' where id = 103",
+            "DELETE FROM " + trivialTableId + " where id = 10001",
+            "INSERT INTO " + tableId + " VALUES(102, 'user_2','Hangzhou','123567891234')",
+            "INSERT INTO "
+                    + trivialTableId
+                    + " VALUES(10002, 'user_22','Guangzhou','123567891234')",
+            "UPDATE " + tableId + " SET address = 'Shanghai' where id = 103",
+            "UPDATE " + trivialTableId + " SET address = 'Tianjin' where id = 10002",
+            "DELETE FROM " + trivialTableId + " where id = 10002",
+        };
     }
 
     /** This stateful task context will skip valid the starting offset. */

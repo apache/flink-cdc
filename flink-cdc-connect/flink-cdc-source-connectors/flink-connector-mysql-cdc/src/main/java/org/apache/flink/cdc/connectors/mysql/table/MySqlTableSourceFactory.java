@@ -106,9 +106,10 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         boolean useLegacyJsonFormat = config.get(MySqlSourceOptions.USE_LEGACY_JSON_FORMAT);
         boolean assignUnboundedChunkFirst =
                 config.get(MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST);
-
         boolean appendOnly =
                 config.get(MySqlSourceOptions.SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED);
+        boolean skipBinlogDeserializationOfUnsubscribedTables =
+                config.get(MySqlSourceOptions.SCAN_BINLOG_SKIP_UNSUBSCRIBED_TABLES_ENABLED);
 
         if (enableParallelRead) {
             validatePrimaryKeyIfEnableParallel(physicalSchema, chunkKeyColumn);
@@ -156,7 +157,8 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                 parseOnLineSchemaChanges,
                 useLegacyJsonFormat,
                 assignUnboundedChunkFirst,
-                appendOnly);
+                appendOnly,
+                skipBinlogDeserializationOfUnsubscribedTables);
     }
 
     @Override
@@ -206,6 +208,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         options.add(MySqlSourceOptions.USE_LEGACY_JSON_FORMAT);
         options.add(MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST);
         options.add(MySqlSourceOptions.SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED);
+        options.add(MySqlSourceOptions.SCAN_BINLOG_SKIP_UNSUBSCRIBED_TABLES_ENABLED);
         return options;
     }
 

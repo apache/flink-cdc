@@ -312,6 +312,14 @@ public class MySqlSourceBuilder<T> {
         return this;
     }
 
+    /** Whether to skip deserialization of binlog row events for unsubscribed tables. */
+    public MySqlSourceBuilder<T> skipBinlogDeserializationOfUnsubscribedTables(
+            boolean skipBinlogDeserializationOfUnsubscribedTables) {
+        this.configFactory.skipBinlogDeserializationOfUnsubscribedTables(
+                skipBinlogDeserializationOfUnsubscribedTables);
+        return this;
+    }
+
     /**
      * Build the {@link MySqlSource}.
      *
