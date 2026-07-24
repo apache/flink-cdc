@@ -24,6 +24,7 @@ import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
+import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
@@ -349,6 +350,224 @@ class SchemaEvolveTest {
 
             harness.clearOutputRecords();
         }
+        harness.close();
+    }
+
+    @Test
+    void testDropAndRecreateTable() throws Exception {
+        TableId tableId = CUSTOMERS_TABLE_ID;
+        Schema schemaV1 =
+                Schema.newBuilder()
+                        .physicalColumn("id", INT)
+                        .physicalColumn("name", STRING)
+                        .primaryKey("id")
+                        .build();
+        Schema schemaV2 =
+                Schema.newBuilder()
+                        .physicalColumn("id", BIGINT)
+                        .physicalColumn("name", STRING)
+                        .physicalColumn("score", INT)
+                        .primaryKey("id")
+                        .build();
+
+        SchemaChangeBehavior behavior = SchemaChangeBehavior.EVOLVE;
+
+        SchemaOperator schemaOperator =
+                new SchemaOperator(
+                        new ArrayList<>(), RouteMode.ALL_MATCH, Duration.ofSeconds(30), behavior);
+        RegularEventOperatorTestHarness<SchemaOperator, Event> harness =
+                RegularEventOperatorTestHarness.withDurationAndBehavior(
+                        schemaOperator, 17, Duration.ofSeconds(3), behavior);
+        harness.open();
+
+        processEvent(
+                schemaOperator, Collections.singletonList(new CreateTableEvent(tableId, schemaV1)));
+        harness.clearOutputRecords();
+
+        processEvent(schemaOperator, Collections.singletonList(new DropTableEvent(tableId)));
+        Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isNull();
+        Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isNull();
+        Assertions.assertThat(
+                        harness.getOutputRecords().stream()
+                                .map(StreamRecord::getValue)
+                                .collect(Collectors.toList()))
+                .isEqualTo(
+                        Arrays.asList(
+                                new FlushEvent(
+                                        0,
+                                        Collections.singletonList(tableId),
+                                        SchemaChangeEventType.DROP_TABLE),
+                                new DropTableEvent(tableId)));
+        harness.clearOutputRecords();
+
+        processEvent(
+                schemaOperator, Collections.singletonList(new CreateTableEvent(tableId, schemaV2)));
+        Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schemaV2);
+        Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV2);
+        Assertions.assertThat(
+                        harness.getOutputRecords().stream()
+                                .map(StreamRecord::getValue)
+                                .collect(Collectors.toList()))
+                .isEqualTo(
+                        Arrays.asList(
+                                new FlushEvent(
+                                        0,
+                                        Collections.singletonList(tableId),
+                                        SchemaChangeEventType.CREATE_TABLE),
+                                new CreateTableEvent(tableId, schemaV2)));
+
+        harness.close();
+    }
+
+    @Test
+    void testDropAndRecreateTableWithDropTableExcluded() throws Exception {
+        TableId tableId = CUSTOMERS_TABLE_ID;
+        Schema schemaV1 =
+                Schema.newBuilder()
+                        .physicalColumn("id", INT)
+                        .physicalColumn("name", STRING)
+                        .primaryKey("id")
+                        .build();
+        Schema schemaV2 =
+                Schema.newBuilder()
+                        .physicalColumn("id", INT)
+                        .physicalColumn("name", STRING)
+                        .physicalColumn("score", INT)
+                        .primaryKey("id")
+                        .build();
+
+        SchemaChangeBehavior behavior = SchemaChangeBehavior.LENIENT;
+        SchemaOperator schemaOperator =
+                new SchemaOperator(
+                        new ArrayList<>(), RouteMode.ALL_MATCH, Duration.ofSeconds(30), behavior);
+        RegularEventOperatorTestHarness<SchemaOperator, Event> harness =
+                RegularEventOperatorTestHarness.withDurationAndFineGrainedBehavior(
+                        schemaOperator,
+                        17,
+                        Duration.ofSeconds(3),
+                        behavior,
+                        Sets.difference(
+                                Arrays.stream(SchemaChangeEventTypeFamily.ALL)
+                                        .collect(Collectors.toSet()),
+                                Collections.singleton(SchemaChangeEventType.DROP_TABLE)));
+        harness.open();
+
+        processEvent(
+                schemaOperator, Collections.singletonList(new CreateTableEvent(tableId, schemaV1)));
+        harness.clearOutputRecords();
+
+        processEvent(schemaOperator, Collections.singletonList(new DropTableEvent(tableId)));
+        Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isNull();
+        Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV1);
+        Assertions.assertThat(
+                        harness.getOutputRecords().stream()
+                                .map(StreamRecord::getValue)
+                                .collect(Collectors.toList()))
+                .isEqualTo(
+                        Collections.singletonList(
+                                new FlushEvent(
+                                        0,
+                                        Collections.singletonList(tableId),
+                                        SchemaChangeEventType.DROP_TABLE)));
+        harness.clearOutputRecords();
+
+        Assertions.assertThatThrownBy(
+                        () ->
+                                processEvent(
+                                        schemaOperator,
+                                        Collections.singletonList(
+                                                DataChangeEvent.insertEvent(
+                                                        tableId,
+                                                        buildRecord(INT, 2, STRING, "Bob")))))
+                .isExactlyInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Unable to coerce data record");
+        harness.clearOutputRecords();
+
+        processEvent(
+                schemaOperator, Collections.singletonList(new CreateTableEvent(tableId, schemaV2)));
+        Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schemaV2);
+        Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV2);
+        Assertions.assertThat(
+                        harness.getOutputRecords().stream()
+                                .map(StreamRecord::getValue)
+                                .collect(Collectors.toList()))
+                .isEqualTo(
+                        Arrays.asList(
+                                new FlushEvent(
+                                        0,
+                                        Collections.singletonList(tableId),
+                                        SchemaChangeEventType.CREATE_TABLE),
+                                new AddColumnEvent(
+                                        tableId,
+                                        Collections.singletonList(
+                                                new AddColumnEvent.ColumnWithPosition(
+                                                        Column.physicalColumn("score", INT))))));
+
+        harness.close();
+    }
+
+    @Test
+    void testIgnoreDropAndRecreateTableKeepsEvolvedSchema() throws Exception {
+        TableId tableId = CUSTOMERS_TABLE_ID;
+        Schema schemaV1 =
+                Schema.newBuilder()
+                        .physicalColumn("id", INT)
+                        .physicalColumn("name", STRING)
+                        .primaryKey("id")
+                        .build();
+        Schema schemaV2 =
+                Schema.newBuilder()
+                        .physicalColumn("id", INT)
+                        .physicalColumn("name", STRING)
+                        .physicalColumn("score", INT)
+                        .primaryKey("id")
+                        .build();
+
+        SchemaChangeBehavior behavior = SchemaChangeBehavior.IGNORE;
+        SchemaOperator schemaOperator =
+                new SchemaOperator(
+                        new ArrayList<>(), RouteMode.ALL_MATCH, Duration.ofSeconds(30), behavior);
+        RegularEventOperatorTestHarness<SchemaOperator, Event> harness =
+                RegularEventOperatorTestHarness.withDurationAndBehavior(
+                        schemaOperator, 17, Duration.ofSeconds(3), behavior);
+        harness.open();
+
+        processEvent(
+                schemaOperator, Collections.singletonList(new CreateTableEvent(tableId, schemaV1)));
+        Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schemaV1);
+        Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV1);
+        harness.clearOutputRecords();
+
+        processEvent(schemaOperator, Collections.singletonList(new DropTableEvent(tableId)));
+        Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isNull();
+        Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV1);
+        Assertions.assertThat(
+                        harness.getOutputRecords().stream()
+                                .map(StreamRecord::getValue)
+                                .collect(Collectors.toList()))
+                .isEqualTo(
+                        Collections.singletonList(
+                                new FlushEvent(
+                                        0,
+                                        Collections.singletonList(tableId),
+                                        SchemaChangeEventType.DROP_TABLE)));
+        harness.clearOutputRecords();
+
+        processEvent(
+                schemaOperator, Collections.singletonList(new CreateTableEvent(tableId, schemaV2)));
+        Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schemaV2);
+        Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV1);
+        Assertions.assertThat(
+                        harness.getOutputRecords().stream()
+                                .map(StreamRecord::getValue)
+                                .collect(Collectors.toList()))
+                .isEqualTo(
+                        Collections.singletonList(
+                                new FlushEvent(
+                                        0,
+                                        Collections.singletonList(tableId),
+                                        SchemaChangeEventType.CREATE_TABLE)));
+
         harness.close();
     }
 

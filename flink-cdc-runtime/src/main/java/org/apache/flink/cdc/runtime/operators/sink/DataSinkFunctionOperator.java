@@ -20,6 +20,7 @@ package org.apache.flink.cdc.runtime.operators.sink;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.event.ChangeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
+import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
@@ -100,6 +101,13 @@ public class DataSinkFunctionOperator extends StreamSink<Event> {
                 return;
             }
 
+            if (event instanceof DropTableEvent) {
+                // Allow a later table with the same identifier to be initialized again.
+                processedTableIds.remove(((DropTableEvent) event).tableId());
+                super.processElement(element);
+                return;
+            }
+
             // Check if the table is processed before emitting all other events, because we have to
             // make
             // sure that sink have a view of the full schema before processing any change events,
@@ -119,7 +127,8 @@ public class DataSinkFunctionOperator extends StreamSink<Event> {
     // ----------------------------- Helper functions -------------------------------
     private void handleFlushEvent(FlushEvent event) throws Exception {
         userFunction.finish();
-        if (event.getSchemaChangeEventType() != SchemaChangeEventType.CREATE_TABLE) {
+        if (event.getSchemaChangeEventType() != SchemaChangeEventType.CREATE_TABLE
+                && event.getSchemaChangeEventType() != SchemaChangeEventType.DROP_TABLE) {
             event.getTableIds().stream()
                     .filter(tableId -> !processedTableIds.contains(tableId))
                     .forEach(

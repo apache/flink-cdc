@@ -21,6 +21,7 @@ import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
+import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
@@ -319,6 +320,58 @@ class DataSinkOperatorWithSchemaEvolveTest {
                     dataSinkWriterOperatorHarness,
                     Arrays.asList(
                             new CreateTableEvent(CUSTOMERS_TABLEID, CUSTOMERS_SCHEMA),
+                            insertEvent));
+            dataSinkWriterOperatorHarness.clearOutputRecords();
+        }
+    }
+
+    @Test
+    void testDataChangeEventAfterDropTable() throws Exception {
+        DataSinkOperatorAdapter dataSinkWriterOperator = new DataSinkOperatorAdapter();
+        try (RegularEventOperatorTestHarness<DataSinkOperatorAdapter, Event>
+                dataSinkWriterOperatorHarness = setupHarness(dataSinkWriterOperator)) {
+            CreateTableEvent createTableEvent =
+                    new CreateTableEvent(CUSTOMERS_TABLEID, CUSTOMERS_SCHEMA);
+            processSchemaChangeEvent(
+                    dataSinkWriterOperator,
+                    dataSinkWriterOperatorHarness,
+                    CUSTOMERS_TABLEID,
+                    createTableEvent);
+            dataSinkWriterOperatorHarness.clearOutputRecords();
+
+            DropTableEvent dropTableEvent = new DropTableEvent(CUSTOMERS_TABLEID);
+            processSchemaChangeEvent(
+                    dataSinkWriterOperator,
+                    dataSinkWriterOperatorHarness,
+                    CUSTOMERS_TABLEID,
+                    dropTableEvent);
+            assertOutputEvents(
+                    dataSinkWriterOperatorHarness, Collections.singletonList(dropTableEvent));
+            dataSinkWriterOperatorHarness.clearOutputRecords();
+
+            dataSinkWriterOperatorHarness.registerOriginalSchema(
+                    CUSTOMERS_TABLEID, CUSTOMERS_LATEST_SCHEMA);
+            dataSinkWriterOperatorHarness.registerEvolvedSchema(
+                    CUSTOMERS_TABLEID, CUSTOMERS_LATEST_SCHEMA);
+
+            BinaryRecordDataGenerator recordDataGenerator =
+                    new BinaryRecordDataGenerator(
+                            ((RowType) CUSTOMERS_LATEST_SCHEMA.toRowDataType()));
+            DataChangeEvent insertEvent =
+                    DataChangeEvent.insertEvent(
+                            CUSTOMERS_TABLEID,
+                            recordDataGenerator.generate(
+                                    new Object[] {
+                                        new BinaryStringData("1"),
+                                        new BinaryStringData("2"),
+                                        new BinaryStringData("3"),
+                                    }));
+
+            processDataChangeEvent(dataSinkWriterOperator, insertEvent);
+            assertOutputEvents(
+                    dataSinkWriterOperatorHarness,
+                    Arrays.asList(
+                            new CreateTableEvent(CUSTOMERS_TABLEID, CUSTOMERS_LATEST_SCHEMA),
                             insertEvent));
             dataSinkWriterOperatorHarness.clearOutputRecords();
         }
