@@ -22,6 +22,10 @@ import org.apache.flink.cdc.connectors.mysql.source.MySqlSource;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
 import org.apache.flink.table.catalog.ObjectPath;
 
+import org.apache.flink.shaded.guava31.com.google.common.cache.CacheBuilder;
+import org.apache.flink.shaded.guava31.com.google.common.cache.CacheLoader;
+import org.apache.flink.shaded.guava31.com.google.common.cache.LoadingCache;
+
 import io.debezium.config.Configuration;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
 import io.debezium.relational.RelationalTableFilters;
@@ -42,6 +46,8 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
 /** A MySql Source configuration which is used by {@link MySqlSource}. */
 public class MySqlSourceConfig implements Serializable {
     private static final long serialVersionUID = 1L;
+    private static final Duration TABLE_FILTER_CACHE_EXPIRE_DURATION = Duration.ofHours(1);
+    private static final long TABLE_FILTER_CACHE_MAXIMUM_SIZE = 1024;
 
     private final String hostname;
     private final int port;
@@ -146,11 +152,7 @@ public class MySqlSourceConfig implements Serializable {
         Tables.TableFilter tableFilter = dbzMySqlConfig.getTableFilters().dataCollectionFilter();
         dbzMySqlConfig
                 .getTableFilters()
-                .setDataCollectionFilters(
-                        (TableId tableId) ->
-                                tableFilter.isIncluded(tableId)
-                                        && (excludeTableFilter == null
-                                                || !excludeTableFilter.isMatch(tableId)));
+                .setDataCollectionFilters(createCachedTableFilter(tableFilter, excludeTableFilter));
         this.jdbcProperties = jdbcProperties;
         this.chunkKeyColumns = chunkKeyColumns;
         this.skipSnapshotBackfill = skipSnapshotBackfill;
@@ -282,6 +284,31 @@ public class MySqlSourceConfig implements Serializable {
     public Predicate<TableId> getTableFilter() {
         RelationalTableFilters tableFilters = dbzMySqlConfig.getTableFilters();
         return tableId -> tableFilters.dataCollectionFilter().isIncluded(tableId);
+    }
+
+    static Tables.TableFilter createCachedTableFilter(
+            Tables.TableFilter tableFilter, @Nullable Selectors excludeTableFilter) {
+        LoadingCache<TableId, Boolean> tableFilterCache =
+                CacheBuilder.newBuilder()
+                        .expireAfterAccess(TABLE_FILTER_CACHE_EXPIRE_DURATION)
+                        .maximumSize(TABLE_FILTER_CACHE_MAXIMUM_SIZE)
+                        .build(
+                                new CacheLoader<TableId, Boolean>() {
+                                    @Override
+                                    public Boolean load(TableId tableId) {
+                                        return isTableIncluded(
+                                                tableFilter, excludeTableFilter, tableId);
+                                    }
+                                });
+        return tableFilterCache::getUnchecked;
+    }
+
+    private static boolean isTableIncluded(
+            Tables.TableFilter tableFilter,
+            @Nullable Selectors excludeTableFilter,
+            TableId tableId) {
+        return tableFilter.isIncluded(tableId)
+                && (excludeTableFilter == null || !excludeTableFilter.isMatch(tableId));
     }
 
     public Properties getJdbcProperties() {
