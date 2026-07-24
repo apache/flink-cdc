@@ -283,8 +283,8 @@ class CliFrontendTest {
                     + "                                                execution. This can take one of\n"
                     + "                                                the following values\n"
                     + "                                                local/remote/yarn-session/yarn-a\n"
-                    + "                                                pplication/kubernetes-session/ku\n"
-                    + "                                                bernetes-application\n"
+                    + "                                                pplication/kubernetes-applicatio\n"
+                    + "                                                n\n"
                     + "       --use-mini-cluster                       Use Flink MiniCluster to run the\n"
                     + "                                                pipeline\n";
 
