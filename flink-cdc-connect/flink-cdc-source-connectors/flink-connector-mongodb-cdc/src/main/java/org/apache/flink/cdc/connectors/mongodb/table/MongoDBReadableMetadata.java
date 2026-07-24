@@ -85,6 +85,21 @@ public enum MongoDBReadableMetadata {
                 }
             }),
 
+    /** It indicates the full document as string raw data. */
+    FULL_DOCUMENT(
+            "full_document",
+            DataTypes.STRING().nullable(),
+            new MetadataConverter() {
+                private static final long serialVersionUID = 1L;
+
+                @Override
+                public Object read(SourceRecord record) {
+                    Struct value = (Struct) record.value();
+                    String fullDocString = value.getString(MongoDBEnvelope.FULL_DOCUMENT_FIELD);
+                    return fullDocString != null ? StringData.fromString(fullDocString) : null;
+                }
+            }),
+
     /**
      * It indicates the row kind of the changelog. '+I' means INSERT message, '-D' means DELETE
      * message, '-U' means UPDATE_BEFORE message and '+U' means UPDATE_AFTER message
