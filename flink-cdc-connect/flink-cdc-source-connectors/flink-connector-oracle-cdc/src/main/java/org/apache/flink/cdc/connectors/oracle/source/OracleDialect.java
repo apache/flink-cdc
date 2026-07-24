@@ -41,6 +41,8 @@ import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
 import io.debezium.relational.history.TableChanges.TableChange;
 
+import javax.annotation.Nullable;
+
 import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.List;
@@ -57,6 +59,7 @@ public class OracleDialect implements JdbcDataSourceDialect {
     private transient OracleSchema oracleSchema;
 
     private transient Tables.TableFilter filters;
+    @Nullable private transient OracleStreamFetchTask streamFetchTask;
 
     @Override
     public String getName() {
@@ -153,7 +156,8 @@ public class OracleDialect implements JdbcDataSourceDialect {
         if (sourceSplitBase.isSnapshotSplit()) {
             return new OracleScanFetchTask(sourceSplitBase.asSnapshotSplit());
         } else {
-            return new OracleStreamFetchTask(sourceSplitBase.asStreamSplit());
+            this.streamFetchTask = new OracleStreamFetchTask(sourceSplitBase.asStreamSplit());
+            return this.streamFetchTask;
         }
     }
 
@@ -164,5 +168,12 @@ public class OracleDialect implements JdbcDataSourceDialect {
         }
 
         return filters.isIncluded(tableId);
+    }
+
+    @Override
+    public void notifyCheckpointComplete(long checkpointId, Offset offset) throws Exception {
+        if (streamFetchTask != null) {
+            streamFetchTask.commitCurrentOffset(offset);
+        }
     }
 }

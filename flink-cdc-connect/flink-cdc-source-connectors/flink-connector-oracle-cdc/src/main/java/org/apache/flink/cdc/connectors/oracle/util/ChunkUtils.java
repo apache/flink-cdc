@@ -58,7 +58,7 @@ public class ChunkUtils {
         if (chunkKeyColumn != null) {
             Optional<Column> targetPkColumn =
                     searchColumns.stream()
-                            .filter(col -> chunkKeyColumn.equals(col.name()))
+                            .filter(col -> chunkKeyColumn.equalsIgnoreCase(col.name()))
                             .findFirst();
             if (targetPkColumn.isPresent()) {
                 return targetPkColumn.get();

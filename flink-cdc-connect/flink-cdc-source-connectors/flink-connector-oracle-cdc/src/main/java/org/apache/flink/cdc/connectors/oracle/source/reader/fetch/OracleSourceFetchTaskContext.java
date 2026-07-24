@@ -46,7 +46,6 @@ import io.debezium.connector.oracle.OracleStreamingChangeEventSourceMetrics;
 import io.debezium.connector.oracle.OracleTaskContext;
 import io.debezium.connector.oracle.OracleTopicSelector;
 import io.debezium.connector.oracle.SourceInfo;
-import io.debezium.connector.oracle.logminer.LogMinerOracleOffsetContextLoader;
 import io.debezium.data.Envelope;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.ErrorHandler;
@@ -62,7 +61,8 @@ import io.debezium.schema.TopicSelector;
 import io.debezium.util.Collect;
 import oracle.sql.ROWID;
 import org.apache.kafka.connect.data.Struct;
-import org.apache.kafka.connect.header.ConnectHeaders;
+import org.apache.kafka.connect.header.Header;
+import org.apache.kafka.connect.header.Headers;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,8 +70,10 @@ import org.slf4j.LoggerFactory;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.util.Map;
+import java.util.function.Function;
 
 import static org.apache.flink.cdc.connectors.oracle.source.utils.OracleConnectionUtils.createOracleConnection;
+import static org.apache.flink.cdc.connectors.oracle.source.utils.OracleConnectionUtils.resolveRedoLogOffsetByTimestamp;
 import static org.apache.flink.cdc.connectors.oracle.util.ChunkUtils.getChunkKeyColumn;
 
 /** The context for fetch task that fetching data of snapshot split from Oracle data source. */
@@ -86,6 +88,7 @@ public class OracleSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
     private OracleTaskContext taskContext;
     private OracleOffsetContext offsetContext;
     private OraclePartition partition;
+    private Long startupTimestampMillis;
 
     private SnapshotChangeEventSourceMetrics<OraclePartition> snapshotChangeEventSourceMetrics;
     private OracleStreamingChangeEventSourceMetrics streamingChangeEventSourceMetrics;
@@ -112,10 +115,9 @@ public class OracleSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                         .getString(EmbeddedFlinkDatabaseHistory.DATABASE_HISTORY_INSTANCE_NAME),
                 sourceSplitBase.getTableSchemas().values());
         this.databaseSchema = OracleUtils.createOracleDatabaseSchema(connectorConfig, connection);
-        // todo logMiner or xStream
         this.offsetContext =
                 loadStartingOffsetState(
-                        new LogMinerOracleOffsetContextLoader(connectorConfig), sourceSplitBase);
+                        createOffsetContextLoader(connectorConfig), sourceSplitBase);
         this.partition = new OraclePartition(connectorConfig.getLogicalName());
         validateAndLoadDatabaseHistory(offsetContext, databaseSchema);
 
@@ -214,20 +216,52 @@ public class OracleSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
 
         // RowId is chunk key column by default, compare RowId
         if (splitKeyType.getFieldNames().contains(ROWID.class.getSimpleName())) {
-            ConnectHeaders headers = (ConnectHeaders) record.headers();
-            ROWID rowId = null;
-            try {
-                rowId = new ROWID(headers.iterator().next().value().toString());
-            } catch (SQLException e) {
-                LOG.error("{} can not convert to RowId", record);
-            }
-            Object[] rowIds = new ROWID[] {rowId};
+            TableId tableId = SourceRecordUtils.getTableId(record);
+            ROWID rowId = parseRowIdFromHeaders(record.headers(), tableId);
+            Object[] rowIds = new Object[] {rowId};
             return SplitKeyUtils.splitKeyRangeContains(rowIds, splitStart, splitEnd);
         } else {
             // config chunk key column compare
             Object[] key = SplitKeyUtils.getSplitKey(splitKeyType, record, getSchemaNameAdjuster());
             return SplitKeyUtils.splitKeyRangeContains(key, splitStart, splitEnd);
         }
+    }
+
+    static ROWID parseRowIdFromHeaders(Headers headers, TableId tableId) {
+        for (Header header : headers) {
+            if (!ROWID.class.getSimpleName().equals(header.key()) || header.value() == null) {
+                continue;
+            }
+            Object value = header.value();
+            if (value instanceof ROWID) {
+                return (ROWID) value;
+            }
+            if (!(value instanceof String)) {
+                throw new IllegalStateException(
+                        String.format(
+                                "Invalid ROWID header type %s for table %s. Configure "
+                                        + "'scan.incremental.snapshot.chunk.key-column' to a stable primary key "
+                                        + "or enable 'scan.incremental.snapshot.backfill.skip=true'.",
+                                value.getClass().getName(), tableId));
+            }
+            try {
+                return new ROWID((String) value);
+            } catch (SQLException e) {
+                throw new IllegalStateException(
+                        String.format(
+                                "Invalid ROWID header for table %s. Configure "
+                                        + "'scan.incremental.snapshot.chunk.key-column' to a stable primary key "
+                                        + "or enable 'scan.incremental.snapshot.backfill.skip=true'.",
+                                tableId),
+                        e);
+            }
+        }
+        throw new IllegalStateException(
+                String.format(
+                        "Missing ROWID header for table %s while using default ROWID split key. "
+                                + "Configure 'scan.incremental.snapshot.chunk.key-column' to a stable primary key "
+                                + "or enable 'scan.incremental.snapshot.backfill.skip=true'.",
+                        tableId));
     }
 
     @Override
@@ -272,12 +306,71 @@ public class OracleSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
     /** Loads the connector's persistent offset (if present) via the given loader. */
     private OracleOffsetContext loadStartingOffsetState(
             OffsetContext.Loader<OracleOffsetContext> loader, SourceSplitBase oracleSplit) {
-        Offset offset =
-                oracleSplit.isSnapshotSplit()
-                        ? RedoLogOffset.INITIAL_OFFSET
-                        : oracleSplit.asStreamSplit().getStartingOffset();
+        StartingOffsetResolution resolution =
+                resolveStartingOffset(
+                        oracleSplit,
+                        timestampMillis ->
+                                resolveRedoLogOffsetByTimestamp(connection, timestampMillis));
+        startupTimestampMillis = resolution.startupTimestampMillis;
+        return loader.load(resolution.offset.getOffset());
+    }
 
-        return loader.load(offset.getOffset());
+    public Long getStartupTimestampMillis() {
+        return startupTimestampMillis;
+    }
+
+    public OracleTaskContext getTaskContext() {
+        return taskContext;
+    }
+
+    static OffsetContext.Loader<OracleOffsetContext> createOffsetContextLoader(
+            OracleConnectorConfig connectorConfig) {
+        return connectorConfig.getAdapter().getOffsetContextLoader();
+    }
+
+    static boolean isLogMinerAdapter(OracleConnectorConfig connectorConfig) {
+        return "logminer".equalsIgnoreCase(connectorConfig.getAdapter().getType());
+    }
+
+    static boolean isXStreamAdapter(OracleConnectorConfig connectorConfig) {
+        return "xstream".equalsIgnoreCase(connectorConfig.getAdapter().getType());
+    }
+
+    static StartingOffsetResolution resolveStartingOffset(
+            SourceSplitBase oracleSplit, Function<Long, Offset> timestampOffsetResolver) {
+        Offset offset = RedoLogOffset.INITIAL_OFFSET;
+        Long resolvedStartupTimestampMillis = null;
+        if (!oracleSplit.isSnapshotSplit()) {
+            offset = oracleSplit.asStreamSplit().getStartingOffset();
+            if (offset instanceof RedoLogOffset) {
+                final Long splitStartupTimestampMillis =
+                        ((RedoLogOffset) offset).getStartupTimestampMillis();
+                if (splitStartupTimestampMillis != null) {
+                    resolvedStartupTimestampMillis = splitStartupTimestampMillis;
+                    offset = timestampOffsetResolver.apply(splitStartupTimestampMillis);
+                }
+            }
+        }
+
+        return new StartingOffsetResolution(offset, resolvedStartupTimestampMillis);
+    }
+
+    static class StartingOffsetResolution {
+        private final Offset offset;
+        private final Long startupTimestampMillis;
+
+        private StartingOffsetResolution(Offset offset, Long startupTimestampMillis) {
+            this.offset = offset;
+            this.startupTimestampMillis = startupTimestampMillis;
+        }
+
+        Offset getOffset() {
+            return offset;
+        }
+
+        Long getStartupTimestampMillis() {
+            return startupTimestampMillis;
+        }
     }
 
     private void validateAndLoadDatabaseHistory(

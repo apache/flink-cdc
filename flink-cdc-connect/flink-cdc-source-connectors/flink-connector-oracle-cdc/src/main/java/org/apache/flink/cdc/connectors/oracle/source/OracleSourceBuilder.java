@@ -17,18 +17,29 @@
 
 package org.apache.flink.cdc.connectors.oracle.source;
 
+import org.apache.flink.api.connector.source.SourceReaderContext;
 import org.apache.flink.cdc.common.annotation.Internal;
+import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.connectors.base.source.jdbc.JdbcIncrementalSource;
+import org.apache.flink.cdc.connectors.base.source.meta.split.SourceRecords;
+import org.apache.flink.cdc.connectors.base.source.metrics.SourceReaderMetrics;
+import org.apache.flink.cdc.connectors.base.source.reader.IncrementalSourceReader;
+import org.apache.flink.cdc.connectors.base.source.reader.IncrementalSourceReaderContext;
+import org.apache.flink.cdc.connectors.base.source.reader.IncrementalSourceSplitReader;
 import org.apache.flink.cdc.connectors.oracle.source.config.OracleSourceConfigFactory;
 import org.apache.flink.cdc.connectors.oracle.source.meta.offset.RedoLogOffsetFactory;
+import org.apache.flink.cdc.connectors.oracle.source.reader.OracleSourceReader;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
+import org.apache.flink.connector.base.source.reader.RecordsWithSplitIds;
+import org.apache.flink.connector.base.source.reader.synchronization.FutureCompletingBlockingQueue;
 
 import javax.annotation.Nullable;
 
 import java.time.Duration;
 import java.util.Properties;
+import java.util.function.Supplier;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
@@ -281,6 +292,37 @@ public class OracleSourceBuilder<T> {
                 RedoLogOffsetFactory offsetFactory,
                 OracleDialect dataSourceDialect) {
             super(configFactory, deserializationSchema, offsetFactory, dataSourceDialect);
+        }
+
+        @Override
+        public IncrementalSourceReader<T, JdbcSourceConfig> createReader(
+                SourceReaderContext readerContext) throws Exception {
+            JdbcSourceConfig sourceConfig = configFactory.create(readerContext.getIndexOfSubtask());
+            FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecords>> elementsQueue =
+                    new FutureCompletingBlockingQueue<>();
+
+            final SourceReaderMetrics sourceReaderMetrics =
+                    new SourceReaderMetrics(readerContext.metricGroup());
+
+            IncrementalSourceReaderContext incrementalSourceReaderContext =
+                    new IncrementalSourceReaderContext(readerContext);
+            Supplier<IncrementalSourceSplitReader<JdbcSourceConfig>> splitReaderSupplier =
+                    () ->
+                            new IncrementalSourceSplitReader<>(
+                                    readerContext.getIndexOfSubtask(),
+                                    dataSourceDialect,
+                                    sourceConfig,
+                                    incrementalSourceReaderContext,
+                                    snapshotHooks);
+            return new OracleSourceReader(
+                    elementsQueue,
+                    splitReaderSupplier,
+                    createRecordEmitter(sourceConfig, sourceReaderMetrics),
+                    readerContext.getConfiguration(),
+                    incrementalSourceReaderContext,
+                    sourceConfig,
+                    sourceSplitSerializer,
+                    dataSourceDialect);
         }
 
         public static <T> OracleSourceBuilder<T> builder() {
