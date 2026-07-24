@@ -39,6 +39,7 @@ import io.debezium.pipeline.EventDispatcher;
 import io.debezium.pipeline.source.AbstractSnapshotChangeEventSource;
 import io.debezium.pipeline.source.spi.SnapshotProgressListener;
 import io.debezium.pipeline.spi.SnapshotResult;
+import io.debezium.relational.Column;
 import io.debezium.relational.RelationalSnapshotChangeEventSource;
 import io.debezium.relational.SnapshotChangeRecordEmitter;
 import io.debezium.relational.Table;
@@ -325,7 +326,10 @@ public class PostgresScanFetchTask extends AbstractScanFetchTask {
                     rows++;
                     final Object[] row = new Object[columnArray.getGreatestColumnPosition()];
                     for (int i = 0; i < columnArray.getColumns().length; i++) {
-                        row[columnArray.getColumns()[i].position() - 1] = rs.getObject(i + 1);
+                        Column col = columnArray.getColumns()[i];
+                        row[col.position() - 1] =
+                                jdbcConnection.getColumnValue(
+                                        rs, i + 1, col, table, databaseSchema);
                     }
                     if (logTimer.expired()) {
                         long stop = clock.currentTimeInMillis();
