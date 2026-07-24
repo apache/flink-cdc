@@ -38,6 +38,8 @@ import org.apache.flink.util.Collector;
 import org.apache.flink.util.Preconditions;
 
 import com.jayway.jsonpath.JsonPath;
+import io.debezium.data.Envelope;
+import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -119,6 +121,7 @@ class Db2SourceTest extends Db2TestBase {
             statement.execute("UPDATE DB2INST1.PRODUCTS SET WEIGHT=1345.67 WHERE ID=2001");
             records = drain(sourceContext, 1);
             assertUpdate(records.get(0), "ID", 2001);
+            assertDirectUpdateImages(records.get(0), 1234.56d, 1345.67d);
 
             // ---------------------------------------------------------------------------------------------------------------
             // Change our schema with a fully-qualified name; we should still see this event
@@ -284,6 +287,7 @@ class Db2SourceTest extends Db2TestBase {
             List<SourceRecord> records = drain(sourceContext3, 2);
             assertInsert(records.get(0), "ID", 1001);
             assertUpdate(records.get(1), "ID", 1001);
+            assertDirectUpdateImages(records.get(1), 1234.56d, 1345.67d);
 
             // make sure there is no more events
             Assertions.assertThat(waitForAvailableRecords(Duration.ofSeconds(3), sourceContext3))
@@ -382,6 +386,17 @@ class Db2SourceTest extends Db2TestBase {
             Thread.sleep(10); // save CPU
         }
         return !sourceContext.getCollectedOutputs().isEmpty();
+    }
+
+    private static void assertDirectUpdateImages(
+            SourceRecord record, double expectedBeforeWeight, double expectedAfterWeight) {
+        Struct value = (Struct) record.value();
+        Struct before = value.getStruct(Envelope.FieldName.BEFORE);
+        Assertions.assertThat((Double) before.get("WEIGHT"))
+                .isCloseTo(expectedBeforeWeight, Assertions.within(0.00001d));
+        Struct after = value.getStruct(Envelope.FieldName.AFTER);
+        Assertions.assertThat((Double) after.get("WEIGHT"))
+                .isCloseTo(expectedAfterWeight, Assertions.within(0.00001d));
     }
 
     private static <T> void setupSource(DebeziumSourceFunction<T> source) throws Exception {

@@ -23,9 +23,12 @@ import org.apache.flink.table.types.DataType;
 import io.debezium.relational.Column;
 
 import java.sql.Types;
+import java.util.Locale;
 
 /** Utilities for converting from Db2 types to Flink SQL types. */
 public class Db2TypeUtils {
+
+    private static final String DECFLOAT = "DECFLOAT";
 
     /** Returns a corresponding Flink data type from a debezium {@link Column}. */
     public static DataType fromDbzColumn(Column column) {
@@ -64,6 +67,14 @@ public class Db2TypeUtils {
                 return DataTypes.FLOAT();
             case Types.DOUBLE:
                 return DataTypes.DOUBLE();
+            case Types.OTHER:
+                if (isDecfloat(column)) {
+                    return DataTypes.DOUBLE();
+                }
+                throw new UnsupportedOperationException(
+                        String.format(
+                                "Don't support DB2 type '%s' yet, jdbcType:'%s'.",
+                                column.typeName(), column.jdbcType()));
             case Types.DECIMAL:
             case Types.NUMERIC:
                 return DataTypes.DECIMAL(column.length(), column.scale().orElse(0));
@@ -79,5 +90,10 @@ public class Db2TypeUtils {
                                 "Don't support DB2 type '%s' yet, jdbcType:'%s'.",
                                 column.typeName(), column.jdbcType()));
         }
+    }
+
+    private static boolean isDecfloat(Column column) {
+        return column.typeName() != null
+                && column.typeName().toUpperCase(Locale.ROOT).startsWith(DECFLOAT);
     }
 }
