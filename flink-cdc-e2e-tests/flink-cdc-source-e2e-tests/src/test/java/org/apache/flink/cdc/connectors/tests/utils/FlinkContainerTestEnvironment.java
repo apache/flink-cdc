@@ -275,18 +275,25 @@ public abstract class FlinkContainerTestEnvironment extends TestLogger {
     public void waitUntilJobRunning(Duration timeout) {
         RestClusterClient<?> clusterClient = getRestClusterClient();
         Deadline deadline = Deadline.fromNow(timeout);
+        String lastObservedJobs = "none";
+        Exception lastStatusFetchError = null;
         while (deadline.hasTimeLeft()) {
             Collection<JobStatusMessage> jobStatusMessages;
             try {
                 jobStatusMessages = clusterClient.listJobs().get(10, TimeUnit.SECONDS);
+                lastStatusFetchError = null;
             } catch (Exception e) {
+                lastStatusFetchError = e;
                 LOG.warn("Error when fetching job status.", e);
+                pauseBeforeNextJobStatusCheck();
                 continue;
             }
             if (jobStatusMessages != null && !jobStatusMessages.isEmpty()) {
+                lastObservedJobs = formatJobStatuses(jobStatusMessages);
                 JobStatusMessage message = jobStatusMessages.iterator().next();
                 JobStatus jobStatus = message.getJobState();
                 if (jobStatus.isTerminalState()) {
+                    logFlinkContainerLogs();
                     throw new ValidationException(
                             String.format(
                                     "Job has been terminated! JobName: %s, JobID: %s, Status: %s",
@@ -297,6 +304,57 @@ public abstract class FlinkContainerTestEnvironment extends TestLogger {
                     return;
                 }
             }
+            pauseBeforeNextJobStatusCheck();
+        }
+
+        logFlinkContainerLogs();
+        String message =
+                String.format(
+                        "Timed out after %s waiting for a Flink job to reach RUNNING state. "
+                                + "Last observed jobs: %s",
+                        timeout, lastObservedJobs);
+        if (lastStatusFetchError != null) {
+            throw new ValidationException(message, lastStatusFetchError);
+        }
+        throw new ValidationException(message);
+    }
+
+    private static String formatJobStatuses(Collection<JobStatusMessage> jobStatusMessages) {
+        return jobStatusMessages.stream()
+                .map(
+                        message ->
+                                String.format(
+                                        "JobName=%s, JobID=%s, Status=%s",
+                                        message.getJobName(),
+                                        message.getJobId(),
+                                        message.getJobState()))
+                .collect(Collectors.joining("; "));
+    }
+
+    private static void pauseBeforeNextJobStatusCheck() {
+        try {
+            Thread.sleep(200L);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new ValidationException("Interrupted while waiting for Flink job status.", e);
+        }
+    }
+
+    private void logFlinkContainerLogs() {
+        logContainerLogs("JobManager", jobManager);
+        logContainerLogs("TaskManager", taskManager);
+    }
+
+    private static void logContainerLogs(
+            String containerName, @Nullable GenericContainer<?> container) {
+        if (container == null) {
+            LOG.error("{} container was not created.", containerName);
+            return;
+        }
+        try {
+            LOG.error("{} logs before test failure:\n{}", containerName, container.getLogs());
+        } catch (RuntimeException e) {
+            LOG.error("Unable to collect {} logs.", containerName, e);
         }
     }
 
