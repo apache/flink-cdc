@@ -24,6 +24,11 @@ source:
   tables: adb.*, bdb.user_table_[0-9]+, [app|web]_order_.*
   chunk-column: app_order_.*:id,web_order:product_id
   capture-new-tables: true
+  scan.snapshot.filters:
+    - table: db1.user_table_[0-9]+
+      filter: id > 100
+    - table: db[1-2].[app|web]_order_\.*
+      filter: city != 'China:beijing'
 
 sink:
   type: kafka

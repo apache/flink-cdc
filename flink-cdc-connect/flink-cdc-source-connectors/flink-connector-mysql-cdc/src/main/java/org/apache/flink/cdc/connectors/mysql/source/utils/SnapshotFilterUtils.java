@@ -1,0 +1,84 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.flink.cdc.connectors.mysql.source.utils;
+
+import org.apache.flink.cdc.common.schema.Selectors;
+
+import io.debezium.relational.TableId;
+
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+/** Utilities to filter snapshot of table. */
+public class SnapshotFilterUtils {
+
+    private SnapshotFilterUtils() {}
+
+    private static final Map<Map<String, String>, Map<Selectors, String>> cache =
+            new ConcurrentHashMap<>();
+
+    /**
+     * Converts the given filters to a map keyed by {@link Selectors}, caching the result.
+     *
+     * <p>The cache is backed by a {@link ConcurrentHashMap} to be safe under concurrent access. To
+     * avoid using a mutable {@link Map} as the cache key, an immutable copy of the input filters is
+     * created and used as the key.
+     *
+     * <p>Uses {@link LinkedHashMap} to preserve insertion order, ensuring deterministic matching
+     * when multiple patterns could match the same table.
+     */
+    private static Map<Selectors, String> toSelector(Map<String, String> filters) {
+        // Create an immutable copy of the filters to avoid using a mutable map as the cache key.
+        // Use LinkedHashMap to preserve the user-defined order.
+        Map<String, String> immutableFilters =
+                Collections.unmodifiableMap(new LinkedHashMap<>(filters));
+
+        return cache.computeIfAbsent(
+                immutableFilters,
+                key -> {
+                    // Use LinkedHashMap to preserve insertion order for deterministic matching
+                    Map<Selectors, String> snapshotFilters = new LinkedHashMap<>();
+                    key.forEach(
+                            (table, filter) -> {
+                                Selectors selector =
+                                        new Selectors.SelectorsBuilder()
+                                                .includeTables(table)
+                                                .build();
+                                snapshotFilters.put(selector, filter);
+                            });
+                    return snapshotFilters;
+                });
+    }
+
+    public static String getSnapshotFilter(Map<String, String> filters, TableId tableId) {
+        Map<Selectors, String> snapshotFilters = toSelector(filters);
+
+        String filter = null;
+        for (Selectors selector : snapshotFilters.keySet()) {
+            if (selector.isMatch(
+                    org.apache.flink.cdc.common.event.TableId.tableId(
+                            tableId.catalog(), tableId.table()))) {
+                filter = snapshotFilters.get(selector);
+                break;
+            }
+        }
+        return filter;
+    }
+}

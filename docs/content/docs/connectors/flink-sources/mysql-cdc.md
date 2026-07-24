@@ -468,6 +468,13 @@ Only valid for cdc 1.x version. During a snapshot operation, the connector will 
         For example updating an already updated value in snapshot, or deleting an already deleted entry in snapshot. These replayed change log events should be handled specially.
       </td>
     </tr>
+    <tr>
+      <td>scan.snapshot.filter</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>When reading a table snapshot, the rows of captured tables will be filtered using the specified filter expression (AKA a SQL WHERE clause). By default, no filter is applied, meaning the entire table will be synchronized. e.g. `id > 100`.</td> 
+    </tr>
     </tbody>
 </table>
 </div>
@@ -928,6 +935,45 @@ CREATE TABLE products (
 
 `binary_data` field in the database is of type VARBINARY(N). In some scenarios, we need to convert binary data to base64 encoded string data. This feature can be enabled by adding the parameter 'debezium.binary.handling.mode'='base64',
 By adding this parameter, we can map the binary field type to 'STRING' in Flink SQL, thereby obtaining base64 encoded string data.
+
+### Snapshot Filter
+
+The `scan.snapshot.filter` option allows you to apply a SQL WHERE clause during snapshot reading, so that only matching rows are synchronized. This is useful for partial initial loads (e.g. migrating only recent data) without modifying the source tables. Binlog events are still captured for all rows after the snapshot phase, regardless of the filter.
+
+**SQL DDL Example**
+
+```sql
+CREATE TABLE products (
+    id INT NOT NULL,
+    name STRING,
+    description STRING,
+    PRIMARY KEY(id) NOT ENFORCED
+) WITH (
+    'connector' = 'mysql-cdc',
+    'hostname' = 'localhost',
+    'port' = '3306',
+    'username' = 'root',
+    'password' = '123456',
+    'database-name' = 'mydb',
+    'table-name' = 'products',
+    'scan.snapshot.filter' = 'id > 100'
+);
+```
+
+**DataStream API Example**
+
+```java
+MySqlSource<String> mySqlSource = MySqlSource.<String>builder()
+    .hostname("yourHostname")
+    .port(yourPort)
+    .databaseList("mydb")
+    .tableList("mydb.products")
+    .username("yourUsername")
+    .password("yourPassword")
+    .snapshotFilters("mydb.products", "id > 100")
+    .deserializer(new JsonDebeziumDeserializationSchema())
+    .build();
+```
 
 ### Available Source metrics
 
