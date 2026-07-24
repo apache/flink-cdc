@@ -56,15 +56,20 @@ public class ValuesDataSink implements DataSink, Serializable {
 
     private final boolean errorOnSchemaChange;
 
+    /** {@link ValuesDataSinkOptions#ERROR_ON_SCHEMA_CHANGE_EXCEPTION_CLASS}. */
+    private final String errorOnSchemaChangeExceptionClass;
+
     public ValuesDataSink(
             boolean materializedInMemory,
             boolean print,
             SinkApi sinkApi,
-            boolean errorOnSchemaChange) {
+            boolean errorOnSchemaChange,
+            String errorOnSchemaChangeExceptionClass) {
         this.materializedInMemory = materializedInMemory;
         this.print = print;
         this.sinkApi = sinkApi;
         this.errorOnSchemaChange = errorOnSchemaChange;
+        this.errorOnSchemaChangeExceptionClass = errorOnSchemaChangeExceptionClass;
     }
 
     @Override
@@ -80,7 +85,8 @@ public class ValuesDataSink implements DataSink, Serializable {
     @Override
     public MetadataApplier getMetadataApplier() {
         if (errorOnSchemaChange) {
-            return new ValuesDatabase.ErrorOnChangeMetadataApplier();
+            return new ValuesDatabase.ErrorOnChangeMetadataApplier(
+                    errorOnSchemaChangeExceptionClass);
         } else {
             return new ValuesDatabase.ValuesMetadataApplier(materializedInMemory);
         }
