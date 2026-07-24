@@ -104,6 +104,7 @@ public class Db2SourceConfigFactory extends JdbcSourceConfigFactory {
                 connectionPoolSize,
                 chunkKeyColumn,
                 skipSnapshotBackfill,
-                assignUnboundedChunkFirst);
+                assignUnboundedChunkFirst,
+                recordsPerSecond);
     }
 }

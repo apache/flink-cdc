@@ -362,6 +362,16 @@ pipeline:
           如果设置 'use.legacy.json.format' = 'false'， 这条数据会被转换为 {"key1": "value1", "key2": "value2"}， 也就是 key 和 value 前的空格都会被保留。
       </td>
     </tr>
+    <tr>
+      <td>records.per.second</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">true</td>
+      <td>Double</td>
+      <td>
+        每秒发出的最大记录数，默认值为 -1，表示不进行速率限制。（仅适用于 flink 2.x）<br>
+        警告：增量/二进制日志阶段：速率限制可能导致连接器落后于上游变更流，在连接器赶上之前，二进制日志/WAL 可能会被清除（MySQL 数据丢失，PostgreSQL 复制槽问题）。
+      </td>
+    </tr>
     </tbody>
 </table>
 </div>

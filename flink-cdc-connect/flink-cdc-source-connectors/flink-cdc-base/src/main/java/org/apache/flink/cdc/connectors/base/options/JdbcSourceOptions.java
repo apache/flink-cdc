@@ -110,4 +110,11 @@ public class JdbcSourceOptions extends SourceOptions {
                     .withDescription(
                             "The chunk key of table snapshot, captured tables are split into multiple chunks by a chunk key when read the snapshot of table."
                                     + "By default, the chunk key is the first column of the primary key and the chunk key is the RowId in oracle.");
+
+    public static final ConfigOption<Double> RECORDS_PER_SECOND =
+            ConfigOptions.key("records.per.second")
+                    .doubleType()
+                    .defaultValue(-1d)
+                    .withDescription(
+                            "The maximum number of records emitted per second, the default value: -1, means no rate limiting.");
 }

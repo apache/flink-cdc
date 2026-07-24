@@ -143,7 +143,8 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
                 assignUnboundedChunkFirst,
                 includePartitionedTables,
                 includeDatabaseInTableId,
-                logicalMessagePrefixes);
+                logicalMessagePrefixes,
+                recordsPerSecond);
     }
 
     /**

@@ -54,6 +54,7 @@ import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourc
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.PASSWORD;
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.POLL_AWAIT_TIME_MILLIS;
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.POLL_MAX_BATCH_SIZE;
+import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.RECORDS_PER_SECOND;
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SAMPLES;
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE_MB;
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED;
@@ -139,6 +140,8 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
                 config.getOptional(FULL_DOCUMENT_PRE_POST_IMAGE).orElse(false);
 
         boolean noCursorTimeout = config.getOptional(SCAN_NO_CURSOR_TIMEOUT).orElse(true);
+
+        double recordsPerSecond = config.get(RECORDS_PER_SECOND);
         ResolvedSchema physicalSchema =
                 getPhysicalSchema(context.getCatalogTable().getResolvedSchema());
         checkArgument(physicalSchema.getPrimaryKey().isPresent(), "Primary key must be present");
@@ -173,7 +176,8 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
                 noCursorTimeout,
                 skipSnapshotBackfill,
                 scanNewlyAddedTableEnabled,
-                assignUnboundedChunkFirst);
+                assignUnboundedChunkFirst,
+                recordsPerSecond);
     }
 
     private void checkPrimaryKey(UniqueConstraint pk, String message) {
@@ -258,6 +262,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         options.add(SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP);
         options.add(SCAN_NEWLY_ADDED_TABLE_ENABLED);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED);
+        options.add(RECORDS_PER_SECOND);
         return options;
     }
 }

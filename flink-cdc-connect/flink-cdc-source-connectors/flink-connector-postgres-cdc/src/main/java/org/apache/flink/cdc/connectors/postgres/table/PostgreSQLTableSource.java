@@ -88,6 +88,7 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
     private final boolean assignUnboundedChunkFirst;
     private final boolean appendOnly;
     private final boolean includePartitionedTables;
+    private final double recordsPerSecond;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -130,7 +131,8 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
             int lsnCommitCheckpointsDelay,
             boolean assignUnboundedChunkFirst,
             boolean appendOnly,
-            boolean includePartitionedTables) {
+            boolean includePartitionedTables,
+            double recordsPerSecond) {
         this.physicalSchema = physicalSchema;
         this.port = port;
         this.hostname = checkNotNull(hostname);
@@ -165,6 +167,7 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
         this.assignUnboundedChunkFirst = assignUnboundedChunkFirst;
         this.appendOnly = appendOnly;
         this.includePartitionedTables = includePartitionedTables;
+        this.recordsPerSecond = recordsPerSecond;
     }
 
     @Override
@@ -305,7 +308,8 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
                         lsnCommitCheckpointsDelay,
                         assignUnboundedChunkFirst,
                         appendOnly,
-                        includePartitionedTables);
+                        includePartitionedTables,
+                        recordsPerSecond);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
@@ -351,7 +355,8 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
                 && Objects.equals(scanNewlyAddedTableEnabled, that.scanNewlyAddedTableEnabled)
                 && Objects.equals(assignUnboundedChunkFirst, that.assignUnboundedChunkFirst)
                 && Objects.equals(appendOnly, that.appendOnly)
-                && Objects.equals(includePartitionedTables, that.includePartitionedTables);
+                && Objects.equals(includePartitionedTables, that.includePartitionedTables)
+                && Objects.equals(recordsPerSecond, that.recordsPerSecond);
     }
 
     @Override
@@ -388,7 +393,8 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
                 scanNewlyAddedTableEnabled,
                 assignUnboundedChunkFirst,
                 appendOnly,
-                includePartitionedTables);
+                includePartitionedTables,
+                recordsPerSecond);
     }
 
     @Override
