@@ -792,6 +792,127 @@ public class OracleSourceITCase extends OracleSourceTestBase {
         }
     }
 
+    @Test
+    void testReadPartitionedTable() throws Exception {
+        createAndInitialize("partition_table.sql");
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
+
+        env.setParallelism(DEFAULT_PARALLELISM);
+        env.enableCheckpointing(200L);
+        RestartStrategyUtils.configureFixedDelayRestartStrategy(env, 1, 0);
+
+        String sourceDDL =
+                format(
+                        "CREATE TABLE partitioned_customers ("
+                                + " ID INT NOT NULL,"
+                                + " NAME STRING,"
+                                + " ADDRESS STRING,"
+                                + " PHONE_NUMBER STRING,"
+                                + " primary key (ID) not enforced"
+                                + ") WITH ("
+                                + " 'connector' = 'oracle-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'schema-name' = '%s',"
+                                + " 'table-name' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = 'false',"
+                                + " 'debezium.log.mining.strategy' = 'online_catalog',"
+                                + " 'debezium.database.history.store.only.captured.tables.ddl' = 'true'"
+                                + ")",
+                        ORACLE_CONTAINER.getHost(),
+                        ORACLE_CONTAINER.getOraclePort(),
+                        TOP_USER,
+                        TOP_SECRET,
+                        ORACLE_DATABASE,
+                        ORACLE_SCHEMA,
+                        "PARTITIONED_CUSTOMERS");
+
+        // first step: check the snapshot data
+        String[] snapshotExpected =
+                new String[] {
+                    "+I[101, user_1, Shanghai, 123567891234]",
+                    "+I[102, user_2, Shanghai, 123567891234]",
+                    "+I[103, user_3, Shanghai, 123567891234]",
+                    "+I[109, user_4, Shanghai, 123567891234]",
+                    "+I[110, user_5, Shanghai, 123567891234]",
+                    "+I[111, user_6, Shanghai, 123567891234]",
+                    "+I[501, user_7, Shanghai, 123567891234]",
+                    "+I[502, user_8, Shanghai, 123567891234]",
+                    "+I[513, user_9, Shanghai, 123567891234]",
+                    "+I[1009, user_10, Shanghai, 123567891234]",
+                    "+I[1010, user_11, Shanghai, 123567891234]",
+                    "+I[1011, user_12, Shanghai, 123567891234]",
+                    "+I[1012, user_13, Shanghai, 123567891234]",
+                    "+I[1013, user_14, Shanghai, 123567891234]",
+                    "+I[1014, user_15, Shanghai, 123567891234]",
+                    "+I[1015, user_16, Shanghai, 123567891234]",
+                    "+I[1016, user_17, Shanghai, 123567891234]",
+                    "+I[1017, user_18, Shanghai, 123567891234]",
+                    "+I[1018, user_19, Shanghai, 123567891234]",
+                    "+I[1019, user_20, Shanghai, 123567891234]",
+                    "+I[2000, user_21, Shanghai, 123567891234]"
+                };
+        tEnv.executeSql(sourceDDL);
+        TableResult tableResult = tEnv.executeSql("select * from partitioned_customers");
+        CloseableIterator<Row> iterator = tableResult.collect();
+
+        List<String> expectedSnapshotData = new ArrayList<>(Arrays.asList(snapshotExpected));
+
+        LOG.info("partition table snapshot data start");
+        assertEqualsInAnyOrder(
+                expectedSnapshotData, fetchRows(iterator, expectedSnapshotData.size()));
+
+        // second step: check the redo log data
+        String tableId = ORACLE_SCHEMA + ".PARTITIONED_CUSTOMERS";
+        // DML operations across different partitions
+        executeSql(
+                "UPDATE " + tableId + " SET ADDRESS = 'Hangzhou' WHERE ID = 103"); // partition p1
+        executeSql("DELETE FROM " + tableId + " WHERE ID = 502"); // partition p2
+        executeSql(
+                "INSERT INTO "
+                        + tableId
+                        + " VALUES(502, 'user_8','Shanghai','123567891234')"); // partition p2
+        executeSql(
+                "UPDATE " + tableId + " SET ADDRESS = 'Shanghai' WHERE ID = 103"); // partition p1
+        executeSql(
+                "UPDATE " + tableId + " SET ADDRESS = 'Hangzhou' WHERE ID = 1010"); // partition p3
+        executeSql(
+                "INSERT INTO "
+                        + tableId
+                        + " VALUES(2001, 'user_22','Shanghai','123567891234')"); // partition p4
+        executeSql(
+                "INSERT INTO "
+                        + tableId
+                        + " VALUES(2002, 'user_23','Shanghai','123567891234')"); // partition p4
+        executeSql(
+                "INSERT INTO "
+                        + tableId
+                        + " VALUES(2003, 'user_24','Shanghai','123567891234')"); // partition p4
+
+        String[] redoLogExpected =
+                new String[] {
+                    "-U[103, user_3, Shanghai, 123567891234]",
+                    "+U[103, user_3, Hangzhou, 123567891234]",
+                    "-D[502, user_8, Shanghai, 123567891234]",
+                    "+I[502, user_8, Shanghai, 123567891234]",
+                    "-U[103, user_3, Hangzhou, 123567891234]",
+                    "+U[103, user_3, Shanghai, 123567891234]",
+                    "-U[1010, user_11, Shanghai, 123567891234]",
+                    "+U[1010, user_11, Hangzhou, 123567891234]",
+                    "+I[2001, user_22, Shanghai, 123567891234]",
+                    "+I[2002, user_23, Shanghai, 123567891234]",
+                    "+I[2003, user_24, Shanghai, 123567891234]"
+                };
+        List<String> expectedRedoLogData = new ArrayList<>(Arrays.asList(redoLogExpected));
+        assertEqualsInAnyOrder(
+                expectedRedoLogData, fetchRows(iterator, expectedRedoLogData.size()));
+        tableResult.getJobClient().get().cancel().get();
+    }
+
     private void executeSql(String sql) throws Exception {
         try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
