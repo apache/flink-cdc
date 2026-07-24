@@ -313,6 +313,15 @@ public class MySqlSourceBuilder<T> {
     }
 
     /**
+     * The rate limit for source reading in records per second, applied to both snapshot and binlog
+     * phases. A value of -1 means no rate limit.
+     */
+    public MySqlSourceBuilder<T> rateLimit(long rateLimit) {
+        this.configFactory.rateLimit(rateLimit);
+        return this;
+    }
+
+    /**
      * Build the {@link MySqlSource}.
      *
      * @return a MySqlParallelSource with the settings made for this builder.
