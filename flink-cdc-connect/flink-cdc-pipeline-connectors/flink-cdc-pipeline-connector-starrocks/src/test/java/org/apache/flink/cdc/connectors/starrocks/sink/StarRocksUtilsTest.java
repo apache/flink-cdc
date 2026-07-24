@@ -425,12 +425,12 @@ class StarRocksUtilsTest {
 
     @Test
     void testCreateFieldGetterTimestamp() {
-        // Timestamp field getter should format output as "yyyy-MM-dd HH:mm:ss"
+        // Timestamp with precision 0 should format as "yyyy-MM-dd HH:mm:ss"
         RecordData.FieldGetter getter =
-                StarRocksUtils.createFieldGetter(new TimestampType(3), 0, ZoneId.of("UTC"));
+                StarRocksUtils.createFieldGetter(new TimestampType(0), 0, ZoneId.of("UTC"));
 
         BinaryRecordDataGenerator generator =
-                new BinaryRecordDataGenerator(new DataType[] {new TimestampType(3)});
+                new BinaryRecordDataGenerator(new DataType[] {new TimestampType(0)});
         BinaryRecordData record =
                 generator.generate(
                         new Object[] {
@@ -441,8 +441,58 @@ class StarRocksUtilsTest {
     }
 
     @Test
+    void testCreateFieldGetterTimestampWithPrecision() {
+        // Timestamp with precision 6 should preserve microseconds
+        RecordData.FieldGetter getter =
+                StarRocksUtils.createFieldGetter(new TimestampType(6), 0, ZoneId.of("UTC"));
+
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(new DataType[] {new TimestampType(6)});
+        LocalDateTime dateTime = LocalDateTime.of(2026, 3, 27, 15, 20, 29, 921550000);
+        BinaryRecordData record =
+                generator.generate(
+                        new Object[] {TimestampData.fromLocalDateTime(dateTime)});
+        assertThat(getter.getFieldOrNull(record)).isEqualTo("2026-03-27 15:20:29.921550");
+    }
+
+    @Test
+    void testCreateFieldGetterTimestampWithPrecision3() {
+        // Timestamp with precision 3 should preserve milliseconds
+        RecordData.FieldGetter getter =
+                StarRocksUtils.createFieldGetter(new TimestampType(3), 0, ZoneId.of("UTC"));
+
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(new DataType[] {new TimestampType(3)});
+        LocalDateTime dateTime = LocalDateTime.of(2024, 1, 15, 10, 30, 0, 123000000);
+        BinaryRecordData record =
+                generator.generate(
+                        new Object[] {TimestampData.fromLocalDateTime(dateTime)});
+        assertThat(getter.getFieldOrNull(record)).isEqualTo("2024-01-15 10:30:00.123");
+    }
+
+    @Test
     void testCreateFieldGetterLocalZonedTimestamp() {
-        // LocalZonedTimestamp field getter should convert to the specified zone
+        // LocalZonedTimestamp with precision 0 should convert to the specified zone
+        ZoneId zoneId = ZoneId.of("Asia/Shanghai");
+        RecordData.FieldGetter getter =
+                StarRocksUtils.createFieldGetter(new LocalZonedTimestampType(0), 0, zoneId);
+
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(new DataType[] {new LocalZonedTimestampType(0)});
+        BinaryRecordData record =
+                generator.generate(
+                        new Object[] {
+                            LocalZonedTimestampData.fromInstant(
+                                    LocalDateTime.of(2024, 1, 15, 10, 30, 0)
+                                            .toInstant(ZoneOffset.UTC))
+                        });
+        // UTC 10:30 -> Asia/Shanghai 18:30
+        assertThat(getter.getFieldOrNull(record)).isEqualTo("2024-01-15 18:30:00");
+    }
+
+    @Test
+    void testCreateFieldGetterLocalZonedTimestampWithPrecision() {
+        // LocalZonedTimestamp with precision 6 should preserve microseconds
         ZoneId zoneId = ZoneId.of("Asia/Shanghai");
         RecordData.FieldGetter getter =
                 StarRocksUtils.createFieldGetter(new LocalZonedTimestampType(6), 0, zoneId);
@@ -453,11 +503,11 @@ class StarRocksUtilsTest {
                 generator.generate(
                         new Object[] {
                             LocalZonedTimestampData.fromInstant(
-                                    LocalDateTime.of(2024, 1, 15, 10, 30, 0)
+                                    LocalDateTime.of(2026, 3, 27, 7, 20, 29, 921550000)
                                             .toInstant(ZoneOffset.UTC))
                         });
-        // UTC 10:30 -> Asia/Shanghai 18:30
-        assertThat(getter.getFieldOrNull(record)).isEqualTo("2024-01-15 18:30:00");
+        // UTC 07:20:29.921550 -> Asia/Shanghai 15:20:29.921550
+        assertThat(getter.getFieldOrNull(record)).isEqualTo("2026-03-27 15:20:29.921550");
     }
 
     @Test
