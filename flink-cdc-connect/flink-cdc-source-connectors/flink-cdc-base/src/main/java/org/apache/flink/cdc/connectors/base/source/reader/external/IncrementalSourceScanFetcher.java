@@ -26,6 +26,7 @@ import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.shaded.guava31.com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 import io.debezium.connector.base.ChangeEventQueue;
+import io.debezium.data.Envelope;
 import io.debezium.pipeline.DataChangeEvent;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
@@ -177,7 +178,14 @@ public class IncrementalSourceScanFetcher implements Fetcher<SourceRecords, Sour
                 }
 
                 if (!reachChangeLogStart) {
-                    outputBuffer.put((Struct) record.key(), record);
+                    if (record.key() != null) {
+                        outputBuffer.put((Struct) record.key(), record);
+                    } else {
+                        // For tables without primary key, use after struct as buffer key
+                        Struct value = (Struct) record.value();
+                        Struct after = value.getStruct(Envelope.FieldName.AFTER);
+                        outputBuffer.put(after, record);
+                    }
                 } else {
                     if (isChangeRecordInChunkRange(record)) {
                         // rewrite overlapping snapshot records through the record key
