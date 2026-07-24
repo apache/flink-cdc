@@ -25,6 +25,8 @@ import com.ververica.cdc.debezium.table.MetadataConverter;
 import io.debezium.connector.AbstractSourceInfo;
 import io.debezium.data.Envelope;
 import org.apache.kafka.connect.data.Struct;
+import org.apache.kafka.connect.header.ConnectHeaders;
+import org.apache.kafka.connect.header.Header;
 import org.apache.kafka.connect.source.SourceRecord;
 
 /** Defines the supported metadata columns for {@link OracleTableSource}. */
@@ -93,6 +95,31 @@ public enum OracleReadableMetaData {
                     Struct sourceStruct = messageStruct.getStruct(Envelope.FieldName.SOURCE);
                     return TimestampData.fromEpochMillis(
                             (Long) sourceStruct.get(AbstractSourceInfo.TIMESTAMP_KEY));
+                }
+            }),
+
+    /**
+     * The ROWID pseudo-column of the Oracle table. For streaming changes, the ROWID is extracted
+     * from LogMiner's V$LOGMNR_CONTENTS.ROW_ID. For snapshot reads, the ROWID is obtained via
+     * Oracle JDBC's OracleResultSet.getROWID().
+     */
+    ROW_ID(
+            "row_id",
+            DataTypes.STRING(),
+            new MetadataConverter() {
+                private static final long serialVersionUID = 1L;
+
+                @Override
+                public Object read(SourceRecord record) {
+                    ConnectHeaders headers = (ConnectHeaders) record.headers();
+                    if (headers != null) {
+                        for (Header header : headers) {
+                            if (oracle.sql.ROWID.class.getSimpleName().equals(header.key())) {
+                                return StringData.fromString(header.value().toString());
+                            }
+                        }
+                    }
+                    return null;
                 }
             });
 

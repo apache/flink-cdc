@@ -129,6 +129,8 @@ public abstract class JdbcSourceFetchTaskContext implements FetchTask.Context {
                             Instant fetchTs =
                                     Instant.ofEpochMilli(
                                             value.getInt64(Envelope.FieldName.TIMESTAMP));
+                            // Preserve headers (e.g. ROWID) from the original record so that
+                            // MetadataConverters (e.g. Oracle row_id) can read them downstream.
                             SourceRecord sourceRecord =
                                     new SourceRecord(
                                             record.sourcePartition(),
@@ -138,7 +140,9 @@ public abstract class JdbcSourceFetchTaskContext implements FetchTask.Context {
                                             record.keySchema(),
                                             record.key(),
                                             record.valueSchema(),
-                                            envelope.read(updateAfter, source, fetchTs));
+                                            envelope.read(updateAfter, source, fetchTs),
+                                            record.timestamp(),
+                                            record.headers());
                             return sourceRecord;
                         })
                 .collect(Collectors.toList());
