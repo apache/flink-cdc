@@ -188,7 +188,6 @@ public class FlinkPipelineComposer implements PipelineComposer {
                         stream,
                         pipelineDef.getTransforms(),
                         pipelineDef.getUdfs(),
-                        pipelineDef.getModels(),
                         dataSource.supportedMetadataColumns());
 
         // PreTransform ---> PostTransform

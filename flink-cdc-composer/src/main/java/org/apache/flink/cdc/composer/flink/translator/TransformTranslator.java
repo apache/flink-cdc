@@ -18,11 +18,17 @@
 package org.apache.flink.cdc.composer.flink.translator;
 
 import org.apache.flink.api.java.tuple.Tuple3;
+import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.factories.AiModelClientFactory;
+import org.apache.flink.cdc.common.factories.Factory;
+import org.apache.flink.cdc.common.factories.FactoryHelper;
+import org.apache.flink.cdc.common.model.AiModelClient;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.composer.definition.ModelDef;
 import org.apache.flink.cdc.composer.definition.TransformDef;
 import org.apache.flink.cdc.composer.definition.UdfDef;
+import org.apache.flink.cdc.composer.utils.FactoryDiscoveryUtils;
 import org.apache.flink.cdc.runtime.operators.transform.PostTransformOperator;
 import org.apache.flink.cdc.runtime.operators.transform.PostTransformOperatorBuilder;
 import org.apache.flink.cdc.runtime.operators.transform.PreTransformOperator;
@@ -30,6 +36,8 @@ import org.apache.flink.cdc.runtime.operators.transform.PreTransformOperatorBuil
 import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.streaming.api.datastream.DataStream;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -40,15 +48,10 @@ import java.util.stream.Collectors;
  */
 public class TransformTranslator {
 
-    /** Package of built-in model. */
-    public static final String PREFIX_CLASSPATH_BUILT_IN_MODEL =
-            "org.apache.flink.cdc.runtime.model.";
-
     public DataStream<Event> translatePreTransform(
             DataStream<Event> input,
             List<TransformDef> transforms,
             List<UdfDef> udfFunctions,
-            List<ModelDef> models,
             SupportedMetadataColumn[] supportedMetadataColumns) {
         if (transforms.isEmpty()) {
             return input;
@@ -56,13 +59,12 @@ public class TransformTranslator {
         return input.transform(
                 "Transform:Schema",
                 new EventTypeInfo(),
-                generatePreTransform(transforms, udfFunctions, models, supportedMetadataColumns));
+                generatePreTransform(transforms, udfFunctions, supportedMetadataColumns));
     }
 
     private PreTransformOperator generatePreTransform(
             List<TransformDef> transforms,
             List<UdfDef> udfFunctions,
-            List<ModelDef> models,
             SupportedMetadataColumn[] supportedMetadataColumns) {
 
         PreTransformOperatorBuilder preTransformFunctionBuilder = PreTransformOperator.newBuilder();
@@ -79,14 +81,8 @@ public class TransformTranslator {
                     supportedMetadataColumns);
         }
 
-        preTransformFunctionBuilder
-                .addUdfFunctions(
-                        udfFunctions.stream()
-                                .map(this::udfDefToUDFTuple)
-                                .collect(Collectors.toList()))
-                .addUdfFunctions(
-                        models.stream().map(this::modelToUDFTuple).collect(Collectors.toList()));
-
+        preTransformFunctionBuilder.addUdfFunctions(
+                udfFunctions.stream().map(this::udfDefToUDFTuple).collect(Collectors.toList()));
         return preTransformFunctionBuilder.build();
     }
 
@@ -116,21 +112,43 @@ public class TransformTranslator {
                     transform.getPostTransformConverter(),
                     supportedMetadataColumns);
         }
-        postTransformFunctionBuilder.addTimezone(timezone);
-        postTransformFunctionBuilder.addUdfFunctions(
-                udfFunctions.stream().map(this::udfDefToUDFTuple).collect(Collectors.toList()));
-        postTransformFunctionBuilder.addUdfFunctions(
-                models.stream().map(this::modelToUDFTuple).collect(Collectors.toList()));
+        postTransformFunctionBuilder
+                .addTimezone(timezone)
+                .addUdfFunctions(
+                        udfFunctions.stream()
+                                .map(this::udfDefToUDFTuple)
+                                .collect(Collectors.toList()))
+                .addModelClients(loadModelClients(models));
+
         return input.transform(
                         "Transform:Data", new EventTypeInfo(), postTransformFunctionBuilder.build())
                 .uid(operatorUidGenerator.generateUid("post-transform"));
     }
 
-    private Tuple3<String, String, Map<String, String>> modelToUDFTuple(ModelDef model) {
-        return Tuple3.of(
-                model.getModelName(),
-                PREFIX_CLASSPATH_BUILT_IN_MODEL + model.getClassName(),
-                model.getParameters());
+    /**
+     * Loads AI model clients for all declared models via SPI, returning a map from Janino parameter
+     * name to the client instance.
+     */
+    private Map<String, AiModelClient> loadModelClients(List<ModelDef> models) {
+        if (models.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        Map<String, AiModelClient> clients = new LinkedHashMap<>();
+        for (ModelDef model : models) {
+            AiModelClientFactory factory =
+                    FactoryDiscoveryUtils.getFactoryByIdentifier(
+                            model.getType(), AiModelClientFactory.class);
+            Factory.Context ctx =
+                    new FactoryHelper.DefaultContext(
+                            Configuration.fromMap(model.getOptions()),
+                            new Configuration(),
+                            Thread.currentThread().getContextClassLoader());
+            FactoryHelper.createFactoryHelper(factory, ctx).validate();
+            AiModelClient client = factory.createClient(ctx);
+            clients.put(model.getName(), client);
+        }
+        return clients;
     }
 
     private Tuple3<String, String, Map<String, String>> udfDefToUDFTuple(UdfDef udf) {

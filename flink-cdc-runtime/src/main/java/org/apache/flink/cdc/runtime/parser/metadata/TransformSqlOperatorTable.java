@@ -413,38 +413,6 @@ public class TransformSqlOperatorTable extends ReflectiveSqlOperatorTable {
     // Supports accessing elements of ARRAY[index], ROW[index], MAP[key], and VARIANT[index/key]
     public static final SqlOperator ITEM = new VariantAwareItemOperator();
 
-    public static final SqlFunction AI_CHAT_PREDICT =
-            new SqlFunction(
-                    "AI_CHAT_PREDICT",
-                    SqlKind.OTHER_FUNCTION,
-                    ReturnTypes.explicit(SqlTypeName.VARCHAR),
-                    null,
-                    OperandTypes.family(
-                            SqlTypeFamily.STRING, SqlTypeFamily.STRING, SqlTypeFamily.STRING),
-                    SqlFunctionCategory.USER_DEFINED_FUNCTION);
-
-    // Define the AI_EMBEDDING function
-    public static final SqlFunction GET_EMBEDDING =
-            new SqlFunction(
-                    "GET_EMBEDDING",
-                    SqlKind.OTHER_FUNCTION,
-                    ReturnTypes.explicit(SqlTypeName.VARCHAR),
-                    null,
-                    OperandTypes.family(
-                            SqlTypeFamily.STRING, SqlTypeFamily.STRING, SqlTypeFamily.STRING),
-                    SqlFunctionCategory.USER_DEFINED_FUNCTION);
-
-    // Define the AI_LANGCHAIN_PREDICT function
-    public static final SqlFunction AI_LANGCHAIN_PREDICT =
-            new SqlFunction(
-                    "AI_LANGCHAIN_PREDICT",
-                    SqlKind.OTHER_FUNCTION,
-                    ReturnTypes.explicit(SqlTypeName.VARCHAR),
-                    null,
-                    OperandTypes.family(
-                            SqlTypeFamily.STRING, SqlTypeFamily.STRING, SqlTypeFamily.STRING),
-                    SqlFunctionCategory.USER_DEFINED_FUNCTION);
-
     // --------------------------------------------------------------------------------------------
     // Variant functions
     // --------------------------------------------------------------------------------------------
