@@ -69,6 +69,7 @@ import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils.createBinaryClient;
 import static org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils.createMySqlConnection;
+import static org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils.createSnapshotMySqlConnection;
 
 /**
  * A snapshot reader that reads data from Table in split level, the split is assigned by primary key
@@ -103,7 +104,8 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
                 new StatefulTaskContext(
                         sourceConfig,
                         createBinaryClient(sourceConfig.getDbzConfiguration()),
-                        createMySqlConnection(sourceConfig)),
+                        createMySqlConnection(sourceConfig),
+                        createSnapshotMySqlConnection(sourceConfig)),
                 subtaskId,
                 hooks);
     }
@@ -143,6 +145,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
                         statefulTaskContext.getSnapshotChangeEventSourceMetrics(),
                         statefulTaskContext.getDatabaseSchema(),
                         statefulTaskContext.getConnection(),
+                        statefulTaskContext.getSnapshotConnection(),
                         statefulTaskContext.getDispatcher(),
                         statefulTaskContext.getTopicSelector(),
                         statefulTaskContext.getSnapshotReceiver(),

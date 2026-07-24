@@ -59,6 +59,18 @@ public class MySqlSourceBuilder<T> {
         return this;
     }
 
+    /**
+     * Optional IP address or hostname of a MySQL read replica. When specified, snapshot data will
+     * be read from this replica instead of the primary writer instance, reducing load on the
+     * writer. The binlog position will still be obtained from the primary writer. This is
+     * particularly useful for Aurora/RDS deployments where you want to offload snapshot read
+     * traffic.
+     */
+    public MySqlSourceBuilder<T> snapshotHostname(String snapshotHostname) {
+        this.configFactory.snapshotHostname(snapshotHostname);
+        return this;
+    }
+
     /** Integer port number of the MySQL database server. */
     public MySqlSourceBuilder<T> port(int port) {
         this.configFactory.port(port);

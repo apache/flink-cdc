@@ -41,14 +41,22 @@ public class PooledDataSourceFactory {
     private PooledDataSourceFactory() {}
 
     public static HikariDataSource createPooledDataSource(MySqlSourceConfig sourceConfig) {
+        return createPooledDataSource(sourceConfig, sourceConfig.getHostname());
+    }
+
+    /**
+     * Creates a pooled data source with a specific hostname. This is useful when connecting to a
+     * read replica for snapshot queries while using the primary for binlog operations.
+     */
+    public static HikariDataSource createPooledDataSource(
+            MySqlSourceConfig sourceConfig, String hostname) {
         final HikariConfig config = new HikariConfig();
 
-        String hostName = sourceConfig.getHostname();
         int port = sourceConfig.getPort();
         Properties jdbcProperties = sourceConfig.getJdbcProperties();
 
-        config.setPoolName(CONNECTION_POOL_PREFIX + hostName + ":" + port);
-        config.setJdbcUrl(formatJdbcUrl(hostName, port, jdbcProperties));
+        config.setPoolName(CONNECTION_POOL_PREFIX + hostname + ":" + port);
+        config.setJdbcUrl(formatJdbcUrl(hostname, port, jdbcProperties));
         config.setUsername(sourceConfig.getUsername());
         config.setPassword(sourceConfig.getPassword());
         config.setMinimumIdle(MINIMUM_POOL_SIZE);
