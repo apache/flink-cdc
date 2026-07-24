@@ -90,6 +90,8 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                 config.get(MySqlSourceOptions.CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
         boolean scanNewlyAddedTableEnabled =
                 config.get(MySqlSourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED);
+        boolean scanBinlogNewlyAddedTableEnabled =
+                config.get(MySqlSourceOptions.SCAN_BINLOG_NEWLY_ADDED_TABLE_ENABLED);
         Duration heartbeatInterval = config.get(MySqlSourceOptions.HEARTBEAT_INTERVAL);
         String chunkKeyColumn =
                 config.getOptional(MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN)
@@ -148,6 +150,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                 distributionFactorLower,
                 startupOptions,
                 scanNewlyAddedTableEnabled,
+                scanBinlogNewlyAddedTableEnabled,
                 closeIdleReaders,
                 JdbcUrlUtils.getJdbcProperties(context.getCatalogTable().getOptions()),
                 heartbeatInterval,
@@ -198,6 +201,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         options.add(MySqlSourceOptions.CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
         options.add(MySqlSourceOptions.CONNECT_MAX_RETRIES);
         options.add(MySqlSourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED);
+        options.add(MySqlSourceOptions.SCAN_BINLOG_NEWLY_ADDED_TABLE_ENABLED);
         options.add(MySqlSourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
         options.add(MySqlSourceOptions.HEARTBEAT_INTERVAL);
         options.add(MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN);
