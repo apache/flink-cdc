@@ -25,6 +25,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SchemaMetadataTransformTest {
 
     @Test
+    void testPrimaryAndPartitionKeysStripBackticks() {
+        SchemaMetadataTransform transform =
+                new SchemaMetadataTransform(
+                        "id, `order-id`, `customer``name`", "region, `order-id`", null, null);
+
+        assertThat(transform.getPrimaryKeys()).containsExactly("id", "order-id", "customer`name");
+        assertThat(transform.getPartitionKeys()).containsExactly("region", "order-id");
+    }
+
+    @Test
     void testTableOptionsWithCommaDelimiter() {
         SchemaMetadataTransform transform =
                 new SchemaMetadataTransform(null, null, "key1=value1,key2=value2", null);

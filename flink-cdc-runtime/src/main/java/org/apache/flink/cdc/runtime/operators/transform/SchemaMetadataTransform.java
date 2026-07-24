@@ -50,14 +50,14 @@ public class SchemaMetadataTransform implements Serializable {
         if (!StringUtils.isNullOrWhitespaceOnly(primaryKeyString)) {
             String[] primaryKeyArr = primaryKeyString.split(",");
             for (int i = 0; i < primaryKeyArr.length; i++) {
-                primaryKeyArr[i] = primaryKeyArr[i].trim();
+                primaryKeyArr[i] = normalizeColumnReference(primaryKeyArr[i]);
             }
             primaryKeys = Arrays.asList(primaryKeyArr);
         }
         if (!StringUtils.isNullOrWhitespaceOnly(partitionKeyString)) {
             String[] partitionKeyArr = partitionKeyString.split(",");
             for (int i = 0; i < partitionKeyArr.length; i++) {
-                partitionKeyArr[i] = partitionKeyArr[i].trim();
+                partitionKeyArr[i] = normalizeColumnReference(partitionKeyArr[i]);
             }
             partitionKeys = Arrays.asList(partitionKeyArr);
         }
@@ -84,6 +84,14 @@ public class SchemaMetadataTransform implements Serializable {
                 }
             }
         }
+    }
+
+    private String normalizeColumnReference(String columnReference) {
+        String trimmed = columnReference.trim();
+        if (trimmed.length() >= 2 && trimmed.startsWith("`") && trimmed.endsWith("`")) {
+            return trimmed.substring(1, trimmed.length() - 1).replace("``", "`");
+        }
+        return trimmed;
     }
 
     public List<String> getPrimaryKeys() {
