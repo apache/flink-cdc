@@ -196,6 +196,27 @@ class TransformParserTest {
         testFilterExpression("trim(id)", "trim(\"BOTH\", \" \", id)");
         testFilterExpression(
                 "REGEXP_REPLACE(id, '[a-zA-Z]', '')", "regexpReplace(id, \"[a-zA-Z]\", \"\")");
+        testFilterExpression(
+                "REGEXP_EXTRACT('foothebar', 'foo(.*?)(bar)', 2)",
+                "regexpExtract(\"foothebar\", \"foo(.*?)(bar)\", 2)");
+        testFilterExpression(
+                "REGEXP_EXTRACT('foothebar', 'foo(.*?)(bar)')",
+                "regexpExtract(\"foothebar\", \"foo(.*?)(bar)\")");
+        testFilterExpression(
+                "REGEXP_EXTRACT_ALL('100-200, 300-400', '([0-9]+)-([0-9]+)', 2)",
+                "regexpExtractAll(\"100-200, 300-400\", \"([0-9]+)-([0-9]+)\", 2)");
+        testFilterExpression(
+                "REGEXP_EXTRACT_ALL('100-200, 300-400', '([0-9]+)-([0-9]+)')",
+                "regexpExtractAll(\"100-200, 300-400\", \"([0-9]+)-([0-9]+)\")");
+        testFilterExpression(
+                "REGEXP_COUNT('abc123xyz456', '[0-9]')",
+                "regexpCount(\"abc123xyz456\", \"[0-9]\")");
+        testFilterExpression(
+                "REGEXP_INSTR('abc123xyz456', '[0-9]')",
+                "regexpInstr(\"abc123xyz456\", \"[0-9]\")");
+        testFilterExpression(
+                "REGEXP_SUBSTR('100-200, 300-400', '([0-9]+)-([0-9]+)')",
+                "regexpSubstr(\"100-200, 300-400\", \"([0-9]+)-([0-9]+)\")");
         testFilterExpression("upper(id)", "upper(id)");
         testFilterExpression("lower(id)", "lower(id)");
         testFilterExpression("concat(a,b)", "concat(a, b)");
@@ -569,6 +590,18 @@ class TransformParserTest {
                         "ProjectionColumn{column=`deposits` DECIMAL(10, 2) 'deposit', expression='deposit', scriptExpression='$0', originalColumnNames=[deposit], columnNameMap={deposit=$0}}",
                         "ProjectionColumn{column=`bmi` DOUBLE, expression='`TB`.`weight` / (`TB`.`height` * `TB`.`height`)', scriptExpression='$0 / $1 * $1', originalColumnNames=[weight, height, height], columnNameMap={weight=$0, height=$1}}");
         Assertions.assertThat(result).hasToString("[" + String.join(", ", expected) + "]");
+
+        List<ProjectionColumn> regexpResult =
+                TransformParser.generateProjectionColumns(
+                        "REGEXP_EXTRACT_ALL(name, '([0-9]+)-([0-9]+)') AS regexp_values",
+                        testColumns,
+                        Collections.emptyList(),
+                        new SupportedMetadataColumn[0]);
+        Assertions.assertThat(regexpResult).hasSize(1);
+        Assertions.assertThat(regexpResult.get(0).getDataType())
+                .isEqualTo(DataTypes.ARRAY(DataTypes.STRING()));
+        Assertions.assertThat(regexpResult.get(0).getScriptExpression())
+                .isEqualTo("regexpExtractAll($0, \"([0-9]+)-([0-9]+)\")");
 
         List<ProjectionColumn> metadataResult =
                 TransformParser.generateProjectionColumns(

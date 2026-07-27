@@ -185,6 +185,60 @@ public class TransformSqlOperatorTable extends ReflectiveSqlOperatorTable {
                     OperandTypes.family(
                             SqlTypeFamily.STRING, SqlTypeFamily.STRING, SqlTypeFamily.STRING),
                     SqlFunctionCategory.STRING);
+    public static final SqlFunction REGEXP_EXTRACT =
+            new SqlFunction(
+                    "REGEXP_EXTRACT",
+                    SqlKind.OTHER_FUNCTION,
+                    TransformSqlReturnTypes.VARCHAR_FORCE_NULLABLE,
+                    null,
+                    OperandTypes.or(
+                            OperandTypes.family(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER),
+                            OperandTypes.family(
+                                    SqlTypeFamily.CHARACTER,
+                                    SqlTypeFamily.CHARACTER,
+                                    SqlTypeFamily.INTEGER)),
+                    SqlFunctionCategory.STRING);
+    public static final SqlFunction REGEXP_EXTRACT_ALL =
+            new SqlFunction(
+                    "REGEXP_EXTRACT_ALL",
+                    SqlKind.OTHER_FUNCTION,
+                    TransformSqlReturnTypes.VARCHAR_ARRAY_FORCE_NULLABLE,
+                    null,
+                    OperandTypes.or(
+                            OperandTypes.family(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER),
+                            OperandTypes.family(
+                                    SqlTypeFamily.CHARACTER,
+                                    SqlTypeFamily.CHARACTER,
+                                    SqlTypeFamily.INTEGER)),
+                    SqlFunctionCategory.STRING);
+    public static final SqlFunction REGEXP_COUNT =
+            new SqlFunction(
+                    "REGEXP_COUNT",
+                    SqlKind.OTHER_FUNCTION,
+                    ReturnTypes.cascade(
+                            ReturnTypes.explicit(SqlTypeName.INTEGER),
+                            SqlTypeTransforms.FORCE_NULLABLE),
+                    null,
+                    OperandTypes.family(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER),
+                    SqlFunctionCategory.STRING);
+    public static final SqlFunction REGEXP_INSTR =
+            new SqlFunction(
+                    "REGEXP_INSTR",
+                    SqlKind.OTHER_FUNCTION,
+                    ReturnTypes.cascade(
+                            ReturnTypes.explicit(SqlTypeName.INTEGER),
+                            SqlTypeTransforms.FORCE_NULLABLE),
+                    null,
+                    OperandTypes.family(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER),
+                    SqlFunctionCategory.STRING);
+    public static final SqlFunction REGEXP_SUBSTR =
+            new SqlFunction(
+                    "REGEXP_SUBSTR",
+                    SqlKind.OTHER_FUNCTION,
+                    TransformSqlReturnTypes.VARCHAR_FORCE_NULLABLE,
+                    null,
+                    OperandTypes.family(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER),
+                    SqlFunctionCategory.STRING);
     public static final SqlFunction SUBSTR =
             new SqlFunction(
                     "SUBSTR",

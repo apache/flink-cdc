@@ -19,6 +19,7 @@ package org.apache.flink.cdc.runtime.operators.transform;
 
 import org.apache.flink.cdc.common.data.DateData;
 import org.apache.flink.cdc.common.data.DecimalData;
+import org.apache.flink.cdc.common.data.GenericArrayData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
@@ -466,6 +467,58 @@ class PostTransformOperatorTest {
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
                 .isEqualTo(new StreamRecord<>(updateEventExpect));
         transformFunctionEventEventOperatorTestHarness.close();
+    }
+
+    @Test
+    void testRegexpExtractAllProjection() throws Exception {
+        TableId tableId = TableId.tableId("my_company", "my_branch", "regexp_table");
+        Schema inputSchema =
+                Schema.newBuilder().physicalColumn("text_value", DataTypes.STRING()).build();
+        Schema outputSchema =
+                Schema.newBuilder()
+                        .physicalColumn("regexp_values", DataTypes.ARRAY(DataTypes.STRING()))
+                        .build();
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
+                        .addTransform(
+                                tableId.identifier(),
+                                "REGEXP_EXTRACT_ALL(text_value, '([0-9]+)-([0-9]+)') AS regexp_values",
+                                null)
+                        .build();
+        RegularEventOperatorTestHarness<PostTransformOperator, Event> harness =
+                RegularEventOperatorTestHarness.with(transform, 1);
+
+        harness.open();
+        harness.getOperator()
+                .processElement(new StreamRecord<>(new CreateTableEvent(tableId, inputSchema)));
+        Assertions.assertThat(harness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(new CreateTableEvent(tableId, outputSchema)));
+
+        BinaryRecordDataGenerator inputGenerator =
+                new BinaryRecordDataGenerator((RowType) inputSchema.toRowDataType());
+        BinaryRecordDataGenerator outputGenerator =
+                new BinaryRecordDataGenerator((RowType) outputSchema.toRowDataType());
+        DataChangeEvent inputEvent =
+                DataChangeEvent.insertEvent(
+                        tableId,
+                        inputGenerator.generate(
+                                new Object[] {BinaryStringData.fromString("100-200, 300-400")}));
+        DataChangeEvent expectedEvent =
+                DataChangeEvent.insertEvent(
+                        tableId,
+                        outputGenerator.generate(
+                                new Object[] {
+                                    new GenericArrayData(
+                                            new Object[] {
+                                                BinaryStringData.fromString("100"),
+                                                BinaryStringData.fromString("300")
+                                            })
+                                }));
+
+        harness.getOperator().processElement(new StreamRecord<>(inputEvent));
+        Assertions.assertThat(harness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(expectedEvent));
+        harness.close();
     }
 
     @Test
