@@ -416,7 +416,7 @@ class TransformSpecsITCase {
         public String timeZone = "UTC";
         public DecimalPrecisionMode decimalPrecisionMode = DecimalPrecisionMode.UP_TO_19;
         public TransformExpressionSemantics expressionSemantics =
-                TransformExpressionSemantics.LEGACY;
+                TransformExpressionSemantics.DEFAULT;
         public List<String> projectionRules = new ArrayList<>();
         public @Nullable String filterRule;
         public @Nullable String primaryKey;

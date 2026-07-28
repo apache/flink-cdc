@@ -22,8 +22,8 @@ import org.apache.flink.cdc.common.annotation.PublicEvolving;
 /** Defines the semantics used to evaluate pipeline transform expressions. */
 @PublicEvolving
 public enum TransformExpressionSemantics {
-    /** Preserves the historical pipeline transform expression behavior. */
-    LEGACY,
+    /** Preserves the current pipeline transform expression behavior. */
+    DEFAULT,
 
     /** Uses Flink SQL-compatible semantics for supported transform expressions. */
     FLINK_SQL

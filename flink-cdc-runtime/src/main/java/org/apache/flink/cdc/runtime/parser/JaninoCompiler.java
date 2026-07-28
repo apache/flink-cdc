@@ -1355,7 +1355,7 @@ public class JaninoCompiler {
                     udfDescriptors,
                     supportedMetadataColumns,
                     DecimalPrecisionMode.UP_TO_19,
-                    TransformExpressionSemantics.LEGACY);
+                    TransformExpressionSemantics.DEFAULT);
         }
 
         public static Context of(
@@ -1370,7 +1370,7 @@ public class JaninoCompiler {
                     udfDescriptors,
                     supportedMetadataColumns,
                     decimalPrecisionMode,
-                    TransformExpressionSemantics.LEGACY);
+                    TransformExpressionSemantics.DEFAULT);
         }
 
         public static Context of(

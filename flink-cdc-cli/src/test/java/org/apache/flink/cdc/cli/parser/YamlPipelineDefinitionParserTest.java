@@ -125,7 +125,7 @@ class YamlPipelineDefinitionParserTest {
                                 .get(PipelineOptions.PIPELINE_TRANSFORM_EXPRESSION_SEMANTICS))
                 .isEqualTo(TransformExpressionSemantics.FLINK_SQL);
         assertThat(new Configuration().get(PipelineOptions.PIPELINE_TRANSFORM_EXPRESSION_SEMANTICS))
-                .isEqualTo(TransformExpressionSemantics.LEGACY);
+                .isEqualTo(TransformExpressionSemantics.DEFAULT);
     }
 
     @Test

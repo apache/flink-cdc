@@ -408,7 +408,7 @@ public class TransformParser {
                 udfDescriptors,
                 supportedMetadataColumns,
                 DecimalPrecisionMode.UP_TO_19,
-                TransformExpressionSemantics.LEGACY);
+                TransformExpressionSemantics.DEFAULT);
     }
 
     public static List<ProjectionColumn> generateProjectionColumns(
@@ -423,7 +423,7 @@ public class TransformParser {
                 udfDescriptors,
                 supportedMetadataColumns,
                 decimalPrecisionMode,
-                TransformExpressionSemantics.LEGACY);
+                TransformExpressionSemantics.DEFAULT);
     }
 
     public static List<ProjectionColumn> generateProjectionColumns(
@@ -778,7 +778,7 @@ public class TransformParser {
                 supportedMetadataColumns,
                 columnNameMap,
                 DecimalPrecisionMode.UP_TO_19,
-                TransformExpressionSemantics.LEGACY);
+                TransformExpressionSemantics.DEFAULT);
     }
 
     public static String translateFilterExpressionToJaninoExpression(
@@ -795,7 +795,7 @@ public class TransformParser {
                 supportedMetadataColumns,
                 columnNameMap,
                 decimalPrecisionMode,
-                TransformExpressionSemantics.LEGACY);
+                TransformExpressionSemantics.DEFAULT);
     }
 
     public static String translateFilterExpressionToJaninoExpression(
