@@ -89,7 +89,7 @@ public class TransformFilterProcessor {
 
     public static TransformFilterProcessor ofNoOp() {
         return new TransformFilterProcessor(
-                true, null, null, null, null, null, null, TransformExpressionSemantics.LEGACY);
+                true, null, null, null, null, null, null, TransformExpressionSemantics.DEFAULT);
     }
 
     public static TransformFilterProcessor of(

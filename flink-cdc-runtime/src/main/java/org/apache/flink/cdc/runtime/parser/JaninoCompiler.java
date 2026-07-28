@@ -892,7 +892,7 @@ public class JaninoCompiler {
                     columnNameMap,
                     udfDescriptors,
                     supportedMetadataColumns,
-                    TransformExpressionSemantics.LEGACY);
+                    TransformExpressionSemantics.DEFAULT);
         }
 
         public static Context of(

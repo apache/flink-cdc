@@ -160,9 +160,9 @@ public class PipelineOptions {
             PIPELINE_TRANSFORM_EXPRESSION_SEMANTICS =
                     ConfigOptions.key("transform.expression.semantics")
                             .enumType(TransformExpressionSemantics.class)
-                            .defaultValue(TransformExpressionSemantics.LEGACY)
+                            .defaultValue(TransformExpressionSemantics.DEFAULT)
                             .withDescription(
-                                    "Semantics used to evaluate transform expressions. LEGACY preserves historical behavior, while FLINK_SQL enables Flink SQL-compatible semantics for supported predicates.");
+                                    "Semantics used to evaluate transform expressions. DEFAULT preserves current behavior, while FLINK_SQL enables Flink SQL-compatible semantics for supported predicates.");
 
     private PipelineOptions() {}
 }

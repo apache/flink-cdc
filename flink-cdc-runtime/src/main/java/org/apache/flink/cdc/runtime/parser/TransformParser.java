@@ -283,7 +283,7 @@ public class TransformParser {
                 columns,
                 udfDescriptors,
                 supportedMetadataColumns,
-                TransformExpressionSemantics.LEGACY);
+                TransformExpressionSemantics.DEFAULT);
     }
 
     public static List<ProjectionColumn> generateProjectionColumns(
@@ -597,7 +597,7 @@ public class TransformParser {
                 udfDescriptors,
                 supportedMetadataColumns,
                 columnNameMap,
-                TransformExpressionSemantics.LEGACY);
+                TransformExpressionSemantics.DEFAULT);
     }
 
     public static String translateFilterExpressionToJaninoExpression(
