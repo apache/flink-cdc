@@ -264,7 +264,51 @@ public class CastingFunctions {
     }
 
     public static LocalDateTime castToTimestamp(Object object, String timezone) {
-        ZoneId zoneId = ZoneId.of(timezone);
+        return castToTimestamp(object, ZoneId.of(timezone), false);
+    }
+
+    public static String tryCastToString(Object object) {
+        return castToString(object);
+    }
+
+    public static Boolean tryCastToBoolean(Object object) {
+        return castToBoolean(object);
+    }
+
+    public static Byte tryCastToByte(Object object) {
+        return castToByte(object);
+    }
+
+    public static Short tryCastToShort(Object object) {
+        return castToShort(object);
+    }
+
+    public static Integer tryCastToInteger(Object object) {
+        return castToInteger(object);
+    }
+
+    public static Long tryCastToLong(Object object) {
+        return castToLong(object);
+    }
+
+    public static Float tryCastToFloat(Object object) {
+        return castToFloat(object);
+    }
+
+    public static Double tryCastToDouble(Object object) {
+        return castToDouble(object);
+    }
+
+    public static BigDecimal tryCastToBigDecimal(Object object, int precision, int scale) {
+        return castToBigDecimal(object, precision, scale);
+    }
+
+    public static LocalDateTime tryCastToTimestamp(Object object, String timezone) {
+        return castToTimestamp(object, ZoneId.of(timezone), true);
+    }
+
+    private static LocalDateTime castToTimestamp(
+            Object object, ZoneId zoneId, boolean returnNullOnFailure) {
         if (object == null) {
             return null;
         }
@@ -302,7 +346,9 @@ public class CastingFunctions {
             return ZonedDateTime.parse(stringRep).toLocalDateTime();
         } catch (DateTimeParseException ignored) {
         }
-
+        if (returnNullOnFailure) {
+            return null;
+        }
         throw new IllegalArgumentException(
                 "Unable to parse given string as timestamp: " + stringRep);
     }

@@ -610,6 +610,22 @@ public class TransformSqlOperatorTable extends ReflectiveSqlOperatorTable {
     // ---------------------
     public static final SqlCaseOperator CASE = SqlStdOperatorTable.CASE;
     public static final SqlFunction COALESCE = SqlStdOperatorTable.COALESCE;
+    public static final SqlFunction NULLIF =
+            new SqlFunction(
+                    "NULLIF",
+                    SqlKind.NULLIF,
+                    ReturnTypes.ARG0_FORCE_NULLABLE,
+                    null,
+                    OperandTypes.COMPARABLE_UNORDERED_COMPARABLE_UNORDERED,
+                    SqlFunctionCategory.SYSTEM);
+    public static final SqlFunction IFNULL =
+            new SqlFunction(
+                    "IFNULL",
+                    SqlKind.OTHER_FUNCTION,
+                    TransformSqlReturnTypes.IF_NULL,
+                    null,
+                    OperandTypes.SAME_SAME,
+                    SqlFunctionCategory.SYSTEM);
     public static final SqlFunction IF =
             new SqlFunction(
                     "IF",
@@ -657,6 +673,14 @@ public class TransformSqlOperatorTable extends ReflectiveSqlOperatorTable {
     // Cast Functions
     // --------------
     public static final SqlFunction CAST = SqlStdOperatorTable.CAST;
+    public static final SqlFunction TRY_CAST =
+            new SqlFunction(
+                    "TRY_CAST",
+                    SqlKind.OTHER_FUNCTION,
+                    ReturnTypes.ARG0_FORCE_NULLABLE,
+                    null,
+                    OperandTypes.ANY,
+                    SqlFunctionCategory.SYSTEM);
 
     // ---------------------
     // Struct Functions

@@ -17,6 +17,8 @@
 
 package org.apache.flink.cdc.runtime.functions.impl;
 
+import java.math.BigDecimal;
+import java.util.Objects;
 import java.util.function.Supplier;
 
 /** Logical built-in functions. */
@@ -101,5 +103,46 @@ public class LogicalFunctions {
             }
         }
         return null;
+    }
+
+    public static <T> T ifNull(T value, T replacement) {
+        return value != null ? value : replacement;
+    }
+
+    public static <T> T nullIf(T value, Object comparison) {
+        return valuesEqualForNullIf(value, comparison) ? null : value;
+    }
+
+    private static boolean valuesEqualForNullIf(Object value, Object comparison) {
+        if (value == null || comparison == null) {
+            return false;
+        }
+        if (!(value instanceof Number) || !(comparison instanceof Number)) {
+            return Objects.deepEquals(value, comparison);
+        }
+
+        Number left = (Number) value;
+        Number right = (Number) comparison;
+        if (left instanceof Double || right instanceof Double) {
+            double leftValue = left.doubleValue();
+            double rightValue = right.doubleValue();
+            if (Double.isFinite(leftValue) && Double.isFinite(rightValue)) {
+                return BigDecimal.valueOf(leftValue).compareTo(BigDecimal.valueOf(rightValue)) == 0;
+            }
+            return Double.compare(leftValue, rightValue) == 0;
+        }
+        if (left instanceof Float || right instanceof Float) {
+            return Float.compare(left.floatValue(), right.floatValue()) == 0;
+        }
+        if (left instanceof BigDecimal || right instanceof BigDecimal) {
+            return toBigDecimal(left).compareTo(toBigDecimal(right)) == 0;
+        }
+        return left.longValue() == right.longValue();
+    }
+
+    private static BigDecimal toBigDecimal(Number number) {
+        return number instanceof BigDecimal
+                ? (BigDecimal) number
+                : BigDecimal.valueOf(number.longValue());
     }
 }

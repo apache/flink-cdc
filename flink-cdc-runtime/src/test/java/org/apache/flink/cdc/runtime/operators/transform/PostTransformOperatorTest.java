@@ -2969,6 +2969,14 @@ class PostTransformOperatorTest {
         testExpressionConditionTransform("round(3.1415926, 2) = 3.14");
         testExpressionConditionTransform("IF(2>0,1,0) = 1");
         testExpressionConditionTransform("COALESCE(null,1,2) = 1");
+        testExpressionConditionTransform("TRY_CAST('invalid' AS INT) IS NULL");
+        testExpressionConditionTransform("TRY_CAST('invalid-timestamp' AS TIMESTAMP) IS NULL");
+        testExpressionConditionTransform("IFNULL(TRY_CAST('invalid' AS INT), 42) = 42");
+        testExpressionConditionTransform("NULLIF(1, 1) IS NULL");
+        testExpressionConditionTransform("NULLIF(1, 2) = 1");
+        testExpressionConditionTransform("NULLIF(CAST(1 AS INT), CAST(1 AS BIGINT)) IS NULL");
+        testExpressionConditionTransform("NULLIF(NULL, 1) IS NULL");
+        testExpressionConditionTransform("NULLIF(1, NULL) = 1");
         testExpressionConditionTransform("1 + 1 = 2");
         testExpressionConditionTransform("1 - 1 = 0");
         testExpressionConditionTransform("1 * 1 = 1");
