@@ -221,10 +221,14 @@ Logical functions follow SQL three-valued logic for nullable BOOLEAN values. `AN
 | CASE WHEN condition1 THEN result1 (WHEN condition2 THEN result2)* (ELSE result_z) END                                 | Nested ternary expression            | Returns resultX when the first conditionX is met. When no condition is met, returns result_z if it is provided and returns NULL otherwise.                                                                                                        |
 | COALESCE(value1 [, value2]*)                                                                                          | coalesce(Object... objects)          | Returns the first argument that is not NULL.If all arguments are NULL, it returns NULL as well. The return type is the least restrictive, common type of all of its arguments. The return type is nullable if all arguments are nullable as well. |
 | IF(condition, true_value, false_value)                                                                                | condition ? true_value : false_value | Returns the true_value if condition is met, otherwise false_value. E.g., IF(5 > 3, 5, 3) returns 5.                                                                                                                                               |
+| IFNULL(value, replacement)                                                                                            | ifNull(value, replacement)           | Returns `replacement` when `value` is NULL; otherwise, returns `value`. The arguments must have a common type. The result can be NULL only when `replacement` can be NULL.                                                                        |
+| NULLIF(value1, value2)                                                                                                | nullIf(value1, value2)               | Returns NULL when `value1` equals `value2`; otherwise, returns `value1`. Its return type is the nullable type of `value1`.                                                                                                                         |
 
 ## Casting Functions
 
 You can use `CAST( <EXPR> AS <T> )` syntax to convert any valid expression `<EXPR>` to a specific type `<T>`. Possible conversion paths are:
+
+`TRY_CAST( <EXPR> AS <T> )` supports the same conversion paths as `CAST`. It returns NULL when a value cannot be converted. An unsupported source-to-target type path is rejected during pipeline validation or initialization. Configuration errors, UDF failures, and internal errors are not converted to NULL.
 
 | Source Type                         | Target Type | Notes                                                                                      |
 |-------------------------------------|-------------|--------------------------------------------------------------------------------------------|

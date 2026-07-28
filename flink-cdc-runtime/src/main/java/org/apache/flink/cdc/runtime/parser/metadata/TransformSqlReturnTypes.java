@@ -163,6 +163,27 @@ public class TransformSqlReturnTypes {
                     },
                     SqlTypeTransforms.TO_NULLABLE);
 
+    /** Return type inference matching Flink SQL's IFNULL function. */
+    public static final SqlReturnTypeInference IF_NULL =
+            opBinding -> {
+                RelDataType inputType = opBinding.getOperandType(0);
+                if (!inputType.isNullable()) {
+                    return inputType;
+                }
+
+                RelDataType replacementType = opBinding.getOperandType(1);
+                RelDataType commonType =
+                        opBinding
+                                .getTypeFactory()
+                                .leastRestrictive(List.of(inputType, replacementType));
+                if (commonType == null) {
+                    return null;
+                }
+                return opBinding
+                        .getTypeFactory()
+                        .createTypeWithNullability(commonType, replacementType.isNullable());
+            };
+
     public static final SqlReturnTypeInference NUMERIC_FROM_ARG1_DEFAULT1 =
             new NumericOrDefaultReturnTypeInference(1, 1);
 

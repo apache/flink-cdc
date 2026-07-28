@@ -220,10 +220,14 @@ Flink CDC 使用 [Calcite](https://calcite.apache.org/) 来解析表达式并且
 | CASE WHEN condition1 THEN result1 (WHEN condition2 THEN result2)* (ELSE result_z) END                                 | 嵌套三元表达式                          | 当第一个 conditionX 满足时，返回 resultX。如果没有条件满足，如果提供了 result_z 则返回 result_z，否则返回 NULL。                              |
 | COALESCE(value1 [, value2]*)                                                                                          | coalesce(Object... objects)      | 返回第一个不为 NULL 的参数。如果所有参数都为 NULL，则返回 NULL。返回类型是所有参数中限制最少的公共类型。如果所有参数都可为空，则返回类型也可为空。                          |
 | IF(condition, true_value, false_value)                                                                                | condition ? true_value : false_value | 如果条件满足，返回 true_value，否则返回 false_value。例如，IF(5 > 3, 5, 3) 返回 5。                                              |
+| IFNULL(value, replacement)                                                                                           | ifNull(value, replacement)       | 当 value 为 NULL 时返回 replacement，否则返回 value。两个参数必须存在公共类型。仅当 replacement 可为 NULL 时，结果才可为 NULL。                  |
+| NULLIF(value1, value2)                                                                                               | nullIf(value1, value2)           | 当 value1 与 value2 相等时返回 NULL，否则返回 value1。返回类型为 value1 对应的可空类型。                                         |
 
 ## 转换函数
 
 你可以使用 `CAST( <EXPR> AS <T> )` 语法将任何有效的表达式 `<EXPR>` 转换为特定类型 `<T>`。可能的转换路径如下：
+
+`TRY_CAST( <EXPR> AS <T> )` 支持与 `CAST` 相同的转换路径。当某个值无法转换时返回 NULL；不支持的源类型到目标类型转换路径会在 pipeline 校验或初始化阶段被拒绝。配置错误、UDF 异常和内部程序错误不会被转换为 NULL。
 
 | 源类型                                 | 目标类型      | 说明                                               |
 |-------------------------------------|-----------|--------------------------------------------------|
