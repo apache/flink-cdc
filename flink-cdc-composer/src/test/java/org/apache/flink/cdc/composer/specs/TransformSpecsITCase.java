@@ -406,7 +406,7 @@ class TransformSpecsITCase {
         public String ignore;
         public String timeZone = "UTC";
         public TransformExpressionSemantics expressionSemantics =
-                TransformExpressionSemantics.LEGACY;
+                TransformExpressionSemantics.DEFAULT;
         public List<String> projectionRules = new ArrayList<>();
         public @Nullable String filterRule;
         public @Nullable String primaryKey;

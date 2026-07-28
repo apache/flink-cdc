@@ -101,7 +101,7 @@ public class TransformFilterProcessor {
                 null,
                 null,
                 null,
-                TransformExpressionSemantics.LEGACY);
+                TransformExpressionSemantics.DEFAULT);
     }
 
     public static TransformFilterProcessor of(

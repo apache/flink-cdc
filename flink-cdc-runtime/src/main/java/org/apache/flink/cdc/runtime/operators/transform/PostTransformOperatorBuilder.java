@@ -35,7 +35,7 @@ import java.util.Map;
 public class PostTransformOperatorBuilder {
     private final List<TransformRule> transformRules = new ArrayList<>();
     private String timezone;
-    private TransformExpressionSemantics expressionSemantics = TransformExpressionSemantics.LEGACY;
+    private TransformExpressionSemantics expressionSemantics = TransformExpressionSemantics.DEFAULT;
     private final List<Tuple3<String, String, Map<String, String>>> udfFunctions =
             new ArrayList<>();
     private final Map<String, AiModelClient> modelClients = new LinkedHashMap<>();
