@@ -188,8 +188,8 @@ Flink CDC 使用 [Calcite](https://calcite.apache.org/) 来解析表达式并且
 | REGEXP_SUBSTR(string, regex)                     | regexpSubstr(string, regex)               | 返回第一个匹配正则表达式的子串。输入为 NULL、无匹配或正则表达式非法时返回 NULL。 |
 | SUBSTR(string, integer1[, integer2])             | substr(string,integer1,integer2)         | 返回 STRING 从位置 integer1 开始、长度为 integer2（默认到末尾）的子串。                                                              |
 | SUBSTRING(string FROM integer1 [ FOR integer2 ]) | substring(string,integer1,integer2)      | 返回 STRING 从位置 integer1 开始、长度为 integer2（默认到末尾）的子串。                                                              |
-| OVERLAY(string1 PLACING string2 FROM integer1 [FOR integer2]) | overlay(string1, string2, integer1[, integer2]) | 从位置 integer1 开始，用 STRING2 替换 STRING1 的子串，替换长度默认为 STRING2 的长度。                                                       |
-| POSITION(string1 IN string2)                               | position(string1, string2)                    | 返回 STRING1 在 STRING2 中第一次出现的位置。起始位置为 1，未找到时返回 0。                                                              |
+| OVERLAY(string1 PLACING string2 FROM integer1 [FOR integer2]) | overlay(string1, string2, integer1[, integer2]) | 从位置 integer1 开始，用 STRING2 替换 STRING1 的子串，替换长度默认为 STRING2 的长度，支持字符字符串和二进制字符串。                                      |
+| POSITION(string1 IN string2 [ FROM integer ])               | position(string1, string2[, integer])         | 返回 STRING1 在 STRING2 中第一次出现的位置，可指定从 integer 开始查找。起始位置为 1，未找到时返回 0，支持字符字符串和二进制字符串。                              |
 | LOCATE(string1, string2[, integer])                        | locate(string1, string2[, integer])           | 返回 STRING1 在 STRING2 中第一次出现的位置，可指定从 integer 开始查找。起始位置为 1，未找到时返回 0。                                           |
 | INSTR(string1, string2)                                    | instr(string1, string2)                       | 返回 STRING2 在 STRING1 中第一次出现的位置。起始位置为 1，未找到时返回 0。                                                            |
 | CONCAT(string1, string2,…)                       | concat(string1, string2,…)               | 返回连接 string1、string2、… 后的字符串。例如，CONCAT('AA', 'BB', 'CC') 返回 'AABBCC'。                                          |
@@ -202,8 +202,9 @@ Flink CDC 使用 [Calcite](https://calcite.apache.org/) 来解析表达式并且
 | RIGHT(string, integer)                                     | right(string, integer)                        | 返回 STRING 最右侧 integer 个字符。                                                                                      |
 | STARTSWITH(string1, string2)                               | startswith(string1, string2)                  | 返回 STRING1 是否以 STRING2 开头，支持字符字符串和二进制字符串。                                                                     |
 | ENDSWITH(string1, string2)                                 | endswith(string1, string2)                    | 返回 STRING1 是否以 STRING2 结尾，支持字符字符串和二进制字符串。                                                                     |
-| TO_BASE64(string)                                          | toBase64(string)                              | 将 STRING 编码为 base64 字符串。                                                                                      |
-| FROM_BASE64(string)                                        | fromBase64(string)                            | 解码 base64 字符串。                                                                                                 |
+| TO_BASE64(string \| binary)                                | toBase64(string \| binary)                    | 将字符或二进制字符串编码为 base64 字符串。                                                                            |
+| FROM_BASE64(string)                                        | fromBase64(string)                            | 将 base64 字符串解码为 UTF-8 字符字符串。                                                                             |
+| FROM_BASE64_BINARY(string)                                 | fromBase64Binary(string)                      | 将 base64 字符串解码为 VARBINARY，并保留原始字节。                                                                   |
 
 ## 时间函数
 

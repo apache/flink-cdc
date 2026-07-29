@@ -225,6 +225,7 @@ class TransformParserTest {
         testFilterExpression("OVERLAY(id PLACING 'x' FROM 2)", "overlay(id, \"x\", 2)");
         testFilterExpression("OVERLAY(id PLACING 'x' FROM 2 FOR 3)", "overlay(id, \"x\", 2, 3)");
         testFilterExpression("POSITION('b' IN id)", "position(\"b\", id)");
+        testFilterExpression("POSITION('b' IN id FROM 2)", "position(\"b\", id, 2)");
         testFilterExpression("LOCATE('b', id)", "locate(\"b\", id)");
         testFilterExpression("LOCATE('b', id, 2)", "locate(\"b\", id, 2)");
         testFilterExpression("INSTR(id, 'b')", "instr(id, \"b\")");
@@ -255,8 +256,18 @@ class TransformParserTest {
                 "ENDSWITH(binary_value, binary_part)",
                 "endswith(binary_value, binary_part)",
                 binaryColumns);
+        testFilterExpressionWithColumns(
+                "POSITION(binary_part IN binary_value)",
+                "position(binary_part, binary_value)",
+                binaryColumns);
+        testFilterExpressionWithColumns(
+                "OVERLAY(binary_value PLACING binary_part FROM 1)",
+                "overlay(binary_value, binary_part, 1)",
+                binaryColumns);
         testFilterExpression("TO_BASE64(id)", "toBase64(id)");
+        testFilterExpression("TO_BASE64(binary_value)", "toBase64(binary_value)");
         testFilterExpression("FROM_BASE64(id)", "fromBase64(id)");
+        testFilterExpression("FROM_BASE64_BINARY(id)", "fromBase64Binary(id)");
         testFilterExpression("id like '^[a-zA-Z]'", "like(id, \"^[a-zA-Z]\")");
         testFilterExpression("id not like '^[a-zA-Z]'", "notLike(id, \"^[a-zA-Z]\")");
         testFilterExpression("id like 'A$%' escape '$'", "like(id, \"A$%\", \"$\")");
@@ -464,7 +475,7 @@ class TransformParserTest {
                         Column.physicalColumn("binary_part", DataTypes.BINARY(2)));
         SqlSelect positionSelect =
                 TransformParser.parseSelect(
-                        "SELECT POSITION(binary_part IN binary_value) AS invalid_value FROM TB");
+                        "SELECT POSITION(binary_part IN binary_value) AS position_value FROM TB");
         SqlBasicCall positionAlias = (SqlBasicCall) positionSelect.getSelectList().get(0);
         SqlBasicCall positionCall = (SqlBasicCall) positionAlias.operand(0);
 
@@ -492,30 +503,41 @@ class TransformParserTest {
         Assertions.assertThatThrownBy(
                         () ->
                                 TransformParser.generateProjectionColumns(
-                                        "POSITION(binary_part IN binary_value) AS invalid_value",
+                                        "OVERLAY(s PLACING binary_part FROM 1) AS invalid_value",
                                         columns,
                                         Collections.emptyList(),
                                         new SupportedMetadataColumn[0]))
                 .isExactlyInstanceOf(CalciteContextException.class)
-                .hasMessageContaining("POSITION");
-        Assertions.assertThatThrownBy(
-                        () ->
-                                TransformParser.generateProjectionColumns(
-                                        "POSITION('a' IN s FROM 2) AS invalid_value",
-                                        columns,
-                                        Collections.emptyList(),
-                                        new SupportedMetadataColumn[0]))
-                .isExactlyInstanceOf(CalciteContextException.class)
-                .hasMessageContaining("POSITION");
-        Assertions.assertThatThrownBy(
-                        () ->
-                                TransformParser.generateProjectionColumns(
-                                        "OVERLAY(binary_value PLACING binary_part FROM 1) AS invalid_value",
-                                        columns,
-                                        Collections.emptyList(),
-                                        new SupportedMetadataColumn[0]))
-                .isExactlyInstanceOf(CalciteContextException.class)
-                .hasMessageContaining("OVERLAY");
+                .hasMessageContaining("is not comparable to");
+        Assertions.assertThat(
+                        TransformParser.generateProjectionColumns(
+                                "POSITION(binary_part IN binary_value) AS position_value",
+                                columns,
+                                Collections.emptyList(),
+                                new SupportedMetadataColumn[0]))
+                .hasSize(1);
+        Assertions.assertThat(
+                        TransformParser.generateProjectionColumns(
+                                "POSITION('a' IN s FROM 2) AS position_value",
+                                columns,
+                                Collections.emptyList(),
+                                new SupportedMetadataColumn[0]))
+                .hasSize(1);
+        Assertions.assertThat(
+                        TransformParser.generateProjectionColumns(
+                                "OVERLAY(binary_value PLACING binary_part FROM 1) AS overlaid_value, "
+                                        + "POSITION(binary_part IN binary_value) AS position_value, "
+                                        + "TO_BASE64(binary_value) AS encoded_value, "
+                                        + "FROM_BASE64_BINARY(s) AS decoded_value",
+                                columns,
+                                Collections.emptyList(),
+                                new SupportedMetadataColumn[0]))
+                .extracting(ProjectionColumn::getDataType)
+                .containsExactly(
+                        DataTypes.VARBINARY(18),
+                        DataTypes.INT(),
+                        DataTypes.STRING(),
+                        DataTypes.VARBINARY(65536));
     }
 
     @Test

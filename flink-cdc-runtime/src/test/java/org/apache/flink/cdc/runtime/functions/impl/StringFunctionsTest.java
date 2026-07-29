@@ -29,10 +29,18 @@ class StringFunctionsTest {
         assertThat(StringFunctions.overlay("abcdef", "ZZ", 3)).isEqualTo("abZZef");
         assertThat(StringFunctions.overlay("abcdef", "ZZ", 3, 2)).isEqualTo("abZZef");
         assertThat(StringFunctions.overlay("abcdef", "ZZ", 0, 2)).isEqualTo("abcdef");
+        assertThat(StringFunctions.overlay(new byte[] {1, 2, 3, 4}, new byte[] {8, 9}, 2))
+                .containsExactly((byte) 1, (byte) 8, (byte) 9, (byte) 4);
+        assertThat(StringFunctions.overlay(new byte[] {1, 2, 3, 4}, new byte[] {8, 9}, 2, 2))
+                .containsExactly((byte) 1, (byte) 8, (byte) 9, (byte) 4);
         assertThat(StringFunctions.position("cd", "abcdef")).isEqualTo(3);
         assertThat(StringFunctions.position("xy", "abcdef")).isZero();
         assertThat(StringFunctions.position("", "abcdef")).isEqualTo(1);
         assertThat(StringFunctions.position("cd", "abcdef", 4)).isZero();
+        assertThat(StringFunctions.position(new byte[] {2, 3}, new byte[] {1, 2, 3, 4}))
+                .isEqualTo(2);
+        assertThat(StringFunctions.position(new byte[] {2, 3}, new byte[] {1, 2, 3, 4}, 3))
+                .isZero();
         assertThat(StringFunctions.locate("cd", "abcdef")).isEqualTo(3);
         assertThat(StringFunctions.locate("", "abcdef", 4)).isEqualTo(1);
         assertThat(StringFunctions.instr("abcabc", "bc")).isEqualTo(2);
@@ -63,14 +71,18 @@ class StringFunctionsTest {
         assertThat(StringFunctions.endswith(new byte[] {1, 2, 3}, new byte[] {2, 3})).isTrue();
         assertThat(StringFunctions.endswith(new byte[] {1, 2, 3}, new byte[] {1, 2})).isFalse();
         assertThat(StringFunctions.toBase64("hello")).isEqualTo("aGVsbG8=");
+        assertThat(StringFunctions.toBase64(new byte[] {(byte) 0xC3, 0x28})).isEqualTo("wyg=");
         assertThat(StringFunctions.fromBase64("aGVsbG8=")).isEqualTo("hello");
+        assertThat(StringFunctions.fromBase64Binary("wyg=")).containsExactly((byte) 0xC3, 0x28);
     }
 
     @Test
     void testStringFunctionsReturnNullOnNullInput() {
         assertThat(StringFunctions.concatWs(null, "a")).isNull();
         assertThat(StringFunctions.overlay(null, "x", 1)).isNull();
+        assertThat(StringFunctions.overlay((byte[]) null, new byte[] {1}, 1)).isNull();
         assertThat(StringFunctions.position(null, "abc")).isNull();
+        assertThat(StringFunctions.position((byte[]) null, new byte[] {1})).isNull();
         assertThat(StringFunctions.locate("a", null)).isNull();
         assertThat(StringFunctions.instr("abc", null)).isNull();
         assertThat(StringFunctions.ltrim(null)).isNull();
@@ -86,8 +98,10 @@ class StringFunctionsTest {
         assertThat(StringFunctions.endswith("a", null)).isNull();
         assertThat(StringFunctions.startswith((byte[]) null, new byte[] {1})).isNull();
         assertThat(StringFunctions.endswith(new byte[] {1}, (byte[]) null)).isNull();
-        assertThat(StringFunctions.toBase64(null)).isNull();
+        assertThat(StringFunctions.toBase64((String) null)).isNull();
+        assertThat(StringFunctions.toBase64((byte[]) null)).isNull();
         assertThat(StringFunctions.fromBase64(null)).isNull();
+        assertThat(StringFunctions.fromBase64Binary(null)).isNull();
     }
 
     @Test

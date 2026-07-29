@@ -295,6 +295,36 @@ public class StringFunctions {
         return builder.toString();
     }
 
+    public static byte[] overlay(byte[] bytes, byte[] replacement, Number start) {
+        if (replacement == null) {
+            return null;
+        }
+        return overlay(bytes, replacement, start, replacement.length);
+    }
+
+    public static byte[] overlay(byte[] bytes, byte[] replacement, Number start, Number length) {
+        if (bytes == null || replacement == null || start == null || length == null) {
+            return null;
+        }
+        int startPosition = start.intValue();
+        int len = length.intValue();
+        if (startPosition <= 0 || startPosition > bytes.length) {
+            return bytes;
+        }
+
+        int prefixLength = startPosition - 1;
+        int suffixStart = prefixLength + Math.max(len, 0);
+        int suffixLength = len > 0 && suffixStart < bytes.length ? bytes.length - suffixStart : 0;
+        byte[] result = new byte[prefixLength + replacement.length + suffixLength];
+        System.arraycopy(bytes, 0, result, 0, prefixLength);
+        System.arraycopy(replacement, 0, result, prefixLength, replacement.length);
+        if (suffixLength > 0) {
+            System.arraycopy(
+                    bytes, suffixStart, result, prefixLength + replacement.length, suffixLength);
+        }
+        return result;
+    }
+
     public static Integer position(String seek, String str) {
         return position(seek, str, 1);
     }
@@ -314,6 +344,25 @@ public class StringFunctions {
         int fromIndex = str.offsetByCodePoints(0, fromCodePoint);
         int index = str.indexOf(seek, fromIndex);
         return index < 0 ? 0 : str.codePointCount(0, index) + 1;
+    }
+
+    public static Integer position(byte[] seek, byte[] bytes) {
+        return position(seek, bytes, 1);
+    }
+
+    public static Integer position(byte[] seek, byte[] bytes, Number from) {
+        if (seek == null || bytes == null || from == null) {
+            return null;
+        }
+        if (seek.length == 0) {
+            return 1;
+        }
+        int fromIndex = Math.max(from.intValue() - 1, 0);
+        if (fromIndex > bytes.length) {
+            return 0;
+        }
+        int index = indexOf(bytes, seek, fromIndex);
+        return index < 0 ? 0 : index + 1;
     }
 
     public static Integer instr(String str, String subString) {
@@ -447,6 +496,13 @@ public class StringFunctions {
         return Base64.getEncoder().encodeToString(str.getBytes(StandardCharsets.UTF_8));
     }
 
+    public static String toBase64(byte[] bytes) {
+        if (bytes == null) {
+            return null;
+        }
+        return Base64.getEncoder().encodeToString(bytes);
+    }
+
     public static String fromBase64(String str) {
         if (str == null) {
             return null;
@@ -454,6 +510,13 @@ public class StringFunctions {
         return new String(
                 Base64.getDecoder().decode(str.getBytes(StandardCharsets.UTF_8)),
                 StandardCharsets.UTF_8);
+    }
+
+    public static byte[] fromBase64Binary(String str) {
+        if (str == null) {
+            return null;
+        }
+        return Base64.getDecoder().decode(str.getBytes(StandardCharsets.UTF_8));
     }
 
     public static String uuid() {
@@ -545,6 +608,16 @@ public class StringFunctions {
             }
         }
         return true;
+    }
+
+    private static int indexOf(byte[] bytes, byte[] target, int fromIndex) {
+        int lastIndex = bytes.length - target.length;
+        for (int i = fromIndex; i <= lastIndex; i++) {
+            if (matchesAt(bytes, target, i)) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     private static String pad(String base, Number length, String pad, boolean leftPad) {

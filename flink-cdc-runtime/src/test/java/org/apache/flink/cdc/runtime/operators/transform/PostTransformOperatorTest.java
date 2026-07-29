@@ -3046,6 +3046,72 @@ class PostTransformOperatorTest {
         testHarness.close();
     }
 
+    @Test
+    void testBinaryOverlayPositionAndBase64Transform() throws Exception {
+        TableId tableId = TableId.tableId("binary_overlay_position_base64");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("value_", DataTypes.VARBINARY(16))
+                        .physicalColumn("replacement_", DataTypes.VARBINARY(4))
+                        .physicalColumn("needle_", DataTypes.VARBINARY(4))
+                        .physicalColumn("encoded_", DataTypes.STRING())
+                        .build();
+        Schema expectedSchema =
+                Schema.newBuilder()
+                        .physicalColumn("overlaid_", DataTypes.VARBINARY(20))
+                        .physicalColumn("position_", DataTypes.INT())
+                        .physicalColumn("encoded_value_", DataTypes.STRING())
+                        .physicalColumn("decoded_", DataTypes.VARBINARY(65536))
+                        .build();
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
+                        .addTransform(
+                                tableId.identifier(),
+                                "OVERLAY(value_ PLACING replacement_ FROM 2 FOR 2) AS overlaid_, "
+                                        + "POSITION(needle_ IN value_) AS position_, "
+                                        + "TO_BASE64(value_) AS encoded_value_, "
+                                        + "FROM_BASE64_BINARY(encoded_) AS decoded_",
+                                null)
+                        .addTimezone("UTC")
+                        .build();
+        RegularEventOperatorTestHarness<PostTransformOperator, Event> testHarness =
+                RegularEventOperatorTestHarness.with(transform, 1);
+        testHarness.open();
+
+        BinaryRecordDataGenerator recordDataGenerator =
+                new BinaryRecordDataGenerator(((RowType) schema.toRowDataType()));
+        BinaryRecordDataGenerator expectedRecordDataGenerator =
+                new BinaryRecordDataGenerator(((RowType) expectedSchema.toRowDataType()));
+        DataChangeEvent insertEvent =
+                DataChangeEvent.insertEvent(
+                        tableId,
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    new byte[] {1, 2, 3, 4},
+                                    new byte[] {8, 9},
+                                    new byte[] {2, 3},
+                                    new BinaryStringData("wyg=")
+                                }));
+        DataChangeEvent expectedInsertEvent =
+                DataChangeEvent.insertEvent(
+                        tableId,
+                        expectedRecordDataGenerator.generate(
+                                new Object[] {
+                                    new byte[] {1, 8, 9, 4},
+                                    2,
+                                    new BinaryStringData("AQIDBA=="),
+                                    new byte[] {(byte) 0xC3, 0x28}
+                                }));
+
+        transform.processElement(new StreamRecord<>(new CreateTableEvent(tableId, schema)));
+        Assertions.assertThat(testHarness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(new CreateTableEvent(tableId, expectedSchema)));
+        transform.processElement(new StreamRecord<>(insertEvent));
+        Assertions.assertThat(testHarness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(expectedInsertEvent));
+        testHarness.close();
+    }
+
     private void testExpressionConditionTransform(String expression) throws Exception {
         PostTransformOperator transform =
                 PostTransformOperator.newBuilder()
