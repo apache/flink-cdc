@@ -37,58 +37,7 @@ import java.util.Properties;
 import java.util.ServiceLoader;
 import java.util.Set;
 
-/**
- * A {@link TableDiscoverer} that reads the list of subscribed tables from a JDBC database.
- *
- * <p>This implementation connects to any JDBC-compatible database (e.g., MySQL, PostgreSQL) and
- * returns fully-qualified table names parsed as {@link TableId} objects.
- *
- * <h3>Default mode — shared subscription table (recommended)</h3>
- *
- * <p>By default, the discoverer assumes that subscriptions for many CDC jobs live in a single
- * shared database table, and that each subscription set is identified by a {@code subscribe-id}.
- * The discoverer issues a parameterized
- *
- * <pre>{@code
- * SELECT column-name FROM table-name WHERE subscribe-id-column = ?
- * }</pre>
- *
- * <p>using a {@link PreparedStatement} (injection-safe), and only the rows whose subscribe-id
- * matches the configured value are returned.
- *
- * <p><b>Required keys:</b> {@code table.discoverer.jdbc.url}, {@code
- * table.discoverer.jdbc.username}, {@code table.discoverer.jdbc.password}, {@code
- * table.discoverer.jdbc.table-name}, {@code table.discoverer.jdbc.subscribe-id}.
- *
- * <p><b>Optional keys:</b> {@code table.discoverer.jdbc.column-name} (defaults to {@code
- * "subscribe_table_name"}), {@code table.discoverer.jdbc.subscribe-id-column} (defaults to {@code
- * "subscribe_id"}).
- *
- * <p><b>Recommended schema:</b>
- *
- * <pre>{@code
- * CREATE TABLE cdc_subscriptions (
- *     subscribe_id         VARCHAR(64)  NOT NULL,
- *     subscribe_table_name VARCHAR(255) NOT NULL,
- *     PRIMARY KEY (subscribe_id, subscribe_table_name)
- * );
- * INSERT INTO cdc_subscriptions VALUES
- *   ('orders-subscription',    'source_db.orders'),
- *   ('orders-subscription',    'source_db.order_items'),
- *   ('analytics-subscription', 'analytics_db.user_events');
- * }</pre>
- *
- * <h3>Advanced escape hatch — custom query (overrides the default mode)</h3>
- *
- * <p>For uncommon layouts (e.g., needing JOINs or extra filters), users may set {@code
- * table.discoverer.jdbc.subscribe-query} to any {@code SELECT} statement; column #1 of each row is
- * treated as a fully-qualified table name. <b>When this option is set it takes priority over the
- * default mode and all of {@code table-name}, {@code column-name}, {@code subscribe-id-column} and
- * {@code subscribe-id} are ignored.</b> Use this only when the default schema cannot model your
- * subscriptions.
- *
- * <p>Null values and rows that cannot be parsed into a valid {@link TableId} are silently skipped.
- */
+/** A {@link TableDiscoverer} that reads the list of subscribed tables from a JDBC database. */
 public class JdbcTableDiscoverer implements TableDiscoverer {
 
     private static final long serialVersionUID = 1L;
@@ -208,16 +157,6 @@ public class JdbcTableDiscoverer implements TableDiscoverer {
         connection = openConnection(jdbcUrl, username, password, userCodeClassLoader);
     }
 
-    /**
-     * Opens a JDBC connection using a driver resolved from {@code userCodeClassLoader}.
-     *
-     * <p>{@link DriverManager#getConnection(String, String, String)} rejects drivers that its
-     * caller's classloader (i.e. this class' classloader) cannot resolve back to the same {@link
-     * Class} instance. When the JDBC driver jar is only present on the user or connector
-     * classpath (e.g. a dynamically loaded connector plugin), this causes a spurious {@code No
-     * suitable driver} failure even though the driver is perfectly usable. To avoid that, the
-     * driver is looked up explicitly via {@code userCodeClassLoader} and used directly.
-     */
     private static Connection openConnection(
             String jdbcUrl, String username, String password, ClassLoader userCodeClassLoader)
             throws SQLException {
@@ -237,10 +176,6 @@ public class JdbcTableDiscoverer implements TableDiscoverer {
         return DriverManager.getConnection(jdbcUrl, username, password);
     }
 
-    /**
-     * Finds the first {@link Driver} loadable from {@code classLoader} that accepts {@code
-     * jdbcUrl}.
-     */
     private static Driver findDriver(String jdbcUrl, ClassLoader classLoader) throws SQLException {
         for (Driver driver : ServiceLoader.load(Driver.class, classLoader)) {
             if (driver.acceptsURL(jdbcUrl)) {

@@ -21,14 +21,7 @@ import org.apache.flink.cdc.common.annotation.PublicEvolving;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.TableId;
 
-/**
- * Table-specific SPI factory that creates a {@link TableDiscoverer}. Implementations are discovered
- * at runtime via Java's {@link java.util.ServiceLoader} mechanism.
- *
- * <p>This is a compatibility specialization of {@link ObjectIdDiscovererFactory} whose discovered
- * object id type is {@link TableId}. The old {@link #identifier()} value now aliases {@link
- * #type()}.
- */
+/** Table-specific SPI factory that creates a {@link TableDiscoverer}. */
 @PublicEvolving
 public interface TableDiscovererFactory extends ObjectIdDiscovererFactory<TableId> {
 

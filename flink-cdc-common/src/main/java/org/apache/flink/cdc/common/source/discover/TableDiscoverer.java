@@ -21,18 +21,8 @@ import org.apache.flink.cdc.common.annotation.PublicEvolving;
 import org.apache.flink.cdc.common.event.TableId;
 
 /**
- * Pluggable abstraction for discovering a set of tables that a source connector should read.
- * Implementations are loaded via SPI through {@link TableDiscovererFactory} and determine which
- * tables the source should subscribe to.
- *
- * <p>This is a table-specific specialization of {@link ObjectIdDiscoverer} whose discovered object
- * id type is {@link TableId}.
- *
- * <p>Built-in implementations include:
- *
- * <ul>
- *   <li>{@link JdbcTableDiscoverer} - reads the subscription list from a JDBC database table.
- * </ul>
+ * Table-specific specialization of {@link ObjectIdDiscoverer} whose discovered object id type is
+ * {@link TableId}.
  */
 @PublicEvolving
 public interface TableDiscoverer extends ObjectIdDiscoverer<TableId> {}

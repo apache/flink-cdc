@@ -30,7 +30,7 @@ public interface ObjectIdDiscoverer<ObjectIdentifier> extends Serializable, Auto
     /** Opens this discoverer and initializes any resources needed for discovery. */
     void open(Context context) throws Exception;
 
-    /** Discovers and returns the set of object identifiers to subscribe to. */
+    /** Discovers and returns the set of object identifiers selected by the caller configuration. */
     Set<ObjectIdentifier> discover() throws Exception;
 
     /** Closes this discoverer and releases any resources. */

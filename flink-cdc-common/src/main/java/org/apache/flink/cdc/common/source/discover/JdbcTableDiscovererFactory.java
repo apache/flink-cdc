@@ -18,8 +18,7 @@
 package org.apache.flink.cdc.common.source.discover;
 
 /**
- * {@link TableDiscovererFactory} for {@link JdbcTableDiscoverer}. Activated when {@code
- * table.discoverer.type = 'jdbc'}.
+ * {@link TableDiscovererFactory} for {@link JdbcTableDiscoverer} with factory type {@code jdbc}.
  */
 public class JdbcTableDiscovererFactory implements TableDiscovererFactory {
 
