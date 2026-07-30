@@ -30,16 +30,16 @@ import java.util.stream.Collectors;
 
 /** SPI factory that creates an {@link ObjectIdDiscoverer}. */
 @PublicEvolving
-public interface ObjectIdDiscovererFactory<ObjectIdentifier> {
+public interface ObjectIdDiscovererFactory<T> {
 
     /** Storage-side type, such as jdbc, local-file, or remote-store. */
     String type();
 
     /** Discovered object id type, used to distinguish TableId/ObjectId/etc. */
-    Class<ObjectIdentifier> objectIdClass();
+    Class<T> objectIdClass();
 
     /** Creates a new uninitialized {@link ObjectIdDiscoverer}. */
-    ObjectIdDiscoverer<ObjectIdentifier> createDiscoverer();
+    ObjectIdDiscoverer<T> createDiscoverer();
 
     /** Creates a discoverer context with the given configuration and class loader. */
     static ObjectIdDiscoverer.Context createContext(

@@ -25,13 +25,13 @@ import java.util.Set;
 
 /** Pluggable abstraction for discovering a set of object identifiers. */
 @PublicEvolving
-public interface ObjectIdDiscoverer<ObjectIdentifier> extends Serializable, AutoCloseable {
+public interface ObjectIdDiscoverer<T> extends Serializable, AutoCloseable {
 
     /** Opens this discoverer and initializes any resources needed for discovery. */
     void open(Context context) throws Exception;
 
     /** Discovers and returns the set of object identifiers selected by the caller configuration. */
-    Set<ObjectIdentifier> discover() throws Exception;
+    Set<T> discover() throws Exception;
 
     /** Closes this discoverer and releases any resources. */
     @Override
