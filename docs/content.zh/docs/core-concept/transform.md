@@ -246,6 +246,13 @@ Flink CDC 使用 [Calcite](https://calcite.apache.org/) 来解析表达式并且
 
 | 函数 | Janino 代码 | 描述 |
 | -------- | ----------- | ----------- |
+| ARRAY[value, ...] | array(value, ...) | 使用给定值构造数组。所有值必须具有公共类型。 |
+| MAP[key, value, ...] | map(key, value, ...) | 使用键值对构造 Map。所有键、所有值必须分别具有公共类型。 |
+| ROW(value, ...) | row(value, ...) | 使用给定值构造 Row。字段名依次生成为 `f0`、`f1` 等。 |
+| CARDINALITY(arrayOrMap) | cardinality(arrayOrMap) | 返回数组或 Map 的元素数量。输入为 NULL 时返回 NULL。 |
+| ARRAY_CONTAINS(array, value) | arrayContains(array, value) | 返回数组是否包含给定值。 |
+| ARRAY_POSITION(array, value) | arrayPosition(array, value) | 返回首个匹配值的位置，位置从 1 开始；未找到时返回 0。 |
+| ELEMENT(array) | element(array) | 返回单元素数组中的元素。空数组返回 NULL；数组包含多个元素时抛出异常。 |
 | array[index] | itemAccess(array, index) | 返回数组中位置 `index` 的元素。索引从 1 开始（SQL 标准）。如果索引超出范围或数组为 NULL，则返回 NULL。 |
 | map[key] | itemAccess(map, key) | 返回 map 中与 `key` 关联的值。如果 key 不存在或 map 为 NULL，则返回 NULL。 |
 | row[index] | itemAccess(row, index) | 返回 row 中位置 `index` 的字段。索引从 1 开始。索引必须是常量（不能是计算表达式），因为返回类型必须在静态阶段确定。 |

@@ -25,6 +25,7 @@ import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypeRoot;
+import org.apache.flink.cdc.common.types.DecimalType;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.common.utils.StringUtils;
 import org.apache.flink.cdc.runtime.operators.transform.UserDefinedFunctionDescriptor;
@@ -35,6 +36,7 @@ import org.apache.calcite.sql.SqlBasicTypeNameSpec;
 import org.apache.calcite.sql.SqlCharStringLiteral;
 import org.apache.calcite.sql.SqlDataTypeSpec;
 import org.apache.calcite.sql.SqlIdentifier;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlNodeList;
@@ -194,6 +196,10 @@ public class JaninoCompiler {
     }
 
     private static Java.Rvalue translateSqlBasicCall(Context context, SqlBasicCall sqlBasicCall) {
+        if (isCollectionConstructor(sqlBasicCall)) {
+            return generateCollectionConstructorOperation(
+                    context, sqlBasicCall, getCollectionConstructorFunctionName(sqlBasicCall));
+        }
         List<SqlNode> operandList = sqlBasicCall.getOperandList();
         List<Java.Rvalue> atoms = new ArrayList<>();
         for (SqlNode sqlNode : operandList) {
@@ -337,6 +343,131 @@ public class JaninoCompiler {
 
     private static Java.Rvalue generateFunctionOperation(String functionName, Java.Rvalue[] atoms) {
         return new Java.MethodInvocation(Location.NOWHERE, null, functionName, atoms);
+    }
+
+    private static Java.Rvalue generateCollectionConstructorOperation(
+            Context context, SqlBasicCall sqlBasicCall, String functionName) {
+        DataType resultType =
+                TransformParser.deduceSubExpressionType(
+                        context.columns,
+                        sqlBasicCall,
+                        context.udfDescriptors,
+                        context.supportedMetadataColumns);
+        return generateCollectionConstructorOperation(
+                context, sqlBasicCall, functionName, resultType);
+    }
+
+    private static Java.Rvalue generateCollectionConstructorOperation(
+            Context context, SqlBasicCall sqlBasicCall, String functionName, DataType resultType) {
+        List<DataType> targetTypes = new ArrayList<>();
+        switch (sqlBasicCall.getKind()) {
+            case ARRAY_VALUE_CONSTRUCTOR:
+                for (int i = 0; i < sqlBasicCall.operandCount(); i++) {
+                    targetTypes.add(resultType.getChildren().get(0));
+                }
+                break;
+            case MAP_VALUE_CONSTRUCTOR:
+                for (int i = 0; i < sqlBasicCall.operandCount(); i++) {
+                    targetTypes.add(resultType.getChildren().get(i % 2));
+                }
+                break;
+            case ROW:
+                targetTypes.addAll(resultType.getChildren());
+                break;
+            default:
+                throw new ParseException("Unrecognized collection constructor: " + sqlBasicCall);
+        }
+
+        List<SqlNode> operands = sqlBasicCall.getOperandList();
+        Java.Rvalue[] atoms = new Java.Rvalue[operands.size()];
+        for (int i = 0; i < operands.size(); i++) {
+            SqlNode operand = operands.get(i);
+            DataType targetType = targetTypes.get(i);
+            if (operand instanceof SqlBasicCall
+                    && isCollectionConstructor((SqlBasicCall) operand)) {
+                SqlBasicCall nestedConstructor = (SqlBasicCall) operand;
+                atoms[i] =
+                        generateCollectionConstructorOperation(
+                                context,
+                                nestedConstructor,
+                                getCollectionConstructorFunctionName(nestedConstructor),
+                                targetType);
+            } else {
+                atoms[i] = translateSqlNodeToJaninoRvalue(context, operand);
+                if (!(operand instanceof SqlLiteral) || ((SqlLiteral) operand).getValue() != null) {
+                    DataType operandType =
+                            TransformParser.deduceSubExpressionType(
+                                    context.columns,
+                                    operand,
+                                    context.udfDescriptors,
+                                    context.supportedMetadataColumns);
+                    atoms[i] = generateImplicitTypeConvertMethod(operandType, targetType, atoms[i]);
+                }
+            }
+        }
+        return generateFunctionOperation(functionName, atoms);
+    }
+
+    private static boolean isCollectionConstructor(SqlBasicCall sqlBasicCall) {
+        return sqlBasicCall.getKind() == SqlKind.ARRAY_VALUE_CONSTRUCTOR
+                || sqlBasicCall.getKind() == SqlKind.MAP_VALUE_CONSTRUCTOR
+                || sqlBasicCall.getKind() == SqlKind.ROW;
+    }
+
+    private static String getCollectionConstructorFunctionName(SqlBasicCall sqlBasicCall) {
+        switch (sqlBasicCall.getKind()) {
+            case ARRAY_VALUE_CONSTRUCTOR:
+                return "array";
+            case MAP_VALUE_CONSTRUCTOR:
+                return "map";
+            case ROW:
+                return "row";
+            default:
+                throw new ParseException("Unrecognized collection constructor: " + sqlBasicCall);
+        }
+    }
+
+    private static Java.Rvalue generateImplicitTypeConvertMethod(
+            DataType sourceType, DataType targetType, Java.Rvalue atom) {
+        if (sourceType.getTypeRoot() == targetType.getTypeRoot()
+                && (!(sourceType instanceof DecimalType)
+                        || sourceType.copy(true).equals(targetType.copy(true)))) {
+            return atom;
+        }
+        switch (targetType.getTypeRoot()) {
+            case BOOLEAN:
+                return generateFunctionOperation("castToBoolean", new Java.Rvalue[] {atom});
+            case TINYINT:
+                return generateFunctionOperation("castToByte", new Java.Rvalue[] {atom});
+            case SMALLINT:
+                return generateFunctionOperation("castToShort", new Java.Rvalue[] {atom});
+            case INTEGER:
+                return generateFunctionOperation("castToInteger", new Java.Rvalue[] {atom});
+            case BIGINT:
+                return generateFunctionOperation("castToLong", new Java.Rvalue[] {atom});
+            case FLOAT:
+                return generateFunctionOperation("castToFloat", new Java.Rvalue[] {atom});
+            case DOUBLE:
+                return generateFunctionOperation("castToDouble", new Java.Rvalue[] {atom});
+            case DECIMAL:
+                DecimalType decimalType = (DecimalType) targetType;
+                return generateFunctionOperation(
+                        "castToBigDecimal",
+                        new Java.Rvalue[] {
+                            atom,
+                            new Java.AmbiguousName(
+                                    Location.NOWHERE,
+                                    new String[] {String.valueOf(decimalType.getPrecision())}),
+                            new Java.AmbiguousName(
+                                    Location.NOWHERE,
+                                    new String[] {String.valueOf(decimalType.getScale())})
+                        });
+            case CHAR:
+            case VARCHAR:
+                return generateFunctionOperation("castToString", new Java.Rvalue[] {atom});
+            default:
+                return atom;
+        }
     }
 
     private static Java.Rvalue generateLazyBinaryFunctionOperation(
@@ -622,7 +753,11 @@ public class JaninoCompiler {
         Java.Rvalue methodInvocation =
                 new Java.MethodInvocation(Location.NOWHERE, null, "itemAccess", atoms);
 
-        // Deduce the return type and add a cast to ensure proper type conversion
+        return castExpressionToInferredType(context, sqlBasicCall, methodInvocation);
+    }
+
+    private static Java.Rvalue castExpressionToInferredType(
+            Context context, SqlBasicCall sqlBasicCall, Java.Rvalue expression) {
         DataType resultType =
                 TransformParser.deduceSubExpressionType(
                         context.columns,
@@ -643,10 +778,10 @@ public class JaninoCompiler {
                                 new Java.Annotation[0],
                                 canonicalName.split("\\."),
                                 null),
-                        methodInvocation);
+                        expression);
             }
         }
-        return methodInvocation;
+        return expression;
     }
 
     private static Java.Rvalue generateOtherFunctionOperation(
@@ -662,6 +797,9 @@ public class JaninoCompiler {
             } else {
                 throw new ParseException("Unrecognized expression: " + sqlBasicCall);
             }
+        } else if (operationName.equals("ELEMENT")) {
+            return castExpressionToInferredType(
+                    context, sqlBasicCall, generateFunctionOperation("element", atoms));
         } else {
             Optional<UserDefinedFunctionDescriptor> udfFunctionOptional =
                     context.udfDescriptors.stream()
