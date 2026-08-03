@@ -15,33 +15,19 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.connectors.fluss.sink.v2;
+package org.apache.flink.api.connector.sink2;
 
-import org.apache.fluss.metadata.TablePath;
+import org.apache.flink.core.io.SimpleVersionedSerializer;
 
-import java.util.List;
+import java.io.IOException;
 
-/** FlussEvent is a wrapper for a list of genericRows. */
-public class FlussEvent {
-    private final TablePath tablePath;
-    private final List<FlussRowWithOp> rowWithOps;
-    private final int schemaId;
+/**
+ * Compatibility adapter for Flink 1.18. This class is part of the multi-version compatibility layer
+ * that allows Flink CDC to work across different Flink versions.
+ */
+public interface SupportsCommitter<CommittableT> {
 
-    public FlussEvent(TablePath tablePath, List<FlussRowWithOp> rowWithOps, int schemaId) {
-        this.tablePath = tablePath;
-        this.rowWithOps = rowWithOps;
-        this.schemaId = schemaId;
-    }
+    Committer<CommittableT> createCommitter(CommitterInitContext context) throws IOException;
 
-    public TablePath getTablePath() {
-        return tablePath;
-    }
-
-    public List<FlussRowWithOp> getRowWithOps() {
-        return rowWithOps;
-    }
-
-    public int getSchemaId() {
-        return schemaId;
-    }
+    SimpleVersionedSerializer<CommittableT> getCommittableSerializer();
 }

@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.connectors.fluss;
+package org.apache.flink.cdc.connectors.fluss.sink;
 
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
@@ -78,7 +78,7 @@ import static org.apache.fluss.server.testutils.FlussClusterExtension.BUILTIN_DA
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** ITCase for Fluss Pipeline. */
-public class FlussPipelineITCase {
+public class FlussSinkPipelineITCase {
     private static final int MAX_PARALLELISM = 4;
 
     // Always use parent-first classloader for CDC classes.
@@ -743,7 +743,6 @@ public class FlussPipelineITCase {
 
         conf.set(ConfigOptions.CLIENT_WRITER_BUFFER_MEMORY_SIZE, MemorySize.parse("1mb"));
         conf.set(ConfigOptions.CLIENT_WRITER_BATCH_SIZE, MemorySize.parse("1kb"));
-        conf.set(ConfigOptions.SERVER_DATA_DISK_WRITE_LIMIT_RATIO, 1.0);
 
         // set security information.
         conf.setString(ConfigOptions.SERVER_SECURITY_PROTOCOL_MAP.key(), "CLIENT:sasl");

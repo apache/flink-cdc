@@ -29,6 +29,7 @@ import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.runtime.operators.AbstractStreamOperatorAdapter;
 import org.apache.flink.cdc.runtime.operators.schema.regular.SchemaOperator;
 import org.apache.flink.cdc.runtime.serializer.event.EventSerializer;
+import org.apache.flink.cdc.source.RuntimeContextAdapter;
 import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
@@ -64,7 +65,7 @@ public class DistributedPrePartitionOperator
     @Override
     public void open() throws Exception {
         super.open();
-        subTaskId = getRuntimeContext().getTaskInfo().getIndexOfThisSubtask();
+        subTaskId = RuntimeContextAdapter.getIndexOfThisSubtask(getRuntimeContext());
         schemaMap = new HashMap<>();
         hashFunctionMap = new HashMap<>();
     }

@@ -15,33 +15,30 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.connectors.fluss.sink.v2;
+package org.apache.flink.cdc.connectors.fluss.source.split;
 
-import org.apache.fluss.metadata.TablePath;
+/** The state of {@link FlussLogSplit}. */
+public class FlussLogSplitState extends FlussSplitState {
 
-import java.util.List;
+    /** The next log offset to read. */
+    private long nextOffset;
 
-/** FlussEvent is a wrapper for a list of genericRows. */
-public class FlussEvent {
-    private final TablePath tablePath;
-    private final List<FlussRowWithOp> rowWithOps;
-    private final int schemaId;
-
-    public FlussEvent(TablePath tablePath, List<FlussRowWithOp> rowWithOps, int schemaId) {
-        this.tablePath = tablePath;
-        this.rowWithOps = rowWithOps;
-        this.schemaId = schemaId;
+    public FlussLogSplitState(FlussLogSplit logSplit) {
+        super(logSplit);
+        this.nextOffset = logSplit.getStartingOffset();
     }
 
-    public TablePath getTablePath() {
-        return tablePath;
+    public void setNextOffset(long nextOffset) {
+        this.nextOffset = nextOffset;
     }
 
-    public List<FlussRowWithOp> getRowWithOps() {
-        return rowWithOps;
-    }
-
-    public int getSchemaId() {
-        return schemaId;
+    @Override
+    public FlussLogSplit toFlussSplit() {
+        return new FlussLogSplit(
+                split.getPhysicalTablePath(),
+                split.getTableBucket(),
+                nextOffset,
+                getSchemaId(),
+                getRowType());
     }
 }

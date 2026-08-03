@@ -15,33 +15,29 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.connectors.fluss.sink.v2;
+package org.apache.flink.cdc.connectors.fluss.source.discover;
 
-import org.apache.fluss.metadata.TablePath;
+import org.apache.flink.cdc.common.source.discover.TableDiscoverer;
+import org.apache.flink.cdc.common.source.discover.TableDiscovererFactory;
 
-import java.util.List;
+/**
+ * {@link TableDiscovererFactory} for {@link FlussDefaultDiscoverer}. Activated when {@code
+ * table.discoverer.type = 'fluss-default'}.
+ *
+ * <p>This is the default discoverer for the Fluss source connector. It matches fully-qualified
+ * Fluss table names against a user-provided regex pattern.
+ */
+public class FlussDefaultDiscovererFactory implements TableDiscovererFactory {
 
-/** FlussEvent is a wrapper for a list of genericRows. */
-public class FlussEvent {
-    private final TablePath tablePath;
-    private final List<FlussRowWithOp> rowWithOps;
-    private final int schemaId;
+    public static final String TYPE = "fluss-default";
 
-    public FlussEvent(TablePath tablePath, List<FlussRowWithOp> rowWithOps, int schemaId) {
-        this.tablePath = tablePath;
-        this.rowWithOps = rowWithOps;
-        this.schemaId = schemaId;
+    @Override
+    public String type() {
+        return TYPE;
     }
 
-    public TablePath getTablePath() {
-        return tablePath;
-    }
-
-    public List<FlussRowWithOp> getRowWithOps() {
-        return rowWithOps;
-    }
-
-    public int getSchemaId() {
-        return schemaId;
+    @Override
+    public TableDiscoverer createDiscoverer() {
+        return new FlussDefaultDiscoverer();
     }
 }
