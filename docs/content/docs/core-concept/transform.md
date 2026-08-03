@@ -282,6 +282,13 @@ Struct functions are used to access elements in ARRAY, MAP, ROW, and VARIANT typ
 
 | Function | Janino Code | Description |
 | -------- | ----------- | ----------- |
+| ARRAY[value, ...] | array(value, ...) | Creates an array from the given values. The values must have a common type. |
+| MAP[key, value, ...] | map(key, value, ...) | Creates a map from key-value pairs. Keys and values must have common types respectively. |
+| ROW(value, ...) | row(value, ...) | Creates a row from the given values. Field names are generated as `f0`, `f1`, and so on. |
+| CARDINALITY(arrayOrMap) | cardinality(arrayOrMap) | Returns the number of elements in an array or map. Returns NULL if the input is NULL. |
+| ARRAY_CONTAINS(array, value) | arrayContains(array, value) | Returns whether the array contains the given value. |
+| ARRAY_POSITION(array, value) | arrayPosition(array, value) | Returns the 1-based position of the first matching value, or 0 if it is not found. |
+| ELEMENT(array) | element(array) | Returns the element of a single-element array. Returns NULL for an empty array and throws an exception if the array has more than one element. |
 | array[index] | itemAccess(array, index) | Returns the element at position `index` in the array. Index is 1-based (SQL standard). Returns NULL if the index is out of bounds or if the array is NULL. |
 | map[key] | itemAccess(map, key) | Returns the value associated with `key` in the map. Returns NULL if the key does not exist or if the map is NULL. |
 | row[index] | itemAccess(row, index) | Returns the field at position `index` in the row. Index is 1-based. The index must be a constant (not a computed expression) since the return type must be statically determined. |

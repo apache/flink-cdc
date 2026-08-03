@@ -685,8 +685,30 @@ public class TransformSqlOperatorTable extends ReflectiveSqlOperatorTable {
     // ---------------------
     // Struct Functions
     // ---------------------
+    public static final SqlOperator ARRAY = SqlStdOperatorTable.ARRAY_VALUE_CONSTRUCTOR;
+    public static final SqlOperator MAP = SqlStdOperatorTable.MAP_VALUE_CONSTRUCTOR;
+    public static final SqlOperator ROW = SqlStdOperatorTable.ROW;
+
     // Supports accessing elements of ARRAY[index], ROW[index], MAP[key], and VARIANT[index/key]
     public static final SqlOperator ITEM = new VariantAwareItemOperator();
+    public static final SqlFunction CARDINALITY = SqlStdOperatorTable.CARDINALITY;
+    public static final SqlFunction ELEMENT = SqlStdOperatorTable.ELEMENT;
+    public static final SqlFunction ARRAY_CONTAINS =
+            new SqlFunction(
+                    "ARRAY_CONTAINS",
+                    SqlKind.OTHER_FUNCTION,
+                    ReturnTypes.BOOLEAN_NULLABLE,
+                    null,
+                    OperandTypes.family(SqlTypeFamily.ARRAY, SqlTypeFamily.ANY),
+                    SqlFunctionCategory.SYSTEM);
+    public static final SqlFunction ARRAY_POSITION =
+            new SqlFunction(
+                    "ARRAY_POSITION",
+                    SqlKind.OTHER_FUNCTION,
+                    ReturnTypes.INTEGER_NULLABLE,
+                    null,
+                    OperandTypes.family(SqlTypeFamily.ARRAY, SqlTypeFamily.ANY),
+                    SqlFunctionCategory.SYSTEM);
 
     public static final SqlFunction AI_CHAT_PREDICT =
             new SqlFunction(

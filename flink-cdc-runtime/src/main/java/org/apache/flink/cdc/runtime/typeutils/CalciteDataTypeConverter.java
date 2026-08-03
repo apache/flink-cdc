@@ -339,6 +339,10 @@ public class CalciteDataTypeConverter {
             case VARIANT:
                 return DataTypes.VARIANT();
             case ROW:
+                return DataTypes.ROW(
+                        relDataType.getFieldList().stream()
+                                .map(field -> convertCalciteRelDataTypeToDataType(field.getType()))
+                                .toArray(DataType[]::new));
             default:
                 throw new UnsupportedOperationException(
                         "Unsupported type: " + relDataType.getSqlTypeName());
