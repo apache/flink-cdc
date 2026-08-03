@@ -35,12 +35,15 @@ import org.apache.calcite.sql.SqlBasicTypeNameSpec;
 import org.apache.calcite.sql.SqlCharStringLiteral;
 import org.apache.calcite.sql.SqlDataTypeSpec;
 import org.apache.calcite.sql.SqlIdentifier;
+import org.apache.calcite.sql.SqlIntervalLiteral;
 import org.apache.calcite.sql.SqlIntervalQualifier;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlNodeList;
 import org.apache.calcite.sql.SqlNumericLiteral;
 import org.apache.calcite.sql.fun.SqlCase;
+import org.apache.calcite.sql.parser.SqlParserUtil;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.util.NlsString;
 import org.codehaus.commons.compiler.CompileException;
@@ -215,7 +218,10 @@ public class JaninoCompiler {
 
     private static Java.Rvalue translateSqlBasicCall(Context context, SqlBasicCall sqlBasicCall) {
         String functionName = sqlBasicCall.getOperator().getName().toUpperCase();
-        if (sqlBasicCall.getKind() == org.apache.calcite.sql.SqlKind.EXTRACT) {
+        if (isIntervalArithmetic(sqlBasicCall)) {
+            return generateIntervalArithmeticOperation(context, sqlBasicCall);
+        }
+        if (sqlBasicCall.getKind() == SqlKind.EXTRACT) {
             return generateExtractOperation(context, sqlBasicCall);
         }
         if (DATE_PART_FUNCTION_UNITS.containsKey(functionName)) {
@@ -239,6 +245,56 @@ public class JaninoCompiler {
             atoms.add(new Java.AmbiguousName(Location.NOWHERE, new String[] {DEFAULT_TIME_ZONE}));
         }
         return sqlBasicCallToJaninoRvalue(context, sqlBasicCall, atoms.toArray(new Java.Rvalue[0]));
+    }
+
+    private static boolean isIntervalArithmetic(SqlBasicCall sqlBasicCall) {
+        if (sqlBasicCall.getKind() != SqlKind.PLUS && sqlBasicCall.getKind() != SqlKind.MINUS) {
+            return false;
+        }
+        return sqlBasicCall.getOperandList().stream()
+                .anyMatch(operand -> operand instanceof SqlIntervalLiteral);
+    }
+
+    private static Java.Rvalue generateIntervalArithmeticOperation(
+            Context context, SqlBasicCall sqlBasicCall) {
+        List<SqlNode> operands = sqlBasicCall.getOperandList();
+        if (operands.size() != 2) {
+            throw new ParseException("Unrecognized interval arithmetic: " + sqlBasicCall);
+        }
+
+        boolean intervalOnLeft = operands.get(0) instanceof SqlIntervalLiteral;
+        boolean intervalOnRight = operands.get(1) instanceof SqlIntervalLiteral;
+        if (intervalOnLeft == intervalOnRight
+                || (intervalOnLeft && sqlBasicCall.getKind() == SqlKind.MINUS)) {
+            throw new ParseException("Unsupported interval arithmetic: " + sqlBasicCall);
+        }
+
+        SqlIntervalLiteral intervalLiteral =
+                (SqlIntervalLiteral) operands.get(intervalOnLeft ? 0 : 1);
+        SqlNode temporalOperand = operands.get(intervalOnLeft ? 1 : 0);
+        Java.Rvalue temporal = translateSqlNodeToJaninoRvalue(context, temporalOperand);
+        if (temporal == null) {
+            throw new ParseException("Unrecognized temporal expression: " + temporalOperand);
+        }
+
+        SqlIntervalLiteral.IntervalValue intervalValue =
+                intervalLiteral.getValueAs(SqlIntervalLiteral.IntervalValue.class);
+        boolean yearMonth = intervalValue.getIntervalQualifier().isYearMonth();
+        long amount =
+                yearMonth
+                        ? SqlParserUtil.intervalToMonths(intervalValue)
+                        : SqlParserUtil.intervalToMillis(intervalValue);
+        if (sqlBasicCall.getKind() == SqlKind.MINUS) {
+            amount = Math.negateExact(amount);
+        }
+
+        return generateFunctionOperation(
+                yearMonth ? "temporalPlusMonths" : "temporalPlusMillis",
+                new Java.Rvalue[] {
+                    temporal,
+                    new Java.AmbiguousName(
+                            Location.NOWHERE, new String[] {Long.toString(amount) + "L"})
+                });
     }
 
     private static Java.Rvalue generateDatePartFunctionOperation(

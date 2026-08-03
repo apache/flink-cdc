@@ -94,4 +94,42 @@ class TemporalFunctionsTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Unsupported EXTRACT unit: MILLISECOND");
     }
+
+    @Test
+    void testTemporalPlusMonths() {
+        assertThat(TemporalFunctions.temporalPlusMonths(LocalDate.of(2024, 1, 31), 1))
+                .isEqualTo(LocalDate.of(2024, 2, 29));
+        assertThat(
+                        TemporalFunctions.temporalPlusMonths(
+                                LocalDateTime.of(2024, 1, 31, 12, 34, 56), 13))
+                .isEqualTo(LocalDateTime.of(2025, 2, 28, 12, 34, 56));
+        assertThat(TemporalFunctions.temporalPlusMonths(Instant.parse("2024-01-31T12:34:56Z"), -1))
+                .isEqualTo(Instant.parse("2023-12-31T12:34:56Z"));
+        assertThat(TemporalFunctions.temporalPlusMonths(LocalTime.NOON, 12))
+                .isEqualTo(LocalTime.NOON);
+        assertThat(TemporalFunctions.temporalPlusMonths((LocalDate) null, 1)).isNull();
+    }
+
+    @Test
+    void testTemporalPlusMillis() {
+        assertThat(
+                        TemporalFunctions.temporalPlusMillis(
+                                LocalDate.of(2024, 2, 28), 24L * 60 * 60 * 1000))
+                .isEqualTo(LocalDate.of(2024, 2, 29));
+        assertThat(
+                        TemporalFunctions.temporalPlusMillis(
+                                LocalDate.of(2024, 2, 28), 12L * 60 * 60 * 1000))
+                .isEqualTo(LocalDate.of(2024, 2, 28));
+        assertThat(TemporalFunctions.temporalPlusMillis(LocalTime.of(23, 30), 2L * 60 * 60 * 1000))
+                .isEqualTo(LocalTime.of(1, 30));
+        assertThat(
+                        TemporalFunctions.temporalPlusMillis(
+                                LocalDateTime.of(2024, 2, 28, 23, 30), 2L * 60 * 60 * 1000))
+                .isEqualTo(LocalDateTime.of(2024, 2, 29, 1, 30));
+        assertThat(
+                        TemporalFunctions.temporalPlusMillis(
+                                Instant.parse("2024-02-28T23:30:00Z"), 2L * 60 * 60 * 1000))
+                .isEqualTo(Instant.parse("2024-02-29T01:30:00Z"));
+        assertThat(TemporalFunctions.temporalPlusMillis((Instant) null, 1)).isNull();
+    }
 }
