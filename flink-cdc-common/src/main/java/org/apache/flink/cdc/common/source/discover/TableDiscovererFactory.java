@@ -26,10 +26,6 @@ import org.apache.flink.cdc.common.event.TableId;
 public interface TableDiscovererFactory extends ObjectIdDiscovererFactory<TableId> {
 
     /** Compatibility alias for the old single identifier, now meaning storage-side type. */
-    default String identifier() {
-        return type();
-    }
-
     @Override
     default Class<TableId> objectIdClass() {
         return TableId.class;

@@ -341,8 +341,8 @@ public class FlussSinkITCase extends AbstractTestBase {
                                 new Object[] {1, BinaryStringData.fromString("Alice")})));
         assertThatThrownBy(() -> submitJob(events))
                 .rootCause()
-                .isExactlyInstanceOf(UnsupportedOperationException.class)
-                .hasMessageContaining("UPSERT for log table");
+                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Operation UPSERT is not supported for log table");
     }
 
     @Test
@@ -376,8 +376,8 @@ public class FlussSinkITCase extends AbstractTestBase {
                                 new Object[] {1, BinaryStringData.fromString("Alice")})));
         assertThatThrownBy(() -> submitJob(events))
                 .rootCause()
-                .isExactlyInstanceOf(UnsupportedOperationException.class)
-                .hasMessageContaining("APPEND for primary key table");
+                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Operation APPEND is not supported for primary-key table");
     }
 
     @Test

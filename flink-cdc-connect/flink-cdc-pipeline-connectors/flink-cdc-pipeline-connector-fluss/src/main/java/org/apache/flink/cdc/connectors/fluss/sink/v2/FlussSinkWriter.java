@@ -25,10 +25,8 @@ import org.apache.flink.metrics.groups.SinkWriterMetricGroup;
 
 import org.apache.fluss.client.Connection;
 import org.apache.fluss.client.ConnectionFactory;
-import org.apache.fluss.client.table.Table;
-import org.apache.fluss.client.table.writer.AppendWriter;
-import org.apache.fluss.client.table.writer.TableWriter;
-import org.apache.fluss.client.table.writer.UpsertWriter;
+import org.apache.fluss.client.table.writer.MultiTableWriteRecord;
+import org.apache.fluss.client.table.writer.MultiTableWriter;
 import org.apache.fluss.config.Configuration;
 import org.apache.fluss.metadata.TablePath;
 import org.apache.fluss.metrics.Gauge;
@@ -40,9 +38,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 /** Base class for Flink {@link SinkWriter} implementations in Fluss. */
@@ -63,8 +58,7 @@ public class FlussSinkWriter<InputT> implements SinkWriter<InputT> {
     private transient Counter numRecordsOutErrorsCounter;
     private volatile Throwable asyncWriterException;
 
-    private final Map<TablePath, TableWriter> writerMap;
-    private final Map<TablePath, Table> tableMap;
+    private transient MultiTableWriter multiTableWriter;
 
     public FlussSinkWriter(
             Configuration flussConfig,
@@ -73,8 +67,6 @@ public class FlussSinkWriter<InputT> implements SinkWriter<InputT> {
         this.flussConfig = flussConfig;
         this.mailboxExecutor = mailboxExecutor;
         this.flussRecordSerializer = flussRecordSerializer;
-        this.writerMap = new HashMap<>();
-        this.tableMap = new HashMap<>();
     }
 
     public void initialize(SinkWriterMetricGroup metricGroup) throws IOException {
@@ -85,6 +77,7 @@ public class FlussSinkWriter<InputT> implements SinkWriter<InputT> {
                         metricGroup, Collections.singleton(MetricNames.WRITER_SEND_LATENCY_MS));
         connection = ConnectionFactory.createConnection(flussConfig, flinkMetricRegistry);
         flussRecordSerializer.open(connection);
+        multiTableWriter = connection.getMultiTable().newMultiTableWrite().createWriter();
 
         initMetrics();
     }
@@ -101,41 +94,22 @@ public class FlussSinkWriter<InputT> implements SinkWriter<InputT> {
 
         try {
             FlussEvent flussEvent = flussRecordSerializer.serialize(inputValue);
-
-            TablePath tablePath = flussEvent.getTablePath();
-
-            if (flussEvent.isShouldRefreshSchema() || !writerMap.containsKey(tablePath)) {
-                // refresh table schema
-                if (tableMap.containsKey(tablePath)) {
-                    Table table = tableMap.remove(tablePath);
-                    writerMap.remove(tablePath);
-                    table.close();
-                }
-
-                Table table = connection.getTable(tablePath);
-                TableWriter writer;
-                if (table.getTableInfo().hasPrimaryKey()) {
-                    writer = table.newUpsert().createWriter();
-                } else {
-                    writer = table.newAppend().createWriter();
-                }
-                tableMap.put(tablePath, table);
-                writerMap.put(tablePath, writer);
-            }
-
-            List<FlussRowWithOp> rowWithOps = flussEvent.getRowWithOps();
-            if (rowWithOps == null) {
+            if (flussEvent == null || flussEvent.getRowWithOps() == null) {
                 return;
             }
-            for (FlussRowWithOp rowWithOp : rowWithOps) {
+
+            TablePath tablePath = flussEvent.getTablePath();
+            int schemaId = flussEvent.getSchemaId();
+
+            for (FlussRowWithOp rowWithOp : flussEvent.getRowWithOps()) {
                 FlussOperationType opType = rowWithOp.getOperationType();
                 InternalRow row = rowWithOp.getRow();
                 if (opType == FlussOperationType.IGNORE) {
                     // skip writing the row
-                    return;
+                    continue;
                 }
                 CompletableFuture<?> writeFuture =
-                        write(writerMap.get(tablePath), opType, row, tablePath);
+                        multiTableWriter.write(toWriteRecord(opType, tablePath, row, schemaId));
                 writeFuture.whenComplete(
                         (ignored, throwable) -> {
                             if (throwable != null) {
@@ -157,55 +131,38 @@ public class FlussSinkWriter<InputT> implements SinkWriter<InputT> {
         }
     }
 
-    private CompletableFuture<?> write(
-            TableWriter writer, FlussOperationType opType, InternalRow row, TablePath tablePath)
-            throws IOException {
-        if (writer instanceof UpsertWriter) {
-            UpsertWriter upsertWriter = (UpsertWriter) writer;
-            if (opType == FlussOperationType.UPSERT) {
-                return upsertWriter.upsert(row);
-            } else if (opType == FlussOperationType.DELETE) {
-                return upsertWriter.delete(row);
-            } else {
+    private static MultiTableWriteRecord toWriteRecord(
+            FlussOperationType opType, TablePath tablePath, InternalRow row, int schemaId) {
+        switch (opType) {
+            case APPEND:
+                return MultiTableWriteRecord.forAppend(tablePath, row, schemaId);
+            case UPSERT:
+                return MultiTableWriteRecord.forUpsert(tablePath, row, schemaId);
+            case DELETE:
+                return MultiTableWriteRecord.forDelete(tablePath, row, schemaId);
+            default:
                 throw new UnsupportedOperationException(
                         String.format(
-                                "Unsupported operation type: %s for primary key table %s",
-                                opType, tablePath));
-            }
-        } else if (writer instanceof AppendWriter) {
-            AppendWriter appendWriter = (AppendWriter) writer;
-            if (opType == FlussOperationType.APPEND) {
-                return appendWriter.append(row);
-            } else {
-                throw new UnsupportedOperationException(
-                        String.format(
-                                "Unsupported operation type: %s for log table %s",
-                                opType, tablePath));
-            }
-        } else {
-            throw new UnsupportedOperationException(
-                    String.format(
-                            "Unsupported writer type: %s for table %s",
-                            writer.getClass(), tablePath));
+                                "Unsupported operation type: %s for table %s", opType, tablePath));
         }
     }
 
     public void flush(boolean endOfInput) throws IOException {
-        for (TableWriter writer : writerMap.values()) {
-            writer.flush();
-            checkAsyncException();
+        if (multiTableWriter != null) {
+            multiTableWriter.flush();
         }
+        checkAsyncException();
     }
 
     @Override
     public void close() throws Exception {
         LOG.info("Closing Fluss sink function.");
         try {
-            for (Table table : tableMap.values()) {
-                table.close();
+            if (multiTableWriter != null) {
+                // close() flushes pending records first.
+                multiTableWriter.close();
+                multiTableWriter = null;
             }
-
-            tableMap.clear();
 
             if (connection != null) {
                 connection.close();
