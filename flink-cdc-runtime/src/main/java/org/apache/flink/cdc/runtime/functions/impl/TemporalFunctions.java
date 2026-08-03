@@ -32,6 +32,9 @@ import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoField;
+import java.time.temporal.IsoFields;
+import java.time.temporal.TemporalAccessor;
 import java.util.TimeZone;
 
 /** Temporal built-in functions. */
@@ -69,6 +72,51 @@ public class TemporalFunctions {
 
     public static LocalDate currentDate(long epochTime, String timezone) {
         return localtimestamp(epochTime, timezone).toLocalDate();
+    }
+
+    public static Long extract(String unit, TemporalAccessor temporal, String timezone) {
+        if (temporal == null) {
+            return null;
+        }
+        if (temporal instanceof Instant) {
+            temporal = ((Instant) temporal).atZone(ZoneId.of(timezone));
+        }
+        switch (unit) {
+            case "YEAR":
+                return getTemporalField(temporal, ChronoField.YEAR, unit);
+            case "QUARTER":
+                return getTemporalField(temporal, IsoFields.QUARTER_OF_YEAR, unit);
+            case "MONTH":
+                return getTemporalField(temporal, ChronoField.MONTH_OF_YEAR, unit);
+            case "WEEK":
+                return getTemporalField(temporal, IsoFields.WEEK_OF_WEEK_BASED_YEAR, unit);
+            case "DAY":
+                return getTemporalField(temporal, ChronoField.DAY_OF_MONTH, unit);
+            case "DOY":
+                return getTemporalField(temporal, ChronoField.DAY_OF_YEAR, unit);
+            case "DOW":
+                // SQL DOW starts with Sunday as 1, while ISO starts with Monday as 1.
+                return getTemporalField(temporal, ChronoField.DAY_OF_WEEK, unit) % 7 + 1;
+            case "HOUR":
+                return getTemporalField(temporal, ChronoField.HOUR_OF_DAY, unit);
+            case "MINUTE":
+                return getTemporalField(temporal, ChronoField.MINUTE_OF_HOUR, unit);
+            case "SECOND":
+                return getTemporalField(temporal, ChronoField.SECOND_OF_MINUTE, unit);
+            default:
+                throw new IllegalArgumentException("Unsupported EXTRACT unit: " + unit);
+        }
+    }
+
+    private static long getTemporalField(
+            TemporalAccessor temporal, java.time.temporal.TemporalField field, String unit) {
+        if (!temporal.isSupported(field)) {
+            throw new IllegalArgumentException(
+                    String.format(
+                            "EXTRACT unit %s cannot be applied to %s",
+                            unit, temporal.getClass().getSimpleName()));
+        }
+        return temporal.getLong(field);
     }
 
     public static String fromUnixtime(Integer seconds, String timezone) {

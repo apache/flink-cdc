@@ -35,6 +35,7 @@ import org.apache.calcite.sql.SqlBasicTypeNameSpec;
 import org.apache.calcite.sql.SqlCharStringLiteral;
 import org.apache.calcite.sql.SqlDataTypeSpec;
 import org.apache.calcite.sql.SqlIdentifier;
+import org.apache.calcite.sql.SqlIntervalQualifier;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlNodeList;
@@ -52,6 +53,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -61,6 +63,24 @@ import java.util.stream.Collectors;
  * https://www.janino.net/index.html#properties
  */
 public class JaninoCompiler {
+
+    private static final Map<String, String> DATE_PART_FUNCTION_UNITS =
+            Map.ofEntries(
+                    Map.entry("YEAR", "YEAR"),
+                    Map.entry("QUARTER", "QUARTER"),
+                    Map.entry("MONTH", "MONTH"),
+                    Map.entry("WEEK", "WEEK"),
+                    Map.entry("DAYOFYEAR", "DOY"),
+                    Map.entry("DAYOFMONTH", "DAY"),
+                    Map.entry("DAYOFWEEK", "DOW"),
+                    Map.entry("HOUR", "HOUR"),
+                    Map.entry("MINUTE", "MINUTE"),
+                    Map.entry("SECOND", "SECOND"));
+
+    private static final Set<String> SUPPORTED_EXTRACT_UNITS =
+            Set.of(
+                    "YEAR", "QUARTER", "MONTH", "WEEK", "DAY", "DOY", "DOW", "HOUR", "MINUTE",
+                    "SECOND");
 
     private static final List<SqlTypeName> SQL_TYPE_NAME_IGNORE = Arrays.asList(SqlTypeName.SYMBOL);
     private static final List<String> TIMEZONE_FREE_TEMPORAL_FUNCTIONS =
@@ -194,6 +214,14 @@ public class JaninoCompiler {
     }
 
     private static Java.Rvalue translateSqlBasicCall(Context context, SqlBasicCall sqlBasicCall) {
+        String functionName = sqlBasicCall.getOperator().getName().toUpperCase();
+        if (sqlBasicCall.getKind() == org.apache.calcite.sql.SqlKind.EXTRACT) {
+            return generateExtractOperation(context, sqlBasicCall);
+        }
+        if (DATE_PART_FUNCTION_UNITS.containsKey(functionName)) {
+            return generateDatePartFunctionOperation(context, sqlBasicCall, functionName);
+        }
+
         List<SqlNode> operandList = sqlBasicCall.getOperandList();
         List<Java.Rvalue> atoms = new ArrayList<>();
         for (SqlNode sqlNode : operandList) {
@@ -211,6 +239,48 @@ public class JaninoCompiler {
             atoms.add(new Java.AmbiguousName(Location.NOWHERE, new String[] {DEFAULT_TIME_ZONE}));
         }
         return sqlBasicCallToJaninoRvalue(context, sqlBasicCall, atoms.toArray(new Java.Rvalue[0]));
+    }
+
+    private static Java.Rvalue generateDatePartFunctionOperation(
+            Context context, SqlBasicCall sqlBasicCall, String functionName) {
+        if (sqlBasicCall.getOperandList().size() != 1) {
+            throw new ParseException("Unrecognized expression: " + sqlBasicCall);
+        }
+        return generateExtractOperation(
+                context,
+                DATE_PART_FUNCTION_UNITS.get(functionName),
+                sqlBasicCall.getOperandList().get(0));
+    }
+
+    private static Java.Rvalue generateExtractOperation(
+            Context context, SqlBasicCall sqlBasicCall) {
+        List<SqlNode> operands = sqlBasicCall.getOperandList();
+        if (operands.size() != 2 || !(operands.get(0) instanceof SqlIntervalQualifier)) {
+            throw new ParseException("Unrecognized expression: " + sqlBasicCall);
+        }
+        SqlIntervalQualifier qualifier = (SqlIntervalQualifier) operands.get(0);
+        if (!qualifier.isSingleDatetimeField()) {
+            throw new ParseException("Unsupported EXTRACT unit: " + qualifier);
+        }
+        return generateExtractOperation(context, qualifier.getStartUnit().name(), operands.get(1));
+    }
+
+    private static Java.Rvalue generateExtractOperation(
+            Context context, String unit, SqlNode temporalOperand) {
+        if (!SUPPORTED_EXTRACT_UNITS.contains(unit)) {
+            throw new ParseException("Unsupported EXTRACT unit: " + unit);
+        }
+        Java.Rvalue temporal = translateSqlNodeToJaninoRvalue(context, temporalOperand);
+        if (temporal == null) {
+            throw new ParseException("Unrecognized temporal expression: " + temporalOperand);
+        }
+        return generateFunctionOperation(
+                "extract",
+                new Java.Rvalue[] {
+                    new Java.AmbiguousName(Location.NOWHERE, new String[] {"\"" + unit + "\""}),
+                    temporal,
+                    new Java.AmbiguousName(Location.NOWHERE, new String[] {DEFAULT_TIME_ZONE})
+                });
     }
 
     private static Java.Rvalue translateSqlCase(Context context, SqlCase sqlCase) {

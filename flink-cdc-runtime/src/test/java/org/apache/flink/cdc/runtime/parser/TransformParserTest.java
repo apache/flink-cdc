@@ -59,6 +59,39 @@ class TransformParserTest {
                     .build();
 
     @Test
+    void testGenerateDatePartFunctionProjectionColumns() {
+        List<ProjectionColumn> projectionColumns =
+                TransformParser.generateProjectionColumns(
+                        "YEAR(date_col) AS year_col, "
+                                + "HOUR(time_col) AS hour_col, "
+                                + "EXTRACT(DAY FROM timestamp_col) AS day_col, "
+                                + "EXTRACT(HOUR FROM timestamp_ltz_col) AS ltz_hour_col",
+                        Arrays.asList(
+                                Column.physicalColumn("date_col", DataTypes.DATE()),
+                                Column.physicalColumn("time_col", DataTypes.TIME()),
+                                Column.physicalColumn("timestamp_col", DataTypes.TIMESTAMP()),
+                                Column.physicalColumn(
+                                        "timestamp_ltz_col", DataTypes.TIMESTAMP_LTZ())),
+                        Collections.emptyList(),
+                        new SupportedMetadataColumn[0]);
+
+        Assertions.assertThat(projectionColumns)
+                .extracting(ProjectionColumn::getDataType)
+                .containsExactly(
+                        DataTypes.BIGINT(),
+                        DataTypes.BIGINT(),
+                        DataTypes.BIGINT(),
+                        DataTypes.BIGINT());
+        Assertions.assertThat(projectionColumns)
+                .extracting(ProjectionColumn::getScriptExpression)
+                .containsExactly(
+                        "extract(\"YEAR\", $0, __time_zone__)",
+                        "extract(\"HOUR\", $0, __time_zone__)",
+                        "extract(\"DAY\", $0, __time_zone__)",
+                        "extract(\"HOUR\", $0, __time_zone__)");
+    }
+
+    @Test
     void testCalciteParser() {
         SqlSelect parse =
                 TransformParser.parseSelect(
@@ -234,10 +267,18 @@ class TransformParserTest {
         testFilterExpression(
                 "UNIX_TIMESTAMP('1970-01-01 08:00:01.001 +0800', 'yyyy-MM-dd HH:mm:ss.SSS X')",
                 "unixTimestamp(\"1970-01-01 08:00:01.001 +0800\", \"yyyy-MM-dd HH:mm:ss.SSS X\", __epoch_time__, __time_zone__)");
-        testFilterExpression("YEAR(dt)", "year(dt)");
-        testFilterExpression("QUARTER(dt)", "quarter(dt)");
-        testFilterExpression("MONTH(dt)", "month(dt)");
-        testFilterExpression("WEEK(dt)", "week(dt)");
+        testFilterExpression("YEAR(dt)", "extract(\"YEAR\", dt, __time_zone__)");
+        testFilterExpression("QUARTER(dt)", "extract(\"QUARTER\", dt, __time_zone__)");
+        testFilterExpression("MONTH(dt)", "extract(\"MONTH\", dt, __time_zone__)");
+        testFilterExpression("WEEK(dt)", "extract(\"WEEK\", dt, __time_zone__)");
+        testFilterExpression("DAYOFYEAR(dt)", "extract(\"DOY\", dt, __time_zone__)");
+        testFilterExpression("DAYOFMONTH(dt)", "extract(\"DAY\", dt, __time_zone__)");
+        testFilterExpression("DAYOFWEEK(dt)", "extract(\"DOW\", dt, __time_zone__)");
+        testFilterExpression("HOUR(dt)", "extract(\"HOUR\", dt, __time_zone__)");
+        testFilterExpression("MINUTE(dt)", "extract(\"MINUTE\", dt, __time_zone__)");
+        testFilterExpression("SECOND(dt)", "extract(\"SECOND\", dt, __time_zone__)");
+        testFilterExpression("EXTRACT(YEAR FROM dt)", "extract(\"YEAR\", dt, __time_zone__)");
+        testFilterExpression("EXTRACT(DOY FROM dt)", "extract(\"DOY\", dt, __time_zone__)");
         testFilterExpression(
                 "DATE_FORMAT(dt,'yyyy-MM-dd')", "dateFormat(dt, \"yyyy-MM-dd\", __time_zone__)");
         testFilterExpression("TO_DATE(dt, 'yyyy-MM-dd')", "toDate(dt, \"yyyy-MM-dd\")");
