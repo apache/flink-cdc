@@ -252,8 +252,7 @@ public class SessionManageOperator extends AbstractStreamOperatorAdapter<Event>
         }
     }
 
-    /** partition column is always after data column. */
-    private String extractPartition(RecordData recordData, TableId tableId) {
+    String extractPartition(RecordData recordData, TableId tableId) {
         Schema schema = schemaMaps.get(tableId);
         int partitionKeyCount = schema.partitionKeys().size();
         if (partitionKeyCount == 0) {
@@ -263,11 +262,17 @@ public class SessionManageOperator extends AbstractStreamOperatorAdapter<Event>
         List<RecordData.FieldGetter> fieldGetters = fieldGetterMaps.get(tableId);
 
         PartitionSpec partitionSpec = new PartitionSpec();
-        for (int i = 0; i < partitionKeyCount; i++) {
-            RecordData.FieldGetter fieldGetter =
-                    fieldGetters.get(columnCount - partitionKeyCount - 1 + i);
+        for (String partitionKey : schema.partitionKeys()) {
+            int partitionColumnIndex = schema.getColumnNames().indexOf(partitionKey);
+            if (partitionColumnIndex < 0 || partitionColumnIndex >= columnCount) {
+                throw new IllegalStateException(
+                        String.format(
+                                "Unable to find partition column \"%s\" in schema %s",
+                                partitionKey, schema));
+            }
+            RecordData.FieldGetter fieldGetter = fieldGetters.get(partitionColumnIndex);
             Object value = fieldGetter.getFieldOrNull(recordData);
-            partitionSpec.set(schema.partitionKeys().get(i), Objects.toString(value));
+            partitionSpec.set(partitionKey, Objects.toString(value));
         }
         return partitionSpec.toString(true, true);
     }
