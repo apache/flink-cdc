@@ -281,10 +281,12 @@ class CliFrontendTest {
                     + "                                                hdfs:///flink/savepoint-1537\n"
                     + "    -t,--target <arg>                           The deployment target for the\n"
                     + "                                                execution. This can take one of\n"
-                    + "                                                the following values\n"
-                    + "                                                local/remote/yarn-session/yarn-a\n"
-                    + "                                                pplication/kubernetes-applicatio\n"
-                    + "                                                n\n"
+                    + "                                                the following values:\n"
+                    + "                                                - local\n"
+                    + "                                                - remote\n"
+                    + "                                                - yarn-session\n"
+                    + "                                                - yarn-application\n"
+                    + "                                                - kubernetes-application\n"
                     + "       --use-mini-cluster                       Use Flink MiniCluster to run the\n"
                     + "                                                pipeline\n";
 
