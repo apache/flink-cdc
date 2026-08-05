@@ -30,8 +30,8 @@ import org.apache.flink.cdc.connectors.mysql.table.MySqlTableSourceFactory;
  *
  * <ul>
  *   <li>Identified by factory identifier "mariadb-cdc"
- *   <li>Reuses all MySQL CDC connector options (startup mode, "server-id", incremental
- *       snapshot, etc.);
+ *   <li>Reuses all MySQL CDC connector options (startup mode, "server-id", incremental snapshot,
+ *       etc.);
  * </ul>
  *
  * @see org.apache.flink.cdc.connectors.mysql.table.MySqlTableSourceFactory base MySQL
