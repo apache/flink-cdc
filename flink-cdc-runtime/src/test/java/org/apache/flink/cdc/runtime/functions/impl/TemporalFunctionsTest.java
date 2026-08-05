@@ -43,6 +43,9 @@ class TemporalFunctionsTest {
         assertThat(TemporalFunctions.extract("DAY", date, "UTC")).isEqualTo(29L);
         assertThat(TemporalFunctions.extract("DOY", date, "UTC")).isEqualTo(60L);
         assertThat(TemporalFunctions.extract("DOW", date, "UTC")).isEqualTo(5L);
+        assertThat(TemporalFunctions.extract("HOUR", date, "UTC")).isZero();
+        assertThat(TemporalFunctions.extract("MINUTE", date, "UTC")).isZero();
+        assertThat(TemporalFunctions.extract("SECOND", date, "UTC")).isZero();
     }
 
     @Test

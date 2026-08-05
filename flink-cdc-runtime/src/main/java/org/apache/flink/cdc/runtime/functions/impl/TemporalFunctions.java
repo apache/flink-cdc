@@ -112,6 +112,12 @@ public class TemporalFunctions {
 
     private static long getTemporalField(
             TemporalAccessor temporal, java.time.temporal.TemporalField field, String unit) {
+        if (temporal instanceof LocalDate
+                && (field == ChronoField.HOUR_OF_DAY
+                        || field == ChronoField.MINUTE_OF_HOUR
+                        || field == ChronoField.SECOND_OF_MINUTE)) {
+            return 0L;
+        }
         if (!temporal.isSupported(field)) {
             throw new IllegalArgumentException(
                     String.format(
