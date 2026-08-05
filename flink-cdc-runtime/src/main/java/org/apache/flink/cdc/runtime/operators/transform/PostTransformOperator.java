@@ -29,6 +29,7 @@ import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.pipeline.TransformExpressionSemantics;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.udf.UserDefinedFunctionContext;
@@ -71,6 +72,7 @@ public class PostTransformOperator extends AbstractStreamOperatorAdapter<Event>
     private static final long serialVersionUID = 1L;
 
     private final String timezone;
+    private final TransformExpressionSemantics expressionSemantics;
     private final List<TransformRule> transformRules;
     private final Map<TableId, Boolean> hasAsteriskMap;
     private final Map<TableId, List<String>> projectedColumnsMap;
@@ -98,8 +100,10 @@ public class PostTransformOperator extends AbstractStreamOperatorAdapter<Event>
     PostTransformOperator(
             List<TransformRule> transformRules,
             String timezone,
+            TransformExpressionSemantics expressionSemantics,
             List<Tuple3<String, String, Map<String, String>>> udfFunctions) {
         this.timezone = timezone;
+        this.expressionSemantics = expressionSemantics;
         this.transformRules = transformRules;
         this.hasAsteriskMap = new HashMap<>();
         this.projectedColumnsMap = new HashMap<>();
@@ -368,7 +372,8 @@ public class PostTransformOperator extends AbstractStreamOperatorAdapter<Event>
                                 .orElse(null),
                         preSchema.getColumns(),
                         udfDescriptors,
-                        transformer.getSupportedMetadataColumns());
+                        transformer.getSupportedMetadataColumns(),
+                        expressionSemantics);
         return preSchema.copy(
                 projectionColumns.stream()
                         .map(ProjectionColumn::getColumn)
@@ -447,7 +452,8 @@ public class PostTransformOperator extends AbstractStreamOperatorAdapter<Event>
                             timezone,
                             udfDescriptors,
                             udfFunctionInstances,
-                            postTransformer.getSupportedMetadataColumns()));
+                            postTransformer.getSupportedMetadataColumns(),
+                            expressionSemantics));
         }
         return projectionProcessors.get(tableId, postTransformer);
     }
@@ -472,7 +478,8 @@ public class PostTransformOperator extends AbstractStreamOperatorAdapter<Event>
                                 timezone,
                                 udfDescriptors,
                                 udfFunctionInstances,
-                                postTransformer.getSupportedMetadataColumns()));
+                                postTransformer.getSupportedMetadataColumns(),
+                                expressionSemantics));
             }
         }
         return filterProcessors.get(tableId, postTransformer);

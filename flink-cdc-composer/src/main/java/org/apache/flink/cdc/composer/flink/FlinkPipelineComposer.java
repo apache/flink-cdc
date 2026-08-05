@@ -197,6 +197,9 @@ public class FlinkPipelineComposer implements PipelineComposer {
                         stream,
                         pipelineDef.getTransforms(),
                         pipelineDef.getConfig().get(PipelineOptions.PIPELINE_LOCAL_TIME_ZONE),
+                        pipelineDef
+                                .getConfig()
+                                .get(PipelineOptions.PIPELINE_TRANSFORM_EXPRESSION_SEMANTICS),
                         pipelineDef.getUdfs(),
                         pipelineDef.getModels(),
                         dataSource.supportedMetadataColumns(),

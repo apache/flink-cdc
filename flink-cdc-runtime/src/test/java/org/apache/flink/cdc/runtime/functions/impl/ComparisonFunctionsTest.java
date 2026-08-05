@@ -19,6 +19,8 @@ package org.apache.flink.cdc.runtime.functions.impl;
 
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Unit tests for {@link ComparisonFunctions}. */
@@ -32,6 +34,49 @@ class ComparisonFunctionsTest {
         assertThat(ComparisonFunctions.lessThanOrEqual(1, null)).isFalse();
         assertThat(ComparisonFunctions.greaterThan(null, 1)).isFalse();
         assertThat(ComparisonFunctions.greaterThanOrEqual(1, null)).isFalse();
+    }
+
+    @Test
+    void testFlinkSqlNullComparisonBehavior() {
+        assertThat(ComparisonFunctions.sqlValueEquals(null, 1)).isNull();
+        assertThat(ComparisonFunctions.sqlNotEquals(1, null)).isNull();
+        assertThat(ComparisonFunctions.sqlLessThan(null, 1)).isNull();
+        assertThat(ComparisonFunctions.sqlLessThanOrEqual(1, null)).isNull();
+        assertThat(ComparisonFunctions.sqlGreaterThan(null, 1)).isNull();
+        assertThat(ComparisonFunctions.sqlGreaterThanOrEqual(1, null)).isNull();
+        assertThat(ComparisonFunctions.sqlValueEquals(1, 1)).isTrue();
+        assertThat(ComparisonFunctions.sqlGreaterThan(2, 1)).isTrue();
+    }
+
+    @Test
+    void testDefaultNumericComparisonBehaviorRemainsUnchanged() {
+        assertThat(ComparisonFunctions.valueEquals(1L, 1)).isFalse();
+        assertThat(ComparisonFunctions.valueEquals(new BigDecimal("1.0"), new BigDecimal("1.00")))
+                .isFalse();
+        assertThat(
+                        ComparisonFunctions.greaterThan(
+                                9007199254740993L, new BigDecimal("9007199254740992")))
+                .isFalse();
+    }
+
+    @Test
+    void testFlinkSqlNumericComparisonBehavior() {
+        assertThat(ComparisonFunctions.sqlValueEquals(1L, 1)).isTrue();
+        assertThat(
+                        ComparisonFunctions.sqlValueEquals(
+                                new BigDecimal("1.0"), new BigDecimal("1.00")))
+                .isTrue();
+        assertThat(ComparisonFunctions.sqlNotEquals(1L, 2)).isTrue();
+        assertThat(
+                        ComparisonFunctions.sqlGreaterThan(
+                                9007199254740993L, new BigDecimal("9007199254740992")))
+                .isTrue();
+        assertThat(
+                        ComparisonFunctions.sqlLessThan(
+                                new BigDecimal("9007199254740992"), 9007199254740993L))
+                .isTrue();
+        assertThat(ComparisonFunctions.sqlGreaterThanOrEqual(new BigDecimal("1.00"), 1L)).isTrue();
+        assertThat(ComparisonFunctions.sqlLessThanOrEqual(1, new BigDecimal("1.0"))).isTrue();
     }
 
     @Test
@@ -56,11 +101,48 @@ class ComparisonFunctionsTest {
     }
 
     @Test
+    void testFlinkSqlBetweenNullBehavior() {
+        assertThat(ComparisonFunctions.sqlBetween(null, 1, 3)).isNull();
+        assertThat(ComparisonFunctions.sqlBetween(2, null, 3)).isNull();
+        assertThat(ComparisonFunctions.sqlBetween(4, null, 3)).isFalse();
+        assertThat(ComparisonFunctions.sqlNotBetween(null, 1, 3)).isNull();
+    }
+
+    @Test
+    void testFlinkSqlBetweenUsesNumericComparison() {
+        assertThat(
+                        ComparisonFunctions.sqlBetween(
+                                9007199254740993L,
+                                BigDecimal.ZERO,
+                                new BigDecimal("9007199254740992")))
+                .isFalse();
+        assertThat(
+                        ComparisonFunctions.sqlBetween(
+                                1L, new BigDecimal("1.00"), new BigDecimal("1.0")))
+                .isTrue();
+    }
+
+    @Test
     void testLegacyInNullBehavior() {
         assertThat(ComparisonFunctions.in(1, 1, null)).isTrue();
         assertThat(ComparisonFunctions.in(1, 2, null)).isFalse();
         assertThat(ComparisonFunctions.in(null, 1, 2)).isFalse();
         assertThat(ComparisonFunctions.notIn(1, 2, null)).isTrue();
+    }
+
+    @Test
+    void testFlinkSqlInNullBehavior() {
+        assertThat(ComparisonFunctions.sqlIn(1, 1, null)).isTrue();
+        assertThat(ComparisonFunctions.sqlIn(1, 2, null)).isNull();
+        assertThat(ComparisonFunctions.sqlIn(null, 1, 2)).isNull();
+        assertThat(ComparisonFunctions.sqlIn(1, 2, 3)).isFalse();
+        assertThat(ComparisonFunctions.sqlNotIn(1, 2, null)).isNull();
+    }
+
+    @Test
+    void testFlinkSqlInUsesNumericComparison() {
+        assertThat(ComparisonFunctions.sqlIn(1L, 2, new BigDecimal("1.00"))).isTrue();
+        assertThat(ComparisonFunctions.sqlNotIn(new BigDecimal("1.0"), 1L, null)).isFalse();
     }
 
     @Test
