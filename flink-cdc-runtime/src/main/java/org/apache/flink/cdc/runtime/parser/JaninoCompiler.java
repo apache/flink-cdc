@@ -94,6 +94,16 @@ public class JaninoCompiler {
         "Arithmetic", "Casting", "Comparison", "Logical", "String", "Struct", "Temporal"
     };
 
+    private static final Map<String, Integer> BINARY_OPERATOR_PRECEDENCE =
+            Map.of(
+                    "||", 1,
+                    "&&", 2,
+                    "+", 3,
+                    "-", 3,
+                    "*", 4,
+                    "/", 4,
+                    "%", 4);
+
     @VisibleForTesting
     public static final String LOAD_MODULES_EXPRESSION =
             Arrays.stream(BUILTIN_FUNCTION_MODULES)
@@ -484,7 +494,34 @@ public class JaninoCompiler {
                 return new Java.MethodInvocation(Location.NOWHERE, null, handler, atoms);
             }
         }
-        return new Java.BinaryOperation(Location.NOWHERE, atoms[0], operator, atoms[1]);
+        return new Java.BinaryOperation(
+                Location.NOWHERE,
+                parenthesizeIfNeeded(atoms[0], operator, false),
+                operator,
+                parenthesizeIfNeeded(atoms[1], operator, true));
+    }
+
+    private static Java.Rvalue parenthesizeIfNeeded(
+            Java.Rvalue expression, String parentOperator, boolean isRightOperand) {
+        if (!(expression instanceof Java.BinaryOperation)) {
+            return expression;
+        }
+
+        Java.BinaryOperation binaryExpression = (Java.BinaryOperation) expression;
+        int parentPrecedence = getBinaryOperatorPrecedence(parentOperator);
+        int childPrecedence = getBinaryOperatorPrecedence(binaryExpression.operator);
+        // Binary operators are left-associative, so a same-precedence right operand must retain
+        // its grouping.
+        if (childPrecedence < parentPrecedence
+                || (isRightOperand && childPrecedence == parentPrecedence)) {
+            return new Java.ParenthesizedExpression(Location.NOWHERE, expression);
+        }
+        return expression;
+    }
+
+    private static int getBinaryOperatorPrecedence(String operator) {
+        return Preconditions.checkNotNull(
+                BINARY_OPERATOR_PRECEDENCE.get(operator), "Unknown binary operator: %s", operator);
     }
 
     private static Java.Rvalue generateEqualsOperation(
