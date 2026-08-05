@@ -44,7 +44,7 @@ class StructFunctionsTest {
             assertThat(StructFunctions.array(1, "two", null)).containsExactly(1, "two", null);
             assertThat(StructFunctions.row(1, "two", null)).containsExactly(1, "two", null);
             assertThat(StructFunctions.map("one", 1, "two", 2, "one", 3))
-                    .containsExactlyEntriesOf(Map.of("one", 3, "two", 2));
+                    .containsExactlyInAnyOrderEntriesOf(Map.of("one", 3, "two", 2));
         }
 
         @Test
