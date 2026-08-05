@@ -45,6 +45,14 @@ class StringFunctionsTest {
     }
 
     @Test
+    void testLegacyLikeNullReturnsUnknown() {
+        assertThat(StringFunctions.like(null, "A.*")).isNull();
+        assertThat(StringFunctions.like("Alice", null)).isNull();
+        assertThat(StringFunctions.notLike(null, "A.*")).isNull();
+        assertThat(StringFunctions.notLike("Alice", null)).isNull();
+    }
+
+    @Test
     void testSimilarTo() {
         assertThat(StringFunctions.similarTo("Alice", "(A|B)%")).isTrue();
         assertThat(StringFunctions.similarTo("Carol", "(A|B)%")).isFalse();

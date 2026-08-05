@@ -66,7 +66,10 @@ public class StringFunctions {
         return String.join("", str);
     }
 
-    public static boolean like(String str, String regex) {
+    public static Boolean like(String str, String regex) {
+        if (str == null || regex == null) {
+            return null;
+        }
         return Pattern.compile(regex).matcher(str).find();
     }
 
@@ -77,8 +80,8 @@ public class StringFunctions {
         return SqlFunctions.like(str, pattern, escape);
     }
 
-    public static boolean notLike(String str, String regex) {
-        return !like(str, regex);
+    public static Boolean notLike(String str, String regex) {
+        return LogicalFunctions.not(like(str, regex));
     }
 
     public static Boolean notLike(String str, String pattern, String escape) {

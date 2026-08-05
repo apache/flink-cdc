@@ -288,6 +288,25 @@ class JaninoCompilerTest {
     }
 
     @Test
+    void testTranslatedLikePredicateReturnsUnknownForNullOperand()
+            throws InvocationTargetException {
+        List<Column> columns = List.of(Column.physicalColumn("name", DataTypes.STRING()));
+        Map<String, String> columnNameMap = Map.of("name", "$0");
+        List<String> columnNames = List.of("$0");
+        List<Class<?>> columnTypes = List.of(String.class);
+
+        ExpressionEvaluator likeEvaluator =
+                compileTranslatedFilterExpression(
+                        "name like 'A.*'", columns, columnNameMap, columnNames, columnTypes);
+        Assertions.assertThat(likeEvaluator.evaluate(new Object[] {null})).isNull();
+
+        ExpressionEvaluator notLikeEvaluator =
+                compileTranslatedFilterExpression(
+                        "name not like 'A.*'", columns, columnNameMap, columnNames, columnTypes);
+        Assertions.assertThat(notLikeEvaluator.evaluate(new Object[] {null})).isNull();
+    }
+
+    @Test
     void testLargeNumericLiterals() {
         // Test parsing integer literals
         Stream.of(
