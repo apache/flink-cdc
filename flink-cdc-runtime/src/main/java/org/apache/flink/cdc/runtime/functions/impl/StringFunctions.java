@@ -19,6 +19,7 @@ package org.apache.flink.cdc.runtime.functions.impl;
 
 import org.apache.flink.cdc.common.types.variant.BinaryVariantInternalBuilder;
 import org.apache.flink.cdc.common.types.variant.Variant;
+import org.apache.flink.cdc.common.utils.ThreadLocalCache;
 
 import org.apache.calcite.runtime.SqlFunctions;
 import org.slf4j.Logger;
@@ -35,6 +36,8 @@ import java.util.regex.PatternSyntaxException;
 public class StringFunctions {
 
     private static final Logger LOG = LoggerFactory.getLogger(StringFunctions.class);
+    private static final ThreadLocalCache<String, Pattern> REGEXP_PATTERN_CACHE =
+            ThreadLocalCache.of(Pattern::compile);
 
     public static int charLength(String str) {
         return str.length();
@@ -291,7 +294,7 @@ public class StringFunctions {
             return null;
         }
         try {
-            return Pattern.compile(regex).matcher(str);
+            return REGEXP_PATTERN_CACHE.get(regex).matcher(str);
         } catch (PatternSyntaxException e) {
             return null;
         }
