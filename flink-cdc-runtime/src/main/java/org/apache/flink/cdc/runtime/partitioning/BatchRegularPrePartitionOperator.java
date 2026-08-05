@@ -56,6 +56,7 @@ public class BatchRegularPrePartitionOperator
 
     private transient Map<TableId, HashFunction<DataChangeEvent>> cachedHashFunctions;
     private transient volatile Map<TableId, Schema> originalSchemaMap;
+    private transient int subTaskId;
 
     public BatchRegularPrePartitionOperator(
             int downstreamParallelism, HashFunctionProvider<DataChangeEvent> hashFunctionProvider) {
@@ -69,6 +70,7 @@ public class BatchRegularPrePartitionOperator
         super.open();
         cachedHashFunctions = new HashMap<>();
         originalSchemaMap = new HashMap<>();
+        subTaskId = getRuntimeContext().getTaskInfo().getIndexOfThisSubtask();
     }
 
     @Override
@@ -95,7 +97,7 @@ public class BatchRegularPrePartitionOperator
                                 dataChangeEvent,
                                 cachedHashFunctions
                                                 .get(dataChangeEvent.tableId())
-                                                .hashcode(dataChangeEvent)
+                                                .hashcode(subTaskId, dataChangeEvent)
                                         % downstreamParallelism)));
     }
 

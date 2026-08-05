@@ -62,6 +62,7 @@ public class RegularPrePartitionOperator extends AbstractStreamOperatorAdapter<P
 
     private transient SchemaEvolutionClient schemaEvolutionClient;
     private transient LoadingCache<TableId, HashFunction<DataChangeEvent>> cachedHashFunctions;
+    private transient int subTaskId;
 
     public RegularPrePartitionOperator(
             OperatorID schemaOperatorId,
@@ -80,6 +81,7 @@ public class RegularPrePartitionOperator extends AbstractStreamOperatorAdapter<P
                 getContainingTask().getEnvironment().getOperatorCoordinatorEventGateway();
         schemaEvolutionClient = new SchemaEvolutionClient(toCoordinator, schemaOperatorId);
         cachedHashFunctions = createCache();
+        subTaskId = getRuntimeContext().getTaskInfo().getIndexOfThisSubtask();
     }
 
     @Override
@@ -107,7 +109,7 @@ public class RegularPrePartitionOperator extends AbstractStreamOperatorAdapter<P
                                 dataChangeEvent,
                                 cachedHashFunctions
                                                 .get(dataChangeEvent.tableId())
-                                                .hashcode(dataChangeEvent)
+                                                .hashcode(subTaskId, dataChangeEvent)
                                         % downstreamParallelism)));
     }
 

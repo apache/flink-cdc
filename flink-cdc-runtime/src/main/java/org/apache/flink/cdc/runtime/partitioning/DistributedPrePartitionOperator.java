@@ -105,7 +105,7 @@ public class DistributedPrePartitionOperator
                                 subTaskId,
                                 hashFunctionMap
                                                 .get(dataChangeEvent.tableId())
-                                                .hashcode(dataChangeEvent)
+                                                .hashcode(subTaskId, dataChangeEvent)
                                         % downstreamParallelism)));
     }
 

@@ -28,4 +28,14 @@ import org.apache.flink.cdc.common.annotation.Internal;
 public interface HashFunction<T> {
 
     int hashcode(T event);
+
+    /**
+     * Calculates the hash code with the upstream source subtask index.
+     *
+     * <p>Implementations that do not depend on the source subtask index can continue implementing
+     * {@link #hashcode(Object)} only.
+     */
+    default int hashcode(int sourceIndex, T event) {
+        return hashcode(event);
+    }
 }
