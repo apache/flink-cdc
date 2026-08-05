@@ -25,6 +25,7 @@ import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.DefaultDataChangeEventHashFunctionProvider;
+import org.apache.flink.cdc.common.sink.ForwardHashFunctionProvider;
 import org.apache.flink.cdc.common.sink.TableIdHashFunctionProvider;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
@@ -39,7 +40,7 @@ import java.util.Collections;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Unit test for {@link RegularPrePartitionOperator}. */
+/** Unit tests for pre-partition operators. */
 class PrePartitionOperatorTest {
     private static final TableId CUSTOMERS =
             TableId.tableId("my_company", "my_branch", "customers");
@@ -140,6 +141,31 @@ class PrePartitionOperatorTest {
         }
     }
 
+    @Test
+    void testForwardingDataChangeEvent() throws Exception {
+        try (RegularEventOperatorTestHarness<RegularPrePartitionOperator, PartitioningEvent>
+                testHarness = createDataForwardTestHarness()) {
+            testHarness.open();
+            testHarness.registerTableSchema(CUSTOMERS, CUSTOMERS_SCHEMA);
+
+            DataChangeEvent dataChangeEvent = createDataChangeEvent();
+            testHarness.getOperator().processElement(new StreamRecord<>(dataChangeEvent));
+
+            assertThat(testHarness.getOutputRecords())
+                    .containsExactly(
+                            new StreamRecord<>(PartitioningEvent.ofRegular(dataChangeEvent, 0)));
+        }
+    }
+
+    private DataChangeEvent createDataChangeEvent() {
+        BinaryRecordDataGenerator recordDataGenerator =
+                new BinaryRecordDataGenerator(((RowType) CUSTOMERS_SCHEMA.toRowDataType()));
+        return DataChangeEvent.insertEvent(
+                CUSTOMERS,
+                recordDataGenerator.generate(
+                        new Object[] {1, new BinaryStringData("Alice"), 12345678L}));
+    }
+
     private int getPartitioningTarget(Schema schema, DataChangeEvent dataChangeEvent) {
         return new DefaultDataChangeEventHashFunctionProvider()
                         .getHashFunction(null, schema)
@@ -226,6 +252,16 @@ class PrePartitionOperatorTest {
                         TestingSchemaRegistryGateway.SCHEMA_OPERATOR_ID,
                         DOWNSTREAM_PARALLELISM,
                         new DefaultDataChangeEventHashFunctionProvider());
+        return RegularEventOperatorTestHarness.with(operator, DOWNSTREAM_PARALLELISM);
+    }
+
+    private RegularEventOperatorTestHarness<RegularPrePartitionOperator, PartitioningEvent>
+            createDataForwardTestHarness() {
+        RegularPrePartitionOperator operator =
+                new RegularPrePartitionOperator(
+                        TestingSchemaRegistryGateway.SCHEMA_OPERATOR_ID,
+                        DOWNSTREAM_PARALLELISM,
+                        new ForwardHashFunctionProvider());
         return RegularEventOperatorTestHarness.with(operator, DOWNSTREAM_PARALLELISM);
     }
 }

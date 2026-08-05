@@ -100,6 +100,13 @@ Pipeline Connector Options
       <td>用于建立与 Fluss 集群初始连接的主机/端口对列表。 </td>
     </tr>
     <tr>
+      <td>sink.partitioning.strategy</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">DEFAULT</td>
+      <td>String</td>
+      <td>DataChangeEvent 路由使用的分区策略。可选值为 <code>DEFAULT</code> 和 <code>FORWARD</code>。<code>DEFAULT</code> 对主键表按主键 hash，对 log 表采用 round-robin。<code>FORWARD</code> 将数据事件发送到与上游 subtask 索引相同的下游 subtask，用于 Fluss 到 Fluss 的数据同步。上游数据分布必须与 Fluss 表的分桶策略保持一致，否则可能出现数据正确性问题。</td>
+    </tr>
+    <tr>
       <td>bucket.key</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
