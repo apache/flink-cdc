@@ -203,7 +203,7 @@ Flink CDC 使用 [Calcite](https://calcite.apache.org/) 来解析表达式并且
 | STARTSWITH(string1, string2)                               | startswith(string1, string2)                  | 返回 STRING1 是否以 STRING2 开头，支持字符字符串和二进制字符串。                                                                     |
 | ENDSWITH(string1, string2)                                 | endswith(string1, string2)                    | 返回 STRING1 是否以 STRING2 结尾，支持字符字符串和二进制字符串。                                                                     |
 | TO_BASE64(string \| binary)                                | toBase64(string \| binary)                    | 将字符或二进制字符串编码为 base64 字符串。                                                                            |
-| FROM_BASE64(string)                                        | fromBase64(string)                            | 将 base64 字符串解码为 UTF-8 字符字符串。                                                                             |
+| FROM_BASE64(string)                                        | fromBase64(string)                            | 将 base64 字符串按 UTF-8 解码，并假定解码后的字节是有效的 UTF-8。对于任意二进制内容，请使用 FROM_BASE64_BINARY。                     |
 | FROM_BASE64_BINARY(string)                                 | fromBase64Binary(string)                      | 将 base64 字符串解码为 VARBINARY，并保留原始字节。                                                                   |
 
 ## 时间函数

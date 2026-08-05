@@ -2941,6 +2941,7 @@ class PostTransformOperatorTest {
         testExpressionConditionTransform("ENDSWITH('abcdef', 'def')");
         testExpressionConditionTransform("TO_BASE64('hello') = 'aGVsbG8='");
         testExpressionConditionTransform("FROM_BASE64('aGVsbG8=') = 'hello'");
+        testExpressionConditionTransform("TO_BASE64(FROM_BASE64('wyg=')) = '77+9KA=='");
         testExpressionConditionTransform("SUBSTR('ABC', -1) = 'C'");
         testExpressionConditionTransform("SUBSTR('ABC', -2, 2) = 'BC'");
         testExpressionConditionTransform("SUBSTR('ABC', 0) = 'ABC'");

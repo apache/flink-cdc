@@ -73,6 +73,13 @@ class StringFunctionsTest {
         assertThat(StringFunctions.toBase64("hello")).isEqualTo("aGVsbG8=");
         assertThat(StringFunctions.toBase64(new byte[] {(byte) 0xC3, 0x28})).isEqualTo("wyg=");
         assertThat(StringFunctions.fromBase64("aGVsbG8=")).isEqualTo("hello");
+    }
+
+    @Test
+    void testFromBase64ReplacesMalformedUtf8() {
+        assertThat(StringFunctions.fromBase64("wyg=")).isEqualTo("\uFFFD(");
+        assertThat(StringFunctions.toBase64(StringFunctions.fromBase64("wyg=")))
+                .isEqualTo("77+9KA==");
         assertThat(StringFunctions.fromBase64Binary("wyg=")).containsExactly((byte) 0xC3, 0x28);
     }
 
