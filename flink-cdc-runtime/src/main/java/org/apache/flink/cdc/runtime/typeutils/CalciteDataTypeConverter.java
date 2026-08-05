@@ -23,6 +23,7 @@ import org.apache.flink.cdc.common.types.BigIntType;
 import org.apache.flink.cdc.common.types.BinaryType;
 import org.apache.flink.cdc.common.types.BooleanType;
 import org.apache.flink.cdc.common.types.CharType;
+import org.apache.flink.cdc.common.types.DataField;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.DateType;
@@ -44,6 +45,8 @@ import org.apache.flink.cdc.common.types.ZonedTimestampType;
 
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
+import org.apache.calcite.rel.type.RelDataTypeField;
+import org.apache.calcite.sql.SqlUtil;
 import org.apache.calcite.sql.type.SqlTypeName;
 
 import java.util.List;
@@ -341,11 +344,23 @@ public class CalciteDataTypeConverter {
             case ROW:
                 return DataTypes.ROW(
                         relDataType.getFieldList().stream()
-                                .map(field -> convertCalciteRelDataTypeToDataType(field.getType()))
-                                .toArray(DataType[]::new));
+                                .map(
+                                        field ->
+                                                DataTypes.FIELD(
+                                                        normalizeRowFieldName(field),
+                                                        convertCalciteRelDataTypeToDataType(
+                                                                field.getType())))
+                                .toArray(DataField[]::new));
             default:
                 throw new UnsupportedOperationException(
                         "Unsupported type: " + relDataType.getSqlTypeName());
         }
+    }
+
+    private static String normalizeRowFieldName(RelDataTypeField field) {
+        if (field.getName().equals(SqlUtil.deriveAliasFromOrdinal(field.getIndex()))) {
+            return "f" + field.getIndex();
+        }
+        return field.getName();
     }
 }

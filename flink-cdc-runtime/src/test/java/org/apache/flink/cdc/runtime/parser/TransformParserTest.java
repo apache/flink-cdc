@@ -187,6 +187,31 @@ class TransformParserTest {
     }
 
     @Test
+    void testPreservesNamedRowFieldsInCollectionTypes() {
+        DataType namedRowType =
+                DataTypes.ROW(
+                        DataTypes.FIELD("name", DataTypes.STRING()),
+                        DataTypes.FIELD("length", DataTypes.INT()));
+        List<Column> columns = List.of(Column.physicalColumn("complex_row_", namedRowType));
+
+        List<ProjectionColumn> projectionColumns =
+                TransformParser.generateProjectionColumns(
+                        "ELEMENT(ARRAY[complex_row_]) AS row_element, "
+                                + "ARRAY[complex_row_] AS row_array, "
+                                + "MAP['row', complex_row_] AS row_map",
+                        columns,
+                        Collections.emptyList(),
+                        new SupportedMetadataColumn[0]);
+
+        Assertions.assertThat(projectionColumns)
+                .extracting(ProjectionColumn::getDataType)
+                .containsExactly(
+                        namedRowType,
+                        DataTypes.ARRAY(namedRowType),
+                        DataTypes.MAP(DataTypes.STRING(), namedRowType));
+    }
+
+    @Test
     void testTranslateCollectionFunctionsToJaninoExpression() {
         List<Column> columns =
                 List.of(
