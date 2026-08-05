@@ -123,16 +123,11 @@ public class LogicalFunctions {
 
         Number left = (Number) value;
         Number right = (Number) comparison;
-        if (left instanceof Double || right instanceof Double) {
-            double leftValue = left.doubleValue();
-            double rightValue = right.doubleValue();
-            if (Double.isFinite(leftValue) && Double.isFinite(rightValue)) {
-                return BigDecimal.valueOf(leftValue).compareTo(BigDecimal.valueOf(rightValue)) == 0;
-            }
-            return Double.compare(leftValue, rightValue) == 0;
-        }
-        if (left instanceof Float || right instanceof Float) {
-            return Float.compare(left.floatValue(), right.floatValue()) == 0;
+        if (left instanceof Double
+                || right instanceof Double
+                || left instanceof Float
+                || right instanceof Float) {
+            return left.doubleValue() == right.doubleValue();
         }
         if (left instanceof BigDecimal || right instanceof BigDecimal) {
             return toBigDecimal(left).compareTo(toBigDecimal(right)) == 0;

@@ -40,8 +40,26 @@ class LogicalFunctionsTest {
         Assertions.assertThat(LogicalFunctions.nullIf(1, 1L)).isNull();
         Assertions.assertThat(LogicalFunctions.nullIf(new BigDecimal("1.00"), 1L)).isNull();
         Assertions.assertThat(LogicalFunctions.nullIf(1, 1.0d)).isNull();
-        Assertions.assertThat(LogicalFunctions.nullIf(16_777_217, 16_777_216f)).isNull();
+        Assertions.assertThat(LogicalFunctions.nullIf(16_777_217L, 16_777_217f))
+                .isEqualTo(16_777_217L);
         Assertions.assertThat(LogicalFunctions.nullIf(new byte[] {1, 2}, new byte[] {1, 2}))
                 .isNull();
+    }
+
+    @Test
+    void testNullIfFloatingPointValues() {
+        Assertions.assertThat(LogicalFunctions.nullIf(-0.0f, 0.0f)).isNull();
+        Assertions.assertThat(LogicalFunctions.nullIf(-0.0d, 0.0d)).isNull();
+        Assertions.assertThat(LogicalFunctions.nullIf(Float.NaN, Float.NaN)).isNaN();
+        Assertions.assertThat(LogicalFunctions.nullIf(Double.NaN, Double.NaN)).isNaN();
+        Assertions.assertThat(
+                        LogicalFunctions.nullIf(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY))
+                .isNull();
+        Assertions.assertThat(
+                        LogicalFunctions.nullIf(Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY))
+                .isNull();
+        Assertions.assertThat(
+                        LogicalFunctions.nullIf(Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY))
+                .isEqualTo(Double.POSITIVE_INFINITY);
     }
 }
