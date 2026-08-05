@@ -33,6 +33,17 @@ public class FlussDataSinkOptions {
                     .noDefaultValue()
                     .withDescription("The bootstrap servers for the Fluss sink connection.");
 
+    public static final ConfigOption<SinkPartitioningStrategy> SINK_PARTITIONING_STRATEGY =
+            ConfigOptions.key("sink.partitioning.strategy")
+                    .enumType(SinkPartitioningStrategy.class)
+                    .defaultValue(SinkPartitioningStrategy.DEFAULT)
+                    .withDescription(
+                            "Partitioning strategy for DataChangeEvent routing. "
+                                    + "DEFAULT hashes primary key tables by primary keys and routes log tables in round-robin mode. "
+                                    + "FORWARD routes data events to downstream subtasks with the same indices as upstream. "
+                                    + "FORWARD is intended for Fluss-to-Fluss data synchronization. "
+                                    + "The upstream data distribution must match the Fluss table bucket distribution; otherwise, data correctness issues may occur.");
+
     public static final ConfigOption<String> BUCKET_KEY =
             ConfigOptions.key("bucket.key")
                     .stringType()
@@ -54,4 +65,10 @@ public class FlussDataSinkOptions {
                             "The number of buckets of each Fluss table."
                                     + "Tables are separated by ';'. "
                                     + "Format: database1.table1:4;database1.table2:8.");
+
+    /** The shuffle strategy for fluss sink. */
+    public enum SinkPartitioningStrategy {
+        DEFAULT,
+        FORWARD
+    }
 }
