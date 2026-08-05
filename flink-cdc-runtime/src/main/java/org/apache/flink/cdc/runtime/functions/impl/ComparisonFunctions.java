@@ -31,6 +31,9 @@ public class ComparisonFunctions {
         if (object1 == null || object2 == null) {
             return null;
         }
+        if (object1 instanceof Number && object2 instanceof Number) {
+            return sqlNumericCompare((Number) object1, (Number) object2) == 0;
+        }
         return object1.equals(object2);
     }
 
@@ -65,6 +68,25 @@ public class ComparisonFunctions {
         }
     }
 
+    private static int sqlCompares(Object lhs, Object rhs) {
+        if (lhs instanceof Number && rhs instanceof Number) {
+            return sqlNumericCompare((Number) lhs, (Number) rhs);
+        }
+        return universalCompares(lhs, rhs);
+    }
+
+    private static int sqlNumericCompare(Number lhs, Number rhs) {
+        if (isNonFinite(lhs) || isNonFinite(rhs)) {
+            return Double.compare(lhs.doubleValue(), rhs.doubleValue());
+        }
+        return new BigDecimal(lhs.toString()).compareTo(new BigDecimal(rhs.toString()));
+    }
+
+    private static boolean isNonFinite(Number value) {
+        return (value instanceof Double && !Double.isFinite(value.doubleValue()))
+                || (value instanceof Float && !Float.isFinite(value.floatValue()));
+    }
+
     public static boolean greaterThan(Object lhs, Object rhs) {
         if (lhs == null || rhs == null) {
             return false;
@@ -76,7 +98,7 @@ public class ComparisonFunctions {
         if (lhs == null || rhs == null) {
             return null;
         }
-        return universalCompares(lhs, rhs) > 0;
+        return sqlCompares(lhs, rhs) > 0;
     }
 
     public static boolean greaterThanOrEqual(Object lhs, Object rhs) {
@@ -90,7 +112,7 @@ public class ComparisonFunctions {
         if (lhs == null || rhs == null) {
             return null;
         }
-        return universalCompares(lhs, rhs) >= 0;
+        return sqlCompares(lhs, rhs) >= 0;
     }
 
     public static boolean lessThan(Object lhs, Object rhs) {
@@ -104,7 +126,7 @@ public class ComparisonFunctions {
         if (lhs == null || rhs == null) {
             return null;
         }
-        return universalCompares(lhs, rhs) < 0;
+        return sqlCompares(lhs, rhs) < 0;
     }
 
     public static boolean lessThanOrEqual(Object lhs, Object rhs) {
@@ -118,7 +140,7 @@ public class ComparisonFunctions {
         if (lhs == null || rhs == null) {
             return null;
         }
-        return universalCompares(lhs, rhs) <= 0;
+        return sqlCompares(lhs, rhs) <= 0;
     }
 
     public static Boolean sqlBetween(Object value, Object minValue, Object maxValue) {
