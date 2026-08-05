@@ -19,19 +19,25 @@ package org.apache.flink.cdc.runtime.functions.impl;
 
 import org.apache.flink.cdc.common.types.variant.BinaryVariantInternalBuilder;
 import org.apache.flink.cdc.common.types.variant.Variant;
+import org.apache.flink.cdc.common.utils.ThreadLocalCache;
 
 import org.apache.calcite.runtime.SqlFunctions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 /** String built-in functions. */
 public class StringFunctions {
 
     private static final Logger LOG = LoggerFactory.getLogger(StringFunctions.class);
+    private static final ThreadLocalCache<String, Pattern> REGEXP_PATTERN_CACHE =
+            ThreadLocalCache.of(Pattern::compile);
 
     public static int charLength(String str) {
         return str.length();
@@ -60,6 +66,72 @@ public class StringFunctions {
             // return null if exception in regex replace
             return null;
         }
+    }
+
+    /** Returns a string extracted with a specified regular expression and capture group index. */
+    public static String regexpExtract(String str, String regex) {
+        return regexpExtract(str, regex, 0);
+    }
+
+    public static String regexpExtract(String str, String regex, Number extractIndex) {
+        if (extractIndex == null || extractIndex.longValue() < 0) {
+            return null;
+        }
+        Matcher matcher = getRegexpMatcher(str, regex);
+        if (matcher == null || matcher.groupCount() < extractIndex.longValue()) {
+            return null;
+        }
+        return matcher.find() ? matcher.group(extractIndex.intValue()) : null;
+    }
+
+    /** Returns all strings extracted with a specified regular expression. */
+    public static List<String> regexpExtractAll(String str, String regex) {
+        return regexpExtractAll(str, regex, 1);
+    }
+
+    public static List<String> regexpExtractAll(String str, String regex, Number extractIndex) {
+        if (extractIndex == null || extractIndex.longValue() < 0) {
+            return null;
+        }
+        Matcher matcher = getRegexpMatcher(str, regex);
+        if (matcher == null || matcher.groupCount() < extractIndex.longValue()) {
+            return null;
+        }
+
+        List<String> result = new ArrayList<>();
+        while (matcher.find()) {
+            result.add(matcher.group(extractIndex.intValue()));
+        }
+        return result;
+    }
+
+    /** Returns the number of non-overlapping matches of a regular expression. */
+    public static Integer regexpCount(String str, String regex) {
+        Matcher matcher = getRegexpMatcher(str, regex);
+        if (matcher == null) {
+            return null;
+        }
+
+        int count = 0;
+        while (matcher.find()) {
+            count++;
+        }
+        return count;
+    }
+
+    /** Returns the 1-based position of the first regular expression match. */
+    public static Integer regexpInstr(String str, String regex) {
+        Matcher matcher = getRegexpMatcher(str, regex);
+        if (matcher == null) {
+            return null;
+        }
+        return matcher.find() ? matcher.start() + 1 : 0;
+    }
+
+    /** Returns the first substring that matches a regular expression. */
+    public static String regexpSubstr(String str, String regex) {
+        Matcher matcher = getRegexpMatcher(str, regex);
+        return matcher != null && matcher.find() ? matcher.group(0) : null;
     }
 
     public static String concat(String... str) {
@@ -214,6 +286,17 @@ public class StringFunctions {
         } catch (Throwable e) {
             throw new IllegalArgumentException(
                     String.format("Failed to parse json string: %s", jsonStr), e);
+        }
+    }
+
+    private static Matcher getRegexpMatcher(String str, String regex) {
+        if (str == null || regex == null) {
+            return null;
+        }
+        try {
+            return REGEXP_PATTERN_CACHE.get(regex).matcher(str);
+        } catch (PatternSyntaxException e) {
+            return null;
         }
     }
 }

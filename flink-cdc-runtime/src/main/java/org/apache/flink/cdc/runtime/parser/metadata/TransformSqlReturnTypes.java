@@ -111,6 +111,20 @@ public class TransformSqlReturnTypes {
             ReturnTypes.cascade(
                     ReturnTypes.explicit(SqlTypeName.VARCHAR), SqlTypeTransforms.FORCE_NULLABLE);
 
+    public static final SqlReturnTypeInference VARCHAR_ARRAY_FORCE_NULLABLE =
+            opBinding -> {
+                RelDataType elementType =
+                        opBinding
+                                .getTypeFactory()
+                                .createTypeWithNullability(
+                                        opBinding
+                                                .getTypeFactory()
+                                                .createSqlType(SqlTypeName.VARCHAR),
+                                        true);
+                RelDataType arrayType = opBinding.getTypeFactory().createArrayType(elementType, -1);
+                return opBinding.getTypeFactory().createTypeWithNullability(arrayType, true);
+            };
+
     public static final SqlReturnTypeInference VARCHAR_NOT_NULL =
             ReturnTypes.cascade(
                     ReturnTypes.explicit(SqlTypeName.VARCHAR), SqlTypeTransforms.TO_NOT_NULLABLE);

@@ -178,6 +178,11 @@ Flink CDC 使用 [Calcite](https://calcite.apache.org/) 来解析表达式并且
 | LOWER(string)                                    | lower(string)                            | 返回小写形式的字符串。                                                                                                    |
 | TRIM(string1)                                    | trim('BOTH',string1)                     | 返回去除两端空格的字符串。                                                                                                  |
 | REGEXP_REPLACE(string1, string2, string3)        | regexpReplace(string1, string2, string3) | 返回将 STRING1 中所有匹配正则表达式 STRING2 的子串替换为 STRING3 后的字符串。例如，'foobar'.regexpReplace('oo\|ar', '') 返回 "fb"。         |
+| REGEXP_EXTRACT(string, regex[, extractIndex])    | regexpExtract(string, regex[, extractIndex]) | 返回正则表达式组 extractIndex 捕获的子串。extractIndex 默认为 0，0 表示完整匹配。输入为 NULL、无匹配、正则表达式非法或组索引非法时返回 NULL。 |
+| REGEXP_EXTRACT_ALL(string, regex[, extractIndex]) | regexpExtractAll(string, regex[, extractIndex]) | 返回组 extractIndex 捕获的所有子串组成的 ARRAY&lt;STRING&gt;。extractIndex 默认为 1，0 表示完整匹配。无匹配时返回空数组，输入为 NULL、正则表达式非法或组索引非法时返回 NULL。 |
+| REGEXP_COUNT(string, regex)                      | regexpCount(string, regex)                | 返回正则表达式匹配的非重叠子串数量。无匹配时返回 0，输入为 NULL 或正则表达式非法时返回 NULL。 |
+| REGEXP_INSTR(string, regex)                      | regexpInstr(string, regex)                | 返回第一个匹配正则表达式的子串的 1-based 位置。无匹配时返回 0，输入为 NULL 或正则表达式非法时返回 NULL。 |
+| REGEXP_SUBSTR(string, regex)                     | regexpSubstr(string, regex)               | 返回第一个匹配正则表达式的子串。输入为 NULL、无匹配或正则表达式非法时返回 NULL。 |
 | SUBSTR(string, integer1[, integer2])             | substr(string,integer1,integer2)         | 返回 STRING 从位置 integer1 开始、长度为 integer2（默认到末尾）的子串。                                                              |
 | SUBSTRING(string FROM integer1 [ FOR integer2 ]) | substring(string,integer1,integer2)      | 返回 STRING 从位置 integer1 开始、长度为 integer2（默认到末尾）的子串。                                                              |
 | CONCAT(string1, string2,…)                       | concat(string1, string2,…)               | 返回连接 string1、string2、… 后的字符串。例如，CONCAT('AA', 'BB', 'CC') 返回 'AABBCC'。                                          |
