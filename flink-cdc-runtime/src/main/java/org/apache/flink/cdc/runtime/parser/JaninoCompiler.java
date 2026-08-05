@@ -25,6 +25,7 @@ import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypeRoot;
+import org.apache.flink.cdc.common.types.DecimalType;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.common.utils.StringUtils;
 import org.apache.flink.cdc.runtime.operators.transform.UserDefinedFunctionDescriptor;
@@ -35,6 +36,7 @@ import org.apache.calcite.sql.SqlBasicTypeNameSpec;
 import org.apache.calcite.sql.SqlCharStringLiteral;
 import org.apache.calcite.sql.SqlDataTypeSpec;
 import org.apache.calcite.sql.SqlIdentifier;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlNodeList;
@@ -194,6 +196,10 @@ public class JaninoCompiler {
     }
 
     private static Java.Rvalue translateSqlBasicCall(Context context, SqlBasicCall sqlBasicCall) {
+        if (sqlBasicCall.getOperator().getName().equalsIgnoreCase("TRY_CAST")) {
+            return generateTryCastOperation(context, sqlBasicCall);
+        }
+
         List<SqlNode> operandList = sqlBasicCall.getOperandList();
         List<Java.Rvalue> atoms = new ArrayList<>();
         for (SqlNode sqlNode : operandList) {
@@ -315,6 +321,8 @@ public class JaninoCompiler {
             case LESS_THAN_OR_EQUAL:
             case GREATER_THAN_OR_EQUAL:
                 return generateCompareOperation(context, sqlBasicCall, atoms);
+            case NULLIF:
+                return generateNullIfOperation(context, sqlBasicCall, atoms);
             case CAST:
                 return generateCastOperation(context, sqlBasicCall, atoms);
             case TIMESTAMP_DIFF:
@@ -425,6 +433,14 @@ public class JaninoCompiler {
     }
 
     private static boolean isBasicCallNullable(Context context, SqlBasicCall sqlBasicCall) {
+        if (sqlBasicCall.getOperator().getName().equalsIgnoreCase("IFNULL")) {
+            List<SqlNode> operands = sqlBasicCall.getOperandList();
+            if (operands.size() != 2) {
+                return true;
+            }
+            return isExpressionNullable(context, operands.get(0))
+                    && isExpressionNullable(context, operands.get(1));
+        }
         switch (sqlBasicCall.getKind()) {
             case AND:
             case OR:
@@ -503,7 +519,33 @@ public class JaninoCompiler {
         }
         List<SqlNode> operandList = sqlBasicCall.getOperandList();
         SqlDataTypeSpec sqlDataTypeSpec = (SqlDataTypeSpec) operandList.get(1);
-        return generateTypeConvertMethod(context, sqlDataTypeSpec, atoms);
+        return generateTypeConvertMethod(context, sqlDataTypeSpec, atoms, false);
+    }
+
+    private static Java.Rvalue generateTryCastOperation(
+            Context context, SqlBasicCall sqlBasicCall) {
+        List<SqlNode> operands = sqlBasicCall.getOperandList();
+        if (operands.size() != 1 || !(operands.get(0) instanceof SqlBasicCall)) {
+            throw new ParseException("Unrecognized expression: " + sqlBasicCall);
+        }
+
+        SqlBasicCall castCall = (SqlBasicCall) operands.get(0);
+        List<SqlNode> castOperands = castCall.getOperandList();
+        if (castCall.getKind() != SqlKind.CAST
+                || castOperands.size() != 2
+                || !(castOperands.get(1) instanceof SqlDataTypeSpec)) {
+            throw new ParseException("Unrecognized expression: " + sqlBasicCall);
+        }
+
+        Java.Rvalue castOperand = translateSqlNodeToJaninoRvalue(context, castOperands.get(0));
+        if (castOperand == null) {
+            throw new ParseException("Unrecognized expression: " + sqlBasicCall);
+        }
+        return generateTypeConvertMethod(
+                context,
+                (SqlDataTypeSpec) castOperands.get(1),
+                new Java.Rvalue[] {castOperand},
+                true);
     }
 
     private static Java.Rvalue generateCompareOperation(
@@ -632,6 +674,10 @@ public class JaninoCompiler {
 
         // Get the Java class for the result type and add a cast
         // Use getCanonicalName() to correctly handle array types (e.g., byte[] instead of "[B")
+        return castToJavaType(resultType, methodInvocation);
+    }
+
+    private static Java.Rvalue castToJavaType(DataType resultType, Java.Rvalue expression) {
         Class<?> javaClass = JavaClassConverter.toJavaClass(resultType);
         if (javaClass != null && javaClass != Object.class) {
             String canonicalName = javaClass.getCanonicalName();
@@ -643,10 +689,10 @@ public class JaninoCompiler {
                                 new Java.Annotation[0],
                                 canonicalName.split("\\."),
                                 null),
-                        methodInvocation);
+                        expression);
             }
         }
-        return methodInvocation;
+        return expression;
     }
 
     private static Java.Rvalue generateOtherFunctionOperation(
@@ -662,6 +708,10 @@ public class JaninoCompiler {
             } else {
                 throw new ParseException("Unrecognized expression: " + sqlBasicCall);
             }
+        } else if (operationName.equals("IFNULL")) {
+            return generateIfNullOperation(context, sqlBasicCall, atoms);
+        } else if (operationName.equals("NULLIF")) {
+            return generateNullIfOperation(context, sqlBasicCall, atoms);
         } else {
             Optional<UserDefinedFunctionDescriptor> udfFunctionOptional =
                     context.udfDescriptors.stream()
@@ -683,6 +733,77 @@ public class JaninoCompiler {
                                             StringUtils.convertToCamelCase(
                                                     sqlBasicCall.getOperator().getName()),
                                             atoms));
+        }
+    }
+
+    private static Java.Rvalue generateIfNullOperation(
+            Context context, SqlBasicCall sqlBasicCall, Java.Rvalue[] atoms) {
+        if (atoms.length != 2) {
+            throw new ParseException("Unrecognized expression: " + sqlBasicCall);
+        }
+
+        DataType resultType =
+                TransformParser.deduceSubExpressionType(
+                        context.columns,
+                        sqlBasicCall,
+                        context.udfDescriptors,
+                        context.supportedMetadataColumns);
+        Java.Rvalue[] coercedAtoms = new Java.Rvalue[atoms.length];
+        for (int index = 0; index < atoms.length; index++) {
+            coercedAtoms[index] = generateNumericTypeConvertMethod(resultType, atoms[index]);
+        }
+        return castToJavaType(resultType, generateFunctionOperation("ifNull", coercedAtoms));
+    }
+
+    private static Java.Rvalue generateNullIfOperation(
+            Context context, SqlBasicCall sqlBasicCall, Java.Rvalue[] atoms) {
+        if (atoms.length != 2) {
+            throw new ParseException("Unrecognized expression: " + sqlBasicCall);
+        }
+        Java.Rvalue operation = generateFunctionOperation("nullIf", atoms);
+        SqlNode value = sqlBasicCall.getOperandList().get(0);
+        if (value instanceof SqlLiteral && ((SqlLiteral) value).getValue() == null) {
+            return operation;
+        }
+        DataType resultType =
+                TransformParser.deduceSubExpressionType(
+                        context.columns,
+                        value,
+                        context.udfDescriptors,
+                        context.supportedMetadataColumns);
+        return castToJavaType(resultType, operation);
+    }
+
+    private static Java.Rvalue generateNumericTypeConvertMethod(
+            DataType dataType, Java.Rvalue atom) {
+        switch (dataType.getTypeRoot()) {
+            case TINYINT:
+                return generateFunctionOperation("castToByte", new Java.Rvalue[] {atom});
+            case SMALLINT:
+                return generateFunctionOperation("castToShort", new Java.Rvalue[] {atom});
+            case INTEGER:
+                return generateFunctionOperation("castToInteger", new Java.Rvalue[] {atom});
+            case BIGINT:
+                return generateFunctionOperation("castToLong", new Java.Rvalue[] {atom});
+            case FLOAT:
+                return generateFunctionOperation("castToFloat", new Java.Rvalue[] {atom});
+            case DOUBLE:
+                return generateFunctionOperation("castToDouble", new Java.Rvalue[] {atom});
+            case DECIMAL:
+                DecimalType decimalType = (DecimalType) dataType;
+                return generateFunctionOperation(
+                        "castToBigDecimal",
+                        new Java.Rvalue[] {
+                            atom,
+                            new Java.AmbiguousName(
+                                    Location.NOWHERE,
+                                    new String[] {String.valueOf(decimalType.getPrecision())}),
+                            new Java.AmbiguousName(
+                                    Location.NOWHERE,
+                                    new String[] {String.valueOf(decimalType.getScale())})
+                        });
+            default:
+                return atom;
         }
     }
 
@@ -732,22 +853,41 @@ public class JaninoCompiler {
     }
 
     private static Java.Rvalue generateTypeConvertMethod(
-            Context context, SqlDataTypeSpec sqlDataTypeSpec, Java.Rvalue[] atoms) {
+            Context context,
+            SqlDataTypeSpec sqlDataTypeSpec,
+            Java.Rvalue[] atoms,
+            boolean tryCast) {
         switch (sqlDataTypeSpec.getTypeName().getSimple().toUpperCase()) {
             case "BOOLEAN":
-                return new Java.MethodInvocation(Location.NOWHERE, null, "castToBoolean", atoms);
+                return new Java.MethodInvocation(
+                        Location.NOWHERE,
+                        null,
+                        tryCast ? "tryCastToBoolean" : "castToBoolean",
+                        atoms);
             case "TINYINT":
-                return new Java.MethodInvocation(Location.NOWHERE, null, "castToByte", atoms);
+                return new Java.MethodInvocation(
+                        Location.NOWHERE, null, tryCast ? "tryCastToByte" : "castToByte", atoms);
             case "SMALLINT":
-                return new Java.MethodInvocation(Location.NOWHERE, null, "castToShort", atoms);
+                return new Java.MethodInvocation(
+                        Location.NOWHERE, null, tryCast ? "tryCastToShort" : "castToShort", atoms);
             case "INTEGER":
-                return new Java.MethodInvocation(Location.NOWHERE, null, "castToInteger", atoms);
+                return new Java.MethodInvocation(
+                        Location.NOWHERE,
+                        null,
+                        tryCast ? "tryCastToInteger" : "castToInteger",
+                        atoms);
             case "BIGINT":
-                return new Java.MethodInvocation(Location.NOWHERE, null, "castToLong", atoms);
+                return new Java.MethodInvocation(
+                        Location.NOWHERE, null, tryCast ? "tryCastToLong" : "castToLong", atoms);
             case "FLOAT":
-                return new Java.MethodInvocation(Location.NOWHERE, null, "castToFloat", atoms);
+                return new Java.MethodInvocation(
+                        Location.NOWHERE, null, tryCast ? "tryCastToFloat" : "castToFloat", atoms);
             case "DOUBLE":
-                return new Java.MethodInvocation(Location.NOWHERE, null, "castToDouble", atoms);
+                return new Java.MethodInvocation(
+                        Location.NOWHERE,
+                        null,
+                        tryCast ? "tryCastToDouble" : "castToDouble",
+                        atoms);
             case "DECIMAL":
                 int precision = 10;
                 int scale = 0;
@@ -771,12 +911,16 @@ public class JaninoCompiler {
                 return new Java.MethodInvocation(
                         Location.NOWHERE,
                         null,
-                        "castToBigDecimal",
+                        tryCast ? "tryCastToBigDecimal" : "castToBigDecimal",
                         newAtoms.toArray(new Java.Rvalue[0]));
             case "CHAR":
             case "VARCHAR":
             case "STRING":
-                return new Java.MethodInvocation(Location.NOWHERE, null, "castToString", atoms);
+                return new Java.MethodInvocation(
+                        Location.NOWHERE,
+                        null,
+                        tryCast ? "tryCastToString" : "castToString",
+                        atoms);
             case "TIMESTAMP":
                 List<Java.Rvalue> timestampAtoms = new ArrayList<>(Arrays.asList(atoms));
                 timestampAtoms.add(
@@ -784,7 +928,7 @@ public class JaninoCompiler {
                 return new Java.MethodInvocation(
                         Location.NOWHERE,
                         null,
-                        "castToTimestamp",
+                        tryCast ? "tryCastToTimestamp" : "castToTimestamp",
                         timestampAtoms.toArray(new Java.Rvalue[0]));
             default:
                 throw new ParseException(

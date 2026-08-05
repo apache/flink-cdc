@@ -263,6 +263,22 @@
     DataChangeEvent{tableId=foo.bar.baz, before=[-1, 1970-01-09T08:57:36.789723456, 1970-01-10T15:49:27.891834561, 1970-01-11T22:41:18.912945612, 1970-01-09T08:57:36.789723456, 1970-01-10T22:49:27.891834561, 1970-01-12T10:41:18.912945612, 1970-01-09T16:57:36.789723456, 1970-01-10T23:49:27.891834561, 1970-01-12T06:41:18.912945612, 2019-12-31T21:48:25], after=[], op=DELETE, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null, null, null, null, null, null, null, null, 2019-12-31T21:48:25], op=INSERT, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null, null, null, null, null, null, null, null, 2019-12-31T21:48:25], after=[], op=DELETE, meta=()}
+- do: Try Cast
+  projection: |-
+    id_
+    TRY_CAST('123' AS INTEGER) AS valid_int
+    TRY_CAST('FOOBAR' AS INTEGER) AS invalid_int
+    TRY_CAST('2019-12-31T21:48:25' AS TIMESTAMP(6)) AS valid_timestamp
+    TRY_CAST('FOOBAR' AS TIMESTAMP(6)) AS invalid_timestamp
+    IFNULL(TRY_CAST('FOOBAR' AS INTEGER), 17) AS int_fallback
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`valid_int` INT,`invalid_int` INT,`valid_timestamp` TIMESTAMP(3),`invalid_timestamp` TIMESTAMP(3),`int_fallback` INT NOT NULL}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, 123, null, 2019-12-31T21:48:25, null, 17], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, 123, null, 2019-12-31T21:48:25, null, 17], after=[-1, 123, null, 2019-12-31T21:48:25, null, 17], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, 123, null, 2019-12-31T21:48:25, null, 17], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, 123, null, 2019-12-31T21:48:25, null, 17], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, 123, null, 2019-12-31T21:48:25, null, 17], after=[], op=DELETE, meta=()}
 - do: Cast To Timestamp Failure
   projection: |-
     id_
