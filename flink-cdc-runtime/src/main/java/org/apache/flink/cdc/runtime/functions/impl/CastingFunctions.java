@@ -30,6 +30,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeParseException;
+import java.util.Locale;
 
 /** Casting built-in functions. */
 public class CastingFunctions {
@@ -272,34 +273,97 @@ public class CastingFunctions {
     }
 
     public static Boolean tryCastToBoolean(Object object) {
+        if (object instanceof String) {
+            switch (((String) object).toLowerCase(Locale.ROOT)) {
+                case "t":
+                case "true":
+                case "y":
+                case "yes":
+                case "1":
+                    return true;
+                case "f":
+                case "false":
+                case "n":
+                case "no":
+                case "0":
+                    return false;
+                default:
+                    return null;
+            }
+        }
         return castToBoolean(object);
     }
 
     public static Byte tryCastToByte(Object object) {
+        if (object instanceof String) {
+            try {
+                return Byte.valueOf(((String) object).trim());
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
+        }
         return castToByte(object);
     }
 
     public static Short tryCastToShort(Object object) {
+        if (object instanceof String) {
+            try {
+                return Short.valueOf(((String) object).trim());
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
+        }
         return castToShort(object);
     }
 
     public static Integer tryCastToInteger(Object object) {
+        if (object instanceof String) {
+            try {
+                return Integer.valueOf(((String) object).trim());
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
+        }
         return castToInteger(object);
     }
 
     public static Long tryCastToLong(Object object) {
+        if (object instanceof String) {
+            try {
+                return Long.valueOf(((String) object).trim());
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
+        }
         return castToLong(object);
     }
 
     public static Float tryCastToFloat(Object object) {
+        if (object instanceof String) {
+            try {
+                return Float.valueOf(((String) object).trim());
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
+        }
         return castToFloat(object);
     }
 
     public static Double tryCastToDouble(Object object) {
+        if (object instanceof String) {
+            try {
+                return Double.valueOf(((String) object).trim());
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
+        }
         return castToDouble(object);
     }
 
     public static BigDecimal tryCastToBigDecimal(Object object, int precision, int scale) {
+        if (object instanceof String) {
+            return castToBigDecimal(((String) object).trim(), precision, scale);
+        }
         return castToBigDecimal(object, precision, scale);
     }
 

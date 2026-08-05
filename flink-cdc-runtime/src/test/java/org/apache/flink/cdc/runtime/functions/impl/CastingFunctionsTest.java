@@ -40,10 +40,19 @@ class CastingFunctionsTest {
         Assertions.assertThat(CastingFunctions.tryCastToString(8)).isEqualTo("8");
         Assertions.assertThat(CastingFunctions.tryCastToTimestamp("2024-01-02T03:04:05", "UTC"))
                 .isEqualTo(LocalDateTime.of(2024, 1, 2, 3, 4, 5));
+        Assertions.assertThat(CastingFunctions.tryCastToBoolean("yes")).isTrue();
+        Assertions.assertThat(CastingFunctions.tryCastToBoolean("no")).isFalse();
+        Assertions.assertThat(CastingFunctions.tryCastToByte(128)).isEqualTo((byte) -128);
+        Assertions.assertThat(CastingFunctions.tryCastToInteger(1.5d)).isEqualTo(1);
     }
 
     @Test
     void testTryCastInvalidDataReturnsNull() {
+        Assertions.assertThat(CastingFunctions.tryCastToBoolean("invalid")).isNull();
+        Assertions.assertThat(CastingFunctions.tryCastToByte("128")).isNull();
+        Assertions.assertThat(CastingFunctions.tryCastToShort("32768")).isNull();
+        Assertions.assertThat(CastingFunctions.tryCastToInteger("1.5")).isNull();
+        Assertions.assertThat(CastingFunctions.tryCastToLong("9223372036854775808")).isNull();
         Assertions.assertThat(CastingFunctions.tryCastToInteger("invalid")).isNull();
         Assertions.assertThat(CastingFunctions.tryCastToDouble("invalid")).isNull();
         Assertions.assertThat(CastingFunctions.tryCastToBigDecimal("invalid", 10, 2)).isNull();
@@ -75,6 +84,10 @@ class CastingFunctionsTest {
 
     @Test
     void testExistingCastFailureBehaviorIsUnchanged() {
+        Assertions.assertThat(CastingFunctions.castToBoolean("invalid")).isFalse();
+        Assertions.assertThat(CastingFunctions.castToByte("128")).isEqualTo((byte) -128);
+        Assertions.assertThat(CastingFunctions.castToInteger("1.5")).isEqualTo(1);
+
         int[] toStringCalls = {0};
         Object invalidTimestamp =
                 new Object() {
