@@ -40,6 +40,7 @@ import org.apache.flink.cdc.common.source.MetadataAccessor;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.connectors.values.sink.ValuesDataSink;
+import org.apache.flink.cdc.connectors.values.sink.ValuesDataSinkOptions;
 import org.apache.flink.cdc.connectors.values.source.ValuesDataSource;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.Sets;
@@ -129,10 +130,22 @@ public class ValuesDatabase {
      * changes occur.
      */
     public static class ErrorOnChangeMetadataApplier implements MetadataApplier {
+
+        public static final String SIMULATED_CAUSE_MESSAGE =
+                "Simulated cause for rejected schema change events.";
+
         private Set<SchemaChangeEventType> enabledSchemaEvolutionTypes;
 
+        /** {@link ValuesDataSinkOptions#ERROR_ON_SCHEMA_CHANGE_EXCEPTION_CLASS}. */
+        private final @Nullable String rejectionCauseClass;
+
         public ErrorOnChangeMetadataApplier() {
+            this(null);
+        }
+
+        public ErrorOnChangeMetadataApplier(@Nullable String rejectionCauseClass) {
             enabledSchemaEvolutionTypes = getSupportedSchemaEvolutionTypes();
+            this.rejectionCauseClass = rejectionCauseClass;
         }
 
         @Override
@@ -167,7 +180,27 @@ public class ValuesDatabase {
                 throw new UnsupportedSchemaChangeEventException(
                         schemaChangeEvent,
                         "Rejected schema change event since error.on.schema.change is enabled.",
-                        null);
+                        createRejectionCause());
+            }
+        }
+
+        /**
+         * Reflectively instantiates the configured rejection cause on the coordinator, so that the
+         * cause class only needs to be present on the JobManager classpath.
+         */
+        @Nullable
+        private Throwable createRejectionCause() {
+            if (rejectionCauseClass == null) {
+                return null;
+            }
+            try {
+                return (Throwable)
+                        Class.forName(rejectionCauseClass, true, getClass().getClassLoader())
+                                .getConstructor(String.class)
+                                .newInstance(SIMULATED_CAUSE_MESSAGE);
+            } catch (ReflectiveOperationException e) {
+                throw new IllegalStateException(
+                        "Unable to instantiate rejection cause class " + rejectionCauseClass, e);
             }
         }
     }
