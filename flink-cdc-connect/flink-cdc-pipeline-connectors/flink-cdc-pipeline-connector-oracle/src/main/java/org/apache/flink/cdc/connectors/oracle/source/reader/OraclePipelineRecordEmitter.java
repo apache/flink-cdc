@@ -85,15 +85,13 @@ public class OraclePipelineRecordEmitter extends IncrementalSourceRecordEmitter<
             }
             for (TableId tableId : capturedTableIds) {
                 Schema schema = OracleSchemaUtils.getSchema(jdbc, tableId);
-                createTableEventCache.put(
+                TableId capturedTableId =
                         new TableId(
                                 sourceConfig.getDbzConnectorConfig().getDatabaseName(),
                                 tableId.catalog(),
-                                tableId.table()),
-                        new CreateTableEvent(
-                                org.apache.flink.cdc.common.event.TableId.tableId(
-                                        tableId.catalog(), tableId.table()),
-                                schema));
+                                tableId.table());
+                createTableEventCache.put(
+                        capturedTableId, new CreateTableEvent(toCdcTableId(capturedTableId), schema));
             }
             this.isBounded = StartupOptions.snapshot().equals(sourceConfig.getStartupOptions());
         } catch (SQLException e) {
@@ -146,12 +144,13 @@ public class OraclePipelineRecordEmitter extends IncrementalSourceRecordEmitter<
     private CreateTableEvent sendCreateTableEvent(
             JdbcConnection jdbc, TableId tableId, SourceOutput<Event> output) {
         Schema schema = OracleSchemaUtils.getSchema(jdbc, tableId);
-        CreateTableEvent createTableEvent =
-                new CreateTableEvent(
-                        org.apache.flink.cdc.common.event.TableId.tableId(
-                                tableId.schema(), tableId.table()),
-                        schema);
+        CreateTableEvent createTableEvent = new CreateTableEvent(toCdcTableId(tableId), schema);
         output.collect(createTableEvent);
         return createTableEvent;
+    }
+
+    static org.apache.flink.cdc.common.event.TableId toCdcTableId(TableId tableId) {
+        return org.apache.flink.cdc.common.event.TableId.tableId(
+                tableId.catalog(), tableId.schema(), tableId.table());
     }
 }
