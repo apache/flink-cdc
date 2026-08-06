@@ -59,10 +59,8 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -361,28 +359,6 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
         }
     }
 
-    private Set<String> getExistedSplitsOfLastGroup(
-            List<FinishedSnapshotSplitInfo> finishedSnapshotSplits, int metaGroupSize) {
-        int splitsNumOfLastGroup =
-                finishedSnapshotSplits.size() % sourceConfig.getSplitMetaGroupSize();
-        if (splitsNumOfLastGroup != 0) {
-            int lastGroupStart =
-                    ((int) (finishedSnapshotSplits.size() / sourceConfig.getSplitMetaGroupSize()))
-                            * metaGroupSize;
-            // Keep same order with HybridSplitAssigner.createStreamSplit() to avoid
-            // 'invalid request meta group id' error
-            List<String> sortedFinishedSnapshotSplits =
-                    finishedSnapshotSplits.stream()
-                            .map(FinishedSnapshotSplitInfo::getSplitId)
-                            .sorted()
-                            .collect(Collectors.toList());
-            return new HashSet<>(
-                    sortedFinishedSnapshotSplits.subList(
-                            lastGroupStart, lastGroupStart + splitsNumOfLastGroup));
-        }
-        return new HashSet<>();
-    }
-
     @Override
     public void handleSourceEvents(SourceEvent sourceEvent) {
         if (sourceEvent instanceof FinishedSnapshotSplitsAckEvent) {
@@ -437,15 +413,24 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
                 streamSplit = toNormalStreamSplit(streamSplit, receivedTotalFinishedSplitSize);
                 uncompletedStreamSplits.put(streamSplit.splitId(), streamSplit);
             } else if (receivedMetaGroupId == expectedMetaGroupId) {
-                Set<String> existedSplitsOfLastGroup =
-                        getExistedSplitsOfLastGroup(
-                                streamSplit.getFinishedSnapshotSplitInfos(),
-                                sourceConfig.getSplitMetaGroupSize());
-
+                int expectedNumberOfAlreadyRetrievedElements =
+                        streamSplit.getFinishedSnapshotSplitInfos().size()
+                                % sourceConfig.getSplitMetaGroupSize();
+                List<byte[]> metaGroup = metadataEvent.getMetaGroup();
+                if (expectedNumberOfAlreadyRetrievedElements > 0) {
+                    LOG.info(
+                            "Source reader {} is discarding the first {} out of {} elements of meta group {}.",
+                            subtaskId,
+                            expectedNumberOfAlreadyRetrievedElements,
+                            metaGroup.size(),
+                            receivedMetaGroupId);
+                    metaGroup =
+                            metaGroup.subList(
+                                    expectedNumberOfAlreadyRetrievedElements, metaGroup.size());
+                }
                 List<FinishedSnapshotSplitInfo> newAddedMetadataGroup =
-                        metadataEvent.getMetaGroup().stream()
+                        metaGroup.stream()
                                 .map(sourceSplitSerializer::deserialize)
-                                .filter(r -> !existedSplitsOfLastGroup.contains(r.getSplitId()))
                                 .collect(Collectors.toList());
                 uncompletedStreamSplits.put(
                         streamSplit.splitId(),

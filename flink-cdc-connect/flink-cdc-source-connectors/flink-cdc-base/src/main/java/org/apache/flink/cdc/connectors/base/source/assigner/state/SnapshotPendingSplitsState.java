@@ -52,7 +52,7 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
      * The snapshot splits that the {@link IncrementalSourceEnumerator} has assigned to {@link
      * IncrementalSourceSplitReader}s.
      */
-    private final Map<String, SchemalessSnapshotSplit> assignedSplits;
+    private final LinkedHashMap<String, SchemalessSnapshotSplit> assignedSplits;
 
     /**
      * The offsets of finished (snapshot) splits that the {@link IncrementalSourceEnumerator} has
@@ -83,7 +83,7 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
     public SnapshotPendingSplitsState(
             List<TableId> alreadyProcessedTables,
             List<SchemalessSnapshotSplit> remainingSplits,
-            Map<String, SchemalessSnapshotSplit> assignedSplits,
+            LinkedHashMap<String, SchemalessSnapshotSplit> assignedSplits,
             Map<TableId, TableChanges.TableChange> tableSchemas,
             Map<String, Offset> splitFinishedOffsets,
             AssignerStatus assignerStatus,
@@ -119,7 +119,7 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
         return remainingSplits;
     }
 
-    public Map<String, SchemalessSnapshotSplit> getAssignedSplits() {
+    public LinkedHashMap<String, SchemalessSnapshotSplit> getAssignedSplits() {
         return assignedSplits;
     }
 
