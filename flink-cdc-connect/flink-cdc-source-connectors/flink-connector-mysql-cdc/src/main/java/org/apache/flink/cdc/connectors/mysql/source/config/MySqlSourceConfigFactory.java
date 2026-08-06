@@ -78,6 +78,7 @@ public class MySqlSourceConfigFactory implements Serializable {
     private boolean treatTinyInt1AsBoolean = true;
     private boolean useLegacyJsonFormat = true;
     private boolean assignUnboundedChunkFirst = false;
+    private long rateLimit = MySqlSourceOptions.SCAN_RATE_LIMIT_RECORDS_PER_SECOND.defaultValue();
 
     public MySqlSourceConfigFactory hostname(String hostname) {
         this.hostname = hostname;
@@ -341,6 +342,15 @@ public class MySqlSourceConfigFactory implements Serializable {
         return this;
     }
 
+    /**
+     * The rate limit for source reading in records per second, applied to both snapshot and binlog
+     * phases. A value of -1 means no rate limit.
+     */
+    public MySqlSourceConfigFactory rateLimit(long rateLimit) {
+        this.rateLimit = rateLimit;
+        return this;
+    }
+
     /** Creates a new {@link MySqlSourceConfig} for the given subtask {@code subtaskId}. */
     public MySqlSourceConfig createConfig(int subtaskId) {
         // hard code server name, because we don't need to distinguish it, docs:
@@ -444,6 +454,7 @@ public class MySqlSourceConfigFactory implements Serializable {
                 parseOnLineSchemaChanges,
                 treatTinyInt1AsBoolean,
                 useLegacyJsonFormat,
-                assignUnboundedChunkFirst);
+                assignUnboundedChunkFirst,
+                rateLimit);
     }
 }

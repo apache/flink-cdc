@@ -24,6 +24,7 @@ import org.apache.flink.api.connector.source.SourceReader;
 import org.apache.flink.api.connector.source.SourceReaderContext;
 import org.apache.flink.api.connector.source.SplitEnumerator;
 import org.apache.flink.api.connector.source.SplitEnumeratorContext;
+import org.apache.flink.api.connector.source.ratelimit.RateLimitedSourceReaderAdapter;
 import org.apache.flink.api.java.typeutils.ResultTypeQueryable;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.annotation.PublicEvolving;
@@ -51,7 +52,6 @@ import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplit;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplitSerializer;
 import org.apache.flink.cdc.connectors.mysql.source.utils.hooks.SnapshotPhaseHooks;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
-import org.apache.flink.connector.base.source.reader.RecordEmitter;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
 import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.util.FlinkRuntimeException;
@@ -180,12 +180,21 @@ public class MySqlSource<T>
                                 readerContext.getIndexOfSubtask(),
                                 mySqlSourceReaderContext,
                                 snapshotHooks);
-        return new MySqlSourceReader<>(
-                splitReaderSupplier,
-                recordEmitterSupplier.get(sourceReaderMetrics, sourceConfig),
-                readerContext.getConfiguration(),
-                mySqlSourceReaderContext,
-                sourceConfig);
+        MySqlRecordEmitter<T> recordEmitter =
+                recordEmitterSupplier.get(sourceReaderMetrics, sourceConfig);
+        MySqlSourceReader<T> sourceReader =
+                new MySqlSourceReader<>(
+                        splitReaderSupplier,
+                        recordEmitter,
+                        readerContext.getConfiguration(),
+                        mySqlSourceReaderContext,
+                        sourceConfig);
+        long rateLimit = sourceConfig.getRateLimit();
+        if (rateLimit > 0) {
+            return RateLimitedSourceReaderAdapter.wrapWithRateLimiter(
+                    sourceReader, (double) rateLimit, readerContext.currentParallelism());
+        }
+        return sourceReader;
     }
 
     @Override
