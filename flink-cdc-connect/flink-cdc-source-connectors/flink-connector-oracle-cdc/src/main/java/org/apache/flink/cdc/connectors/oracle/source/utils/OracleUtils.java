@@ -27,11 +27,14 @@ import io.debezium.connector.oracle.OracleDatabaseSchema;
 import io.debezium.connector.oracle.OracleDefaultValueConverter;
 import io.debezium.connector.oracle.OracleTopicSelector;
 import io.debezium.connector.oracle.OracleValueConverters;
+import io.debezium.connector.oracle.SourceInfo;
 import io.debezium.connector.oracle.StreamingAdapter;
+import io.debezium.data.Envelope;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
 import io.debezium.schema.TopicSelector;
 import io.debezium.util.SchemaNameAdjuster;
+import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 
 import java.sql.Connection;
@@ -219,16 +222,35 @@ public class OracleUtils {
     }
 
     public static RedoLogOffset getRedoLogPosition(SourceRecord dataRecord) {
-        return getRedoLogPosition(dataRecord.sourceOffset());
+        Map<String, String> offsetStrMap = toStringOffsetMap(dataRecord.sourceOffset());
+        if (offsetStrMap.get(RedoLogOffset.SCN_KEY) == null) {
+            Struct value = (Struct) dataRecord.value();
+            if (value != null && value.schema() != null) {
+                Struct source = value.getStruct(Envelope.FieldName.SOURCE);
+                if (source != null
+                        && source.schema() != null
+                        && source.schema().field(SourceInfo.SCN_KEY) != null) {
+                    Object scn = source.get(SourceInfo.SCN_KEY);
+                    if (scn != null) {
+                        offsetStrMap.put(RedoLogOffset.SCN_KEY, scn.toString());
+                    }
+                }
+            }
+        }
+        return new RedoLogOffset(offsetStrMap);
     }
 
     public static RedoLogOffset getRedoLogPosition(Map<String, ?> offset) {
+        return new RedoLogOffset(toStringOffsetMap(offset));
+    }
+
+    private static Map<String, String> toStringOffsetMap(Map<String, ?> offset) {
         Map<String, String> offsetStrMap = new HashMap<>();
         for (Map.Entry<String, ?> entry : offset.entrySet()) {
             offsetStrMap.put(
                     entry.getKey(), entry.getValue() == null ? null : entry.getValue().toString());
         }
-        return new RedoLogOffset(offsetStrMap);
+        return offsetStrMap;
     }
 
     public static String quote(String dbOrTableName) {
