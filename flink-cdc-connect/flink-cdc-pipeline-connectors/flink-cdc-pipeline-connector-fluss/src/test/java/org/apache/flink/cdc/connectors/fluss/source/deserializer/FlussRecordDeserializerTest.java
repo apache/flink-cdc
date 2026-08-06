@@ -17,6 +17,9 @@
 
 package org.apache.flink.cdc.connectors.fluss.source.deserializer;
 
+import org.apache.flink.cdc.common.data.ArrayData;
+import org.apache.flink.cdc.common.data.MapData;
+import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
@@ -28,9 +31,13 @@ import org.apache.fluss.client.table.scanner.ScanRecord;
 import org.apache.fluss.metadata.TablePath;
 import org.apache.fluss.record.ChangeType;
 import org.apache.fluss.row.BinaryString;
+import org.apache.fluss.row.GenericArray;
+import org.apache.fluss.row.GenericMap;
 import org.apache.fluss.row.GenericRow;
+import org.apache.fluss.types.ArrayType;
 import org.apache.fluss.types.DataField;
 import org.apache.fluss.types.IntType;
+import org.apache.fluss.types.MapType;
 import org.apache.fluss.types.RowType;
 import org.apache.fluss.types.StringType;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,7 +45,9 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -102,6 +111,85 @@ class FlussRecordDeserializerTest {
     /** Creates a snapshot-phase ScanRecord (schemaId = -1, rowType = null). */
     private static ScanRecord snapshotRecord(GenericRow row) {
         return new ScanRecord(row);
+    }
+
+    @Test
+    void testDeserializeComplexTypes() {
+        RowType nestedRowType =
+                rowType(
+                        new DataField("nested_id", new IntType(true)),
+                        new DataField("nested_name", new StringType(true)));
+        RowType rt =
+                rowType(
+                        field("id", new IntType(false), 1),
+                        field("scores", new ArrayType(new IntType(true)), 2),
+                        field(
+                                "attributes",
+                                new MapType(
+                                        new StringType(false), new ArrayType(new IntType(true))),
+                                3),
+                        field("nested", nestedRowType, 4));
+
+        Map<BinaryString, GenericArray> attributes = new LinkedHashMap<>();
+        attributes.put(BinaryString.fromString("a"), new GenericArray(new Object[] {1, null, 3}));
+        attributes.put(BinaryString.fromString("empty"), new GenericArray(new Object[] {}));
+        GenericRow row =
+                GenericRow.of(
+                        1,
+                        new GenericArray(new Object[] {10, null, 30}),
+                        new GenericMap(attributes),
+                        GenericRow.of(7, BinaryString.fromString("nested-row")));
+
+        List<Event> events = deserializer.deserialize(logRecord(1, rt, row), TABLE_PATH);
+
+        assertThat(events).hasSize(2);
+        RecordData after = ((DataChangeEvent) events.get(1)).after();
+        ArrayData scores = after.getArray(1);
+        assertThat(scores.size()).isEqualTo(3);
+        assertThat(scores.getInt(0)).isEqualTo(10);
+        assertThat(scores.isNullAt(1)).isTrue();
+        assertThat(scores.getInt(2)).isEqualTo(30);
+
+        MapData attributesData = after.getMap(2);
+        ArrayData keyArray = attributesData.keyArray();
+        ArrayData valueArray = attributesData.valueArray();
+        assertThat(attributesData.size()).isEqualTo(2);
+        assertThat(keyArray.getString(0).toString()).isEqualTo("a");
+        assertThat(valueArray.getArray(0).getInt(0)).isEqualTo(1);
+        assertThat(valueArray.getArray(0).isNullAt(1)).isTrue();
+        assertThat(valueArray.getArray(0).getInt(2)).isEqualTo(3);
+        assertThat(keyArray.getString(1).toString()).isEqualTo("empty");
+        assertThat(valueArray.getArray(1).size()).isZero();
+
+        RecordData nested = after.getRow(3, 2);
+        assertThat(nested.getInt(0)).isEqualTo(7);
+        assertThat(nested.getString(1).toString()).isEqualTo("nested-row");
+    }
+
+    @Test
+    void testDeserializeNestedComplexTypesWithNulls() {
+        RowType innerRowType = rowType(new DataField("value", new StringType(true)));
+        RowType rt =
+                rowType(
+                        field("id", new IntType(false), 1),
+                        field("nested_rows", new ArrayType(innerRowType), 2));
+        GenericRow row =
+                GenericRow.of(
+                        1,
+                        new GenericArray(
+                                new Object[] {
+                                    GenericRow.of(BinaryString.fromString("first")),
+                                    null,
+                                    GenericRow.of((Object) null)
+                                }));
+
+        List<Event> events = deserializer.deserialize(logRecord(1, rt, row), TABLE_PATH);
+
+        RecordData after = ((DataChangeEvent) events.get(1)).after();
+        ArrayData nestedRows = after.getArray(1);
+        assertThat(nestedRows.getRecord(0, 1).getString(0).toString()).isEqualTo("first");
+        assertThat(nestedRows.isNullAt(1)).isTrue();
+        assertThat(nestedRows.getRecord(2, 1).isNullAt(0)).isTrue();
     }
 
     // ------------------------------------------------------------------

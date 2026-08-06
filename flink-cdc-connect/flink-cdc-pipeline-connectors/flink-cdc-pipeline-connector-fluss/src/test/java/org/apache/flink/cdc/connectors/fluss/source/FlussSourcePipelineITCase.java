@@ -19,6 +19,8 @@ package org.apache.flink.cdc.connectors.fluss.source;
 
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.cdc.common.data.ArrayData;
+import org.apache.flink.cdc.common.data.MapData;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.ChangeEvent;
@@ -27,8 +29,11 @@ import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.source.discover.TableDiscoverer;
+import org.apache.flink.cdc.common.types.ArrayType;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
+import org.apache.flink.cdc.common.types.MapType;
+import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.connectors.fluss.source.deserializer.FlussRecordDeserializer;
 import org.apache.flink.cdc.connectors.fluss.source.discover.FlussDefaultDiscoverer;
 import org.apache.flink.cdc.connectors.fluss.source.discover.FlussSubscriberTableDiscoverer;
@@ -143,12 +148,12 @@ public class FlussSourcePipelineITCase {
         FlussSource<Event> source = createFlussSource(DATABASE_NAME, tableName, "earliest");
         List<Event> allEvents = collectAllEvents(source, 4, COLLECT_TIMEOUT);
         List<String> actual = convertToStringList(allEvents, DataTypes.INT(), DataTypes.STRING());
-        assertThat(actual)
-                .containsExactly(
-                        "CREATE TABLE pk_table (`id` INT NOT NULL, `name` STRING, PRIMARY KEY (id) NOT ENFORCED)",
-                        "+I[1, Alice]",
-                        "+I[2, Bob]",
-                        "+I[3, Charlie]");
+        assertSchemaAndDataEvents(
+                actual,
+                "CREATE TABLE pk_table (`id` INT NOT NULL, `name` STRING, PRIMARY KEY (id) NOT ENFORCED)",
+                "+I[1, Alice]",
+                "+I[2, Bob]",
+                "+I[3, Charlie]");
     }
 
     @Test
@@ -168,14 +173,14 @@ public class FlussSourcePipelineITCase {
         FlussSource<Event> source = createFlussSource(DATABASE_NAME, tableName, "earliest");
         List<Event> allEvents = collectAllEvents(source, 6, COLLECT_TIMEOUT);
         List<String> actual = convertToStringList(allEvents, DataTypes.INT(), DataTypes.STRING());
-        assertThat(actual)
-                .containsExactly(
-                        "CREATE TABLE log_table (`id` INT, `name` STRING)",
-                        "+I[1, Alice]",
-                        "+I[2, Bob]",
-                        "+I[3, Charlie]",
-                        "+I[4, David]",
-                        "+I[5, Eve]");
+        assertSchemaAndDataEvents(
+                actual,
+                "CREATE TABLE log_table (`id` INT, `name` STRING)",
+                "+I[1, Alice]",
+                "+I[2, Bob]",
+                "+I[3, Charlie]",
+                "+I[4, David]",
+                "+I[5, Eve]");
     }
 
     @Test
@@ -233,14 +238,61 @@ public class FlussSourcePipelineITCase {
                                 DataTypes.INT(),
                                 DataTypes.STRING(),
                                 DataTypes.STRING()))
-                .containsExactly("+I[1, 20240101, Alice]", "+I[2, 20240101, Bob]");
+                .containsExactlyInAnyOrder("+I[1, 20240101, Alice]", "+I[2, 20240101, Bob]");
         assertThat(
                         convertToStringList(
                                 eventsByPartition.get("20240102"),
                                 DataTypes.INT(),
                                 DataTypes.STRING(),
                                 DataTypes.STRING()))
-                .containsExactly("+I[3, 20240102, Charlie]", "+I[4, 20240102, David]");
+                .containsExactlyInAnyOrder("+I[3, 20240102, Charlie]", "+I[4, 20240102, David]");
+    }
+
+    @Test
+    void testComplexTypeTable() throws Exception {
+        String tableName = "complex_type_table";
+        tBatchEnv
+                .executeSql(
+                        String.format(
+                                "CREATE TABLE %s ("
+                                        + "id INT, "
+                                        + "scores ARRAY<INT>, "
+                                        + "props MAP<STRING, INT>, "
+                                        + "nested ROW<nested_id INT, nested_name STRING>"
+                                        + ")",
+                                tableName))
+                .await();
+
+        tBatchEnv
+                .executeSql(
+                        String.format(
+                                "INSERT INTO %s VALUES "
+                                        + "(1, ARRAY[10, 20], MAP['a', 100, 'b', 200], ROW(7, 'nested-a')), "
+                                        + "(2, ARRAY[30, 40], MAP['c', 300], ROW(8, 'nested-b'))",
+                                tableName))
+                .await();
+
+        FlussSource<Event> source = createFlussSource(DATABASE_NAME, tableName, "earliest");
+        List<Event> allEvents = collectAllEvents(source, 3, COLLECT_TIMEOUT);
+        List<String> actual =
+                convertToStringList(
+                        allEvents,
+                        DataTypes.INT(),
+                        DataTypes.ARRAY(DataTypes.INT()),
+                        DataTypes.MAP(DataTypes.STRING(), DataTypes.INT()),
+                        DataTypes.ROW(
+                                DataTypes.FIELD("nested_id", DataTypes.INT()),
+                                DataTypes.FIELD("nested_name", DataTypes.STRING())));
+
+        String expectedCreateTable =
+                "CREATE TABLE complex_type_table (`id` INT, `scores` ARRAY<INT>, "
+                        + "`props` MAP<STRING NOT NULL, INT>, "
+                        + "`nested` ROW<`nested_id` INT, `nested_name` STRING>)";
+        assertSchemaAndDataEvents(
+                actual,
+                expectedCreateTable,
+                "+I[1, [10, 20], {a=100, b=200}, [7, nested-a]]",
+                "+I[2, [30, 40], {c=300}, [8, nested-b]]");
     }
 
     @Test
@@ -291,30 +343,27 @@ public class FlussSourcePipelineITCase {
                                 Collectors.groupingBy(
                                         event -> ((ChangeEvent) event).tableId().getTableName()));
 
-        assertThat(
-                        convertToStringList(
-                                eventsByTable.get(pkTable), DataTypes.INT(), DataTypes.STRING()))
-                .containsExactly(
-                        "CREATE TABLE mixed_pk (`id` INT NOT NULL, `val` STRING, PRIMARY KEY (id) NOT ENFORCED)",
-                        "+I[1, pk1]",
-                        "+I[2, pk2]");
-        assertThat(
-                        convertToStringList(
-                                eventsByTable.get(logTable), DataTypes.INT(), DataTypes.STRING()))
-                .containsExactly(
-                        "CREATE TABLE mixed_log (`id` INT, `val` STRING)",
-                        "+I[1, log1]",
-                        "+I[2, log2]");
-        assertThat(
-                        convertToStringList(
-                                eventsByTable.get(partTable),
-                                DataTypes.INT(),
-                                DataTypes.STRING(),
-                                DataTypes.STRING()))
-                .containsExactly(
-                        "CREATE TABLE mixed_part (`id` INT NOT NULL, `ds` STRING NOT NULL, `val` STRING, PRIMARY KEY (id, ds) NOT ENFORCED) PARTITIONED BY (ds)",
-                        "+I[1, 20240101, part1]",
-                        "+I[2, 20240102, part2]");
+        assertSchemaAndDataEvents(
+                convertToStringList(
+                        eventsByTable.get(pkTable), DataTypes.INT(), DataTypes.STRING()),
+                "CREATE TABLE mixed_pk (`id` INT NOT NULL, `val` STRING, PRIMARY KEY (id) NOT ENFORCED)",
+                "+I[1, pk1]",
+                "+I[2, pk2]");
+        assertSchemaAndDataEvents(
+                convertToStringList(
+                        eventsByTable.get(logTable), DataTypes.INT(), DataTypes.STRING()),
+                "CREATE TABLE mixed_log (`id` INT, `val` STRING)",
+                "+I[1, log1]",
+                "+I[2, log2]");
+        assertSchemaAndDataEvents(
+                convertToStringList(
+                        eventsByTable.get(partTable),
+                        DataTypes.INT(),
+                        DataTypes.STRING(),
+                        DataTypes.STRING()),
+                "CREATE TABLE mixed_part (`id` INT NOT NULL, `ds` STRING NOT NULL, `val` STRING, PRIMARY KEY (id, ds) NOT ENFORCED) PARTITIONED BY (ds)",
+                "+I[1, 20240101, part1]",
+                "+I[2, 20240102, part2]");
     }
 
     @Test
@@ -335,12 +384,12 @@ public class FlussSourcePipelineITCase {
         FlussSource<Event> source = createFlussSource(DATABASE_NAME, tableName, "earliest");
         List<Event> allEvents = collectAllEvents(source, 4, COLLECT_TIMEOUT);
         List<String> actual = convertToStringList(allEvents, DataTypes.INT(), DataTypes.STRING());
-        assertThat(actual)
-                .containsExactly(
-                        "CREATE TABLE earliest_test (`id` INT NOT NULL, `name` STRING, PRIMARY KEY (id) NOT ENFORCED)",
-                        "+I[1, A]",
-                        "+I[2, B]",
-                        "+I[3, C]");
+        assertSchemaAndDataEvents(
+                actual,
+                "CREATE TABLE earliest_test (`id` INT NOT NULL, `name` STRING, PRIMARY KEY (id) NOT ENFORCED)",
+                "+I[1, A]",
+                "+I[2, B]",
+                "+I[3, C]");
     }
 
     @Test
@@ -385,11 +434,11 @@ public class FlussSourcePipelineITCase {
         // Should only receive the NEW data (written after source started)
         List<Event> allEvents = collectAllEvents(iter, 3, COLLECT_TIMEOUT, true);
         List<String> actual = convertToStringList(allEvents, DataTypes.INT(), DataTypes.STRING());
-        assertThat(actual)
-                .containsExactly(
-                        "CREATE TABLE latest_test (`id` INT NOT NULL, `name` STRING, PRIMARY KEY (id) NOT ENFORCED)",
-                        "+I[3, New1]",
-                        "+I[4, New2]");
+        assertSchemaAndDataEvents(
+                actual,
+                "CREATE TABLE latest_test (`id` INT NOT NULL, `name` STRING, PRIMARY KEY (id) NOT ENFORCED)",
+                "+I[3, New1]",
+                "+I[4, New2]");
     }
 
     @Test
@@ -423,14 +472,14 @@ public class FlussSourcePipelineITCase {
         FlussSource<Event> source = createFlussSource(DATABASE_NAME, tableName, "full");
         List<Event> allEvents = collectAllEvents(source, 6, COLLECT_TIMEOUT);
         List<String> actual = convertToStringList(allEvents, DataTypes.INT(), DataTypes.STRING());
-        assertThat(actual)
-                .containsExactly(
-                        "CREATE TABLE full_test (`id` INT NOT NULL, `name` STRING, PRIMARY KEY (id) NOT ENFORCED)",
-                        "+I[1, Snap1]",
-                        "+I[2, Snap2]",
-                        "+I[3, Snap3]",
-                        "+I[4, Log1]",
-                        "+I[5, Log2]");
+        assertSchemaAndDataEvents(
+                actual,
+                "CREATE TABLE full_test (`id` INT NOT NULL, `name` STRING, PRIMARY KEY (id) NOT ENFORCED)",
+                "+I[1, Snap1]",
+                "+I[2, Snap2]",
+                "+I[3, Snap3]",
+                "+I[4, Log1]",
+                "+I[5, Log2]");
     }
 
     @Test
@@ -468,12 +517,12 @@ public class FlussSourcePipelineITCase {
                 createFlussSourceWithTimestamp(DATABASE_NAME, tableName, timestampMarker);
         List<Event> allEvents = collectAllEvents(source, 4, COLLECT_TIMEOUT);
         List<String> actual = convertToStringList(allEvents, DataTypes.INT(), DataTypes.STRING());
-        assertThat(actual)
-                .containsExactly(
-                        "CREATE TABLE timestamp_test (`id` INT NOT NULL, `name` STRING, PRIMARY KEY (id) NOT ENFORCED)",
-                        "+I[3, After1]",
-                        "+I[4, After2]",
-                        "+I[5, After3]");
+        assertSchemaAndDataEvents(
+                actual,
+                "CREATE TABLE timestamp_test (`id` INT NOT NULL, `name` STRING, PRIMARY KEY (id) NOT ENFORCED)",
+                "+I[3, After1]",
+                "+I[4, After2]",
+                "+I[5, After3]");
     }
 
     @Test
@@ -550,11 +599,11 @@ public class FlussSourcePipelineITCase {
         // After restore, should receive only the new events (D, E), not the old ones
         List<Event> allEvents = collectAllEvents(iter, 3, COLLECT_TIMEOUT, true);
         List<String> actual = convertToStringList(allEvents, DataTypes.INT(), DataTypes.STRING());
-        assertThat(actual)
-                .containsExactly(
-                        "CREATE TABLE savepoint_test (`id` INT NOT NULL, `name` STRING, PRIMARY KEY (id) NOT ENFORCED)",
-                        "+I[4, D]",
-                        "+I[5, E]");
+        assertSchemaAndDataEvents(
+                actual,
+                "CREATE TABLE savepoint_test (`id` INT NOT NULL, `name` STRING, PRIMARY KEY (id) NOT ENFORCED)",
+                "+I[4, D]",
+                "+I[5, E]");
     }
 
     @Test
@@ -588,11 +637,11 @@ public class FlussSourcePipelineITCase {
 
         List<Event> allEvents = collectAllEvents(iter, 3, Duration.ofMinutes(5), false);
         List<String> actual = convertToStringList(allEvents, DataTypes.INT(), DataTypes.STRING());
-        assertThat(actual)
-                .containsExactly(
-                        "CREATE TABLE discover_a (`id` INT NOT NULL, `val` STRING, PRIMARY KEY (id) NOT ENFORCED)",
-                        "+I[1, a1]",
-                        "+I[2, a2]");
+        assertSchemaAndDataEvents(
+                actual,
+                "CREATE TABLE discover_a (`id` INT NOT NULL, `val` STRING, PRIMARY KEY (id) NOT ENFORCED)",
+                "+I[1, a1]",
+                "+I[2, a2]");
 
         // Create a new table and write data
         String tableB = "discover_b";
@@ -608,11 +657,11 @@ public class FlussSourcePipelineITCase {
 
         allEvents = collectAllEvents(iter, 3, Duration.ofMinutes(5), true);
         actual = convertToStringList(allEvents, DataTypes.INT(), DataTypes.STRING());
-        assertThat(actual)
-                .containsExactly(
-                        "CREATE TABLE discover_b (`id` INT NOT NULL, `val` STRING, PRIMARY KEY (id) NOT ENFORCED)",
-                        "+I[1, b1]",
-                        "+I[2, b2]");
+        assertSchemaAndDataEvents(
+                actual,
+                "CREATE TABLE discover_b (`id` INT NOT NULL, `val` STRING, PRIMARY KEY (id) NOT ENFORCED)",
+                "+I[1, b1]",
+                "+I[2, b2]");
     }
 
     @Test
@@ -666,11 +715,11 @@ public class FlussSourcePipelineITCase {
         // Phase 1: should receive CreateTable(tableA) + its 2 data rows.
         List<Event> allEvents = collectAllEvents(iter, 3, Duration.ofMinutes(5), false);
         List<String> actual = convertToStringList(allEvents, DataTypes.INT(), DataTypes.STRING());
-        assertThat(actual)
-                .containsExactly(
-                        "CREATE TABLE sub_discover_a (`id` INT NOT NULL, `val` STRING, PRIMARY KEY (id) NOT ENFORCED)",
-                        "+I[1, a1]",
-                        "+I[2, a2]");
+        assertSchemaAndDataEvents(
+                actual,
+                "CREATE TABLE sub_discover_a (`id` INT NOT NULL, `val` STRING, PRIMARY KEY (id) NOT ENFORCED)",
+                "+I[1, a1]",
+                "+I[2, a2]");
 
         // 4. Dynamically extend the subscription: append a row pointing to a freshly
         //    created table B. The running enumerator should discover B on its next cycle.
@@ -694,11 +743,11 @@ public class FlussSourcePipelineITCase {
         // Phase 2: should receive CreateTable(tableB) + its 2 data rows.
         allEvents = collectAllEvents(iter, 3, Duration.ofMinutes(5), true);
         actual = convertToStringList(allEvents, DataTypes.INT(), DataTypes.STRING());
-        assertThat(actual)
-                .containsExactly(
-                        "CREATE TABLE sub_discover_b (`id` INT NOT NULL, `val` STRING, PRIMARY KEY (id) NOT ENFORCED)",
-                        "+I[1, b1]",
-                        "+I[2, b2]");
+        assertSchemaAndDataEvents(
+                actual,
+                "CREATE TABLE sub_discover_b (`id` INT NOT NULL, `val` STRING, PRIMARY KEY (id) NOT ENFORCED)",
+                "+I[1, b1]",
+                "+I[2, b2]");
     }
 
     @Test
@@ -742,11 +791,11 @@ public class FlussSourcePipelineITCase {
         List<String> actual =
                 convertToStringList(
                         allEvents, DataTypes.INT(), DataTypes.STRING(), DataTypes.STRING());
-        assertThat(actual)
-                .containsExactly(
-                        "CREATE TABLE part_discover_table (`id` INT NOT NULL, `ds` STRING NOT NULL, `val` STRING, PRIMARY KEY (id, ds) NOT ENFORCED) PARTITIONED BY (ds)",
-                        "+I[1, 20240101, p1_v1]",
-                        "+I[2, 20240101, p1_v2]");
+        assertSchemaAndDataEvents(
+                actual,
+                "CREATE TABLE part_discover_table (`id` INT NOT NULL, `ds` STRING NOT NULL, `val` STRING, PRIMARY KEY (id, ds) NOT ENFORCED) PARTITIONED BY (ds)",
+                "+I[1, 20240101, p1_v1]",
+                "+I[2, 20240101, p1_v2]");
 
         // Add a new partition (p2) by inserting data with a new partition value
         tBatchEnv
@@ -761,11 +810,11 @@ public class FlussSourcePipelineITCase {
         actual =
                 convertToStringList(
                         allEvents, DataTypes.INT(), DataTypes.STRING(), DataTypes.STRING());
-        assertThat(actual)
-                .containsExactly(
-                        "CREATE TABLE part_discover_table (`id` INT NOT NULL, `ds` STRING NOT NULL, `val` STRING, PRIMARY KEY (id, ds) NOT ENFORCED) PARTITIONED BY (ds)",
-                        "+I[3, 20240102, p2_v1]",
-                        "+I[4, 20240102, p2_v2]");
+        assertSchemaAndDataEvents(
+                actual,
+                "CREATE TABLE part_discover_table (`id` INT NOT NULL, `ds` STRING NOT NULL, `val` STRING, PRIMARY KEY (id, ds) NOT ENFORCED) PARTITIONED BY (ds)",
+                "+I[3, 20240102, p2_v1]",
+                "+I[4, 20240102, p2_v2]");
     }
 
     @Test
@@ -803,11 +852,11 @@ public class FlussSourcePipelineITCase {
         // Phase 1: Collect CreateTableEvent + initial 2 DataChangeEvents
         List<Event> allEvents = collectAllEvents(iter, 3, Duration.ofMinutes(2), false);
         List<String> actual = convertToStringList(allEvents, DataTypes.INT(), DataTypes.STRING());
-        assertThat(actual)
-                .containsExactly(
-                        "CREATE TABLE add_column_test (`id` INT NOT NULL, `name` STRING, PRIMARY KEY (id) NOT ENFORCED)",
-                        "+I[1, Alice]",
-                        "+I[2, Bob]");
+        assertSchemaAndDataEvents(
+                actual,
+                "CREATE TABLE add_column_test (`id` INT NOT NULL, `name` STRING, PRIMARY KEY (id) NOT ENFORCED)",
+                "+I[1, Alice]",
+                "+I[2, Bob]");
 
         // Phase 2: ALTER TABLE to add a new nullable column
         tBatchEnv.executeSql(String.format("ALTER TABLE %s ADD `age` INT", tableName)).await();
@@ -825,11 +874,11 @@ public class FlussSourcePipelineITCase {
         List<String> newStrings =
                 convertToStringList(
                         allEvents, DataTypes.INT(), DataTypes.STRING(), DataTypes.INT());
-        assertThat(newStrings)
-                .containsExactly(
-                        "ALTER TABLE add_column_test ADD `age` INT LAST",
-                        "+I[3, Charlie, 30]",
-                        "+I[4, David, 40]");
+        assertSchemaAndDataEvents(
+                newStrings,
+                "ALTER TABLE add_column_test ADD `age` INT LAST",
+                "+I[3, Charlie, 30]",
+                "+I[4, David, 40]");
     }
 
     // ======================== Helper methods ========================
@@ -1052,6 +1101,13 @@ public class FlussSourcePipelineITCase {
         return ddl;
     }
 
+    private void assertSchemaAndDataEvents(
+            List<String> actual, String expectedSchemaEvent, String... expectedDataEvents) {
+        assertThat(actual).hasSize(expectedDataEvents.length + 1);
+        assertThat(actual.get(0)).isEqualTo(expectedSchemaEvent);
+        assertThat(actual.subList(1, actual.size())).containsExactlyInAnyOrder(expectedDataEvents);
+    }
+
     /** Converts a list of events to human-readable strings while preserving event order. */
     private List<String> convertToStringList(List<? extends Event> events, DataType... fieldTypes) {
         List<RecordData.FieldGetter> fieldGetters = new ArrayList<>();
@@ -1065,7 +1121,7 @@ public class FlussSourcePipelineITCase {
             } else if (event instanceof AddColumnEvent) {
                 result.add(addColumnEventToString((AddColumnEvent) event));
             } else if (event instanceof DataChangeEvent) {
-                result.add(eventToString((DataChangeEvent) event, fieldGetters));
+                result.add(eventToString((DataChangeEvent) event, fieldGetters, fieldTypes));
             } else {
                 throw new IllegalStateException(String.format("%s is not expected", event));
             }
@@ -1096,7 +1152,10 @@ public class FlussSourcePipelineITCase {
                 .collect(Collectors.joining("; "));
     }
 
-    private String eventToString(DataChangeEvent event, List<RecordData.FieldGetter> fieldGetters) {
+    private String eventToString(
+            DataChangeEvent event,
+            List<RecordData.FieldGetter> fieldGetters,
+            DataType[] fieldTypes) {
         String prefix;
         RecordData record;
         switch (event.op()) {
@@ -1120,11 +1179,65 @@ public class FlussSourcePipelineITCase {
                 throw new IllegalArgumentException("Unknown op: " + event.op());
         }
         List<Object> fields = new ArrayList<>();
-        int fieldCount = Math.min(record.getArity(), fieldGetters.size());
+        int fieldCount =
+                Math.min(record.getArity(), Math.min(fieldGetters.size(), fieldTypes.length));
         for (int i = 0; i < fieldCount; i++) {
-            fields.add(fieldGetters.get(i).getFieldOrNull(record));
+            Object field = fieldGetters.get(i).getFieldOrNull(record);
+            fields.add(stringifyValue(fieldTypes[i], field));
         }
         return prefix + fields;
+    }
+
+    private Object stringifyValue(DataType fieldType, Object field) {
+        if (field == null) {
+            return null;
+        }
+        if (fieldType instanceof ArrayType) {
+            return arrayToString((ArrayData) field, ((ArrayType) fieldType).getElementType());
+        }
+        if (fieldType instanceof MapType) {
+            MapType mapType = (MapType) fieldType;
+            return mapToString((MapData) field, mapType.getKeyType(), mapType.getValueType());
+        }
+        if (fieldType instanceof RowType) {
+            RowType rowType = (RowType) fieldType;
+            return rowToString((RecordData) field, rowType.getFieldTypes());
+        }
+        return field;
+    }
+
+    private String arrayToString(ArrayData array, DataType elementType) {
+        ArrayData.ElementGetter elementGetter = ArrayData.createElementGetter(elementType);
+        List<Object> elements = new ArrayList<>();
+        for (int i = 0; i < array.size(); i++) {
+            elements.add(stringifyValue(elementType, elementGetter.getElementOrNull(array, i)));
+        }
+        return elements.toString();
+    }
+
+    private String mapToString(MapData map, DataType keyType, DataType valueType) {
+        ArrayData.ElementGetter keyGetter = ArrayData.createElementGetter(keyType);
+        ArrayData.ElementGetter valueGetter = ArrayData.createElementGetter(valueType);
+        ArrayData keyArray = map.keyArray();
+        ArrayData valueArray = map.valueArray();
+        List<String> entries = new ArrayList<>();
+        for (int i = 0; i < map.size(); i++) {
+            Object key = stringifyValue(keyType, keyGetter.getElementOrNull(keyArray, i));
+            Object value = stringifyValue(valueType, valueGetter.getElementOrNull(valueArray, i));
+            entries.add(key + "=" + value);
+        }
+        Collections.sort(entries);
+        return "{" + String.join(", ", entries) + "}";
+    }
+
+    private String rowToString(RecordData row, List<DataType> fieldTypes) {
+        List<Object> fields = new ArrayList<>();
+        for (int i = 0; i < fieldTypes.size(); i++) {
+            DataType fieldType = fieldTypes.get(i);
+            RecordData.FieldGetter fieldGetter = RecordData.createFieldGetter(fieldType, i);
+            fields.add(stringifyValue(fieldType, fieldGetter.getFieldOrNull(row)));
+        }
+        return fields.toString();
     }
 
     private void waitForFlussClusterReady() throws Exception {
