@@ -141,7 +141,8 @@ public class OracleScanFetchTask extends AbstractScanFetchTask {
                 context.getDatabaseSchema(),
                 context.getSourceConfig().getOriginDbzConnectorConfig(),
                 context.getStreamingChangeEventSourceMetrics(),
-                backfillRedoLogSplit);
+                backfillRedoLogSplit,
+                null);
     }
 
     /** A wrapped task to fetch snapshot split of table. */

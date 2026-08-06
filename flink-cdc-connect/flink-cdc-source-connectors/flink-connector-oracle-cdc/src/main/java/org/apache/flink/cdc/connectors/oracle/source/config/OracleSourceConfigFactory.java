@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.oracle.source.config;
 
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfigFactory;
+import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.connectors.base.source.EmbeddedFlinkDatabaseHistory;
 
 import io.debezium.config.Configuration;
@@ -136,5 +137,23 @@ public class OracleSourceConfigFactory extends JdbcSourceConfigFactory {
                 skipSnapshotBackfill,
                 scanNewlyAddedTableEnabled,
                 assignUnboundedChunkFirst);
+    }
+
+    @Override
+    public JdbcSourceConfigFactory startupOptions(StartupOptions startupOptions) {
+        switch (startupOptions.startupMode) {
+            case INITIAL:
+            case SNAPSHOT:
+            case LATEST_OFFSET:
+            case SPECIFIC_OFFSETS:
+            case COMMITTED_OFFSETS:
+            case TIMESTAMP:
+                break;
+            default:
+                throw new UnsupportedOperationException(
+                        "Unsupported startup mode: " + startupOptions.startupMode);
+        }
+        this.startupOptions = startupOptions;
+        return this;
     }
 }
