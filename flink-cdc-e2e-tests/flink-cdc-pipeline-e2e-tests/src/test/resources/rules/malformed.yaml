@@ -55,20 +55,3 @@ steps:
     error: |
       YAML UDF block is expecting an array children, but got an OBJECT ({"name":"addone","classpath":"org.apache.flink.cdc.udf.examples.%s.AddOneFunctionClass"}).
       Perhaps you missed a dash prefix `-`?
-  # Models not an array
-  - type: submit
-    yaml: |
-      source:
-        type: values
-      sink:
-        type: values
-      pipeline:
-        model:
-          model-name: GET_EMBEDDING
-          class-name: OpenAIEmbeddingModel
-          openai.model: text-embedding-3-small
-          openai.host: https://xxxx
-          openai.apikey: abcd1234
-    error: |
-      YAML model block is expecting an array children, but got an OBJECT ({"model-name":"GET_EMBEDDING","class-name":"OpenAIEmbeddingModel","openai.model":"text-embedding-3-small","openai.host":"https://xxxx","openai.apikey":"abcd1234"}).
-      Perhaps you missed a dash prefix `-`?

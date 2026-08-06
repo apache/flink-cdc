@@ -44,6 +44,7 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.dataformat.yaml.YA
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -96,9 +97,8 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     private static final String UDF_OPTIONS_KEY = "options";
 
     // Model related keys
-    private static final String MODEL_NAME_KEY = "model-name";
-
-    private static final String MODEL_CLASS_NAME_KEY = "class-name";
+    private static final String MODEL_NAME_KEY = "name";
+    private static final String MODEL_TYPE_KEY = "type";
 
     public static final String TRANSFORM_PRIMARY_KEY_KEY = "primary-keys";
 
@@ -145,7 +145,6 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
 
             Optional.ofNullable(
                             ((ObjectNode) pipelineDefJsonNode.get(PIPELINE_KEY)).remove(MODEL_KEY))
-                    .map(node -> validateArray("model", node))
                     .ifPresent(node -> modelDefs.addAll(parseModels(node)));
         }
 
@@ -428,24 +427,45 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         } else {
             modelDefs.add(convertJsonNodeToModelDef(modelsNode));
         }
+        Set<String> seenNames = new HashSet<>();
+        for (ModelDef model : modelDefs) {
+            if (!seenNames.add(model.getName())) {
+                throw new IllegalArgumentException(
+                        "Duplicate model name '" + model.getName() + "' in pipeline definition.");
+            }
+        }
         return modelDefs;
     }
 
     private ModelDef convertJsonNodeToModelDef(JsonNode modelNode) {
+        Preconditions.checkArgument(
+                modelNode instanceof ObjectNode,
+                "`model` in `pipeline` should be an object, but got %s",
+                modelNode);
+        ObjectNode node = (ObjectNode) modelNode;
         String name =
                 checkNotNull(
-                                modelNode.get(MODEL_NAME_KEY),
+                                node.remove(MODEL_NAME_KEY),
                                 "Missing required field \"%s\" in `model`",
                                 MODEL_NAME_KEY)
                         .asText();
-        String model =
+        Preconditions.checkArgument(
+                name.matches("[a-zA-Z_][a-zA-Z0-9_]*") && !name.startsWith("__"),
+                "Model name \"%s\" is not a valid identifier. "
+                        + "It must start with a letter or underscore, "
+                        + "contain only letters, digits, or underscores, "
+                        + "and must not start with double underscores.",
+                name);
+        String type =
                 checkNotNull(
-                                modelNode.get(MODEL_CLASS_NAME_KEY),
+                                node.remove(MODEL_TYPE_KEY),
                                 "Missing required field \"%s\" in `model`",
-                                MODEL_CLASS_NAME_KEY)
+                                MODEL_TYPE_KEY)
                         .asText();
-        Map<String, String> properties = mapper.convertValue(modelNode, Map.class);
-        return new ModelDef(name, model, properties);
+        Map<String, String> options = new HashMap<>();
+        node.fields()
+                .forEachRemaining(entry -> options.put(entry.getKey(), entry.getValue().asText()));
+        return new ModelDef(name, type, options);
     }
 
     private void validateJsonNodeKeys(
