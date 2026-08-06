@@ -36,4 +36,11 @@ public class OracleSourceOptions extends JdbcSourceOptions {
                     .intType()
                     .defaultValue(1521)
                     .withDescription("Integer port number of the Oracle database server.");
+
+    public static final ConfigOption<Boolean> SCAN_INCREMENTAL_SNAPSHOT_ANALYZE_TABLE_ENABLED =
+            ConfigOptions.key("scan.incremental.snapshot.analyze-table.enabled")
+                    .booleanType()
+                    .defaultValue(true)
+                    .withDescription(
+                            "Whether to execute ANALYZE TABLE before querying ALL_TABLES.NUM_ROWS for approximate row count during incremental snapshot chunk planning.");
 }
