@@ -21,6 +21,7 @@ import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
 
+import com.github.shyiko.mysql.binlog.BinaryLogClient;
 import io.debezium.connector.mysql.MySqlConnection;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -63,6 +64,42 @@ class DebeziumUtilsTest {
                         + "&nullCatalogMeansCurrent=false&characterSetResults=UTF-8&useSSL=true&onlyTest=test"
                         + "&zeroDateTimeBehavior=CONVERT_TO_NULL&characterEncoding=UTF-8&useUnicode=true",
                 connection2.connectionString());
+    }
+
+    @Test
+    void testCreateBinaryClientReturnsMariaDbClientForMariadbDialect() {
+        BinaryLogClient client =
+                DebeziumUtils.createBinaryClient(
+                        getConfig(new Properties()).getDbzConfiguration(), "mariadb");
+        Assertions.assertThat(client).isInstanceOf(MariaDBBinaryLogClient.class);
+    }
+
+    @Test
+    void testCreateBinaryClientReturnsMariaDbClientForAutoDialect() {
+        BinaryLogClient client =
+                DebeziumUtils.createBinaryClient(
+                        getConfig(new Properties()).getDbzConfiguration(), "auto");
+        Assertions.assertThat(client).isInstanceOf(MariaDBBinaryLogClient.class);
+    }
+
+    @Test
+    void testCreateBinaryClientIsCaseInsensitiveForMysql() {
+        BinaryLogClient client =
+                DebeziumUtils.createBinaryClient(
+                        getConfig(new Properties()).getDbzConfiguration(), "MySQL");
+        Assertions.assertThat(client)
+                .isExactlyInstanceOf(BinaryLogClient.class)
+                .isNotInstanceOf(MariaDBBinaryLogClient.class);
+    }
+
+    @Test
+    void testCreateBinaryClientReturnStockClientForMysqlDialect() {
+        BinaryLogClient client =
+                DebeziumUtils.createBinaryClient(
+                        getConfig(new Properties()).getDbzConfiguration(), "mysql");
+        Assertions.assertThat(client)
+                .isExactlyInstanceOf(BinaryLogClient.class)
+                .isNotInstanceOf(MariaDBBinaryLogClient.class);
     }
 
     private MySqlSourceConfig getConfig(Properties jdbcProperties) {

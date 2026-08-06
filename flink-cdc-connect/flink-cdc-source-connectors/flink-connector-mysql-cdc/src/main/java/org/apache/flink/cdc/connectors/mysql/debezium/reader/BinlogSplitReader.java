@@ -22,6 +22,7 @@ import org.apache.flink.cdc.connectors.mysql.debezium.task.MySqlBinlogSplitReadT
 import org.apache.flink.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
+import org.apache.flink.cdc.connectors.mysql.source.offset.MariaDbGtidStrategy;
 import org.apache.flink.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplit;
@@ -101,7 +102,8 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
         this(
                 new StatefulTaskContext(
                         sourceConfig,
-                        createBinaryClient(sourceConfig.getDbzConfiguration()),
+                        createBinaryClient(
+                                sourceConfig.getDbzConfiguration(), sourceConfig.getDialect()),
                         createMySqlConnection(sourceConfig)),
                 subtaskId);
     }
@@ -123,6 +125,13 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
         this.currentBinlogSplit = mySqlSplit.asBinlogSplit();
         configureFilter();
         statefulTaskContext.configure(currentBinlogSplit);
+        if (MariaDbGtidStrategy.DIALECT.equals(statefulTaskContext.getResolvedDialect())) {
+            LOG.info(
+                    "MariaDB binlog split is submitted: startingOffset={} capturedSchemas={} finishedSnapshotSplits={}",
+                    currentBinlogSplit.getStartingOffset(),
+                    currentBinlogSplit.getTableSchemas().keySet(),
+                    currentBinlogSplit.getFinishedSnapshotSplitInfos().size());
+        }
         this.capturedTableFilter = statefulTaskContext.getSourceConfig().getTableFilter();
         this.queue = statefulTaskContext.getQueue();
         this.binlogSplitReadTask =
@@ -137,7 +146,8 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
                         (MySqlStreamingChangeEventSourceMetrics)
                                 statefulTaskContext.getStreamingChangeEventSourceMetrics(),
                         currentBinlogSplit,
-                        createEventFilter());
+                        createEventFilter(),
+                        statefulTaskContext.getResolvedDialect());
 
         executorService.submit(
                 () -> {

@@ -211,6 +211,15 @@ public class MySqlSourceBuilder<T> {
         return this;
     }
 
+    /**
+     * The database dialect of the source server: "mysql"/"mariadb"/"auto" Defaults to "auto"
+     * (detect via SELECT VERSION() at startup).
+     */
+    public MySqlSourceBuilder<T> dialect(String dialect) {
+        this.configFactory.dialect(dialect);
+        return this;
+    }
+
     /** Specifies the startup options. */
     public MySqlSourceBuilder<T> startupOptions(StartupOptions startupOptions) {
         this.configFactory.startupOptions(startupOptions);

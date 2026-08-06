@@ -83,6 +83,7 @@ public class MySqlSnapshotSplitReadTask
 
     private final SnapshotPhaseHooks hooks;
     private final boolean isBackfillSkipped;
+    private final String resolvedDialect;
 
     public MySqlSnapshotSplitReadTask(
             MySqlSourceConfig sourceConfig,
@@ -96,7 +97,8 @@ public class MySqlSnapshotSplitReadTask
             Clock clock,
             MySqlSnapshotSplit snapshotSplit,
             SnapshotPhaseHooks hooks,
-            boolean isBackfillSkipped) {
+            boolean isBackfillSkipped,
+            String resolvedDialect) {
         super(connectorConfig, snapshotChangeEventSourceMetrics);
         this.sourceConfig = sourceConfig;
         this.databaseSchema = databaseSchema;
@@ -109,6 +111,7 @@ public class MySqlSnapshotSplitReadTask
         this.snapshotChangeEventSourceMetrics = snapshotChangeEventSourceMetrics;
         this.hooks = hooks;
         this.isBackfillSkipped = isBackfillSkipped;
+        this.resolvedDialect = resolvedDialect;
     }
 
     @Override
@@ -153,7 +156,8 @@ public class MySqlSnapshotSplitReadTask
         if (hooks.getPreLowWatermarkAction() != null) {
             hooks.getPreLowWatermarkAction().accept(jdbcConnection, snapshotSplit);
         }
-        final BinlogOffset lowWatermark = DebeziumUtils.currentBinlogOffset(jdbcConnection);
+        final BinlogOffset lowWatermark =
+                DebeziumUtils.currentBinlogOffset(jdbcConnection, resolvedDialect);
         LOG.info(
                 "Snapshot step 1 - Determining low watermark {} for split {}",
                 lowWatermark,
@@ -186,7 +190,7 @@ public class MySqlSnapshotSplitReadTask
             highWatermark = lowWatermark;
         } else {
             // Get the current binlog offset as HW
-            highWatermark = DebeziumUtils.currentBinlogOffset(jdbcConnection);
+            highWatermark = DebeziumUtils.currentBinlogOffset(jdbcConnection, resolvedDialect);
         }
 
         LOG.info(
