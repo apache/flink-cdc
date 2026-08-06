@@ -29,6 +29,7 @@ import org.apache.flink.cdc.composer.definition.TransformDef;
 import org.apache.flink.cdc.composer.definition.UdfDef;
 import org.apache.flink.core.fs.Path;
 
+import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableList;
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableSet;
 import org.apache.flink.shaded.guava31.com.google.common.io.Resources;
@@ -370,9 +371,9 @@ class YamlPipelineDefinitionParserTest {
                             "mysql",
                             "source-database",
                             Configuration.fromMap(
-                                    ImmutableMap.<String, String>builder()
+                                    ImmutableMap.<String, Object>builder()
                                             .put("host", "localhost")
-                                            .put("port", "3306")
+                                            .put("port", 3306)
                                             .put("username", "admin")
                                             .put("password", "pass")
                                             .put(
@@ -381,7 +382,24 @@ class YamlPipelineDefinitionParserTest {
                                             .put(
                                                     "chunk-column",
                                                     "app_order_.*:id,web_order:product_id")
-                                            .put("capture-new-tables", "true")
+                                            .put("capture-new-tables", true)
+                                            .put(
+                                                    "scan.snapshot.filters",
+                                                    ImmutableList.of(
+                                                            ImmutableMap.<String, String>builder()
+                                                                    .put(
+                                                                            "table",
+                                                                            "db1.user_table_[0-9]+")
+                                                                    .put("filter", "id > 100")
+                                                                    .build(),
+                                                            ImmutableMap.<String, String>builder()
+                                                                    .put(
+                                                                            "table",
+                                                                            "db[1-2].[app|web]_order_\\.*")
+                                                                    .put(
+                                                                            "filter",
+                                                                            "city != 'China:beijing'")
+                                                                    .build()))
                                             .build())),
                     new SinkDef(
                             "kafka",
@@ -510,9 +528,9 @@ class YamlPipelineDefinitionParserTest {
                             "mysql",
                             "source-database",
                             Configuration.fromMap(
-                                    ImmutableMap.<String, String>builder()
+                                    ImmutableMap.<String, Object>builder()
                                             .put("host", "localhost")
-                                            .put("port", "3306")
+                                            .put("port", 3306)
                                             .put("username", "admin")
                                             .put("password", "pass")
                                             .put(
@@ -521,7 +539,24 @@ class YamlPipelineDefinitionParserTest {
                                             .put(
                                                     "chunk-column",
                                                     "app_order_.*:id,web_order:product_id")
-                                            .put("capture-new-tables", "true")
+                                            .put("capture-new-tables", true)
+                                            .put(
+                                                    "scan.snapshot.filters",
+                                                    ImmutableList.of(
+                                                            ImmutableMap.<String, String>builder()
+                                                                    .put(
+                                                                            "table",
+                                                                            "db1.user_table_[0-9]+")
+                                                                    .put("filter", "id > 100")
+                                                                    .build(),
+                                                            ImmutableMap.<String, String>builder()
+                                                                    .put(
+                                                                            "table",
+                                                                            "db[1-2].[app|web]_order_\\.*")
+                                                                    .put(
+                                                                            "filter",
+                                                                            "city != 'China:beijing'")
+                                                                    .build()))
                                             .build())),
                     new SinkDef(
                             "kafka",
@@ -590,9 +625,9 @@ class YamlPipelineDefinitionParserTest {
                             "mysql",
                             null,
                             Configuration.fromMap(
-                                    ImmutableMap.<String, String>builder()
+                                    ImmutableMap.<String, Object>builder()
                                             .put("host", "localhost")
-                                            .put("port", "3306")
+                                            .put("port", 3306)
                                             .put("username", "admin")
                                             .put("password", "pass")
                                             .put(
@@ -653,9 +688,9 @@ class YamlPipelineDefinitionParserTest {
                             "mysql",
                             "source-database",
                             Configuration.fromMap(
-                                    ImmutableMap.<String, String>builder()
+                                    ImmutableMap.<String, Object>builder()
                                             .put("host", "localhost")
-                                            .put("port", "3306")
+                                            .put("port", 3306)
                                             .put("username", "admin")
                                             .put("password", "pass")
                                             .put(
@@ -664,7 +699,7 @@ class YamlPipelineDefinitionParserTest {
                                             .put(
                                                     "chunk-column",
                                                     "app_order_.*:id,web_order:product_id")
-                                            .put("capture-new-tables", "true")
+                                            .put("capture-new-tables", true)
                                             .build())),
                     new SinkDef(
                             "kafka",
