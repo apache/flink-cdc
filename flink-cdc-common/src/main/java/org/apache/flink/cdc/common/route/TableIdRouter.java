@@ -173,9 +173,19 @@ public class TableIdRouter {
         if (route.f2 != null) {
             return TableId.parse(route.f1.replace(route.f2, originalTable.getTableName()));
         } else {
+            // Use matches() so that the entire source table id is consumed. After matches() the
+            // matcher holds the full match, and we feed it through appendReplacement /
+            // appendTail to perform the `$N` substitution only on the matched region. We cannot
+            // use Matcher.replaceAll here because it internally calls reset() + find(), which
+            // would only match a prefix of the source table id (when the regex alternation
+            // order matters, e.g. `([1-9]|1[0-6])` matching `1` in `db_6.table_13`), leaving `3` as
+            // a leftover that gets appended to the configured sink-table name (e.g. `...merged3`).
             Matcher matcher = route.f0.matcher(originalTable.toString());
-            if (matcher.find()) {
-                return TableId.parse(matcher.replaceAll(route.f1));
+            if (matcher.matches()) {
+                StringBuilder sb = new StringBuilder();
+                matcher.appendReplacement(sb, route.f1);
+                matcher.appendTail(sb);
+                return TableId.parse(sb.toString());
             }
         }
         return TableId.parse(route.f1);
