@@ -238,7 +238,7 @@ MongoDB 的更改事件记录在消息之前没有更新。因此，我们只能
         <td>String</td>
         <td> MongoDB CDC 消费者可选的启动模式，
          合法的模式为 "initial"，"latest-offset" 和 "timestamp"。
-           请查阅 <a href="#a-name-id-002-a">启动模式</a> 章节了解更多详细信息。</td>
+           请查阅 <a href="#启动模式">启动模式</a> 章节了解更多详细信息。</td>
     </tr>
     <tr>
         <td>scan.startup.timestamp-millis</td>
@@ -423,7 +423,7 @@ CREATE TABLE products (
 
 MongoDB CDC 连接器是一个 Flink Source 连接器，它将首先读取数据库快照，然后在处理**甚至失败时继续读取带有**的更改流事件。
 
-### 启动模式<a name="启动模式" id="002" ></a>
+### 启动模式
 
 配置选项```scan.startup.mode```指定 MongoDB CDC 消费者的启动模式。有效枚举包括：
 
@@ -544,7 +544,7 @@ $ ./bin/flink run \
       --from-savepoint /tmp/flink-savepoints/savepoint-cca7bc-bb1e257f0dab \
       ./FlinkCDCExample.jar
 ```
-**注意:** 请参考文档 [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.17/docs/deployment/cli/#command-line-interface) 了解更多详细信息。
+**注意:** 请参考文档 [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.20/docs/deployment/cli/#command-line-interface) 了解更多详细信息。
 
 ### DataStream Source
 
@@ -694,7 +694,7 @@ CREATE TABLE mongodb_source (...) WITH (
 ----------------
 [BSON](https://docs.mongodb.com/manual/reference/bson-types/) **二进制 JSON**的缩写是一种类似 JSON 格式的二进制编码序列，用于在 MongoDB 中存储文档和进行远程过程调用。
 
-[Flink SQL Data Type](https://nightlies.apache.org/flink/flink-docs-release-1.16/docs/dev/table/types/) 类似于 SQL 标准的数据类型术语，该术语描述了表生态系统中值的逻辑类型。它可以用于声明操作的输入和/或输出类型。
+[Flink SQL Data Type](https://nightlies.apache.org/flink/flink-docs-release-1.20/docs/dev/table/types/) 类似于 SQL 标准的数据类型术语，该术语描述了表生态系统中值的逻辑类型。它可以用于声明操作的输入和/或输出类型。
 
 为了使 Flink SQL 能够处理来自异构数据源的数据，异构数据源的数据类型需要统一转换为 Flink SQL 数据类型。
 
@@ -812,6 +812,6 @@ CREATE TABLE mongodb_source (...) WITH (
 - [Replica set protocol](https://docs.mongodb.com/manual/reference/replica-configuration/#mongodb-rsconf-rsconf.protocolVersion)
 - [Connection String Options](https://docs.mongodb.com/manual/reference/connection-string/#std-label-connections-connection-options)
 - [BSON Types](https://docs.mongodb.com/manual/reference/bson-types/)
-- [Flink DataTypes](https://nightlies.apache.org/flink/flink-docs-release-1.16/docs/dev/table/types/)
+- [Flink DataTypes](https://nightlies.apache.org/flink/flink-docs-release-1.20/docs/dev/table/types/)
 
 {{< top >}}
