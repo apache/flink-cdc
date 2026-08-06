@@ -468,6 +468,12 @@ limitations under the License.
                         <exclude>
                             flink-cdc-connect/flink-cdc-source-connectors/flink-connector-db2-cdc/src/test/resources/db2_server/Dockerfile
                         </exclude>
+                        <!-- Certificate files -->
+                        <exclude>**/ssl/*.crt</exclude>
+                        <exclude>**/ssl/*.csr</exclude>
+                        <exclude>**/ssl/*.ext</exclude>
+                        <exclude>**/ssl/*.key</exclude>
+                        <exclude>**/ssl/*.srl</exclude>
                     </excludes>
                 </configuration>
             </plugin>
