@@ -25,6 +25,7 @@ import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypeRoot;
+import org.apache.flink.cdc.common.types.DecimalType;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.common.utils.StringUtils;
 import org.apache.flink.cdc.runtime.operators.transform.UserDefinedFunctionDescriptor;
@@ -35,6 +36,7 @@ import org.apache.calcite.sql.SqlBasicTypeNameSpec;
 import org.apache.calcite.sql.SqlCharStringLiteral;
 import org.apache.calcite.sql.SqlDataTypeSpec;
 import org.apache.calcite.sql.SqlIdentifier;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlNodeList;
@@ -47,6 +49,7 @@ import org.codehaus.commons.compiler.Location;
 import org.codehaus.janino.ExpressionEvaluator;
 import org.codehaus.janino.Java;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -134,6 +137,17 @@ public class JaninoCompiler {
             return rvalue.toString();
         }
         return "";
+    }
+
+    public static GeneratedExpression translateSqlNodeToGeneratedExpression(
+            Context context, SqlNode transform, Class<?> resultClass) {
+        return new GeneratedExpressionGenerator(context).translate(transform, resultClass);
+    }
+
+    public static GeneratedExpression translateSqlNodeToGeneratedExpression(
+            Context context, SqlNode transform) {
+        return translateSqlNodeToGeneratedExpression(
+                context, transform, deduceGeneratedExpressionClass(context, transform));
     }
 
     public static Java.Rvalue translateSqlNodeToJaninoRvalue(Context context, SqlNode transform) {
@@ -298,6 +312,7 @@ public class JaninoCompiler {
             case CEIL:
             case FLOOR:
             case TRIM:
+            case COALESCE:
             case OTHER_FUNCTION:
                 return generateOtherFunctionOperation(context, sqlBasicCall, atoms);
             case PLUS:
@@ -494,6 +509,103 @@ public class JaninoCompiler {
         }
         return new Java.MethodInvocation(
                 Location.NOWHERE, null, StringUtils.convertToCamelCase("VALUE_EQUALS"), atoms);
+    }
+
+    private static Class<?> deduceGeneratedExpressionClass(Context context, SqlNode sqlNode) {
+        if (sqlNode instanceof SqlIdentifier) {
+            return deduceIdentifierClass(context, (SqlIdentifier) sqlNode);
+        }
+        if (sqlNode instanceof SqlLiteral) {
+            return deduceLiteralClass((SqlLiteral) sqlNode);
+        }
+        if (sqlNode instanceof SqlBasicCall && isBooleanResultCall((SqlBasicCall) sqlNode)) {
+            return Boolean.class;
+        }
+        try {
+            return JavaClassConverter.toJavaClass(
+                    TransformParser.deduceSubExpressionType(
+                            context.columns,
+                            sqlNode,
+                            context.udfDescriptors,
+                            context.supportedMetadataColumns));
+        } catch (RuntimeException e) {
+            return Object.class;
+        }
+    }
+
+    private static Class<?> deduceIdentifierClass(Context context, SqlIdentifier sqlIdentifier) {
+        String columnName = sqlIdentifier.names.get(sqlIdentifier.names.size() - 1);
+        for (Column column : context.columns) {
+            if (column.getName().equals(columnName)) {
+                return JavaClassConverter.toJavaClass(column.getType());
+            }
+        }
+        for (SupportedMetadataColumn metadataColumn : context.supportedMetadataColumns) {
+            if (metadataColumn.getName().equals(columnName)) {
+                return metadataColumn.getJavaClass();
+            }
+        }
+        Optional<Class<?>> metadataColumnClass =
+                MetadataColumns.METADATA_COLUMNS.stream()
+                        .filter(column -> column.f0.equals(columnName))
+                        .findFirst()
+                        .map(column -> (Class<?>) column.f2);
+        return metadataColumnClass.orElse(Object.class);
+    }
+
+    private static Class<?> deduceLiteralClass(SqlLiteral sqlLiteral) {
+        if (sqlLiteral.getValue() == null) {
+            return Object.class;
+        }
+        if (sqlLiteral instanceof SqlCharStringLiteral) {
+            return String.class;
+        }
+        if (sqlLiteral instanceof SqlNumericLiteral) {
+            SqlNumericLiteral numericLiteral = (SqlNumericLiteral) sqlLiteral;
+            if (numericLiteral.isInteger()) {
+                long longValue = numericLiteral.longValue(true);
+                if (longValue > Integer.MAX_VALUE || longValue < Integer.MIN_VALUE) {
+                    return Long.class;
+                }
+                return Integer.class;
+            }
+            return Double.class;
+        }
+        if (sqlLiteral.getTypeName() == SqlTypeName.BOOLEAN) {
+            return Boolean.class;
+        }
+        return Object.class;
+    }
+
+    private static boolean isBooleanResultCall(SqlBasicCall sqlBasicCall) {
+        switch (sqlBasicCall.getKind()) {
+            case AND:
+            case OR:
+            case NOT:
+            case EQUALS:
+            case NOT_EQUALS:
+            case IS_DISTINCT_FROM:
+            case IS_NOT_DISTINCT_FROM:
+            case IS_NULL:
+            case IS_NOT_NULL:
+            case IS_FALSE:
+            case IS_NOT_TRUE:
+            case IS_TRUE:
+            case IS_NOT_FALSE:
+            case IS_UNKNOWN:
+            case BETWEEN:
+            case IN:
+            case NOT_IN:
+            case LIKE:
+            case SIMILAR:
+            case LESS_THAN:
+            case GREATER_THAN:
+            case LESS_THAN_OR_EQUAL:
+            case GREATER_THAN_OR_EQUAL:
+                return true;
+            default:
+                return false;
+        }
     }
 
     private static Java.Rvalue generateCastOperation(
@@ -801,6 +913,418 @@ public class JaninoCompiler {
                     udfFunction.getClassName());
         } else {
             return String.format("__instanceOf%s.eval", udfFunction.getClassName());
+        }
+    }
+
+    private static class GeneratedExpressionGenerator {
+        private final Context context;
+        private int termId;
+
+        private GeneratedExpressionGenerator(Context context) {
+            this.context = context;
+        }
+
+        private GeneratedExpression translate(SqlNode sqlNode, Class<?> resultClass) {
+            if (sqlNode instanceof SqlBasicCall) {
+                return translateSqlBasicCall((SqlBasicCall) sqlNode, resultClass);
+            }
+            if (sqlNode instanceof SqlCase) {
+                return translateSqlCase((SqlCase) sqlNode, resultClass);
+            }
+            Java.Rvalue rvalue = translateSqlNodeToJaninoRvalue(context, sqlNode);
+            if (rvalue == null) {
+                throw new ParseException("Unrecognized expression: " + sqlNode);
+            }
+            return GeneratedExpression.fromExpression(rvalue.toString(), resultClass);
+        }
+
+        private GeneratedExpression translateSqlBasicCall(
+                SqlBasicCall sqlBasicCall, Class<?> resultClass) {
+            switch (sqlBasicCall.getKind()) {
+                case AND:
+                    return translateLogicalBinaryOperation(sqlBasicCall, true);
+                case OR:
+                    return translateLogicalBinaryOperation(sqlBasicCall, false);
+                case OTHER_FUNCTION:
+                    if (sqlBasicCall.getOperator().getName().equalsIgnoreCase("IF")) {
+                        return translateIf(sqlBasicCall, resultClass);
+                    }
+                    return translateGenericBasicCall(sqlBasicCall, resultClass);
+                default:
+                    return translateGenericBasicCall(sqlBasicCall, resultClass);
+            }
+        }
+
+        private GeneratedExpression translateLogicalBinaryOperation(
+                SqlBasicCall sqlBasicCall, boolean isAnd) {
+            List<SqlNode> operands = sqlBasicCall.getOperandList();
+            if (operands.size() != 2) {
+                throw new ParseException("Unrecognized expression: " + sqlBasicCall);
+            }
+
+            GeneratedExpression left = translate(operands.get(0), Boolean.class);
+            GeneratedExpression right = translate(operands.get(1), Boolean.class);
+
+            String resultTerm = newTerm("result");
+            String leftTerm = newTerm("left");
+            String rightTerm = newTerm("right");
+            String shortCircuitValue = isAnd ? "FALSE" : "TRUE";
+            String functionName = isAnd ? "and" : "or";
+
+            StringBuilder code = new StringBuilder();
+            appendCode(code, left.getCode());
+            code.append("Boolean ").append(resultTerm).append(";\n");
+            code.append("Boolean ")
+                    .append(leftTerm)
+                    .append(" = ")
+                    .append(left.getResultTerm())
+                    .append(";\n");
+            code.append("if (Boolean.")
+                    .append(shortCircuitValue)
+                    .append(".equals(")
+                    .append(leftTerm)
+                    .append(")) {\n");
+            code.append(resultTerm).append(" = Boolean.").append(shortCircuitValue).append(";\n");
+            code.append("} else {\n");
+            appendCode(code, right.getCode());
+            code.append("Boolean ")
+                    .append(rightTerm)
+                    .append(" = ")
+                    .append(right.getResultTerm())
+                    .append(";\n");
+            code.append(resultTerm)
+                    .append(" = ")
+                    .append(functionName)
+                    .append("(")
+                    .append(leftTerm)
+                    .append(", ")
+                    .append(rightTerm)
+                    .append(");\n");
+            code.append("}\n");
+
+            return GeneratedExpression.of(code.toString(), resultTerm, Boolean.class);
+        }
+
+        private GeneratedExpression translateIf(SqlBasicCall sqlBasicCall, Class<?> resultClass) {
+            List<SqlNode> operands = sqlBasicCall.getOperandList();
+            if (operands.size() != 3) {
+                throw new ParseException("Unrecognized expression: " + sqlBasicCall);
+            }
+
+            GeneratedExpression condition = translate(operands.get(0), Boolean.class);
+            GeneratedExpression thenExpression = translateConditionalResult(operands.get(1));
+            GeneratedExpression elseExpression = translateConditionalResult(operands.get(2));
+
+            String resultTerm = newTerm("result");
+            String conditionTerm = newTerm("condition");
+            StringBuilder code = new StringBuilder();
+            appendCode(code, condition.getCode());
+            code.append(className(resultClass)).append(" ").append(resultTerm).append(";\n");
+            code.append("Boolean ")
+                    .append(conditionTerm)
+                    .append(" = ")
+                    .append(condition.getResultTerm())
+                    .append(";\n");
+            code.append("if (isTrue(").append(conditionTerm).append(")) {\n");
+            appendCode(code, thenExpression.getCode());
+            appendConditionalResultAssignment(
+                    code, resultTerm, thenExpression, resultClass, sqlBasicCall);
+            code.append("} else {\n");
+            appendCode(code, elseExpression.getCode());
+            appendConditionalResultAssignment(
+                    code, resultTerm, elseExpression, resultClass, sqlBasicCall);
+            code.append("}\n");
+
+            return GeneratedExpression.of(code.toString(), resultTerm, resultClass);
+        }
+
+        private GeneratedExpression translateSqlCase(SqlCase sqlCase, Class<?> resultClass) {
+            String resultTerm = newTerm("result");
+            StringBuilder code = new StringBuilder();
+            code.append(className(resultClass)).append(" ").append(resultTerm).append(";\n");
+            appendCaseBranch(
+                    code,
+                    resultTerm,
+                    sqlCase,
+                    sqlCase.getWhenOperands(),
+                    sqlCase.getThenOperands(),
+                    sqlCase.getElseOperand(),
+                    0,
+                    resultClass);
+            return GeneratedExpression.of(code.toString(), resultTerm, resultClass);
+        }
+
+        private void appendCaseBranch(
+                StringBuilder code,
+                String resultTerm,
+                SqlCase sqlCase,
+                SqlNodeList whenOperands,
+                SqlNodeList thenOperands,
+                SqlNode elseOperand,
+                int index,
+                Class<?> resultClass) {
+            if (index >= whenOperands.size()) {
+                GeneratedExpression elseExpression =
+                        elseOperand == null
+                                ? GeneratedExpression.fromExpression("null", resultClass)
+                                : translateConditionalResult(elseOperand);
+                appendCode(code, elseExpression.getCode());
+                appendConditionalResultAssignment(
+                        code, resultTerm, elseExpression, resultClass, sqlCase);
+                return;
+            }
+
+            GeneratedExpression whenExpression = translate(whenOperands.get(index), Boolean.class);
+            GeneratedExpression thenExpression =
+                    translateConditionalResult(thenOperands.get(index));
+            String conditionTerm = newTerm("condition");
+            appendCode(code, whenExpression.getCode());
+            code.append("Boolean ")
+                    .append(conditionTerm)
+                    .append(" = ")
+                    .append(whenExpression.getResultTerm())
+                    .append(";\n");
+            code.append("if (isTrue(").append(conditionTerm).append(")) {\n");
+            appendCode(code, thenExpression.getCode());
+            appendConditionalResultAssignment(
+                    code, resultTerm, thenExpression, resultClass, sqlCase);
+            code.append("} else {\n");
+            appendCaseBranch(
+                    code,
+                    resultTerm,
+                    sqlCase,
+                    whenOperands,
+                    thenOperands,
+                    elseOperand,
+                    index + 1,
+                    resultClass);
+            code.append("}\n");
+        }
+
+        private GeneratedExpression translateConditionalResult(SqlNode sqlNode) {
+            return translate(sqlNode, deduceGeneratedExpressionClass(context, sqlNode));
+        }
+
+        private void appendConditionalResultAssignment(
+                StringBuilder code,
+                String resultTerm,
+                GeneratedExpression value,
+                Class<?> resultClass,
+                SqlNode conditionalExpression) {
+            code.append(resultTerm)
+                    .append(" = ")
+                    .append(coerceConditionalResult(value, resultClass, conditionalExpression))
+                    .append(";\n");
+        }
+
+        private String coerceConditionalResult(
+                GeneratedExpression value, Class<?> resultClass, SqlNode conditionalExpression) {
+            if ("null".equals(value.getResultTerm())
+                    || resultClass.isAssignableFrom(value.getResultClass())) {
+                return value.getResultTerm();
+            }
+            return coerceRvalueToResultClass(
+                            toRvalue(value), resultClass, conditionalExpression, false)
+                    .toString();
+        }
+
+        private Java.Rvalue coerceRvalueToResultClass(
+                Java.Rvalue valueRvalue,
+                Class<?> resultClass,
+                SqlNode resultExpression,
+                boolean castReferenceType) {
+            if (resultClass == Byte.class) {
+                return generateFunctionOperation("castToByte", new Java.Rvalue[] {valueRvalue});
+            }
+            if (resultClass == Short.class) {
+                return generateFunctionOperation("castToShort", new Java.Rvalue[] {valueRvalue});
+            }
+            if (resultClass == Integer.class) {
+                return generateFunctionOperation("castToInteger", new Java.Rvalue[] {valueRvalue});
+            }
+            if (resultClass == Long.class) {
+                return generateFunctionOperation("castToLong", new Java.Rvalue[] {valueRvalue});
+            }
+            if (resultClass == Float.class) {
+                return generateFunctionOperation("castToFloat", new Java.Rvalue[] {valueRvalue});
+            }
+            if (resultClass == Double.class) {
+                return generateFunctionOperation("castToDouble", new Java.Rvalue[] {valueRvalue});
+            }
+            if (resultClass == BigDecimal.class) {
+                DataType resultType =
+                        TransformParser.deduceSubExpressionType(
+                                context.columns,
+                                resultExpression,
+                                context.udfDescriptors,
+                                context.supportedMetadataColumns);
+                if (!(resultType instanceof DecimalType)) {
+                    throw new ParseException(
+                            "Unable to deduce decimal type for expression: " + resultExpression);
+                }
+                DecimalType decimalType = (DecimalType) resultType;
+                return generateFunctionOperation(
+                        "castToBigDecimal",
+                        new Java.Rvalue[] {
+                            valueRvalue,
+                            new Java.AmbiguousName(
+                                    Location.NOWHERE,
+                                    new String[] {String.valueOf(decimalType.getPrecision())}),
+                            new Java.AmbiguousName(
+                                    Location.NOWHERE,
+                                    new String[] {String.valueOf(decimalType.getScale())})
+                        });
+            }
+            if (resultClass == String.class) {
+                return generateFunctionOperation("castToString", new Java.Rvalue[] {valueRvalue});
+            }
+            if (resultClass == Boolean.class) {
+                return generateFunctionOperation("castToBoolean", new Java.Rvalue[] {valueRvalue});
+            }
+            if (castReferenceType && resultClass != Object.class) {
+                String canonicalName = resultClass.getCanonicalName();
+                if (canonicalName != null) {
+                    return new Java.Cast(
+                            Location.NOWHERE,
+                            new Java.ReferenceType(
+                                    Location.NOWHERE,
+                                    new Java.Annotation[0],
+                                    canonicalName.split("\\."),
+                                    null),
+                            valueRvalue);
+                }
+            }
+            return valueRvalue;
+        }
+
+        private GeneratedExpression translateGenericBasicCall(
+                SqlBasicCall sqlBasicCall, Class<?> resultClass) {
+            List<GeneratedOperand> atoms = new ArrayList<>();
+            List<SqlNode> operands = sqlBasicCall.getOperandList();
+            for (int index = 0; index < operands.size(); index++) {
+                SqlNode sqlNode = operands.get(index);
+                // CAST type metadata is consumed by generateCastOperation and is not a runtime
+                // operand.
+                if (sqlBasicCall.getKind() == SqlKind.CAST
+                        && index == 1
+                        && sqlNode instanceof SqlDataTypeSpec) {
+                    continue;
+                }
+                translateSqlNodeToGeneratedAtoms(sqlNode, atoms);
+            }
+            if (TIMEZONE_FREE_TEMPORAL_FUNCTIONS.contains(
+                    sqlBasicCall.getOperator().getName().toUpperCase())) {
+                atoms.add(
+                        GeneratedOperand.synthetic(
+                                GeneratedExpression.fromExpression(
+                                        DEFAULT_EPOCH_TIME, Long.class)));
+            } else if (TIMEZONE_REQUIRED_TEMPORAL_FUNCTIONS.contains(
+                    sqlBasicCall.getOperator().getName().toUpperCase())) {
+                atoms.add(
+                        GeneratedOperand.synthetic(
+                                GeneratedExpression.fromExpression(
+                                        DEFAULT_EPOCH_TIME, Long.class)));
+                atoms.add(
+                        GeneratedOperand.synthetic(
+                                GeneratedExpression.fromExpression(
+                                        DEFAULT_TIME_ZONE, String.class)));
+            } else if (TIMEZONE_REQUIRED_TEMPORAL_CONVERSION_FUNCTIONS.contains(
+                    sqlBasicCall.getOperator().getName().toUpperCase())) {
+                atoms.add(
+                        GeneratedOperand.synthetic(
+                                GeneratedExpression.fromExpression(
+                                        DEFAULT_TIME_ZONE, String.class)));
+            }
+
+            StringBuilder code = new StringBuilder();
+            Java.Rvalue[] rvalues = new Java.Rvalue[atoms.size()];
+            for (int i = 0; i < atoms.size(); i++) {
+                GeneratedOperand operand = atoms.get(i);
+                GeneratedExpression atom = operand.generatedExpression;
+                appendCode(code, atom.getCode());
+                if (operand.sqlNode instanceof SqlBasicCall && hasGeneratedCodeAfter(atoms, i)) {
+                    String operandTerm = newTerm("operand");
+                    code.append(className(atom.getResultClass()))
+                            .append(" ")
+                            .append(operandTerm)
+                            .append(" = ")
+                            .append(atom.getResultTerm())
+                            .append(";\n");
+                    rvalues[i] =
+                            new Java.AmbiguousName(Location.NOWHERE, new String[] {operandTerm});
+                } else {
+                    rvalues[i] = toRvalue(atom);
+                }
+            }
+            Java.Rvalue rvalue = sqlBasicCallToJaninoRvalue(context, sqlBasicCall, rvalues);
+            if (sqlBasicCall.getKind() == SqlKind.COALESCE) {
+                rvalue = coerceRvalueToResultClass(rvalue, resultClass, sqlBasicCall, true);
+            }
+            return GeneratedExpression.of(code.toString(), rvalue.toString(), resultClass);
+        }
+
+        private void translateSqlNodeToGeneratedAtoms(
+                SqlNode sqlNode, List<GeneratedOperand> atoms) {
+            if (sqlNode instanceof SqlNodeList) {
+                for (SqlNode node : (SqlNodeList) sqlNode) {
+                    translateSqlNodeToGeneratedAtoms(node, atoms);
+                }
+                return;
+            }
+            atoms.add(
+                    new GeneratedOperand(
+                            sqlNode,
+                            translate(sqlNode, deduceGeneratedExpressionClass(context, sqlNode))));
+        }
+
+        private static boolean hasGeneratedCodeAfter(
+                List<GeneratedOperand> operands, int currentIndex) {
+            for (int index = currentIndex + 1; index < operands.size(); index++) {
+                if (!operands.get(index).generatedExpression.getCode().isEmpty()) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static class GeneratedOperand {
+            private final SqlNode sqlNode;
+            private final GeneratedExpression generatedExpression;
+
+            private GeneratedOperand(SqlNode sqlNode, GeneratedExpression generatedExpression) {
+                this.sqlNode = sqlNode;
+                this.generatedExpression = generatedExpression;
+            }
+
+            private static GeneratedOperand synthetic(GeneratedExpression generatedExpression) {
+                return new GeneratedOperand(null, generatedExpression);
+            }
+        }
+
+        private String newTerm(String prefix) {
+            return prefix + "$" + termId++;
+        }
+
+        private static Java.Rvalue toRvalue(GeneratedExpression generatedExpression) {
+            return new Java.AmbiguousName(
+                    Location.NOWHERE, new String[] {generatedExpression.getResultTerm()});
+        }
+
+        private static void appendCode(StringBuilder builder, String code) {
+            if (code.isEmpty()) {
+                return;
+            }
+            builder.append(code);
+            if (code.charAt(code.length() - 1) != '\n') {
+                builder.append('\n');
+            }
+        }
+
+        private static String className(Class<?> clazz) {
+            if (clazz.getCanonicalName() != null) {
+                return clazz.getCanonicalName();
+            }
+            return clazz.getName();
         }
     }
 

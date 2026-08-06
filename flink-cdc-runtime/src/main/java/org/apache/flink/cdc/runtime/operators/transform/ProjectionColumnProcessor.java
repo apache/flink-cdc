@@ -22,8 +22,6 @@ import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.runtime.parser.JaninoCompiler;
 
-import org.codehaus.janino.ExpressionEvaluator;
-
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -45,7 +43,7 @@ public class ProjectionColumnProcessor {
     private final TransformExpressionKey transformExpressionKey;
     private final Map<String, SupportedMetadataColumn> supportedMetadataColumns;
     private final List<Object> udfFunctionInstances;
-    private final ExpressionEvaluator expressionEvaluator;
+    private final TransformExpressionEvaluator expressionEvaluator;
 
     public ProjectionColumnProcessor(
             PostTransformChangeInfo tableInfo,
@@ -89,12 +87,12 @@ public class ProjectionColumnProcessor {
             throw new RuntimeException(
                     String.format(
                             "Failed to evaluate projection expression `%s` for column `%s` in table `%s`.\n"
-                                    + "\tCompiled expression: %s\n"
+                                    + "\tCompiled script: %s\n"
                                     + "\tColumn name map: {%s}",
                             projectionColumn.getExpression(),
                             projectionColumn.getColumnName(),
                             tableInfo.getName(),
-                            projectionColumn.getScriptExpression(),
+                            projectionColumn.getCompiledScript(),
                             projectionColumn.getColumnNameMapAsString()),
                     e);
         }
@@ -170,10 +168,9 @@ public class ProjectionColumnProcessor {
 
         return TransformExpressionKey.of(
                 projectionColumn.getExpression(),
-                projectionColumn.getScriptExpression(),
+                projectionColumn.getGeneratedExpression(),
                 argumentNames,
                 paramTypes,
-                JavaClassConverter.toJavaClass(projectionColumn.getDataType()),
                 columnNameMap);
     }
 }

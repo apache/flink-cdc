@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.runtime.parser;
 
+import org.apache.flink.api.common.io.ParseException;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
@@ -24,7 +25,16 @@ import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.variant.BinaryVariantInternalBuilder;
 import org.apache.flink.cdc.common.types.variant.Variant;
 import org.apache.flink.cdc.common.types.variant.VariantTypeException;
+import org.apache.flink.cdc.common.udf.UserDefinedFunction;
+import org.apache.flink.cdc.runtime.operators.transform.TransformExpressionKey;
+import org.apache.flink.cdc.runtime.operators.transform.UserDefinedFunctionDescriptor;
 
+import org.apache.calcite.sql.SqlDynamicParam;
+import org.apache.calcite.sql.SqlLiteral;
+import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.SqlNodeList;
+import org.apache.calcite.sql.fun.SqlStdOperatorTable;
+import org.apache.calcite.sql.parser.SqlParserPos;
 import org.assertj.core.api.Assertions;
 import org.codehaus.commons.compiler.CompileException;
 import org.codehaus.commons.compiler.Location;
@@ -32,6 +42,7 @@ import org.codehaus.janino.ExpressionEvaluator;
 import org.codehaus.janino.Java;
 import org.codehaus.janino.Parser;
 import org.codehaus.janino.Scanner;
+import org.codehaus.janino.ScriptEvaluator;
 import org.codehaus.janino.Unparser;
 import org.junit.jupiter.api.Test;
 
@@ -47,6 +58,14 @@ import java.util.stream.Stream;
 
 /** Unit tests for the {@link JaninoCompiler}. */
 class JaninoCompilerTest {
+
+    public static class CounterFunction implements UserDefinedFunction {
+        private int counter;
+
+        public String eval() {
+            return String.valueOf(++counter);
+        }
+    }
 
     @Test
     void testJaninoParser() throws CompileException, IOException, InvocationTargetException {
@@ -288,6 +307,195 @@ class JaninoCompilerTest {
     }
 
     @Test
+    void testGeneratedLogicalExpressionCompilesWithJanino() throws Exception {
+        List<Column> columns = List.of(Column.physicalColumn("nullable_bool", DataTypes.BOOLEAN()));
+        Map<String, String> columnNameMap = Map.of("nullable_bool", "$0");
+        List<String> columnNames = List.of("$0");
+        List<Class<?>> columnTypes = List.of(Boolean.class);
+
+        GeneratedExpression nullAndFalse =
+                translateGeneratedFilterExpression(
+                        "nullable_bool and false", columns, columnNameMap);
+        Assertions.assertThat(nullAndFalse.asScript())
+                .contains("if (Boolean.FALSE.equals")
+                .doesNotContain("new java.util.function.Supplier");
+        Assertions.assertThat(
+                        compileGeneratedFilterExpression(nullAndFalse, columnNames, columnTypes)
+                                .evaluate(new Object[] {null}))
+                .isEqualTo(false);
+
+        GeneratedExpression nullAndTrue =
+                translateGeneratedFilterExpression(
+                        "nullable_bool and true", columns, columnNameMap);
+        Assertions.assertThat(nullAndTrue.asScript())
+                .contains("if (Boolean.FALSE.equals")
+                .doesNotContain("new java.util.function.Supplier");
+        Assertions.assertThat(
+                        compileGeneratedFilterExpression(nullAndTrue, columnNames, columnTypes)
+                                .evaluate(new Object[] {null}))
+                .isNull();
+
+        GeneratedExpression nullOrTrue =
+                translateGeneratedFilterExpression("nullable_bool or true", columns, columnNameMap);
+        Assertions.assertThat(nullOrTrue.asScript())
+                .contains("if (Boolean.TRUE.equals")
+                .doesNotContain("new java.util.function.Supplier");
+        Assertions.assertThat(
+                        compileGeneratedFilterExpression(nullOrTrue, columnNames, columnTypes)
+                                .evaluate(new Object[] {null}))
+                .isEqualTo(true);
+
+        GeneratedExpression nullOrFalse =
+                translateGeneratedFilterExpression(
+                        "nullable_bool or false", columns, columnNameMap);
+        Assertions.assertThat(nullOrFalse.asScript())
+                .contains("if (Boolean.TRUE.equals")
+                .doesNotContain("new java.util.function.Supplier");
+        Assertions.assertThat(
+                        compileGeneratedFilterExpression(nullOrFalse, columnNames, columnTypes)
+                                .evaluate(new Object[] {null}))
+                .isNull();
+    }
+
+    @Test
+    void testGeneratedConditionalExpressionWithNumericTypeCoercion() throws Exception {
+        for (String expression :
+                List.of(
+                        "IF(TRUE, 1, CAST(2 AS BIGINT)) > 0",
+                        "CASE WHEN TRUE THEN 1 ELSE CAST(2 AS BIGINT) END > 0",
+                        "IF(TRUE, CAST(1 AS TINYINT), 2) > 0",
+                        "IF(TRUE, CAST(1 AS FLOAT), CAST(2 AS DOUBLE)) > 0",
+                        "IF(TRUE, 1, CAST(2 AS DECIMAL(10, 2))) > 0",
+                        "CASE WHEN TRUE THEN IF(TRUE, 1, CAST(2 AS BIGINT)) "
+                                + "ELSE CAST(3 AS BIGINT) END > 0",
+                        "IF(FALSE, 1, CAST(NULL AS BIGINT)) IS NULL")) {
+            GeneratedExpression generatedExpression =
+                    translateGeneratedFilterExpression(
+                            expression, Collections.emptyList(), Collections.emptyMap());
+
+            Assertions.assertThat(
+                            compileGeneratedFilterExpression(
+                                            generatedExpression,
+                                            Collections.emptyList(),
+                                            Collections.emptyList())
+                                    .evaluate(new Object[0]))
+                    .as(expression)
+                    .isEqualTo(true);
+        }
+    }
+
+    @Test
+    void testGeneratedConditionalExpressionWithObjectReturningFunction() throws Exception {
+        for (String expression :
+                List.of(
+                        "COALESCE(1, 2) = IF(TRUE, 1, 2)",
+                        "IF(TRUE, COALESCE('a', 'b'), 'c') = 'a'")) {
+            GeneratedExpression generatedExpression =
+                    translateGeneratedFilterExpression(
+                            expression, Collections.emptyList(), Collections.emptyMap());
+
+            Assertions.assertThat(
+                            compileGeneratedFilterExpression(
+                                            generatedExpression,
+                                            Collections.emptyList(),
+                                            Collections.emptyList())
+                                    .evaluate(new Object[0]))
+                    .as(expression)
+                    .isEqualTo(true);
+        }
+    }
+
+    @Test
+    void testGeneratedFunctionOperandsPreserveEvaluationOrder() throws Exception {
+        UserDefinedFunctionDescriptor descriptor =
+                new UserDefinedFunctionDescriptor("counter", CounterFunction.class.getName());
+        GeneratedExpression generatedExpression =
+                TransformParser.translateFilterExpressionToGeneratedExpression(
+                        "CONCAT(counter(), IF(TRUE, counter(), 'x')) = '12'",
+                        Collections.emptyList(),
+                        List.of(descriptor),
+                        new SupportedMetadataColumn[0],
+                        Collections.emptyMap());
+
+        Assertions.assertThat(
+                        compileGeneratedFilterExpression(
+                                        generatedExpression,
+                                        List.of("__instanceOf" + descriptor.getClassName()),
+                                        List.of(CounterFunction.class))
+                                .evaluate(new Object[] {new CounterFunction()}))
+                .isEqualTo(true);
+    }
+
+    @Test
+    void testTransformExpressionKeyRejectsEmptyResultTermForFullScript() {
+        TransformExpressionKey key =
+                TransformExpressionKey.of(
+                        null,
+                        GeneratedExpression.fromExpression("", Boolean.class),
+                        Collections.emptyList(),
+                        Collections.emptyList(),
+                        Collections.emptyMap());
+
+        Assertions.assertThatCode(key::toString).doesNotThrowAnyException();
+        Assertions.assertThatThrownBy(key::getFullScript)
+                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Generated expression result term must not be empty.");
+    }
+
+    @Test
+    void testTranslateSqlNodeToGeneratedExpressionRejectsUnrecognizedSqlNode() {
+        Assertions.assertThatThrownBy(
+                        () ->
+                                JaninoCompiler.translateSqlNodeToGeneratedExpression(
+                                        JaninoCompiler.Context.of(
+                                                Collections.emptyList(),
+                                                Collections.emptyMap(),
+                                                Collections.emptyList(),
+                                                new SupportedMetadataColumn[0]),
+                                        SqlNodeList.EMPTY,
+                                        Boolean.class))
+                .isExactlyInstanceOf(ParseException.class)
+                .hasMessageStartingWith("Unrecognized expression:");
+    }
+
+    @Test
+    void testTranslateSqlNodeToGeneratedExpressionRejectsUnrecognizedOperand() {
+        SqlNode expression =
+                SqlStdOperatorTable.COALESCE.createCall(
+                        SqlParserPos.ZERO,
+                        SqlLiteral.createExactNumeric("1", SqlParserPos.ZERO),
+                        new SqlDynamicParam(0, SqlParserPos.ZERO));
+
+        Assertions.assertThatThrownBy(
+                        () ->
+                                JaninoCompiler.translateSqlNodeToGeneratedExpression(
+                                        JaninoCompiler.Context.of(
+                                                Collections.emptyList(),
+                                                Collections.emptyMap(),
+                                                Collections.emptyList(),
+                                                new SupportedMetadataColumn[0]),
+                                        expression,
+                                        Integer.class))
+                .isExactlyInstanceOf(ParseException.class)
+                .hasMessage("Unrecognized expression: ?");
+    }
+
+    @Test
+    void testTranslateSqlNodeToGeneratedExpressionHandlesCastTypeMetadata() throws Exception {
+        GeneratedExpression generatedExpression =
+                translateGeneratedFilterExpression(
+                        "CAST('true' AS BOOLEAN)", Collections.emptyList(), Collections.emptyMap());
+
+        Assertions.assertThat(
+                        compileGeneratedFilterExpression(
+                                        generatedExpression,
+                                        Collections.emptyList(),
+                                        Collections.emptyList())
+                                .evaluate(new Object[0]))
+                .isEqualTo(true);
+    }
+
+    @Test
     void testLargeNumericLiterals() {
         // Test parsing integer literals
         Stream.of(
@@ -395,5 +603,28 @@ class JaninoCompilerTest {
                 columnNames,
                 columnTypes,
                 Boolean.class);
+    }
+
+    private static GeneratedExpression translateGeneratedFilterExpression(
+            String expression, List<Column> columns, Map<String, String> columnNameMap) {
+        return TransformParser.translateFilterExpressionToGeneratedExpression(
+                expression,
+                columns,
+                Collections.emptyList(),
+                new SupportedMetadataColumn[0],
+                columnNameMap);
+    }
+
+    private static ScriptEvaluator compileGeneratedFilterExpression(
+            GeneratedExpression generatedExpression,
+            List<String> columnNames,
+            List<Class<?>> columnTypes)
+            throws CompileException {
+        ScriptEvaluator scriptEvaluator = new ScriptEvaluator();
+        scriptEvaluator.setParameters(
+                columnNames.toArray(new String[0]), columnTypes.toArray(new Class[0]));
+        scriptEvaluator.setReturnType(Boolean.class);
+        scriptEvaluator.cook(JaninoCompiler.loadSystemFunction(generatedExpression.asScript()));
+        return scriptEvaluator;
     }
 }

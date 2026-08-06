@@ -21,10 +21,9 @@ import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.converter.JavaClassConverter;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
+import org.apache.flink.cdc.runtime.parser.GeneratedExpression;
 import org.apache.flink.cdc.runtime.parser.JaninoCompiler;
 import org.apache.flink.cdc.runtime.parser.TransformParser;
-
-import org.codehaus.janino.ExpressionEvaluator;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
@@ -49,7 +48,7 @@ public class TransformFilterProcessor {
     private final Map<String, SupportedMetadataColumn> supportedMetadataColumns;
 
     private final TransformExpressionKey transformExpressionKey;
-    private final ExpressionEvaluator expressionEvaluator;
+    private final TransformExpressionEvaluator expressionEvaluator;
 
     protected TransformFilterProcessor(
             boolean isNoOp,
@@ -72,7 +71,6 @@ public class TransformFilterProcessor {
         } else {
             this.transformExpressionKey =
                     generateTransformExpressionKey(
-                            tableInfo.getPreTransformedSchema().getColumns(),
                             udfDescriptors,
                             supportedMetadataColumns
                                     .values()
@@ -122,14 +120,14 @@ public class TransformFilterProcessor {
                     String.format(
                             "Failed to evaluate filtering expression for table `%s`.\n"
                                     + "\tOriginal expression: %s\n"
-                                    + "\tCompiled expression: %s\n"
+                                    + "\tCompiled script: %s\n"
                                     + "\tColumn name map: {%s}",
                             tableInfo.getName(),
                             transformExpressionKey != null
                                     ? transformExpressionKey.getOriginalExpression()
                                     : "<no op>",
                             transformExpressionKey != null
-                                    ? transformExpressionKey.getCompiledExpression()
+                                    ? transformExpressionKey.getCompiledScript()
                                     : "<no op>",
                             transformFilter.getColumnNameMapAsString()),
                     e);
@@ -142,15 +140,7 @@ public class TransformFilterProcessor {
         List<Class<?>> argTypes = new ArrayList<>();
         String expression = transformFilter.getExpression();
 
-        // Post-transformed columns comes in priority
-        List<Column> columns = new ArrayList<>(tableInfo.getPostTransformedSchema().getColumns());
-        {
-            Set<String> existingColumnNames =
-                    new HashSet<>(tableInfo.getPostTransformedSchema().getColumnNames());
-            tableInfo.getPreTransformedSchema().getColumns().stream()
-                    .filter(col -> !existingColumnNames.contains(col.getName()))
-                    .forEach(columns::add);
-        }
+        List<Column> columns = getAvailableColumns();
 
         Map<String, String> columnNameMap = transformFilter.getColumnNameMap();
         LinkedHashSet<String> columnNames = new LinkedHashSet<>(transformFilter.getColumnNames());
@@ -187,6 +177,17 @@ public class TransformFilterProcessor {
         return Tuple2.of(argNames, argTypes);
     }
 
+    private List<Column> getAvailableColumns() {
+        // Post-transformed columns come in priority.
+        List<Column> columns = new ArrayList<>(tableInfo.getPostTransformedSchema().getColumns());
+        Set<String> existingColumnNames =
+                new HashSet<>(tableInfo.getPostTransformedSchema().getColumnNames());
+        tableInfo.getPreTransformedSchema().getColumns().stream()
+                .filter(column -> !existingColumnNames.contains(column.getName()))
+                .forEach(columns::add);
+        return columns;
+    }
+
     private Object[] generateParams(Object[] preRow, Object[] postRow, TransformContext context) {
         List<Object> params = new ArrayList<>();
 
@@ -213,7 +214,6 @@ public class TransformFilterProcessor {
     }
 
     private TransformExpressionKey generateTransformExpressionKey(
-            List<Column> columns,
             List<UserDefinedFunctionDescriptor> udfDescriptors,
             SupportedMetadataColumn[] supportedMetadataColumns) {
         Tuple2<List<String>, List<Class<?>>> args = generateArguments(true);
@@ -223,20 +223,19 @@ public class TransformFilterProcessor {
         args.f0.add(JaninoCompiler.DEFAULT_EPOCH_TIME);
         args.f1.add(Long.class);
 
-        String scriptExpression =
-                TransformParser.translateFilterExpressionToJaninoExpression(
+        GeneratedExpression generatedExpression =
+                TransformParser.translateFilterExpressionToGeneratedExpression(
                         transformFilter.getExpression(),
-                        columns,
+                        getAvailableColumns(),
                         udfDescriptors,
                         supportedMetadataColumns,
                         transformFilter.getColumnNameMap());
 
         return TransformExpressionKey.of(
                 transformFilter.getExpression(),
-                scriptExpression,
+                generatedExpression,
                 args.f0,
                 args.f1,
-                Boolean.class,
                 transformFilter.getColumnNameMap());
     }
 }
