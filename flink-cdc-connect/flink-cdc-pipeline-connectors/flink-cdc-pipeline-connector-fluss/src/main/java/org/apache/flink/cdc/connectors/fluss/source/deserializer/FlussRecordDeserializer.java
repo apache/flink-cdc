@@ -18,6 +18,9 @@
 package org.apache.flink.cdc.connectors.fluss.source.deserializer;
 
 import org.apache.flink.cdc.common.data.DecimalData;
+import org.apache.flink.cdc.common.data.GenericArrayData;
+import org.apache.flink.cdc.common.data.GenericMapData;
+import org.apache.flink.cdc.common.data.GenericRecordData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.TimestampData;
@@ -37,16 +40,26 @@ import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.fluss.client.table.scanner.ScanRecord;
 import org.apache.fluss.metadata.TablePath;
 import org.apache.fluss.record.ChangeType;
+import org.apache.fluss.row.BinaryString;
+import org.apache.fluss.row.Decimal;
+import org.apache.fluss.row.InternalArray;
+import org.apache.fluss.row.InternalMap;
 import org.apache.fluss.row.InternalRow;
 import org.apache.fluss.row.ProjectedRow;
+import org.apache.fluss.row.TimestampLtz;
+import org.apache.fluss.row.TimestampNtz;
+import org.apache.fluss.types.ArrayType;
 import org.apache.fluss.types.DataField;
+import org.apache.fluss.types.MapType;
 import org.apache.fluss.types.RowType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -68,8 +81,11 @@ public class FlussRecordDeserializer implements FlussDeserializer<Event> {
     /** Cache of the last-seen RowType per table, used to detect schema changes. */
     private transient Map<TablePath, RowType> latestRowTypeCache;
 
-    /** Cache of the last-seen RowType per table, used to detect schema changes. */
+    /** Cache of row data generators per table. */
     private transient Map<TablePath, BinaryRecordDataGenerator> latestRecordDataGeneratorCache;
+
+    /** Cache of field converters per table, used to avoid rebuilding nested type converters. */
+    private transient Map<TablePath, FlussDeserializationConverter[]> latestFieldConverterCache;
 
     /** Tables restored from split state whose CreateTableEvent needs fresh table key metadata. */
     private transient Map<TablePath, RowType> restoredCreateTableRowTypeCache;
@@ -163,6 +179,7 @@ public class FlussRecordDeserializer implements FlussDeserializer<Event> {
                 latestRowTypeCache.put(tablePath, rowType);
                 latestRecordDataGeneratorCache.put(
                         tablePath, new BinaryRecordDataGenerator(cdcRowType));
+                latestFieldConverterCache.put(tablePath, createFieldConverters(rowType));
             }
         }
         return inferSchemaChangeEvent;
@@ -191,15 +208,12 @@ public class FlussRecordDeserializer implements FlussDeserializer<Event> {
         }
 
         BinaryRecordDataGenerator generator = latestRecordDataGeneratorCache.get(tablePath);
+        FlussDeserializationConverter[] fieldConverters = latestFieldConverterCache.get(tablePath);
         int fieldCount = latestRowType.getFieldCount();
         Object[] rowFields = new Object[fieldCount];
-        List<DataField> fields = latestRowType.getFields();
         for (int i = 0; i < fieldCount; i++) {
-            if (row.isNullAt(i)) {
-                rowFields[i] = null;
-            } else {
-                rowFields[i] = convertFlussField(row, i, fields.get(i).getType());
-            }
+            Object flussField = fieldConverters[i].getFieldOrNull(row);
+            rowFields[i] = fieldConverters[i].deserialize(flussField);
         }
         return generator.generate(rowFields);
     }
@@ -224,6 +238,7 @@ public class FlussRecordDeserializer implements FlussDeserializer<Event> {
                     (org.apache.flink.cdc.common.types.RowType) FlussConversions.toCdcType(rowType);
             latestRecordDataGeneratorCache.put(
                     tablePath, new BinaryRecordDataGenerator(cdcRowType));
+            latestFieldConverterCache.put(tablePath, createFieldConverters(rowType));
             restoredCreateTableRowTypeCache.put(tablePath, rowType);
         }
         return Collections.emptyList();
@@ -256,9 +271,13 @@ public class FlussRecordDeserializer implements FlussDeserializer<Event> {
             latestSchemaIdCache = new HashMap<>();
             latestRowTypeCache = new HashMap<>();
             latestRecordDataGeneratorCache = new HashMap<>();
+            latestFieldConverterCache = new HashMap<>();
             restoredCreateTableRowTypeCache = new HashMap<>();
         } else if (restoredCreateTableRowTypeCache == null) {
+            latestFieldConverterCache = new HashMap<>();
             restoredCreateTableRowTypeCache = new HashMap<>();
+        } else if (latestFieldConverterCache == null) {
+            latestFieldConverterCache = new HashMap<>();
         }
     }
 
@@ -340,60 +359,146 @@ public class FlussRecordDeserializer implements FlussDeserializer<Event> {
         return Collections.singletonList(new AddColumnEvent(tableId, addedColumns));
     }
 
-    private Object convertFlussField(
-            InternalRow row, int pos, org.apache.fluss.types.DataType flussType) {
-        if (flussType instanceof org.apache.fluss.types.BooleanType) {
-            return row.getBoolean(pos);
-        } else if (flussType instanceof org.apache.fluss.types.TinyIntType) {
-            return row.getByte(pos);
-        } else if (flussType instanceof org.apache.fluss.types.SmallIntType) {
-            return row.getShort(pos);
-        } else if (flussType instanceof org.apache.fluss.types.IntType) {
-            return row.getInt(pos);
-        } else if (flussType instanceof org.apache.fluss.types.BigIntType) {
-            return row.getLong(pos);
-        } else if (flussType instanceof org.apache.fluss.types.FloatType) {
-            return row.getFloat(pos);
-        } else if (flussType instanceof org.apache.fluss.types.DoubleType) {
-            return row.getDouble(pos);
-        } else if (flussType instanceof org.apache.fluss.types.CharType) {
-            int length = ((org.apache.fluss.types.CharType) flussType).getLength();
-            return BinaryStringData.fromString(row.getChar(pos, length).toString());
-        } else if (flussType instanceof org.apache.fluss.types.StringType) {
-            return BinaryStringData.fromString(row.getString(pos).toString());
-        } else if (flussType instanceof org.apache.fluss.types.DecimalType) {
-            org.apache.fluss.types.DecimalType decimalType =
-                    (org.apache.fluss.types.DecimalType) flussType;
-            org.apache.fluss.row.Decimal flussDecimal =
-                    row.getDecimal(pos, decimalType.getPrecision(), decimalType.getScale());
-            return DecimalData.fromBigDecimal(
-                    flussDecimal.toBigDecimal(),
-                    decimalType.getPrecision(),
-                    decimalType.getScale());
-        } else if (flussType instanceof org.apache.fluss.types.DateType) {
-            return row.getInt(pos);
-        } else if (flussType instanceof org.apache.fluss.types.TimeType) {
-            return row.getInt(pos);
-        } else if (flussType instanceof org.apache.fluss.types.TimestampType) {
-            int precision = ((org.apache.fluss.types.TimestampType) flussType).getPrecision();
-            org.apache.fluss.row.TimestampNtz flussTimestamp = row.getTimestampNtz(pos, precision);
-            return TimestampData.fromMillis(
-                    flussTimestamp.getMillisecond(), flussTimestamp.getNanoOfMillisecond());
-        } else if (flussType instanceof org.apache.fluss.types.LocalZonedTimestampType) {
-            int precision =
-                    ((org.apache.fluss.types.LocalZonedTimestampType) flussType).getPrecision();
-            org.apache.fluss.row.TimestampLtz flussTimestamp = row.getTimestampLtz(pos, precision);
-            return LocalZonedTimestampData.fromEpochMillis(
-                    flussTimestamp.getEpochMillisecond(), flussTimestamp.getNanoOfMillisecond());
-        } else if (flussType instanceof org.apache.fluss.types.BinaryType) {
-            int length = ((org.apache.fluss.types.BinaryType) flussType).getLength();
-            return row.getBinary(pos, length);
-        } else if (flussType instanceof org.apache.fluss.types.BytesType) {
-            return row.getBytes(pos);
-        } else {
+    private FlussDeserializationConverter[] createFieldConverters(RowType rowType) {
+        FlussDeserializationConverter[] converters =
+                new FlussDeserializationConverter[rowType.getFieldCount()];
+        for (int i = 0; i < rowType.getFieldCount(); i++) {
+            converters[i] = createNullableInternalConverter(rowType.getTypeAt(i), i);
+        }
+        return converters;
+    }
+
+    private FlussDeserializationConverter createNullableInternalConverter(
+            org.apache.fluss.types.DataType flussDataType, int pos) {
+        InternalRow.FieldGetter fieldGetter = InternalRow.createFieldGetter(flussDataType, pos);
+        FlussDeserializationConverter converter = createNullableInternalConverter(flussDataType);
+        return new FlussDeserializationConverter() {
+            @Override
+            public Object deserialize(Object flussField) {
+                return converter.deserialize(flussField);
+            }
+
+            @Override
+            public Object getFieldOrNull(InternalRow row) {
+                return fieldGetter.getFieldOrNull(row);
+            }
+        };
+    }
+
+    private FlussDeserializationConverter createNullableInternalConverter(
+            org.apache.fluss.types.DataType flussDataType) {
+        FlussDeserializationConverter converter = createInternalConverter(flussDataType);
+        return flussField -> flussField == null ? null : converter.deserialize(flussField);
+    }
+
+    private FlussDeserializationConverter createInternalConverter(
+            org.apache.fluss.types.DataType flussDataType) {
+        switch (flussDataType.getTypeRoot()) {
+            case BOOLEAN:
+            case TINYINT:
+            case SMALLINT:
+            case INTEGER:
+            case BIGINT:
+            case FLOAT:
+            case DOUBLE:
+            case DATE:
+            case TIME_WITHOUT_TIME_ZONE:
+            case BINARY:
+            case BYTES:
+                return flussField -> flussField;
+            case CHAR:
+            case STRING:
+                return flussField ->
+                        BinaryStringData.fromBytes(((BinaryString) flussField).toBytes());
+            case DECIMAL:
+                return flussField -> {
+                    Decimal decimal = (Decimal) flussField;
+                    return DecimalData.fromBigDecimal(
+                            decimal.toBigDecimal(), decimal.precision(), decimal.scale());
+                };
+            case TIMESTAMP_WITHOUT_TIME_ZONE:
+                return flussField -> {
+                    TimestampNtz timestampNtz = (TimestampNtz) flussField;
+                    return TimestampData.fromMillis(
+                            timestampNtz.getMillisecond(), timestampNtz.getNanoOfMillisecond());
+                };
+            case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
+                return flussField -> {
+                    TimestampLtz timestampLtz = (TimestampLtz) flussField;
+                    return LocalZonedTimestampData.fromEpochMillis(
+                            timestampLtz.getEpochMillisecond(),
+                            timestampLtz.getNanoOfMillisecond());
+                };
+            case ARRAY:
+                ArrayType arrayType = (ArrayType) flussDataType;
+                InternalArray.ElementGetter elementGetter =
+                        InternalArray.createElementGetter(arrayType.getElementType());
+                FlussDeserializationConverter elementConverter =
+                        createNullableInternalConverter(arrayType.getElementType());
+                return flussField -> {
+                    InternalArray flussArray = (InternalArray) flussField;
+                    Object[] cdcArray = new Object[flussArray.size()];
+                    for (int i = 0; i < flussArray.size(); i++) {
+                        Object flussElement = elementGetter.getElementOrNull(flussArray, i);
+                        cdcArray[i] = elementConverter.deserialize(flussElement);
+                    }
+                    return new GenericArrayData(cdcArray);
+                };
+            case MAP:
+                MapType mapType = (MapType) flussDataType;
+                InternalArray.ElementGetter keyGetter =
+                        InternalArray.createElementGetter(mapType.getKeyType());
+                InternalArray.ElementGetter valueGetter =
+                        InternalArray.createElementGetter(mapType.getValueType());
+                FlussDeserializationConverter keyConverter =
+                        createNullableInternalConverter(mapType.getKeyType());
+                FlussDeserializationConverter valueConverter =
+                        createNullableInternalConverter(mapType.getValueType());
+                return flussField -> {
+                    InternalMap flussMap = (InternalMap) flussField;
+                    InternalArray keyArray = flussMap.keyArray();
+                    InternalArray valueArray = flussMap.valueArray();
+                    Map<Object, Object> cdcMap = new LinkedHashMap<>();
+                    for (int i = 0; i < flussMap.size(); i++) {
+                        Object flussKey = keyGetter.getElementOrNull(keyArray, i);
+                        Object flussValue = valueGetter.getElementOrNull(valueArray, i);
+                        cdcMap.put(
+                                keyConverter.deserialize(flussKey),
+                                valueConverter.deserialize(flussValue));
+                    }
+                    return new GenericMapData(cdcMap);
+                };
+            case ROW:
+                RowType rowType = (RowType) flussDataType;
+                int fieldCount = rowType.getFieldCount();
+                InternalRow.FieldGetter[] fieldGetters = new InternalRow.FieldGetter[fieldCount];
+                FlussDeserializationConverter[] fieldConverters =
+                        new FlussDeserializationConverter[fieldCount];
+                for (int i = 0; i < fieldCount; i++) {
+                    fieldGetters[i] = InternalRow.createFieldGetter(rowType.getTypeAt(i), i);
+                    fieldConverters[i] = createNullableInternalConverter(rowType.getTypeAt(i));
+                }
+                return flussField -> {
+                    InternalRow flussRow = (InternalRow) flussField;
+                    GenericRecordData cdcRow = new GenericRecordData(fieldCount);
+                    for (int i = 0; i < fieldCount; i++) {
+                        Object flussFieldValue = fieldGetters[i].getFieldOrNull(flussRow);
+                        cdcRow.setField(i, fieldConverters[i].deserialize(flussFieldValue));
+                    }
+                    return cdcRow;
+                };
+            default:
+                throw new UnsupportedOperationException(
+                        "Unsupported Fluss data type for deserialization: " + flussDataType);
+        }
+    }
+
+    private interface FlussDeserializationConverter extends Serializable {
+        Object deserialize(Object flussField);
+
+        default Object getFieldOrNull(InternalRow row) {
             throw new UnsupportedOperationException(
-                    "Unsupported Fluss data type for deserialization: "
-                            + flussType.getClass().getSimpleName());
+                    "Only top-level converters support field access.");
         }
     }
 }
