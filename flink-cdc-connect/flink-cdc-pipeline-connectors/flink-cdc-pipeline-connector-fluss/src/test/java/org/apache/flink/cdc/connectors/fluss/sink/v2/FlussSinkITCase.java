@@ -32,6 +32,7 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.connectors.fluss.sink.FlussEventSerializationSchema;
+import org.apache.flink.cdc.connectors.fluss.sink.FlussMetaDataApplier;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
@@ -45,6 +46,8 @@ import org.apache.flink.util.CloseableIterator;
 
 import org.apache.fluss.client.Connection;
 import org.apache.fluss.client.ConnectionFactory;
+import org.apache.fluss.config.ConfigOptions;
+import org.apache.fluss.config.Configuration;
 import org.apache.fluss.server.testutils.FlussClusterExtension;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -59,7 +62,9 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.apache.fluss.config.ConfigOptions.BOOTSTRAP_SERVERS;
 import static org.apache.fluss.flink.source.testutils.FlinkRowAssertionsUtils.assertResultsIgnoreOrder;
@@ -72,6 +77,15 @@ public class FlussSinkITCase extends AbstractTestBase {
     @RegisterExtension
     public static final FlussClusterExtension FLUSS_CLUSTER_EXTENSION =
             FlussClusterExtension.builder().setNumOfTabletServers(3).build();
+
+    @RegisterExtension
+    public static final FlussClusterExtension AUTH_FLUSS_CLUSTER_EXTENSION =
+            FlussClusterExtension.builder()
+                    .setClusterConf(initAuthConfig())
+                    .setCoordinatorServerListeners("FLUSS://localhost:0, CLIENT://localhost:0")
+                    .setTabletServerListeners("FLUSS://localhost:0, CLIENT://localhost:0")
+                    .setNumOfTabletServers(3)
+                    .build();
 
     static final String CATALOG_NAME = "test_catalog";
     static final String DEFAULT_DB = "default_db";
@@ -126,6 +140,55 @@ public class FlussSinkITCase extends AbstractTestBase {
     void after() {
         tBatchEnv.useDatabase(BUILTIN_DATABASE);
         tBatchEnv.executeSql(String.format("drop database %s cascade", DEFAULT_DB));
+    }
+
+    @Test
+    void testLackUsernameAndPassword() throws Exception {
+        TableId tableId = TableId.tableId("default_namespace", DEFAULT_DB, "test_lack_auth");
+        List<Event> events =
+                constructInsertEvents(
+                        tableId,
+                        new String[] {"id", "name"},
+                        new String[0],
+                        new DataType[] {DataTypes.INT(), DataTypes.STRING()},
+                        new Object[][] {{1, BinaryStringData.fromString("Alice")}},
+                        new String[0]);
+        Configuration flussConfig = new Configuration();
+        flussConfig.set(
+                BOOTSTRAP_SERVERS,
+                AUTH_FLUSS_CLUSTER_EXTENSION.getClientConfig("CLIENT").get(BOOTSTRAP_SERVERS));
+
+        assertThatThrownBy(() -> submitJob(events, flussConfig))
+                .rootCause()
+                .hasMessageContaining(
+                        "The connection has not completed authentication yet. "
+                                + "This may be caused by a missing or incorrect configuration of "
+                                + "'client.security.protocol' on the client side.");
+    }
+
+    @Test
+    void testWrongTableOptions() {
+        TableId tableId = TableId.tableId("default_namespace", DEFAULT_DB, "test_wrong_options");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .build();
+        Map<String, String> tableProperties = new HashMap<>();
+        tableProperties.put("table.non-key", "non-key-value");
+        FlussMetaDataApplier metaDataApplier =
+                new FlussMetaDataApplier(
+                        FLUSS_CLUSTER_EXTENSION.getClientConfig(),
+                        tableProperties,
+                        Collections.emptyMap(),
+                        Collections.emptyMap());
+
+        assertThatThrownBy(
+                        () ->
+                                metaDataApplier.applySchemaChange(
+                                        new CreateTableEvent(tableId, schema)))
+                .rootCause()
+                .hasMessageContaining("'table.non-key' is not a recognized Fluss table property");
     }
 
     @ParameterizedTest
@@ -595,6 +658,10 @@ public class FlussSinkITCase extends AbstractTestBase {
     }
 
     private void submitJob(List<Event> events) throws Exception {
+        submitJob(events, FLUSS_CLUSTER_EXTENSION.getClientConfig());
+    }
+
+    private void submitJob(List<Event> events, Configuration flussConfig) throws Exception {
 
         StreamExecutionEnvironment environment =
                 StreamExecutionEnvironment.getExecutionEnvironment();
@@ -603,8 +670,7 @@ public class FlussSinkITCase extends AbstractTestBase {
         DataStreamSource<Event> source = environment.fromData(events, new EventTypeInfo());
 
         FlussEventSerializationSchema flussRecordSerializer = new FlussEventSerializationSchema();
-        FlussSink<Event> flussSink =
-                new FlussSink<>(FLUSS_CLUSTER_EXTENSION.getClientConfig(), flussRecordSerializer);
+        FlussSink<Event> flussSink = new FlussSink<>(flussConfig, flussRecordSerializer);
         source.sinkTo(flussSink);
         environment.execute();
     }
@@ -620,5 +686,17 @@ public class FlussSinkITCase extends AbstractTestBase {
                                         expectedRows.size()))
                         .collect();
         assertResultsIgnoreOrder(rowIter, expectedRows, true);
+    }
+
+    private static Configuration initAuthConfig() {
+        Configuration conf = new Configuration();
+        conf.setString(ConfigOptions.SERVER_SECURITY_PROTOCOL_MAP.key(), "CLIENT:sasl");
+        conf.setString("security.sasl.enabled.mechanisms", "plain");
+        conf.setString(
+                "security.sasl.plain.jaas.config",
+                "org.apache.fluss.security.auth.sasl.plain.PlainLoginModule required "
+                        + "    user_root=\"password\" "
+                        + "    user_guest=\"password2\";");
+        return conf;
     }
 }
