@@ -43,6 +43,7 @@ import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import org.apache.flink.cdc.connectors.mysql.source.enumerator.MySqlSourceEnumerator;
 import org.apache.flink.cdc.connectors.mysql.source.metrics.MySqlSourceReaderMetrics;
+import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
 import org.apache.flink.cdc.connectors.mysql.source.reader.MySqlRecordEmitter;
 import org.apache.flink.cdc.connectors.mysql.source.reader.MySqlSourceReader;
 import org.apache.flink.cdc.connectors.mysql.source.reader.MySqlSourceReaderContext;
@@ -61,6 +62,7 @@ import io.debezium.jdbc.JdbcConnection;
 import java.io.Serializable;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
 /**
@@ -125,13 +127,15 @@ public class MySqlSource<T>
         this(
                 configFactory,
                 deserializationSchema,
-                (sourceReaderMetrics, sourceConfig) ->
+                (sourceReaderMetrics, sourceConfig, latestMasterOffset) ->
                         new MySqlRecordEmitter<>(
                                 deserializationSchema,
                                 sourceReaderMetrics,
                                 sourceConfig.isIncludeSchemaChanges(),
                                 sourceConfig.isIncludeHeartbeatEvents(),
-                                sourceConfig.isIncludeTransactionMetadataEvents()));
+                                sourceConfig.isIncludeTransactionMetadataEvents(),
+                                latestMasterOffset,
+                                sourceConfig.getBinlogPositionLagIntervalMs()));
     }
 
     MySqlSource(
@@ -171,18 +175,24 @@ public class MySqlSource<T>
         final MySqlSourceReaderMetrics sourceReaderMetrics =
                 new MySqlSourceReaderMetrics(metricGroup);
         sourceReaderMetrics.registerMetrics();
+        if (sourceConfig.isBinlogPositionLagEnabled()) {
+            sourceReaderMetrics.registerBinlogLagMetrics();
+        }
         MySqlSourceReaderContext mySqlSourceReaderContext =
                 new MySqlSourceReaderContext(readerContext);
+        // Shared reference for binlog position lag between SplitReader and RecordEmitter
+        final AtomicReference<BinlogOffset> latestMasterOffset = new AtomicReference<>();
         Supplier<MySqlSplitReader> splitReaderSupplier =
                 () ->
                         new MySqlSplitReader(
                                 sourceConfig,
                                 readerContext.getIndexOfSubtask(),
                                 mySqlSourceReaderContext,
-                                snapshotHooks);
+                                snapshotHooks,
+                                latestMasterOffset);
         return new MySqlSourceReader<>(
                 splitReaderSupplier,
-                recordEmitterSupplier.get(sourceReaderMetrics, sourceConfig),
+                recordEmitterSupplier.get(sourceReaderMetrics, sourceConfig, latestMasterOffset),
                 readerContext.getConfiguration(),
                 mySqlSourceReaderContext,
                 sourceConfig);
@@ -292,6 +302,9 @@ public class MySqlSource<T>
     @FunctionalInterface
     interface RecordEmitterSupplier<T> extends Serializable {
 
-        MySqlRecordEmitter<T> get(MySqlSourceReaderMetrics metrics, MySqlSourceConfig sourceConfig);
+        MySqlRecordEmitter<T> get(
+                MySqlSourceReaderMetrics metrics,
+                MySqlSourceConfig sourceConfig,
+                AtomicReference<BinlogOffset> latestMasterOffset);
     }
 }

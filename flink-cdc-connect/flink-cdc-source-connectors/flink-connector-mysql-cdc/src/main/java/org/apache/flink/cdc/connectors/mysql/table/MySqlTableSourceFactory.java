@@ -106,6 +106,8 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         boolean useLegacyJsonFormat = config.get(MySqlSourceOptions.USE_LEGACY_JSON_FORMAT);
         boolean assignUnboundedChunkFirst =
                 config.get(MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST);
+        long binlogPositionLagIntervalMs =
+                config.get(MySqlSourceOptions.BINLOG_POSITION_LAG_INTERVAL_MS);
 
         boolean appendOnly =
                 config.get(MySqlSourceOptions.SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED);
@@ -156,6 +158,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                 parseOnLineSchemaChanges,
                 useLegacyJsonFormat,
                 assignUnboundedChunkFirst,
+                binlogPositionLagIntervalMs,
                 appendOnly);
     }
 
@@ -205,6 +208,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         options.add(MySqlSourceOptions.PARSE_ONLINE_SCHEMA_CHANGES);
         options.add(MySqlSourceOptions.USE_LEGACY_JSON_FORMAT);
         options.add(MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST);
+        options.add(MySqlSourceOptions.BINLOG_POSITION_LAG_INTERVAL_MS);
         options.add(MySqlSourceOptions.SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED);
         return options;
     }
