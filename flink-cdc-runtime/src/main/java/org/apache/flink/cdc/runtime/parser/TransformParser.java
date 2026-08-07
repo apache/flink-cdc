@@ -64,7 +64,9 @@ import org.apache.calcite.sql.type.SqlReturnTypeInference;
 import org.apache.calcite.sql.type.SqlTypeFactoryImpl;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.sql.util.SqlOperatorTables;
+import org.apache.calcite.sql.validate.SqlConformance;
 import org.apache.calcite.sql.validate.SqlConformanceEnum;
+import org.apache.calcite.sql.validate.SqlDelegatingConformance;
 import org.apache.calcite.sql.validate.SqlValidator;
 import org.apache.calcite.sql.validate.SqlValidatorUtil;
 import org.apache.calcite.sql2rel.SqlToRelConverter;
@@ -97,12 +99,55 @@ public class TransformParser {
     private static final String DEFAULT_TABLE = "TB";
     private static final String MAPPED_COLUMN_NAME_PREFIX = "$";
     private static final String MAPPED_SINGLE_COLUMN_NAME = MAPPED_COLUMN_NAME_PREFIX + "0";
+    private static final SqlConformance TRANSFORM_SQL_CONFORMANCE = new TransformSqlConformance();
+
+    private static class TransformSqlConformance extends SqlDelegatingConformance {
+
+        private TransformSqlConformance() {
+            super(SqlConformanceEnum.MYSQL_5);
+        }
+
+        @Override
+        public boolean allowCharLiteralAlias() {
+            return SqlConformanceEnum.MYSQL_5.allowCharLiteralAlias();
+        }
+
+        @Override
+        public boolean allowExplicitRowValueConstructor() {
+            return true;
+        }
+
+        @Override
+        public boolean isLimitStartCountAllowed() {
+            return SqlConformanceEnum.MYSQL_5.isLimitStartCountAllowed();
+        }
+
+        @Override
+        public boolean isPercentRemainderAllowed() {
+            return SqlConformanceEnum.MYSQL_5.isPercentRemainderAllowed();
+        }
+
+        @Override
+        public boolean allowGeometry() {
+            return SqlConformanceEnum.MYSQL_5.allowGeometry();
+        }
+
+        @Override
+        public boolean shouldConvertRaggedUnionTypesToVarying() {
+            return SqlConformanceEnum.MYSQL_5.shouldConvertRaggedUnionTypesToVarying();
+        }
+
+        @Override
+        public boolean allowExtendedTrim() {
+            return SqlConformanceEnum.MYSQL_5.allowExtendedTrim();
+        }
+    }
 
     private static SqlParser getCalciteParser(String sql) {
         return SqlParser.create(
                 sql,
                 SqlParser.Config.DEFAULT
-                        .withConformance(SqlConformanceEnum.MYSQL_5)
+                        .withConformance(TRANSFORM_SQL_CONFORMANCE)
                         .withCaseSensitive(true)
                         .withLex(Lex.JAVA));
     }
