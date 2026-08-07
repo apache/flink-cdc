@@ -129,7 +129,14 @@ public class JsonSerializationSchema implements SerializationSchema<Event> {
         DataField[] fields = new DataField[schema.primaryKeys().size() + 1];
         fields[0] = DataTypes.FIELD("TableId", DataTypes.STRING());
         for (int i = 0; i < schema.primaryKeys().size(); i++) {
-            Column column = schema.getColumn(schema.primaryKeys().get(i)).get();
+            Column column =
+                    schema.getColumn(schema.primaryKeys().get(i))
+                            .orElseThrow(
+                                    () ->
+                                            new IllegalStateException(
+                                                    "Primary key column '"
+                                                            + schema.primaryKeys().get(i)
+                                                            + "' not found in schema"));
             fields[i + 1] = DataTypes.FIELD(column.getName(), column.getType());
         }
         // the row should never be null

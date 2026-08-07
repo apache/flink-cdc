@@ -75,7 +75,14 @@ public class StarRocksUtils {
         // so reorder the columns in the source schema to make primary key columns at the front
         List<Column> orderedColumns = new ArrayList<>();
         for (String primaryKey : schema.primaryKeys()) {
-            orderedColumns.add(schema.getColumn(primaryKey).get());
+            orderedColumns.add(
+                    schema.getColumn(primaryKey)
+                            .orElseThrow(
+                                    () ->
+                                            new IllegalStateException(
+                                                    "Primary key column '"
+                                                            + primaryKey
+                                                            + "' not found in schema")));
         }
         for (Column column : schema.getColumns()) {
             if (!schema.primaryKeys().contains(column.getName())) {
