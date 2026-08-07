@@ -514,6 +514,47 @@ transform:
     filter: inc(id) < 100
 ```
 
+### Python UDFs
+
+Flink CDC supports defining Python UDFs inline in the pipeline YAML. The distribution includes the
+`flink-cdc-python` module, which embeds Python on each TaskManager through
+[Pemja](https://pypi.org/project/pemja/).
+
+```yaml
+transform:
+  - source-table: db.users
+    projection: ID, py_normalize(EMAIL) AS EMAIL_NORM, py_double(AGE) AS DOUBLED
+
+pipeline:
+  user-defined-function:
+    - name: py_normalize
+      python-code: |
+        def eval(s: str) -> str:
+            return None if s is None else s.strip().lower()
+      python-executable: /usr/bin/python3
+    - name: py_double
+      python-code: |
+        def eval(x: int) -> int:
+            return None if x is None else x * 2
+      python-files:
+        - /opt/flink/python-deps
+        - /opt/flink/python-deps.zip
+```
+
+Each entry must contain one top-level function named `eval` with a return type annotation. Supported
+annotations are `bool`, `bytes`, `float`, `int`, and `str`, mapped to Flink CDC `BOOLEAN`, `BYTES`,
+`DOUBLE`, `BIGINT`, and `STRING`, respectively.
+
+The following runtime requirements apply:
+
+* Every TaskManager must have Python and `pemja==0.5.7` installed. `python-executable` defaults to
+  the first `python3` on `PATH`.
+* `python-files` is optional and accepts a YAML list of existing directories or `.zip` archives.
+  These paths must be available on every TaskManager. Zip archives are extracted before being added
+  to Python's import path.
+* `python-code` cannot be combined with `classpath` or `options`. Use one UDF entry for each Python
+  function.
+
 ## Embedding AI Model
 
 Embedding AI Model can be used in transform rules.
