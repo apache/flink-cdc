@@ -528,3 +528,113 @@ transform:
 ```
 
 有关 AI 模型函数和配置，请参见 [AI 模型]({{< ref "docs/core-concept/ai-model" >}})。
+
+### Python UDF
+
+Flink CDC 支持直接在 Pipeline YAML 中定义 Python UDF。发行包内置了 `flink-cdc-python`
+模块，通过 [Pemja](https://pypi.org/project/pemja/) 在每个 TaskManager 中嵌入 Python。
+
+```yaml
+transform:
+  - source-table: db.users
+    projection: ID, py_normalize(EMAIL) AS EMAIL_NORM, py_double(AGE) AS DOUBLED
+
+pipeline:
+  user-defined-function:
+    - name: py_normalize
+      python-code: |
+        def eval(s: str) -> str:
+            return None if s is None else s.strip().lower()
+      python-executable: /usr/bin/python3
+    - name: py_double
+      python-code: |
+        def eval(x: int) -> int:
+            return None if x is None else x * 2
+      python-files:
+        - /opt/flink/python-deps
+        - /opt/flink/python-deps.zip
+```
+
+每个条目必须包含一个名为 `eval` 的顶层函数，并声明返回值类型。目前支持 `bool`、
+`bytes`、`float`、`int` 和 `str`，依次映射为 Flink CDC 的 `BOOLEAN`、`BYTES`、
+`DOUBLE`、`BIGINT` 和 `STRING`。
+
+运行时还需满足以下条件：
+
+* 每个 TaskManager 都要安装 Python 和 `pemja==0.5.7`。`python-executable` 默认使用
+  `PATH` 中找到的第一个 `python3`。
+* 可选的 `python-files` 是一个 YAML 列表，元素只能是已存在的目录或 `.zip` 压缩包；
+  这些路径必须在每个 TaskManager 上都可访问。压缩包解压后才会加入 Python import path。
+* `python-code` 不能与 `classpath` 或 `options` 同时使用。每个 Python 函数应单独声明为
+  一个 UDF 条目。
+
+## Embedding AI 模型
+
+内置 AI 模型可以在 transform 规则中使用。
+为了使用内置 AI 模型，你需要下载内置模型的 jar ，然后在 `flink-cdc.sh` 命令中添加 `--jar {$BUILT_IN_MODEL_PATH}`。
+
+如何定义一个 Embedding AI 模型：
+
+```yaml
+pipeline:
+  model:
+    - model-name: CHAT
+      class-name: OpenAIChatModel
+      openai.model: gpt-4o-mini
+      openai.host: https://xxxx
+      openai.apikey: abcd1234
+      openai.chat.prompt: please summary this
+    - model-name: GET_EMBEDDING
+      class-name: OpenAIEmbeddingModel
+      openai.model: text-embedding-3-small
+      openai.host: https://xxxx
+      openai.apikey: abcd1234
+```
+注意：
+* `model-name` 是一个通用的必填参数，用于所有支持的模型，表示在 `projection` 或 `filter` 中调用的函数名称。
+* `class-name` 是一个通用的必填参数，用于所有支持的模型，可用值可以在[所有支持的模型](#all-support-models)中找到。
+* `openai.model`，`openai.host`，`openai.apiKey` 和 `openai.chat.prompt` 是在各个模型中特别的可选参数。
+
+如何使用一个 Embedding AI 模型：
+
+```yaml
+transform:
+  - source-table: db.\.*
+    projection: "*, inc(inc(inc(id))) as inc_id, GET_EMBEDDING(page) as emb, CHAT(page) as summary"
+    filter: inc(id) < 100
+pipeline:
+  model:
+    - model-name: CHAT
+      class-name: OpenAIChatModel
+      openai.model: gpt-4o-mini
+      openai.host: http://langchain4j.dev/demo/openai/v1
+      openai.apikey: demo
+      openai.chat.prompt: please summary this
+    - model-name: GET_EMBEDDING
+      class-name: OpenAIEmbeddingModel
+      openai.model: text-embedding-3-small
+      openai.host: http://langchain4j.dev/demo/openai/v1
+      openai.apikey: demo
+```
+这里，GET_EMBEDDING 是通过 `model-name` 在 `pipeline` 中定义的。
+
+### 所有支持的模型
+
+下面列出了所有支持的模型：
+
+#### OpenAIChatModel
+
+| 参数                 | 类型     | 是否必填     | 含义                                                                                                 |
+|--------------------|--------|----------|-----------------------------------------------------------------------------------------------------|
+| openai.model       | STRING | 必填       | 要调用的模型名称，例如："gpt-4o-mini"，可用选项有 "gpt-4o-mini"、"gpt-4o"、"gpt-4-32k"、"gpt-3.5-turbo"。 |
+| openai.host        | STRING | 必填       | 要连接的模型服务器地址，例如：`http://langchain4j.dev/demo/openai/v1`。                                 |
+| openai.apikey      | STRING | 必填       | 模型服务器验证的 API Key，例如："demo"。                                                                |
+| openai.chat.prompt | STRING | 可选       | 与 OpenAI 聊天的提示词，例如："Please summary this"。                                                   |
+
+#### OpenAIEmbeddingModel
+
+| 参数            | 类型     | 是否必填     | 含义                                                                                                                   |
+|---------------|--------|----------|----------------------------------------------------------------------------------------------------------------------|
+| openai.model  | STRING | 必填       | 要调用的模型名称，例如："text-embedding-3-small"，可用选项有 "text-embedding-3-small"、"text-embedding-3-large"、"text-embedding-ada-002"。 |
+| openai.host   | STRING | 必填       | 要连接的模型服务器地址，例如：`http://langchain4j.dev/demo/openai/v1`。                                                   |
+| openai.apikey | STRING | 必填       | 模型服务器验证的 API Key，例如："demo"。                                                                                  |
