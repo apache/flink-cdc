@@ -490,6 +490,45 @@ transform:
     filter: inc(id) < 100
 ```
 
+### Python UDF
+
+Flink CDC 支持直接在 Pipeline YAML 中定义 Python UDF。发行包内置了 `flink-cdc-python`
+模块，通过 [Pemja](https://pypi.org/project/pemja/) 在每个 TaskManager 中嵌入 Python。
+
+```yaml
+transform:
+  - source-table: db.users
+    projection: ID, py_normalize(EMAIL) AS EMAIL_NORM, py_double(AGE) AS DOUBLED
+
+pipeline:
+  user-defined-function:
+    - name: py_normalize
+      python-code: |
+        def eval(s: str) -> str:
+            return None if s is None else s.strip().lower()
+      python-executable: /usr/bin/python3
+    - name: py_double
+      python-code: |
+        def eval(x: int) -> int:
+            return None if x is None else x * 2
+      python-files:
+        - /opt/flink/python-deps
+        - /opt/flink/python-deps.zip
+```
+
+每个条目必须包含一个名为 `eval` 的顶层函数，并声明返回值类型。目前支持 `bool`、
+`bytes`、`float`、`int` 和 `str`，依次映射为 Flink CDC 的 `BOOLEAN`、`BYTES`、
+`DOUBLE`、`BIGINT` 和 `STRING`。
+
+运行时还需满足以下条件：
+
+* 每个 TaskManager 都要安装 Python 和 `pemja==0.5.7`。`python-executable` 默认使用
+  `PATH` 中找到的第一个 `python3`。
+* 可选的 `python-files` 是一个 YAML 列表，元素只能是已存在的目录或 `.zip` 压缩包；
+  这些路径必须在每个 TaskManager 上都可访问。压缩包解压后才会加入 Python import path。
+* `python-code` 不能与 `classpath` 或 `options` 同时使用。每个 Python 函数应单独声明为
+  一个 UDF 条目。
+
 ## Embedding AI 模型
 
 内置 AI 模型可以在 transform 规则中使用。

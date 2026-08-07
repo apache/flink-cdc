@@ -26,15 +26,26 @@ import org.apache.flink.cdc.common.types.DataType;
  */
 @PublicEvolving
 public interface UserDefinedFunction {
+
+    /**
+     * Returns the return type of this UDF when it cannot be derived from per-UDF options.
+     *
+     * @deprecated Use {@link #getReturnType(UserDefinedFunctionContext)} instead.
+     */
+    @Deprecated
     default DataType getReturnType() {
         return null;
+    }
+
+    /** Returns the return type of this UDF, given the per-UDF YAML options. */
+    default DataType getReturnType(UserDefinedFunctionContext context) {
+        return getReturnType();
     }
 
     /**
      * This will be invoked every time when a UDF got created.
      *
-     * <p>this method is {@link Deprecated}, please use {@link #open(UserDefinedFunctionContext)}
-     * instead.
+     * @deprecated Use {@link #open(UserDefinedFunctionContext)} instead.
      */
     @Deprecated
     default void open() throws Exception {}

@@ -44,6 +44,7 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.dataformat.yaml.YA
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -93,7 +94,11 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     private static final String UDF_KEY = "user-defined-function";
     private static final String UDF_FUNCTION_NAME_KEY = "name";
     private static final String UDF_CLASSPATH_KEY = "classpath";
+    private static final String UDF_PYTHON_CODE_KEY = "python-code";
+    private static final String UDF_PYTHON_EXECUTABLE_KEY = "python-executable";
+    private static final String UDF_PYTHON_FILES_KEY = "python-files";
     private static final String UDF_OPTIONS_KEY = "options";
+    private static final String PYTHON_UDF_CLASSPATH = "org.apache.flink.cdc.python.PythonUdf";
 
     // Model related keys
     private static final String MODEL_NAME_KEY = "model-name";
@@ -311,8 +316,13 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         validateJsonNodeKeys(
                 "UDF",
                 udfNode,
-                Arrays.asList(UDF_FUNCTION_NAME_KEY, UDF_CLASSPATH_KEY),
-                Collections.singletonList(UDF_OPTIONS_KEY));
+                Collections.singletonList(UDF_FUNCTION_NAME_KEY),
+                Arrays.asList(
+                        UDF_CLASSPATH_KEY,
+                        UDF_PYTHON_CODE_KEY,
+                        UDF_PYTHON_EXECUTABLE_KEY,
+                        UDF_PYTHON_FILES_KEY,
+                        UDF_OPTIONS_KEY));
 
         String functionName =
                 checkNotNull(
@@ -320,12 +330,22 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                                 "Missing required field \"%s\" in UDF configuration",
                                 UDF_FUNCTION_NAME_KEY)
                         .asText();
-        String classpath =
-                checkNotNull(
-                                udfNode.get(UDF_CLASSPATH_KEY),
-                                "Missing required field \"%s\" in UDF configuration",
-                                UDF_CLASSPATH_KEY)
-                        .asText();
+        JsonNode classpathNode = udfNode.get(UDF_CLASSPATH_KEY);
+        JsonNode pythonCodeNode = udfNode.get(UDF_PYTHON_CODE_KEY);
+
+        Preconditions.checkArgument(
+                classpathNode != null || pythonCodeNode != null,
+                "Missing required field \"%s\" or \"%s\" in UDF configuration",
+                UDF_CLASSPATH_KEY,
+                UDF_PYTHON_CODE_KEY);
+        Preconditions.checkArgument(
+                classpathNode == null || pythonCodeNode == null,
+                "UDF configuration cannot define both \"%s\" and \"%s\"",
+                UDF_CLASSPATH_KEY,
+                UDF_PYTHON_CODE_KEY);
+
+        JsonNode pythonExecutableNode = udfNode.get(UDF_PYTHON_EXECUTABLE_KEY);
+        JsonNode pythonFilesNode = udfNode.get(UDF_PYTHON_FILES_KEY);
 
         Map<String, String> options =
                 Optional.ofNullable(udfNode.get(UDF_OPTIONS_KEY))
@@ -333,9 +353,55 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                                 node ->
                                         mapper.convertValue(
                                                 node, new TypeReference<Map<String, String>>() {}))
-                        .orElse(null);
+                        .orElseGet(HashMap::new);
 
+        if (pythonCodeNode != null) {
+            Preconditions.checkArgument(
+                    udfNode.get(UDF_OPTIONS_KEY) == null,
+                    "UDF configuration using \"%s\" cannot define \"%s\"; use top-level \"%s\" and \"%s\" instead",
+                    UDF_PYTHON_CODE_KEY,
+                    UDF_OPTIONS_KEY,
+                    UDF_PYTHON_EXECUTABLE_KEY,
+                    UDF_PYTHON_FILES_KEY);
+            options.put("source", pythonCodeNode.asText());
+            Optional.ofNullable(pythonExecutableNode)
+                    .map(JsonNode::asText)
+                    .ifPresent(value -> options.put("python-executable", value));
+            Optional.ofNullable(normalizePythonFiles(pythonFilesNode))
+                    .ifPresent(value -> options.put("python-files", value));
+            return new UdfDef(functionName, PYTHON_UDF_CLASSPATH, options);
+        }
+
+        Preconditions.checkArgument(
+                pythonExecutableNode == null && pythonFilesNode == null,
+                "UDF configuration using \"%s\" or \"%s\" requires \"%s\"",
+                UDF_PYTHON_EXECUTABLE_KEY,
+                UDF_PYTHON_FILES_KEY,
+                UDF_PYTHON_CODE_KEY);
+
+        String classpath = classpathNode.asText();
         return new UdfDef(functionName, classpath, options);
+    }
+
+    private String normalizePythonFiles(JsonNode pythonFilesNode) {
+        if (pythonFilesNode == null || pythonFilesNode.isNull()) {
+            return null;
+        }
+        if (pythonFilesNode.isTextual()) {
+            throw new IllegalArgumentException(
+                    String.format(
+                            "YAML UDF field `%s` should be a list when used with `python-code`.",
+                            UDF_PYTHON_FILES_KEY));
+        }
+        if (!pythonFilesNode.isArray()) {
+            throw new IllegalArgumentException(
+                    String.format(
+                            "YAML UDF field `%s` should be a list, but got %s.",
+                            UDF_PYTHON_FILES_KEY, pythonFilesNode.getNodeType()));
+        }
+        List<String> pythonFiles = new ArrayList<>();
+        pythonFilesNode.forEach(node -> pythonFiles.add(node.asText()));
+        return String.join(",", pythonFiles);
     }
 
     private TransformDef toTransformDef(JsonNode transformNode) {

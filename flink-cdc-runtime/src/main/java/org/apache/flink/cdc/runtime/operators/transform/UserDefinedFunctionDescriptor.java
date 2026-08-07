@@ -19,8 +19,10 @@ package org.apache.flink.cdc.runtime.operators.transform;
 
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.cdc.common.annotation.Internal;
+import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.udf.UserDefinedFunction;
+import org.apache.flink.cdc.common.udf.UserDefinedFunctionContext;
 
 import java.io.Serializable;
 import java.lang.reflect.InvocationTargetException;
@@ -62,13 +64,10 @@ public class UserDefinedFunctionDescriptor implements Serializable {
             Class<?> clazz = Class.forName(classpath);
             isCdcPipelineUdf = isCdcPipelineUdf(clazz);
             if (isCdcPipelineUdf) {
-                // We use reflection to invoke UDF methods since we may add more methods
-                // into UserDefinedFunction interface, thus the provided UDF classes
-                // might not be compatible with the interface definition in CDC common.
+                UserDefinedFunctionContext context = () -> Configuration.fromMap(parameters);
                 returnTypeHint =
-                        (DataType)
-                                clazz.getMethod("getReturnType")
-                                        .invoke(clazz.getConstructor().newInstance());
+                        ((UserDefinedFunction) clazz.getConstructor().newInstance())
+                                .getReturnType(context);
             } else {
                 returnTypeHint = null;
             }
