@@ -46,7 +46,9 @@ import org.codehaus.commons.compiler.CompileException;
 import org.codehaus.commons.compiler.Location;
 import org.codehaus.janino.ExpressionEvaluator;
 import org.codehaus.janino.Java;
+import org.codehaus.janino.Unparser;
 
+import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -131,7 +133,11 @@ public class JaninoCompiler {
     public static String translateSqlNodeToJaninoExpression(Context context, SqlNode transform) {
         Java.Rvalue rvalue = translateSqlNodeToJaninoRvalue(context, transform);
         if (rvalue != null) {
-            return rvalue.toString();
+            StringWriter writer = new StringWriter();
+            Unparser unparser = new Unparser(writer);
+            unparser.unparseAtom(rvalue);
+            unparser.close();
+            return writer.toString();
         }
         return "";
     }

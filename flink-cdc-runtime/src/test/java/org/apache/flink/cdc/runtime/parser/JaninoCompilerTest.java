@@ -288,6 +288,83 @@ class JaninoCompilerTest {
     }
 
     @Test
+    void testTranslatedNestedExpressionPreservesSemantics() throws InvocationTargetException {
+        List<Column> arithmeticColumns =
+                List.of(
+                        Column.physicalColumn("a", DataTypes.INT()),
+                        Column.physicalColumn("b", DataTypes.INT()),
+                        Column.physicalColumn("c", DataTypes.INT()));
+        Map<String, String> columnNameMap = Map.of("a", "$0", "b", "$1", "c", "$2");
+        List<String> columnNames = List.of("$0", "$1", "$2");
+        List<Class<?>> columnTypes = List.of(Integer.class, Integer.class, Integer.class);
+
+        ExpressionEvaluator additiveOperandEvaluator =
+                compileTranslatedFilterExpression(
+                        "(a + b) * c = 9",
+                        arithmeticColumns,
+                        columnNameMap,
+                        columnNames,
+                        columnTypes);
+        Assertions.assertThat(additiveOperandEvaluator.evaluate(new Object[] {1, 2, 3}))
+                .isEqualTo(true);
+
+        ExpressionEvaluator multiplicativeRightOperandEvaluator =
+                compileTranslatedFilterExpression(
+                        "a / (b * c) = 2",
+                        arithmeticColumns,
+                        columnNameMap,
+                        columnNames,
+                        columnTypes);
+        Assertions.assertThat(multiplicativeRightOperandEvaluator.evaluate(new Object[] {12, 2, 3}))
+                .isEqualTo(true);
+
+        ExpressionEvaluator subtractiveRightOperandEvaluator =
+                compileTranslatedFilterExpression(
+                        "a - (b - c) = 6",
+                        arithmeticColumns,
+                        columnNameMap,
+                        columnNames,
+                        columnTypes);
+        Assertions.assertThat(subtractiveRightOperandEvaluator.evaluate(new Object[] {10, 6, 2}))
+                .isEqualTo(true);
+
+        ExpressionEvaluator conditionalLeftOperandEvaluator =
+                compileTranslatedFilterExpression(
+                        "IF(a > b, a, b) + c = 13",
+                        arithmeticColumns,
+                        columnNameMap,
+                        columnNames,
+                        columnTypes);
+        Assertions.assertThat(conditionalLeftOperandEvaluator.evaluate(new Object[] {10, 2, 3}))
+                .isEqualTo(true);
+
+        ExpressionEvaluator conditionalRightOperandEvaluator =
+                compileTranslatedFilterExpression(
+                        "c * IF(a > b, a, b) = 30",
+                        arithmeticColumns,
+                        columnNameMap,
+                        columnNames,
+                        columnTypes);
+        Assertions.assertThat(conditionalRightOperandEvaluator.evaluate(new Object[] {10, 2, 3}))
+                .isEqualTo(true);
+
+        List<Column> booleanColumns =
+                List.of(
+                        Column.physicalColumn("a", DataTypes.BOOLEAN().notNull()),
+                        Column.physicalColumn("b", DataTypes.BOOLEAN().notNull()),
+                        Column.physicalColumn("c", DataTypes.BOOLEAN().notNull()));
+        ExpressionEvaluator logicalOperandEvaluator =
+                compileTranslatedFilterExpression(
+                        "(a OR b) AND c",
+                        booleanColumns,
+                        columnNameMap,
+                        columnNames,
+                        List.of(Boolean.class, Boolean.class, Boolean.class));
+        Assertions.assertThat(logicalOperandEvaluator.evaluate(new Object[] {true, false, false}))
+                .isEqualTo(false);
+    }
+
+    @Test
     void testLargeNumericLiterals() {
         // Test parsing integer literals
         Stream.of(
