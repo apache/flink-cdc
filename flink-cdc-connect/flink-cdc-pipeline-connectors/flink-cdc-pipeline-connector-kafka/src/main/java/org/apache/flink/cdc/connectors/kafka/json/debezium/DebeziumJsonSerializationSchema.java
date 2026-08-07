@@ -58,6 +58,7 @@ import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.nio.charset.StandardCharsets;
 import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.List;
@@ -310,7 +311,7 @@ public class DebeziumJsonSerializationSchema implements SerializationSchema<Even
                             .setScale(decimalType.getScale(), RoundingMode.HALF_UP);
                 case BINARY:
                 case VARBINARY:
-                    return defaultValueExpression.getBytes();
+                    return defaultValueExpression.getBytes(StandardCharsets.UTF_8);
                 case CHAR:
                 case VARCHAR:
                 case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
