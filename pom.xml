@@ -69,12 +69,12 @@ limitations under the License.
         <flink.reuseForks>true</flink.reuseForks>
 
         <!-- dependencies versions -->
-        <flink.1.x.version>1.20.3</flink.1.x.version>
-        <flink.2.x.version>2.2.0</flink.2.x.version>
+        <flink.1.x.version>1.20.5</flink.1.x.version>
+        <flink.2.x.version>2.3.0</flink.2.x.version>
         <flink.version>${flink.1.x.version}</flink.version>
         <flink.major.version>1.20</flink.major.version>
         <flink.1.x.shaded.guava.version>31.1-jre-17.0</flink.1.x.shaded.guava.version>
-        <flink.2.x.shaded.guava.version>33.4.0-jre-20.0</flink.2.x.shaded.guava.version>
+        <flink.2.x.shaded.guava.version>33.5.0-jre-21.0</flink.2.x.shaded.guava.version>
         <shaded.guava.version>${flink.1.x.shaded.guava.version}</shaded.guava.version>
         <flink.shaded.version>17.0</flink.shaded.version>
         <debezium.version>1.9.8.Final</debezium.version>
@@ -855,7 +855,7 @@ limitations under the License.
             <id>flink2</id>
             <properties>
                 <flink.kafka.connector.version>4.0.1-2.0</flink.kafka.connector.version>
-                <paimon.flink.major.version>2.1</paimon.flink.major.version>
+                <paimon.flink.major.version>2.2</paimon.flink.major.version>
                 <iceberg.flink.major.version>2.0</iceberg.flink.major.version>
             </properties>
             <build>
