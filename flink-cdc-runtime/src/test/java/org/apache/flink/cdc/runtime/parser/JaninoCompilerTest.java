@@ -288,7 +288,7 @@ class JaninoCompilerTest {
     }
 
     @Test
-    void testTranslatedNestedBinaryExpressionPreservesSemantics() throws InvocationTargetException {
+    void testTranslatedNestedExpressionPreservesSemantics() throws InvocationTargetException {
         List<Column> arithmeticColumns =
                 List.of(
                         Column.physicalColumn("a", DataTypes.INT()),
@@ -326,6 +326,26 @@ class JaninoCompilerTest {
                         columnNames,
                         columnTypes);
         Assertions.assertThat(subtractiveRightOperandEvaluator.evaluate(new Object[] {10, 6, 2}))
+                .isEqualTo(true);
+
+        ExpressionEvaluator conditionalLeftOperandEvaluator =
+                compileTranslatedFilterExpression(
+                        "IF(a > b, a, b) + c = 13",
+                        arithmeticColumns,
+                        columnNameMap,
+                        columnNames,
+                        columnTypes);
+        Assertions.assertThat(conditionalLeftOperandEvaluator.evaluate(new Object[] {10, 2, 3}))
+                .isEqualTo(true);
+
+        ExpressionEvaluator conditionalRightOperandEvaluator =
+                compileTranslatedFilterExpression(
+                        "c * IF(a > b, a, b) = 30",
+                        arithmeticColumns,
+                        columnNameMap,
+                        columnNames,
+                        columnTypes);
+        Assertions.assertThat(conditionalRightOperandEvaluator.evaluate(new Object[] {10, 2, 3}))
                 .isEqualTo(true);
 
         List<Column> booleanColumns =

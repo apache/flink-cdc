@@ -452,25 +452,33 @@ class TransformParserTest {
     }
 
     @Test
-    void testTranslateNestedBinaryExpressionPreservesOperatorPrecedence() {
+    void testTranslateNestedExpressionPreservesOperatorPrecedence() {
         List<Column> arithmeticColumns =
                 List.of(
                         Column.physicalColumn("a", DataTypes.INT()),
                         Column.physicalColumn("b", DataTypes.INT()),
                         Column.physicalColumn("c", DataTypes.INT()));
 
-        testFilterExpressionWithColumns("(a + b) * c", "(a + b) * c", arithmeticColumns);
-        testFilterExpressionWithColumns("a / (b * c)", "a / (b * c)", arithmeticColumns);
-        testFilterExpressionWithColumns("a - (b - c)", "a - (b - c)", arithmeticColumns);
+        testFilterExpressionWithColumns("(a + b) * c", "((( a + b ))) * c", arithmeticColumns);
+        testFilterExpressionWithColumns("a / (b * c)", "a / ((( b * c )))", arithmeticColumns);
+        testFilterExpressionWithColumns("a - (b - c)", "a - ((( b - c )))", arithmeticColumns);
         testFilterExpressionWithColumns("a + b * c", "a + b * c", arithmeticColumns);
         testFilterExpressionWithColumns("(a - b) - c", "a - b - c", arithmeticColumns);
+        testFilterExpressionWithColumns(
+                "IF(a > b, a, b) + c",
+                "((( isTrue(greaterThan(a, b)) ? a : b ))) + c",
+                arithmeticColumns);
+        testFilterExpressionWithColumns(
+                "c * IF(a > b, a, b)",
+                "c * ((( isTrue(greaterThan(a, b)) ? a : b )))",
+                arithmeticColumns);
 
         List<Column> booleanColumns =
                 List.of(
                         Column.physicalColumn("a", DataTypes.BOOLEAN().notNull()),
                         Column.physicalColumn("b", DataTypes.BOOLEAN().notNull()),
                         Column.physicalColumn("c", DataTypes.BOOLEAN().notNull()));
-        testFilterExpressionWithColumns("(a OR b) AND c", "(a || b) && c", booleanColumns);
+        testFilterExpressionWithColumns("(a OR b) AND c", "((( a || b ))) && c", booleanColumns);
     }
 
     @Test
@@ -610,7 +618,7 @@ class TransformParserTest {
                         "ProjectionColumn{column=`newCreateTime` TIMESTAMP(3) 'newCreateTime', expression='createTime', scriptExpression='$0', originalColumnNames=[createTime], columnNameMap={createTime=$0}}",
                         "ProjectionColumn{column=`newAddress` VARCHAR(50) 'newAddress', expression='address', scriptExpression='$0', originalColumnNames=[address], columnNameMap={address=$0}}",
                         "ProjectionColumn{column=`deposits` DECIMAL(10, 2) 'deposit', expression='deposit', scriptExpression='$0', originalColumnNames=[deposit], columnNameMap={deposit=$0}}",
-                        "ProjectionColumn{column=`bmi` DOUBLE, expression='`TB`.`weight` / (`TB`.`height` * `TB`.`height`)', scriptExpression='$0 / ($1 * $1)', originalColumnNames=[weight, height, height], columnNameMap={weight=$0, height=$1}}");
+                        "ProjectionColumn{column=`bmi` DOUBLE, expression='`TB`.`weight` / (`TB`.`height` * `TB`.`height`)', scriptExpression='$0 / ((( $1 * $1 )))', originalColumnNames=[weight, height, height], columnNameMap={weight=$0, height=$1}}");
         Assertions.assertThat(result).hasToString("[" + String.join(", ", expected) + "]");
 
         List<ProjectionColumn> regexpResult =
