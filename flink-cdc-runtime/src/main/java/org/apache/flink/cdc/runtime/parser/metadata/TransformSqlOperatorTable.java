@@ -443,6 +443,17 @@ public class TransformSqlOperatorTable extends ReflectiveSqlOperatorTable {
     // ------------------
     // Temporal Functions
     // ------------------
+    public static final SqlFunction EXTRACT = SqlStdOperatorTable.EXTRACT;
+    public static final SqlFunction YEAR = SqlStdOperatorTable.YEAR;
+    public static final SqlFunction QUARTER = SqlStdOperatorTable.QUARTER;
+    public static final SqlFunction MONTH = SqlStdOperatorTable.MONTH;
+    public static final SqlFunction WEEK = SqlStdOperatorTable.WEEK;
+    public static final SqlFunction DAYOFYEAR = SqlStdOperatorTable.DAYOFYEAR;
+    public static final SqlFunction DAYOFMONTH = SqlStdOperatorTable.DAYOFMONTH;
+    public static final SqlFunction DAYOFWEEK = SqlStdOperatorTable.DAYOFWEEK;
+    public static final SqlFunction HOUR = SqlStdOperatorTable.HOUR;
+    public static final SqlFunction MINUTE = SqlStdOperatorTable.MINUTE;
+    public static final SqlFunction SECOND = SqlStdOperatorTable.SECOND;
     public static final SqlFunction LOCALTIME = SqlStdOperatorTable.LOCALTIME;
     public static final SqlFunction LOCALTIMESTAMP =
             new BuiltInTimestampFunction("LOCALTIMESTAMP", SqlTypeName.TIMESTAMP, 3);
