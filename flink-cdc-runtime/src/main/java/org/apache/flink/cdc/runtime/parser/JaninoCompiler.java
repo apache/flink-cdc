@@ -301,6 +301,7 @@ public class JaninoCompiler {
             case NOT_IN:
             case LIKE:
             case SIMILAR:
+            case POSITION:
             case CEIL:
             case FLOOR:
             case TRIM:

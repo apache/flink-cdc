@@ -177,6 +177,9 @@ Flink CDC 使用 [Calcite](https://calcite.apache.org/) 来解析表达式并且
 | UPPER(string)                                    | upper(string)                            | 返回大写形式的字符串。                                                                                                    |
 | LOWER(string)                                    | lower(string)                            | 返回小写形式的字符串。                                                                                                    |
 | TRIM(string1)                                    | trim('BOTH',string1)                     | 返回去除两端空格的字符串。                                                                                                  |
+| LTRIM(string[, trimString])                                | ltrim(string[, trimString])                   | 返回去除开头 trimString 字符后的字符串，默认去除空格。                                                                            |
+| RTRIM(string[, trimString])                                | rtrim(string[, trimString])                   | 返回去除末尾 trimString 字符后的字符串，默认去除空格。                                                                            |
+| BTRIM(string[, trimString])                                | btrim(string[, trimString])                   | 返回去除开头和末尾 trimString 字符后的字符串，默认去除空格。                                                                         |
 | REGEXP_REPLACE(string1, string2, string3)        | regexpReplace(string1, string2, string3) | 返回将 STRING1 中所有匹配正则表达式 STRING2 的子串替换为 STRING3 后的字符串。例如，'foobar'.regexpReplace('oo\|ar', '') 返回 "fb"。         |
 | REGEXP_EXTRACT(string, regex[, extractIndex])    | regexpExtract(string, regex[, extractIndex]) | 返回正则表达式组 extractIndex 捕获的子串。extractIndex 默认为 0，0 表示完整匹配。输入为 NULL、无匹配、正则表达式非法或组索引非法时返回 NULL。 |
 | REGEXP_EXTRACT_ALL(string, regex[, extractIndex]) | regexpExtractAll(string, regex[, extractIndex]) | 返回组 extractIndex 捕获的所有子串组成的 ARRAY&lt;STRING&gt;。extractIndex 默认为 1，0 表示完整匹配。无匹配时返回空数组，输入为 NULL、正则表达式非法或组索引非法时返回 NULL。 |
@@ -185,7 +188,23 @@ Flink CDC 使用 [Calcite](https://calcite.apache.org/) 来解析表达式并且
 | REGEXP_SUBSTR(string, regex)                     | regexpSubstr(string, regex)               | 返回第一个匹配正则表达式的子串。输入为 NULL、无匹配或正则表达式非法时返回 NULL。 |
 | SUBSTR(string, integer1[, integer2])             | substr(string,integer1,integer2)         | 返回 STRING 从位置 integer1 开始、长度为 integer2（默认到末尾）的子串。                                                              |
 | SUBSTRING(string FROM integer1 [ FOR integer2 ]) | substring(string,integer1,integer2)      | 返回 STRING 从位置 integer1 开始、长度为 integer2（默认到末尾）的子串。                                                              |
+| OVERLAY(string1 PLACING string2 FROM integer1 [FOR integer2]) | overlay(string1, string2, integer1[, integer2]) | 从位置 integer1 开始，用 STRING2 替换 STRING1 的子串，替换长度默认为 STRING2 的长度，支持字符字符串和二进制字符串。                                      |
+| POSITION(string1 IN string2 [ FROM integer ])               | position(string1, string2[, integer])         | 返回 STRING1 在 STRING2 中第一次出现的位置，可指定从 integer 开始查找。起始位置为 1，未找到时返回 0，支持字符字符串和二进制字符串。                              |
+| LOCATE(string1, string2[, integer])                        | locate(string1, string2[, integer])           | 返回 STRING1 在 STRING2 中第一次出现的位置，可指定从 integer 开始查找。起始位置为 1，未找到时返回 0。                                           |
+| INSTR(string1, string2)                                    | instr(string1, string2)                       | 返回 STRING2 在 STRING1 中第一次出现的位置。起始位置为 1，未找到时返回 0。                                                            |
 | CONCAT(string1, string2,…)                       | concat(string1, string2,…)               | 返回连接 string1、string2、… 后的字符串。例如，CONCAT('AA', 'BB', 'CC') 返回 'AABBCC'。                                          |
+| CONCAT_WS(separator, string1, string2,...)                 | concatWs(separator, string1, string2,...)     | 使用分隔符连接 string1、string2、... 后返回字符串。NULL 字符串参数会被跳过。                                                            |
+| LPAD(string1, integer, string2)                            | lpad(string1, integer, string2)               | 返回使用 STRING2 左填充 STRING1 至 integer 个字符后的字符串。如果 STRING1 更长，则截断到 integer 个字符。                                      |
+| RPAD(string1, integer, string2)                            | rpad(string1, integer, string2)               | 返回使用 STRING2 右填充 STRING1 至 integer 个字符后的字符串。如果 STRING1 更长，则截断到 integer 个字符。                                      |
+| REPLACE(string1, string2, string3)                         | replace(string1, string2, string3)            | 返回将 STRING1 中所有 STRING2 替换为 STRING3 后的字符串。                                                                      |
+| REPEAT(string, integer)                                    | repeat(string, integer)                       | 返回将 STRING 重复 integer 次后的字符串。                                                                                  |
+| LEFT(string, integer)                                      | left(string, integer)                         | 返回 STRING 最左侧 integer 个字符。                                                                                      |
+| RIGHT(string, integer)                                     | right(string, integer)                        | 返回 STRING 最右侧 integer 个字符。                                                                                      |
+| STARTSWITH(string1, string2)                               | startswith(string1, string2)                  | 返回 STRING1 是否以 STRING2 开头，支持字符字符串和二进制字符串。                                                                     |
+| ENDSWITH(string1, string2)                                 | endswith(string1, string2)                    | 返回 STRING1 是否以 STRING2 结尾，支持字符字符串和二进制字符串。                                                                     |
+| TO_BASE64(string \| binary)                                | toBase64(string \| binary)                    | 将字符或二进制字符串编码为 base64 字符串。                                                                            |
+| FROM_BASE64(string)                                        | fromBase64(string)                            | 将 base64 字符串按 UTF-8 解码，并假定解码后的字节是有效的 UTF-8。对于任意二进制内容，请使用 FROM_BASE64_BINARY。                     |
+| FROM_BASE64_BINARY(string)                                 | fromBase64Binary(string)                      | 将 base64 字符串解码为 VARBINARY，并保留原始字节。                                                                   |
 
 ## 时间函数
 
