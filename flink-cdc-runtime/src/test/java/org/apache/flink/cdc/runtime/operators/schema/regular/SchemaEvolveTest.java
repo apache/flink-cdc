@@ -2571,6 +2571,223 @@ class SchemaEvolveTest {
         }
     }
 
+    /**
+     * Tests that sending a CreateTableEvent for an already-existing table with a different schema
+     * (simulating a projection change) produces the correct diff events (AddColumnEvent /
+     * DropColumnEvent) instead of a raw CreateTableEvent.
+     */
+    @Test
+    void testCreateTableEventWithChangedProjection() throws Exception {
+        TableId tableId = CUSTOMERS_TABLE_ID;
+        Schema schemaV1 =
+                Schema.newBuilder()
+                        .physicalColumn("id", INT)
+                        .physicalColumn("name", STRING)
+                        .physicalColumn("age", SMALLINT)
+                        .primaryKey("id")
+                        .build();
+
+        SchemaChangeBehavior behavior = SchemaChangeBehavior.EVOLVE;
+
+        SchemaOperator schemaOperator =
+                new SchemaOperator(new ArrayList<>(), Duration.ofSeconds(30), behavior);
+        RegularEventOperatorTestHarness<SchemaOperator, Event> harness =
+                RegularEventOperatorTestHarness.withDurationAndBehavior(
+                        schemaOperator, 17, Duration.ofSeconds(3), behavior);
+        harness.open();
+
+        // Step 1: Create the table with the initial schema
+        {
+            List<Event> createAndInsertDataEvents =
+                    Arrays.asList(
+                            new CreateTableEvent(tableId, schemaV1),
+                            DataChangeEvent.insertEvent(
+                                    tableId,
+                                    buildRecord(INT, 1, STRING, "Alice", SMALLINT, (short) 17)));
+
+            processEvent(schemaOperator, createAndInsertDataEvents);
+
+            Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schemaV1);
+            Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV1);
+
+            harness.clearOutputRecords();
+        }
+
+        // Step 2: Send a CreateTableEvent with a different schema (added column, simulating
+        // projection change). The coordinator should convert this into AddColumnEvent.
+        {
+            Schema schemaV2 =
+                    Schema.newBuilder()
+                            .physicalColumn("id", INT)
+                            .physicalColumn("name", STRING)
+                            .physicalColumn("age", SMALLINT)
+                            .physicalColumn("email", STRING)
+                            .primaryKey("id")
+                            .build();
+
+            List<Event> createWithNewProjection =
+                    Collections.singletonList(new CreateTableEvent(tableId, schemaV2));
+
+            processEvent(schemaOperator, createWithNewProjection);
+
+            // The evolved schema should now include the new "email" column
+            Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV2);
+
+            // Verify that the output contains an AddColumnEvent (not a CreateTableEvent)
+            // for the "email" column, preceded by a FlushEvent
+            List<Event> outputEvents =
+                    harness.getOutputRecords().stream()
+                            .map(StreamRecord::getValue)
+                            .collect(Collectors.toList());
+
+            Assertions.assertThat(outputEvents)
+                    .filteredOn(e -> e instanceof AddColumnEvent)
+                    .hasSize(1);
+
+            AddColumnEvent addColumnEvent =
+                    (AddColumnEvent)
+                            outputEvents.stream()
+                                    .filter(e -> e instanceof AddColumnEvent)
+                                    .findFirst()
+                                    .get();
+            Assertions.assertThat(addColumnEvent.getAddedColumns())
+                    .extracting(c -> c.getAddColumn().getName())
+                    .containsExactly("email");
+
+            // Verify no CreateTableEvent was emitted downstream (it should have been
+            // converted to diff events)
+            Assertions.assertThat(outputEvents)
+                    .filteredOn(e -> e instanceof CreateTableEvent)
+                    .isEmpty();
+
+            harness.clearOutputRecords();
+        }
+
+        // Step 3: Send a CreateTableEvent with a removed column (simulating projection change
+        // that drops a column). The coordinator should convert this into DropColumnEvent.
+        {
+            Schema schemaV3 =
+                    Schema.newBuilder()
+                            .physicalColumn("id", INT)
+                            .physicalColumn("name", STRING)
+                            .physicalColumn("email", STRING)
+                            .primaryKey("id")
+                            .build();
+
+            List<Event> createWithDroppedColumn =
+                    Collections.singletonList(new CreateTableEvent(tableId, schemaV3));
+
+            processEvent(schemaOperator, createWithDroppedColumn);
+
+            // The evolved schema should now reflect the dropped "age" column
+            Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV3);
+
+            List<Event> outputEvents =
+                    harness.getOutputRecords().stream()
+                            .map(StreamRecord::getValue)
+                            .collect(Collectors.toList());
+
+            Assertions.assertThat(outputEvents)
+                    .filteredOn(e -> e instanceof DropColumnEvent)
+                    .hasSize(1);
+
+            DropColumnEvent dropColumnEvent =
+                    (DropColumnEvent)
+                            outputEvents.stream()
+                                    .filter(e -> e instanceof DropColumnEvent)
+                                    .findFirst()
+                                    .get();
+            Assertions.assertThat(dropColumnEvent.getDroppedColumnNames()).containsExactly("age");
+
+            // Verify no CreateTableEvent was emitted downstream
+            Assertions.assertThat(outputEvents)
+                    .filteredOn(e -> e instanceof CreateTableEvent)
+                    .isEmpty();
+
+            harness.clearOutputRecords();
+        }
+
+        // Step 4: Send a CreateTableEvent with a column type change (simulating projection
+        // change that alters a column type). The coordinator should convert this into
+        // AlterColumnTypeEvent.
+        {
+            Schema schemaV4 =
+                    Schema.newBuilder()
+                            .physicalColumn("id", INT)
+                            .physicalColumn("name", DataTypes.VARCHAR(255))
+                            .physicalColumn("email", STRING)
+                            .primaryKey("id")
+                            .build();
+
+            List<Event> createWithTypeChange =
+                    Collections.singletonList(new CreateTableEvent(tableId, schemaV4));
+
+            processEvent(schemaOperator, createWithTypeChange);
+
+            Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV4);
+
+            List<Event> outputEvents =
+                    harness.getOutputRecords().stream()
+                            .map(StreamRecord::getValue)
+                            .collect(Collectors.toList());
+
+            Assertions.assertThat(outputEvents)
+                    .filteredOn(e -> e instanceof AlterColumnTypeEvent)
+                    .hasSize(1);
+
+            AlterColumnTypeEvent alterColumnTypeEvent =
+                    (AlterColumnTypeEvent)
+                            outputEvents.stream()
+                                    .filter(e -> e instanceof AlterColumnTypeEvent)
+                                    .findFirst()
+                                    .get();
+            Assertions.assertThat(alterColumnTypeEvent.getTypeMapping())
+                    .containsEntry("name", DataTypes.VARCHAR(255));
+
+            // Verify no CreateTableEvent was emitted downstream
+            Assertions.assertThat(outputEvents)
+                    .filteredOn(e -> e instanceof CreateTableEvent)
+                    .isEmpty();
+
+            harness.clearOutputRecords();
+        }
+
+        // Step 5: Send a CreateTableEvent with the same schema (no change). Should be
+        // redundant (caught by isSchemaChangeEventRedundant) and produce no schema change
+        // events.
+        {
+            Schema schemaV4 =
+                    Schema.newBuilder()
+                            .physicalColumn("id", INT)
+                            .physicalColumn("name", DataTypes.VARCHAR(255))
+                            .physicalColumn("email", STRING)
+                            .primaryKey("id")
+                            .build();
+
+            List<Event> createWithSameSchema =
+                    Collections.singletonList(new CreateTableEvent(tableId, schemaV4));
+
+            processEvent(schemaOperator, createWithSameSchema);
+
+            List<Event> outputEvents =
+                    harness.getOutputRecords().stream()
+                            .map(StreamRecord::getValue)
+                            .collect(Collectors.toList());
+
+            // No schema change events should be emitted for an identical schema
+            Assertions.assertThat(outputEvents)
+                    .filteredOn(
+                            e ->
+                                    e instanceof CreateTableEvent
+                                            || e instanceof AddColumnEvent
+                                            || e instanceof DropColumnEvent
+                                            || e instanceof AlterColumnTypeEvent)
+                    .isEmpty();
+
+            harness.clearOutputRecords();
+        }
+    }
+
     private RecordData buildRecord(final Object... args) {
         List<DataType> dataTypes = new ArrayList<>();
         List<Object> objects = new ArrayList<>();
