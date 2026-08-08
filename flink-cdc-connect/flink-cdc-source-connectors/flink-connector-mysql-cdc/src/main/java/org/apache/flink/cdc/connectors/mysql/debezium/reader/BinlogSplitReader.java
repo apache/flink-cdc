@@ -137,7 +137,10 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
                         (MySqlStreamingChangeEventSourceMetrics)
                                 statefulTaskContext.getStreamingChangeEventSourceMetrics(),
                         currentBinlogSplit,
-                        createEventFilter());
+                        createEventFilter(),
+                        statefulTaskContext
+                                .getSourceConfig()
+                                .isSkipBinlogDeserializationOfUnsubscribedTables());
 
         executorService.submit(
                 () -> {
