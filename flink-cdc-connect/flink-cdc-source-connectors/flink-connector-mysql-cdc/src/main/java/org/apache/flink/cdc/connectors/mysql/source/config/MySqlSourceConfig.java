@@ -81,6 +81,8 @@ public class MySqlSourceConfig implements Serializable {
     private final MySqlConnectorConfig dbzMySqlConfig;
     private final boolean treatTinyInt1AsBoolean;
 
+    private final double recordsPerSecond;
+
     MySqlSourceConfig(
             String hostname,
             int port,
@@ -112,7 +114,8 @@ public class MySqlSourceConfig implements Serializable {
             boolean parseOnLineSchemaChanges,
             boolean treatTinyInt1AsBoolean,
             boolean useLegacyJsonFormat,
-            boolean assignUnboundedChunkFirst) {
+            boolean assignUnboundedChunkFirst,
+            double recordsPerSecond) {
         this.hostname = checkNotNull(hostname);
         this.port = port;
         this.username = checkNotNull(username);
@@ -158,6 +161,7 @@ public class MySqlSourceConfig implements Serializable {
         this.treatTinyInt1AsBoolean = treatTinyInt1AsBoolean;
         this.useLegacyJsonFormat = useLegacyJsonFormat;
         this.assignUnboundedChunkFirst = assignUnboundedChunkFirst;
+        this.recordsPerSecond = recordsPerSecond;
     }
 
     public String getHostname() {
@@ -298,5 +302,9 @@ public class MySqlSourceConfig implements Serializable {
 
     public boolean isTreatTinyInt1AsBoolean() {
         return treatTinyInt1AsBoolean;
+    }
+
+    public double getRecordsPerSecond() {
+        return recordsPerSecond;
     }
 }
