@@ -37,6 +37,7 @@ import org.apache.flink.cdc.runtime.operators.schema.common.metrics.SchemaOperat
 import org.apache.flink.cdc.runtime.operators.schema.distributed.event.SchemaChangeRequest;
 import org.apache.flink.cdc.runtime.operators.schema.distributed.event.SchemaChangeResponse;
 import org.apache.flink.cdc.runtime.partitioning.PartitioningEvent;
+import org.apache.flink.cdc.source.RuntimeContextAdapter;
 import org.apache.flink.runtime.jobgraph.tasks.TaskOperatorEventGateway;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
 import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
@@ -101,7 +102,7 @@ public class SchemaOperator extends AbstractStreamOperatorAdapter<Event>
     @Override
     public void open() throws Exception {
         super.open();
-        subTaskId = getRuntimeContext().getTaskInfo().getIndexOfThisSubtask();
+        subTaskId = RuntimeContextAdapter.getIndexOfThisSubtask(getRuntimeContext());
         upstreamSchemaTable = HashBasedTable.create();
         evolvedSchemaMap = new HashMap<>();
         tableIdRouter = new TableIdRouter(routingRules, routeMode);
