@@ -32,6 +32,11 @@ import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoField;
+import java.time.temporal.ChronoUnit;
+import java.time.temporal.IsoFields;
+import java.time.temporal.TemporalAccessor;
+import java.time.temporal.TemporalField;
 import java.util.TimeZone;
 
 /** Temporal built-in functions. */
@@ -39,6 +44,7 @@ public class TemporalFunctions {
 
     private static final Logger LOG = LoggerFactory.getLogger(TemporalFunctions.class);
 
+    private static final long MILLIS_PER_DAY = 24L * 60 * 60 * 1000;
     private static final String DEFAULT_DATE_FORMAT = "yyyy-MM-dd";
     private static final String DEFAULT_DATETIME_FORMAT = "yyyy-MM-dd HH:mm:ss";
 
@@ -69,6 +75,94 @@ public class TemporalFunctions {
 
     public static LocalDate currentDate(long epochTime, String timezone) {
         return localtimestamp(epochTime, timezone).toLocalDate();
+    }
+
+    public static Long extract(String unit, TemporalAccessor temporal, String timezone) {
+        if (temporal == null) {
+            return null;
+        }
+        if (temporal instanceof Instant) {
+            temporal = ((Instant) temporal).atZone(ZoneId.of(timezone));
+        }
+        switch (unit) {
+            case "YEAR":
+                return getTemporalField(temporal, ChronoField.YEAR, unit);
+            case "QUARTER":
+                return getTemporalField(temporal, IsoFields.QUARTER_OF_YEAR, unit);
+            case "MONTH":
+                return getTemporalField(temporal, ChronoField.MONTH_OF_YEAR, unit);
+            case "WEEK":
+                return getTemporalField(temporal, IsoFields.WEEK_OF_WEEK_BASED_YEAR, unit);
+            case "DAY":
+                return getTemporalField(temporal, ChronoField.DAY_OF_MONTH, unit);
+            case "DOY":
+                return getTemporalField(temporal, ChronoField.DAY_OF_YEAR, unit);
+            case "DOW":
+                // SQL DOW starts with Sunday as 1, while ISO starts with Monday as 1.
+                return getTemporalField(temporal, ChronoField.DAY_OF_WEEK, unit) % 7 + 1;
+            case "HOUR":
+                return getTemporalField(temporal, ChronoField.HOUR_OF_DAY, unit);
+            case "MINUTE":
+                return getTemporalField(temporal, ChronoField.MINUTE_OF_HOUR, unit);
+            case "SECOND":
+                return getTemporalField(temporal, ChronoField.SECOND_OF_MINUTE, unit);
+            default:
+                throw new IllegalArgumentException("Unsupported EXTRACT unit: " + unit);
+        }
+    }
+
+    private static long getTemporalField(
+            TemporalAccessor temporal, TemporalField field, String unit) {
+        if (temporal instanceof LocalDate
+                && (field == ChronoField.HOUR_OF_DAY
+                        || field == ChronoField.MINUTE_OF_HOUR
+                        || field == ChronoField.SECOND_OF_MINUTE)) {
+            return 0L;
+        }
+        if (!temporal.isSupported(field)) {
+            throw new IllegalArgumentException(
+                    String.format(
+                            "EXTRACT unit %s cannot be applied to %s",
+                            unit, temporal.getClass().getSimpleName()));
+        }
+        return temporal.getLong(field);
+    }
+
+    public static LocalDate temporalPlusMonths(LocalDate temporal, long months) {
+        return temporal == null ? null : temporal.plusMonths(months);
+    }
+
+    public static LocalTime temporalPlusMonths(LocalTime temporal, long months) {
+        // Year-month intervals do not affect TIME values.
+        return temporal;
+    }
+
+    public static LocalDateTime temporalPlusMonths(LocalDateTime temporal, long months) {
+        return temporal == null ? null : temporal.plusMonths(months);
+    }
+
+    public static Instant temporalPlusMonths(Instant temporal, long months) {
+        // TIMESTAMP_LTZ month arithmetic follows UTC calendar semantics.
+        return temporal == null
+                ? null
+                : temporal.atZone(ZoneId.of("UTC")).plusMonths(months).toInstant();
+    }
+
+    public static LocalDate temporalPlusMillis(LocalDate temporal, long millis) {
+        // DATE arithmetic uses only the whole-day portion of a day-time interval.
+        return temporal == null ? null : temporal.plusDays(millis / MILLIS_PER_DAY);
+    }
+
+    public static LocalTime temporalPlusMillis(LocalTime temporal, long millis) {
+        return temporal == null ? null : temporal.plus(millis, ChronoUnit.MILLIS);
+    }
+
+    public static LocalDateTime temporalPlusMillis(LocalDateTime temporal, long millis) {
+        return temporal == null ? null : temporal.plus(millis, ChronoUnit.MILLIS);
+    }
+
+    public static Instant temporalPlusMillis(Instant temporal, long millis) {
+        return temporal == null ? null : temporal.plusMillis(millis);
     }
 
     public static String fromUnixtime(Integer seconds, String timezone) {
