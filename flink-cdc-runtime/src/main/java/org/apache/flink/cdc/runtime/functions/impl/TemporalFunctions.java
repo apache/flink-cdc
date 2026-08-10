@@ -36,6 +36,7 @@ import java.time.temporal.ChronoField;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.IsoFields;
 import java.time.temporal.TemporalAccessor;
+import java.time.temporal.TemporalField;
 import java.util.TimeZone;
 
 /** Temporal built-in functions. */
@@ -111,7 +112,7 @@ public class TemporalFunctions {
     }
 
     private static long getTemporalField(
-            TemporalAccessor temporal, java.time.temporal.TemporalField field, String unit) {
+            TemporalAccessor temporal, TemporalField field, String unit) {
         if (temporal instanceof LocalDate
                 && (field == ChronoField.HOUR_OF_DAY
                         || field == ChronoField.MINUTE_OF_HOUR
