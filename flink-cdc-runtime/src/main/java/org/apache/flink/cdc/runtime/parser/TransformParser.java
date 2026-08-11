@@ -55,8 +55,10 @@ import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlNodeList;
+import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql.SqlOperatorTable;
 import org.apache.calcite.sql.SqlSelect;
+import org.apache.calcite.sql.SqlSyntax;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParser;
 import org.apache.calcite.sql.parser.SqlParserPos;
@@ -66,9 +68,11 @@ import org.apache.calcite.sql.type.SqlReturnTypeInference;
 import org.apache.calcite.sql.type.SqlTypeFactoryImpl;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.sql.util.SqlOperatorTables;
+import org.apache.calcite.sql.util.SqlShuttle;
 import org.apache.calcite.sql.validate.SqlConformance;
 import org.apache.calcite.sql.validate.SqlConformanceEnum;
 import org.apache.calcite.sql.validate.SqlDelegatingConformance;
+import org.apache.calcite.sql.validate.SqlNameMatcher;
 import org.apache.calcite.sql.validate.SqlValidator;
 import org.apache.calcite.sql.validate.SqlValidatorUtil;
 import org.apache.calcite.sql2rel.SqlToRelConverter;
@@ -214,18 +218,22 @@ public class TransformParser {
         TransformSqlOperatorTable transformSqlOperatorTable = TransformSqlOperatorTable.instance();
         SqlOperatorTable udfOperatorTable = SqlOperatorTables.of(udfFunctions);
         SqlOperatorTable aiFunctionOperatorTable = AiFunctionSqlOperatorTable.create();
+        // Calcite looks up function candidates again when deriving a call's type. Rebind
+        // same-name calls and expose only UDF candidates to keep validation consistent with
+        // UDF-first code generation.
         SqlValidator validator =
                 SqlValidatorUtil.newValidator(
-                        SqlOperatorTables.chain(
-                                transformSqlOperatorTable,
+                        new UdfFirstSqlOperatorTable(
                                 udfOperatorTable,
-                                aiFunctionOperatorTable),
+                                SqlOperatorTables.chain(
+                                        transformSqlOperatorTable, aiFunctionOperatorTable)),
                         calciteCatalogReader,
                         factory,
                         SqlValidator.Config.DEFAULT
                                 .withIdentifierExpansion(true)
                                 .withConformance(SqlConformanceEnum.MYSQL_5));
-        SqlNode validateSqlNode = validator.validate(sqlNode);
+        SqlNode validateSqlNode =
+                validator.validate(resolveUserDefinedFunctions(sqlNode, udfFunctions));
         SqlToRelConverter sqlToRelConverter =
                 new SqlToRelConverter(
                         null,
@@ -238,6 +246,67 @@ public class TransformParser {
                         SqlToRelConverter.config().withTrimUnusedFields(true));
         RelRoot relRoot = sqlToRelConverter.convertQuery(validateSqlNode, false, false);
         return relRoot.rel;
+    }
+
+    private static SqlNode resolveUserDefinedFunctions(
+            SqlNode sqlNode, List<SqlFunction> udfFunctions) {
+        return sqlNode.accept(
+                new SqlShuttle() {
+                    @Override
+                    public SqlNode visit(SqlCall call) {
+                        SqlNode visited = super.visit(call);
+                        if (visited instanceof SqlBasicCall) {
+                            SqlBasicCall basicCall = (SqlBasicCall) visited;
+                            udfFunctions.stream()
+                                    .filter(
+                                            udf ->
+                                                    udf.getName()
+                                                            .equalsIgnoreCase(
+                                                                    basicCall
+                                                                            .getOperator()
+                                                                            .getName()))
+                                    .findFirst()
+                                    .ifPresent(basicCall::setOperator);
+                        }
+                        return visited;
+                    }
+                });
+    }
+
+    private static final class UdfFirstSqlOperatorTable implements SqlOperatorTable {
+        private final SqlOperatorTable udfOperatorTable;
+        private final SqlOperatorTable fallbackOperatorTable;
+
+        private UdfFirstSqlOperatorTable(
+                SqlOperatorTable udfOperatorTable, SqlOperatorTable fallbackOperatorTable) {
+            this.udfOperatorTable = udfOperatorTable;
+            this.fallbackOperatorTable = fallbackOperatorTable;
+        }
+
+        @Override
+        public void lookupOperatorOverloads(
+                SqlIdentifier opName,
+                @Nullable SqlFunctionCategory category,
+                SqlSyntax syntax,
+                List<SqlOperator> operatorList,
+                SqlNameMatcher nameMatcher) {
+            List<SqlOperator> udfOperators = new ArrayList<>();
+            udfOperatorTable.lookupOperatorOverloads(
+                    opName, category, syntax, udfOperators, nameMatcher);
+            if (udfOperators.isEmpty()) {
+                fallbackOperatorTable.lookupOperatorOverloads(
+                        opName, category, syntax, operatorList, nameMatcher);
+            } else {
+                operatorList.addAll(udfOperators);
+            }
+        }
+
+        @Override
+        public List<SqlOperator> getOperatorList() {
+            List<SqlOperator> operators = new ArrayList<>(udfOperatorTable.getOperatorList());
+            operators.addAll(fallbackOperatorTable.getOperatorList());
+            return operators;
+        }
     }
 
     public static SqlSelect parseSelect(String statement) {
