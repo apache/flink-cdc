@@ -234,7 +234,8 @@ public class JaninoCompiler {
         if (DATE_PART_FUNCTION_UNITS.containsKey(functionName)) {
             return generateDatePartFunctionOperation(context, sqlBasicCall, functionName);
         }
-        if (functionName.equals("TRY_CAST")) {
+        if (functionName.equals("TRY_CAST")
+                && !findUserDefinedFunction(context, functionName).isPresent()) {
             return generateTryCastOperation(context, sqlBasicCall);
         }
 
@@ -453,6 +454,10 @@ public class JaninoCompiler {
             case GREATER_THAN_OR_EQUAL:
                 return generateCompareOperation(context, sqlBasicCall, atoms);
             case NULLIF:
+                if (findUserDefinedFunction(context, sqlBasicCall.getOperator().getName())
+                        .isPresent()) {
+                    return generateOtherFunctionOperation(context, sqlBasicCall, atoms);
+                }
                 return generateNullIfOperation(context, sqlBasicCall, atoms);
             case CAST:
                 return generateCastOperation(context, sqlBasicCall, atoms);
@@ -564,7 +569,9 @@ public class JaninoCompiler {
     }
 
     private static boolean isBasicCallNullable(Context context, SqlBasicCall sqlBasicCall) {
-        if (sqlBasicCall.getOperator().getName().equalsIgnoreCase("IFNULL")) {
+        if (sqlBasicCall.getOperator().getName().equalsIgnoreCase("IFNULL")
+                && !findUserDefinedFunction(context, sqlBasicCall.getOperator().getName())
+                        .isPresent()) {
             List<SqlNode> operands = sqlBasicCall.getOperandList();
             if (operands.size() != 2) {
                 return true;
@@ -829,6 +836,8 @@ public class JaninoCompiler {
     private static Java.Rvalue generateOtherFunctionOperation(
             Context context, SqlBasicCall sqlBasicCall, Java.Rvalue[] atoms) {
         String operationName = sqlBasicCall.getOperator().getName().toUpperCase();
+        Optional<UserDefinedFunctionDescriptor> udfFunctionOptional =
+                findUserDefinedFunction(context, operationName);
         if (operationName.equals("IF")) {
             if (atoms.length == 3) {
                 return new Java.ConditionalExpression(
@@ -839,15 +848,11 @@ public class JaninoCompiler {
             } else {
                 throw new ParseException("Unrecognized expression: " + sqlBasicCall);
             }
-        } else if (operationName.equals("IFNULL")) {
+        } else if (operationName.equals("IFNULL") && !udfFunctionOptional.isPresent()) {
             return generateIfNullOperation(context, sqlBasicCall, atoms);
-        } else if (operationName.equals("NULLIF")) {
+        } else if (operationName.equals("NULLIF") && !udfFunctionOptional.isPresent()) {
             return generateNullIfOperation(context, sqlBasicCall, atoms);
         } else {
-            Optional<UserDefinedFunctionDescriptor> udfFunctionOptional =
-                    context.udfDescriptors.stream()
-                            .filter(e -> e.getName().equalsIgnoreCase(operationName))
-                            .findFirst();
             return udfFunctionOptional
                     .map(
                             udfFunction ->
@@ -865,6 +870,13 @@ public class JaninoCompiler {
                                                     sqlBasicCall.getOperator().getName()),
                                             atoms));
         }
+    }
+
+    private static Optional<UserDefinedFunctionDescriptor> findUserDefinedFunction(
+            Context context, String functionName) {
+        return context.udfDescriptors.stream()
+                .filter(udf -> udf.getName().equalsIgnoreCase(functionName))
+                .findFirst();
     }
 
     private static Java.Rvalue generateIfNullOperation(

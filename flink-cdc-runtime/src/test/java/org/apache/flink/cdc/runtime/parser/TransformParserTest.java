@@ -1069,6 +1069,40 @@ class TransformParserTest {
     }
 
     @Test
+    void testUdfTakesPrecedenceOverBuiltInFunction() {
+        List<UserDefinedFunctionDescriptor> udfDescriptors =
+                Arrays.asList(
+                        new UserDefinedFunctionDescriptor(
+                                "ifnull",
+                                "org.apache.flink.cdc.udf.examples.java.AddOneFunctionClass"),
+                        new UserDefinedFunctionDescriptor(
+                                "try_cast",
+                                "org.apache.flink.cdc.udf.examples.java.TypeOfFunctionClass"),
+                        new UserDefinedFunctionDescriptor(
+                                "nullif",
+                                "org.apache.flink.cdc.udf.examples.java.FormatFunctionClass"));
+
+        testFilterExpressionWithUdf(
+                "IFNULL(id)",
+                "__instanceOfAddOneFunctionClass.eval(id)",
+                DUMMY_COLUMNS,
+                Collections.emptyMap(),
+                udfDescriptors);
+        testFilterExpressionWithUdf(
+                "TRY_CAST(id)",
+                "__instanceOfTypeOfFunctionClass.eval(id)",
+                DUMMY_COLUMNS,
+                Collections.emptyMap(),
+                udfDescriptors);
+        testFilterExpressionWithUdf(
+                "NULLIF('%s', 'udf')",
+                "__instanceOfFormatFunctionClass.eval(\"%s\", \"udf\")",
+                DUMMY_COLUMNS,
+                Collections.emptyMap(),
+                udfDescriptors);
+    }
+
+    @Test
     public void testTranslateUdfFilterToJaninoExpressionWithColumnNameMap() {
         List<Column> columns =
                 List.of(
@@ -1287,20 +1321,34 @@ class TransformParserTest {
             String expressionExpect,
             List<Column> columns,
             Map<String, String> columnNameMap) {
+        testFilterExpressionWithUdf(
+                expression,
+                expressionExpect,
+                columns,
+                columnNameMap,
+                Arrays.asList(
+                        new UserDefinedFunctionDescriptor(
+                                "format",
+                                "org.apache.flink.cdc.udf.examples.java.FormatFunctionClass"),
+                        new UserDefinedFunctionDescriptor(
+                                "addone",
+                                "org.apache.flink.cdc.udf.examples.java.AddOneFunctionClass"),
+                        new UserDefinedFunctionDescriptor(
+                                "typeof",
+                                "org.apache.flink.cdc.udf.examples.java.TypeOfFunctionClass")));
+    }
+
+    private void testFilterExpressionWithUdf(
+            String expression,
+            String expressionExpect,
+            List<Column> columns,
+            Map<String, String> columnNameMap,
+            List<UserDefinedFunctionDescriptor> udfDescriptors) {
         String janinoExpression =
                 TransformParser.translateFilterExpressionToJaninoExpression(
                         expression,
                         columns,
-                        Arrays.asList(
-                                new UserDefinedFunctionDescriptor(
-                                        "format",
-                                        "org.apache.flink.cdc.udf.examples.java.FormatFunctionClass"),
-                                new UserDefinedFunctionDescriptor(
-                                        "addone",
-                                        "org.apache.flink.cdc.udf.examples.java.AddOneFunctionClass"),
-                                new UserDefinedFunctionDescriptor(
-                                        "typeof",
-                                        "org.apache.flink.cdc.udf.examples.java.TypeOfFunctionClass")),
+                        udfDescriptors,
                         new SupportedMetadataColumn[0],
                         columnNameMap);
         Assertions.assertThat(janinoExpression).isEqualTo(expressionExpect);

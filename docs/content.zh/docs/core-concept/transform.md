@@ -247,6 +247,8 @@ Flink CDC 使用 [Calcite](https://calcite.apache.org/) 来解析表达式并且
 | IFNULL(value, replacement)                                                                                           | ifNull(value, replacement)       | 当 value 为 NULL 时返回 replacement，否则返回 value。两个参数必须存在公共类型。仅当 replacement 可为 NULL 时，结果才可为 NULL。                  |
 | NULLIF(value1, value2)                                                                                               | nullIf(value1, value2)           | 当 value1 与 value2 相等时返回 NULL，否则返回 value1。返回类型为 value1 对应的可空类型。                                         |
 
+`NULLIF` 会对数值参数进行跨数值类型比较。例如，`NULLIF(CAST(1 AS INT), CAST(1 AS BIGINT))` 返回 NULL。该行为与当前 Transform `=` 运算符的类型敏感相等比较不同；对于上述混合类型比较，`=` 返回 FALSE。
+
 ## 转换函数
 
 你可以使用 `CAST( <EXPR> AS <T> )` 语法将任何有效的表达式 `<EXPR>` 转换为特定类型 `<T>`。可能的转换路径如下：

@@ -248,6 +248,8 @@ Logical functions follow SQL three-valued logic for nullable BOOLEAN values. `AN
 | IFNULL(value, replacement)                                                                                            | ifNull(value, replacement)           | Returns `replacement` when `value` is NULL; otherwise, returns `value`. The arguments must have a common type. The result can be NULL only when `replacement` can be NULL.                                                                        |
 | NULLIF(value1, value2)                                                                                                | nullIf(value1, value2)               | Returns NULL when `value1` equals `value2`; otherwise, returns `value1`. Its return type is the nullable type of `value1`.                                                                                                                         |
 
+`NULLIF` compares numeric operands across numeric types. For example, `NULLIF(CAST(1 AS INT), CAST(1 AS BIGINT))` returns NULL. This differs from the current type-sensitive equality behavior of the Transform `=` operator, which returns FALSE for the same mixed-type comparison.
+
 ## Casting Functions
 
 You can use `CAST( <EXPR> AS <T> )` syntax to convert any valid expression `<EXPR>` to a specific type `<T>`. Possible conversion paths are:
