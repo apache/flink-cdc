@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.runtime.operators.transform;
 
+import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.cdc.common.data.DateData;
 import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.GenericArrayData;
@@ -45,6 +46,8 @@ import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.util.Collections;
+import java.util.List;
 
 /** Unit tests for the {@link PostTransformOperator}. */
 class PostTransformOperatorTest {
@@ -467,6 +470,83 @@ class PostTransformOperatorTest {
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
                 .isEqualTo(new StreamRecord<>(updateEventExpect));
         transformFunctionEventEventOperatorTestHarness.close();
+    }
+
+    @Test
+    void testUdfTakesPrecedenceOverBuiltInFunction() throws Exception {
+        Schema expectedSchema =
+                Schema.newBuilder()
+                        .physicalColumn("col1", DataTypes.STRING().notNull())
+                        .physicalColumn("col2", DataTypes.STRING())
+                        .physicalColumn("col12", DataTypes.STRING())
+                        .physicalColumn("udf_ifnull", DataTypes.STRING())
+                        .physicalColumn("udf_try_cast", DataTypes.STRING())
+                        .physicalColumn("udf_nullif", DataTypes.STRING())
+                        .primaryKey("col1")
+                        .build();
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
+                        .addTransform(
+                                CUSTOMERS_TABLEID.identifier(),
+                                "*, CAST(IFNULL(1, 0) AS VARCHAR) AS udf_ifnull, "
+                                        + "TRY_CAST(col1) AS udf_try_cast, "
+                                        + "NULLIF('%s', col1) AS udf_nullif",
+                                null)
+                        .addUdfFunctions(
+                                List.of(
+                                        Tuple3.of(
+                                                "ifnull",
+                                                "org.apache.flink.cdc.udf.examples.java.ThrottlerFunctionClass",
+                                                Collections.emptyMap()),
+                                        Tuple3.of(
+                                                "try_cast",
+                                                "org.apache.flink.cdc.udf.examples.java.TypeOfFunctionClass",
+                                                Collections.emptyMap()),
+                                        Tuple3.of(
+                                                "nullif",
+                                                "org.apache.flink.cdc.udf.examples.java.FormatFunctionClass",
+                                                Collections.emptyMap())))
+                        .build();
+        RegularEventOperatorTestHarness<PostTransformOperator, Event> harness =
+                RegularEventOperatorTestHarness.with(transform, 1);
+        BinaryRecordDataGenerator inputGenerator =
+                new BinaryRecordDataGenerator((RowType) CUSTOMERS_SCHEMA.toRowDataType());
+        BinaryRecordDataGenerator outputGenerator =
+                new BinaryRecordDataGenerator((RowType) expectedSchema.toRowDataType());
+
+        harness.open();
+        harness.getOperator()
+                .processElement(
+                        new StreamRecord<>(
+                                new CreateTableEvent(CUSTOMERS_TABLEID, CUSTOMERS_SCHEMA)));
+        Assertions.assertThat(harness.getOutputRecords().poll())
+                .isEqualTo(
+                        new StreamRecord<>(
+                                new CreateTableEvent(CUSTOMERS_TABLEID, expectedSchema)));
+
+        DataChangeEvent inputEvent =
+                DataChangeEvent.insertEvent(
+                        CUSTOMERS_TABLEID,
+                        inputGenerator.generate(
+                                new Object[] {
+                                    new BinaryStringData("1"), new BinaryStringData("2"), null
+                                }));
+        DataChangeEvent expectedEvent =
+                DataChangeEvent.insertEvent(
+                        CUSTOMERS_TABLEID,
+                        outputGenerator.generate(
+                                new Object[] {
+                                    new BinaryStringData("1"),
+                                    new BinaryStringData("2"),
+                                    null,
+                                    new BinaryStringData("throttled_1"),
+                                    new BinaryStringData("String: 1"),
+                                    new BinaryStringData("1")
+                                }));
+        harness.getOperator().processElement(new StreamRecord<>(inputEvent));
+        Assertions.assertThat(harness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(expectedEvent));
+        harness.close();
     }
 
     @Test
@@ -2969,6 +3049,26 @@ class PostTransformOperatorTest {
         testExpressionConditionTransform("round(3.1415926, 2) = 3.14");
         testExpressionConditionTransform("IF(2>0,1,0) = 1");
         testExpressionConditionTransform("COALESCE(null,1,2) = 1");
+        testExpressionConditionTransform("TRY_CAST('invalid' AS INT) IS NULL");
+        testExpressionConditionTransform("TRY_CAST('invalid' AS BOOLEAN) IS NULL");
+        testExpressionConditionTransform("TRY_CAST('128' AS TINYINT) IS NULL");
+        testExpressionConditionTransform("TRY_CAST('1.5' AS INT) IS NULL");
+        testExpressionConditionTransform("TRY_CAST('invalid-timestamp' AS TIMESTAMP) IS NULL");
+        testExpressionConditionTransform("IFNULL(TRY_CAST('invalid' AS INT), 42) = 42");
+        testExpressionConditionTransform("NULLIF(1, 1) IS NULL");
+        testExpressionConditionTransform("NULLIF(1, 2) = 1");
+        testExpressionConditionTransform("NULLIF(CAST(1 AS INT), CAST(1 AS BIGINT)) IS NULL");
+        testExpressionConditionTransform("NULLIF(NULL, 1) IS NULL");
+        testExpressionConditionTransform("NULLIF(1, NULL) = 1");
+        testExpressionConditionTransform(
+                "NULLIF(CAST(16777217 AS BIGINT), CAST(16777217 AS FLOAT)) "
+                        + "= CAST(16777217 AS BIGINT)");
+        testExpressionConditionTransform(
+                "NULLIF(CAST('-0.0' AS DOUBLE), CAST('0.0' AS DOUBLE)) IS NULL");
+        testExpressionConditionTransform(
+                "NULLIF(CAST('NaN' AS DOUBLE), CAST('NaN' AS DOUBLE)) IS NOT NULL");
+        testExpressionConditionTransform(
+                "NULLIF(CAST('Infinity' AS DOUBLE), CAST('Infinity' AS DOUBLE)) IS NULL");
         testExpressionConditionTransform("1 + 1 = 2");
         testExpressionConditionTransform("1 - 1 = 0");
         testExpressionConditionTransform("1 * 1 = 1");

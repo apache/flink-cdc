@@ -479,7 +479,7 @@ class TransformParserTest {
         testFilterExpression(
                 "timestampadd(year, 1, dt)", "timestampadd(\"YEAR\", 1, dt, __time_zone__)");
         testFilterExpression("IF(a>b,a,b)", "isTrue(greaterThan(a, b)) ? a : b");
-        testFilterExpression("NULLIF(a,b)", "nullif(a, b)");
+        testFilterExpression("NULLIF(id,id)", "(java.lang.Integer) nullIf(id, id)");
         testFilterExpression("COALESCE(a,b,c)", "coalesce(a, b, c)");
         testFilterExpression("id + 2", "id + 2");
         testFilterExpression("id - 2", "id - 2");
@@ -541,6 +541,24 @@ class TransformParserTest {
                 "cast(CURRENT_TIMESTAMP as TIMESTAMP)",
                 "castToTimestamp(currentTimestamp(__epoch_time__), __time_zone__)");
         testFilterExpression("cast(dt as TIMESTAMP)", "castToTimestamp(dt, __time_zone__)");
+        testFilterExpression("try_cast(id||'0' as int)", "tryCastToInteger(concat(id, \"0\"))");
+        testFilterExpression("try_cast(1 as string)", "tryCastToString(1)");
+        testFilterExpression("try_cast(1 as boolean)", "tryCastToBoolean(1)");
+        testFilterExpression("try_cast(1 as tinyint)", "tryCastToByte(1)");
+        testFilterExpression("try_cast(1 as smallint)", "tryCastToShort(1)");
+        testFilterExpression("try_cast(1 as bigint)", "tryCastToLong(1)");
+        testFilterExpression("try_cast(1 as float)", "tryCastToFloat(1)");
+        testFilterExpression("try_cast(1 as double)", "tryCastToDouble(1)");
+        testFilterExpression("try_cast(1 as decimal)", "tryCastToBigDecimal(1, 10, 0)");
+        testFilterExpression("try_cast(1 as char)", "tryCastToString(1)");
+        testFilterExpression("try_cast(1 as varchar)", "tryCastToString(1)");
+        testFilterExpression("try_cast(dt as timestamp)", "tryCastToTimestamp(dt, __time_zone__)");
+        testFilterExpression(
+                "try_cast(try_cast(id as int) as varchar)",
+                "tryCastToString(tryCastToInteger(id))");
+        testFilterExpression(
+                "ifnull(null, 1)",
+                "(java.lang.Integer) ifNull(castToInteger(null), castToInteger(1))");
         testFilterExpression("parse_json(jsonStr)", "parseJson(jsonStr)");
         testFilterExpression("try_parse_json(jsonStr)", "tryParseJson(jsonStr)");
     }
@@ -882,6 +900,53 @@ class TransformParserTest {
     }
 
     @Test
+    void testNullHelperAndTryCastTypeInference() {
+        List<Column> columns =
+                List.of(
+                        Column.physicalColumn("text", DataTypes.STRING()),
+                        Column.physicalColumn("nullable_int", DataTypes.INT()),
+                        Column.physicalColumn("not_null_int", DataTypes.INT().notNull()),
+                        Column.physicalColumn("nullable_bigint", DataTypes.BIGINT()));
+
+        List<ProjectionColumn> result =
+                TransformParser.generateProjectionColumns(
+                        "TRY_CAST(text AS INT) AS try_int, "
+                                + "NULLIF(nullable_int, 1) AS nullif_int, "
+                                + "IFNULL(nullable_int, 1) AS ifnull_not_null, "
+                                + "IFNULL(nullable_int, nullable_bigint) AS ifnull_nullable, "
+                                + "IFNULL(not_null_int, nullable_bigint) AS ifnull_input_not_null",
+                        columns,
+                        Collections.emptyList(),
+                        new SupportedMetadataColumn[0]);
+
+        Assertions.assertThat(result)
+                .extracting(ProjectionColumn::getDataType)
+                .containsExactly(
+                        DataTypes.INT(),
+                        DataTypes.INT(),
+                        DataTypes.INT().notNull(),
+                        DataTypes.BIGINT(),
+                        DataTypes.INT().notNull());
+
+        Assertions.assertThatThrownBy(
+                        () ->
+                                TransformParser.generateProjectionColumns(
+                                        "IFNULL(nullable_int, DATE '2024-01-01') AS invalid",
+                                        columns,
+                                        Collections.emptyList(),
+                                        new SupportedMetadataColumn[0]))
+                .hasMessageContaining("Parameters must be of the same type");
+        Assertions.assertThatThrownBy(
+                        () ->
+                                TransformParser.generateProjectionColumns(
+                                        "TRY_CAST(text AS ARRAY<INT>) AS unsupported",
+                                        columns,
+                                        Collections.emptyList(),
+                                        new SupportedMetadataColumn[0]))
+                .isInstanceOf(RuntimeException.class);
+    }
+
+    @Test
     public void testGenerateProjectionColumnsWithPrecision() {
         List<Column> testColumns =
                 Arrays.asList(
@@ -956,6 +1021,12 @@ class TransformParserTest {
     @Test
     void testTranslateUdfFilterToJaninoExpression() {
         testFilterExpressionWithUdf(
+                "IFNULL(format(id), 'fallback')",
+                "(java.lang.String) ifNull(__instanceOfFormatFunctionClass.eval(id), \"fallback\")");
+        testFilterExpressionWithUdf(
+                "NULLIF(format(id), '1')",
+                "(java.lang.String) nullIf(__instanceOfFormatFunctionClass.eval(id), \"1\")");
+        testFilterExpressionWithUdf(
                 "format(upper(id))", "__instanceOfFormatFunctionClass.eval(upper(id))");
         testFilterExpressionWithUdf(
                 "format(lower(id))", "__instanceOfFormatFunctionClass.eval(lower(id))");
@@ -995,6 +1066,40 @@ class TransformParserTest {
         testFilterExpressionWithUdf(
                 "ADDONE(ADDONE(id)) > 4 OR TYPEOF(id) <> 'bool' AND FORMAT('from %s to %s is %s', 'a', 'z', 'lie') <> ''",
                 "greaterThan(__instanceOfAddOneFunctionClass.eval(__instanceOfAddOneFunctionClass.eval(id)), 4) || !valueEquals(__instanceOfTypeOfFunctionClass.eval(id), \"bool\") && !valueEquals(__instanceOfFormatFunctionClass.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")");
+    }
+
+    @Test
+    void testUdfTakesPrecedenceOverBuiltInFunction() {
+        List<UserDefinedFunctionDescriptor> udfDescriptors =
+                Arrays.asList(
+                        new UserDefinedFunctionDescriptor(
+                                "ifnull",
+                                "org.apache.flink.cdc.udf.examples.java.AddOneFunctionClass"),
+                        new UserDefinedFunctionDescriptor(
+                                "try_cast",
+                                "org.apache.flink.cdc.udf.examples.java.TypeOfFunctionClass"),
+                        new UserDefinedFunctionDescriptor(
+                                "nullif",
+                                "org.apache.flink.cdc.udf.examples.java.FormatFunctionClass"));
+
+        testFilterExpressionWithUdf(
+                "IFNULL(id)",
+                "__instanceOfAddOneFunctionClass.eval(id)",
+                DUMMY_COLUMNS,
+                Collections.emptyMap(),
+                udfDescriptors);
+        testFilterExpressionWithUdf(
+                "TRY_CAST(id)",
+                "__instanceOfTypeOfFunctionClass.eval(id)",
+                DUMMY_COLUMNS,
+                Collections.emptyMap(),
+                udfDescriptors);
+        testFilterExpressionWithUdf(
+                "NULLIF('%s', 'udf')",
+                "__instanceOfFormatFunctionClass.eval(\"%s\", \"udf\")",
+                DUMMY_COLUMNS,
+                Collections.emptyMap(),
+                udfDescriptors);
     }
 
     @Test
@@ -1216,20 +1321,34 @@ class TransformParserTest {
             String expressionExpect,
             List<Column> columns,
             Map<String, String> columnNameMap) {
+        testFilterExpressionWithUdf(
+                expression,
+                expressionExpect,
+                columns,
+                columnNameMap,
+                Arrays.asList(
+                        new UserDefinedFunctionDescriptor(
+                                "format",
+                                "org.apache.flink.cdc.udf.examples.java.FormatFunctionClass"),
+                        new UserDefinedFunctionDescriptor(
+                                "addone",
+                                "org.apache.flink.cdc.udf.examples.java.AddOneFunctionClass"),
+                        new UserDefinedFunctionDescriptor(
+                                "typeof",
+                                "org.apache.flink.cdc.udf.examples.java.TypeOfFunctionClass")));
+    }
+
+    private void testFilterExpressionWithUdf(
+            String expression,
+            String expressionExpect,
+            List<Column> columns,
+            Map<String, String> columnNameMap,
+            List<UserDefinedFunctionDescriptor> udfDescriptors) {
         String janinoExpression =
                 TransformParser.translateFilterExpressionToJaninoExpression(
                         expression,
                         columns,
-                        Arrays.asList(
-                                new UserDefinedFunctionDescriptor(
-                                        "format",
-                                        "org.apache.flink.cdc.udf.examples.java.FormatFunctionClass"),
-                                new UserDefinedFunctionDescriptor(
-                                        "addone",
-                                        "org.apache.flink.cdc.udf.examples.java.AddOneFunctionClass"),
-                                new UserDefinedFunctionDescriptor(
-                                        "typeof",
-                                        "org.apache.flink.cdc.udf.examples.java.TypeOfFunctionClass")),
+                        udfDescriptors,
                         new SupportedMetadataColumn[0],
                         columnNameMap);
         Assertions.assertThat(janinoExpression).isEqualTo(expressionExpect);

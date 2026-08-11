@@ -100,7 +100,7 @@ public class TransformParser {
 
     private static SqlParser getCalciteParser(String sql) {
         return SqlParser.create(
-                sql,
+                TransformSqlSyntaxRewriter.rewriteTryCast(sql),
                 SqlParser.Config.DEFAULT
                         .withConformance(SqlConformanceEnum.MYSQL_5)
                         .withCaseSensitive(true)
@@ -344,11 +344,20 @@ public class TransformParser {
                 } else {
                     List<String> originalColumnNames = parseColumnNameList(exprNode);
                     Map<String, String> columnNameMap = generateColumnNameMap(originalColumnNames);
+                    DataType dataType =
+                            CalciteDataTypeConverter.convertCalciteRelDataTypeToDataType(
+                                    relDataType);
+                    if (exprNode instanceof SqlBasicCall
+                            && ((SqlBasicCall) exprNode)
+                                    .getOperator()
+                                    .getName()
+                                    .equalsIgnoreCase("IFNULL")) {
+                        dataType = dataType.copy(relDataType.isNullable());
+                    }
                     projectionColumn =
                             ProjectionColumn.ofCalculated(
                                     columnName,
-                                    CalciteDataTypeConverter.convertCalciteRelDataTypeToDataType(
-                                            relDataType),
+                                    dataType,
                                     exprNode.toString(),
                                     JaninoCompiler.translateSqlNodeToJaninoExpression(
                                             JaninoCompiler.Context.of(

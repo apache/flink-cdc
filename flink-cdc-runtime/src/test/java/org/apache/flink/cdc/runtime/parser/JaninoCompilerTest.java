@@ -365,6 +365,32 @@ class JaninoCompilerTest {
     }
 
     @Test
+    void testTranslatedNullFunctionsCompileWithJanino() throws InvocationTargetException {
+        List<Column> columns = List.of(Column.physicalColumn("input_value", DataTypes.STRING()));
+        Map<String, String> columnNameMap = Map.of("input_value", "$0");
+
+        ExpressionEvaluator tryCastEvaluator =
+                compileTranslatedFilterExpression(
+                        "IFNULL(TRY_CAST(input_value AS INT), 42) = 42",
+                        columns,
+                        columnNameMap,
+                        List.of("$0"),
+                        List.of(String.class));
+        Assertions.assertThat(tryCastEvaluator.evaluate(new Object[] {"invalid"})).isEqualTo(true);
+        Assertions.assertThat(tryCastEvaluator.evaluate(new Object[] {"7"})).isEqualTo(false);
+
+        ExpressionEvaluator nullIfEvaluator =
+                compileTranslatedFilterExpression(
+                        "NULLIF(CAST(input_value AS INT), CAST(1 AS BIGINT)) IS NULL",
+                        columns,
+                        columnNameMap,
+                        List.of("$0"),
+                        List.of(String.class));
+        Assertions.assertThat(nullIfEvaluator.evaluate(new Object[] {"1"})).isEqualTo(true);
+        Assertions.assertThat(nullIfEvaluator.evaluate(new Object[] {"2"})).isEqualTo(false);
+    }
+
+    @Test
     void testLargeNumericLiterals() {
         // Test parsing integer literals
         Stream.of(
