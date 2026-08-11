@@ -225,6 +225,13 @@ public class JaninoCompiler {
 
     private static Java.Rvalue translateSqlBasicCall(Context context, SqlBasicCall sqlBasicCall) {
         String functionName = sqlBasicCall.getOperator().getName().toUpperCase();
+        Optional<UserDefinedFunctionDescriptor> udfFunction =
+                findUserDefinedFunction(context, functionName);
+        if (udfFunction.isPresent()) {
+            return generateUserDefinedFunctionOperation(
+                    udfFunction.get(),
+                    translateOperands(context, sqlBasicCall).toArray(new Java.Rvalue[0]));
+        }
         if (isIntervalArithmetic(sqlBasicCall)) {
             return generateIntervalArithmeticOperation(context, sqlBasicCall);
         }
@@ -234,16 +241,11 @@ public class JaninoCompiler {
         if (DATE_PART_FUNCTION_UNITS.containsKey(functionName)) {
             return generateDatePartFunctionOperation(context, sqlBasicCall, functionName);
         }
-        if (functionName.equals("TRY_CAST")
-                && !findUserDefinedFunction(context, functionName).isPresent()) {
+        if (functionName.equals("TRY_CAST")) {
             return generateTryCastOperation(context, sqlBasicCall);
         }
 
-        List<SqlNode> operandList = sqlBasicCall.getOperandList();
-        List<Java.Rvalue> atoms = new ArrayList<>();
-        for (SqlNode sqlNode : operandList) {
-            translateSqlNodeToAtoms(context, sqlNode, atoms);
-        }
+        List<Java.Rvalue> atoms = translateOperands(context, sqlBasicCall);
         if (TIMEZONE_FREE_TEMPORAL_FUNCTIONS.contains(
                 sqlBasicCall.getOperator().getName().toUpperCase())) {
             atoms.add(new Java.AmbiguousName(Location.NOWHERE, new String[] {DEFAULT_EPOCH_TIME}));
@@ -256,6 +258,14 @@ public class JaninoCompiler {
             atoms.add(new Java.AmbiguousName(Location.NOWHERE, new String[] {DEFAULT_TIME_ZONE}));
         }
         return sqlBasicCallToJaninoRvalue(context, sqlBasicCall, atoms.toArray(new Java.Rvalue[0]));
+    }
+
+    private static List<Java.Rvalue> translateOperands(Context context, SqlBasicCall sqlBasicCall) {
+        List<Java.Rvalue> atoms = new ArrayList<>();
+        for (SqlNode operand : sqlBasicCall.getOperandList()) {
+            translateSqlNodeToAtoms(context, operand, atoms);
+        }
+        return atoms;
     }
 
     private static boolean isIntervalArithmetic(SqlBasicCall sqlBasicCall) {
@@ -454,10 +464,6 @@ public class JaninoCompiler {
             case GREATER_THAN_OR_EQUAL:
                 return generateCompareOperation(context, sqlBasicCall, atoms);
             case NULLIF:
-                if (findUserDefinedFunction(context, sqlBasicCall.getOperator().getName())
-                        .isPresent()) {
-                    return generateOtherFunctionOperation(context, sqlBasicCall, atoms);
-                }
                 return generateNullIfOperation(context, sqlBasicCall, atoms);
             case CAST:
                 return generateCastOperation(context, sqlBasicCall, atoms);
@@ -569,9 +575,10 @@ public class JaninoCompiler {
     }
 
     private static boolean isBasicCallNullable(Context context, SqlBasicCall sqlBasicCall) {
-        if (sqlBasicCall.getOperator().getName().equalsIgnoreCase("IFNULL")
-                && !findUserDefinedFunction(context, sqlBasicCall.getOperator().getName())
-                        .isPresent()) {
+        if (findUserDefinedFunction(context, sqlBasicCall.getOperator().getName()).isPresent()) {
+            return true;
+        }
+        if (sqlBasicCall.getOperator().getName().equalsIgnoreCase("IFNULL")) {
             List<SqlNode> operands = sqlBasicCall.getOperandList();
             if (operands.size() != 2) {
                 return true;
@@ -836,8 +843,6 @@ public class JaninoCompiler {
     private static Java.Rvalue generateOtherFunctionOperation(
             Context context, SqlBasicCall sqlBasicCall, Java.Rvalue[] atoms) {
         String operationName = sqlBasicCall.getOperator().getName().toUpperCase();
-        Optional<UserDefinedFunctionDescriptor> udfFunctionOptional =
-                findUserDefinedFunction(context, operationName);
         if (operationName.equals("IF")) {
             if (atoms.length == 3) {
                 return new Java.ConditionalExpression(
@@ -848,28 +853,23 @@ public class JaninoCompiler {
             } else {
                 throw new ParseException("Unrecognized expression: " + sqlBasicCall);
             }
-        } else if (operationName.equals("IFNULL") && !udfFunctionOptional.isPresent()) {
+        } else if (operationName.equals("IFNULL")) {
             return generateIfNullOperation(context, sqlBasicCall, atoms);
-        } else if (operationName.equals("NULLIF") && !udfFunctionOptional.isPresent()) {
+        } else if (operationName.equals("NULLIF")) {
             return generateNullIfOperation(context, sqlBasicCall, atoms);
         } else {
-            return udfFunctionOptional
-                    .map(
-                            udfFunction ->
-                                    new Java.MethodInvocation(
-                                            Location.NOWHERE,
-                                            null,
-                                            generateInvokeExpression(udfFunction),
-                                            atoms))
-                    .orElseGet(
-                            () ->
-                                    new Java.MethodInvocation(
-                                            Location.NOWHERE,
-                                            null,
-                                            StringUtils.convertToCamelCase(
-                                                    sqlBasicCall.getOperator().getName()),
-                                            atoms));
+            return new Java.MethodInvocation(
+                    Location.NOWHERE,
+                    null,
+                    StringUtils.convertToCamelCase(sqlBasicCall.getOperator().getName()),
+                    atoms);
         }
+    }
+
+    private static Java.Rvalue generateUserDefinedFunctionOperation(
+            UserDefinedFunctionDescriptor udfFunction, Java.Rvalue[] atoms) {
+        return new Java.MethodInvocation(
+                Location.NOWHERE, null, generateInvokeExpression(udfFunction), atoms);
     }
 
     private static Optional<UserDefinedFunctionDescriptor> findUserDefinedFunction(
