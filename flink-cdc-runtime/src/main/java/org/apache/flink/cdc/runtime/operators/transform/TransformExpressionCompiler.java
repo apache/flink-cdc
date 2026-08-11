@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.runtime.operators.transform;
 
 import org.apache.flink.api.common.InvalidProgramException;
+import org.apache.flink.cdc.common.model.AiModelClient;
 import org.apache.flink.cdc.runtime.operators.transform.exceptions.TransformException;
 import org.apache.flink.util.FlinkRuntimeException;
 
@@ -30,7 +31,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 /**
  * The processor of the transform expression. It processes the expression of projections and
@@ -54,6 +57,20 @@ public class TransformExpressionCompiler {
     /** Compiles an expression code to a janino {@link ExpressionEvaluator}. */
     public static ExpressionEvaluator compileExpression(
             TransformExpressionKey key, List<UserDefinedFunctionDescriptor> udfDescriptors) {
+        return compileExpression(key, udfDescriptors, Collections.emptyMap());
+    }
+
+    /**
+     * Compiles an expression code to a janino {@link ExpressionEvaluator}, with additional {@link
+     * AiModelClient} instances appended after UDF instances.
+     *
+     * <p>{@code modelClients} maps model names (e.g. {@code myModel}) to the corresponding client
+     * instances.
+     */
+    public static ExpressionEvaluator compileExpression(
+            TransformExpressionKey key,
+            List<UserDefinedFunctionDescriptor> udfDescriptors,
+            Map<String, AiModelClient> modelClients) {
         try {
             return COMPILED_EXPRESSION_CACHE.get(
                     key,
@@ -66,6 +83,11 @@ public class TransformExpressionCompiler {
                         for (UserDefinedFunctionDescriptor udfFunction : udfDescriptors) {
                             argumentNames.add("__instanceOf" + udfFunction.getClassName());
                             argumentClasses.add(Class.forName(udfFunction.getClasspath()));
+                        }
+
+                        for (String paramName : modelClients.keySet()) {
+                            argumentNames.add(paramName);
+                            argumentClasses.add(AiModelClient.class);
                         }
 
                         // Input args
