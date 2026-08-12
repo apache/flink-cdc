@@ -91,6 +91,7 @@ class CachedTableFilterTest {
     @Test
     void testCacheSizeIsBounded() {
         AtomicInteger invocationCount = new AtomicInteger();
+        int numberOfTableIds = 32 * 1024 + 1;
         TableFilter cachedTableFilter =
                 CachedTableFilter.from(
                         tableId -> {
@@ -98,14 +99,14 @@ class CachedTableFilterTest {
                             return true;
                         });
         List<TableId> tableIds = new ArrayList<>();
-        for (int i = 0; i < 1025; i++) {
+        for (int i = 0; i < numberOfTableIds; i++) {
             tableIds.add(new TableId("test_db", null, "table_" + i));
         }
 
         tableIds.forEach(cachedTableFilter::isIncluded);
-        assertThat(invocationCount).hasValue(1025);
+        assertThat(invocationCount).hasValue(numberOfTableIds);
 
         tableIds.forEach(cachedTableFilter::isIncluded);
-        assertThat(invocationCount).hasValueGreaterThan(1025);
+        assertThat(invocationCount).hasValueGreaterThan(numberOfTableIds);
     }
 }
