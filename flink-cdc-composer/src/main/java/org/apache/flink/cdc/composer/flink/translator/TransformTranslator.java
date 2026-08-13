@@ -18,20 +18,30 @@
 package org.apache.flink.cdc.composer.flink.translator;
 
 import org.apache.flink.api.java.tuple.Tuple3;
+import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.factories.FactoryHelper;
+import org.apache.flink.cdc.common.model.AiModelClient;
+import org.apache.flink.cdc.common.model.AiModelClientFactory;
+import org.apache.flink.cdc.common.model.ModelContext;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.composer.definition.ModelDef;
 import org.apache.flink.cdc.composer.definition.TransformDef;
 import org.apache.flink.cdc.composer.definition.UdfDef;
+import org.apache.flink.cdc.composer.utils.FactoryDiscoveryUtils;
 import org.apache.flink.cdc.runtime.operators.transform.PostTransformOperator;
 import org.apache.flink.cdc.runtime.operators.transform.PostTransformOperatorBuilder;
 import org.apache.flink.cdc.runtime.operators.transform.PreTransformOperator;
 import org.apache.flink.cdc.runtime.operators.transform.PreTransformOperatorBuilder;
+import org.apache.flink.cdc.runtime.parser.TransformParser;
 import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.streaming.api.datastream.DataStream;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -53,6 +63,7 @@ public class TransformTranslator {
         if (transforms.isEmpty()) {
             return input;
         }
+        validateModelReferences(transforms, models);
         return input.transform(
                 "Transform:Schema",
                 new EventTypeInfo(),
@@ -85,7 +96,10 @@ public class TransformTranslator {
                                 .map(this::udfDefToUDFTuple)
                                 .collect(Collectors.toList()))
                 .addUdfFunctions(
-                        models.stream().map(this::modelToUDFTuple).collect(Collectors.toList()));
+                        models.stream()
+                                .filter(ModelDef::isLegacy)
+                                .map(this::modelToUDFTuple)
+                                .collect(Collectors.toList()));
 
         return preTransformFunctionBuilder.build();
     }
@@ -120,7 +134,11 @@ public class TransformTranslator {
         postTransformFunctionBuilder.addUdfFunctions(
                 udfFunctions.stream().map(this::udfDefToUDFTuple).collect(Collectors.toList()));
         postTransformFunctionBuilder.addUdfFunctions(
-                models.stream().map(this::modelToUDFTuple).collect(Collectors.toList()));
+                models.stream()
+                        .filter(ModelDef::isLegacy)
+                        .map(this::modelToUDFTuple)
+                        .collect(Collectors.toList()));
+        postTransformFunctionBuilder.addModelClients(loadModelClients(models));
         return input.transform(
                         "Transform:Data", new EventTypeInfo(), postTransformFunctionBuilder.build())
                 .uid(operatorUidGenerator.generateUid("post-transform"));
@@ -133,7 +151,70 @@ public class TransformTranslator {
                 model.getParameters());
     }
 
+    private Map<String, AiModelClient> loadModelClients(List<ModelDef> models) {
+        List<ModelDef> clientModels =
+                models.stream().filter(model -> !model.isLegacy()).collect(Collectors.toList());
+        if (clientModels.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+        Map<String, AiModelClient> clients = new LinkedHashMap<>();
+        for (ModelDef model : clientModels) {
+            AiModelClientFactory factory =
+                    FactoryDiscoveryUtils.getFactoryByIdentifier(
+                            model.getType(), AiModelClientFactory.class);
+            FactoryHelper.createFactoryHelper(
+                            factory,
+                            new FactoryHelper.DefaultContext(
+                                    Configuration.fromMap(model.getOptions()),
+                                    new Configuration(),
+                                    classLoader))
+                    .validate();
+            ModelContext context = new DefaultModelContext(model, classLoader);
+            clients.put(model.getName(), factory.createClient(context));
+        }
+        return clients;
+    }
+
+    private void validateModelReferences(List<TransformDef> transforms, List<ModelDef> models) {
+        Set<String> clientModelNames =
+                models.stream()
+                        .filter(model -> !model.isLegacy())
+                        .map(ModelDef::getName)
+                        .collect(Collectors.toSet());
+        for (TransformDef transform : transforms) {
+            TransformParser.validateAiModelReferences(
+                    transform.getProjection(), transform.getFilter(), clientModelNames);
+        }
+    }
+
     private Tuple3<String, String, Map<String, String>> udfDefToUDFTuple(UdfDef udf) {
         return Tuple3.of(udf.getName(), udf.getClasspath(), udf.getOptions());
+    }
+
+    private static final class DefaultModelContext implements ModelContext {
+        private final ModelDef modelDef;
+        private final ClassLoader classLoader;
+
+        private DefaultModelContext(ModelDef modelDef, ClassLoader classLoader) {
+            this.modelDef = modelDef;
+            this.classLoader = classLoader;
+        }
+
+        @Override
+        public String getModelName() {
+            return modelDef.getName();
+        }
+
+        @Override
+        public Map<String, String> getOptions() {
+            return modelDef.getOptions();
+        }
+
+        @Override
+        public ClassLoader getClassLoader() {
+            return classLoader;
+        }
     }
 }

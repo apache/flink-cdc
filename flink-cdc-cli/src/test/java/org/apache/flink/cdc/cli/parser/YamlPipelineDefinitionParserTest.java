@@ -364,6 +364,115 @@ class YamlPipelineDefinitionParserTest {
                                                 .build())));
     }
 
+    @Test
+    void testParsingFactoryBasedModel() throws Exception {
+        String yaml =
+                "source:\n"
+                        + "  type: values\n"
+                        + "sink:\n"
+                        + "  type: values\n"
+                        + "pipeline:\n"
+                        + "  model:\n"
+                        + "    name: completion_model\n"
+                        + "    type: dummy\n"
+                        + "    options:\n"
+                        + "      debug: true\n"
+                        + "      retries: 3\n";
+
+        PipelineDef pipelineDef =
+                new YamlPipelineDefinitionParser().parse(yaml, new Configuration());
+
+        assertThat(pipelineDef.getModels())
+                .containsExactly(
+                        ModelDef.of(
+                                "completion_model",
+                                "dummy",
+                                ImmutableMap.of("debug", "true", "retries", "3")));
+    }
+
+    @Test
+    void testParsingFactoryBasedModelWithFlatModelNameOption() throws Exception {
+        String yaml =
+                "source:\n"
+                        + "  type: values\n"
+                        + "sink:\n"
+                        + "  type: values\n"
+                        + "pipeline:\n"
+                        + "  model:\n"
+                        + "    name: completion_model\n"
+                        + "    type: openai-compatible\n"
+                        + "    model-name: model-v1\n";
+
+        PipelineDef pipelineDef =
+                new YamlPipelineDefinitionParser().parse(yaml, new Configuration());
+
+        assertThat(pipelineDef.getModels())
+                .containsExactly(
+                        ModelDef.of(
+                                "completion_model",
+                                "openai-compatible",
+                                Collections.singletonMap("model-name", "model-v1")));
+    }
+
+    @Test
+    void testParsingLegacyAndFactoryBasedModelsTogether() throws Exception {
+        String yaml =
+                "source:\n"
+                        + "  type: values\n"
+                        + "sink:\n"
+                        + "  type: values\n"
+                        + "pipeline:\n"
+                        + "  model:\n"
+                        + "    - model-name: LEGACY_CHAT\n"
+                        + "      class-name: OpenAIChatModel\n"
+                        + "      openai.model: legacy-model\n"
+                        + "    - name: completion_model\n"
+                        + "      type: dummy\n"
+                        + "      debug: false\n";
+
+        PipelineDef pipelineDef =
+                new YamlPipelineDefinitionParser().parse(yaml, new Configuration());
+
+        assertThat(pipelineDef.getModels()).hasSize(2);
+        assertThat(pipelineDef.getModels().get(0).isLegacy()).isTrue();
+        assertThat(pipelineDef.getModels().get(1))
+                .isEqualTo(
+                        ModelDef.of(
+                                "completion_model",
+                                "dummy",
+                                Collections.singletonMap("debug", "false")));
+    }
+
+    @Test
+    void testDuplicateAndInvalidModelNames() {
+        String duplicate =
+                "source:\n"
+                        + "  type: values\n"
+                        + "sink:\n"
+                        + "  type: values\n"
+                        + "pipeline:\n"
+                        + "  model:\n"
+                        + "    - name: duplicated\n"
+                        + "      type: dummy\n"
+                        + "    - model-name: duplicated\n"
+                        + "      class-name: OpenAIChatModel\n";
+        String invalid =
+                "source:\n"
+                        + "  type: values\n"
+                        + "sink:\n"
+                        + "  type: values\n"
+                        + "pipeline:\n"
+                        + "  model:\n"
+                        + "    name: invalid-name\n"
+                        + "    type: dummy\n";
+
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+        assertThatThrownBy(() -> parser.parse(duplicate, new Configuration()))
+                .hasMessage("Duplicate model name 'duplicated' in pipeline definition.");
+        assertThatThrownBy(() -> parser.parse(invalid, new Configuration()))
+                .hasMessageContaining("is not a valid identifier");
+    }
+
     private final PipelineDef fullDef =
             new PipelineDef(
                     new SourceDef(

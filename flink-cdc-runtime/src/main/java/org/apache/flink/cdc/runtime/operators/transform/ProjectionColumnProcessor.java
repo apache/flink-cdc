@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.runtime.operators.transform;
 
 import org.apache.flink.cdc.common.converter.JavaClassConverter;
+import org.apache.flink.cdc.common.model.AiModelClient;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.runtime.parser.JaninoCompiler;
@@ -26,6 +27,7 @@ import org.codehaus.janino.ExpressionEvaluator;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -45,6 +47,7 @@ public class ProjectionColumnProcessor {
     private final TransformExpressionKey transformExpressionKey;
     private final Map<String, SupportedMetadataColumn> supportedMetadataColumns;
     private final List<Object> udfFunctionInstances;
+    private final Map<String, AiModelClient> modelClients;
     private final ExpressionEvaluator expressionEvaluator;
 
     public ProjectionColumnProcessor(
@@ -53,15 +56,17 @@ public class ProjectionColumnProcessor {
             String timezone,
             List<UserDefinedFunctionDescriptor> udfDescriptors,
             final List<Object> udfFunctionInstances,
-            Map<String, SupportedMetadataColumn> supportedMetadataColumns) {
+            Map<String, SupportedMetadataColumn> supportedMetadataColumns,
+            Map<String, AiModelClient> modelClients) {
         this.tableInfo = tableInfo;
         this.projectionColumn = projectionColumn;
         this.timezone = timezone;
         this.supportedMetadataColumns = supportedMetadataColumns;
+        this.modelClients = modelClients;
         this.transformExpressionKey = generateTransformExpressionKey();
         this.expressionEvaluator =
                 TransformExpressionCompiler.compileExpression(
-                        transformExpressionKey, udfDescriptors);
+                        transformExpressionKey, udfDescriptors, modelClients);
         this.udfFunctionInstances = udfFunctionInstances;
     }
 
@@ -72,13 +77,32 @@ public class ProjectionColumnProcessor {
             List<UserDefinedFunctionDescriptor> udfDescriptors,
             List<Object> udfFunctionInstances,
             Map<String, SupportedMetadataColumn> supportedMetadataColumns) {
+        return of(
+                tableInfo,
+                projectionColumn,
+                timezone,
+                udfDescriptors,
+                udfFunctionInstances,
+                supportedMetadataColumns,
+                Collections.emptyMap());
+    }
+
+    public static ProjectionColumnProcessor of(
+            PostTransformChangeInfo tableInfo,
+            ProjectionColumn projectionColumn,
+            String timezone,
+            List<UserDefinedFunctionDescriptor> udfDescriptors,
+            List<Object> udfFunctionInstances,
+            Map<String, SupportedMetadataColumn> supportedMetadataColumns,
+            Map<String, AiModelClient> modelClients) {
         return new ProjectionColumnProcessor(
                 tableInfo,
                 projectionColumn,
                 timezone,
                 udfDescriptors,
                 udfFunctionInstances,
-                supportedMetadataColumns);
+                supportedMetadataColumns,
+                modelClients);
     }
 
     public Object evaluate(Object[] rowData, TransformContext context) {
@@ -123,6 +147,9 @@ public class ProjectionColumnProcessor {
 
         // 3 - Add UDF function instances
         params.addAll(udfFunctionInstances);
+
+        // 4 - Add AI model client instances
+        params.addAll(modelClients.values());
         return params.toArray();
     }
 

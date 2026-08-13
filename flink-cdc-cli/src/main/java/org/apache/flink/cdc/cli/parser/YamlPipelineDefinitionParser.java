@@ -46,6 +46,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -96,9 +97,11 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     private static final String UDF_OPTIONS_KEY = "options";
 
     // Model related keys
-    private static final String MODEL_NAME_KEY = "model-name";
-
-    private static final String MODEL_CLASS_NAME_KEY = "class-name";
+    private static final String MODEL_NAME_KEY = "name";
+    private static final String MODEL_TYPE_KEY = "type";
+    private static final String MODEL_OPTIONS_KEY = "options";
+    private static final String LEGACY_MODEL_NAME_KEY = "model-name";
+    private static final String LEGACY_MODEL_CLASS_NAME_KEY = "class-name";
 
     public static final String TRANSFORM_PRIMARY_KEY_KEY = "primary-keys";
 
@@ -145,7 +148,6 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
 
             Optional.ofNullable(
                             ((ObjectNode) pipelineDefJsonNode.get(PIPELINE_KEY)).remove(MODEL_KEY))
-                    .map(node -> validateArray("model", node))
                     .ifPresent(node -> modelDefs.addAll(parseModels(node)));
         }
 
@@ -428,24 +430,98 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         } else {
             modelDefs.add(convertJsonNodeToModelDef(modelsNode));
         }
+        Set<String> seenNames = new HashSet<>();
+        for (ModelDef model : modelDefs) {
+            if (!seenNames.add(model.getName())) {
+                throw new IllegalArgumentException(
+                        "Duplicate model name '" + model.getName() + "' in pipeline definition.");
+            }
+        }
         return modelDefs;
     }
 
     private ModelDef convertJsonNodeToModelDef(JsonNode modelNode) {
+        Preconditions.checkArgument(
+                modelNode instanceof ObjectNode,
+                "`model` in `pipeline` should be an object, but got %s",
+                modelNode);
+        ObjectNode node = ((ObjectNode) modelNode).deepCopy();
+        boolean usesNewFormat = node.has(MODEL_NAME_KEY) || node.has(MODEL_TYPE_KEY);
+        boolean usesLegacyFormat =
+                node.has(LEGACY_MODEL_NAME_KEY) && node.has(LEGACY_MODEL_CLASS_NAME_KEY);
+        Preconditions.checkArgument(
+                !(usesNewFormat && usesLegacyFormat),
+                "Model definition must use either name/type/options or model-name/class-name, but not both: %s",
+                modelNode);
+
+        if (usesLegacyFormat) {
+            String modelName =
+                    checkNotNull(
+                                    node.get(LEGACY_MODEL_NAME_KEY),
+                                    "Missing required field \"%s\" in `model`",
+                                    LEGACY_MODEL_NAME_KEY)
+                            .asText();
+            validateModelName(modelName);
+            String className =
+                    checkNotNull(
+                                    node.get(LEGACY_MODEL_CLASS_NAME_KEY),
+                                    "Missing required field \"%s\" in `model`",
+                                    LEGACY_MODEL_CLASS_NAME_KEY)
+                            .asText();
+            Map<String, String> parameters =
+                    mapper.convertValue(node, new TypeReference<Map<String, String>>() {});
+            return new ModelDef(modelName, className, parameters);
+        }
+
         String name =
                 checkNotNull(
-                                modelNode.get(MODEL_NAME_KEY),
+                                node.remove(MODEL_NAME_KEY),
                                 "Missing required field \"%s\" in `model`",
                                 MODEL_NAME_KEY)
                         .asText();
-        String model =
+        validateModelName(name);
+        String type =
                 checkNotNull(
-                                modelNode.get(MODEL_CLASS_NAME_KEY),
+                                node.remove(MODEL_TYPE_KEY),
                                 "Missing required field \"%s\" in `model`",
-                                MODEL_CLASS_NAME_KEY)
+                                MODEL_TYPE_KEY)
                         .asText();
-        Map<String, String> properties = mapper.convertValue(modelNode, Map.class);
-        return new ModelDef(name, model, properties);
+        Preconditions.checkArgument(
+                !StringUtils.isNullOrWhitespaceOnly(type),
+                "Model type must not be empty for model '%s'.",
+                name);
+
+        Map<String, String> options = new LinkedHashMap<>();
+        JsonNode optionsNode = node.remove(MODEL_OPTIONS_KEY);
+        if (optionsNode != null) {
+            Preconditions.checkArgument(
+                    optionsNode instanceof ObjectNode,
+                    "Model options must be an object, but got %s",
+                    optionsNode);
+            options.putAll(
+                    mapper.convertValue(optionsNode, new TypeReference<Map<String, String>>() {}));
+        }
+        node.fields()
+                .forEachRemaining(
+                        entry -> {
+                            Preconditions.checkArgument(
+                                    !options.containsKey(entry.getKey()),
+                                    "Duplicate model option '%s' for model '%s'.",
+                                    entry.getKey(),
+                                    name);
+                            options.put(entry.getKey(), entry.getValue().asText());
+                        });
+        return ModelDef.of(name, type, options);
+    }
+
+    private void validateModelName(String name) {
+        Preconditions.checkArgument(
+                name.matches("[a-zA-Z_][a-zA-Z0-9_]*") && !name.startsWith("__"),
+                "Model name \"%s\" is not a valid identifier. "
+                        + "It must start with a letter or underscore, "
+                        + "contain only letters, digits, or underscores, "
+                        + "and must not start with double underscores.",
+                name);
     }
 
     private void validateJsonNodeKeys(

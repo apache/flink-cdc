@@ -24,6 +24,7 @@ import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.runtime.operators.transform.ProjectionColumn;
 import org.apache.flink.cdc.runtime.operators.transform.UserDefinedFunctionDescriptor;
+import org.apache.flink.cdc.runtime.parser.metadata.AiFunctionSqlOperatorTable;
 import org.apache.flink.cdc.runtime.parser.metadata.TransformSchemaFactory;
 import org.apache.flink.cdc.runtime.parser.metadata.TransformSqlOperatorTable;
 import org.apache.flink.cdc.runtime.typeutils.CalciteDataTypeConverter;
@@ -47,6 +48,7 @@ import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.schema.impl.ScalarFunctionImpl;
 import org.apache.calcite.sql.SqlBasicCall;
 import org.apache.calcite.sql.SqlCall;
+import org.apache.calcite.sql.SqlCharStringLiteral;
 import org.apache.calcite.sql.SqlFunction;
 import org.apache.calcite.sql.SqlFunctionCategory;
 import org.apache.calcite.sql.SqlIdentifier;
@@ -164,9 +166,13 @@ public class TransformParser {
                         new CalciteConnectionConfigImpl(new Properties()));
         TransformSqlOperatorTable transformSqlOperatorTable = TransformSqlOperatorTable.instance();
         SqlOperatorTable udfOperatorTable = SqlOperatorTables.of(udfFunctions);
+        SqlOperatorTable aiFunctionOperatorTable = AiFunctionSqlOperatorTable.create();
         SqlValidator validator =
                 SqlValidatorUtil.newValidator(
-                        SqlOperatorTables.chain(transformSqlOperatorTable, udfOperatorTable),
+                        SqlOperatorTables.chain(
+                                transformSqlOperatorTable,
+                                udfOperatorTable,
+                                aiFunctionOperatorTable),
                         calciteCatalogReader,
                         factory,
                         SqlValidator.Config.DEFAULT
@@ -722,6 +728,54 @@ public class TransformParser {
             statement.append(filterExpression);
         }
         return parseSelect(statement.toString());
+    }
+
+    /** Validates model arguments and references in the supported AI functions. */
+    public static void validateAiModelReferences(
+            @Nullable String projection, @Nullable String filter, Set<String> declaredModelNames) {
+        if (!isNullOrWhitespaceOnly(projection)) {
+            validateAiModelReferences(parseProjectionExpression(projection), declaredModelNames);
+        }
+        if (!isNullOrWhitespaceOnly(filter)) {
+            validateAiModelReferences(parseFilterExpression(filter), declaredModelNames);
+        }
+    }
+
+    private static void validateAiModelReferences(SqlNode node, Set<String> declaredModelNames) {
+        if (node instanceof SqlCall) {
+            SqlCall call = (SqlCall) node;
+            if (isAiFunction(call.getOperator().getName())) {
+                if (call.operandCount() == 0) {
+                    return;
+                }
+                SqlNode modelArgument = call.operand(0);
+                Preconditions.checkArgument(
+                        modelArgument instanceof SqlCharStringLiteral,
+                        "The model argument of %s must be a string constant, but was %s.",
+                        call.getOperator().getName(),
+                        modelArgument);
+                String modelName = ((SqlCharStringLiteral) modelArgument).getNlsString().getValue();
+                Preconditions.checkArgument(
+                        declaredModelNames.contains(modelName),
+                        "Model '%s' referenced by %s has not been declared.",
+                        modelName,
+                        call.getOperator().getName());
+            }
+            for (SqlNode operand : call.getOperandList()) {
+                if (operand != null) {
+                    validateAiModelReferences(operand, declaredModelNames);
+                }
+            }
+        } else if (node instanceof SqlNodeList) {
+            for (SqlNode child : (SqlNodeList) node) {
+                validateAiModelReferences(child, declaredModelNames);
+            }
+        }
+    }
+
+    private static boolean isAiFunction(String functionName) {
+        return "AI_COMPLETE".equalsIgnoreCase(functionName)
+                || "AI_EMBED".equalsIgnoreCase(functionName);
     }
 
     public static boolean hasAsterisk(@Nullable String projection) {
