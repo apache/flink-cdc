@@ -187,6 +187,19 @@ class TransformParserTest {
     }
 
     @Test
+    void testCollectionConstructorWithIncompatibleElementTypes() {
+        Assertions.assertThatThrownBy(
+                        () ->
+                                TransformParser.generateProjectionColumns(
+                                        "ARRAY[1, TRUE] AS invalid_array",
+                                        Collections.emptyList(),
+                                        Collections.emptyList(),
+                                        new SupportedMetadataColumn[0]))
+                .isExactlyInstanceOf(CalciteContextException.class)
+                .hasMessageContaining("Parameters must be of the same type");
+    }
+
+    @Test
     void testPreservesNamedRowFieldsInCollectionTypes() {
         DataType namedRowType =
                 DataTypes.ROW(
