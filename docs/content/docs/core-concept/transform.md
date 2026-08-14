@@ -525,11 +525,84 @@ transform:
     filter: inc(id) < 100
 ```
 
-## AI Model Clients
+## Embedding AI Model
+
+Embedding AI Model can be used in transform rules.
+To use Embedding AI Model, you need to download the jar of build-in model, and then add `--jar {$BUILT_IN_MODEL_PATH}` to your flink-cdc.sh command.
+
+How to define a Embedding AI Model:
+
+```yaml
+pipeline:
+  model:
+    - model-name: CHAT
+      class-name: OpenAIChatModel
+      openai.model: text-embedding-3-small
+      openai.host: https://xxxx
+      openai.apikey: abcd1234
+      openai.chat.prompt: please summary this
+    - model-name: GET_EMBEDDING
+      class-name: OpenAIEmbeddingModel
+      openai.model: text-embedding-3-small
+      openai.host: https://xxxx
+      openai.apikey: abcd1234
+```
+Note:
+* `model-name` is a common required parameter for all support models, which represent the function name called in `projection` or `filter`.
+* `class-name` is a common required parameter for all support models, available values can be found in [All Support models](#all-support-models).
+* `openai.model`, `openai.host`, `openai.apiKey` and `openai.chat.prompt` is option parameters that defined in specific model.
+
+How to use a Embedding AI Model:
+
+```yaml
+transform:
+  - source-table: db.\.*
+    projection: "*, inc(inc(inc(id))) as inc_id, GET_EMBEDDING(page) as emb, CHAT(page) as summary"
+    filter: inc(id) < 100
+pipeline:
+  model:
+    - model-name: CHAT
+      class-name: OpenAIChatModel
+      openai.model: gpt-4o-mini
+      openai.host: http://langchain4j.dev/demo/openai/v1
+      openai.apikey: demo
+      openai.chat.prompt: please summary this
+    - model-name: GET_EMBEDDING
+      class-name: OpenAIEmbeddingModel
+      openai.model: text-embedding-3-small
+      openai.host: http://langchain4j.dev/demo/openai/v1
+      openai.apikey: demo
+```
+Here, GET_EMBEDDING is defined though `model-name` in `pipeline`.
+
+### All Support models
+
+The following built-in models are provided:
+
+#### OpenAIChatModel
+
+| parameter          | type   | optional/required | meaning                                                                                                                              |
+|--------------------|--------|-------------------|--------------------------------------------------------------------------------------------------------------------------------------|
+| openai.model       | STRING | required          | Name of model to be called, for example: "gpt-4o-mini", Available options are "gpt-4o-mini", "gpt-4o", "gpt-4-32k", "gpt-3.5-turbo". |
+| openai.host        | STRING | required          | Host of the Model server to be connected, for example: `http://langchain4j.dev/demo/openai/v1`.                                      |
+| openai.apikey      | STRING | required          | Api Key for verification of the Model server, for example, "demo".                                                                   |
+| openai.chat.prompt | STRING | optional          | Prompt for chatting with OpenAI, for example: "Please summary this ".                                                                |
+
+#### OpenAIEmbeddingModel
+
+| parameter     | type   | optional/required | meaning                                                                                                                                                                |
+|---------------|--------|-------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| openai.model  | STRING | required          | Name of model to be called, for example: "text-embedding-3-small", Available options are "text-embedding-3-small", "text-embedding-3-large", "text-embedding-ada-002". |
+| openai.host   | STRING | required          | Host of the Model server to be connected, for example: `http://langchain4j.dev/demo/openai/v1`.                                                                        |
+| openai.apikey | STRING | required          | Api Key for verification of the Model server, for example, "demo".                                                                                                     |
+
+## OpenAI-compatible Model Client
 
 AI model clients can be referenced by the `AI_COMPLETE` and `AI_EMBED` transform functions. Add the model implementation JAR, such as `flink-cdc-pipeline-model-openai-compatible`, to the pipeline command with `--jar`.
 
 The OpenAI-compatible client supports chat completions and text embeddings against endpoints that implement the corresponding OpenAI REST APIs:
+
+System prompts, function prompts, and input text may contain either English or Chinese content.
 
 ```yaml
 transform:

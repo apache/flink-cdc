@@ -130,6 +130,22 @@ class OpenAiCompatibleModelClientTest {
     }
 
     @Test
+    void testTextCompletionPreservesChinesePromptsAndInput() throws Exception {
+        server.enqueue(jsonResponse(200, COMPLETION_RESPONSE));
+        Map<String, String> options = baseOptions();
+        options.put("system-prompt", "你是一个简洁的助手。");
+        options.put("user-prompt", "请直接回答。");
+        client = createAndOpenClient(options);
+
+        assertThat(client.generate("总结输入内容", "包含中文的输入文本")).isEqualTo("{\"result\":\"done\"}");
+
+        JsonNode body = objectMapper.readTree(server.takeRequest().getBody().readUtf8());
+        assertThat(body.at("/messages/0/content").asText()).isEqualTo("你是一个简洁的助手。\n总结输入内容");
+        assertThat(body.at("/messages/1/content").asText()).isEqualTo("包含中文的输入文本");
+        assertThat(body.at("/messages/2/content").asText()).isEqualTo("请直接回答。");
+    }
+
+    @Test
     void testImageUrlCompletion() throws Exception {
         server.enqueue(jsonResponse(200, COMPLETION_RESPONSE));
         Map<String, String> options = baseOptions();

@@ -520,18 +520,91 @@ transform:
     filter: inc(id) < 100
 ```
 
-## AI 模型客户端
+## Embedding AI 模型
+
+内置 AI 模型可以在 transform 规则中使用。
+为了使用内置 AI 模型，你需要下载内置模型的 jar ，然后在 `flink-cdc.sh` 命令中添加 `--jar {$BUILT_IN_MODEL_PATH}`。
+
+如何定义一个 Embedding AI 模型：
+
+```yaml
+pipeline:
+  model:
+    - model-name: CHAT
+      class-name: OpenAIChatModel
+      openai.model: gpt-4o-mini
+      openai.host: https://xxxx
+      openai.apikey: abcd1234
+      openai.chat.prompt: please summary this
+    - model-name: GET_EMBEDDING
+      class-name: OpenAIEmbeddingModel
+      openai.model: text-embedding-3-small
+      openai.host: https://xxxx
+      openai.apikey: abcd1234
+```
+注意：
+* `model-name` 是一个通用的必填参数，用于所有支持的模型，表示在 `projection` 或 `filter` 中调用的函数名称。
+* `class-name` 是一个通用的必填参数，用于所有支持的模型，可用值可以在[所有支持的模型](#all-support-models)中找到。
+* `openai.model`，`openai.host`，`openai.apiKey` 和 `openai.chat.prompt` 是在各个模型中特别的可选参数。
+
+如何使用一个 Embedding AI 模型：
+
+```yaml
+transform:
+  - source-table: db.\.*
+    projection: "*, inc(inc(inc(id))) as inc_id, GET_EMBEDDING(page) as emb, CHAT(page) as summary"
+    filter: inc(id) < 100
+pipeline:
+  model:
+    - model-name: CHAT
+      class-name: OpenAIChatModel
+      openai.model: gpt-4o-mini
+      openai.host: http://langchain4j.dev/demo/openai/v1
+      openai.apikey: demo
+      openai.chat.prompt: please summary this
+    - model-name: GET_EMBEDDING
+      class-name: OpenAIEmbeddingModel
+      openai.model: text-embedding-3-small
+      openai.host: http://langchain4j.dev/demo/openai/v1
+      openai.apikey: demo
+```
+这里，GET_EMBEDDING 是通过 `model-name` 在 `pipeline` 中定义的。
+
+### 所有支持的模型
+
+下面列出了所有支持的模型：
+
+#### OpenAIChatModel
+
+| 参数                 | 类型     | 是否必填     | 含义                                                                                                 |
+|--------------------|--------|----------|-----------------------------------------------------------------------------------------------------|
+| openai.model       | STRING | 必填       | 要调用的模型名称，例如："gpt-4o-mini"，可用选项有 "gpt-4o-mini"、"gpt-4o"、"gpt-4-32k"、"gpt-3.5-turbo"。 |
+| openai.host        | STRING | 必填       | 要连接的模型服务器地址，例如：`http://langchain4j.dev/demo/openai/v1`。                                 |
+| openai.apikey      | STRING | 必填       | 模型服务器验证的 API Key，例如："demo"。                                                                |
+| openai.chat.prompt | STRING | 可选       | 与 OpenAI 聊天的提示词，例如："Please summary this"。                                                   |
+
+#### OpenAIEmbeddingModel
+
+| 参数            | 类型     | 是否必填     | 含义                                                                                                                   |
+|---------------|--------|----------|----------------------------------------------------------------------------------------------------------------------|
+| openai.model  | STRING | 必填       | 要调用的模型名称，例如："text-embedding-3-small"，可用选项有 "text-embedding-3-small"、"text-embedding-3-large"、"text-embedding-ada-002"。 |
+| openai.host   | STRING | 必填       | 要连接的模型服务器地址，例如：`http://langchain4j.dev/demo/openai/v1`。                                                   |
+| openai.apikey | STRING | 必填       | 模型服务器验证的 API Key，例如："demo"。                                                                                  |
+
+## OpenAI-compatible 模型客户端
 
 AI 模型客户端可供 transform 中的 `AI_COMPLETE` 和 `AI_EMBED` 函数引用。使用时，需要通过 `--jar` 将模型实现 JAR（例如 `flink-cdc-pipeline-model-openai-compatible`）添加到 Pipeline 命令中。
 
 OpenAI-compatible 客户端支持调用实现 OpenAI Chat Completions 和 Embeddings REST API 的服务：
+
+system prompt、函数 prompt 和输入文本均支持英文或中文内容。
 
 ```yaml
 transform:
   - source-table: db.\.*
     projection: >-
       *,
-      AI_COMPLETE('completion_model', content, 'Summarize the input') AS summary,
+      AI_COMPLETE('completion_model', content, '总结输入内容') AS summary,
       AI_EMBED('embedding_model', content) AS embedding
 
 pipeline:
@@ -542,7 +615,7 @@ pipeline:
         model: gpt-4o-mini
         endpoint: https://api.example.com/v1
         api-key: <api-key>
-        system-prompt: You are a concise assistant.
+        system-prompt: 你是一个简洁的助手。
         temperature: 0.2
         max-tokens: 256
     - name: embedding_model
