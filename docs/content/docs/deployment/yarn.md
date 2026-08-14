@@ -134,8 +134,8 @@ pipeline:
    execution.target: yarn-session
    yarn.application.id: {{YARN_APPLICATION_ID}}
    execution.checkpointing.interval: 2min
-   #If you need to restore from a savepoint, configure the following parameters:
-   #execution.savepoint.path: hdfs:///flink/savepoint-1537
+   # If you need to restore from a savepoint, uncomment the next line:
+   # execution.savepoint.path: hdfs:///flink/savepoint-1537
 ```
 
 You need to modify the configuration file according to your needs.

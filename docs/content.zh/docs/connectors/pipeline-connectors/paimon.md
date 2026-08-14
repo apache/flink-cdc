@@ -58,8 +58,6 @@ sink:
 pipeline:
   name: MySQL to Paimon Pipeline
   parallelism: 2
-  flink-conf:
-    execution.checkpointing.interval: 2min
 ```
 
 Pipeline 连接器配置项

@@ -132,8 +132,8 @@ pipeline:
    execution.target: yarn-session
    yarn.application.id: {{YARN_APPLICATION_ID}}
    execution.checkpointing.interval: 2min
-   #如果需要从savepoint恢复，则配置以下参数
-   #execution.savepoint.path: hdfs:///flink/savepoint-1537
+   # 如需从 savepoint 恢复，可配置以下参数：
+   # execution.savepoint.path: hdfs:///flink/savepoint-1537
 ```
 
 你可以按需修改配置文件。
