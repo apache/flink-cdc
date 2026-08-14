@@ -13,8 +13,6 @@ MODULES_CORE = [
     "flink-cdc-common",
     "flink-cdc-composer",
     "flink-cdc-runtime",
-    "flink-cdc-pipeline-model/flink-cdc-pipeline-model-legacy",
-    "flink-cdc-pipeline-model/flink-cdc-pipeline-model-dummy",
     "flink-cdc-pipeline-model/flink-cdc-pipeline-model-openai-compatible",
     "flink-cdc-connect/flink-cdc-source-connectors/flink-cdc-base",
     "flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-values"
