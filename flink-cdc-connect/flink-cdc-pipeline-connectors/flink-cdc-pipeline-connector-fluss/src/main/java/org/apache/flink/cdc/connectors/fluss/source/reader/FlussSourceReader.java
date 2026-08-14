@@ -54,6 +54,7 @@ public class FlussSourceReader<T>
     private static final Logger LOG = LoggerFactory.getLogger(FlussSourceReader.class);
 
     private final FlussRecordEmitter<T> recordEmitter;
+    private final WrapperFlussMetricRegistry metricRegistry;
 
     public FlussSourceReader(
             FutureCompletingBlockingQueue<RecordsWithSplitIds<FlussSourceRecord>> elementsQueue,
@@ -73,6 +74,16 @@ public class FlussSourceReader<T>
                 new Configuration(),
                 readerContext);
         this.recordEmitter = recordEmitter;
+        this.metricRegistry = metricRegistry;
+    }
+
+    @Override
+    public void close() throws Exception {
+        try {
+            super.close();
+        } finally {
+            metricRegistry.close();
+        }
     }
 
     @Override
