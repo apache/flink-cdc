@@ -126,8 +126,8 @@ class CliFrontendTest {
         assertThat(executor.getFlinkConfig().get(CHECKPOINTING_TIMEOUT))
                 .as(
                         "execution.checkpointing.timeout config priority test: "
-                                + "flink-home(config.yml): 10min(default) < command-line: 11min < pipeline.yml: 12min")
-                .isEqualTo(Duration.ofMinutes(12));
+                                + "10min(default: config.yml) < pipeline.yml: 12min < command-line: 11min")
+                .isEqualTo(Duration.ofMinutes(11));
     }
 
     @Test

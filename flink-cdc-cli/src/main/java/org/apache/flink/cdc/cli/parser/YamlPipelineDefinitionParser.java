@@ -111,7 +111,9 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
 
     public static final String TRANSFORM_TABLE_OPTION_KEY = "table-options";
 
-    private final ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
+    public static final String TRANSFORM_TABLE_OPTION_DELIMITER_KEY = "table-options.delimiter";
+
+    private static final ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
 
     /** Parse the specified pipeline definition file. */
     @Override

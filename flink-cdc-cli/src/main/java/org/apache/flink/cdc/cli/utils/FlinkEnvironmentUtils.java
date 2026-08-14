@@ -63,15 +63,15 @@ public class FlinkEnvironmentUtils {
 
     /**
      * Load and merge flink configuration from flink_home、command line and flink pipeline.yaml.flink
-     * config priority: pipeline.yaml > command line > flink_home.
+     * config priority: CDC CLI arguments > YAML Pipeline config blocks > Flink `config.yaml`.
      */
     public static Configuration mergeFlinkConfigurationsWithPriority(
             Path pipelineDefPath, CommandLine commandLine) throws Exception {
         Configuration flinkConfig = loadBaseFlinkConfig(commandLine);
 
-        mergeCommandLineFlinkConfig(commandLine, flinkConfig);
-
         mergePipelineFlinkConfig(pipelineDefPath, flinkConfig);
+
+        mergeCommandLineFlinkConfig(commandLine, flinkConfig);
 
         applySavepointSettings(flinkConfig);
         return flinkConfig;
