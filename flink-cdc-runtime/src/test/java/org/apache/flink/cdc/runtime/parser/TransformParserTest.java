@@ -137,6 +137,116 @@ class TransformParserTest {
     }
 
     @Test
+    void testCollectionConstructorsAndFunctions() {
+        List<Column> columns =
+                List.of(
+                        Column.physicalColumn("id", DataTypes.BIGINT()),
+                        Column.physicalColumn("arr", DataTypes.ARRAY(DataTypes.INT())),
+                        Column.physicalColumn(
+                                "m", DataTypes.MAP(DataTypes.STRING(), DataTypes.INT())));
+
+        List<ProjectionColumn> projectionColumns =
+                TransformParser.generateProjectionColumns(
+                        "ARRAY[1, id] AS array_col, "
+                                + "MAP['one', 1, 'id', id] AS map_col, "
+                                + "ROW(id, arr) AS row_col, "
+                                + "CARDINALITY(arr) AS array_size, "
+                                + "CARDINALITY(m) AS map_size, "
+                                + "ARRAY_CONTAINS(arr, 2) AS contains_two, "
+                                + "ARRAY_POSITION(arr, 2) AS position_two, "
+                                + "ELEMENT(ARRAY[id]) AS only_element, "
+                                + "ARRAY[ARRAY[1], ARRAY[id]] AS nested_array",
+                        columns,
+                        Collections.emptyList(),
+                        new SupportedMetadataColumn[0]);
+
+        Assertions.assertThat(projectionColumns)
+                .extracting(ProjectionColumn::getDataType)
+                .containsExactly(
+                        DataTypes.ARRAY(DataTypes.BIGINT()),
+                        DataTypes.MAP(DataTypes.STRING(), DataTypes.BIGINT()),
+                        DataTypes.ROW(DataTypes.BIGINT(), DataTypes.ARRAY(DataTypes.INT())),
+                        DataTypes.INT(),
+                        DataTypes.INT(),
+                        DataTypes.BOOLEAN(),
+                        DataTypes.INT(),
+                        DataTypes.BIGINT(),
+                        DataTypes.ARRAY(DataTypes.ARRAY(DataTypes.BIGINT())));
+        Assertions.assertThat(projectionColumns)
+                .extracting(ProjectionColumn::getScriptExpression)
+                .containsExactly(
+                        "array(castToLong(1), $0)",
+                        "map(\"one\", castToLong(1), \"id\", $0)",
+                        "row($0, $1)",
+                        "cardinality($0)",
+                        "cardinality($0)",
+                        "arrayContains($0, 2)",
+                        "arrayPosition($0, 2)",
+                        "(java.lang.Long) element(array($0))",
+                        "array(array(castToLong(1)), array($0))");
+    }
+
+    @Test
+    void testCollectionConstructorWithIncompatibleElementTypes() {
+        Assertions.assertThatThrownBy(
+                        () ->
+                                TransformParser.generateProjectionColumns(
+                                        "ARRAY[1, TRUE] AS invalid_array",
+                                        Collections.emptyList(),
+                                        Collections.emptyList(),
+                                        new SupportedMetadataColumn[0]))
+                .isExactlyInstanceOf(CalciteContextException.class)
+                .hasMessageContaining("Parameters must be of the same type");
+    }
+
+    @Test
+    void testPreservesNamedRowFieldsInCollectionTypes() {
+        DataType namedRowType =
+                DataTypes.ROW(
+                        DataTypes.FIELD("name", DataTypes.STRING()),
+                        DataTypes.FIELD("length", DataTypes.INT()));
+        List<Column> columns = List.of(Column.physicalColumn("complex_row_", namedRowType));
+
+        List<ProjectionColumn> projectionColumns =
+                TransformParser.generateProjectionColumns(
+                        "ELEMENT(ARRAY[complex_row_]) AS row_element, "
+                                + "ARRAY[complex_row_] AS row_array, "
+                                + "MAP['row', complex_row_] AS row_map",
+                        columns,
+                        Collections.emptyList(),
+                        new SupportedMetadataColumn[0]);
+
+        Assertions.assertThat(projectionColumns)
+                .extracting(ProjectionColumn::getDataType)
+                .containsExactly(
+                        namedRowType,
+                        DataTypes.ARRAY(namedRowType),
+                        DataTypes.MAP(DataTypes.STRING(), namedRowType));
+    }
+
+    @Test
+    void testTranslateCollectionFunctionsToJaninoExpression() {
+        List<Column> columns =
+                List.of(
+                        Column.physicalColumn("id", DataTypes.BIGINT()),
+                        Column.physicalColumn("arr", DataTypes.ARRAY(DataTypes.INT())),
+                        Column.physicalColumn(
+                                "m", DataTypes.MAP(DataTypes.STRING(), DataTypes.INT())));
+
+        testFilterExpressionWithColumns("CARDINALITY(arr)", "cardinality(arr)", columns);
+        testFilterExpressionWithColumns("ARRAY_CONTAINS(arr, 2)", "arrayContains(arr, 2)", columns);
+        testFilterExpressionWithColumns("ARRAY_POSITION(arr, 2)", "arrayPosition(arr, 2)", columns);
+        testFilterExpressionWithColumns(
+                "ELEMENT(ARRAY[id])", "(java.lang.Long) element(array(id))", columns);
+        testFilterExpressionWithColumns(
+                "MAP['one', 1]['one']",
+                "(java.lang.Integer) itemAccess(map(\"one\", 1), \"one\")",
+                columns);
+        testFilterExpressionWithColumns(
+                "ROW(id, arr)[2]", "(java.util.List) itemAccess(row(id, arr), 2)", columns);
+    }
+
+    @Test
     void testTransformCalciteValidate() {
         SqlSelect parse =
                 TransformParser.parseSelect(
