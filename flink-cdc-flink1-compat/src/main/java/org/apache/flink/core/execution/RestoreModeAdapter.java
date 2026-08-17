@@ -40,9 +40,9 @@ public final class RestoreModeAdapter {
 
     private RestoreModeAdapter() {}
 
-    public static void setRestoreMode(Configuration configuration, RestoreMode restoreMode) {
+    public static void setRestoreMode(Configuration configuration, Object restoreMode) {
 
-        configuration.set(StateRecoveryOptions.RESTORE_MODE, convert(restoreMode));
+        configuration.set(StateRecoveryOptions.RESTORE_MODE, convert((RestoreMode) restoreMode));
     }
 
     public static void setSavepointIgnoreUnclaimedState(
