@@ -22,8 +22,8 @@ import org.apache.flink.cdc.cli.parser.YamlPipelineDefinitionParser;
 import org.apache.flink.cdc.common.utils.StringUtils;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.DeploymentOptions;
-import org.apache.flink.core.execution.RestoreModeAdapter;
 import org.apache.flink.core.execution.RestoreMode;
+import org.apache.flink.core.execution.RestoreModeAdapter;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.runtime.jobgraph.SavepointRestoreSettings;
 
