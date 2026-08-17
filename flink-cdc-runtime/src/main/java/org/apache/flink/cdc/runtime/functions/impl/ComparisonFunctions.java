@@ -27,6 +27,20 @@ public class ComparisonFunctions {
         return (object1 != null && object2 != null) && object1.equals(object2);
     }
 
+    public static Boolean sqlValueEquals(Object object1, Object object2) {
+        if (object1 == null || object2 == null) {
+            return null;
+        }
+        if (object1 instanceof Number && object2 instanceof Number) {
+            return sqlNumericCompare((Number) object1, (Number) object2) == 0;
+        }
+        return object1.equals(object2);
+    }
+
+    public static Boolean sqlNotEquals(Object object1, Object object2) {
+        return LogicalFunctions.not(sqlValueEquals(object1, object2));
+    }
+
     public static boolean isDistinctFrom(Object object1, Object object2) {
         if (object1 == null || object2 == null) {
             return object1 != object2;
@@ -54,11 +68,37 @@ public class ComparisonFunctions {
         }
     }
 
+    private static int sqlCompares(Object lhs, Object rhs) {
+        if (lhs instanceof Number && rhs instanceof Number) {
+            return sqlNumericCompare((Number) lhs, (Number) rhs);
+        }
+        return universalCompares(lhs, rhs);
+    }
+
+    private static int sqlNumericCompare(Number lhs, Number rhs) {
+        if (isNonFinite(lhs) || isNonFinite(rhs)) {
+            return Double.compare(lhs.doubleValue(), rhs.doubleValue());
+        }
+        return new BigDecimal(lhs.toString()).compareTo(new BigDecimal(rhs.toString()));
+    }
+
+    private static boolean isNonFinite(Number value) {
+        return (value instanceof Double && !Double.isFinite(value.doubleValue()))
+                || (value instanceof Float && !Float.isFinite(value.floatValue()));
+    }
+
     public static boolean greaterThan(Object lhs, Object rhs) {
         if (lhs == null || rhs == null) {
             return false;
         }
         return universalCompares(lhs, rhs) > 0;
+    }
+
+    public static Boolean sqlGreaterThan(Object lhs, Object rhs) {
+        if (lhs == null || rhs == null) {
+            return null;
+        }
+        return sqlCompares(lhs, rhs) > 0;
     }
 
     public static boolean greaterThanOrEqual(Object lhs, Object rhs) {
@@ -68,6 +108,13 @@ public class ComparisonFunctions {
         return universalCompares(lhs, rhs) >= 0;
     }
 
+    public static Boolean sqlGreaterThanOrEqual(Object lhs, Object rhs) {
+        if (lhs == null || rhs == null) {
+            return null;
+        }
+        return sqlCompares(lhs, rhs) >= 0;
+    }
+
     public static boolean lessThan(Object lhs, Object rhs) {
         if (lhs == null || rhs == null) {
             return false;
@@ -75,11 +122,50 @@ public class ComparisonFunctions {
         return universalCompares(lhs, rhs) < 0;
     }
 
+    public static Boolean sqlLessThan(Object lhs, Object rhs) {
+        if (lhs == null || rhs == null) {
+            return null;
+        }
+        return sqlCompares(lhs, rhs) < 0;
+    }
+
     public static boolean lessThanOrEqual(Object lhs, Object rhs) {
         if (lhs == null || rhs == null) {
             return false;
         }
         return universalCompares(lhs, rhs) <= 0;
+    }
+
+    public static Boolean sqlLessThanOrEqual(Object lhs, Object rhs) {
+        if (lhs == null || rhs == null) {
+            return null;
+        }
+        return sqlCompares(lhs, rhs) <= 0;
+    }
+
+    public static Boolean sqlBetween(Object value, Object minValue, Object maxValue) {
+        return LogicalFunctions.and(
+                sqlGreaterThanOrEqual(value, minValue), sqlLessThanOrEqual(value, maxValue));
+    }
+
+    public static Boolean sqlNotBetween(Object value, Object minValue, Object maxValue) {
+        return LogicalFunctions.not(sqlBetween(value, minValue, maxValue));
+    }
+
+    public static Boolean sqlIn(Object value, Object... values) {
+        boolean containsUnknown = false;
+        for (Object candidate : values) {
+            Boolean equals = sqlValueEquals(value, candidate);
+            if (Boolean.TRUE.equals(equals)) {
+                return true;
+            }
+            containsUnknown |= equals == null;
+        }
+        return containsUnknown ? null : false;
+    }
+
+    public static Boolean sqlNotIn(Object value, Object... values) {
+        return LogicalFunctions.not(sqlIn(value, values));
     }
 
     public static boolean betweenAsymmetric(String value, String minValue, String maxValue) {
