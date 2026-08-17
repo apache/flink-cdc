@@ -237,15 +237,14 @@ The TiDB CDC source can work in parallel reading, because there is multiple task
 
 ### DataStream Source
 
-The TiDB CDC connector can also be a DataStream source. You can create a SourceFunction as the following shows:
-
-### DataStream Source
+The TiDB CDC connector can also be a DataStream source. Region-based splits are computed once by the source enumerator; restore reuses the checkpointed key ranges instead of querying PD again.
 
 ```java
+import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.connector.source.Source;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.api.functions.source.SourceFunction;
 import org.apache.flink.util.Collector;
 
 import org.apache.flink.cdc.connectors.tidb.TDBSourceOptions;
@@ -261,13 +260,13 @@ public class TiDBSourceExample {
 
     public static void main(String[] args) throws Exception {
 
-        SourceFunction<String> tidbSource =
+        Source<String, ?, ?> tidbSource =
             TiDBSource.<String>builder()
                 .database("mydb") // set captured database
                 .tableName("products") // set captured table
                 .tiConf(
                     TDBSourceOptions.getTiConfiguration(
-                        "localhost:2399", new HashMap<>()))
+                        "localhost:2399", null, new HashMap<>()))
                 .snapshotEventDeserializer(
                     new TiKVSnapshotEventDeserializationSchema<String>() {
                         @Override
@@ -302,7 +301,9 @@ public class TiDBSourceExample {
 
         // enable checkpoint
         env.enableCheckpointing(3000);
-        env.addSource(tidbSource).print().setParallelism(1);
+        env.fromSource(tidbSource, WatermarkStrategy.noWatermarks(), "TiDB Source")
+                .print()
+                .setParallelism(1);
 
         env.execute("Print TiDB Snapshot + Binlog");
     }
