@@ -22,6 +22,7 @@ import org.apache.flink.cdc.cli.parser.YamlPipelineDefinitionParser;
 import org.apache.flink.cdc.common.utils.StringUtils;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.DeploymentOptions;
+import org.apache.flink.core.execution.RestoreModeAdapter;
 import org.apache.flink.core.execution.RestoreMode;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.runtime.jobgraph.SavepointRestoreSettings;
@@ -48,9 +49,6 @@ import static org.apache.flink.cdc.cli.CliFrontendOptions.TARGET;
 import static org.apache.flink.cdc.cli.CliFrontendOptions.USE_MINI_CLUSTER;
 import static org.apache.flink.cdc.composer.flink.deployment.ComposeDeployment.LOCAL;
 import static org.apache.flink.cdc.composer.flink.deployment.ComposeDeployment.REMOTE;
-import static org.apache.flink.runtime.jobgraph.SavepointConfigOptions.RESTORE_MODE;
-import static org.apache.flink.runtime.jobgraph.SavepointConfigOptions.SAVEPOINT_IGNORE_UNCLAIMED_STATE;
-import static org.apache.flink.runtime.jobgraph.SavepointConfigOptions.SAVEPOINT_PATH;
 
 /** Utilities for handling Flink configuration and environment. */
 public class FlinkEnvironmentUtils {
@@ -112,7 +110,7 @@ public class FlinkEnvironmentUtils {
         flinkConfig.set(DeploymentOptions.TARGET, target);
 
         Optional.ofNullable(commandLine.getOptionValue(SAVEPOINT_PATH_OPTION))
-                .ifPresent(value -> flinkConfig.set(SAVEPOINT_PATH, value));
+                .ifPresent(value -> RestoreModeAdapter.setSavepointPath(flinkConfig, value));
 
         Optional.ofNullable(commandLine.getOptionValue(SAVEPOINT_CLAIM_MODE))
                 .ifPresent(
@@ -122,11 +120,11 @@ public class FlinkEnvironmentUtils {
                                             value,
                                             org.apache.flink.cdc.cli.utils.ConfigurationUtils
                                                     .getClaimModeClass());
-                            flinkConfig.set(RESTORE_MODE, restoreMode);
+                            RestoreModeAdapter.setRestoreMode(flinkConfig, restoreMode);
                         });
 
         if (commandLine.hasOption(SAVEPOINT_ALLOW_NON_RESTORED_OPTION)) {
-            flinkConfig.set(SAVEPOINT_IGNORE_UNCLAIMED_STATE, true);
+            RestoreModeAdapter.setSavepointIgnoreUnclaimedState(flinkConfig, true);
         }
 
         LOG.info("Dynamic flink config items found from command-line: {}", commandLineProperties);
@@ -188,7 +186,7 @@ public class FlinkEnvironmentUtils {
 
     public static SavepointRestoreSettings createSavepointRestoreSettings(
             Configuration flinkConfig) {
-        final Optional<String> savepointOpt = flinkConfig.getOptional(SAVEPOINT_PATH);
+        final Optional<String> savepointOpt = RestoreModeAdapter.getSavepointPath(flinkConfig);
         if (!savepointOpt.isPresent()) {
             return SavepointRestoreSettings.none();
         }
@@ -197,12 +195,9 @@ public class FlinkEnvironmentUtils {
         LOG.info("Load savepoint from path: {}", savepointPath);
 
         final boolean allowNonRestoredState =
-                flinkConfig
-                        .getOptional(SAVEPOINT_IGNORE_UNCLAIMED_STATE)
-                        .orElse(SAVEPOINT_IGNORE_UNCLAIMED_STATE.defaultValue());
+                RestoreModeAdapter.getSavepointIgnoreUnclaimedState(flinkConfig);
 
-        final Object restoreMode =
-                flinkConfig.getOptional(RESTORE_MODE).orElse(RESTORE_MODE.defaultValue());
+        final Object restoreMode = RestoreModeAdapter.getRestoreMode(flinkConfig);
 
         return (SavepointRestoreSettings)
                 Arrays.stream(SavepointRestoreSettings.class.getMethods())
