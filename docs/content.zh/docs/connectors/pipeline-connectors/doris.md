@@ -46,7 +46,6 @@ sink:
 
 pipeline:
    parallelism: 1
-
 ```
 
 ## 连接器配置项
