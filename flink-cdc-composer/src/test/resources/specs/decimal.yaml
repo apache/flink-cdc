@@ -41,6 +41,21 @@
     DataChangeEvent{tableId=foo.bar.baz, before=[1, 1234567891, 123456789012345679.90], after=[-1, -9876543209, -987654321098765431.10], op=UPDATE, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[-1, -9876543209, -987654321098765431.10], after=[], op=DELETE, meta=()}
 
+- do: Nested Expressions (Decimal-38 mode)
+  decimal-precision-mode: up_to_38
+  projection: |-
+    id_
+    IFNULL(decimal_20_2_ + CAST(1 AS DECIMAL(1, 0)), CAST(0 AS DECIMAL(1, 0))) AS ifnull_decimal
+    NULLIF(decimal_20_2_ + CAST(1 AS DECIMAL(1, 0)), CAST(0 AS DECIMAL(1, 0))) AS nullif_decimal
+    ARRAY[decimal_20_2_ + CAST(1 AS DECIMAL(1, 0)), CAST(0 AS DECIMAL(1, 0))] AS decimal_array
+  non-null: 'true'
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`ifnull_decimal` DECIMAL(21, 2) NOT NULL,`nullif_decimal` DECIMAL(21, 2),`decimal_array` ARRAY<DECIMAL(21, 2)>}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, 123456789012345679.90, 123456789012345679.90, [123456789012345679.90, 0.00]], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, 123456789012345679.90, 123456789012345679.90, [123456789012345679.90, 0.00]], after=[-1, -987654321098765431.10, -987654321098765431.10, [-987654321098765431.10, 0.00]], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, -987654321098765431.10, -987654321098765431.10, [-987654321098765431.10, 0.00]], after=[], op=DELETE, meta=()}
+
 - do: Subtract Op (Decimal-19 mode)
   decimal-precision-mode: up_to_19
   projection: |-

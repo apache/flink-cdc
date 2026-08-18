@@ -503,7 +503,8 @@ public class JaninoCompiler {
                         context.columns,
                         sqlBasicCall,
                         context.udfDescriptors,
-                        context.supportedMetadataColumns);
+                        context.supportedMetadataColumns,
+                        context.decimalPrecisionMode);
         return generateCollectionConstructorOperation(
                 context, sqlBasicCall, functionName, resultType);
     }
@@ -551,7 +552,8 @@ public class JaninoCompiler {
                                     context.columns,
                                     operand,
                                     context.udfDescriptors,
-                                    context.supportedMetadataColumns);
+                                    context.supportedMetadataColumns,
+                                    context.decimalPrecisionMode);
                     atoms[i] = generateImplicitTypeConvertMethod(operandType, targetType, atoms[i]);
                 }
             }
@@ -1038,7 +1040,8 @@ public class JaninoCompiler {
                         context.columns,
                         sqlBasicCall,
                         context.udfDescriptors,
-                        context.supportedMetadataColumns);
+                        context.supportedMetadataColumns,
+                        context.decimalPrecisionMode);
         Java.Rvalue[] coercedAtoms = new Java.Rvalue[atoms.length];
         for (int index = 0; index < atoms.length; index++) {
             coercedAtoms[index] = generateNumericTypeConvertMethod(resultType, atoms[index]);
@@ -1061,7 +1064,8 @@ public class JaninoCompiler {
                         context.columns,
                         value,
                         context.udfDescriptors,
-                        context.supportedMetadataColumns);
+                        context.supportedMetadataColumns,
+                        context.decimalPrecisionMode);
         return castToJavaType(resultType, operation);
     }
 
