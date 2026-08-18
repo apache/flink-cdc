@@ -85,22 +85,30 @@ public final class PythonUdf implements UserDefinedFunction {
 
         PythonInterpreterConfig.PythonInterpreterConfigBuilder pemjaConfigBuilder =
                 PythonInterpreterConfig.newBuilder().setPythonExec(pythonExec);
-        configurePythonFiles(pemjaConfigBuilder, config);
-
-        this.interpreter = new PythonInterpreter(pemjaConfigBuilder.build());
-        this.interpreter.exec(source);
+        try {
+            configurePythonFiles(pemjaConfigBuilder, config);
+            this.interpreter = new PythonInterpreter(pemjaConfigBuilder.build());
+            this.interpreter.exec(source);
+        } catch (Exception | Error failure) {
+            try {
+                close();
+            } catch (Exception | Error cleanupFailure) {
+                failure.addSuppressed(cleanupFailure);
+            }
+            throw failure;
+        }
     }
 
     @Override
     public void close() {
-        if (interpreter != null) {
-            try {
+        try {
+            if (interpreter != null) {
                 interpreter.close();
-            } finally {
-                interpreter = null;
             }
+        } finally {
+            interpreter = null;
+            cleanupExtractedPythonFiles();
         }
-        cleanupExtractedPythonFiles();
     }
 
     @Override
@@ -197,16 +205,18 @@ public final class PythonUdf implements UserDefinedFunction {
         if (extractedPythonFilesDirectory == null) {
             return;
         }
-        try (Stream<Path> files = Files.walk(extractedPythonFilesDirectory)) {
-            files.sorted(Comparator.reverseOrder())
-                    .forEach(
-                            path -> {
-                                try {
-                                    Files.deleteIfExists(path);
-                                } catch (IOException ignored) {
-                                    // Best-effort cleanup only.
-                                }
-                            });
+        try {
+            Path[] filesToDelete;
+            try (Stream<Path> files = Files.walk(extractedPythonFilesDirectory)) {
+                filesToDelete = files.sorted(Comparator.reverseOrder()).toArray(Path[]::new);
+            }
+            for (Path path : filesToDelete) {
+                try {
+                    Files.deleteIfExists(path);
+                } catch (IOException ignored) {
+                    // Best-effort cleanup only.
+                }
+            }
         } catch (IOException ignored) {
             // Best-effort cleanup only.
         } finally {
