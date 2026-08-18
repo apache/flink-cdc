@@ -24,6 +24,7 @@ import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.model.AiModelClient;
 import org.apache.flink.cdc.common.model.AiModelClientFactory;
 import org.apache.flink.cdc.common.model.ModelContext;
+import org.apache.flink.cdc.common.pipeline.DecimalPrecisionMode;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.composer.definition.ModelDef;
 import org.apache.flink.cdc.composer.definition.TransformDef;
@@ -110,6 +111,7 @@ public class TransformTranslator {
             DataStream<Event> input,
             List<TransformDef> transforms,
             String timezone,
+            DecimalPrecisionMode decimalPrecisionMode,
             List<UdfDef> udfFunctions,
             List<ModelDef> models,
             SupportedMetadataColumn[] supportedMetadataColumns,
@@ -134,6 +136,7 @@ public class TransformTranslator {
                     supportedMetadataColumns);
         }
         postTransformFunctionBuilder.addTimezone(timezone);
+        postTransformFunctionBuilder.addDecimalPrecisionMode(decimalPrecisionMode);
         postTransformFunctionBuilder.addUdfFunctions(
                 udfFunctions.stream().map(this::udfDefToUDFTuple).collect(Collectors.toList()));
         postTransformFunctionBuilder.addUdfFunctions(

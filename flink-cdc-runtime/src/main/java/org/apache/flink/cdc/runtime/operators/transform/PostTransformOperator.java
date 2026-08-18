@@ -30,6 +30,7 @@ import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.model.AiModelClient;
+import org.apache.flink.cdc.common.pipeline.DecimalPrecisionMode;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.udf.UserDefinedFunctionContext;
@@ -77,6 +78,7 @@ public class PostTransformOperator extends AbstractStreamOperatorAdapter<Event>
     private static final Logger LOG = LoggerFactory.getLogger(PostTransformOperator.class);
 
     private final String timezone;
+    private final DecimalPrecisionMode decimalPrecisionMode;
     private final List<TransformRule> transformRules;
     private final Map<TableId, Boolean> hasAsteriskMap;
     private final Map<TableId, List<String>> projectedColumnsMap;
@@ -107,9 +109,11 @@ public class PostTransformOperator extends AbstractStreamOperatorAdapter<Event>
     PostTransformOperator(
             List<TransformRule> transformRules,
             String timezone,
+            DecimalPrecisionMode decimalPrecisionMode,
             List<Tuple3<String, String, Map<String, String>>> udfFunctions,
             Map<String, AiModelClient> modelClients) {
         this.timezone = timezone;
+        this.decimalPrecisionMode = decimalPrecisionMode;
         this.transformRules = transformRules;
         this.hasAsteriskMap = new HashMap<>();
         this.projectedColumnsMap = new HashMap<>();
@@ -383,7 +387,8 @@ public class PostTransformOperator extends AbstractStreamOperatorAdapter<Event>
                                 .orElse(null),
                         preSchema.getColumns(),
                         udfDescriptors,
-                        transformer.getSupportedMetadataColumns());
+                        transformer.getSupportedMetadataColumns(),
+                        decimalPrecisionMode);
         return preSchema.copy(
                 projectionColumns.stream()
                         .map(ProjectionColumn::getColumn)
@@ -460,6 +465,7 @@ public class PostTransformOperator extends AbstractStreamOperatorAdapter<Event>
                                     .map(TransformProjection::getProjection)
                                     .orElse(null),
                             timezone,
+                            decimalPrecisionMode,
                             udfDescriptors,
                             udfFunctionInstances,
                             postTransformer.getSupportedMetadataColumns(),
@@ -476,7 +482,10 @@ public class PostTransformOperator extends AbstractStreamOperatorAdapter<Event>
             TableId tableId, PostTransformer postTransformer) {
         if (!filterProcessors.contains(tableId, postTransformer)) {
             if (!postTransformer.getFilter().isPresent()) {
-                filterProcessors.put(tableId, postTransformer, TransformFilterProcessor.ofNoOp());
+                filterProcessors.put(
+                        tableId,
+                        postTransformer,
+                        TransformFilterProcessor.ofNoOp(decimalPrecisionMode));
             } else {
                 PostTransformChangeInfo changeInfo = postTransformInfoMap.get(tableId);
                 filterProcessors.put(
@@ -486,6 +495,7 @@ public class PostTransformOperator extends AbstractStreamOperatorAdapter<Event>
                                 changeInfo,
                                 postTransformer.getFilter().orElse(null),
                                 timezone,
+                                decimalPrecisionMode,
                                 udfDescriptors,
                                 udfFunctionInstances,
                                 postTransformer.getSupportedMetadataColumns(),

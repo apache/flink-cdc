@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.runtime.parser;
 
 import org.apache.flink.api.common.io.ParseException;
+import org.apache.flink.cdc.common.pipeline.DecimalPrecisionMode;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.common.types.DataType;
@@ -41,7 +42,6 @@ import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelDataTypeField;
-import org.apache.calcite.rel.type.RelDataTypeSystem;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.schema.ScalarFunction;
 import org.apache.calcite.schema.SchemaPlus;
@@ -158,7 +158,8 @@ public class TransformParser {
             List<Column> columns,
             SqlNode sqlNode,
             List<UserDefinedFunctionDescriptor> udfDescriptors,
-            SupportedMetadataColumn[] supportedMetadataColumns) {
+            SupportedMetadataColumn[] supportedMetadataColumns,
+            DecimalPrecisionMode decimalPrecisionMode) {
         List<Column> columnsWithMetadata =
                 copyFillMetadataColumn(columns, supportedMetadataColumns);
         CalciteSchema rootSchema = CalciteSchema.createRootSchema(true);
@@ -202,7 +203,8 @@ public class TransformParser {
                 throw new RuntimeException("Failed to resolve UDF: " + udf, e);
             }
         }
-        SqlTypeFactoryImpl factory = new SqlTypeFactoryImpl(RelDataTypeSystem.DEFAULT);
+        SqlTypeFactoryImpl factory =
+                new SqlTypeFactoryImpl(FlinkCdcTypeSystem.of(decimalPrecisionMode));
         CalciteCatalogReader calciteCatalogReader =
                 new CalciteCatalogReader(
                         rootSchema,
@@ -328,6 +330,20 @@ public class TransformParser {
             List<Column> columns,
             List<UserDefinedFunctionDescriptor> udfDescriptors,
             SupportedMetadataColumn[] supportedMetadataColumns) {
+        return generateProjectionColumns(
+                projectionExpression,
+                columns,
+                udfDescriptors,
+                supportedMetadataColumns,
+                DecimalPrecisionMode.UP_TO_19);
+    }
+
+    public static List<ProjectionColumn> generateProjectionColumns(
+            String projectionExpression,
+            List<Column> columns,
+            List<UserDefinedFunctionDescriptor> udfDescriptors,
+            SupportedMetadataColumn[] supportedMetadataColumns,
+            DecimalPrecisionMode decimalPrecisionMode) {
         if (isNullOrWhitespaceOnly(projectionExpression)) {
             return new ArrayList<>();
         }
@@ -345,7 +361,8 @@ public class TransformParser {
                         originalColumnMap,
                         sqlSelect,
                         udfDescriptors,
-                        supportedMetadataColumns);
+                        supportedMetadataColumns,
+                        decimalPrecisionMode);
         List<ProjectionColumn> projectionColumns = new ArrayList<>();
         Map<String, Integer> addedProjectionColumnNames = new HashMap<>();
 
@@ -415,7 +432,8 @@ public class TransformParser {
                                                     columns,
                                                     columnNameMap,
                                                     udfDescriptors,
-                                                    supportedMetadataColumns),
+                                                    supportedMetadataColumns,
+                                                    decimalPrecisionMode),
                                             exprNode),
                                     originalColumnNames,
                                     columnNameMap);
@@ -455,10 +473,16 @@ public class TransformParser {
             Map<String, Column> originalColumnMap,
             SqlSelect sqlSelect,
             List<UserDefinedFunctionDescriptor> udfDescriptors,
-            SupportedMetadataColumn[] supportedMetadataColumns) {
+            SupportedMetadataColumn[] supportedMetadataColumns,
+            DecimalPrecisionMode decimalPrecisionMode) {
         try {
             RelNode relNode =
-                    sqlToRel(columns, sqlSelect, udfDescriptors, supportedMetadataColumns);
+                    sqlToRel(
+                            columns,
+                            sqlSelect,
+                            udfDescriptors,
+                            supportedMetadataColumns,
+                            decimalPrecisionMode);
             return relNode.getRowType().getFieldList().stream()
                     .map(RelDataTypeField::getType)
                     .toArray(RelDataType[]::new);
@@ -467,7 +491,8 @@ public class TransformParser {
                 // Keep Calcite as the primary type inference path. This fallback only covers
                 // transform predicates that Janino can evaluate but Calcite may fail to convert
                 // while building projection columns.
-                SqlTypeFactoryImpl typeFactory = new SqlTypeFactoryImpl(RelDataTypeSystem.DEFAULT);
+                SqlTypeFactoryImpl typeFactory =
+                        new SqlTypeFactoryImpl(FlinkCdcTypeSystem.of(decimalPrecisionMode));
                 List<RelDataType> relDataTypes = new ArrayList<>();
                 for (SqlNode sqlNode : sqlSelect.getSelectList()) {
                     relDataTypes.add(
@@ -477,7 +502,8 @@ public class TransformParser {
                                     originalColumnMap,
                                     unwrapAsExpression(sqlNode),
                                     udfDescriptors,
-                                    supportedMetadataColumns));
+                                    supportedMetadataColumns,
+                                    decimalPrecisionMode));
                 }
                 return relDataTypes.toArray(new RelDataType[0]);
             } catch (RuntimeException fallbackException) {
@@ -504,7 +530,8 @@ public class TransformParser {
             Map<String, Column> originalColumnMap,
             SqlNode exprNode,
             List<UserDefinedFunctionDescriptor> udfDescriptors,
-            SupportedMetadataColumn[] supportedMetadataColumns) {
+            SupportedMetadataColumn[] supportedMetadataColumns,
+            DecimalPrecisionMode decimalPrecisionMode) {
         if (exprNode instanceof SqlIdentifier) {
             String columnName =
                     ((SqlIdentifier) exprNode)
@@ -522,7 +549,11 @@ public class TransformParser {
         return toRelDataType(
                 typeFactory,
                 deduceSubExpressionType(
-                        columns, exprNode, udfDescriptors, supportedMetadataColumns));
+                        columns,
+                        exprNode,
+                        udfDescriptors,
+                        supportedMetadataColumns,
+                        decimalPrecisionMode));
     }
 
     private static DataType findIdentifierDataType(
@@ -635,6 +666,22 @@ public class TransformParser {
             List<UserDefinedFunctionDescriptor> udfDescriptors,
             SupportedMetadataColumn[] supportedMetadataColumns,
             Map<String, String> columnNameMap) {
+        return translateFilterExpressionToJaninoExpression(
+                filterExpression,
+                columns,
+                udfDescriptors,
+                supportedMetadataColumns,
+                columnNameMap,
+                DecimalPrecisionMode.UP_TO_19);
+    }
+
+    public static String translateFilterExpressionToJaninoExpression(
+            String filterExpression,
+            List<Column> columns,
+            List<UserDefinedFunctionDescriptor> udfDescriptors,
+            SupportedMetadataColumn[] supportedMetadataColumns,
+            Map<String, String> columnNameMap,
+            DecimalPrecisionMode decimalPrecisionMode) {
         if (isNullOrWhitespaceOnly(filterExpression)) {
             return "";
         }
@@ -645,7 +692,11 @@ public class TransformParser {
         SqlNode where = sqlSelect.getWhere();
         return JaninoCompiler.translateSqlNodeToJaninoExpression(
                 JaninoCompiler.Context.of(
-                        columns, columnNameMap, udfDescriptors, supportedMetadataColumns),
+                        columns,
+                        columnNameMap,
+                        udfDescriptors,
+                        supportedMetadataColumns,
+                        decimalPrecisionMode),
                 where);
     }
 
@@ -863,6 +914,20 @@ public class TransformParser {
             SqlNode subExpression,
             List<UserDefinedFunctionDescriptor> udfDescriptors,
             SupportedMetadataColumn[] supportedMetadataColumns) {
+        return deduceSubExpressionType(
+                columns,
+                subExpression,
+                udfDescriptors,
+                supportedMetadataColumns,
+                DecimalPrecisionMode.UP_TO_19);
+    }
+
+    public static DataType deduceSubExpressionType(
+            List<Column> columns,
+            SqlNode subExpression,
+            List<UserDefinedFunctionDescriptor> udfDescriptors,
+            SupportedMetadataColumn[] supportedMetadataColumns,
+            DecimalPrecisionMode decimalPrecisionMode) {
         SqlSelect sqlSelect =
                 new SqlSelect(
                         SqlParserPos.QUOTED_ZERO,
@@ -877,7 +942,13 @@ public class TransformParser {
                         null,
                         null,
                         null);
-        RelNode relNode = sqlToRel(columns, sqlSelect, udfDescriptors, supportedMetadataColumns);
+        RelNode relNode =
+                sqlToRel(
+                        columns,
+                        sqlSelect,
+                        udfDescriptors,
+                        supportedMetadataColumns,
+                        decimalPrecisionMode);
         RelDataType[] relDataTypes =
                 relNode.getRowType().getFieldList().stream()
                         .map(RelDataTypeField::getType)
