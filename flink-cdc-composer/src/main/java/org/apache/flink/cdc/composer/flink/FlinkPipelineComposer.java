@@ -200,7 +200,8 @@ public class FlinkPipelineComposer implements PipelineComposer {
                         pipelineDef.getUdfs(),
                         pipelineDef.getModels(),
                         dataSource.supportedMetadataColumns(),
-                        operatorUidGenerator);
+                        operatorUidGenerator,
+                        env);
 
         if (isParallelMetadataSource) {
             // Translate a distributed topology for sources with distributed tables

@@ -39,6 +39,8 @@ import org.apache.flink.cdc.connectors.values.factory.ValuesDataFactory;
 import org.apache.flink.cdc.connectors.values.sink.ValuesDataSinkOptions;
 import org.apache.flink.cdc.connectors.values.source.ValuesDataSourceHelper;
 import org.apache.flink.cdc.connectors.values.source.ValuesDataSourceOptions;
+import org.apache.flink.cdc.models.dummy.DummyModelClient;
+import org.apache.flink.cdc.models.dummy.DummyModelClientFactory;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
 import org.apache.flink.test.junit5.MiniClusterExtension;
@@ -47,14 +49,25 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.io.PrintStream;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.jar.JarEntry;
+import java.util.jar.JarOutputStream;
 
 import static org.apache.flink.configuration.CoreOptions.ALWAYS_PARENT_FIRST_LOADER_PATTERNS_ADDITIONAL;
+import static org.apache.flink.configuration.PipelineOptions.JARS;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Integration test for AI functions in the Flink pipeline. */
@@ -82,6 +95,8 @@ class FlinkPipelineAiFunctionITCase {
 
     private final PrintStream standardOut = System.out;
     private final ByteArrayOutputStream outCaptor = new ByteArrayOutputStream();
+
+    @TempDir Path tempDir;
 
     @BeforeEach
     void init() {
@@ -125,6 +140,19 @@ class FlinkPipelineAiFunctionITCase {
     }
 
     private String[] runAiFunctionTest(String projection, List<ModelDef> models) throws Exception {
+        URL modelJar = createDummyModelJar().toUri().toURL();
+        ClassLoader originalClassLoader = Thread.currentThread().getContextClassLoader();
+        try (URLClassLoader modelClassLoader =
+                new DummyModelClassLoader(modelJar, originalClassLoader)) {
+            Thread.currentThread().setContextClassLoader(modelClassLoader);
+            return runAiFunctionTest(projection, models, modelJar);
+        } finally {
+            Thread.currentThread().setContextClassLoader(originalClassLoader);
+        }
+    }
+
+    private String[] runAiFunctionTest(String projection, List<ModelDef> models, URL modelJar)
+            throws Exception {
         FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
 
         // Source: one table with a single row
@@ -190,8 +218,69 @@ class FlinkPipelineAiFunctionITCase {
 
         // Execute & capture output
         PipelineExecution execution = composer.compose(pipelineDef);
+        assertThat(composer.getEnv().getConfiguration().get(JARS))
+                .as("AI model provider JARs uploaded with the JobGraph")
+                .contains(modelJar.toString());
         execution.execute();
 
         return outCaptor.toString().trim().split("\n");
+    }
+
+    private Path createDummyModelJar() throws IOException {
+        Path modelJar = tempDir.resolve("dummy-model.jar");
+        try (JarOutputStream output = new JarOutputStream(Files.newOutputStream(modelJar))) {
+            addClassToJar(DummyModelClient.class, output);
+            addClassToJar(DummyModelClientFactory.class, output);
+
+            output.putNextEntry(
+                    new JarEntry(
+                            "META-INF/services/org.apache.flink.cdc.common.factories.Factory"));
+            output.write(
+                    (DummyModelClientFactory.class.getName() + "\n")
+                            .getBytes(StandardCharsets.UTF_8));
+            output.closeEntry();
+        }
+        return modelJar;
+    }
+
+    private static void addClassToJar(Class<?> clazz, JarOutputStream output) throws IOException {
+        String resourceName = clazz.getName().replace('.', '/') + ".class";
+        try (InputStream input = clazz.getClassLoader().getResourceAsStream(resourceName)) {
+            assertThat(input).as("class resource %s", resourceName).isNotNull();
+            output.putNextEntry(new JarEntry(resourceName));
+            input.transferTo(output);
+            output.closeEntry();
+        }
+    }
+
+    private static final class DummyModelClassLoader extends URLClassLoader {
+
+        private static final String DUMMY_MODEL_PACKAGE = "org.apache.flink.cdc.models.dummy.";
+
+        private DummyModelClassLoader(URL modelJar, ClassLoader parent) {
+            super(new URL[] {modelJar}, parent);
+        }
+
+        @Override
+        protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
+            if (!name.startsWith(DUMMY_MODEL_PACKAGE)) {
+                return super.loadClass(name, resolve);
+            }
+
+            synchronized (getClassLoadingLock(name)) {
+                Class<?> clazz = findLoadedClass(name);
+                if (clazz == null) {
+                    try {
+                        clazz = findClass(name);
+                    } catch (ClassNotFoundException e) {
+                        clazz = super.loadClass(name, false);
+                    }
+                }
+                if (resolve) {
+                    resolveClass(clazz);
+                }
+                return clazz;
+            }
+        }
     }
 }
