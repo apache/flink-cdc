@@ -28,6 +28,7 @@ import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.composer.definition.ModelDef;
 import org.apache.flink.cdc.composer.definition.TransformDef;
 import org.apache.flink.cdc.composer.definition.UdfDef;
+import org.apache.flink.cdc.composer.flink.FlinkEnvironmentUtils;
 import org.apache.flink.cdc.composer.utils.FactoryDiscoveryUtils;
 import org.apache.flink.cdc.runtime.operators.transform.PostTransformOperator;
 import org.apache.flink.cdc.runtime.operators.transform.PostTransformOperatorBuilder;
@@ -36,6 +37,7 @@ import org.apache.flink.cdc.runtime.operators.transform.PreTransformOperatorBuil
 import org.apache.flink.cdc.runtime.parser.TransformParser;
 import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -111,7 +113,8 @@ public class TransformTranslator {
             List<UdfDef> udfFunctions,
             List<ModelDef> models,
             SupportedMetadataColumn[] supportedMetadataColumns,
-            OperatorUidGenerator operatorUidGenerator) {
+            OperatorUidGenerator operatorUidGenerator,
+            StreamExecutionEnvironment env) {
         if (transforms.isEmpty()) {
             return input;
         }
@@ -138,7 +141,7 @@ public class TransformTranslator {
                         .filter(ModelDef::isLegacy)
                         .map(this::modelToUDFTuple)
                         .collect(Collectors.toList()));
-        postTransformFunctionBuilder.addModelClients(loadModelClients(models));
+        postTransformFunctionBuilder.addModelClients(loadModelClients(models, env));
         return input.transform(
                         "Transform:Data", new EventTypeInfo(), postTransformFunctionBuilder.build())
                 .uid(operatorUidGenerator.generateUid("post-transform"));
@@ -151,7 +154,8 @@ public class TransformTranslator {
                 model.getParameters());
     }
 
-    private Map<String, AiModelClient> loadModelClients(List<ModelDef> models) {
+    private Map<String, AiModelClient> loadModelClients(
+            List<ModelDef> models, StreamExecutionEnvironment env) {
         List<ModelDef> clientModels =
                 models.stream().filter(model -> !model.isLegacy()).collect(Collectors.toList());
         if (clientModels.isEmpty()) {
@@ -164,6 +168,8 @@ public class TransformTranslator {
             AiModelClientFactory factory =
                     FactoryDiscoveryUtils.getFactoryByIdentifier(
                             model.getType(), AiModelClientFactory.class);
+            FactoryDiscoveryUtils.getJarPathByIdentifier(factory)
+                    .ifPresent(jar -> FlinkEnvironmentUtils.addJar(env, jar));
             FactoryHelper.createFactoryHelper(
                             factory,
                             new FactoryHelper.DefaultContext(

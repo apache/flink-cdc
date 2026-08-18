@@ -107,16 +107,8 @@ limitations under the License.
                                     <shadedPattern>org.apache.flink.cdc.models.openai.shaded.com.google.errorprone</shadedPattern>
                                 </relocation>
                                 <relocation>
-                                    <pattern>com.openai</pattern>
-                                    <shadedPattern>org.apache.flink.cdc.models.openai.shaded.com.openai</shadedPattern>
-                                </relocation>
-                                <relocation>
                                     <pattern>io.swagger</pattern>
                                     <shadedPattern>org.apache.flink.cdc.models.openai.shaded.io.swagger</shadedPattern>
-                                </relocation>
-                                <relocation>
-                                    <pattern>kotlin</pattern>
-                                    <shadedPattern>org.apache.flink.cdc.models.openai.shaded.kotlin</shadedPattern>
                                 </relocation>
                                 <relocation>
                                     <pattern>okhttp3</pattern>
