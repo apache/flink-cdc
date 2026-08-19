@@ -227,6 +227,12 @@ limitations under the License.
                                         org.apache.flink.cdc.connectors.shaded.com.fasterxml
                                     </shadedPattern>
                                 </relocation>
+                                <relocation>
+                                    <pattern>com.zaxxer</pattern>
+                                    <shadedPattern>
+                                        org.apache.flink.cdc.connectors.shaded.com.zaxxer
+                                    </shadedPattern>
+                                </relocation>
                             </relocations>
                         </configuration>
                     </execution>
