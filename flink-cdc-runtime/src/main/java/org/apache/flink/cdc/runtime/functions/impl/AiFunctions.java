@@ -36,14 +36,49 @@ public class AiFunctions {
     private AiFunctions() {}
 
     public static BinaryVariant aiComplete(AiModelClient model, String input, String systemPrompt) {
+        return generateText(model, AiTextFunctionDef.AI_COMPLETE, input, systemPrompt);
+    }
+
+    public static BinaryVariant aiClassify(AiModelClient model, String input, String labels) {
+        return generateText(model, AiTextFunctionDef.AI_CLASSIFY, input, labels);
+    }
+
+    public static BinaryVariant aiTranslate(
+            AiModelClient model, String input, String sourceLang, String targetLang) {
+        return generateText(model, AiTextFunctionDef.AI_TRANSLATE, input, sourceLang, targetLang);
+    }
+
+    public static BinaryVariant aiSummarize(AiModelClient model, String input, int maxLength) {
+        return generateText(model, AiTextFunctionDef.AI_SUMMARIZE, input, maxLength);
+    }
+
+    public static BinaryVariant aiSentiment(AiModelClient model, String input) {
+        return generateText(model, AiTextFunctionDef.AI_SENTIMENT, input);
+    }
+
+    public static BinaryVariant aiExtract(AiModelClient model, String input, String schema) {
+        return generateText(model, AiTextFunctionDef.AI_EXTRACT, input, schema);
+    }
+
+    public static BinaryVariant aiMask(AiModelClient model, String input, String entities) {
+        return generateText(model, AiTextFunctionDef.AI_MASK, input, entities);
+    }
+
+    private static BinaryVariant generateText(
+            AiModelClient model,
+            AiTextFunctionDef function,
+            String input,
+            Object... promptArguments) {
+        if (input == null) {
+            return null;
+        }
         if (!(model instanceof SupportsTextGeneration)) {
             throw new UnsupportedOperationException(
                     "Model " + model.getClass().getName() + " does not support text generation");
         }
 
-        AiTextFunctionDef function = AiTextFunctionDef.AI_COMPLETE;
         String prompt =
-                function.buildPrompt(systemPrompt)
+                function.buildPrompt(promptArguments)
                         + "\n"
                         + buildOutputSchemaHint(function.getOutputType());
         String json = ((SupportsTextGeneration) model).generate(prompt, input);
@@ -53,11 +88,15 @@ public class AiFunctions {
         try {
             return BinaryVariantInternalBuilder.parseJson(json, false);
         } catch (IOException e) {
-            throw new RuntimeException("Failed to parse AI response as JSON: " + json, e);
+            throw new RuntimeException(
+                    "AI function " + function.getFunctionName() + " returned invalid JSON.", e);
         }
     }
 
     public static List<Float> aiEmbed(AiModelClient model, String input) {
+        if (input == null) {
+            return null;
+        }
         if (!(model instanceof SupportsEmbedding)) {
             throw new UnsupportedOperationException(
                     "Model " + model.getClass().getName() + " does not support embedding");
@@ -67,7 +106,9 @@ public class AiFunctions {
     }
 
     private static String buildOutputSchemaHint(RowType outputType) {
-        StringBuilder builder = new StringBuilder("Return valid JSON with this shape:\n{\n");
+        StringBuilder builder =
+                new StringBuilder(
+                        "Return only valid JSON without Markdown fences or additional text, using this shape:\n{\n");
         List<String> fieldNames = outputType.getFieldNames();
         for (int i = 0; i < fieldNames.size(); i++) {
             builder.append("  \"")
