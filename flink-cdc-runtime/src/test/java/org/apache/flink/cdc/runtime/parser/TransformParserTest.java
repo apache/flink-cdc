@@ -1231,6 +1231,28 @@ class TransformParserTest {
     }
 
     @Test
+    void testUdfDoesNotReplaceStructuralOperator() {
+        List<UserDefinedFunctionDescriptor> udfDescriptors =
+                Collections.singletonList(
+                        new UserDefinedFunctionDescriptor(
+                                "as",
+                                "org.apache.flink.cdc.udf.examples.java.AddOneFunctionClass"));
+
+        List<ProjectionColumn> projectionColumns =
+                TransformParser.generateProjectionColumns(
+                        "id AS alias",
+                        DUMMY_COLUMNS,
+                        udfDescriptors,
+                        new SupportedMetadataColumn[0]);
+
+        Assertions.assertThat(projectionColumns).hasSize(1);
+        ProjectionColumn projectionColumn = projectionColumns.get(0);
+        Assertions.assertThat(projectionColumn.getColumnName()).isEqualTo("alias");
+        Assertions.assertThat(projectionColumn.getDataType()).isEqualTo(DataTypes.INT());
+        Assertions.assertThat(projectionColumn.getScriptExpression()).isEqualTo("$0");
+    }
+
+    @Test
     public void testTranslateUdfFilterToJaninoExpressionWithColumnNameMap() {
         List<Column> columns =
                 List.of(

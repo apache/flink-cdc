@@ -257,6 +257,9 @@ public class TransformParser {
                         SqlNode visited = super.visit(call);
                         if (visited instanceof SqlBasicCall) {
                             SqlBasicCall basicCall = (SqlBasicCall) visited;
+                            if (basicCall.getOperator().getSyntax().family != SqlSyntax.FUNCTION) {
+                                return visited;
+                            }
                             udfFunctions.stream()
                                     .filter(
                                             udf ->
