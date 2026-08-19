@@ -208,6 +208,139 @@ class YamlPipelineDefinitionParserTest {
     }
 
     @Test
+    void testPythonUdfDefinition() throws Exception {
+        URL resource =
+                Resources.getResource("definitions/pipeline-definition-with-python-udf.yaml");
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+        PipelineDef pipelineDef = parser.parse(new Path(resource.toURI()), new Configuration());
+        assertThat(pipelineDef).isEqualTo(pipelineDefWithPythonUdf);
+    }
+
+    @Test
+    void testPythonUdfRejectsClasspathAndPythonCodeTogether() {
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+        assertThatThrownBy(
+                        () ->
+                                parser.parse(
+                                        buildPipelineDefWithPythonUdf(
+                                                "py_identity",
+                                                "classpath: org.example.MyFunction\n"
+                                                        + "      python-code: |\n"
+                                                        + "        def eval(x: int) -> int:\n"
+                                                        + "          return x\n"
+                                                        + "      python-executable: /usr/bin/python3\n"),
+                                        new Configuration()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage(
+                        "UDF configuration cannot define both \"classpath\" and \"python-code\"");
+    }
+
+    @Test
+    void testPythonUdfRejectsOptionsAlongsidePythonCode() {
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+        assertThatThrownBy(
+                        () ->
+                                parser.parse(
+                                        buildPipelineDefWithPythonUdf(
+                                                "py_identity",
+                                                "python-code: |\n"
+                                                        + "        def eval(x: int) -> int:\n"
+                                                        + "          return x\n"
+                                                        + "      options:\n"
+                                                        + "        cache.enabled: true\n"),
+                                        new Configuration()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage(
+                        "UDF configuration using \"python-code\" cannot define \"options\"; use top-level \"python-executable\" and \"python-files\" instead");
+    }
+
+    @Test
+    void testPythonExecutableRequiresPythonCode() {
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+        assertThatThrownBy(
+                        () ->
+                                parser.parse(
+                                        buildPipelineDefWithPythonUdf(
+                                                "py_identity",
+                                                "python-executable: /usr/bin/python3\n"
+                                                        + "      classpath: org.example.MyFunction\n"),
+                                        new Configuration()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage(
+                        "UDF configuration using \"python-executable\" or \"python-files\" requires \"python-code\"");
+    }
+
+    @Test
+    void testPythonFilesRequiresPythonCode() {
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+        assertThatThrownBy(
+                        () ->
+                                parser.parse(
+                                        buildPipelineDefWithPythonUdf(
+                                                "py_identity",
+                                                "python-files:\n"
+                                                        + "        - /flink/usrlib/deps.zip\n"
+                                                        + "      classpath: org.example.MyFunction\n"),
+                                        new Configuration()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage(
+                        "UDF configuration using \"python-executable\" or \"python-files\" requires \"python-code\"");
+    }
+
+    @Test
+    void testPythonFilesMustUseListSyntax() {
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+        assertThatThrownBy(
+                        () ->
+                                parser.parse(
+                                        buildPipelineDefWithPythonUdf(
+                                                "py_identity",
+                                                "python-code: |\n"
+                                                        + "        def eval(x: int) -> int:\n"
+                                                        + "          return x\n"
+                                                        + "      python-files: /flink/usrlib/deps.zip\n"),
+                                        new Configuration()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage(
+                        "YAML UDF field `python-files` should be a list when used with `python-code`.");
+    }
+
+    @Test
+    void testUdfRequiresClasspathOrPythonCode() {
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+        assertThatThrownBy(
+                        () ->
+                                parser.parse(
+                                        buildPipelineDefWithPythonUdf("py_identity", ""),
+                                        new Configuration()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage(
+                        "Missing required field \"classpath\" or \"python-code\" in UDF configuration");
+    }
+
+    @Test
+    void testPythonUdfRequiresName() {
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+        assertThatThrownBy(
+                        () ->
+                                parser.parse(
+                                        "source:\n"
+                                                + "  type: values\n"
+                                                + "\n"
+                                                + "sink:\n"
+                                                + "  type: values\n"
+                                                + "\n"
+                                                + "pipeline:\n"
+                                                + "  user-defined-function:\n"
+                                                + "    - python-code: |\n"
+                                                + "        def eval(x: int) -> int:\n"
+                                                + "          return x\n",
+                                        new Configuration()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Missing required field \"name\" in UDF configuration");
+    }
+
+    @Test
     void testRouteMode() throws Exception {
         URL resource =
                 Resources.getResource("definitions/pipeline-definition-with-route-mode.yaml");
@@ -899,6 +1032,49 @@ class YamlPipelineDefinitionParserTest {
                                     .put("parallelism", "1")
                                     .build()));
 
+    private final PipelineDef pipelineDefWithPythonUdf =
+            new PipelineDef(
+                    new SourceDef("values", null, new Configuration()),
+                    new SinkDef(
+                            "values",
+                            null,
+                            new Configuration(),
+                            ImmutableSet.of(
+                                    ALTER_TABLE_COMMENT,
+                                    DROP_COLUMN,
+                                    ALTER_COLUMN_TYPE,
+                                    ADD_COLUMN,
+                                    CREATE_TABLE,
+                                    RENAME_COLUMN)),
+                    Collections.emptyList(),
+                    Collections.singletonList(
+                            new TransformDef(
+                                    "mydb.web_order",
+                                    "*, py_identity(id) as py_id",
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                    ",",
+                                    null,
+                                    null)),
+                    Collections.singletonList(
+                            new UdfDef(
+                                    "py_identity",
+                                    "org.apache.flink.cdc.python.PythonUdf",
+                                    ImmutableMap.<String, String>builder()
+                                            .put("source", "def eval(x: int) -> int:\n  return x\n")
+                                            .put("python-executable", "/usr/bin/python3")
+                                            .put(
+                                                    "python-files",
+                                                    "/flink/usrlib/deps.zip,/flink/usrlib/shared")
+                                            .build())),
+                    Collections.emptyList(),
+                    Configuration.fromMap(
+                            ImmutableMap.<String, String>builder()
+                                    .put("parallelism", "1")
+                                    .build()));
+
     private final PipelineDef pipelineDefWithRouteMode =
             new PipelineDef(
                     new SourceDef(
@@ -955,4 +1131,26 @@ class YamlPipelineDefinitionParserTest {
                                     .put("parallelism", "2")
                                     .put("route-mode", "FIRST_MATCH")
                                     .build()));
+
+    private static String buildPipelineDefWithPythonUdf(String name, String udfBody) {
+        return "source:\n"
+                + "  type: values\n"
+                + "\n"
+                + "sink:\n"
+                + "  type: values\n"
+                + "\n"
+                + "transform:\n"
+                + "  - source-table: mydb.web_order\n"
+                + "    projection: \"*, "
+                + name
+                + "(id) as py_id\"\n"
+                + "\n"
+                + "pipeline:\n"
+                + "  parallelism: 1\n"
+                + "  user-defined-function:\n"
+                + "    - name: "
+                + name
+                + "\n"
+                + (udfBody.isEmpty() ? "" : "      " + udfBody);
+    }
 }
