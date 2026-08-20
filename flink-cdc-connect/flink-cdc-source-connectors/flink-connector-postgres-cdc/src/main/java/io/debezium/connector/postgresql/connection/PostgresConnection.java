@@ -709,8 +709,13 @@ public class PostgresConnection extends JdbcConnection {
         // - When querying 'user_sink', the pattern may also match 'userbsink' (due to '_')
         // - When querying 'user%data' (where % is literal), it may match 'user_test_data' (due to
         // '%')
+        // Both the schema name and table name are passed to DatabaseMetaData#getColumns as LIKE
+        // patterns, so wildcards in either may produce columns from other schemas/tables. Verify
+        // both against the requested TableId (skipping the schema check when no schema is given).
+        final String resultSchemaName = columnMetadata.getString(2);
         final String resultTableName = columnMetadata.getString(3);
-        if (!tableId.table().equals(resultTableName)) {
+        if (!tableId.table().equals(resultTableName)
+                || (tableId.schema() != null && !tableId.schema().equals(resultSchemaName))) {
             return Optional.empty();
         }
 
