@@ -488,7 +488,7 @@ class PostTransformOperatorTest {
                 PostTransformOperator.newBuilder()
                         .addTransform(
                                 CUSTOMERS_TABLEID.identifier(),
-                                "*, CAST(IFNULL(1, 0) AS VARCHAR) AS udf_ifnull, "
+                                "*, IFNULL(1, 0) AS udf_ifnull, "
                                         + "TRY_CAST(col1) AS udf_try_cast, "
                                         + "NULLIF('%s', col1) AS udf_nullif",
                                 null)
