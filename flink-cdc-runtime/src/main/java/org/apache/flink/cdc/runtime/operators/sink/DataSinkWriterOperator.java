@@ -210,7 +210,7 @@ public class DataSinkWriterOperator<CommT>
     // ----------------------------- Helper functions -------------------------------
 
     private void handleFlushEvent(FlushEvent event) throws Exception {
-        copySinkWriter.flush(false);
+        flushSinkWriter(event);
         if (event.getSchemaChangeEventType() != SchemaChangeEventType.CREATE_TABLE
                 && event.getSchemaChangeEventType() != SchemaChangeEventType.DROP_TABLE) {
             event.getTableIds().stream()
@@ -229,6 +229,10 @@ public class DataSinkWriterOperator<CommT>
         schemaEvolutionClient.notifyFlushSuccess(
                 getRuntimeContext().getTaskInfo().getIndexOfThisSubtask(),
                 event.getSourceSubTaskId());
+    }
+
+    private void flushSinkWriter(FlushEvent event) throws Exception {
+        FlushEventSinkWriters.flush(copySinkWriter, event);
     }
 
     private void emitLatestSchema(TableId tableId) throws Exception {
