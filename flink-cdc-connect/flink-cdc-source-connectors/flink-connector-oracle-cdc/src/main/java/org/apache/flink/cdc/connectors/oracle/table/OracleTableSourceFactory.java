@@ -33,6 +33,7 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 
 import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.CONNECTION_POOL_SIZE;
@@ -56,7 +57,9 @@ import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_ST
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND;
 import static org.apache.flink.cdc.connectors.base.utils.ObjectUtils.doubleCompare;
+import static org.apache.flink.cdc.connectors.oracle.source.config.OracleSourceConfigFactory.ANALYZE_TABLE_FOR_APPROXIMATE_ROW_COUNT_ENABLED;
 import static org.apache.flink.cdc.connectors.oracle.source.config.OracleSourceOptions.PORT;
+import static org.apache.flink.cdc.connectors.oracle.source.config.OracleSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ANALYZE_TABLE_ENABLED;
 import static org.apache.flink.cdc.connectors.oracle.source.config.OracleSourceOptions.SCHEMA_NAME;
 import static org.apache.flink.cdc.connectors.oracle.source.config.OracleSourceOptions.URL;
 import static org.apache.flink.cdc.debezium.table.DebeziumOptions.getDebeziumProperties;
@@ -117,6 +120,8 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
         boolean scanNewlyAddedTableEnabled = config.get(SCAN_NEWLY_ADDED_TABLE_ENABLED);
         boolean assignUnboundedChunkFirst =
                 config.get(SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED);
+        boolean analyzeTableForApproximateRowCount =
+                config.get(SCAN_INCREMENTAL_SNAPSHOT_ANALYZE_TABLE_ENABLED);
 
         if (enableParallelRead) {
             validateIntegerOption(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE, splitSize, 1);
@@ -130,6 +135,11 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
 
         OptionUtils.printOptions(IDENTIFIER, ((Configuration) config).toMap());
 
+        Properties dbzProperties = getDebeziumProperties(context.getCatalogTable().getOptions());
+        if (!analyzeTableForApproximateRowCount) {
+            dbzProperties.setProperty(ANALYZE_TABLE_FOR_APPROXIMATE_ROW_COUNT_ENABLED, "false");
+        }
+
         return new OracleTableSource(
                 physicalSchema,
                 url,
@@ -140,7 +150,7 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
                 schemaName,
                 username,
                 password,
-                getDebeziumProperties(context.getCatalogTable().getOptions()),
+                dbzProperties,
                 startupOptions,
                 enableParallelRead,
                 splitSize,
@@ -195,6 +205,7 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
         options.add(SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP);
         options.add(SCAN_NEWLY_ADDED_TABLE_ENABLED);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED);
+        options.add(SCAN_INCREMENTAL_SNAPSHOT_ANALYZE_TABLE_ENABLED);
         return options;
     }
 
