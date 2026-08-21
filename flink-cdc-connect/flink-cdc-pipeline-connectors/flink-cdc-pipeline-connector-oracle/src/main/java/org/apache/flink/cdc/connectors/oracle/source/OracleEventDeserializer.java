@@ -144,8 +144,9 @@ public class OracleEventDeserializer extends DebeziumEventDeserializationSchema 
 
     @Override
     protected TableId getTableId(SourceRecord record) {
-        String[] parts = record.topic().split("\\.");
-        return TableId.tableId(parts[1], parts[2]);
+        io.debezium.relational.TableId dbzTableId =
+                org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils.getTableId(record);
+        return TableId.tableId(dbzTableId.catalog(), dbzTableId.schema(), dbzTableId.table());
     }
 
     @Override
