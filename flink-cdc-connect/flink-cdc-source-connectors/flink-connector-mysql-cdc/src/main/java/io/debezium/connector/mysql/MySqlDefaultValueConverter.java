@@ -60,7 +60,7 @@ public class MySqlDefaultValueConverter implements DefaultValueConverter {
             Pattern.compile("([0-9]*-[0-9]*-[0-9]*) ([0-9]*:[0-9]*:[0-9]*(\\.([0-9]*))?)");
 
     private static final Pattern CHARSET_INTRODUCER_PATTERN =
-            Pattern.compile("^_[A-Za-z0-9]+'(.*)'$");
+            Pattern.compile("^_[A-Za-z0-9]+(?:'(.*)'|\"(.*)\")$");
 
     @Immutable
     private static final Set<Integer> TRIM_DATA_TYPES =
@@ -160,6 +160,16 @@ public class MySqlDefaultValueConverter implements DefaultValueConverter {
 
         // strip character set introducer on default value expressions
         value = stripCharacterSetIntroducer(value);
+
+        // A default value like `_utf8mb4' 0 '` will become ` 0 ` after stripping the character
+        // set introducer, i.e. paddings inside the quotes still remain. For numeric / date-like
+        // columns those inner paddings will crash the downstream parsers (NumberFormatException,
+        // DateTimeParseException, etc.). Trim once more here so every downstream `convertToXxx`
+        // gets a clean literal. VARCHAR-like columns keep their original value since they are
+        // filtered out by TRIM_DATA_TYPES.
+        if (TRIM_DATA_TYPES.contains(column.jdbcType())) {
+            value = value.trim();
+        }
 
         // boolean is also INT(1) or TINYINT(1)
         if (NUMBER_DATA_TYPES.contains(column.jdbcType())
@@ -522,6 +532,12 @@ public class MySqlDefaultValueConverter implements DefaultValueConverter {
 
     private String stripCharacterSetIntroducer(String value) {
         final Matcher matcher = CHARSET_INTRODUCER_PATTERN.matcher(value);
-        return !matcher.matches() ? value : matcher.group(1);
+        if (!matcher.matches()) {
+            return value;
+        }
+        // group(1) matches when the literal is wrapped by single quotes,
+        // group(2) matches when it is wrapped by double quotes. Only one of them is non-null.
+        final String singleQuoted = matcher.group(1);
+        return singleQuoted != null ? singleQuoted : matcher.group(2);
     }
 }
