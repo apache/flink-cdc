@@ -21,6 +21,8 @@ import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.udf.UserDefinedFunction;
 
+import java.nio.charset.StandardCharsets;
+
 /** This is an example UDF class for testing purposes only. */
 public class BinaryTypeReturningClass implements UserDefinedFunction {
     @Override
@@ -29,6 +31,6 @@ public class BinaryTypeReturningClass implements UserDefinedFunction {
     }
 
     public byte[] eval() {
-        return "xyzzy".getBytes();
+        return "xyzzy".getBytes(StandardCharsets.UTF_8);
     }
 }

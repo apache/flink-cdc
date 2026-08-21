@@ -54,6 +54,7 @@ import org.junit.jupiter.api.Test;
 import javax.annotation.Nullable;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -1270,6 +1271,6 @@ class SchemaMergingUtilsTest {
     }
 
     private static byte[] binOf(String str) {
-        return str.getBytes();
+        return str.getBytes(StandardCharsets.UTF_8);
     }
 }
