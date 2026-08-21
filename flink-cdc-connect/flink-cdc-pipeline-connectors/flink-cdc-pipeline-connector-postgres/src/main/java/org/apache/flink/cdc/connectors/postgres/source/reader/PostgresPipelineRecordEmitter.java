@@ -94,7 +94,7 @@ public class PostgresPipelineRecordEmitter<T> extends PostgresSourceRecordEmitte
         this.createTableEventCache =
                 ((DebeziumEventDeserializationSchema) debeziumDeserializationSchema)
                         .getCreateTableEventCache();
-        generateCreateTableEvent(sourceConfig);
+        this.createTableEventCache.putAll(generateCreateTableEvent(sourceConfig));
         this.isBounded = StartupOptions.snapshot().equals(sourceConfig.getStartupOptions());
     }
 
@@ -217,7 +217,7 @@ public class PostgresPipelineRecordEmitter<T> extends PostgresSourceRecordEmitte
     private Map<TableId, CreateTableEvent> generateCreateTableEvent(
             PostgresSourceConfig sourceConfig) {
         try (PostgresConnection jdbc = postgresDialect.openJdbcConnection()) {
-            Map<TableId, CreateTableEvent> createTableEventCache = new HashMap<>();
+            Map<TableId, CreateTableEvent> generatedCreateTableEvent = new HashMap<>();
             List<TableId> capturedTableIds =
                     TableDiscoveryUtils.listTables(
                             sourceConfig.getDatabaseList().get(0),
@@ -226,7 +226,7 @@ public class PostgresPipelineRecordEmitter<T> extends PostgresSourceRecordEmitte
                             sourceConfig.includePartitionedTables());
             for (TableId tableId : capturedTableIds) {
                 Schema schema = PostgresSchemaUtils.getTableSchema(tableId, sourceConfig, jdbc);
-                createTableEventCache.put(
+                generatedCreateTableEvent.put(
                         tableId,
                         new CreateTableEvent(
                                 toCdcTableId(
@@ -235,7 +235,7 @@ public class PostgresPipelineRecordEmitter<T> extends PostgresSourceRecordEmitte
                                         includeDatabaseInTableId),
                                 schema));
             }
-            return createTableEventCache;
+            return generatedCreateTableEvent;
         } catch (SQLException e) {
             throw new RuntimeException("Cannot start emitter to fetch table schema.", e);
         }
