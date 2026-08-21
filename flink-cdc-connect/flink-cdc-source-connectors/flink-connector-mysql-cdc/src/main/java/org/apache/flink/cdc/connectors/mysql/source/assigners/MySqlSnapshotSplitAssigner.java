@@ -197,7 +197,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
         if (needToDiscoveryTables()) {
             long start = System.currentTimeMillis();
             LOG.debug("The remainingTables is empty, start to discovery tables");
-            try (JdbcConnection jdbc = DebeziumUtils.openJdbcConnection(sourceConfig)) {
+            try (JdbcConnection jdbc = DebeziumUtils.openSnapshotJdbcConnection(sourceConfig)) {
                 final List<TableId> discoverTables =
                         DebeziumUtils.discoverCapturedTables(jdbc, sourceConfig);
                 this.remainingTables.addAll(discoverTables);
@@ -213,7 +213,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
         // remaining tables, discovery remaining table here
         else if (!isRemainingTablesCheckpointed
                 && !AssignerStatus.isSnapshotAssigningFinished(assignerStatus)) {
-            try (JdbcConnection jdbc = DebeziumUtils.openJdbcConnection(sourceConfig)) {
+            try (JdbcConnection jdbc = DebeziumUtils.openSnapshotJdbcConnection(sourceConfig)) {
                 final List<TableId> discoverTables =
                         DebeziumUtils.discoverCapturedTables(jdbc, sourceConfig);
                 discoverTables.removeAll(alreadyProcessedTables);
@@ -231,7 +231,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
         if (sourceConfig.isScanNewlyAddedTableEnabled()
                 && !sourceConfig.getStartupOptions().isSnapshotOnly()) {
             // check whether we got newly added tables
-            try (JdbcConnection jdbc = DebeziumUtils.openJdbcConnection(sourceConfig)) {
+            try (JdbcConnection jdbc = DebeziumUtils.openSnapshotJdbcConnection(sourceConfig)) {
                 final List<TableId> currentCapturedTables =
                         DebeziumUtils.discoverCapturedTables(jdbc, sourceConfig);
                 final Set<TableId> previousCapturedTables = new HashSet<>();
