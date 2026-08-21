@@ -29,6 +29,7 @@ import org.apache.flink.cdc.connectors.base.source.meta.split.SchemalessSnapshot
 import org.apache.flink.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.metrics.SourceEnumeratorMetrics;
+import org.apache.flink.cdc.connectors.base.source.reader.IncrementalSourceReader;
 import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.Preconditions;
 
@@ -72,7 +73,21 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
 
     private final List<TableId> alreadyProcessedTables;
     private final List<SchemalessSnapshotSplit> remainingSplits;
-    private final Map<String, SchemalessSnapshotSplit> assignedSplits;
+
+    /**
+     * The splits that have been assigned to a reader. Once a split is finished, it remains in this
+     * map. An entry added to {@link #splitFinishedOffsets} indicates that the split has been
+     * finished. If reading the split fails, it is removed from this map.
+     *
+     * <p>{@link IncrementalSourceReader} relies on the order of elements within the map:
+     *
+     * <ol>
+     *   <li>It must correspond to the order of assignment of the splits to readers.
+     *   <li>The order must be retained across job restarts.
+     * </ol>
+     */
+    private final LinkedHashMap<String, SchemalessSnapshotSplit> assignedSplits;
+
     private final Map<TableId, TableChanges.TableChange> tableSchemas;
     private final Map<String, Offset> splitFinishedOffsets;
 
@@ -152,7 +167,7 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
             int currentParallelism,
             List<TableId> alreadyProcessedTables,
             List<SchemalessSnapshotSplit> remainingSplits,
-            Map<String, SchemalessSnapshotSplit> assignedSplits,
+            LinkedHashMap<String, SchemalessSnapshotSplit> assignedSplits,
             Map<TableId, TableChanges.TableChange> tableSchemas,
             Map<String, Offset> splitFinishedOffsets,
             AssignerStatus assignerStatus,
@@ -167,17 +182,7 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
         this.currentParallelism = currentParallelism;
         this.alreadyProcessedTables = alreadyProcessedTables;
         this.remainingSplits = remainingSplits;
-        // When job restore from savepoint, sort the existing tables and newly added tables
-        // to let enumerator only send newly added tables' StreamSplitMetaEvent
-        this.assignedSplits =
-                assignedSplits.entrySet().stream()
-                        .sorted(Map.Entry.comparingByKey())
-                        .collect(
-                                Collectors.toMap(
-                                        Map.Entry::getKey,
-                                        Map.Entry::getValue,
-                                        (o, o2) -> o,
-                                        LinkedHashMap::new));
+        this.assignedSplits = assignedSplits;
         this.tableSchemas = tableSchemas;
         this.splitFinishedOffsets = splitFinishedOffsets;
         this.assignerStatus = assignerStatus;
