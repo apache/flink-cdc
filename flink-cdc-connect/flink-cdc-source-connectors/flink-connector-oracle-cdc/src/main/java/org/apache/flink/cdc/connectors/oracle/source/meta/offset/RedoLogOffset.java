@@ -35,6 +35,7 @@ public class RedoLogOffset extends Offset {
     public static final String SCN_KEY = "scn";
     public static final String COMMIT_SCN_KEY = "commit_scn";
     public static final String LCR_POSITION_KEY = "lcr_position";
+    public static final String STARTUP_TIMESTAMP_MILLIS_KEY = "startup_timestamp_millis";
 
     public static final RedoLogOffset INITIAL_OFFSET = new RedoLogOffset(0L);
     public static final RedoLogOffset NO_STOPPING_OFFSET = new RedoLogOffset(Long.MIN_VALUE);
@@ -44,14 +45,25 @@ public class RedoLogOffset extends Offset {
     }
 
     public RedoLogOffset(Long scn) {
-        this(scn, 0L, null);
+        this(scn, 0L, null, null);
     }
 
     public RedoLogOffset(Long scn, Long commitScn, @Nullable String lcrPosition) {
+        this(scn, commitScn, lcrPosition, null);
+    }
+
+    public RedoLogOffset(
+            Long scn,
+            Long commitScn,
+            @Nullable String lcrPosition,
+            @Nullable Long startupTimestampMillis) {
         Map<String, String> offsetMap = new HashMap<>();
         offsetMap.put(SCN_KEY, String.valueOf(scn));
         offsetMap.put(COMMIT_SCN_KEY, String.valueOf(commitScn));
         offsetMap.put(LCR_POSITION_KEY, lcrPosition);
+        if (startupTimestampMillis != null) {
+            offsetMap.put(STARTUP_TIMESTAMP_MILLIS_KEY, String.valueOf(startupTimestampMillis));
+        }
         this.offset = offsetMap;
     }
 
@@ -65,6 +77,12 @@ public class RedoLogOffset extends Offset {
 
     public String getLcrPosition() {
         return offset.get(LCR_POSITION_KEY);
+    }
+
+    @Nullable
+    public Long getStartupTimestampMillis() {
+        String timestampMillis = offset.get(STARTUP_TIMESTAMP_MILLIS_KEY);
+        return timestampMillis == null ? null : Long.valueOf(timestampMillis);
     }
 
     @Override
