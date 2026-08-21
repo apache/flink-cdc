@@ -205,6 +205,29 @@ class SchemaUtilsTest {
     }
 
     @Test
+    void testApplyAddColumnEventWithCaseInsensitiveExistingColumnName() {
+        TableId tableId = TableId.parse("gc_fps_receivable.billstat");
+        Schema schema =
+                Schema.newBuilder().physicalColumn("changetype", DataTypes.STRING()).build();
+
+        List<AddColumnEvent.ColumnWithPosition> addedColumns = new ArrayList<>();
+        addedColumns.add(
+                new AddColumnEvent.ColumnWithPosition(
+                        Column.physicalColumn("origintypecode", DataTypes.STRING()),
+                        AddColumnEvent.ColumnPosition.AFTER,
+                        "ChangeType"));
+        AddColumnEvent addColumnEvent = new AddColumnEvent(tableId, addedColumns);
+
+        schema = SchemaUtils.applySchemaChangeEvent(schema, addColumnEvent);
+        Assertions.assertThat(schema)
+                .isEqualTo(
+                        Schema.newBuilder()
+                                .physicalColumn("changetype", DataTypes.STRING())
+                                .physicalColumn("origintypecode", DataTypes.STRING())
+                                .build());
+    }
+
+    @Test
     void testGetNumericPrecision() {
         Assertions.assertThat(SchemaUtils.getNumericPrecision(DataTypes.TINYINT())).isEqualTo(3);
         Assertions.assertThat(SchemaUtils.getNumericPrecision(DataTypes.SMALLINT())).isEqualTo(5);
