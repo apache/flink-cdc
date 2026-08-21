@@ -19,6 +19,7 @@ package org.apache.flink.cdc.runtime.partitioning;
 
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
+import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
@@ -72,7 +73,13 @@ public class DistributedPrePartitionOperator
     @Override
     public void processElement(StreamRecord<Event> element) throws Exception {
         Event event = element.getValue();
-        if (event instanceof SchemaChangeEvent) {
+        if (event instanceof DropTableEvent) {
+            TableId tableId = ((DropTableEvent) event).tableId();
+            schemaMap.remove(tableId);
+            hashFunctionMap.remove(tableId);
+            // DropTableEvent ends the table lifecycle and no longer has a latest schema.
+            broadcastEvent(event);
+        } else if (event instanceof SchemaChangeEvent) {
             SchemaChangeEvent schemaChangeEvent = (SchemaChangeEvent) event;
             TableId tableId = schemaChangeEvent.tableId();
 

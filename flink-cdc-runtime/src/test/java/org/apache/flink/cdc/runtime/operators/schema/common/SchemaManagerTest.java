@@ -21,6 +21,7 @@ import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
+import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Column;
@@ -70,6 +71,27 @@ class SchemaManagerTest {
                                 schemaManager.applyEvolvedSchemaChange(
                                         new CreateTableEvent(CUSTOMERS, CUSTOMERS_SCHEMA)))
                 .doesNotThrowAnyException();
+    }
+
+    @Test
+    void testHandlingDropTableEvent() {
+        SchemaManager schemaManager = new SchemaManager();
+        schemaManager.applyOriginalSchemaChange(new CreateTableEvent(CUSTOMERS, CUSTOMERS_SCHEMA));
+        schemaManager.applyEvolvedSchemaChange(new CreateTableEvent(CUSTOMERS, CUSTOMERS_SCHEMA));
+
+        schemaManager.applyOriginalSchemaChange(new DropTableEvent(CUSTOMERS));
+        schemaManager.applyEvolvedSchemaChange(new DropTableEvent(CUSTOMERS));
+
+        assertThat(schemaManager.getLatestOriginalSchema(CUSTOMERS)).isEmpty();
+        assertThat(schemaManager.getLatestEvolvedSchema(CUSTOMERS)).isEmpty();
+
+        schemaManager.applyOriginalSchemaChange(new CreateTableEvent(CUSTOMERS, PRODUCTS_SCHEMA));
+        schemaManager.applyEvolvedSchemaChange(new CreateTableEvent(CUSTOMERS, PRODUCTS_SCHEMA));
+
+        assertThat(schemaManager.getLatestOriginalSchema(CUSTOMERS)).contains(PRODUCTS_SCHEMA);
+        assertThat(schemaManager.getLatestEvolvedSchema(CUSTOMERS)).contains(PRODUCTS_SCHEMA);
+        assertThat(schemaManager.getOriginalSchema(CUSTOMERS, 0)).isEqualTo(PRODUCTS_SCHEMA);
+        assertThat(schemaManager.getEvolvedSchema(CUSTOMERS, 0)).isEqualTo(PRODUCTS_SCHEMA);
     }
 
     @Test
