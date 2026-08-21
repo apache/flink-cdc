@@ -30,7 +30,13 @@ class AiFunctionE2eITCase extends PipelineTestEnvironment {
 
     private static final String TABLE_1 = "default_namespace.default_schema.table1";
     private static final String TABLE_2 = "default_namespace.default_schema.table2";
-    private static final String DUMMY_JSON = "{\"result\":\"dummy response\"}";
+    private static final String DUMMY_TEXT_RESULTS =
+            "{\"category\":\"dummy\",\"confidence\":1}, "
+                    + "{\"detected_language\":\"en\",\"translated_text\":\"dummy translation\"}, "
+                    + "{\"summary\":\"dummy summary\"}, "
+                    + "{\"confidence\":1,\"label\":\"neutral\",\"score\":0}, "
+                    + "{\"extracted_json\":{\"name\":\"dummy\"}}, "
+                    + "{\"detected_entities\":\"name\",\"masked_text\":\"d***y\"}";
     private static final String DUMMY_EMBEDDING = "[3.0, 1.0, 4.0, 1.0, 5.0, 9.0, 2.0, 6.0]";
 
     @Test
@@ -47,7 +53,7 @@ class AiFunctionE2eITCase extends PipelineTestEnvironment {
                         + "  - source-table: "
                         + TABLE_1
                         + "\n"
-                        + "    projection: col1, AI_COMPLETE('myModel', col1, 'Complete it') AS completed\n"
+                        + "    projection: col1, AI_CLASSIFY('myModel', col1, 'a,b') AS classified, AI_TRANSLATE('myModel', col1, 'auto', 'en') AS translated, AI_SUMMARIZE('myModel', col1, 100) AS summarized, AI_SENTIMENT('myModel', col1) AS sentiment, AI_EXTRACT('myModel', col1, 'name:string') AS extracted, AI_MASK('myModel', col1, 'name') AS masked\n"
                         + "  - source-table: "
                         + TABLE_2
                         + "\n"
@@ -70,33 +76,33 @@ class AiFunctionE2eITCase extends PipelineTestEnvironment {
         validateResult(
                 "CreateTableEvent{tableId="
                         + TABLE_1
-                        + ", schema=columns={`col1` STRING NOT NULL,`completed` VARIANT}, primaryKeys=col1, options=()}",
+                        + ", schema=columns={`col1` STRING NOT NULL,`classified` VARIANT,`translated` VARIANT,`summarized` VARIANT,`sentiment` VARIANT,`extracted` VARIANT,`masked` VARIANT}, primaryKeys=col1, options=()}",
                 "DataChangeEvent{tableId="
                         + TABLE_1
                         + ", before=[], after=[1, "
-                        + DUMMY_JSON
+                        + DUMMY_TEXT_RESULTS
                         + "], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId="
                         + TABLE_1
                         + ", before=[], after=[2, "
-                        + DUMMY_JSON
+                        + DUMMY_TEXT_RESULTS
                         + "], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId="
                         + TABLE_1
                         + ", before=[], after=[3, "
-                        + DUMMY_JSON
+                        + DUMMY_TEXT_RESULTS
                         + "], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId="
                         + TABLE_1
                         + ", before=[1, "
-                        + DUMMY_JSON
+                        + DUMMY_TEXT_RESULTS
                         + "], after=[], op=DELETE, meta=()}",
                 "DataChangeEvent{tableId="
                         + TABLE_1
                         + ", before=[2, "
-                        + DUMMY_JSON
+                        + DUMMY_TEXT_RESULTS
                         + "], after=[2, "
-                        + DUMMY_JSON
+                        + DUMMY_TEXT_RESULTS
                         + "], op=UPDATE, meta=()}");
 
         validateResult(
