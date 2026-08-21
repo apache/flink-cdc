@@ -75,6 +75,8 @@ public class Db2SourceConfigFactory extends JdbcSourceConfigFactory {
                 throw new UnsupportedOperationException();
         }
 
+        props.setProperty("snapshot.fetch.size", String.valueOf(fetchSize));
+
         if (dbzProperties != null) {
             props.putAll(dbzProperties);
         }
