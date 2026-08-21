@@ -599,6 +599,7 @@ class MongoDBFullChangelogITCase extends MongoDBSourceTestBase {
                                 + " database_name STRING METADATA VIRTUAL,"
                                 + " collection_name STRING METADATA VIRTUAL,"
                                 + " row_kind STRING METADATA VIRTUAL,"
+                                + " full_document STRING METADATA FROM 'full_document' VIRTUAL,"
                                 + " primary key (_id) not enforced"
                                 + ") WITH ("
                                 + " 'connector' = 'mongodb-cdc',"
@@ -653,7 +654,7 @@ class MongoDBFullChangelogITCase extends MongoDBSourceTestBase {
         TableResult tableResult =
                 tEnv.executeSql(
                         "select database_name, collection_name, row_kind, "
-                                + "cid, name, address, phone_number from customers");
+                                + "cid, name, address, phone_number, full_document from customers");
         CloseableIterator<Row> iterator = tableResult.collect();
         JobID jobId = tableResult.getJobClient().get().getJobID();
         List<String> expectedSnapshotData = new ArrayList<>();
@@ -661,8 +662,24 @@ class MongoDBFullChangelogITCase extends MongoDBSourceTestBase {
             expectedSnapshotData.addAll(snapshotForSingleTable);
         }
 
-        assertEqualsInAnyOrder(
-                expectedSnapshotData, fetchRows(iterator, expectedSnapshotData.size()));
+        List<String> rawSnapshotData = fetchRows(iterator, expectedSnapshotData.size());
+
+        // Strip full_document (last column) for precise matching of other metadata columns
+        List<String> snapshotWithoutFullDoc =
+                rawSnapshotData.stream()
+                        .map(MongoDBFullChangelogITCase::stripLastColumn)
+                        .collect(Collectors.toList());
+        assertEqualsInAnyOrder(expectedSnapshotData, snapshotWithoutFullDoc);
+
+        // Verify full_document is non-null and contains expected fields in snapshot records
+        for (String row : rawSnapshotData) {
+            Assertions.assertThat(row)
+                    .as("Snapshot full_document should contain 'cid'")
+                    .contains("\"cid\"");
+            Assertions.assertThat(row)
+                    .as("Snapshot full_document should contain 'name'")
+                    .contains("\"name\"");
+        }
 
         // second step: check the change stream data
         for (String collectionName : captureCustomerCollections) {
@@ -693,9 +710,48 @@ class MongoDBFullChangelogITCase extends MongoDBSourceTestBase {
         for (int i = 0; i < captureCustomerCollections.length; i++) {
             expectedChangeStreamData.addAll(changeEventsForSingleTable);
         }
-        List<String> actualChangeStreamData = fetchRows(iterator, expectedChangeStreamData.size());
-        assertEqualsInAnyOrder(expectedChangeStreamData, actualChangeStreamData);
+        List<String> rawChangeStreamData = fetchRows(iterator, expectedChangeStreamData.size());
+
+        // Strip full_document for precise matching of other metadata columns
+        List<String> changeStreamWithoutFullDoc =
+                rawChangeStreamData.stream()
+                        .map(MongoDBFullChangelogITCase::stripLastColumn)
+                        .collect(Collectors.toList());
+        assertEqualsInAnyOrder(expectedChangeStreamData, changeStreamWithoutFullDoc);
+
+        // Verify full_document in change stream: non-null for +I/+U, null for -D
+        for (String row : rawChangeStreamData) {
+            if (row.startsWith("+I") || row.startsWith("+U")) {
+                Assertions.assertThat(row)
+                        .as("Change stream full_document should contain 'name'")
+                        .contains("\"name\"");
+            }
+            if (row.startsWith("-D")) {
+                Assertions.assertThat(row)
+                        .as("Delete event full_document should be null")
+                        .endsWith(", null]");
+            }
+        }
+
         tableResult.getJobClient().get().cancel().get();
+    }
+
+    /**
+     * Strip the last column (full_document) from a Row.toString() formatted string. Row format:
+     * "+I[col1, col2, ..., colN, full_document_json]" or "+I[col1, col2, ..., colN, null]".
+     */
+    private static String stripLastColumn(String row) {
+        // Find the last ", " before the full_document column value
+        // The full_document is a JSON string starting with {"  or null
+        int lastJsonStart = row.lastIndexOf(", {\"");
+        if (lastJsonStart > 0) {
+            return row.substring(0, lastJsonStart) + "]";
+        }
+        int lastNullStart = row.lastIndexOf(", null]");
+        if (lastNullStart > 0) {
+            return row.substring(0, lastNullStart) + "]";
+        }
+        return row;
     }
 
     private void testMongoDBParallelSource(
