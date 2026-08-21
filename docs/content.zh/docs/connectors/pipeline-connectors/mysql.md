@@ -294,6 +294,17 @@ pipeline:
       </td>
     </tr>
     <tr>
+      <td>scan.binlog.skip-unsubscribed-tables.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+       在增量解析阶段，是否跳过未订阅表的增量数据（binlog）反序列化。<br>
+        建议在订阅部分表的场景下选择开启，能过滤非订阅表的增量数据解析，提升解析性能。<br>
+        这是一项实验性功能，默认关闭。
+      </td>
+    </tr>
+    <tr>
       <td>scan.parse.online.schema.changes.enabled</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>
