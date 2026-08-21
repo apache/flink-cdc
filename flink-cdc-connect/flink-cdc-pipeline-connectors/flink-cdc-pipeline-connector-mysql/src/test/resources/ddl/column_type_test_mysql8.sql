@@ -208,3 +208,28 @@ VALUES (DEFAULT,
         '[{"key1":"value1","key2":{"key2_1":"value2_1","key2_2":"value2_2"},"key3":["value3"],"key4":["value4_1","value4_2"]},{"key5":"value5"}]',
         1
         );
+
+-- All ZEROFILL types without the UNSIGNED keyword. MySQL binlog preserves the original DDL
+-- text, so these type names reach MySqlTypeUtils as e.g. "INT ZEROFILL" during schema change
+-- parsing.
+CREATE TABLE zerofill_types
+(
+    id                       SERIAL,
+    tiny_z_c                 TINYINT ZEROFILL,
+    small_z_c                SMALLINT ZEROFILL,
+    medium_z_c               MEDIUMINT ZEROFILL,
+    int_z_c                  INT ZEROFILL,
+    integer_z_c              INTEGER ZEROFILL,
+    big_z_c                  BIGINT ZEROFILL,
+    real_z_c                 REAL ZEROFILL,
+    float_z_c                FLOAT ZEROFILL,
+    double_z_c               DOUBLE ZEROFILL,
+    double_precision_z_c     DOUBLE PRECISION ZEROFILL,
+    numeric_z_c              NUMERIC(8, 3) ZEROFILL,
+    fixed_z_c                FIXED(8, 3) ZEROFILL,
+    decimal_z_c              DECIMAL(8, 3) ZEROFILL,
+    PRIMARY KEY (id)
+) DEFAULT CHARSET=utf8;
+
+INSERT INTO zerofill_types
+VALUES (DEFAULT, 1, 2, 3, 4, 5, 6, 7.5, 8.5, 9.5, 10.5, 11.5, 12.5, 13.5);
