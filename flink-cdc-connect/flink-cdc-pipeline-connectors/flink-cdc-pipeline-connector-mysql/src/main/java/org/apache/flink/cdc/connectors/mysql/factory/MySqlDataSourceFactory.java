@@ -224,6 +224,18 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
 
         List<TableId> tableIds = MySqlSchemaUtils.listTables(configFactory.createConfig(0), null);
 
+        Selectors tableSelectors = new Selectors.SelectorsBuilder().includeTables(tables).build();
+        List<String> capturedTables = getTableList(tableIds, tableSelectors);
+        boolean hasIncludedTables = !capturedTables.isEmpty();
+        if (tablesExclude != null) {
+            Selectors selectExclude =
+                    new Selectors.SelectorsBuilder().includeTables(tablesExclude).build();
+            List<String> excludeTables = getTableList(tableIds, selectExclude);
+            if (!excludeTables.isEmpty()) {
+                capturedTables.removeAll(excludeTables);
+            }
+        }
+
         if (scanBinlogNewlyAddedTableEnabled && scanNewlyAddedTableEnabled) {
             throw new IllegalArgumentException(
                     "If both scan.binlog.newly-added-table.enabled and scan.newly-added-table.enabled are true, data maybe duplicate after restore");
@@ -235,24 +247,14 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
             configFactory.excludeTableList(tablesExclude);
 
         } else {
-            Selectors selectors = new Selectors.SelectorsBuilder().includeTables(tables).build();
-            List<String> capturedTables = getTableList(tableIds, selectors);
-            if (capturedTables.isEmpty()) {
+            if (!hasIncludedTables) {
                 throw new IllegalArgumentException(
                         "Cannot find any table by the option 'tables' = " + tables);
             }
-            if (tablesExclude != null) {
-                Selectors selectExclude =
-                        new Selectors.SelectorsBuilder().includeTables(tablesExclude).build();
-                List<String> excludeTables = getTableList(tableIds, selectExclude);
-                if (!excludeTables.isEmpty()) {
-                    capturedTables.removeAll(excludeTables);
-                }
-                if (capturedTables.isEmpty()) {
-                    throw new IllegalArgumentException(
-                            "Cannot find any table with by the option 'tables.exclude'  = "
-                                    + tablesExclude);
-                }
+            if (capturedTables.isEmpty()) {
+                throw new IllegalArgumentException(
+                        "Cannot find any table with by the option 'tables.exclude'  = "
+                                + tablesExclude);
             }
             configFactory.tableList(capturedTables.toArray(new String[0]));
         }
@@ -266,9 +268,9 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
                 if (splits.length == 2) {
                     Selectors chunkKeySelector =
                             new Selectors.SelectorsBuilder().includeTables(splits[0]).build();
-                    List<ObjectPath> tableList =
+                    List<ObjectPath> chunkKeyTables =
                             getChunkKeyColumnTableList(tableIds, chunkKeySelector);
-                    for (ObjectPath table : tableList) {
+                    for (ObjectPath table : chunkKeyTables) {
                         chunkKeyColumnMap.put(table, splits[1]);
                     }
                 } else {
@@ -286,7 +288,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         }
         String metadataList = config.get(METADATA_LIST);
         List<MySqlReadableMetadata> readableMetadataList = listReadableMetadata(metadataList);
-        return new MySqlDataSource(configFactory, readableMetadataList);
+        return new MySqlDataSource(configFactory, readableMetadataList, capturedTables);
     }
 
     private List<MySqlReadableMetadata> listReadableMetadata(String metadataList) {
