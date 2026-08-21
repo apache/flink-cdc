@@ -20,6 +20,7 @@ package org.apache.flink.cdc.connectors.mysql.source.config;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory;
 import org.apache.flink.cdc.connectors.mysql.source.MySqlSource;
+import org.apache.flink.cdc.connectors.mysql.source.offset.GtidStrategies;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
 import org.apache.flink.table.catalog.ObjectPath;
 
@@ -78,6 +79,7 @@ public class MySqlSourceConfigFactory implements Serializable {
     private boolean treatTinyInt1AsBoolean = true;
     private boolean useLegacyJsonFormat = true;
     private boolean assignUnboundedChunkFirst = false;
+    private String dialect = GtidStrategies.AUTO;
 
     public MySqlSourceConfigFactory hostname(String hostname) {
         this.hostname = hostname;
@@ -332,6 +334,11 @@ public class MySqlSourceConfigFactory implements Serializable {
         return this;
     }
 
+    public MySqlSourceConfigFactory dialect(String dialect) {
+        this.dialect = dialect;
+        return this;
+    }
+
     /**
      * Whether to assign the unbounded chunks first during snapshot reading phase. Defaults to
      * false.
@@ -355,6 +362,12 @@ public class MySqlSourceConfigFactory implements Serializable {
     /** Creates a new {@link MySqlSourceConfig} for the given subtask {@code subtaskId}. */
     public MySqlSourceConfig createConfig(int subtaskId, String serverName) {
         checkSupportCheckpointsAfterTasksFinished(closeIdleReaders);
+        if (!GtidStrategies.isSupportedDialect(dialect)) {
+            throw new IllegalArgumentException(
+                    String.format(
+                            "Invalid value for 'dialect'. Supported dialects are: [mysql, mariadb, auto], but was: %s",
+                            dialect));
+        }
         Properties props = new Properties();
         props.setProperty("database.server.name", serverName);
         props.setProperty("database.hostname", checkNotNull(hostname));
@@ -444,6 +457,7 @@ public class MySqlSourceConfigFactory implements Serializable {
                 parseOnLineSchemaChanges,
                 treatTinyInt1AsBoolean,
                 useLegacyJsonFormat,
-                assignUnboundedChunkFirst);
+                assignUnboundedChunkFirst,
+                dialect);
     }
 }

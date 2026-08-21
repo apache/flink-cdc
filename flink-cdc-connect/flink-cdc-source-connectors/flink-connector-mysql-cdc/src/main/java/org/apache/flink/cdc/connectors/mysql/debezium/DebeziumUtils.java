@@ -20,6 +20,10 @@ package org.apache.flink.cdc.connectors.mysql.debezium;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.connection.JdbcConnectionFactory;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
+import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffsetBuilder;
+import org.apache.flink.cdc.connectors.mysql.source.offset.GtidStrategies;
+import org.apache.flink.cdc.connectors.mysql.source.offset.MariaDbGtidStrategy;
+import org.apache.flink.cdc.connectors.mysql.source.offset.MysqlGtidStrategy;
 import org.apache.flink.cdc.connectors.mysql.source.utils.TableDiscoveryUtils;
 import org.apache.flink.util.FlinkRuntimeException;
 
@@ -43,6 +47,7 @@ import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
 import io.debezium.schema.TopicSelector;
 import io.debezium.util.SchemaNameAdjuster;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -102,6 +107,20 @@ public class DebeziumUtils {
                 connectorConfig.password());
     }
 
+    public static BinaryLogClient createBinaryClient(
+            Configuration dbzConfiguration, String dialect) {
+        if (MysqlGtidStrategy.DIALECT.equalsIgnoreCase(dialect)) {
+            return createBinaryClient(dbzConfiguration);
+        }
+
+        final MySqlConnectorConfig connectorConfig = new MySqlConnectorConfig(dbzConfiguration);
+        return new MariaDBBinaryLogClient(
+                connectorConfig.hostname(),
+                connectorConfig.port(),
+                connectorConfig.username(),
+                connectorConfig.password());
+    }
+
     /** Creates a new {@link MySqlDatabaseSchema} to monitor the latest MySql database schemas. */
     public static MySqlDatabaseSchema createMySqlDatabaseSchema(
             MySqlConnectorConfig dbzMySqlConfig, boolean isTableIdCaseSensitive) {
@@ -114,6 +133,45 @@ public class DebeziumUtils {
                 topicSelector,
                 schemaNameAdjuster,
                 isTableIdCaseSensitive);
+    }
+
+    /**
+     * Fetch the current binlog offset, dialect-aware. For MariaDB the GTID set is read from
+     * {@code @@gtid_binlog_pos}. For MySQL the behavior is identical to {@link
+     * #currentBinlogOffset(MySqlConnection)}
+     */
+    public static BinlogOffset currentBinlogOffset(MySqlConnection jdbc, String resolvedDialect) {
+        if (!MariaDbGtidStrategy.DIALECT.equalsIgnoreCase(resolvedDialect)) {
+            return currentBinlogOffset(jdbc);
+        }
+
+        final String showMasterStmt = "Show MASTER STATUS";
+        try {
+            BinlogOffsetBuilder builder =
+                    jdbc.queryAndMap(
+                            showMasterStmt,
+                            rs -> {
+                                if (rs.next()) {
+                                    return BinlogOffset.builder()
+                                            .setBinlogFilePosition(rs.getString(1), rs.getLong(2));
+                                }
+                                throw new FlinkRuntimeException(
+                                        "Cannot read MariaDB binlog filename/position via '"
+                                                + showMasterStmt
+                                                + "'. Make sure your server is correctly configured.");
+                            });
+            String gtidSet =
+                    jdbc.queryAndMap(
+                            "SELECT @@gtid_binlog_pos", rs -> rs.next() ? rs.getString(1) : null);
+            if (StringUtils.isNotBlank(gtidSet)) {
+                builder.setGtidSet(gtidSet);
+            }
+
+            return builder.build();
+        } catch (SQLException e) {
+            throw new FlinkRuntimeException(
+                    "Cannot read MariaDB binlog offset via '" + showMasterStmt + "'.");
+        }
     }
 
     /** Fetch current binlog offsets in MySql Server. */
@@ -146,6 +204,29 @@ public class DebeziumUtils {
                             + "'. Make sure your server is correctly configured",
                     e);
         }
+    }
+
+    /**
+     * Resolves the effective dialect for a server: returns the pinned value verbatim when
+     * "configuredDialect" is "mysql"/"mariadb",otherwise run "SELECT VERSION()".
+     */
+    public static String discoverDialect(JdbcConnection jdbc, String configuredDialect) {
+        if (MysqlGtidStrategy.DIALECT.equalsIgnoreCase(configuredDialect)
+                || MariaDbGtidStrategy.DIALECT.equalsIgnoreCase(configuredDialect)) {
+            return GtidStrategies.resolveDialect(configuredDialect, null);
+        }
+
+        String versionText = null;
+        try {
+            versionText =
+                    jdbc.queryAndMap("SELECT VERSION()", rs -> rs.next() ? rs.getString(1) : "");
+        } catch (SQLException e) {
+            LOG.warn(
+                    "Failed to run SELECT VERSION() for dialect auto-detect; "
+                            + "falling back to mysql.",
+                    e);
+        }
+        return GtidStrategies.resolveDialect(configuredDialect, versionText);
     }
 
     /** Create a TableFilter by database name and table name. */
