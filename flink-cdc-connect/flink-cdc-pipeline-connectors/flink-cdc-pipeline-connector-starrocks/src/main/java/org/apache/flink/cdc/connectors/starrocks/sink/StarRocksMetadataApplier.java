@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.starrocks.sink;
 
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
+import org.apache.flink.cdc.common.event.AlterTableCommentEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.DropTableEvent;
@@ -29,6 +30,7 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.event.visitor.SchemaChangeEventVisitor;
 import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
+import org.apache.flink.cdc.common.exceptions.UnsupportedSchemaChangeEventException;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.common.types.DataType;
@@ -93,7 +95,8 @@ public class StarRocksMetadataApplier implements MetadataApplier {
                 SchemaChangeEventType.RENAME_COLUMN,
                 SchemaChangeEventType.ALTER_COLUMN_TYPE,
                 SchemaChangeEventType.DROP_TABLE,
-                SchemaChangeEventType.TRUNCATE_TABLE);
+                SchemaChangeEventType.TRUNCATE_TABLE,
+                SchemaChangeEventType.ALTER_TABLE_COMMENT);
     }
 
     @Override
@@ -113,14 +116,7 @@ public class StarRocksMetadataApplier implements MetadataApplier {
                 this::applyDropTable,
                 this::applyRenameColumn,
                 this::applyTruncateTable,
-                alterTableCommentEvent -> {
-                    // TODO Currently, table comments cannot be modified.
-                    // See
-                    // https://docs.starrocks.io/docs/sql-reference/sql-statements/table_bucket_part_index/ALTER_TABLE/#alter-table-comment-from-v31
-                    LOG.warn(
-                            "AlterTableCommentEvent is not supported by StarRocks connector yet. Event: {}",
-                            alterTableCommentEvent);
-                });
+                this::applyAlterTableComment);
     }
 
     private void applyCreateTable(CreateTableEvent createTableEvent) throws SchemaEvolveException {
@@ -331,6 +327,22 @@ public class StarRocksMetadataApplier implements MetadataApplier {
             }
         } catch (Exception e) {
             throw new SchemaEvolveException(event, "fail to apply alter column type event", e);
+        }
+    }
+
+    private void applyAlterTableComment(AlterTableCommentEvent event) throws SchemaEvolveException {
+        try {
+            if (!catalog.supportsAlterTableComment()) {
+                throw new UnsupportedSchemaChangeEventException(
+                        event, "Alter table comment requires StarRocks 3.1 or later.");
+            }
+            TableId tableId = event.tableId();
+            catalog.alterTableComment(
+                    tableId.getSchemaName(), tableId.getTableName(), event.getComment());
+        } catch (UnsupportedSchemaChangeEventException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new SchemaEvolveException(event, "fail to apply alter table comment event", e);
         }
     }
 
