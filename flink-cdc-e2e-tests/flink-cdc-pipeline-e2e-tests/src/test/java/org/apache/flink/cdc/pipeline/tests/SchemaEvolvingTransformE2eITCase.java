@@ -101,7 +101,9 @@ class SchemaEvolvingTransformE2eITCase extends PipelineTestEnvironment {
                 Arrays.asList(
                         "An exception was triggered from Schema change applying task. Job will fail now.",
                         "org.apache.flink.util.FlinkRuntimeException: Failed to apply schema change event.",
-                        "Caused by: org.apache.flink.cdc.common.exceptions.UnsupportedSchemaChangeEventException",
+                        // No "Caused by: " prefix: the coordinator failure crosses the RPC boundary
+                        // as a SerializedThrowable, so the cause-chain rendering varies.
+                        "org.apache.flink.cdc.common.exceptions.UnsupportedSchemaChangeEventException",
                         "org.apache.flink.runtime.JobException: Recovery is suppressed by NoRestartBackoffTimeStrategy"));
     }
 

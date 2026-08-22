@@ -40,6 +40,7 @@ import org.apache.flink.runtime.operators.coordination.OperatorCoordinator;
 import org.apache.flink.runtime.operators.coordination.OperatorEvent;
 import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.FlinkRuntimeException;
+import org.apache.flink.util.SerializedThrowable;
 import org.apache.flink.util.function.ThrowingRunnable;
 
 import org.slf4j.Logger;
@@ -352,9 +353,10 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
                         // if we have a JVM critical error, promote it immediately, there is a good
                         // chance the logging or job failing will not succeed anymore
                         ExceptionUtils.rethrowIfFatalErrorOrOOM(t);
-                        handleUnrecoverableError(
-                                String.format(actionName, actionNameFormatParameters), t);
-                        context.failJob(t);
+                        // Route through failJob so the exception is wrapped into a
+                        // SerializedThrowable before crossing the operator-coordinator RPC
+                        // boundary (see failJob for the rationale).
+                        failJob(String.format(actionName, actionNameFormatParameters), t);
                     }
                 });
     }
@@ -393,8 +395,20 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
     protected <T extends Throwable> void failJob(String taskDescription, T t) {
         ExceptionUtils.rethrowIfFatalErrorOrOOM(t);
         LOG.error("An exception was triggered from {}. Job will fail now.", taskDescription, t);
-        handleUnrecoverableError(taskDescription, t);
-        context.failJob(t);
+        // Wrap into a SerializedThrowable before it crosses the operator-coordinator / failover
+        // RPC boundary. Otherwise an exception whose class only lives in the user classloader
+        // (e.g. com.mysql.cj.exceptions.ConnectionIsClosedException surfaced during table
+        // discovery / schema coordination) fails to deserialize on the receiving side, where
+        // flink-rpc-akka uses an isolated classloader, with ClassNotFoundException. The
+        // coordination response is then never delivered, so the SchemaOperator request stalls
+        // until rpcTimeout and fails with a misleading TimeoutException that hides the real
+        // cause and turns a transient error into a restart loop.
+        SerializedThrowable serialized =
+                (t instanceof SerializedThrowable)
+                        ? (SerializedThrowable) t
+                        : new SerializedThrowable(t);
+        handleUnrecoverableError(taskDescription, serialized);
+        context.failJob(serialized);
     }
 
     // ------------------------
