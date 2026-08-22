@@ -87,6 +87,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 import static java.lang.String.format;
@@ -571,7 +572,9 @@ class MySqlSourceReaderTest extends MySqlSourceTestBase {
                                 new MySqlSourceReaderMetrics(readerContext.metricGroup()),
                                 configuration.isIncludeSchemaChanges(),
                                 configuration.isIncludeHeartbeatEvents(),
-                                configuration.isIncludeTransactionMetadataEvents());
+                                configuration.isIncludeTransactionMetadataEvents(),
+                                new AtomicReference<>(),
+                                -1L);
         final MySqlSourceReaderContext mySqlSourceReaderContext =
                 new MySqlSourceReaderContext(readerContext);
         return new MySqlSourceReader<>(
@@ -586,7 +589,8 @@ class MySqlSourceReaderTest extends MySqlSourceTestBase {
             MySqlSourceConfig configuration,
             MySqlSourceReaderContext readerContext,
             SnapshotPhaseHooks snapshotHooks) {
-        return new MySqlSplitReader(configuration, 0, readerContext, snapshotHooks);
+        return new MySqlSplitReader(
+                configuration, 0, readerContext, snapshotHooks, new AtomicReference<>());
     }
 
     private void makeBinlogEventsInOneTransaction(MySqlSourceConfig sourceConfig, String tableId)
@@ -742,7 +746,9 @@ class MySqlSourceReaderTest extends MySqlSourceTestBase {
                     sourceReaderMetrics,
                     includeSchemaChanges,
                     false,
-                    false);
+                    false,
+                    new AtomicReference<>(),
+                    -1L);
             this.debeziumDeserializationSchema = debeziumDeserializationSchema;
             this.sourceReaderMetrics = sourceReaderMetrics;
             this.includeSchemaChanges = includeSchemaChanges;

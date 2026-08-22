@@ -22,6 +22,7 @@ import org.apache.flink.cdc.connectors.mysql.debezium.reader.DebeziumReader;
 import org.apache.flink.cdc.connectors.mysql.debezium.reader.SnapshotSplitReader;
 import org.apache.flink.cdc.connectors.mysql.source.MySqlSource;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
+import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlRecords;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
@@ -44,6 +45,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.apache.flink.cdc.connectors.mysql.source.assigners.MySqlBinlogSplitAssigner.BINLOG_SPLIT_ID;
 
@@ -59,6 +61,9 @@ public class MySqlSplitReader implements SplitReader<SourceRecords, MySqlSplit> 
 
     private final SnapshotPhaseHooks snapshotHooks;
 
+    /** Shared reference for the latest master binlog offset, written by BinlogSplitReader. */
+    private final AtomicReference<BinlogOffset> latestMasterOffset;
+
     @Nullable private String currentSplitId;
     @Nullable private DebeziumReader<SourceRecords, MySqlSplit> currentReader;
     @Nullable private SnapshotSplitReader reusedSnapshotReader;
@@ -68,13 +73,15 @@ public class MySqlSplitReader implements SplitReader<SourceRecords, MySqlSplit> 
             MySqlSourceConfig sourceConfig,
             int subtaskId,
             MySqlSourceReaderContext context,
-            SnapshotPhaseHooks snapshotHooks) {
+            SnapshotPhaseHooks snapshotHooks,
+            AtomicReference<BinlogOffset> latestMasterOffset) {
         this.sourceConfig = sourceConfig;
         this.subtaskId = subtaskId;
         this.snapshotSplits = new ArrayDeque<>();
         this.binlogSplits = new ArrayDeque<>(1);
         this.context = context;
         this.snapshotHooks = snapshotHooks;
+        this.latestMasterOffset = latestMasterOffset;
     }
 
     @Override
@@ -232,7 +239,7 @@ public class MySqlSplitReader implements SplitReader<SourceRecords, MySqlSplit> 
 
     private BinlogSplitReader getBinlogSplitReader() {
         if (reusedBinlogReader == null) {
-            reusedBinlogReader = new BinlogSplitReader(sourceConfig, subtaskId);
+            reusedBinlogReader = new BinlogSplitReader(sourceConfig, subtaskId, latestMasterOffset);
         }
         return reusedBinlogReader;
     }
