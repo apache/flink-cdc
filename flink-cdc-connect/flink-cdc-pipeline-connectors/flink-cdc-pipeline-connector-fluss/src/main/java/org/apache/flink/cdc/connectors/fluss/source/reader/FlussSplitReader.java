@@ -139,11 +139,6 @@ public class FlussSplitReader implements SplitReader<FlussSourceRecord, FlussSpl
                                 new FlussSourceRecord(
                                         record, getPartitionKeyNames(record.getTablePath())));
 
-                        // Track offset and timestamp for metrics
-                        long offset = record.logOffset();
-                        if (offset >= 0) {
-                            sourceReaderMetrics.recordCurrentOffset(bucket, offset);
-                        }
                         maxRecordTimestamp = Math.max(maxRecordTimestamp, record.timestamp());
                     }
                 }
@@ -314,9 +309,6 @@ public class FlussSplitReader implements SplitReader<FlussSourceRecord, FlussSpl
         TableBucket tableBucket = split.getTableBucket();
 
         getOrCreateTable(tablePath);
-
-        // Register metrics for this bucket
-        sourceReaderMetrics.registerTableBucket(tableBucket);
 
         MultiTableLogScanner scanner = getOrCreateTableLogScanner();
 

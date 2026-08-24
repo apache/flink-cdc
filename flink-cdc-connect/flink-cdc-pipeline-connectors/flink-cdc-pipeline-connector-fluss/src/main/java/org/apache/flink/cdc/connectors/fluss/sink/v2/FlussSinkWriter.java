@@ -70,7 +70,7 @@ public class FlussSinkWriter<InputT> implements SinkWriter<InputT> {
     }
 
     public void initialize(SinkWriterMetricGroup metricGroup) throws IOException {
-        LOG.info("Opening Fluss with config {}", flussConfig);
+        LOG.info("Opening Fluss sink writer.");
         this.metricGroup = metricGroup;
         flinkMetricRegistry =
                 new WrapperFlussMetricRegistry(
@@ -109,7 +109,6 @@ public class FlussSinkWriter<InputT> implements SinkWriter<InputT> {
                     continue;
                 }
                 MultiTableWriteRecord writeRecord = toWriteRecord(opType, tablePath, row, schemaId);
-                LOG.info("------writeRecord  " + writeRecord);
                 CompletableFuture<?> writeFuture = multiTableWriter.write(writeRecord);
                 writeFuture.whenComplete(
                         (ignored, throwable) -> {

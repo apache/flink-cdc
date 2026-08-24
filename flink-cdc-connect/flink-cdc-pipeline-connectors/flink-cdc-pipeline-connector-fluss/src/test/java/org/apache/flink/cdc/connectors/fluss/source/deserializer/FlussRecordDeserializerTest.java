@@ -288,6 +288,43 @@ class FlussRecordDeserializerTest {
     }
 
     @Test
+    void testOlderSchemaRecordAfterSchemaEvolutionIsProjectedToLatestSchema() {
+        RowType schema1 =
+                rowType(field("id", new IntType(false), 1), field("name", new StringType(true), 2));
+        RowType schema2 =
+                rowType(
+                        field("id", new IntType(false), 1),
+                        field("name", new StringType(true), 2),
+                        field("age", new IntType(true), 3));
+
+        List<Event> schema1Events =
+                deserializer.deserialize(
+                        logRecord(1, schema1, GenericRow.of(1, BinaryString.fromString("Alice"))),
+                        TABLE_PATH);
+        assertThat(schema1Events).hasSize(2);
+        assertThat(schema1Events.get(0)).isInstanceOf(CreateTableEvent.class);
+
+        List<Event> schema2Events =
+                deserializer.deserialize(
+                        logRecord(2, schema2, GenericRow.of(2, BinaryString.fromString("Bob"), 30)),
+                        TABLE_PATH);
+        assertThat(schema2Events).hasSize(2);
+        assertThat(schema2Events.get(0)).isInstanceOf(AddColumnEvent.class);
+
+        List<Event> olderSchemaEvents =
+                deserializer.deserialize(
+                        logRecord(1, schema1, GenericRow.of(3, BinaryString.fromString("Carol"))),
+                        TABLE_PATH);
+
+        assertThat(olderSchemaEvents).singleElement().isInstanceOf(DataChangeEvent.class);
+        RecordData after = ((DataChangeEvent) olderSchemaEvents.get(0)).after();
+        assertThat(after.getArity()).isEqualTo(3);
+        assertThat(after.getInt(0)).isEqualTo(3);
+        assertThat(after.getString(1).toString()).isEqualTo("Carol");
+        assertThat(after.isNullAt(2)).isTrue();
+    }
+
+    @Test
     void testAddMultipleColumnsAtLast() {
         RowType oldRt = rowType(field("id", new IntType(false), 1));
         RowType newRt =

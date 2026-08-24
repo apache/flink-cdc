@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.fluss.sink.v2.metrics;
 
+import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.metrics.MetricGroup;
 
 import org.apache.fluss.metrics.CharacterFilter;
@@ -70,9 +71,18 @@ public class WrapperFlussMetricRegistry implements MetricRegistry {
 
     public WrapperFlussMetricRegistry(
             MetricGroup flinkOperatorMetricGroup, Set<String> exposedMetricNames) {
+        this(flinkOperatorMetricGroup, exposedMetricNames, null);
+    }
+
+    @VisibleForTesting
+    WrapperFlussMetricRegistry(
+            MetricGroup flinkOperatorMetricGroup,
+            Set<String> exposedMetricNames,
+            ScheduledExecutorService viewUpdaterScheduledExecutor) {
         this.metricGroupForFluss = flinkOperatorMetricGroup.addGroup(FLUSS_GROUP_NAME);
         this.metrics = new HashMap<>();
         this.exposedMetricNames = exposedMetricNames;
+        this.viewUpdaterScheduledExecutor = viewUpdaterScheduledExecutor;
     }
 
     @Override
@@ -155,9 +165,11 @@ public class WrapperFlussMetricRegistry implements MetricRegistry {
                 return;
             }
             if (metricViewUpdater == null) {
-                viewUpdaterScheduledExecutor =
-                        Executors.newSingleThreadScheduledExecutor(
-                                new ExecutorThreadFactory("fluss-metric-view-updater"));
+                if (viewUpdaterScheduledExecutor == null) {
+                    viewUpdaterScheduledExecutor =
+                            Executors.newSingleThreadScheduledExecutor(
+                                    new ExecutorThreadFactory("fluss-metric-view-updater"));
+                }
                 metricViewUpdater = new MetricViewUpdater(viewUpdaterScheduledExecutor);
             }
             metricViewUpdater.notifyOfAddedView((MetricView) metric);

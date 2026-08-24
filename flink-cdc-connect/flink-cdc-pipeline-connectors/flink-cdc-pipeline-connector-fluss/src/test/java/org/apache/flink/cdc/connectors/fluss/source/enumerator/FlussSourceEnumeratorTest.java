@@ -21,12 +21,14 @@ import org.apache.flink.api.connector.source.ReaderInfo;
 import org.apache.flink.api.connector.source.SplitsAssignment;
 import org.apache.flink.api.connector.source.mocks.MockSplitEnumeratorContext;
 import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.source.discover.TableDiscoverer;
 import org.apache.flink.cdc.connectors.fluss.source.discover.FlussDefaultDiscoverer;
 import org.apache.flink.cdc.connectors.fluss.source.discover.FlussSubscriberTableDiscoverer;
 import org.apache.flink.cdc.connectors.fluss.source.split.FlussSplitBase;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableEnvironment;
+import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.fluss.client.Connection;
 import org.apache.fluss.client.ConnectionFactory;
@@ -49,6 +51,7 @@ import java.util.stream.Collectors;
 import static org.apache.fluss.config.ConfigOptions.BOOTSTRAP_SERVERS;
 import static org.apache.fluss.server.testutils.FlussClusterExtension.BUILTIN_DATABASE;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Unit tests for {@link FlussSourceEnumerator} focusing on dynamic table discovery via both {@link
@@ -223,6 +226,121 @@ class FlussSourceEnumeratorTest {
         }
     }
 
+    @Test
+    void testDiscoveryFailsWhenTableDiscoveryFails() throws Throwable {
+        RuntimeException discoveryFailure =
+                new RuntimeException("Injected table discovery failure");
+        TableDiscoverer failingDiscoverer =
+                new TableDiscoverer() {
+                    @Override
+                    public void open(Context context) {}
+
+                    @Override
+                    public Set<TableId> discover() {
+                        throw discoveryFailure;
+                    }
+
+                    @Override
+                    public void close() {}
+                };
+
+        try (MockSplitEnumeratorContext<FlussSplitBase> context =
+                new MockSplitEnumeratorContext<>(NUM_READERS)) {
+            FlussSourceEnumerator enumerator =
+                    newEnumerator(
+                            context, failingDiscoverer, null, OffsetsInitializer.earliest(), 0L);
+            try {
+                enumerator.start();
+                registerAllReaders(context, enumerator);
+
+                assertThatThrownBy(context::runNextOneTimeCallable)
+                        .isInstanceOf(FlinkRuntimeException.class)
+                        .hasMessage("Failed to discover subscribed table-buckets.")
+                        .hasRootCauseMessage("Injected table discovery failure");
+                assertThat(context.getSplitsAssignmentSequence()).isEmpty();
+            } finally {
+                enumerator.close();
+            }
+        }
+    }
+
+    @Test
+    void testDiscoveryFailsWhenOffsetInitializationFails() throws Throwable {
+        String tableName = "offset_failure";
+        createPkTable(tableName);
+
+        RuntimeException offsetFailure =
+                new RuntimeException("Injected offset initialization failure");
+        OffsetsInitializer failingOffsetsInitializer =
+                (partitionName, bucketIds, retriever) -> {
+                    throw offsetFailure;
+                };
+
+        try (MockSplitEnumeratorContext<FlussSplitBase> context =
+                new MockSplitEnumeratorContext<>(NUM_READERS)) {
+            FlussSourceEnumerator enumerator =
+                    newEnumerator(
+                            context,
+                            new FlussDefaultDiscoverer(),
+                            fqnRegex(DATABASE_NAME, tableName),
+                            failingOffsetsInitializer,
+                            0L);
+            try {
+                enumerator.start();
+                registerAllReaders(context, enumerator);
+
+                context.runNextOneTimeCallable();
+                assertThat(context.getOneTimeCallables()).hasSize(1);
+
+                assertThatThrownBy(context::runNextOneTimeCallable)
+                        .isInstanceOf(FlinkRuntimeException.class)
+                        .hasMessage("Failed to initialize splits for new table-buckets.")
+                        .hasRootCauseMessage("Injected offset initialization failure");
+                assertThat(context.getSplitsAssignmentSequence()).isEmpty();
+            } finally {
+                enumerator.close();
+            }
+        }
+    }
+
+    @Test
+    void testDiscoveryFailsWhenOffsetInitializationIsIncomplete() throws Throwable {
+        String tableName = "incomplete_offsets";
+        createPkTable(tableName);
+
+        OffsetsInitializer incompleteOffsetsInitializer =
+                (partitionName, bucketIds, retriever) -> java.util.Collections.emptyMap();
+
+        try (MockSplitEnumeratorContext<FlussSplitBase> context =
+                new MockSplitEnumeratorContext<>(NUM_READERS)) {
+            FlussSourceEnumerator enumerator =
+                    newEnumerator(
+                            context,
+                            new FlussDefaultDiscoverer(),
+                            fqnRegex(DATABASE_NAME, tableName),
+                            incompleteOffsetsInitializer,
+                            0L);
+            try {
+                enumerator.start();
+                registerAllReaders(context, enumerator);
+
+                context.runNextOneTimeCallable();
+                assertThat(context.getOneTimeCallables()).hasSize(1);
+
+                assertThatThrownBy(context::runNextOneTimeCallable)
+                        .isInstanceOf(FlinkRuntimeException.class)
+                        .hasMessage("Failed to initialize splits for new table-buckets.")
+                        .rootCause()
+                        .isInstanceOf(IllegalStateException.class)
+                        .hasMessageContaining(
+                                "Offsets initializer did not return offsets for buckets");
+                assertThat(context.getSplitsAssignmentSequence()).isEmpty();
+            } finally {
+                enumerator.close();
+            }
+        }
+    }
+
     // =====================================================================
     //  FlussTableSubscriber tests — subscription-table driven add/remove
     // =====================================================================
@@ -363,6 +481,16 @@ class FlussSourceEnumeratorTest {
             MockSplitEnumeratorContext<FlussSplitBase> context,
             TableDiscoverer discoverer,
             String pattern) {
+        return newEnumerator(
+                context, discoverer, pattern, OffsetsInitializer.earliest(), DISCOVERY_INTERVAL_MS);
+    }
+
+    private FlussSourceEnumerator newEnumerator(
+            MockSplitEnumeratorContext<FlussSplitBase> context,
+            TableDiscoverer discoverer,
+            String pattern,
+            OffsetsInitializer offsetsInitializer,
+            long discoveryIntervalMs) {
         org.apache.fluss.config.Configuration flussConfig =
                 FLUSS_CLUSTER_EXTENSION.getClientConfig();
         Configuration sourceConfig = buildSourceConfig(flussConfig, pattern);
@@ -371,8 +499,8 @@ class FlussSourceEnumeratorTest {
                 discoverer,
                 flussConfig,
                 sourceConfig,
-                OffsetsInitializer.earliest(),
-                DISCOVERY_INTERVAL_MS,
+                offsetsInitializer,
+                discoveryIntervalMs,
                 new HashSet<>());
     }
 

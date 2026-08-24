@@ -33,6 +33,7 @@ limitations under the License.
 
 
     <properties>
+        <!-- Target the upcoming Fluss 1.0 release and use its public Apache snapshot until then. -->
         <fluss.version>1.0-SNAPSHOT</fluss.version>
     </properties>
 

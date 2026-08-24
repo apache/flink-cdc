@@ -134,7 +134,7 @@ public class FlussDefaultDiscoverer implements TableDiscoverer {
                 }
             }
         }
-        LOG.info(
+        LOG.debug(
                 "FlussDefaultDiscoverer discovered {} tables with pattern '{}'.",
                 matched.size(),
                 pattern);

@@ -95,8 +95,9 @@ public class FlussRecordDeserializer implements FlussDeserializer<Event> {
         List<Event> events = new ArrayList<>();
         TableId tableId = TableId.tableId(tablePath.getDatabaseName(), tablePath.getTableName());
         RowType rowType = record.getRowType();
+        int schemaId = record.getScanRecord().getSchemaId();
 
-        boolean isSchemaChangeEvent = inferSchemaChangeEvent(events, record, tablePath, tableId);
+        inferSchemaChangeEvents(events, record, tablePath, tableId, schemaId);
         InternalRow row = record.getScanRecord().getRow();
         ChangeType changeType = record.getScanRecord().getChangeType();
 
@@ -105,8 +106,7 @@ public class FlussRecordDeserializer implements FlussDeserializer<Event> {
             case INSERT:
                 {
                     RecordData after =
-                            convertFlussRowToCdcRecord(
-                                    tablePath, row, rowType, isSchemaChangeEvent);
+                            convertFlussRowToCdcRecord(tablePath, row, rowType, schemaId);
                     events.add(DataChangeEvent.insertEvent(tableId, after));
                     break;
                 }
@@ -117,16 +117,14 @@ public class FlussRecordDeserializer implements FlussDeserializer<Event> {
             case UPDATE_AFTER:
                 {
                     RecordData after =
-                            convertFlussRowToCdcRecord(
-                                    tablePath, row, rowType, isSchemaChangeEvent);
+                            convertFlussRowToCdcRecord(tablePath, row, rowType, schemaId);
                     events.add(DataChangeEvent.replaceEvent(tableId, after));
                     break;
                 }
             case DELETE:
                 {
                     RecordData before =
-                            convertFlussRowToCdcRecord(
-                                    tablePath, row, rowType, isSchemaChangeEvent);
+                            convertFlussRowToCdcRecord(tablePath, row, rowType, schemaId);
                     events.add(DataChangeEvent.deleteEvent(tableId, before));
                     break;
                 }
@@ -136,15 +134,14 @@ public class FlussRecordDeserializer implements FlussDeserializer<Event> {
         return events;
     }
 
-    private boolean inferSchemaChangeEvent(
-            List<Event> events, FlussSourceRecord record, TablePath tablePath, TableId tableId) {
-        // Detect schema changes for log records (schemaId >= 0).
-        // Snapshot records have schemaId = -1 and are skipped.
-        boolean inferSchemaChangeEvent = false;
-        int schemaId = record.getScanRecord().getSchemaId();
+    private void inferSchemaChangeEvents(
+            List<Event> events,
+            FlussSourceRecord record,
+            TablePath tablePath,
+            TableId tableId,
+            int schemaId) {
+        // Detect schema changes using the schema ID carried by each source record.
         RowType rowType = record.getRowType();
-        org.apache.flink.cdc.common.types.RowType cdcRowType =
-                (org.apache.flink.cdc.common.types.RowType) FlussConversions.toCdcType(rowType);
         if (schemaId >= 0) {
             ensureCacheInitialized();
             RowType restoredRowType = restoredCreateTableRowTypeCache.remove(tablePath);
@@ -171,31 +168,33 @@ public class FlussRecordDeserializer implements FlussDeserializer<Event> {
                                             record.getPartitionKeyNames())));
                 } else {
                     // SchemaId changed — infer and emit schema change events
-                    inferSchemaChangeEvent = true;
                     RowType oldRowType = latestRowTypeCache.get(tablePath);
                     events.addAll(inferSchemaChanges(tableId, tablePath, oldRowType, rowType));
                 }
                 latestSchemaIdCache.put(tablePath, schemaId);
                 latestRowTypeCache.put(tablePath, rowType);
+                org.apache.flink.cdc.common.types.RowType cdcRowType =
+                        (org.apache.flink.cdc.common.types.RowType)
+                                FlussConversions.toCdcType(rowType);
                 latestRecordDataGeneratorCache.put(
                         tablePath, new BinaryRecordDataGenerator(cdcRowType));
                 latestFieldConverterCache.put(tablePath, createFieldConverters(rowType));
             }
         }
-        return inferSchemaChangeEvent;
     }
 
     private RecordData convertFlussRowToCdcRecord(
             TablePath tablePath,
             InternalRow initialRow,
             RowType initialRowType,
-            boolean isSchemaChangeEvent) {
+            int initialSchemaId) {
         RowType latestRowType = latestRowTypeCache.get(tablePath);
         InternalRow row = initialRow;
 
-        // A reader maybe subscribe multiple split, thus only inferred by the latest schema(also the
-        // widest)
-        if (isSchemaChangeEvent) {
+        // Records emitted by FlussSplitReader always carry a valid schema ID. Compare IDs to avoid
+        // traversing the RowType on every record.
+        int latestSchemaId = latestSchemaIdCache.get(tablePath);
+        if (initialSchemaId != latestSchemaId) {
             org.apache.fluss.metadata.Schema latestSchema =
                     org.apache.fluss.metadata.Schema.newBuilder()
                             .fromRowType(latestRowType)

@@ -28,6 +28,7 @@ import org.apache.flink.cdc.connectors.fluss.source.discover.FlussDefaultDiscove
 import org.apache.flink.cdc.connectors.fluss.source.split.FlussHybridSnapshotLogSplit;
 import org.apache.flink.cdc.connectors.fluss.source.split.FlussLogSplit;
 import org.apache.flink.cdc.connectors.fluss.source.split.FlussSplitBase;
+import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.fluss.client.Connection;
 import org.apache.fluss.client.ConnectionFactory;
@@ -139,7 +140,6 @@ public class FlussSourceEnumerator
 
     @Override
     public void start() {
-        LOG.info("Starting Fluss source enumerator.");
         connection = ConnectionFactory.createConnection(flussConfig);
         admin = connection.getAdmin();
 
@@ -154,7 +154,7 @@ public class FlussSourceEnumerator
 
         if (scanDiscoveryIntervalMs > 0) {
             LOG.info(
-                    "Starting the FlussSourceEnumerator with discovery interval of {} ms.",
+                    "Starting Fluss source enumerator with a discovery interval of {} ms.",
                     scanDiscoveryIntervalMs);
             context.callAsync(
                     this::getSubscribedTableBuckets,
@@ -162,7 +162,7 @@ public class FlussSourceEnumerator
                     0,
                     scanDiscoveryIntervalMs);
         } else {
-            LOG.info("Starting the FlussSourceEnumerator without discovery.");
+            LOG.info("Starting Fluss source enumerator without periodic discovery.");
             context.callAsync(this::getSubscribedTableBuckets, this::checkTableBucketChanges);
         }
     }
@@ -228,8 +228,7 @@ public class FlussSourceEnumerator
      */
     private void checkTableBucketChanges(List<TableBucketInfo> allBuckets, Throwable error) {
         if (error != null) {
-            LOG.error("Error discovering subscribed table-buckets", error);
-            return;
+            throw new FlinkRuntimeException("Failed to discover subscribed table-buckets.", error);
         }
 
         List<TableBucketInfo> newBuckets = new ArrayList<>();
@@ -336,12 +335,18 @@ public class FlussSourceEnumerator
             OptionalLong snapshotId = kvSnapshots.getSnapshotId(bucketId);
             if (snapshotId.isPresent()) {
                 OptionalLong logOffset = kvSnapshots.getLogOffset(bucketId);
+                if (!logOffset.isPresent()) {
+                    throw new IllegalStateException(
+                            String.format(
+                                    "Missing log offset for snapshot %d of table-bucket %s.",
+                                    snapshotId.getAsLong(), info.tableBucket));
+                }
                 splits.add(
                         new FlussHybridSnapshotLogSplit(
                                 info.physicalTablePath,
                                 info.tableBucket,
                                 snapshotId.getAsLong(),
-                                logOffset.orElse(0L)));
+                                logOffset.getAsLong()));
             } else {
                 bucketsNeedInitOffset.add(bucketId);
             }
@@ -353,9 +358,10 @@ public class FlussSourceEnumerator
             Map<Integer, Long> bucketOffsets =
                     offsetsInitializer.getBucketOffsets(
                             partitionName, bucketsNeedInitOffset, retriever);
+            validateBucketOffsets(tablePath, partitionName, bucketsNeedInitOffset, bucketOffsets);
             for (TableBucketInfo info : bucketInfos) {
                 int bucketId = info.tableBucket.getBucket();
-                if (bucketOffsets.containsKey(bucketId)) {
+                if (bucketsNeedInitOffset.contains(bucketId)) {
                     splits.add(
                             new FlussLogSplit(
                                     info.physicalTablePath,
@@ -382,12 +388,35 @@ public class FlussSourceEnumerator
 
         Map<Integer, Long> bucketOffsets =
                 offsetsInitializer.getBucketOffsets(partitionName, bucketIds, retriever);
+        validateBucketOffsets(tablePath, partitionName, bucketIds, bucketOffsets);
 
         for (TableBucketInfo info : bucketInfos) {
-            long offset = bucketOffsets.getOrDefault(info.tableBucket.getBucket(), 0L);
+            long offset = bucketOffsets.get(info.tableBucket.getBucket());
             splits.add(new FlussLogSplit(info.physicalTablePath, info.tableBucket, offset));
         }
         return splits;
+    }
+
+    private static void validateBucketOffsets(
+            TablePath tablePath,
+            @Nullable String partitionName,
+            Collection<Integer> expectedBucketIds,
+            @Nullable Map<Integer, Long> bucketOffsets) {
+        List<Integer> missingBucketIds =
+                expectedBucketIds.stream()
+                        .filter(
+                                bucketId ->
+                                        bucketOffsets == null
+                                                || bucketOffsets.get(bucketId) == null)
+                        .collect(Collectors.toList());
+        if (!missingBucketIds.isEmpty()) {
+            throw new IllegalStateException(
+                    String.format(
+                            "Offsets initializer did not return offsets for buckets %s of table %s%s.",
+                            missingBucketIds,
+                            tablePath,
+                            partitionName == null ? "" : ", partition " + partitionName));
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -400,13 +429,12 @@ public class FlussSourceEnumerator
      */
     private void handleTableBucketChanges(List<FlussSplitBase> newSplits, Throwable error) {
         if (error != null) {
-            LOG.error("Error creating splits for new table-buckets", error);
-            return;
+            throw new FlinkRuntimeException(
+                    "Failed to initialize splits for new table-buckets.", error);
         }
 
         if (newSplits.isEmpty()) {
-            LOG.info("No new splits to assign.");
-            return;
+            throw new FlinkRuntimeException("No splits were created for discovered table-buckets.");
         }
 
         addPartitionSplitChangeToPendingAssignments(newSplits);
@@ -454,7 +482,10 @@ public class FlussSourceEnumerator
         }
 
         if (!incrementalAssignment.isEmpty()) {
-            LOG.info("Assigning splits to readers {}", incrementalAssignment);
+            int splitCount = incrementalAssignment.values().stream().mapToInt(List::size).sum();
+            LOG.info(
+                    "Assigning {} splits to {} readers.", splitCount, incrementalAssignment.size());
+            LOG.debug("Split assignment: {}", incrementalAssignment);
             context.assignSplits(new SplitsAssignment<>(incrementalAssignment));
         }
     }
