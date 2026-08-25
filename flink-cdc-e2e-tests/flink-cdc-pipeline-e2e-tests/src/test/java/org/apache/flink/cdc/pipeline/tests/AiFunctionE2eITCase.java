@@ -53,7 +53,13 @@ class AiFunctionE2eITCase extends PipelineTestEnvironment {
                         + "  - source-table: "
                         + TABLE_1
                         + "\n"
-                        + "    projection: col1, AI_CLASSIFY('myModel', col1, 'a,b') AS classified, AI_TRANSLATE('myModel', col1, 'auto', 'en') AS translated, AI_SUMMARIZE('myModel', col1, 100) AS summarized, AI_SENTIMENT('myModel', col1) AS sentiment, AI_EXTRACT('myModel', col1, 'name:string') AS extracted, AI_MASK('myModel', col1, 'name') AS masked\n"
+                        + "    projection: col1, "
+                        + "AI_CLASSIFY('myModel', col1, 'a,b') AS classified, "
+                        + "AI_TRANSLATE('myModel', col1, 'auto', 'en') AS translated, "
+                        + "AI_SUMMARIZE('myModel', col1, 100) AS summarized, "
+                        + "AI_SENTIMENT('myModel', col1) AS sentiment, "
+                        + "AI_EXTRACT('myModel', col1, 'name:string') AS extracted, "
+                        + "AI_MASK('myModel', col1, 'name') AS masked\n"
                         + "  - source-table: "
                         + TABLE_2
                         + "\n"

@@ -961,13 +961,7 @@ public class TransformParser {
                 if (call.operandCount() == 0) {
                     return;
                 }
-                SqlNode modelArgument = call.operand(0);
-                Preconditions.checkArgument(
-                        modelArgument instanceof SqlCharStringLiteral,
-                        "The model argument of %s must be a string constant, but was %s.",
-                        call.getOperator().getName(),
-                        modelArgument);
-                String modelName = ((SqlCharStringLiteral) modelArgument).getNlsString().getValue();
+                String modelName = resolveAiModelName(call);
                 Preconditions.checkArgument(
                         declaredModelNames.contains(modelName),
                         "Model '%s' referenced by %s has not been declared.",
@@ -997,13 +991,7 @@ public class TransformParser {
             if (isAiFunction(functionName)
                     && !isUserDefinedFunction(functionName, userDefinedFunctionNames)
                     && call.operandCount() > 0) {
-                SqlNode modelArgument = call.operand(0);
-                Preconditions.checkArgument(
-                        modelArgument instanceof SqlCharStringLiteral,
-                        "The model argument of %s must be a string constant, but was %s.",
-                        functionName,
-                        modelArgument);
-                String modelName = ((SqlCharStringLiteral) modelArgument).getNlsString().getValue();
+                String modelName = resolveAiModelName(call);
                 AiModelClient modelClient = modelClients.get(modelName);
                 Preconditions.checkArgument(
                         modelClient != null,
@@ -1034,6 +1022,16 @@ public class TransformParser {
                 validateAiModelCapabilities(child, modelClients, userDefinedFunctionNames);
             }
         }
+    }
+
+    private static String resolveAiModelName(SqlCall call) {
+        SqlNode modelArgument = call.operand(0);
+        Preconditions.checkArgument(
+                modelArgument instanceof SqlCharStringLiteral,
+                "The model argument of %s must be a string constant, but was %s.",
+                call.getOperator().getName(),
+                modelArgument);
+        return ((SqlCharStringLiteral) modelArgument).getNlsString().getValue();
     }
 
     private static boolean isUserDefinedFunction(

@@ -131,7 +131,20 @@ class AiFunctionsTest {
 
         assertThatThrownBy(() -> AiFunctions.aiClassify(model, "input", "positive,negative"))
                 .isInstanceOf(RuntimeException.class)
-                .hasMessage("AI function AI_CLASSIFY returned invalid JSON.");
+                .hasMessage("AI function AI_CLASSIFY returned invalid JSON: not-json");
+    }
+
+    @Test
+    void testInvalidJsonResponseIsTruncated() {
+        String longInvalidJson = "x".repeat(600);
+        TestModelClient model = new TestModelClient(longInvalidJson);
+
+        assertThatThrownBy(() -> AiFunctions.aiClassify(model, "input", "positive,negative"))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessage(
+                        "AI function AI_CLASSIFY returned invalid JSON: "
+                                + "x".repeat(512)
+                                + "... (truncated)");
     }
 
     @Test

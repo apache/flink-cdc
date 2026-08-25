@@ -33,6 +33,8 @@ import java.util.List;
 /** Built-in AI functions available to transform expressions. */
 public class AiFunctions {
 
+    private static final int MAX_INVALID_JSON_RESPONSE_LENGTH = 512;
+
     private AiFunctions() {}
 
     public static BinaryVariant aiComplete(AiModelClient model, String input, String systemPrompt) {
@@ -89,7 +91,11 @@ public class AiFunctions {
             return BinaryVariantInternalBuilder.parseJson(json, false);
         } catch (IOException e) {
             throw new RuntimeException(
-                    "AI function " + function.getFunctionName() + " returned invalid JSON.", e);
+                    "AI function "
+                            + function.getFunctionName()
+                            + " returned invalid JSON: "
+                            + truncateInvalidJsonResponse(json),
+                    e);
         }
     }
 
@@ -103,6 +109,13 @@ public class AiFunctions {
         }
         float[] embedding = ((SupportsEmbedding) model).embed(input);
         return embedding == null ? null : Floats.asList(embedding);
+    }
+
+    private static String truncateInvalidJsonResponse(String response) {
+        if (response.length() <= MAX_INVALID_JSON_RESPONSE_LENGTH) {
+            return response;
+        }
+        return response.substring(0, MAX_INVALID_JSON_RESPONSE_LENGTH) + "... (truncated)";
     }
 
     private static String buildOutputSchemaHint(RowType outputType) {
