@@ -41,6 +41,8 @@ import org.apache.fluss.types.RowType;
 import org.apache.fluss.types.StringType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -134,6 +136,42 @@ class FlussRecordEmitterTest {
         // Only ONE CreateTableEvent should be emitted (not two)
         long createTableCount = events.stream().filter(e -> e instanceof CreateTableEvent).count();
         assertThat(createTableCount).isEqualTo(1);
+    }
+
+    @ParameterizedTest(name = "olderSplitFirst = {0}")
+    @ValueSource(booleans = {true, false})
+    void testHighestRestoredSchemaIsRetained(boolean olderSplitFirst) throws Exception {
+        RowType schema1 =
+                rowType(field("id", new IntType(false), 1), field("name", new StringType(true), 2));
+        RowType schema2 =
+                rowType(
+                        field("id", new IntType(false), 1),
+                        field("name", new StringType(true), 2),
+                        field("age", new IntType(true), 3));
+        FlussLogSplit schema1Split =
+                new FlussLogSplit(
+                        PHYSICAL_TABLE_PATH, new TableBucket(TABLE_ID, 0), 50L, 1, schema1);
+        FlussLogSplit schema2Split =
+                new FlussLogSplit(
+                        PHYSICAL_TABLE_PATH, new TableBucket(TABLE_ID, 1), 80L, 2, schema2);
+
+        emitter.applySplit(olderSplitFirst ? schema1Split : schema2Split);
+        emitter.applySplit(olderSplitFirst ? schema2Split : schema1Split);
+
+        emitter.emitRecord(
+                logRecord(1, schema1, GenericRow.of(2, BinaryString.fromString("Bob")), 50L),
+                output,
+                new FlussLogSplitState(schema1Split));
+
+        assertThat(output.getCollectedEvents()).hasSize(2);
+        assertThat(output.getCollectedEvents().get(0)).isInstanceOf(CreateTableEvent.class);
+        CreateTableEvent createTableEvent = (CreateTableEvent) output.getCollectedEvents().get(0);
+        assertThat(createTableEvent.getSchema().getColumnNames())
+                .containsExactly("id", "name", "age");
+        assertThat(output.getCollectedEvents().get(1)).isInstanceOf(DataChangeEvent.class);
+        DataChangeEvent dataChangeEvent = (DataChangeEvent) output.getCollectedEvents().get(1);
+        assertThat(dataChangeEvent.after().getArity()).isEqualTo(3);
+        assertThat(dataChangeEvent.after().isNullAt(2)).isTrue();
     }
 
     @Test

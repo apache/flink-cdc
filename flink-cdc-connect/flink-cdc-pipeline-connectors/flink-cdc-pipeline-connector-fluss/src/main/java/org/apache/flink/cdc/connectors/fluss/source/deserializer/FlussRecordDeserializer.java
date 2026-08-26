@@ -229,8 +229,9 @@ public class FlussRecordDeserializer implements FlussDeserializer<Event> {
     @Override
     public List<Event> restoreState(TablePath tablePath, int schemaId, RowType rowType) {
         ensureCacheInitialized();
-        // Multiple splits may read log with different schemaIds; only reserve the first one.
-        if (!latestSchemaIdCache.containsKey(tablePath)) {
+        // Different splits may checkpoint different schemas; retain the one with the highest ID.
+        Integer restoredSchemaId = latestSchemaIdCache.get(tablePath);
+        if (restoredSchemaId == null || schemaId > restoredSchemaId) {
             latestSchemaIdCache.put(tablePath, schemaId);
             latestRowTypeCache.put(tablePath, rowType);
             org.apache.flink.cdc.common.types.RowType cdcRowType =

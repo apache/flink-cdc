@@ -120,11 +120,11 @@ public class FlussSplitReader implements SplitReader<FlussSourceRecord, FlussSpl
         }
 
         // Read from log scanners
-        long fetchTimestamp = System.currentTimeMillis();
         long maxRecordTimestamp = -1;
 
         MultiTableLogScanner scanner = getOrCreateTableLogScanner();
         MultiTableRecords scanRecords = scanner.poll(POLL_TIMEOUT);
+        long pollCompletionTimestamp = System.currentTimeMillis();
         if (scanRecords != null && !scanRecords.isEmpty()) {
             for (TablePath tablePath : scanRecords.tablePaths()) {
                 for (TableBucket bucket : scanRecords.buckets(tablePath)) {
@@ -147,10 +147,15 @@ public class FlussSplitReader implements SplitReader<FlussSourceRecord, FlussSpl
 
         // Report event time lag
         if (maxRecordTimestamp > 0) {
-            sourceReaderMetrics.reportRecordEventTime(fetchTimestamp - maxRecordTimestamp);
+            sourceReaderMetrics.reportRecordEventTime(
+                    calculateFetchEventTimeLag(pollCompletionTimestamp, maxRecordTimestamp));
         }
 
         return builder.build();
+    }
+
+    static long calculateFetchEventTimeLag(long pollCompletionTimestamp, long recordTimestamp) {
+        return Math.max(0L, pollCompletionTimestamp - recordTimestamp);
     }
 
     @Override
@@ -294,7 +299,6 @@ public class FlussSplitReader implements SplitReader<FlussSourceRecord, FlussSpl
             throw new IOException("Failed to close batch scanner", e);
         }
 
-        // todo: 可以封装为一个对象
         currentBatchScanner = null;
         currentBoundedSplit = null;
         currentBatchSchemaId = null;
