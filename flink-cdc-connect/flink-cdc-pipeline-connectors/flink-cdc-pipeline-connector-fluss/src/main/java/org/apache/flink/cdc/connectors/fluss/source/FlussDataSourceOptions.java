@@ -82,5 +82,20 @@ public class FlussDataSourceOptions {
                                     + "new tables, partitions, and buckets while scanning. "
                                     + "A non-positive value disables the periodic discovery.");
 
+    public static final ConfigOption<String> SCAN_KV_SNAPSHOT_LEASE_ID =
+            ConfigOptions.key("scan.kv.snapshot.lease.id")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "The lease ID used to protect acquired KV snapshots from deletion. "
+                                    + "A random UUID is used by default.");
+
+    public static final ConfigOption<Duration> SCAN_KV_SNAPSHOT_LEASE_DURATION =
+            ConfigOptions.key("scan.kv.snapshot.lease.duration")
+                    .durationType()
+                    .defaultValue(Duration.ofDays(1))
+                    .withDescription(
+                            "The duration for retaining KV snapshots acquired by the source.");
+
     private FlussDataSourceOptions() {}
 }

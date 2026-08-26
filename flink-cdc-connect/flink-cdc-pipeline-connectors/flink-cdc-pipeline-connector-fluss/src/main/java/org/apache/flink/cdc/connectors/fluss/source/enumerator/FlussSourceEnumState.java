@@ -29,12 +29,15 @@ public class FlussSourceEnumState {
 
     private final Set<PhysicalTablePath> assignedPhysicalTablePaths;
     private final List<FlussSplitBase> remainingSplits;
+    private final String leaseId;
 
     public FlussSourceEnumState(
             Set<PhysicalTablePath> assignedPhysicalTablePaths,
-            List<FlussSplitBase> remainingSplits) {
+            List<FlussSplitBase> remainingSplits,
+            String leaseId) {
         this.assignedPhysicalTablePaths = assignedPhysicalTablePaths;
         this.remainingSplits = remainingSplits;
+        this.leaseId = leaseId;
     }
 
     public Set<PhysicalTablePath> getAssignedPhysicalTablePaths() {
@@ -43,5 +46,9 @@ public class FlussSourceEnumState {
 
     public List<FlussSplitBase> getRemainingSplits() {
         return remainingSplits;
+    }
+
+    public String getLeaseId() {
+        return leaseId;
     }
 }

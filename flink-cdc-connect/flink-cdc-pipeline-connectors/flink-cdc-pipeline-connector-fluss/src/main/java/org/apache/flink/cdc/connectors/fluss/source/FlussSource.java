@@ -34,6 +34,7 @@ import org.apache.flink.cdc.connectors.fluss.source.metrics.FlussSourceReaderMet
 import org.apache.flink.cdc.connectors.fluss.source.reader.FlussRecordEmitter;
 import org.apache.flink.cdc.connectors.fluss.source.reader.FlussSourceReader;
 import org.apache.flink.cdc.connectors.fluss.source.reader.FlussSourceRecord;
+import org.apache.flink.cdc.connectors.fluss.source.reader.LeaseContext;
 import org.apache.flink.cdc.connectors.fluss.source.split.FlussSplitBase;
 import org.apache.flink.cdc.connectors.fluss.source.split.FlussSplitSerializer;
 import org.apache.flink.connector.base.source.reader.RecordsWithSplitIds;
@@ -65,6 +66,7 @@ public class FlussSource<T> implements Source<T, FlussSplitBase, FlussSourceEnum
     private final OffsetsInitializer offsetsInitializer;
     private final long scanDiscoveryIntervalMs;
     private final FlussDeserializer<T> deserializer;
+    private final LeaseContext leaseContext;
 
     public FlussSource(
             TableDiscoverer discoverer,
@@ -73,12 +75,33 @@ public class FlussSource<T> implements Source<T, FlussSplitBase, FlussSourceEnum
             OffsetsInitializer offsetsInitializer,
             long scanDiscoveryIntervalMs,
             FlussDeserializer<T> deserializer) {
+        this(
+                discoverer,
+                flussConfig,
+                sourceConfig,
+                offsetsInitializer,
+                scanDiscoveryIntervalMs,
+                deserializer,
+                LeaseContext.fromConf(
+                        org.apache.flink.configuration.Configuration.fromMap(
+                                sourceConfig.toMap())));
+    }
+
+    FlussSource(
+            TableDiscoverer discoverer,
+            org.apache.fluss.config.Configuration flussConfig,
+            Configuration sourceConfig,
+            OffsetsInitializer offsetsInitializer,
+            long scanDiscoveryIntervalMs,
+            FlussDeserializer<T> deserializer,
+            LeaseContext leaseContext) {
         this.discoverer = discoverer;
         this.flussConfig = flussConfig;
         this.sourceConfig = sourceConfig;
         this.offsetsInitializer = offsetsInitializer;
         this.scanDiscoveryIntervalMs = scanDiscoveryIntervalMs;
         this.deserializer = deserializer;
+        this.leaseContext = leaseContext;
     }
 
     @Override
@@ -96,7 +119,10 @@ public class FlussSource<T> implements Source<T, FlussSplitBase, FlussSourceEnum
                 sourceConfig,
                 offsetsInitializer,
                 scanDiscoveryIntervalMs,
-                new HashSet<>());
+                new HashSet<>(),
+                Collections.emptyList(),
+                leaseContext,
+                false);
     }
 
     @Override
@@ -109,7 +135,8 @@ public class FlussSource<T> implements Source<T, FlussSplitBase, FlussSourceEnum
                 sourceConfig,
                 offsetsInitializer,
                 scanDiscoveryIntervalMs,
-                checkpoint);
+                checkpoint,
+                leaseContext);
     }
 
     @Override

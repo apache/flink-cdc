@@ -35,6 +35,8 @@ import java.util.Set;
 import static org.apache.flink.cdc.connectors.fluss.source.FlussDataSourceOptions.BOOTSTRAP_SERVERS;
 import static org.apache.flink.cdc.connectors.fluss.source.FlussDataSourceOptions.CLIENT_PROPERTIES_PREFIX;
 import static org.apache.flink.cdc.connectors.fluss.source.FlussDataSourceOptions.SCAN_DISCOVERY_INTERVAL;
+import static org.apache.flink.cdc.connectors.fluss.source.FlussDataSourceOptions.SCAN_KV_SNAPSHOT_LEASE_DURATION;
+import static org.apache.flink.cdc.connectors.fluss.source.FlussDataSourceOptions.SCAN_KV_SNAPSHOT_LEASE_ID;
 import static org.apache.flink.cdc.connectors.fluss.source.FlussDataSourceOptions.SCAN_STARTUP_MODE;
 import static org.apache.flink.cdc.connectors.fluss.source.FlussDataSourceOptions.SCAN_STARTUP_TIMESTAMP;
 import static org.apache.flink.cdc.connectors.fluss.source.FlussDataSourceOptions.TABLE_DISCOVERER_OPTIONS_PREFIX;
@@ -99,6 +101,8 @@ public class FlussDataSourceFactory implements DataSourceFactory {
         options.add(SCAN_STARTUP_MODE);
         options.add(SCAN_STARTUP_TIMESTAMP);
         options.add(SCAN_DISCOVERY_INTERVAL);
+        options.add(SCAN_KV_SNAPSHOT_LEASE_ID);
+        options.add(SCAN_KV_SNAPSHOT_LEASE_DURATION);
         return options;
     }
 

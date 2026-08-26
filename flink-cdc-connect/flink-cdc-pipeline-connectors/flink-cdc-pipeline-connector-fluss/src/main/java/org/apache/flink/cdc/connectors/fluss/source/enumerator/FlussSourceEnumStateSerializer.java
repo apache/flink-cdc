@@ -69,6 +69,8 @@ public class FlussSourceEnumStateSerializer
                 out.writeInt(splitBytes.length);
                 out.write(splitBytes);
             }
+            // Serialize KV snapshot lease ID
+            out.writeUTF(state.getLeaseId());
             return baos.toByteArray();
         }
     }
@@ -95,7 +97,7 @@ public class FlussSourceEnumStateSerializer
                 remaining.add(
                         splitSerializer.deserialize(splitSerializer.getVersion(), splitBytes));
             }
-            return new FlussSourceEnumState(assignedPaths, remaining);
+            return new FlussSourceEnumState(assignedPaths, remaining, in.readUTF());
         }
     }
 }

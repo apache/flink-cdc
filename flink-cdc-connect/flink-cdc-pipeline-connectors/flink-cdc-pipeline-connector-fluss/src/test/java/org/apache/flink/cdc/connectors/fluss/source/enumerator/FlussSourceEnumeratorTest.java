@@ -25,6 +25,8 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.source.discover.TableDiscoverer;
 import org.apache.flink.cdc.connectors.fluss.source.discover.FlussDefaultDiscoverer;
 import org.apache.flink.cdc.connectors.fluss.source.discover.FlussSubscriberTableDiscoverer;
+import org.apache.flink.cdc.connectors.fluss.source.reader.LeaseContext;
+import org.apache.flink.cdc.connectors.fluss.source.split.FlussHybridSnapshotLogSplit;
 import org.apache.flink.cdc.connectors.fluss.source.split.FlussSplitBase;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableEnvironment;
@@ -33,7 +35,12 @@ import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.fluss.client.Connection;
 import org.apache.fluss.client.ConnectionFactory;
 import org.apache.fluss.client.initializer.OffsetsInitializer;
+import org.apache.fluss.client.table.Table;
+import org.apache.fluss.client.table.scanner.batch.BatchScanUtils;
+import org.apache.fluss.client.table.scanner.batch.BatchScanner;
 import org.apache.fluss.config.ConfigOptions;
+import org.apache.fluss.metadata.TablePath;
+import org.apache.fluss.row.InternalRow;
 import org.apache.fluss.server.testutils.FlussClusterExtension;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,11 +48,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 import java.time.Duration;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import static org.apache.fluss.config.ConfigOptions.BOOTSTRAP_SERVERS;
@@ -309,7 +318,7 @@ class FlussSourceEnumeratorTest {
         createPkTable(tableName);
 
         OffsetsInitializer incompleteOffsetsInitializer =
-                (partitionName, bucketIds, retriever) -> java.util.Collections.emptyMap();
+                (partitionName, bucketIds, retriever) -> Collections.emptyMap();
 
         try (MockSplitEnumeratorContext<FlussSplitBase> context =
                 new MockSplitEnumeratorContext<>(NUM_READERS)) {
@@ -337,6 +346,221 @@ class FlussSourceEnumeratorTest {
                 assertThat(context.getSplitsAssignmentSequence()).isEmpty();
             } finally {
                 enumerator.close();
+            }
+        }
+    }
+
+    // =====================================================================
+    //  Enumerator checkpoint restore tests
+    // =====================================================================
+
+    @Test
+    void testRestorePendingLatestSplitPreservesStartingOffsetAfterRescale() throws Throwable {
+        String tableName = "restore_pending_latest";
+        createPkTable(tableName);
+        tBatchEnv
+                .executeSql(
+                        String.format("INSERT INTO %s VALUES (1, 'before-checkpoint')", tableName))
+                .await();
+
+        AtomicInteger offsetInitializationCount = new AtomicInteger();
+        OffsetsInitializer latestOffsetsInitializer = OffsetsInitializer.latest();
+        OffsetsInitializer trackingLatestOffsetsInitializer =
+                (partitionName, bucketIds, retriever) -> {
+                    offsetInitializationCount.incrementAndGet();
+                    return latestOffsetsInitializer.getBucketOffsets(
+                            partitionName, bucketIds, retriever);
+                };
+
+        FlussSourceEnumState checkpoint;
+        FlussSplitBase checkpointedSplit;
+        try (MockSplitEnumeratorContext<FlussSplitBase> context =
+                new MockSplitEnumeratorContext<>(NUM_READERS)) {
+            FlussSourceEnumerator enumerator =
+                    newEnumerator(
+                            context,
+                            new FlussDefaultDiscoverer(),
+                            fqnRegex(DATABASE_NAME, tableName),
+                            trackingLatestOffsetsInitializer,
+                            DISCOVERY_INTERVAL_MS);
+            try {
+                enumerator.start();
+
+                runDiscoveryCycle(context);
+                checkpoint = enumerator.snapshotState(1L);
+
+                assertThat(checkpoint.getAssignedPhysicalTablePaths()).isEmpty();
+                assertThat(checkpoint.getRemainingSplits()).hasSize(1);
+                checkpointedSplit = checkpoint.getRemainingSplits().get(0);
+                assertThat(checkpointedSplit.isLogSplit()).isTrue();
+                assertThat(checkpointedSplit.asLogSplit().getStartingOffset()).isEqualTo(1L);
+                assertThat(offsetInitializationCount.get()).isEqualTo(1);
+            } finally {
+                enumerator.close();
+            }
+        }
+
+        tBatchEnv
+                .executeSql(
+                        String.format("INSERT INTO %s VALUES (2, 'after-checkpoint')", tableName))
+                .await();
+
+        int originalOwner =
+                FlussSourceEnumerator.getSplitOwner(
+                        checkpointedSplit.getTableBucket(), NUM_READERS);
+        int restoredParallelism =
+                findParallelismWithDifferentOwner(
+                        checkpointedSplit.getTableBucket(), NUM_READERS, originalOwner);
+        int restoredOwner =
+                FlussSourceEnumerator.getSplitOwner(
+                        checkpointedSplit.getTableBucket(), restoredParallelism);
+
+        try (MockSplitEnumeratorContext<FlussSplitBase> restoredContext =
+                new MockSplitEnumeratorContext<>(restoredParallelism)) {
+            org.apache.fluss.config.Configuration flussConfig =
+                    FLUSS_CLUSTER_EXTENSION.getClientConfig();
+            FlussSourceEnumerator restoredEnumerator =
+                    new FlussSourceEnumerator(
+                            restoredContext,
+                            new FlussDefaultDiscoverer(),
+                            flussConfig,
+                            buildSourceConfig(flussConfig, fqnRegex(DATABASE_NAME, tableName)),
+                            trackingLatestOffsetsInitializer,
+                            DISCOVERY_INTERVAL_MS,
+                            checkpoint,
+                            LeaseContext.fromConf(
+                                    new org.apache.flink.configuration.Configuration()));
+            try {
+                restoredEnumerator.start();
+
+                // Discovery may run before the restored split's owner reader registers.
+                runDiscoveryCycle(restoredContext);
+
+                restoredContext.registerReader(
+                        new ReaderInfo(originalOwner, "loc_" + originalOwner));
+                restoredEnumerator.addReader(originalOwner);
+                assertThat(restoredContext.getSplitsAssignmentSequence()).isEmpty();
+
+                restoredContext.registerReader(
+                        new ReaderInfo(restoredOwner, "loc_" + restoredOwner));
+                restoredEnumerator.addReader(restoredOwner);
+
+                assertThat(restoredOwner).isNotEqualTo(originalOwner);
+                assertThat(restoredContext.getSplitsAssignmentSequence()).hasSize(1);
+                SplitsAssignment<FlussSplitBase> assignment =
+                        restoredContext.getSplitsAssignmentSequence().get(0);
+                assertThat(assignment.assignment()).containsOnlyKeys(restoredOwner);
+                assertThat(assignment.assignment().get(restoredOwner))
+                        .containsExactly(checkpointedSplit);
+                assertThat(offsetInitializationCount.get()).isEqualTo(1);
+            } finally {
+                restoredEnumerator.close();
+            }
+        }
+    }
+
+    @Test
+    void testRestoreHybridSplitKeepsCheckpointedSnapshotAvailable() throws Throwable {
+        String tableName = "restore_snapshot_lease";
+        createPkTable(tableName);
+        tBatchEnv
+                .executeSql(String.format("INSERT INTO %s VALUES (1, 'checkpointed')", tableName))
+                .await();
+
+        TablePath tablePath = TablePath.of(DATABASE_NAME, tableName);
+        FLUSS_CLUSTER_EXTENSION.triggerAndWaitSnapshot(tablePath);
+
+        FlussSourceEnumState checkpoint;
+        FlussHybridSnapshotLogSplit checkpointedSplit;
+        try (MockSplitEnumeratorContext<FlussSplitBase> context =
+                new MockSplitEnumeratorContext<>(NUM_READERS)) {
+            FlussSourceEnumerator enumerator =
+                    newEnumerator(
+                            context,
+                            new FlussDefaultDiscoverer(),
+                            fqnRegex(DATABASE_NAME, tableName),
+                            OffsetsInitializer.full(),
+                            DISCOVERY_INTERVAL_MS);
+            try {
+                enumerator.start();
+                runDiscoveryCycle(context);
+
+                checkpoint = enumerator.snapshotState(1L);
+                assertThat(checkpoint.getRemainingSplits()).hasSize(1);
+                assertThat(checkpoint.getRemainingSplits().get(0).isHybridSnapshotLogSplit())
+                        .isTrue();
+                checkpointedSplit =
+                        checkpoint.getRemainingSplits().get(0).asHybridSnapshotLogSplit();
+
+                enumerator.notifyCheckpointComplete(1L);
+            } finally {
+                enumerator.close();
+            }
+        }
+
+        tBatchEnv
+                .executeSql(
+                        String.format("INSERT INTO %s VALUES (2, 'newer-snapshot-1')", tableName))
+                .await();
+        FLUSS_CLUSTER_EXTENSION.triggerAndWaitSnapshot(tablePath);
+        tBatchEnv
+                .executeSql(
+                        String.format("INSERT INTO %s VALUES (3, 'newer-snapshot-2')", tableName))
+                .await();
+        FLUSS_CLUSTER_EXTENSION.triggerAndWaitSnapshot(tablePath);
+
+        try (MockSplitEnumeratorContext<FlussSplitBase> restoredContext =
+                new MockSplitEnumeratorContext<>(NUM_READERS)) {
+            org.apache.fluss.config.Configuration flussConfig =
+                    FLUSS_CLUSTER_EXTENSION.getClientConfig();
+            FlussSourceEnumerator restoredEnumerator =
+                    new FlussSourceEnumerator(
+                            restoredContext,
+                            new FlussDefaultDiscoverer(),
+                            flussConfig,
+                            buildSourceConfig(flussConfig, fqnRegex(DATABASE_NAME, tableName)),
+                            OffsetsInitializer.full(),
+                            DISCOVERY_INTERVAL_MS,
+                            checkpoint,
+                            LeaseContext.fromConf(
+                                    new org.apache.flink.configuration.Configuration()));
+            try {
+                restoredEnumerator.start();
+                runDiscoveryCycle(restoredContext);
+
+                int owner =
+                        FlussSourceEnumerator.getSplitOwner(
+                                checkpointedSplit.getTableBucket(), NUM_READERS);
+                restoredContext.registerReader(new ReaderInfo(owner, "loc_" + owner));
+                restoredEnumerator.addReader(owner);
+
+                assertThat(restoredContext.getSplitsAssignmentSequence()).hasSize(1);
+                FlussHybridSnapshotLogSplit restoredSplit =
+                        restoredContext
+                                .getSplitsAssignmentSequence()
+                                .get(0)
+                                .assignment()
+                                .get(owner)
+                                .get(0)
+                                .asHybridSnapshotLogSplit();
+                assertThat(restoredSplit.getSnapshotId())
+                        .isEqualTo(checkpointedSplit.getSnapshotId());
+
+                List<InternalRow> rows;
+                try (Connection scanConnection =
+                                ConnectionFactory.createConnection(
+                                        FLUSS_CLUSTER_EXTENSION.getClientConfig());
+                        Table table = scanConnection.getTable(restoredSplit.getTablePath());
+                        BatchScanner scanner =
+                                table.newScan()
+                                        .createBatchScanner(
+                                                restoredSplit.getTableBucket(),
+                                                restoredSplit.getSnapshotId())) {
+                    rows = BatchScanUtils.collectRows(scanner);
+                }
+                assertThat(rows).hasSize(1);
+            } finally {
+                restoredEnumerator.close();
             }
         }
     }
@@ -501,7 +725,10 @@ class FlussSourceEnumeratorTest {
                 sourceConfig,
                 offsetsInitializer,
                 discoveryIntervalMs,
-                new HashSet<>());
+                new HashSet<>(),
+                Collections.emptyList(),
+                LeaseContext.fromConf(new org.apache.flink.configuration.Configuration()),
+                false);
     }
 
     private static Configuration buildSourceConfig(
@@ -536,6 +763,21 @@ class FlussSourceEnumeratorTest {
         }
     }
 
+    private static int findParallelismWithDifferentOwner(
+            org.apache.fluss.metadata.TableBucket tableBucket,
+            int currentParallelism,
+            int currentOwner) {
+        for (int parallelism = currentParallelism + 1;
+                parallelism <= currentParallelism + 10;
+                parallelism++) {
+            if (FlussSourceEnumerator.getSplitOwner(tableBucket, parallelism) != currentOwner) {
+                return parallelism;
+            }
+        }
+        throw new IllegalStateException(
+                "Could not find a parallelism with a different split owner");
+    }
+
     /**
      * Drives one full discovery cycle: runs the periodic callable (phase 1 + 2) and, if new
      * table-buckets were discovered, the follow-up one-time callable (phase 3 + 4).
@@ -563,7 +805,7 @@ class FlussSourceEnumeratorTest {
             MockSplitEnumeratorContext<FlussSplitBase> context) {
         List<SplitsAssignment<FlussSplitBase>> sequence = context.getSplitsAssignmentSequence();
         if (sequence.isEmpty()) {
-            return java.util.Collections.emptySet();
+            return Collections.emptySet();
         }
         SplitsAssignment<FlussSplitBase> last = sequence.get(sequence.size() - 1);
         return last.assignment().values().stream()
@@ -624,7 +866,8 @@ class FlussSourceEnumeratorTest {
     private static org.apache.fluss.config.Configuration initConfig() {
         org.apache.fluss.config.Configuration conf = new org.apache.fluss.config.Configuration();
         conf.setInt(ConfigOptions.DEFAULT_REPLICATION_FACTOR, 3);
-        conf.set(ConfigOptions.KV_SNAPSHOT_INTERVAL, Duration.ofSeconds(1));
+        conf.set(ConfigOptions.KV_SNAPSHOT_INTERVAL, Duration.ofHours(1));
+        conf.setInt(ConfigOptions.KV_MAX_RETAINED_SNAPSHOTS, 1);
         conf.set(ConfigOptions.LOG_REPLICA_MAX_LAG_TIME, Duration.ofSeconds(10));
         return conf;
     }

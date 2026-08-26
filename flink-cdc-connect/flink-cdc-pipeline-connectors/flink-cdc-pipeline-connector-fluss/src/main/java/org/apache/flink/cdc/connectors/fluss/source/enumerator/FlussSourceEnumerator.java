@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.fluss.source.enumerator;
 
+import org.apache.flink.api.connector.source.SourceEvent;
 import org.apache.flink.api.connector.source.SplitEnumerator;
 import org.apache.flink.api.connector.source.SplitEnumeratorContext;
 import org.apache.flink.api.connector.source.SplitsAssignment;
@@ -25,6 +26,8 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.source.discover.TableDiscoverer;
 import org.apache.flink.cdc.common.source.discover.TableDiscovererFactory;
 import org.apache.flink.cdc.connectors.fluss.source.discover.FlussDefaultDiscoverer;
+import org.apache.flink.cdc.connectors.fluss.source.event.FinishedKvSnapshotConsumeEvent;
+import org.apache.flink.cdc.connectors.fluss.source.reader.LeaseContext;
 import org.apache.flink.cdc.connectors.fluss.source.split.FlussHybridSnapshotLogSplit;
 import org.apache.flink.cdc.connectors.fluss.source.split.FlussLogSplit;
 import org.apache.flink.cdc.connectors.fluss.source.split.FlussSplitBase;
@@ -33,15 +36,18 @@ import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.fluss.client.Connection;
 import org.apache.fluss.client.ConnectionFactory;
 import org.apache.fluss.client.admin.Admin;
+import org.apache.fluss.client.admin.KvSnapshotLease;
 import org.apache.fluss.client.initializer.BucketOffsetsRetrieverImpl;
 import org.apache.fluss.client.initializer.OffsetsInitializer;
 import org.apache.fluss.client.initializer.SnapshotOffsetsInitializer;
 import org.apache.fluss.client.metadata.KvSnapshots;
+import org.apache.fluss.exception.UnsupportedVersionException;
 import org.apache.fluss.metadata.PartitionInfo;
 import org.apache.fluss.metadata.PhysicalTablePath;
 import org.apache.fluss.metadata.TableBucket;
 import org.apache.fluss.metadata.TableInfo;
 import org.apache.fluss.metadata.TablePath;
+import org.apache.fluss.utils.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,8 +62,10 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableMap;
 import java.util.OptionalLong;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 /**
@@ -95,9 +103,13 @@ public class FlussSourceEnumerator
     private final Configuration sourceConfig;
     private final OffsetsInitializer offsetsInitializer;
     private final long scanDiscoveryIntervalMs;
+    private final LeaseContext leaseContext;
 
     private final Set<PhysicalTablePath> assignedPhysicalTablePaths;
     private final Map<Integer, Set<FlussSplitBase>> pendingPartitionSplitAssignment;
+    private final TreeMap<Long, Set<TableBucket>> consumedKvSnapshotMap;
+
+    private volatile boolean checkpointCompletedBefore;
 
     private transient Connection connection;
     private transient Admin admin;
@@ -109,15 +121,22 @@ public class FlussSourceEnumerator
             Configuration sourceConfig,
             OffsetsInitializer offsetsInitializer,
             long scanDiscoveryIntervalMs,
-            Set<PhysicalTablePath> assignedPhysicalTablePaths) {
+            Set<PhysicalTablePath> assignedPhysicalTablePaths,
+            List<FlussSplitBase> remainingSplits,
+            LeaseContext leaseContext,
+            boolean checkpointCompletedBefore) {
         this.context = context;
         this.discoverer = discoverer;
         this.flussConfig = flussConfig;
         this.sourceConfig = sourceConfig;
         this.offsetsInitializer = offsetsInitializer;
         this.scanDiscoveryIntervalMs = scanDiscoveryIntervalMs;
+        this.leaseContext = leaseContext;
         this.assignedPhysicalTablePaths = assignedPhysicalTablePaths;
         this.pendingPartitionSplitAssignment = new HashMap<>();
+        this.consumedKvSnapshotMap = new TreeMap<>();
+        this.checkpointCompletedBefore = checkpointCompletedBefore;
+        addPartitionSplitChangeToPendingAssignments(remainingSplits);
     }
 
     public FlussSourceEnumerator(
@@ -127,7 +146,8 @@ public class FlussSourceEnumerator
             Configuration sourceConfig,
             OffsetsInitializer offsetsInitializer,
             long scanDiscoveryIntervalMs,
-            FlussSourceEnumState restoredState) {
+            FlussSourceEnumState restoredState,
+            LeaseContext leaseContext) {
         this(
                 context,
                 discoverer,
@@ -135,7 +155,11 @@ public class FlussSourceEnumerator
                 sourceConfig,
                 offsetsInitializer,
                 scanDiscoveryIntervalMs,
-                restoredState.getAssignedPhysicalTablePaths());
+                restoredState.getAssignedPhysicalTablePaths(),
+                restoredState.getRemainingSplits(),
+                new LeaseContext(
+                        restoredState.getLeaseId(), leaseContext.getKvSnapshotLeaseDurationMs()),
+                true);
     }
 
     @Override
@@ -223,17 +247,24 @@ public class FlussSourceEnumerator
     // -------------------------------------------------------------------------
 
     /**
-     * Compares the discovered table-buckets against already-assigned {@link PhysicalTablePath}s and
-     * triggers split creation for newly discovered table-buckets.
+     * Compares the discovered table-buckets against assigned and pending {@link PhysicalTablePath}s
+     * and triggers split creation for newly discovered table-buckets.
      */
     private void checkTableBucketChanges(List<TableBucketInfo> allBuckets, Throwable error) {
         if (error != null) {
             throw new FlinkRuntimeException("Failed to discover subscribed table-buckets.", error);
         }
 
+        Set<PhysicalTablePath> assignedOrPendingPhysicalTablePaths =
+                new HashSet<>(assignedPhysicalTablePaths);
+        pendingPartitionSplitAssignment.values().stream()
+                .flatMap(Set::stream)
+                .map(FlussSplitBase::getPhysicalTablePath)
+                .forEach(assignedOrPendingPhysicalTablePaths::add);
+
         List<TableBucketInfo> newBuckets = new ArrayList<>();
         for (TableBucketInfo info : allBuckets) {
-            if (!assignedPhysicalTablePaths.contains(info.physicalTablePath)) {
+            if (!assignedOrPendingPhysicalTablePaths.contains(info.physicalTablePath)) {
                 newBuckets.add(info);
             }
         }
@@ -329,6 +360,9 @@ public class FlussSourceEnumerator
                         ? admin.getLatestKvSnapshots(tablePath).get()
                         : admin.getLatestKvSnapshots(tablePath, partitionName).get();
 
+        Map<Integer, Long> snapshotIds = new HashMap<>();
+        Map<Integer, Long> logOffsets = new HashMap<>();
+        Map<TableBucket, Long> snapshotsToLease = new HashMap<>();
         List<Integer> bucketsNeedInitOffset = new ArrayList<>();
         for (TableBucketInfo info : bucketInfos) {
             int bucketId = info.tableBucket.getBucket();
@@ -341,14 +375,53 @@ public class FlussSourceEnumerator
                                     "Missing log offset for snapshot %d of table-bucket %s.",
                                     snapshotId.getAsLong(), info.tableBucket));
                 }
+                snapshotIds.put(bucketId, snapshotId.getAsLong());
+                logOffsets.put(bucketId, logOffset.getAsLong());
+                snapshotsToLease.put(info.tableBucket, snapshotId.getAsLong());
+            } else {
+                bucketsNeedInitOffset.add(bucketId);
+            }
+        }
+
+        if (!snapshotsToLease.isEmpty()) {
+            LOG.info(
+                    "Acquiring KV snapshot lease {} for table {}.",
+                    leaseContext.getKvSnapshotLeaseId(),
+                    PhysicalTablePath.of(tablePath, partitionName));
+            try {
+                Set<TableBucket> unavailableBuckets =
+                        kvSnapshotLease()
+                                .acquireSnapshots(snapshotsToLease)
+                                .get()
+                                .getUnavailableTableBucketSet();
+                if (!unavailableBuckets.isEmpty()) {
+                    throw new IllegalStateException(
+                            String.format(
+                                    "Failed to acquire KV snapshot lease %s for table-buckets %s.",
+                                    leaseContext.getKvSnapshotLeaseId(), unavailableBuckets));
+                }
+            } catch (Exception e) {
+                if (ExceptionUtils.findThrowable(e, UnsupportedVersionException.class)
+                        .isPresent()) {
+                    LOG.warn(
+                            "The Fluss server does not support KV snapshot leases. Snapshots may be cleaned up before they are consumed.",
+                            e);
+                } else {
+                    throw e;
+                }
+            }
+        }
+
+        for (TableBucketInfo info : bucketInfos) {
+            int bucketId = info.tableBucket.getBucket();
+            Long snapshotId = snapshotIds.get(bucketId);
+            if (snapshotId != null) {
                 splits.add(
                         new FlussHybridSnapshotLogSplit(
                                 info.physicalTablePath,
                                 info.tableBucket,
-                                snapshotId.getAsLong(),
-                                logOffset.getAsLong()));
-            } else {
-                bucketsNeedInitOffset.add(bucketId);
+                                snapshotId,
+                                logOffsets.get(bucketId)));
             }
         }
 
@@ -511,6 +584,23 @@ public class FlussSourceEnumerator
     }
 
     @Override
+    public void handleSourceEvent(int subtaskId, SourceEvent sourceEvent) {
+        if (sourceEvent instanceof FinishedKvSnapshotConsumeEvent) {
+            FinishedKvSnapshotConsumeEvent event = (FinishedKvSnapshotConsumeEvent) sourceEvent;
+            LOG.info(
+                    "Received finished KV snapshot event from reader {} for buckets {} at checkpoint {}.",
+                    subtaskId,
+                    event.getTableBuckets(),
+                    event.getCheckpointId());
+            event.getTableBuckets()
+                    .forEach(
+                            tableBucket ->
+                                    addConsumedKvSnapshotBucket(
+                                            event.getCheckpointId(), tableBucket));
+        }
+    }
+
+    @Override
     public void addSplitsBack(List<FlussSplitBase> splits, int subtaskId) {
         LOG.info("Adding {} splits back from subtask {}", splits.size(), subtaskId);
         addPartitionSplitChangeToPendingAssignments(splits);
@@ -530,24 +620,127 @@ public class FlussSourceEnumerator
     public FlussSourceEnumState snapshotState(long checkpointId) throws Exception {
         List<FlussSplitBase> remainingSplits = new ArrayList<>();
         pendingPartitionSplitAssignment.forEach((reader, splits) -> remainingSplits.addAll(splits));
-        return new FlussSourceEnumState(assignedPhysicalTablePaths, remainingSplits);
+        return new FlussSourceEnumState(
+                assignedPhysicalTablePaths, remainingSplits, leaseContext.getKvSnapshotLeaseId());
+    }
+
+    @Override
+    public void notifyCheckpointComplete(long checkpointId) throws Exception {
+        checkpointCompletedBefore = true;
+
+        Set<TableBucket> consumedKvSnapshots =
+                getAndRemoveConsumedKvSnapshotBucketsBefore(checkpointId);
+        if (consumedKvSnapshots.isEmpty()) {
+            return;
+        }
+
+        LOG.info(
+                "Releasing KV snapshot lease {} for buckets {} after checkpoint {} completed.",
+                leaseContext.getKvSnapshotLeaseId(),
+                consumedKvSnapshots,
+                checkpointId);
+        try {
+            kvSnapshotLease().releaseSnapshots(consumedKvSnapshots).get();
+        } catch (Exception e) {
+            if (ExceptionUtils.findThrowable(e, UnsupportedVersionException.class).isPresent()) {
+                LOG.warn("The Fluss server does not support releasing KV snapshot leases.", e);
+            } else {
+                LOG.error(
+                        "Failed to release KV snapshot lease {} for buckets {}; they will be retried after a later checkpoint.",
+                        leaseContext.getKvSnapshotLeaseId(),
+                        consumedKvSnapshots,
+                        e);
+                consumedKvSnapshots.forEach(
+                        tableBucket -> addConsumedKvSnapshotBucket(checkpointId, tableBucket));
+            }
+        }
     }
 
     @Override
     public void close() throws IOException {
+        Exception closeError = null;
+        try {
+            maybeDropKvSnapshotLease();
+        } catch (Exception e) {
+            closeError = e;
+        }
+
         try {
             if (discoverer != null) {
                 discoverer.close();
             }
+        } catch (Exception e) {
+            closeError = collectCloseError(closeError, e);
+        }
+
+        try {
             if (admin != null) {
                 admin.close();
             }
+        } catch (Exception e) {
+            closeError = collectCloseError(closeError, e);
+        }
+
+        try {
             if (connection != null) {
                 connection.close();
             }
         } catch (Exception e) {
-            throw new IOException("Failed to close Fluss connection", e);
+            closeError = collectCloseError(closeError, e);
         }
+
+        if (closeError != null) {
+            throw new IOException("Failed to close Fluss source enumerator.", closeError);
+        }
+    }
+
+    private void addConsumedKvSnapshotBucket(long checkpointId, TableBucket tableBucket) {
+        consumedKvSnapshotMap
+                .computeIfAbsent(checkpointId, ignored -> new HashSet<>())
+                .add(tableBucket);
+    }
+
+    private Set<TableBucket> getAndRemoveConsumedKvSnapshotBucketsBefore(long checkpointId) {
+        NavigableMap<Long, Set<TableBucket>> completedSnapshots =
+                consumedKvSnapshotMap.headMap(checkpointId, false);
+        Set<TableBucket> tableBuckets = new HashSet<>();
+        completedSnapshots.values().forEach(tableBuckets::addAll);
+        completedSnapshots.clear();
+        return tableBuckets;
+    }
+
+    private void maybeDropKvSnapshotLease() throws Exception {
+        if (admin != null
+                && offsetsInitializer instanceof SnapshotOffsetsInitializer
+                && !checkpointCompletedBefore) {
+            LOG.info(
+                    "Dropping KV snapshot lease {} because no completed checkpoint references it.",
+                    leaseContext.getKvSnapshotLeaseId());
+            try {
+                kvSnapshotLease().dropLease().get();
+            } catch (Exception e) {
+                if (ExceptionUtils.findThrowable(e, UnsupportedVersionException.class)
+                        .isPresent()) {
+                    LOG.warn("The Fluss server does not support dropping KV snapshot leases.", e);
+                } else {
+                    throw e;
+                }
+            }
+        }
+    }
+
+    private KvSnapshotLease kvSnapshotLease() {
+        return admin.createKvSnapshotLease(
+                leaseContext.getKvSnapshotLeaseId(), leaseContext.getKvSnapshotLeaseDurationMs());
+    }
+
+    private static Exception collectCloseError(
+            @Nullable Exception currentError, Exception additionalError) {
+        if (currentError == null) {
+            return additionalError;
+        }
+        currentError.addSuppressed(additionalError);
+        return currentError;
     }
 
     /**

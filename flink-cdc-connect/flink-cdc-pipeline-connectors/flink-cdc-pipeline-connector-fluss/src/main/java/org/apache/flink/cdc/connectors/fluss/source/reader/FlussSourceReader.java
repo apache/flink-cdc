@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.fluss.source.reader;
 
 import org.apache.flink.api.connector.source.SourceReaderContext;
 import org.apache.flink.cdc.connectors.fluss.sink.v2.metrics.WrapperFlussMetricRegistry;
+import org.apache.flink.cdc.connectors.fluss.source.event.FinishedKvSnapshotConsumeEvent;
 import org.apache.flink.cdc.connectors.fluss.source.metrics.FlussSourceReaderMetrics;
 import org.apache.flink.cdc.connectors.fluss.source.split.FlussHybridSnapshotLogSplitState;
 import org.apache.flink.cdc.connectors.fluss.source.split.FlussLogSplitState;
@@ -31,10 +32,14 @@ import org.apache.flink.connector.base.source.reader.RecordsWithSplitIds;
 import org.apache.flink.connector.base.source.reader.SingleThreadMultiplexSourceReaderBase;
 import org.apache.flink.connector.base.source.reader.synchronization.FutureCompletingBlockingQueue;
 
+import org.apache.fluss.metadata.TableBucket;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * A generic {@link org.apache.flink.api.connector.source.SourceReader} for Fluss, built on top of
@@ -55,6 +60,8 @@ public class FlussSourceReader<T>
 
     private final FlussRecordEmitter<T> recordEmitter;
     private final WrapperFlussMetricRegistry metricRegistry;
+    private final SourceReaderContext readerContext;
+    private final Set<TableBucket> reportedFinishedSnapshotBuckets;
 
     public FlussSourceReader(
             FutureCompletingBlockingQueue<RecordsWithSplitIds<FlussSourceRecord>> elementsQueue,
@@ -75,6 +82,8 @@ public class FlussSourceReader<T>
                 readerContext);
         this.recordEmitter = recordEmitter;
         this.metricRegistry = metricRegistry;
+        this.readerContext = readerContext;
+        this.reportedFinishedSnapshotBuckets = new HashSet<>();
     }
 
     @Override
@@ -103,6 +112,30 @@ public class FlussSourceReader<T>
     @Override
     protected FlussSplitBase toSplitType(String splitId, FlussSplitState splitState) {
         return splitState.toFlussSplit();
+    }
+
+    @Override
+    public List<FlussSplitBase> snapshotState(long checkpointId) {
+        List<FlussSplitBase> splits = super.snapshotState(checkpointId);
+        Set<TableBucket> finishedSnapshotBuckets = new HashSet<>();
+        for (FlussSplitBase split : splits) {
+            if (split.isHybridSnapshotLogSplit()
+                    && split.asHybridSnapshotLogSplit().isSnapshotFinished()
+                    && !reportedFinishedSnapshotBuckets.contains(split.getTableBucket())) {
+                finishedSnapshotBuckets.add(split.getTableBucket());
+            }
+        }
+
+        if (!finishedSnapshotBuckets.isEmpty()) {
+            LOG.info(
+                    "Finished reading KV snapshots for buckets {} at checkpoint {}.",
+                    finishedSnapshotBuckets,
+                    checkpointId);
+            readerContext.sendSourceEventToCoordinator(
+                    new FinishedKvSnapshotConsumeEvent(checkpointId, finishedSnapshotBuckets));
+            reportedFinishedSnapshotBuckets.addAll(finishedSnapshotBuckets);
+        }
+        return splits;
     }
 
     @Override
