@@ -44,7 +44,7 @@ import io.debezium.relational.RelationalSnapshotChangeEventSource;
 import io.debezium.relational.SnapshotChangeRecordEmitter;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
-import io.debezium.schema.TopicSelector;
+import io.debezium.spi.topic.TopicNamingStrategy;
 import io.debezium.util.Clock;
 import io.debezium.util.ColumnUtils;
 import io.debezium.util.Strings;
@@ -77,7 +77,7 @@ public class MySqlSnapshotSplitReadTask
     private final EventDispatcherImpl<TableId> dispatcher;
     private final Clock clock;
     private final MySqlSnapshotSplit snapshotSplit;
-    private final TopicSelector<TableId> topicSelector;
+    private final TopicNamingStrategy<TableId> topicNamingStrategy;
     private final EventDispatcher.SnapshotReceiver<MySqlPartition> snapshotReceiver;
     private final SnapshotChangeEventSourceMetrics<MySqlPartition> snapshotChangeEventSourceMetrics;
 
@@ -91,7 +91,7 @@ public class MySqlSnapshotSplitReadTask
             MySqlDatabaseSchema databaseSchema,
             MySqlConnection jdbcConnection,
             EventDispatcherImpl<TableId> dispatcher,
-            TopicSelector<TableId> topicSelector,
+            TopicNamingStrategy<TableId> topicNamingStrategy,
             EventDispatcher.SnapshotReceiver<MySqlPartition> snapshotReceiver,
             Clock clock,
             MySqlSnapshotSplit snapshotSplit,
@@ -104,7 +104,7 @@ public class MySqlSnapshotSplitReadTask
         this.dispatcher = dispatcher;
         this.clock = clock;
         this.snapshotSplit = snapshotSplit;
-        this.topicSelector = topicSelector;
+        this.topicNamingStrategy = topicNamingStrategy;
         this.snapshotReceiver = snapshotReceiver;
         this.snapshotChangeEventSourceMetrics = snapshotChangeEventSourceMetrics;
         this.hooks = hooks;
@@ -147,7 +147,7 @@ public class MySqlSnapshotSplitReadTask
         final SignalEventDispatcher signalEventDispatcher =
                 new SignalEventDispatcher(
                         previousOffset.getOffset(),
-                        topicSelector.topicNameFor(snapshotSplit.getTableId()),
+                        topicNamingStrategy.dataChangeTopic(snapshotSplit.getTableId()),
                         dispatcher.getQueue());
 
         if (hooks.getPreLowWatermarkAction() != null) {

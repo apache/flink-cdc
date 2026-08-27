@@ -32,10 +32,8 @@ import org.apache.flink.util.Collector;
 import io.debezium.config.Configuration;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
 import io.debezium.heartbeat.Heartbeat;
-import io.debezium.heartbeat.HeartbeatFactory;
+import io.debezium.heartbeat.HeartbeatImpl;
 import io.debezium.jdbc.JdbcConfiguration;
-import io.debezium.relational.TableId;
-import io.debezium.schema.TopicSelector;
 import io.debezium.util.SchemaNameAdjuster;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.SchemaBuilder;
@@ -49,8 +47,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static io.debezium.config.CommonConnectorConfig.TRANSACTION_TOPIC;
-import static io.debezium.connector.mysql.MySqlConnectorConfig.SERVER_NAME;
+import static io.debezium.config.CommonConnectorConfig.TOPIC_PREFIX;
 
 /** Unit test for {@link org.apache.flink.cdc.connectors.mysql.source.reader.MySqlRecordEmitter}. */
 class MySqlRecordEmitterTest {
@@ -60,18 +57,21 @@ class MySqlRecordEmitterTest {
         Configuration dezConf =
                 JdbcConfiguration.create()
                         .with(Heartbeat.HEARTBEAT_INTERVAL, 100)
-                        .with(TRANSACTION_TOPIC, "fake-topic")
-                        .with(SERVER_NAME, "mysql_binlog_source")
+                        .with(TOPIC_PREFIX, "mysql_binlog_source")
                         .build();
 
         MySqlConnectorConfig mySqlConfig = new MySqlConnectorConfig(dezConf);
-        HeartbeatFactory<TableId> heartbeatFactory =
-                new HeartbeatFactory<>(
-                        new MySqlConnectorConfig(dezConf),
-                        TopicSelector.defaultSelector(
-                                mySqlConfig, (id, prefix, delimiter) -> "fake-topic"),
+        // Construct a plain HeartbeatImpl directly. Debezium 2.0's HeartbeatFactory would route to
+        // a DatabaseHeartbeatImpl (which needs a live JDBC connection) because MySqlConnectorConfig
+        // reports a non-null heartbeat action query; this unit test only needs a heartbeat record.
+        Heartbeat heartbeat =
+                new HeartbeatImpl(
+                        mySqlConfig.getHeartbeatInterval(),
+                        mySqlConfig
+                                .getTopicNamingStrategy(MySqlConnectorConfig.TOPIC_NAMING_STRATEGY)
+                                .heartbeatTopic(),
+                        mySqlConfig.getLogicalName(),
                         SchemaNameAdjuster.create());
-        Heartbeat heartbeat = heartbeatFactory.createHeartbeat();
         BinlogOffset fakeOffset = BinlogOffset.ofBinlogFilePosition("fake-file", 15213L);
         MySqlRecordEmitter<Void> recordEmitter = createRecordEmitter();
         MySqlBinlogSplitState splitState = createBinlogSplitState();

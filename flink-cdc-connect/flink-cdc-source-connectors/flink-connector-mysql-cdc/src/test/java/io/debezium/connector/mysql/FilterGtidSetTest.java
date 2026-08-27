@@ -17,7 +17,7 @@
 
 package io.debezium.connector.mysql;
 
-import io.debezium.connector.mysql.MySqlConnectorConfig.GtidNewChannelPosition;
+import io.debezium.config.Configuration;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
@@ -35,8 +35,7 @@ class FilterGtidSetTest {
 
     @Test
     void testFilterGtidSetLatestModeFixesNonContiguousGtid() throws Exception {
-        MySqlStreamingChangeEventSource source =
-                createSourceWithConfig(GtidNewChannelPosition.LATEST, null);
+        MySqlStreamingChangeEventSource source = createSourceWithConfig("latest", null);
 
         MySqlOffsetContext offsetContext = createOffsetContext("aaa-111:5000-8000");
         GtidSet availableServerGtidSet = new GtidSet("aaa-111:1-10000,bbb-222:1-3000");
@@ -52,8 +51,7 @@ class FilterGtidSetTest {
     @Test
     void testFilterGtidSetLatestModeWithSourceFilter() throws Exception {
         Predicate<String> excludeCcc = uuid -> !uuid.equals("ccc-333");
-        MySqlStreamingChangeEventSource source =
-                createSourceWithConfig(GtidNewChannelPosition.LATEST, excludeCcc);
+        MySqlStreamingChangeEventSource source = createSourceWithConfig("latest", excludeCcc);
 
         MySqlOffsetContext offsetContext = createOffsetContext("aaa-111:5000-8000,bbb-222:1-2000");
         GtidSet availableServerGtidSet =
@@ -70,8 +68,7 @@ class FilterGtidSetTest {
 
     @Test
     void testFilterGtidSetEarliestModeNotAffected() throws Exception {
-        MySqlStreamingChangeEventSource source =
-                createSourceWithConfig(GtidNewChannelPosition.EARLIEST, null);
+        MySqlStreamingChangeEventSource source = createSourceWithConfig("earliest", null);
 
         MySqlOffsetContext offsetContext = createOffsetContext("aaa-111:5000-8000");
         GtidSet availableServerGtidSet = new GtidSet("aaa-111:1-10000,bbb-222:1-3000");
@@ -86,8 +83,7 @@ class FilterGtidSetTest {
 
     @Test
     void testFilterGtidSetReturnsNullWhenNoGtid() throws Exception {
-        MySqlStreamingChangeEventSource source =
-                createSourceWithConfig(GtidNewChannelPosition.LATEST, null);
+        MySqlStreamingChangeEventSource source = createSourceWithConfig("latest", null);
 
         MySqlOffsetContext offsetContext = createOffsetContext(null);
         GtidSet availableServerGtidSet = new GtidSet("aaa-111:1-10000");
@@ -100,10 +96,11 @@ class FilterGtidSetTest {
     }
 
     private static MySqlStreamingChangeEventSource createSourceWithConfig(
-            GtidNewChannelPosition channelPosition, Predicate<String> gtidSourceFilter)
-            throws Exception {
+            String channelPosition, Predicate<String> gtidSourceFilter) throws Exception {
         MySqlConnectorConfig mockConfig = Mockito.mock(MySqlConnectorConfig.class);
-        when(mockConfig.gtidNewChannelPosition()).thenReturn(channelPosition);
+        Configuration dbzConfig =
+                Configuration.create().with("gtid.new.channel.position", channelPosition).build();
+        when(mockConfig.getConfig()).thenReturn(dbzConfig);
         when(mockConfig.gtidSourceFilter()).thenReturn(gtidSourceFilter);
 
         MySqlStreamingChangeEventSource source =

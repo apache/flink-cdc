@@ -23,15 +23,15 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.connectors.postgres.source.PostgresDialect;
 import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfig;
 
+import io.debezium.config.CommonConnectorConfig;
 import io.debezium.connector.postgresql.PostgresConnectorConfig;
 import io.debezium.connector.postgresql.PostgresObjectUtils;
 import io.debezium.connector.postgresql.PostgresSchema;
-import io.debezium.connector.postgresql.PostgresTopicSelector;
 import io.debezium.connector.postgresql.TypeRegistry;
 import io.debezium.connector.postgresql.connection.PostgresConnection;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.Table;
-import io.debezium.schema.TopicSelector;
+import io.debezium.spi.topic.TopicNamingStrategy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -155,8 +155,10 @@ public class PostgresSchemaUtils {
             PostgresConnection jdbc) {
         try {
             // fetch table schemas
-            TopicSelector<io.debezium.relational.TableId> topicSelector =
-                    PostgresTopicSelector.create(sourceConfig.getDbzConnectorConfig());
+            TopicNamingStrategy<io.debezium.relational.TableId> topicSelector =
+                    sourceConfig
+                            .getDbzConnectorConfig()
+                            .getTopicNamingStrategy(CommonConnectorConfig.TOPIC_NAMING_STRATEGY);
             PostgresConnection.PostgresValueConverterBuilder valueConverterBuilder =
                     newPostgresValueConverterBuilder(sourceConfig.getDbzConnectorConfig());
             PostgresSchema postgresSchema =

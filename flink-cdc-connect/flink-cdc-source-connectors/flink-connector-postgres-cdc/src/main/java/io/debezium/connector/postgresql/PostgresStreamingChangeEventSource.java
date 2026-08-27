@@ -101,8 +101,7 @@ public class PostgresStreamingChangeEventSource
         this.errorHandler = errorHandler;
         this.clock = clock;
         this.schema = schema;
-        pauseNoMessage =
-                DelayStrategy.constant(taskContext.getConfig().getPollInterval().toMillis());
+        pauseNoMessage = DelayStrategy.constant(taskContext.getConfig().getPollInterval());
         this.taskContext = taskContext;
         this.snapshotter = snapshotter;
         this.replicationConnection = replicationConnection;
@@ -286,11 +285,12 @@ public class PostgresStreamingChangeEventSource
                                         dispatcher.dispatchTransactionStartedEvent(
                                                 partition,
                                                 toString(message.getTransactionId()),
-                                                offsetContext);
+                                                offsetContext,
+                                                message.getCommitTime());
                                     } else if (message.getOperation() == Operation.COMMIT) {
                                         commitMessage(partition, offsetContext, lsn);
                                         dispatcher.dispatchTransactionCommittedEvent(
-                                                partition, offsetContext);
+                                                partition, offsetContext, message.getCommitTime());
                                     }
                                     maybeWarnAboutGrowingWalBacklog(true);
                                 } else if (message.getOperation() == Operation.MESSAGE) {
@@ -465,7 +465,7 @@ public class PostgresStreamingChangeEventSource
     }
 
     @Override
-    public void commitOffset(Map<String, ?> offset) {
+    public void commitOffset(Map<String, ?> partition, Map<String, ?> offset) {
         try {
             ReplicationStream replicationStream = this.replicationStream.get();
             final Lsn commitLsn =

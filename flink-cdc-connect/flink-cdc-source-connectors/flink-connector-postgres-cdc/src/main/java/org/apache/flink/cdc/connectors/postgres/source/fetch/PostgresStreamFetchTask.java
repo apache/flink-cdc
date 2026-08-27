@@ -159,7 +159,7 @@ public class PostgresStreamFetchTask implements FetchTask<SourceSplitBase> {
                         "Committing offset {} for {}",
                         Lsn.valueOf(lastCommitLsn),
                         streamSplitReadTask.streamSplit);
-                streamSplitReadTask.commitOffset(offsets);
+                streamSplitReadTask.commitOffset(null, offsets);
             }
         }
     }

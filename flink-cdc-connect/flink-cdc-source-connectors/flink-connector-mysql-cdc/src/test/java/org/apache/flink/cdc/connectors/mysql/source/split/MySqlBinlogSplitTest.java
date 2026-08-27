@@ -176,6 +176,17 @@ class MySqlBinlogSplitTest {
 
     /** A mock implementation for {@link Table} which is used for unit tests. */
     private static class MockTable implements Table {
+
+        @Override
+        public io.debezium.relational.Attribute attributeWithName(String name) {
+            return null;
+        }
+
+        @Override
+        public java.util.List<io.debezium.relational.Attribute> attributes() {
+            return java.util.Collections.emptyList();
+        }
+
         private final TableId tableId;
 
         public MockTable(TableId tableId) {

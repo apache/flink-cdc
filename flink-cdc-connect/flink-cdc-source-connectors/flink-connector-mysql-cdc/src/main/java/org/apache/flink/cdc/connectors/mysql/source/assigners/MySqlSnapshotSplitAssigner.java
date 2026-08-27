@@ -179,7 +179,14 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
         this.chunkSplitter =
                 createChunkSplitter(sourceConfig, isTableIdCaseSensitive, chunkSplitterState);
         this.partition =
-                new MySqlPartition(sourceConfig.getMySqlConnectorConfig().getLogicalName());
+                new MySqlPartition(
+                        sourceConfig.getMySqlConnectorConfig().getLogicalName(),
+                        sourceConfig
+                                .getMySqlConnectorConfig()
+                                .getConfig()
+                                .getString(
+                                        io.debezium.relational.RelationalDatabaseConnectorConfig
+                                                .DATABASE_NAME));
         this.enumeratorContext = enumeratorContext;
     }
 

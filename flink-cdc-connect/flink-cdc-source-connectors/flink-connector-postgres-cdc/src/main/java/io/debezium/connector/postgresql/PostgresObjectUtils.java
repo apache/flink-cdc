@@ -25,7 +25,7 @@ import io.debezium.connector.postgresql.connection.ReplicationConnection;
 import io.debezium.connector.postgresql.spi.SlotState;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges;
-import io.debezium.schema.TopicSelector;
+import io.debezium.spi.topic.TopicNamingStrategy;
 import io.debezium.util.Clock;
 import io.debezium.util.Metronome;
 import org.slf4j.Logger;
@@ -49,7 +49,7 @@ public class PostgresObjectUtils {
             PostgresConnection connection,
             PostgresConnectorConfig config,
             TypeRegistry typeRegistry,
-            TopicSelector<TableId> topicSelector,
+            TopicNamingStrategy<TableId> topicSelector,
             PostgresValueConverter valueConverter)
             throws SQLException {
         RelationAwarePostgresSchema schema =
@@ -67,7 +67,7 @@ public class PostgresObjectUtils {
             PostgresConnection connection,
             PostgresConnectorConfig config,
             TypeRegistry typeRegistry,
-            TopicSelector<TableId> topicSelector,
+            TopicNamingStrategy<TableId> topicSelector,
             PostgresValueConverter valueConverter,
             Collection<TableChanges.TableChange> tableChanges)
             throws SQLException {
@@ -85,7 +85,7 @@ public class PostgresObjectUtils {
     public static PostgresTaskContext newTaskContext(
             PostgresConnectorConfig connectorConfig,
             PostgresSchema schema,
-            TopicSelector<TableId> topicSelector) {
+            TopicNamingStrategy<TableId> topicSelector) {
         return new PostgresTaskContext(connectorConfig, schema, topicSelector);
     }
 

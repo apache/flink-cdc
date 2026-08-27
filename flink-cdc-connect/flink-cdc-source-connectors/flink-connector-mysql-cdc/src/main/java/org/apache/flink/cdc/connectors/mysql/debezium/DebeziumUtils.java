@@ -22,17 +22,18 @@ import org.apache.flink.cdc.connectors.mysql.source.connection.JdbcConnectionFac
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
 import org.apache.flink.cdc.connectors.mysql.source.utils.TableDiscoveryUtils;
 import org.apache.flink.util.FlinkRuntimeException;
+import org.apache.flink.util.TemporaryClassLoaderContext;
 
 import com.github.shyiko.mysql.binlog.BinaryLogClient;
 import com.github.shyiko.mysql.binlog.event.EventData;
 import com.github.shyiko.mysql.binlog.event.EventHeaderV4;
 import com.github.shyiko.mysql.binlog.event.RotateEventData;
+import io.debezium.config.CommonConnectorConfig;
 import io.debezium.config.Configuration;
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
 import io.debezium.connector.mysql.MySqlDatabaseSchema;
 import io.debezium.connector.mysql.MySqlSystemVariables;
-import io.debezium.connector.mysql.MySqlTopicSelector;
 import io.debezium.connector.mysql.MySqlValueConverters;
 import io.debezium.jdbc.JdbcConfiguration;
 import io.debezium.jdbc.JdbcConnection;
@@ -41,7 +42,7 @@ import io.debezium.jdbc.TemporalPrecisionMode;
 import io.debezium.relational.Selectors;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
-import io.debezium.schema.TopicSelector;
+import io.debezium.spi.topic.TopicNamingStrategy;
 import io.debezium.util.SchemaNameAdjuster;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -105,13 +106,21 @@ public class DebeziumUtils {
     /** Creates a new {@link MySqlDatabaseSchema} to monitor the latest MySql database schemas. */
     public static MySqlDatabaseSchema createMySqlDatabaseSchema(
             MySqlConnectorConfig dbzMySqlConfig, boolean isTableIdCaseSensitive) {
-        TopicSelector<TableId> topicSelector = MySqlTopicSelector.defaultSelector(dbzMySqlConfig);
+        TopicNamingStrategy<TableId> topicNamingStrategy;
+        // Debezium 2.0 resolves classes through the thread context class loader; pin it to the
+        // loader that loaded Debezium so a stale/closed Flink user class loader cannot break it.
+        try (TemporaryClassLoaderContext ignored =
+                TemporaryClassLoaderContext.of(CommonConnectorConfig.class.getClassLoader())) {
+            topicNamingStrategy =
+                    dbzMySqlConfig.getTopicNamingStrategy(
+                            MySqlConnectorConfig.TOPIC_NAMING_STRATEGY);
+        }
         SchemaNameAdjuster schemaNameAdjuster = SchemaNameAdjuster.create();
         MySqlValueConverters valueConverters = getValueConverters(dbzMySqlConfig);
         return new MySqlDatabaseSchema(
                 dbzMySqlConfig,
                 valueConverters,
-                topicSelector,
+                topicNamingStrategy,
                 schemaNameAdjuster,
                 isTableIdCaseSensitive);
     }

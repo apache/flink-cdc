@@ -96,7 +96,8 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
                             tableId,
                             original.columns(),
                             original.primaryKeyColumnNames(),
-                            original.defaultCharsetName());
+                            original.defaultCharsetName(),
+                            Collections.emptyList());
             parser.signalCreateTable(tableId, ctx);
             Schema.Builder builder = Schema.newBuilder();
             original.columns().forEach(column -> builder.column(toCdcColumn(column)));

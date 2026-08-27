@@ -71,7 +71,8 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
         // database server/cluster being monitored. The logical name should be unique across
         // all other connectors, since it is used as a prefix for all Kafka topic names coming
         // from this connector. Only alphanumeric characters and underscores should be used.
-        props.setProperty("database.server.name", "postgres_cdc_source");
+        // Debezium 2.0 renamed "database.server.name" to "topic.prefix".
+        props.setProperty("topic.prefix", "postgres_cdc_source");
         props.setProperty("database.hostname", checkNotNull(hostname));
         props.setProperty("database.dbname", checkNotNull(database));
         props.setProperty("database.user", checkNotNull(username));
@@ -83,10 +84,11 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
         props.setProperty("slot.name", checkNotNull(slotName));
         // database history
         props.setProperty(
-                "database.history", EmbeddedFlinkDatabaseHistory.class.getCanonicalName());
-        props.setProperty("database.history.instance.name", UUID.randomUUID() + "_" + subtaskId);
-        props.setProperty("database.history.skip.unparseable.ddl", String.valueOf(true));
-        props.setProperty("database.history.refer.ddl", String.valueOf(true));
+                "schema.history.internal", EmbeddedFlinkDatabaseHistory.class.getCanonicalName());
+        props.setProperty(
+                "schema.history.internal.instance.name", UUID.randomUUID() + "_" + subtaskId);
+        props.setProperty("schema.history.internal.skip.unparseable.ddl", String.valueOf(true));
+        props.setProperty("schema.history.internal.prefer.ddl", String.valueOf(true));
         // we have to enable heartbeat for PG to make sure DebeziumChangeConsumer#handleBatch
         // is invoked after job restart
         // Enable TCP keep-alive probe to verify that the database connection is still alive

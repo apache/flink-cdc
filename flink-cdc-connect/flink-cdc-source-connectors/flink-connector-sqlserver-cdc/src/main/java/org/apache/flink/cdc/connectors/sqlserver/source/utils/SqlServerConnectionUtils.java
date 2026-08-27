@@ -19,7 +19,6 @@ package org.apache.flink.cdc.connectors.sqlserver.source.utils;
 
 import io.debezium.config.Configuration;
 import io.debezium.connector.sqlserver.SqlServerConnection;
-import io.debezium.connector.sqlserver.SqlServerConnectorConfig;
 import io.debezium.connector.sqlserver.SqlServerValueConverters;
 import io.debezium.jdbc.JdbcConfiguration;
 import io.debezium.jdbc.JdbcConnection;
@@ -46,11 +45,12 @@ public class SqlServerConnectionUtils {
                         connectorConfig.getDecimalMode(),
                         connectorConfig.getTemporalPrecisionMode(),
                         connectorConfig.binaryHandlingMode());
+        // Debezium 2.0 removed the sourceTimestampMode and classloader-supplier constructor
+        // arguments; the constructor is now (config, valueConverters, skippedOperations,
+        // useSingleDatabase).
         return new SqlServerConnection(
                 JdbcConfiguration.adapt(dbzConnectorConfig),
-                ((SqlServerConnectorConfig) connectorConfig).getSourceTimestampMode(),
                 valueConverters,
-                SqlServerConnectionUtils.class::getClassLoader,
                 connectorConfig.getSkippedOperations(),
                 false);
     }

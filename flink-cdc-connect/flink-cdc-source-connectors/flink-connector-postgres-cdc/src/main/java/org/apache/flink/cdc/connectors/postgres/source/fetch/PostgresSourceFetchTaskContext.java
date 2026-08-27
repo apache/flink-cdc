@@ -46,7 +46,6 @@ import io.debezium.connector.postgresql.PostgresOffsetContext;
 import io.debezium.connector.postgresql.PostgresPartition;
 import io.debezium.connector.postgresql.PostgresSchema;
 import io.debezium.connector.postgresql.PostgresTaskContext;
-import io.debezium.connector.postgresql.PostgresTopicSelector;
 import io.debezium.connector.postgresql.connection.PostgresConnection;
 import io.debezium.connector.postgresql.connection.ReplicationConnection;
 import io.debezium.connector.postgresql.spi.Snapshotter;
@@ -63,7 +62,7 @@ import io.debezium.relational.Column;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
-import io.debezium.schema.TopicSelector;
+import io.debezium.spi.topic.TopicNamingStrategy;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.errors.RetriableException;
 import org.apache.kafka.connect.source.SourceRecord;
@@ -180,7 +179,10 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                 new PostgresConnection(
                         dbzConfig.getJdbcConfig(), valueConverterBuilder, CONNECTION_NAME);
 
-        TopicSelector<TableId> topicSelector = PostgresTopicSelector.create(dbzConfig);
+        TopicNamingStrategy<TableId> topicSelector =
+                dbzConfig.getTopicNamingStrategy(
+                        io.debezium.connector.postgresql.PostgresConnectorConfig
+                                .TOPIC_NAMING_STRATEGY);
 
         try {
             this.schema =
@@ -198,7 +200,8 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
         this.offsetContext =
                 loadStartingOffsetState(
                         new PostgresOffsetContext.Loader(dbzConfig), sourceSplitBase);
-        this.partition = new PostgresPartition(dbzConfig.getLogicalName());
+        this.partition =
+                new PostgresPartition(dbzConfig.getLogicalName(), dbzConfig.databaseName());
         this.taskContext = PostgresObjectUtils.newTaskContext(dbzConfig, schema, topicSelector);
 
         if (replicationConnection == null) {

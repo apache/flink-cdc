@@ -12,7 +12,6 @@ import io.debezium.annotation.VisibleForTesting;
 import io.debezium.config.Configuration;
 import io.debezium.connector.postgresql.PgOid;
 import io.debezium.connector.postgresql.PostgresConnectorConfig;
-import io.debezium.connector.postgresql.PostgresSchema;
 import io.debezium.connector.postgresql.PostgresType;
 import io.debezium.connector.postgresql.PostgresValueConverter;
 import io.debezium.connector.postgresql.TypeRegistry;
@@ -25,7 +24,6 @@ import io.debezium.relational.ColumnEditor;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
-import io.debezium.schema.DatabaseSchema;
 import io.debezium.util.Clock;
 import io.debezium.util.Metronome;
 import org.apache.kafka.connect.errors.ConnectException;
@@ -156,7 +154,6 @@ public class PostgresConnection extends JdbcConnection {
                 addDefaultSettings(config, connectionUsage),
                 factory,
                 PostgresConnection::validateServerVersion,
-                null,
                 "\"",
                 "\"");
 
@@ -169,7 +166,8 @@ public class PostgresConnection extends JdbcConnection {
             final PostgresValueConverter valueConverter =
                     valueConverterBuilder.build(this.typeRegistry);
             this.defaultValueConverter =
-                    new PostgresDefaultValueConverter(valueConverter, this.getTimestampUtils());
+                    new PostgresDefaultValueConverter(
+                            valueConverter, this.getTimestampUtils(), this.typeRegistry);
         }
     }
 
@@ -186,7 +184,6 @@ public class PostgresConnection extends JdbcConnection {
                 addDefaultSettings(config.getJdbcConfig(), connectionUsage),
                 FACTORY,
                 PostgresConnection::validateServerVersion,
-                null,
                 "\"",
                 "\"");
         if (Objects.isNull(typeRegistry)) {
@@ -197,7 +194,8 @@ public class PostgresConnection extends JdbcConnection {
             final PostgresValueConverter valueConverter =
                     PostgresValueConverter.of(config, this.getDatabaseCharset(), typeRegistry);
             this.defaultValueConverter =
-                    new PostgresDefaultValueConverter(valueConverter, this.getTimestampUtils());
+                    new PostgresDefaultValueConverter(
+                            valueConverter, this.getTimestampUtils(), this.typeRegistry);
         }
     }
 
@@ -779,14 +777,12 @@ public class PostgresConnection extends JdbcConnection {
     }
 
     @Override
-    public <T extends DatabaseSchema<TableId>> Object getColumnValue(
-            ResultSet rs, int columnIndex, Column column, Table table, T schema)
+    public Object getColumnValue(ResultSet rs, int columnIndex, Column column, Table table)
             throws SQLException {
         try {
             final ResultSetMetaData metaData = rs.getMetaData();
             final String columnTypeName = metaData.getColumnTypeName(columnIndex);
-            final PostgresType type =
-                    ((PostgresSchema) schema).getTypeRegistry().get(columnTypeName);
+            final PostgresType type = getTypeRegistry().get(columnTypeName);
 
             LOGGER.trace("Type of incoming data is: {}", type.getOid());
             LOGGER.trace("ColumnTypeName is: {}", columnTypeName);
@@ -843,7 +839,7 @@ public class PostgresConnection extends JdbcConnection {
             }
         } catch (SQLException e) {
             // not a known type
-            return super.getColumnValue(rs, columnIndex, column, table, schema);
+            return super.getColumnValue(rs, columnIndex, column, table);
         }
     }
 

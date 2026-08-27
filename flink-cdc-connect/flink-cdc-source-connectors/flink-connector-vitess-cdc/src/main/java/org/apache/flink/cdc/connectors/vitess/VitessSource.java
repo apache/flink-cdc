@@ -263,7 +263,8 @@ public class VitessSource {
             // Vtgate server/cluster being monitored. The logical name should be unique across
             // all other connectors, since it is used as a prefix for all Kafka topic names coming
             // from this connector. Only alphanumeric characters and underscores should be used.
-            props.setProperty("database.server.name", "vitess_cdc_source");
+            // Debezium 2.0 renamed "database.server.name" to "topic.prefix".
+            props.setProperty("topic.prefix", "vitess_cdc_source");
             props.setProperty("database.hostname", checkNotNull(hostname));
             props.setProperty("database.port", String.valueOf(port));
             props.setProperty("vitess.keyspace", checkNotNull(keyspace));
