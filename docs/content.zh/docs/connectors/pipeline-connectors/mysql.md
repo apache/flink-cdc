@@ -283,6 +283,13 @@ pipeline:
       <td>是否启用动态加表特性，默认关闭。 此配置项只有作业从savepoint/checkpoint启动时才生效。</td>
     </tr>
     <tr>
+      <td>scan.incremental.snapshot.metadata.release.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>是否在进入 binlog 阶段后，释放 source coordinator 持有的快照分片元数据，以降低 JobManager 内存占用。与 scan.newly-added-table.enabled 不兼容；默认关闭。仅在成功完成一次 checkpoint 后才会释放；若未开启 checkpoint 或没有 checkpoint 完成，则会保留该元数据。</td>
+    </tr>
+    <tr>
       <td>scan.binlog.newly-added-table.enabled</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>

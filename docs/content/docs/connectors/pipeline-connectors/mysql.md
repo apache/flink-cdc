@@ -294,7 +294,7 @@ pipeline:
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>
       <td>Boolean</td>
-      <td>Whether to release the snapshot split metadata held by the source coordinator after entering the binlog phase to reduce JobManager memory. Incompatible with scan.newly-added-table.enabled; disabled by default.</td>
+      <td>Whether to release the snapshot split metadata held by the source coordinator after entering the binlog phase to reduce JobManager memory. Incompatible with scan.newly-added-table.enabled; disabled by default. Release happens only after a successful checkpoint; if checkpointing is disabled or no checkpoint completes, the metadata is retained, so this option has no effect without checkpointing.</td>
     </tr>
     <tr>
       <td>scan.binlog.newly-added-table.enabled</td>
