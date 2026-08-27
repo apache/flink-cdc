@@ -33,7 +33,8 @@ limitations under the License.
 
 
     <properties>
-        <fluss.version>0.9.0-incubating</fluss.version>
+        <!-- Target the upcoming Fluss 1.0 release and use its public Apache snapshot until then. -->
+        <fluss.version>1.0-SNAPSHOT</fluss.version>
     </properties>
 
     <dependencies>
@@ -43,6 +44,12 @@ limitations under the License.
             <version>${fluss.version}</version>
         </dependency>
 
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-connector-base</artifactId>
+            <version>${flink.version}</version>
+            <scope>provided</scope>
+        </dependency>
 
         <!-- Test dependencies -->
         <dependency>
@@ -94,7 +101,7 @@ limitations under the License.
         </dependency>
         <dependency>
             <groupId>org.apache.fluss</groupId>
-            <artifactId>fluss-flink-1.20</artifactId>
+            <artifactId>fluss-flink-${fluss.flink.major.version}</artifactId>
             <version>${fluss.version}</version>
             <scope>test</scope>
         </dependency>
