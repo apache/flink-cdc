@@ -24,8 +24,10 @@ import org.apache.flink.cdc.connectors.mysql.debezium.dispatcher.SignalEventDisp
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplit;
+import org.apache.flink.util.TemporaryClassLoaderContext;
 
 import com.github.shyiko.mysql.binlog.BinaryLogClient;
+import io.debezium.config.CommonConnectorConfig;
 import io.debezium.connector.AbstractSourceInfo;
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.connector.mysql.GtidSet;
@@ -37,7 +39,6 @@ import io.debezium.connector.mysql.MySqlDatabaseSchema;
 import io.debezium.connector.mysql.MySqlOffsetContext;
 import io.debezium.connector.mysql.MySqlPartition;
 import io.debezium.connector.mysql.MySqlStreamingChangeEventSourceMetrics;
-import io.debezium.connector.mysql.MySqlTopicSelector;
 import io.debezium.data.Envelope;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.ErrorHandler;
@@ -48,8 +49,8 @@ import io.debezium.pipeline.source.spi.EventMetadataProvider;
 import io.debezium.pipeline.spi.OffsetContext;
 import io.debezium.pipeline.spi.Offsets;
 import io.debezium.relational.TableId;
-import io.debezium.schema.DataCollectionId;
-import io.debezium.schema.TopicSelector;
+import io.debezium.spi.schema.DataCollectionId;
+import io.debezium.spi.topic.TopicNamingStrategy;
 import io.debezium.util.Clock;
 import io.debezium.util.Collect;
 import io.debezium.util.SchemaNameAdjuster;
@@ -88,7 +89,7 @@ public class StatefulTaskContext implements AutoCloseable {
     private MySqlTaskContextImpl taskContext;
     private MySqlOffsetContext offsetContext;
     private MySqlPartition mySqlPartition;
-    private TopicSelector<TableId> topicSelector;
+    private TopicNamingStrategy<TableId> topicNamingStrategy;
     private SnapshotChangeEventSourceMetrics<MySqlPartition> snapshotChangeEventSourceMetrics;
     private StreamingChangeEventSourceMetrics<MySqlPartition> streamingChangeEventSourceMetrics;
     private EventDispatcherImpl<TableId> dispatcher;
@@ -110,74 +111,94 @@ public class StatefulTaskContext implements AutoCloseable {
     }
 
     public void configure(MySqlSplit mySqlSplit) {
-        // initial stateful objects
-        final boolean tableIdCaseInsensitive = connection.isTableIdCaseSensitive();
-        this.topicSelector = MySqlTopicSelector.defaultSelector(connectorConfig);
-        EmbeddedFlinkDatabaseHistory.registerHistory(
-                sourceConfig
-                        .getDbzConfiguration()
-                        .getString(EmbeddedFlinkDatabaseHistory.DATABASE_HISTORY_INSTANCE_NAME),
-                mySqlSplit.getTableSchemas().values());
+        // Debezium 2.0 changed io.debezium.config.Instantiator to resolve classes through the
+        // thread context class loader. On a Flink task thread that loader can be a user code
+        // class loader left over from a previous job attempt, which is already closed, so
+        // Debezium fails with "Trying to access closed classloader" while building its own
+        // objects. Pin the context class loader to the one that loaded Debezium.
+        try (TemporaryClassLoaderContext ignored =
+                TemporaryClassLoaderContext.of(CommonConnectorConfig.class.getClassLoader())) {
+            // initial stateful objects
+            final boolean tableIdCaseInsensitive = connection.isTableIdCaseSensitive();
+            this.topicNamingStrategy =
+                    connectorConfig.getTopicNamingStrategy(
+                            MySqlConnectorConfig.TOPIC_NAMING_STRATEGY);
+            EmbeddedFlinkDatabaseHistory.registerHistory(
+                    sourceConfig
+                            .getDbzConfiguration()
+                            .getString(EmbeddedFlinkDatabaseHistory.DATABASE_HISTORY_INSTANCE_NAME),
+                    mySqlSplit.getTableSchemas().values());
 
-        Optional.ofNullable(databaseSchema).ifPresent(MySqlDatabaseSchema::close);
-        this.databaseSchema =
-                DebeziumUtils.createMySqlDatabaseSchema(connectorConfig, tableIdCaseInsensitive);
+            Optional.ofNullable(databaseSchema).ifPresent(MySqlDatabaseSchema::close);
+            this.databaseSchema =
+                    DebeziumUtils.createMySqlDatabaseSchema(
+                            connectorConfig, tableIdCaseInsensitive);
 
-        this.mySqlPartition = new MySqlPartition(connectorConfig.getLogicalName());
+            this.mySqlPartition =
+                    new MySqlPartition(
+                            connectorConfig.getLogicalName(),
+                            connectorConfig
+                                    .getConfig()
+                                    .getString(
+                                            io.debezium.relational.RelationalDatabaseConnectorConfig
+                                                    .DATABASE_NAME));
 
-        this.offsetContext =
-                loadStartingOffsetState(new MySqlOffsetContext.Loader(connectorConfig), mySqlSplit);
-        validateAndLoadDatabaseHistory(offsetContext, databaseSchema);
+            this.offsetContext =
+                    loadStartingOffsetState(
+                            new MySqlOffsetContext.Loader(connectorConfig), mySqlSplit);
+            validateAndLoadDatabaseHistory(offsetContext, databaseSchema);
 
-        this.taskContext =
-                new MySqlTaskContextImpl(connectorConfig, databaseSchema, binaryLogClient);
+            this.taskContext =
+                    new MySqlTaskContextImpl(connectorConfig, databaseSchema, binaryLogClient);
 
-        final int queueSize =
-                mySqlSplit.isSnapshotSplit()
-                        ? sourceConfig.getSplitSize() + DEFAULT_BINLOG_QUEUE_SIZE_IN_SNAPSHOT_SCAN
-                        : connectorConfig.getMaxQueueSize();
-        this.queue =
-                new ChangeEventQueue.Builder<DataChangeEvent>()
-                        .pollInterval(connectorConfig.getPollInterval())
-                        .maxBatchSize(connectorConfig.getMaxBatchSize())
-                        .maxQueueSize(queueSize)
-                        .maxQueueSizeInBytes(connectorConfig.getMaxQueueSizeInBytes())
-                        .loggingContextSupplier(
-                                () ->
-                                        taskContext.configureLoggingContext(
-                                                "mysql-cdc-connector-task"))
-                        // do not buffer any element, we use signal event
-                        // .buffering()
-                        .build();
-        this.dispatcher =
-                new EventDispatcherImpl<>(
-                        connectorConfig,
-                        topicSelector,
-                        databaseSchema,
-                        queue,
-                        connectorConfig.getTableFilters().dataCollectionFilter(),
-                        DataChangeEvent::new,
-                        metadataProvider,
-                        schemaNameAdjuster);
+            final int queueSize =
+                    mySqlSplit.isSnapshotSplit()
+                            ? sourceConfig.getSplitSize()
+                                    + DEFAULT_BINLOG_QUEUE_SIZE_IN_SNAPSHOT_SCAN
+                            : connectorConfig.getMaxQueueSize();
+            this.queue =
+                    new ChangeEventQueue.Builder<DataChangeEvent>()
+                            .pollInterval(connectorConfig.getPollInterval())
+                            .maxBatchSize(connectorConfig.getMaxBatchSize())
+                            .maxQueueSize(queueSize)
+                            .maxQueueSizeInBytes(connectorConfig.getMaxQueueSizeInBytes())
+                            .loggingContextSupplier(
+                                    () ->
+                                            taskContext.configureLoggingContext(
+                                                    "mysql-cdc-connector-task"))
+                            // do not buffer any element, we use signal event
+                            // .buffering()
+                            .build();
+            this.dispatcher =
+                    new EventDispatcherImpl<>(
+                            connectorConfig,
+                            topicNamingStrategy,
+                            databaseSchema,
+                            queue,
+                            connectorConfig.getTableFilters().dataCollectionFilter(),
+                            DataChangeEvent::new,
+                            metadataProvider,
+                            schemaNameAdjuster);
 
-        this.snapshotReceiver = dispatcher.getSnapshotChangeEventReceiver();
+            this.snapshotReceiver = dispatcher.getSnapshotChangeEventReceiver();
 
-        this.signalEventDispatcher =
-                new SignalEventDispatcher(
-                        offsetContext.getOffset(), topicSelector.getPrimaryTopic(), queue);
+            this.signalEventDispatcher =
+                    new SignalEventDispatcher(
+                            offsetContext.getOffset(), connectorConfig.getLogicalName(), queue);
 
-        final MySqlChangeEventSourceMetricsFactory changeEventSourceMetricsFactory =
-                new MySqlChangeEventSourceMetricsFactory(
-                        new MySqlStreamingChangeEventSourceMetrics(
-                                taskContext, queue, metadataProvider));
-        this.snapshotChangeEventSourceMetrics =
-                changeEventSourceMetricsFactory.getSnapshotMetrics(
-                        taskContext, queue, metadataProvider);
-        this.streamingChangeEventSourceMetrics =
-                changeEventSourceMetricsFactory.getStreamingMetrics(
-                        taskContext, queue, metadataProvider);
-        this.errorHandler =
-                new MySqlErrorHandler(connectorConfig, queue, taskContext, sourceConfig);
+            final MySqlChangeEventSourceMetricsFactory changeEventSourceMetricsFactory =
+                    new MySqlChangeEventSourceMetricsFactory(
+                            new MySqlStreamingChangeEventSourceMetrics(
+                                    taskContext, queue, metadataProvider));
+            this.snapshotChangeEventSourceMetrics =
+                    changeEventSourceMetricsFactory.getSnapshotMetrics(
+                            taskContext, queue, metadataProvider);
+            this.streamingChangeEventSourceMetrics =
+                    changeEventSourceMetricsFactory.getStreamingMetrics(
+                            taskContext, queue, metadataProvider);
+            this.errorHandler =
+                    new MySqlErrorHandler(connectorConfig, queue, taskContext, sourceConfig);
+        }
     }
 
     private void validateAndLoadDatabaseHistory(
@@ -428,8 +449,8 @@ public class StatefulTaskContext implements AutoCloseable {
         return mySqlPartition;
     }
 
-    public TopicSelector<TableId> getTopicSelector() {
-        return topicSelector;
+    public TopicNamingStrategy<TableId> getTopicNamingStrategy() {
+        return topicNamingStrategy;
     }
 
     public SnapshotChangeEventSourceMetrics<MySqlPartition> getSnapshotChangeEventSourceMetrics() {

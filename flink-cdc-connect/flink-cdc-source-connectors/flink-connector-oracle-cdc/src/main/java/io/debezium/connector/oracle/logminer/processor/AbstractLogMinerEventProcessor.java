@@ -1,9 +1,19 @@
 /*
- * Copyright Debezium Authors.
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache Software License version 2.0, available at http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
-
 package io.debezium.connector.oracle.logminer.processor;
 
 import io.debezium.DebeziumException;
@@ -52,14 +62,12 @@ import java.util.Map;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
- * Copied from Debezium 1.9.8.Final.
+ * An abstract implementation of {@link LogMinerEventProcessor} that all processors should extend.
  *
- * <p>An abstract implementation of {@link LogMinerEventProcessor} that all processors should
- * extend.
- *
- * <p>Lines 411, 423: pass ROWID to LogMinerChangeRecordEmitter.
+ * @author Chris Cranford
  */
 public abstract class AbstractLogMinerEventProcessor<T extends AbstractTransaction>
         implements LogMinerEventProcessor {
@@ -178,13 +186,12 @@ public abstract class AbstractLogMinerEventProcessor<T extends AbstractTransacti
     }
 
     @Override
-    public Scn process(OraclePartition partition, Scn startScn, Scn endScn)
-            throws SQLException, InterruptedException {
+    public Scn process(Scn startScn, Scn endScn) throws SQLException, InterruptedException {
         counters.reset();
 
         try (PreparedStatement statement = createQueryStatement()) {
             LOGGER.debug("Fetching results for SCN [{}, {}]", startScn, endScn);
-            statement.setFetchSize(getConfig().getLogMiningViewFetchSize());
+            statement.setFetchSize(getConfig().getQueryFetchSize());
             statement.setFetchDirection(ResultSet.FETCH_FORWARD);
             statement.setString(1, startScn.toString());
             statement.setString(2, endScn.toString());
@@ -221,6 +228,14 @@ public abstract class AbstractLogMinerEventProcessor<T extends AbstractTransacti
                         offsetContext.getCommitScn(),
                         metrics.getNumberOfActiveTransactions(),
                         metrics.getMillisecondToSleepBetweenMiningQuery());
+
+                if (metrics.getNumberOfActiveTransactions() > 0) {
+                    LOGGER.debug(
+                            "All active transactions: {}",
+                            getTransactionCache().values().stream()
+                                    .map(t -> t.getTransactionId() + " (" + t.getStartScn() + ")")
+                                    .collect(Collectors.joining(",")));
+                }
 
                 metrics.addProcessedRows(counters.rows);
                 return calculateNewStartScn(
@@ -403,7 +418,7 @@ public abstract class AbstractLogMinerEventProcessor<T extends AbstractTransacti
 
         final boolean skipExcludedUserName = isTransactionUserExcluded(transaction);
         TransactionCommitConsumer.Handler<LogMinerEvent> delegate =
-                new TransactionCommitConsumer.Handler<LogMinerEvent>() {
+                new TransactionCommitConsumer.Handler<>() {
                     private int numEvents = getTransactionEventCount(transaction);
 
                     @Override
@@ -418,6 +433,7 @@ public abstract class AbstractLogMinerEventProcessor<T extends AbstractTransacti
 
                         offsetContext.setEventScn(event.getScn());
                         offsetContext.setTransactionId(transactionId);
+                        offsetContext.setUserName(transaction.getUserName());
                         offsetContext.setSourceTime(
                                 event.getChangeTime()
                                         .minusSeconds(databaseOffset.getTotalSeconds()));
@@ -489,7 +505,8 @@ public abstract class AbstractLogMinerEventProcessor<T extends AbstractTransacti
 
         offsetContext.setEventScn(commitScn);
         if (getTransactionEventCount(transaction) > 0 && !skipExcludedUserName) {
-            dispatcher.dispatchTransactionCommittedEvent(partition, offsetContext);
+            dispatcher.dispatchTransactionCommittedEvent(
+                    partition, offsetContext, transaction.getChangeTime());
         } else {
             dispatcher.dispatchHeartbeatEvent(partition, offsetContext);
         }
@@ -580,7 +597,7 @@ public abstract class AbstractLogMinerEventProcessor<T extends AbstractTransacti
     }
 
     /**
-     * Finalizes the rollback the specified transaction.
+     * Finalizes the rollback the specified transaction
      *
      * @param transactionId the unique transaction identifier, never {@code null}
      * @param rollbackScn the rollback transaction's system change number, never {@code null}
@@ -851,8 +868,7 @@ public abstract class AbstractLogMinerEventProcessor<T extends AbstractTransacti
                 row.getTransactionId(),
                 row,
                 () -> {
-                    final LogMinerDmlEntry dmlEntry =
-                            parseDmlStatement(row.getRedoSql(), table, row.getTransactionId());
+                    final LogMinerDmlEntry dmlEntry = parseDmlStatement(row.getRedoSql(), table);
                     dmlEntry.setObjectName(row.getTableName());
                     dmlEntry.setObjectOwner(row.getTablespaceName());
                     return new DmlEvent(row, dmlEntry);
@@ -1050,10 +1066,7 @@ public abstract class AbstractLogMinerEventProcessor<T extends AbstractTransacti
         // results.
         // This should have negligible overhead since this use case should happen rarely.
         try (OracleConnection connection =
-                new OracleConnection(
-                        connectorConfig.getJdbcConfig(),
-                        () -> getClass().getClassLoader(),
-                        false)) {
+                new OracleConnection(connectorConfig.getJdbcConfig(), false)) {
             connection.setAutoCommit(false);
             final String pdbName = getConfig().getPdbName();
             if (pdbName != null) {
@@ -1068,10 +1081,9 @@ public abstract class AbstractLogMinerEventProcessor<T extends AbstractTransacti
      *
      * @param redoSql the redo SQL statement
      * @param table the table the SQL statement is for
-     * @param transactionId the associated transaction id for the SQL statement
      * @return a parse object for the redo SQL statement
      */
-    private LogMinerDmlEntry parseDmlStatement(String redoSql, Table table, String transactionId) {
+    private LogMinerDmlEntry parseDmlStatement(String redoSql, Table table) {
         LogMinerDmlEntry dmlEntry;
         try {
             Instant parseStart = Instant.now();
@@ -1097,7 +1109,7 @@ public abstract class AbstractLogMinerEventProcessor<T extends AbstractTransacti
         return dmlEntry;
     }
 
-    private static final Pattern LOB_WRITE_SQL_PATTERN =
+    private static Pattern LOB_WRITE_SQL_PATTERN =
             Pattern.compile(
                     "(?s).* := ((?:HEXTORAW\\()?'.*'(?:\\))?);\\s*dbms_lob.write\\([^,]+,\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,[^,]+\\);.*");
 
@@ -1133,10 +1145,10 @@ public abstract class AbstractLogMinerEventProcessor<T extends AbstractTransacti
         final int length;
         final String data;
 
-        ParsedLobWriteSql(int offset, int length, String data) {
-            this.offset = offset;
-            this.length = length;
-            this.data = data;
+        ParsedLobWriteSql(int _offset, int _length, String _data) {
+            offset = _offset;
+            length = _length;
+            data = _data;
         }
     }
 
@@ -1158,13 +1170,13 @@ public abstract class AbstractLogMinerEventProcessor<T extends AbstractTransacti
      *   <li>Sequence number of the transaction that generated the change
      * </ol>
      *
-     * <p>When Oracle LogMiner mines records, it is possible that when an undo operation is
-     * detected, often the product of a constraint violation, the LogMiner row will have the same
-     * explicit XID (transaction id) as the source operation that we should undo; however, if the
-     * record to be undone was mined in a prior iteration, Oracle LogMiner won't be able to make a
-     * link back to the full transaction's sequence number, therefore the XID value for the undo row
-     * will contain only the undo segment number and slot number, setting the sequence number to
-     * 4294967295 (aka -1 or 0xFFFFFFFF).
+     * When Oracle LogMiner mines records, it is possible that when an undo operation is detected,
+     * often the product of a constraint violation, the LogMiner row will have the same explicit XID
+     * (transaction id) as the source operation that we should undo; however, if the record to be
+     * undone was mined in a prior iteration, Oracle LogMiner won't be able to make a link back to
+     * the full transaction's sequence number, therefore the XID value for the undo row will contain
+     * only the undo segment number and slot number, setting the sequence number to 4294967295 (aka
+     * -1 or 0xFFFFFFFF).
      *
      * <p>This method explicitly checks if the provided transaction id has the no sequence sentinel
      * value and if so, returns {@code true}; otherwise returns {@code false}.
@@ -1180,7 +1192,24 @@ public abstract class AbstractLogMinerEventProcessor<T extends AbstractTransacti
         return transactionId.substring(0, 8);
     }
 
-    /** Wrapper for all counter variables. */
+    protected boolean isTransactionOverEventThreshold(T transaction) {
+        if (getConfig().getLogMiningBufferTransactionEventsThreshold() == 0) {
+            return false;
+        }
+        return getTransactionEventCount(transaction)
+                >= getConfig().getLogMiningBufferTransactionEventsThreshold();
+    }
+
+    protected void abandonTransactionOverEventThreshold(T transaction) {
+        LOGGER.warn(
+                "Transaction {} exceeds maximum allowed number of events, transaction will be abandoned.",
+                transaction.getTransactionId());
+        metrics.incrementWarningCount();
+        getAndRemoveTransactionFromCache(transaction.getTransactionId());
+        metrics.incrementOversizedTransactions();
+    }
+
+    /** Wrapper for all counter variables */
     protected class Counters {
         public int stuckCount;
         public int dmlCount;

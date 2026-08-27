@@ -226,7 +226,8 @@ class SqlServerEventDeserializerTest {
                         DBZ_TABLE_ID.catalog(),
                         DBZ_TABLE_ID.schema(),
                         "ddl",
-                        tableChanges);
+                        tableChanges,
+                        java.time.Instant.now());
 
         String historyJson = DOCUMENT_WRITER.write(historyRecord.document());
 

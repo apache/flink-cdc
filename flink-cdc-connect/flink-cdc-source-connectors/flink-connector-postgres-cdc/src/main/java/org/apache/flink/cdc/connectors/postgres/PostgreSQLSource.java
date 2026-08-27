@@ -157,7 +157,8 @@ public class PostgreSQLSource {
             // database server/cluster being monitored. The logical name should be unique across
             // all other connectors, since it is used as a prefix for all Kafka topic names coming
             // from this connector. Only alphanumeric characters and underscores should be used.
-            props.setProperty("database.server.name", "postgres_cdc_source");
+            // Debezium 2.0 renamed "database.server.name" to "topic.prefix".
+            props.setProperty("topic.prefix", "postgres_cdc_source");
             props.setProperty("database.hostname", checkNotNull(hostname));
             props.setProperty("database.dbname", checkNotNull(database));
             props.setProperty("database.user", checkNotNull(username));

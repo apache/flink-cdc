@@ -90,10 +90,14 @@ public class FlinkOffsetBackingStore implements OffsetBackingStore {
         String engineName = (String) conf.get(EmbeddedEngine.ENGINE_NAME.name());
         Converter keyConverter = new JsonConverter();
         Converter valueConverter = new JsonConverter();
-        keyConverter.configure(config.originals(), true);
-        Map<String, Object> valueConfigs = new HashMap<>(conf);
-        valueConfigs.put("schemas.enable", false);
-        valueConverter.configure(valueConfigs, true);
+        // Debezium 2.0's embedded engine serializes offset keys/values as raw JSON without the
+        // {"schema":...,"payload":...} envelope. Disable schemas on BOTH converters so the key we
+        // seed here matches the key the engine looks up on recovery (otherwise the restored offset
+        // is never found and the connector falls back to a schema-only-recovery snapshot).
+        Map<String, Object> converterConfigs = new HashMap<>(conf);
+        converterConfigs.put("schemas.enable", false);
+        keyConverter.configure(converterConfigs, true);
+        valueConverter.configure(converterConfigs, false);
         OffsetStorageWriter offsetWriter =
                 new OffsetStorageWriter(
                         this,

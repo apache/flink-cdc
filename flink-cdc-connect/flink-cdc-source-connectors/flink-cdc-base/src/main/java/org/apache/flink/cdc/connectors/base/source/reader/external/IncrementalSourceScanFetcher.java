@@ -22,9 +22,11 @@ import org.apache.flink.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceRecords;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.util.FlinkRuntimeException;
+import org.apache.flink.util.TemporaryClassLoaderContext;
 
 import org.apache.flink.shaded.guava31.com.google.common.util.concurrent.ThreadFactoryBuilder;
 
+import io.debezium.config.CommonConnectorConfig;
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.pipeline.DataChangeEvent;
 import org.apache.kafka.connect.data.Struct;
@@ -89,7 +91,15 @@ public class IncrementalSourceScanFetcher implements Fetcher<SourceRecords, Sour
     public void submitTask(FetchTask<SourceSplitBase> fetchTask) {
         this.snapshotSplitReadTask = fetchTask;
         this.currentSnapshotSplit = fetchTask.getSplit().asSnapshotSplit();
-        taskContext.configure(currentSnapshotSplit);
+        // Debezium 2.0 changed io.debezium.config.Instantiator to resolve classes through the
+        // thread context class loader. On a Flink task thread that loader can be a user code class
+        // loader left over from a previous job attempt, which is already closed, so Debezium fails
+        // with "Trying to access closed classloader" while building its own objects (topic naming
+        // strategy, transaction metadata factory, ...). Pin it to the loader that loaded Debezium.
+        try (TemporaryClassLoaderContext ignored =
+                TemporaryClassLoaderContext.of(CommonConnectorConfig.class.getClassLoader())) {
+            taskContext.configure(currentSnapshotSplit);
+        }
         this.queue = taskContext.getQueue();
         this.hasNextElement.set(true);
         this.reachEnd.set(false);

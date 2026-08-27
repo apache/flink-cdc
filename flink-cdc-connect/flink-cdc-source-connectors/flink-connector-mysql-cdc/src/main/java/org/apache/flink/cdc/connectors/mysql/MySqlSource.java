@@ -173,12 +173,13 @@ public class MySqlSource {
             // connectors,
             // since it is used as a prefix for all Kafka topic names emanating from this connector.
             // Only alphanumeric characters and underscores should be used.
-            props.setProperty("database.server.name", DATABASE_SERVER_NAME);
+            // Debezium 2.0 renamed "database.server.name" to "topic.prefix".
+            props.setProperty("topic.prefix", DATABASE_SERVER_NAME);
             props.setProperty("database.hostname", checkNotNull(hostname));
             props.setProperty("database.user", checkNotNull(username));
             props.setProperty("database.password", checkNotNull(password));
             props.setProperty("database.port", String.valueOf(port));
-            props.setProperty("database.history.skip.unparseable.ddl", String.valueOf(true));
+            props.setProperty("schema.history.internal.skip.unparseable.ddl", String.valueOf(true));
             // debezium use "long" mode to handle unsigned bigint by default,
             // but it'll cause lose of precise when the value is larger than 2^63,
             // so use "precise" mode to avoid it.
@@ -186,6 +187,12 @@ public class MySqlSource {
 
             if (serverId != null) {
                 props.setProperty("database.server.id", String.valueOf(serverId));
+            } else {
+                // Debezium 2.0 made "database.server.id" required (1.9 assigned a random default in
+                // the 5400-6400 range). Preserve that behavior when no server id is configured.
+                props.setProperty(
+                        "database.server.id",
+                        String.valueOf(5400 + new java.util.Random().nextInt(1000)));
             }
             if (databaseList != null) {
                 props.setProperty("database.include.list", String.join(",", databaseList));

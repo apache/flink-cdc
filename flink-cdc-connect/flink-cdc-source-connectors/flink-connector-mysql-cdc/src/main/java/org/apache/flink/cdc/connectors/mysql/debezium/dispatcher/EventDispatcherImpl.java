@@ -33,11 +33,11 @@ import io.debezium.relational.TableId;
 import io.debezium.relational.history.HistoryRecord;
 import io.debezium.relational.history.TableChanges;
 import io.debezium.schema.DataCollectionFilters;
-import io.debezium.schema.DataCollectionId;
 import io.debezium.schema.DatabaseSchema;
 import io.debezium.schema.HistorizedDatabaseSchema;
 import io.debezium.schema.SchemaChangeEvent;
-import io.debezium.schema.TopicSelector;
+import io.debezium.spi.schema.DataCollectionId;
+import io.debezium.spi.topic.TopicNamingStrategy;
 import io.debezium.util.SchemaNameAdjuster;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.SchemaBuilder;
@@ -79,13 +79,13 @@ public class EventDispatcherImpl<T extends DataCollectionId>
     private final HistorizedDatabaseSchema historizedSchema;
     private final DataCollectionFilters.DataCollectionFilter<T> filter;
     private final CommonConnectorConfig connectorConfig;
-    private final TopicSelector<T> topicSelector;
+    private final TopicNamingStrategy<T> topicNamingStrategy;
     private final Schema schemaChangeKeySchema;
     private final Schema schemaChangeValueSchema;
 
     public EventDispatcherImpl(
             CommonConnectorConfig connectorConfig,
-            TopicSelector<T> topicSelector,
+            TopicNamingStrategy<T> topicNamingStrategy,
             DatabaseSchema<T> schema,
             ChangeEventQueue<DataChangeEvent> queue,
             DataCollectionFilters.DataCollectionFilter<T> filter,
@@ -94,7 +94,7 @@ public class EventDispatcherImpl<T extends DataCollectionId>
             SchemaNameAdjuster schemaNameAdjuster) {
         super(
                 connectorConfig,
-                topicSelector,
+                topicNamingStrategy,
                 schema,
                 queue,
                 filter,
@@ -108,7 +108,7 @@ public class EventDispatcherImpl<T extends DataCollectionId>
         this.filter = filter;
         this.queue = queue;
         this.connectorConfig = connectorConfig;
-        this.topicSelector = topicSelector;
+        this.topicNamingStrategy = topicNamingStrategy;
         this.schemaChangeKeySchema =
                 SchemaBuilder.struct()
                         .name(
@@ -208,7 +208,8 @@ public class EventDispatcherImpl<T extends DataCollectionId>
                             event.getDatabase(),
                             null,
                             event.getDdl(),
-                            event.getTableChanges());
+                            event.getTableChanges(),
+                            event.getTimestamp());
             String historyStr = DOCUMENT_WRITER.write(historyRecord.document());
 
             Struct value = new Struct(schemaChangeValueSchema);
@@ -314,7 +315,7 @@ public class EventDispatcherImpl<T extends DataCollectionId>
             historizedSchema.applySchemaChange(event);
             if (connectorConfig.isSchemaChangesHistoryEnabled()) {
                 try {
-                    final String topicName = topicSelector.getPrimaryTopic();
+                    final String topicName = connectorConfig.getLogicalName();
                     final Integer partition = 0;
                     final Struct key = schemaChangeRecordKey(event);
                     final Struct value = schemaChangeRecordValue(event);

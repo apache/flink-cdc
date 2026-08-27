@@ -171,6 +171,8 @@ public class IncrementalSourceStreamFetcherTest extends PostgresTestBase {
                                 + "primary key: [Id]\n"
                                 + "default charset: null\n"
                                 + "comment: null\n"
+                                + "attributes: {\n"
+                                + "}\n"
                                 + "}");
         assertThat(allRecords.get(1).toString()).contains("before_ddl");
         assertThat(allRecords.get(2).toString())
@@ -185,6 +187,8 @@ public class IncrementalSourceStreamFetcherTest extends PostgresTestBase {
                                 + "primary key: [Id]\n"
                                 + "default charset: null\n"
                                 + "comment: null\n"
+                                + "attributes: {\n"
+                                + "}\n"
                                 + "}");
         assertThat(allRecords.get(3).toString()).contains("after_ddl");
 

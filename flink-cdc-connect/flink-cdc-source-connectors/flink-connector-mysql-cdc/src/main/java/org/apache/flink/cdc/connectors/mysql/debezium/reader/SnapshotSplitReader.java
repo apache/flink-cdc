@@ -144,7 +144,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
                         statefulTaskContext.getDatabaseSchema(),
                         statefulTaskContext.getConnection(),
                         statefulTaskContext.getDispatcher(),
-                        statefulTaskContext.getTopicSelector(),
+                        statefulTaskContext.getTopicNamingStrategy(),
                         statefulTaskContext.getSnapshotReceiver(),
                         StatefulTaskContext.getClock(),
                         currentSnapshotSplit,
@@ -262,7 +262,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
         final SignalEventDispatcher signalEventDispatcher =
                 new SignalEventDispatcher(
                         statefulTaskContext.getOffsetContext().getOffset(),
-                        statefulTaskContext.getTopicSelector().getPrimaryTopic(),
+                        statefulTaskContext.getConnectorConfig().getLogicalName(),
                         statefulTaskContext.getDispatcher().getQueue());
         signalEventDispatcher.dispatchWatermarkEvent(
                 backFillBinlogSplit,

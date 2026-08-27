@@ -14,13 +14,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.debezium.connector.oracle.logminer;
 
 import io.debezium.DebeziumException;
 import io.debezium.config.Configuration;
 import io.debezium.connector.oracle.OracleConnection;
 import io.debezium.connector.oracle.OracleConnectorConfig;
+import io.debezium.connector.oracle.OracleConnectorConfig.LogMiningBufferType;
 import io.debezium.connector.oracle.OracleDatabaseSchema;
 import io.debezium.connector.oracle.OracleOffsetContext;
 import io.debezium.connector.oracle.OraclePartition;
@@ -60,15 +60,11 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import static io.debezium.connector.oracle.logminer.LogMinerHelper.logError;
 import static io.debezium.connector.oracle.logminer.LogMinerHelper.setLogFilesForMining;
 
 /**
- * Copied from Debezium 1.9.8.Final. A {@link StreamingChangeEventSource} based on Oracle's LogMiner
- * utility. The event handler loop is executed in a separate executor.
- *
- * <p>Diff: Make createProcessor method as protected to produce a LogMinerEventProcessor with
- * enhanced processRow method to distinguish whether is bounded.
+ * A {@link StreamingChangeEventSource} based on Oracle's LogMiner utility. The event handler loop
+ * is executed in a separate executor.
  */
 public class LogMinerStreamingChangeEventSource
         implements StreamingChangeEventSource<OraclePartition, OracleOffsetContext> {
@@ -78,6 +74,7 @@ public class LogMinerStreamingChangeEventSource
     private static final int MAXIMUM_NAME_LENGTH = 30;
     private static final String ALL_COLUMN_LOGGING = "ALL COLUMN LOGGING";
     private static final int MINING_START_RETRIES = 5;
+    private static final Long SMALL_REDO_LOG_WARNING = 524_288_000L;
 
     private final OracleConnection jdbcConnection;
     private final EventDispatcher<OraclePartition, TableId> dispatcher;
@@ -130,7 +127,7 @@ public class LogMinerStreamingChangeEventSource
     }
 
     /**
-     * This is the loop to get changes from LogMiner.
+     * This is the loop to get changes from LogMiner
      *
      * @param context change event source context
      */
@@ -171,6 +168,8 @@ public class LogMinerStreamingChangeEventSource
 
                 setNlsSessionParameters(jdbcConnection);
                 checkDatabaseAndTableState(jdbcConnection, connectorConfig.getPdbName(), schema);
+
+                logOnlineRedoLogSizes(connectorConfig);
 
                 try (LogMinerEventProcessor processor =
                         createProcessor(context, partition, offsetContext)) {
@@ -247,10 +246,10 @@ public class LogMinerStreamingChangeEventSource
                                 retryAttempts++;
                             } else {
                                 retryAttempts = 1;
+                                startScn = processor.process(startScn, endScn);
                                 streamingMetrics.setCurrentBatchProcessingTime(
                                         Duration.between(start, Instant.now()));
                                 captureSessionMemoryStatistics(jdbcConnection);
-                                startScn = processor.process(partition, startScn, endScn);
                             }
                             pauseBetweenMiningSessions();
                         }
@@ -258,13 +257,40 @@ public class LogMinerStreamingChangeEventSource
                 }
             }
         } catch (Throwable t) {
-            logError(streamingMetrics, "Mining session stopped due to the {}", t);
+            LOGGER.error("Mining session stopped due to error.", t);
+            streamingMetrics.incrementErrorCount();
             errorHandler.setProducerThrowable(t);
         } finally {
             LOGGER.info("startScn={}, endScn={}", startScn, endScn);
             LOGGER.info("Streaming metrics dump: {}", streamingMetrics.toString());
             LOGGER.info("Offsets: {}", offsetContext);
         }
+    }
+
+    private void logOnlineRedoLogSizes(OracleConnectorConfig config) throws SQLException {
+        jdbcConnection.query(
+                "SELECT GROUP#, BYTES FROM V$LOG ORDER BY 1",
+                rs -> {
+                    LOGGER.info("Redo Log Group Sizes:");
+                    boolean potentiallySmallLogs = false;
+                    while (rs.next()) {
+                        long logSize = rs.getLong(2);
+                        if (logSize < SMALL_REDO_LOG_WARNING) {
+                            potentiallySmallLogs = true;
+                        }
+                        LOGGER.info("\tGroup #{}: {} bytes", rs.getInt(1), logSize);
+                    }
+                    if (config.getAdapter().getType().equals(LogMinerAdapter.TYPE)) {
+                        if (config.getLogMiningStrategy()
+                                == OracleConnectorConfig.LogMiningStrategy.CATALOG_IN_REDO) {
+                            if (potentiallySmallLogs) {
+                                LOGGER.warn(
+                                        "Redo logs may be sized too small using the default mining strategy, "
+                                                + "consider increasing redo log sizes to a minimum of 500MB.");
+                            }
+                        }
+                    }
+                });
     }
 
     /**
@@ -325,7 +351,7 @@ public class LogMinerStreamingChangeEventSource
             }
 
             // set start SCN to minScn
-            if (minScn.compareTo(startScn) <= 0) {
+            if (minScn.compareTo(startScn) < 0) {
                 LOGGER.info(
                         "Resetting start SCN from {} (snapshot SCN) to {} (start of oldest complete pending transaction)",
                         startScn,
@@ -364,8 +390,7 @@ public class LogMinerStreamingChangeEventSource
             ChangeEventSourceContext context,
             OraclePartition partition,
             OracleOffsetContext offsetContext) {
-        final OracleConnectorConfig.LogMiningBufferType bufferType =
-                connectorConfig.getLogMiningBufferType();
+        final LogMiningBufferType bufferType = connectorConfig.getLogMiningBufferType();
         return bufferType.createProcessor(
                 context,
                 connectorConfig,
@@ -458,7 +483,7 @@ public class LogMinerStreamingChangeEventSource
     }
 
     /**
-     * Get the maximum archive log SCN.
+     * Get the maximum archive log SCN
      *
      * @param logFiles the current logs that are part of the mining session
      * @return the maximum system change number from the archive logs
@@ -622,14 +647,14 @@ public class LogMinerStreamingChangeEventSource
      * @throws SQLException if a database exception occurred
      */
     private void setNlsSessionParameters(OracleConnection connection) throws SQLException {
-        final String nlsSessionParameters =
+        final String NLS_SESSION_PARAMETERS =
                 "ALTER SESSION SET "
                         + "  NLS_DATE_FORMAT = 'YYYY-MM-DD HH24:MI:SS'"
                         + "  NLS_TIMESTAMP_FORMAT = 'YYYY-MM-DD HH24:MI:SS.FF'"
                         + "  NLS_TIMESTAMP_TZ_FORMAT = 'YYYY-MM-DD HH24:MI:SS.FF TZH:TZM'"
                         + "  NLS_NUMERIC_CHARACTERS = '.,'";
 
-        connection.executeWithoutCommitting(nlsSessionParameters);
+        connection.executeWithoutCommitting(NLS_SESSION_PARAMETERS);
         // This is necessary so that TIMESTAMP WITH LOCAL TIME ZONE is returned in UTC
         connection.executeWithoutCommitting("ALTER SESSION SET TIME_ZONE = '00:00'");
     }
@@ -1077,7 +1102,7 @@ public class LogMinerStreamingChangeEventSource
     }
 
     @Override
-    public void commitOffset(Map<String, ?> offset) {
+    public void commitOffset(Map<String, ?> partition, Map<String, ?> offset) {
         // nothing to do
     }
 }

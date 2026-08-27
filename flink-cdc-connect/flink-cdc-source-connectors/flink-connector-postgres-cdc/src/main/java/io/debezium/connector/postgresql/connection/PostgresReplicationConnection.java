@@ -119,13 +119,7 @@ public class PostgresReplicationConnection extends JdbcConnection implements Rep
             TypeRegistry typeRegistry,
             Properties streamParams,
             PostgresSchema schema) {
-        super(
-                addDefaultSettings(config.getJdbcConfig()),
-                PostgresConnection.FACTORY,
-                null,
-                null,
-                "\"",
-                "\"");
+        super(addDefaultSettings(config.getJdbcConfig()), PostgresConnection.FACTORY, "\"", "\"");
 
         this.connectorConfig = config;
         this.slotName = slotName;
@@ -495,13 +489,9 @@ public class PostgresReplicationConnection extends JdbcConnection implements Rep
 
         try {
             try {
-                s =
-                        startPgReplicationStream(
-                                startLsn,
-                                plugin.forceRds()
-                                        ? messageDecoder::optionsWithoutMetadata
-                                        : messageDecoder::optionsWithMetadata);
-                messageDecoder.setContainsMetadata(plugin.forceRds() ? false : true);
+                // Debezium 2.0 removed forceRds()/optionsWith(out)Metadata()/setContainsMetadata();
+                // metadata handling now lives inside the decoder via defaultOptions().
+                s = startPgReplicationStream(startLsn, messageDecoder::defaultOptions);
             } catch (PSQLException e) {
                 LOGGER.debug(
                         "Could not register for streaming, retrying without optional options", e);
@@ -512,13 +502,9 @@ public class PostgresReplicationConnection extends JdbcConnection implements Rep
                     initReplicationSlot();
                 }
 
-                s =
-                        startPgReplicationStream(
-                                startLsn,
-                                plugin.forceRds()
-                                        ? messageDecoder::optionsWithoutMetadata
-                                        : messageDecoder::optionsWithMetadata);
-                messageDecoder.setContainsMetadata(plugin.forceRds() ? false : true);
+                // Debezium 2.0 removed forceRds()/optionsWith(out)Metadata()/setContainsMetadata();
+                // metadata handling now lives inside the decoder via defaultOptions().
+                s = startPgReplicationStream(startLsn, messageDecoder::defaultOptions);
             }
         } catch (PSQLException e) {
             if (e.getMessage().matches("(?s)ERROR: option .* is unknown.*")) {
@@ -532,8 +518,7 @@ public class PostgresReplicationConnection extends JdbcConnection implements Rep
                     initReplicationSlot();
                 }
 
-                s = startPgReplicationStream(startLsn, messageDecoder::optionsWithoutMetadata);
-                messageDecoder.setContainsMetadata(false);
+                s = startPgReplicationStream(startLsn, messageDecoder::defaultOptions);
             } else if (e.getMessage()
                     .matches("(?s)ERROR: requested WAL segment .* has already been removed.*")) {
                 LOGGER.error("Cannot rewind to last processed WAL position", e);

@@ -44,6 +44,6 @@ class RelationalTableFiltersTest {
 
     private static RelationalTableFilters createTableFilters() {
         return new RelationalTableFilters(
-                Configuration.empty(), tableId -> true, TableId::toString);
+                Configuration.empty(), tableId -> true, TableId::toString, false);
     }
 }

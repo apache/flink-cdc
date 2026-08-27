@@ -21,8 +21,6 @@ import io.debezium.connector.oracle.OracleConnection;
 import io.debezium.jdbc.JdbcConfiguration;
 import io.debezium.relational.Column;
 import io.debezium.relational.Table;
-import io.debezium.relational.TableId;
-import io.debezium.schema.DatabaseSchema;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -34,12 +32,13 @@ public class OracleSourceConnection extends OracleConnection {
 
     public OracleSourceConnection(
             JdbcConfiguration config, Supplier<ClassLoader> classLoaderSupplier) {
-        super(config, classLoaderSupplier);
+        // Debezium 2.0 removed the classloader-supplier constructor; the classloader is now
+        // resolved internally. The supplier is kept in this signature for caller compatibility.
+        super(config);
     }
 
     @Override
-    public <T extends DatabaseSchema<TableId>> Object getColumnValue(
-            ResultSet rs, int columnIndex, Column column, Table table, T schema)
+    public Object getColumnValue(ResultSet rs, int columnIndex, Column column, Table table)
             throws SQLException {
         try {
             if (rs.getObject(columnIndex) == null) {
@@ -54,7 +53,7 @@ public class OracleSourceConnection extends OracleConnection {
                     return rs.getObject(columnIndex);
             }
         } catch (SQLException e) {
-            return super.getColumnValue(rs, columnIndex, column, table, schema);
+            return super.getColumnValue(rs, columnIndex, column, table);
         }
     }
 }
