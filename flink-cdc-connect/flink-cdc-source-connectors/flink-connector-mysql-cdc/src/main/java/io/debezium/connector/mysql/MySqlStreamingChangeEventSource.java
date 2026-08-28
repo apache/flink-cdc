@@ -43,6 +43,7 @@ import io.debezium.pipeline.EventDispatcher;
 import io.debezium.pipeline.source.spi.StreamingChangeEventSource;
 import io.debezium.relational.TableId;
 import io.debezium.schema.SchemaChangeEvent;
+import io.debezium.schema.SchemaChangeEvent.SchemaChangeEventType;
 import io.debezium.time.Conversions;
 import io.debezium.util.Clock;
 import io.debezium.util.Metronome;
@@ -84,6 +85,12 @@ import java.util.function.Predicate;
 import static io.debezium.util.Strings.isNullOrEmpty;
 
 /**
+ * Copied from Debezium 2.1.4.Final.
+ *
+ * <p>Flink CDC patches: GTID new-channel-position handling driven by the {@code
+ * gtid.new.channel.position} pass-through property (Debezium 2.0 removed the config enum); the O(n)
+ * {@code handleChange}/{@code wrap()} error-message handling.
+ *
  * @author Jiri Pechanec
  */
 public class MySqlStreamingChangeEventSource
@@ -177,7 +184,7 @@ public class MySqlStreamingChangeEventSource
     }
 
     @FunctionalInterface
-    private static interface BinlogChangeEmitter<T> {
+    private interface BinlogChangeEmitter<T> {
         void emit(TableId tableId, T data) throws InterruptedException;
     }
 
@@ -682,6 +689,20 @@ public class MySqlStreamingChangeEventSource
                         schemaChangeEvent.getTables().isEmpty()
                                 ? null
                                 : schemaChangeEvent.getTables().iterator().next().id();
+                if (tableId != null
+                        && !connectorConfig.getSkippedOperations().contains(Operation.TRUNCATE)
+                        && schemaChangeEvent.getType().equals(SchemaChangeEventType.TRUNCATE)) {
+                    eventDispatcher.dispatchDataChangeEvent(
+                            partition,
+                            tableId,
+                            new MySqlChangeRecordEmitter(
+                                    partition,
+                                    offsetContext,
+                                    clock,
+                                    Operation.TRUNCATE,
+                                    null,
+                                    null));
+                }
                 eventDispatcher.dispatchSchemaChangeEvent(
                         partition,
                         tableId,

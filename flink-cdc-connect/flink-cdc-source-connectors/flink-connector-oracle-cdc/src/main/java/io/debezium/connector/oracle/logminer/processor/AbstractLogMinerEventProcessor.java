@@ -1,18 +1,7 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
+ * Copyright Debezium Authors.
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Licensed under the Apache Software License version 2.0, available at http://www.apache.org/licenses/LICENSE-2.0
  */
 package io.debezium.connector.oracle.logminer.processor;
 
@@ -35,6 +24,7 @@ import io.debezium.connector.oracle.logminer.events.LogMinerEvent;
 import io.debezium.connector.oracle.logminer.events.LogMinerEventRow;
 import io.debezium.connector.oracle.logminer.events.SelectLobLocatorEvent;
 import io.debezium.connector.oracle.logminer.events.TruncateEvent;
+import io.debezium.connector.oracle.logminer.logwriter.LogWriterFlushStrategy;
 import io.debezium.connector.oracle.logminer.parser.DmlParserException;
 import io.debezium.connector.oracle.logminer.parser.LogMinerDmlEntry;
 import io.debezium.connector.oracle.logminer.parser.LogMinerDmlEntryImpl;
@@ -45,6 +35,7 @@ import io.debezium.pipeline.EventDispatcher;
 import io.debezium.pipeline.source.spi.ChangeEventSource.ChangeEventSourceContext;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
+import io.debezium.relational.Tables;
 import io.debezium.util.Clock;
 import io.debezium.util.Strings;
 import org.slf4j.Logger;
@@ -67,6 +58,9 @@ import java.util.stream.Collectors;
 /**
  * An abstract implementation of {@link LogMinerEventProcessor} that all processors should extend.
  *
+ * <p>Copied from Debezium 2.1.4.Final. Flink CDC patch: pass {@code dmlEvent.getRowId()} to the
+ * {@link LogMinerChangeRecordEmitter} so the ROWID is emitted as a change-event header.
+ *
  * @author Chris Cranford
  */
 public abstract class AbstractLogMinerEventProcessor<T extends AbstractTransaction>
@@ -85,6 +79,7 @@ public abstract class AbstractLogMinerEventProcessor<T extends AbstractTransacti
     private final OracleStreamingChangeEventSourceMetrics metrics;
     private final LogMinerDmlParser dmlParser;
     private final SelectLobParser selectLobParser;
+    private final Tables.TableFilter tableFilter;
 
     protected final Counters counters;
 
@@ -108,6 +103,7 @@ public abstract class AbstractLogMinerEventProcessor<T extends AbstractTransacti
         this.offsetContext = offsetContext;
         this.dispatcher = dispatcher;
         this.metrics = metrics;
+        this.tableFilter = connectorConfig.getTableFilters().dataCollectionFilter();
         this.counters = new Counters();
         this.dmlParser = new LogMinerDmlParser();
         this.selectLobParser = new SelectLobParser();
@@ -306,6 +302,28 @@ public abstract class AbstractLogMinerEventProcessor<T extends AbstractTransacti
                 return;
             }
         }
+
+        // Check whether the row has a table reference and if so, is the reference included by the
+        // filter.
+        // If the reference isn't included, the row will be skipped entirely.
+        if (row.getTableId() != null) {
+            if (LogWriterFlushStrategy.isFlushTable(
+                    row.getTableId(), connectorConfig.getJdbcConfig().getUser())) {
+                LOGGER.trace("Skipped change associated with flush table '{}'", row.getTableId());
+                return;
+            }
+
+            // DDL events get filtered inside the DDL handler
+            // We do the non-DDL ones here to cover multiple switch handlers in one place.
+            if (!EventType.DDL.equals(row.getEventType())
+                    && !tableFilter.isIncluded(row.getTableId())) {
+                LOGGER.trace(
+                        "Skipping change associated with table '{}' which does not match filters.",
+                        row.getTableId());
+                return;
+            }
+        }
+
         switch (row.getEventType()) {
             case MISSING_SCN:
                 handleMissingScn(row);
@@ -357,15 +375,19 @@ public abstract class AbstractLogMinerEventProcessor<T extends AbstractTransacti
      */
     protected void handleStart(LogMinerEventRow row) {
         final String transactionId = row.getTransactionId();
-        final AbstractTransaction transaction = getTransactionCache().get(transactionId);
+        final T transaction = getTransactionCache().get(transactionId);
         if (transaction == null && !isRecentlyProcessed(transactionId)) {
             getTransactionCache().put(transactionId, createTransaction(row));
             metrics.setActiveTransactions(getTransactionCache().size());
         } else if (transaction != null && !isRecentlyProcessed(transactionId)) {
             LOGGER.trace(
                     "Transaction {} is not yet committed and START event detected.", transactionId);
-            transaction.start();
+            resetTransactionToStart(transaction);
         }
+    }
+
+    protected void resetTransactionToStart(T transaction) {
+        transaction.start();
     }
 
     /**
@@ -394,15 +416,17 @@ public abstract class AbstractLogMinerEventProcessor<T extends AbstractTransacti
 
         final Scn commitScn = row.getScn();
         if (offsetContext.getCommitScn().hasCommitAlreadyBeenHandled(row)) {
-            final Scn lastCommittedScn =
-                    offsetContext.getCommitScn().getCommitScnForRedoThread(row.getThread());
-            LOGGER.debug(
-                    "Transaction {} has already been processed. "
-                            + "Offset Commit SCN {}, Transaction Commit SCN {}, Last Seen Commit SCN {}.",
-                    transactionId,
-                    offsetContext.getCommitScn(),
-                    commitScn,
-                    lastCommittedScn);
+            if (transaction.getNumberOfEvents() > 0) {
+                final Scn lastCommittedScn =
+                        offsetContext.getCommitScn().getCommitScnForRedoThread(row.getThread());
+                LOGGER.debug(
+                        "Transaction {} has already been processed. "
+                                + "Offset Commit SCN {}, Transaction Commit SCN {}, Last Seen Commit SCN {}.",
+                        transactionId,
+                        offsetContext.getCommitScn(),
+                        commitScn,
+                        lastCommittedScn);
+            }
             removeTransactionAndEventsFromCache(transaction);
             metrics.setActiveTransactions(getTransactionCache().size());
             return;
@@ -611,6 +635,26 @@ public abstract class AbstractLogMinerEventProcessor<T extends AbstractTransacti
      * @throws InterruptedException if the event dispatcher is interrupted sending the event
      */
     protected void handleSchemaChange(LogMinerEventRow row) throws InterruptedException {
+        if (row.getTableId() != null) {
+            if ("SYS".equalsIgnoreCase(row.getUserName())
+                    || "SYSTEM".equalsIgnoreCase(row.getUserName())) {
+                // We do not process SYS/SYSTEM schema changes as these are mostly internal.
+                LOGGER.trace("SYS/SYSTEM initiated DDL '{}' skipped", row.getRedoSql());
+                return;
+            } else if (row.getInfo() != null && row.getInfo().startsWith("INTERNAL DDL")) {
+                // Internal DDL operations are skipped.
+                LOGGER.trace("Internal DDL '{}' skipped", row.getRedoSql());
+                return;
+            }
+
+            if (schema.storeOnlyCapturedTables() && !tableFilter.isIncluded(row.getTableId())) {
+                LOGGER.trace(
+                        "Skipping DDL associated with table '{}', schema history only stores included tables only.",
+                        row.getTableId());
+                return;
+            }
+        }
+
         if (hasSchemaChangeBeenSeen(row)) {
             LOGGER.trace(
                     "DDL: Scn {}, SQL '{}' has already been processed, skipped.",

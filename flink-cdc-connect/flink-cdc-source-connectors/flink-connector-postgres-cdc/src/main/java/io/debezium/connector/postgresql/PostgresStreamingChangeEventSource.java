@@ -35,9 +35,12 @@ import java.util.OptionalLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Copied from Debezium 1.9.8.final
+ * Copied from Debezium 2.1.4.Final.
  *
- * <p>Line 150~151 : set the ending lsn for the replication connection.
+ * <p>Set the ending lsn for the replication connection (see {@code setEndingPos} call in {@link
+ * #execute}) so the streaming phase stops at the split's high watermark.
+ *
+ * @author Horia Chiorean (hchiorea@redhat.com), Jiri Pechanec
  */
 public class PostgresStreamingChangeEventSource
         implements StreamingChangeEventSource<PostgresPartition, PostgresOffsetContext> {
@@ -154,8 +157,11 @@ public class PostgresStreamingChangeEventSource
                         offsetContext.lastCompletelyProcessedLsn() != null
                                 ? offsetContext.lastCompletelyProcessedLsn()
                                 : offsetContext.lsn();
+                final Operation lastProcessedMessageType = offsetContext.lastProcessedMessageType();
                 LOGGER.info("Retrieved latest position from stored offset '{}'", lsn);
-                walPosition = new WalPositionLocator(offsetContext.lastCommitLsn(), lsn);
+                walPosition =
+                        new WalPositionLocator(
+                                offsetContext.lastCommitLsn(), lsn, lastProcessedMessageType);
                 replicationStream.compareAndSet(
                         null, replicationConnection.startStreaming(lsn, walPosition));
             } else {
@@ -280,7 +286,8 @@ public class PostgresStreamingChangeEventSource
                                             message.getCommitTime(),
                                             toLong(message.getTransactionId()),
                                             taskContext.getSlotXmin(connection),
-                                            null);
+                                            null,
+                                            message.getOperation());
                                     if (message.getOperation() == Operation.BEGIN) {
                                         dispatcher.dispatchTransactionStartedEvent(
                                                 partition,
@@ -299,7 +306,8 @@ public class PostgresStreamingChangeEventSource
                                             lastCompletelyProcessedLsn,
                                             message.getCommitTime(),
                                             toLong(message.getTransactionId()),
-                                            taskContext.getSlotXmin(connection));
+                                            taskContext.getSlotXmin(connection),
+                                            message.getOperation());
 
                                     // non-transactional message that will not be followed by a
                                     // COMMIT message
@@ -329,7 +337,8 @@ public class PostgresStreamingChangeEventSource
                                             message.getCommitTime(),
                                             toLong(message.getTransactionId()),
                                             taskContext.getSlotXmin(connection),
-                                            tableId);
+                                            tableId,
+                                            message.getOperation());
 
                                     boolean dispatched =
                                             message.getOperation() != Operation.NOOP
@@ -478,6 +487,10 @@ public class PostgresStreamingChangeEventSource
                                                     .LAST_COMPLETELY_PROCESSED_LSN_KEY));
             final Lsn lsn = (commitLsn != null) ? commitLsn : changeLsn;
 
+            LOGGER.debug(
+                    "Received offset commit request on commit LSN '{}' and change LSN '{}'",
+                    commitLsn,
+                    changeLsn);
             if (replicationStream != null && lsn != null) {
                 if (!lsnFlushingAllowed) {
                     LOGGER.info(
@@ -524,7 +537,7 @@ public class PostgresStreamingChangeEventSource
     }
 
     @FunctionalInterface
-    public static interface PgConnectionSupplier {
+    public interface PgConnectionSupplier {
         BaseConnection get() throws SQLException;
     }
 }
