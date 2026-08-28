@@ -176,7 +176,10 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
         return splitSnapshotReadTask.execute(
                 sourceContext,
                 statefulTaskContext.getMySqlPartition(),
-                statefulTaskContext.getOffsetContext());
+                statefulTaskContext.getOffsetContext(),
+                splitSnapshotReadTask.getSnapshottingTask(
+                        statefulTaskContext.getMySqlPartition(),
+                        statefulTaskContext.getOffsetContext()));
     }
 
     private void backfill(
@@ -477,5 +480,25 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
         public boolean isRunning() {
             return lowWatermark != null && highWatermark != null;
         }
+
+        // The following methods are only used by Debezium's signal-based blocking snapshot,
+        // which Flink CDC does not use, so they are no-ops here.
+
+        @Override
+        public boolean isPaused() {
+            return false;
+        }
+
+        @Override
+        public void resumeStreaming() throws InterruptedException {}
+
+        @Override
+        public void waitSnapshotCompletion() throws InterruptedException {}
+
+        @Override
+        public void streamingPaused() {}
+
+        @Override
+        public void waitStreamingPaused() throws InterruptedException {}
     }
 }

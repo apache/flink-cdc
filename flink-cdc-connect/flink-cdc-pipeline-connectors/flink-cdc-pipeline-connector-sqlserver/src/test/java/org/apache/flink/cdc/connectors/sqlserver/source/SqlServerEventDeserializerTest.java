@@ -213,7 +213,7 @@ class SqlServerEventDeserializerTest {
                 tableChanges.alter(table);
                 break;
             case DROP:
-                tableChanges.drop(table);
+                tableChanges.drop(table.id());
                 break;
             default:
                 throw new IllegalArgumentException("Unsupported type " + type);

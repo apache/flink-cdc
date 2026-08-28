@@ -31,7 +31,9 @@ import io.debezium.connector.oracle.OraclePartition;
 import io.debezium.connector.oracle.logminer.LogMinerOracleOffsetContextLoader;
 import io.debezium.heartbeat.Heartbeat;
 import io.debezium.pipeline.EventDispatcher;
+import io.debezium.pipeline.notification.NotificationService;
 import io.debezium.pipeline.source.AbstractSnapshotChangeEventSource;
+import io.debezium.pipeline.source.SnapshottingTask;
 import io.debezium.pipeline.source.spi.SnapshotProgressListener;
 import io.debezium.pipeline.spi.ChangeRecordEmitter;
 import io.debezium.pipeline.spi.SnapshotResult;
@@ -39,6 +41,7 @@ import io.debezium.relational.RelationalSnapshotChangeEventSource;
 import io.debezium.relational.SnapshotChangeRecordEmitter;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
+import io.debezium.schema.SchemaFactory;
 import io.debezium.util.Clock;
 import io.debezium.util.ColumnUtils;
 import io.debezium.util.Strings;
@@ -51,6 +54,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
+import java.util.Collections;
 
 import static org.apache.flink.cdc.connectors.oracle.source.reader.fetch.OracleStreamFetchTask.RedoLogSplitReadTask;
 import static org.apache.flink.cdc.connectors.oracle.source.utils.OracleUtils.buildSplitScanQuery;
@@ -81,7 +85,10 @@ public class OracleScanFetchTask extends AbstractScanFetchTask {
                 snapshotSplitReadTask.execute(
                         changeEventSourceContext,
                         sourceFetchContext.getPartition(),
-                        sourceFetchContext.getOffsetContext());
+                        sourceFetchContext.getOffsetContext(),
+                        snapshotSplitReadTask.getSnapshottingTask(
+                                sourceFetchContext.getPartition(),
+                                sourceFetchContext.getOffsetContext()));
         if (!snapshotResult.isCompletedOrSkipped()) {
             taskRunning = false;
             throw new IllegalStateException(
@@ -171,7 +178,14 @@ public class OracleScanFetchTask extends AbstractScanFetchTask {
                 OracleConnection jdbcConnection,
                 EventDispatcher<OraclePartition, TableId> eventDispatcher,
                 SnapshotSplit snapshotSplit) {
-            super(connectorConfig, snapshotProgressListener);
+            super(
+                    connectorConfig,
+                    snapshotProgressListener,
+                    new NotificationService<>(
+                            Collections.emptyList(),
+                            connectorConfig,
+                            SchemaFactory.get(),
+                            notification -> {}));
             this.offsetContext = previousOffset;
             this.connectorConfig = connectorConfig;
             this.databaseSchema = databaseSchema;
@@ -186,9 +200,9 @@ public class OracleScanFetchTask extends AbstractScanFetchTask {
         public SnapshotResult<OracleOffsetContext> execute(
                 ChangeEventSourceContext context,
                 OraclePartition partition,
-                OracleOffsetContext previousOffset)
+                OracleOffsetContext previousOffset,
+                SnapshottingTask snapshottingTask)
                 throws InterruptedException {
-            SnapshottingTask snapshottingTask = getSnapshottingTask(partition, previousOffset);
             final SnapshotContext<OraclePartition, OracleOffsetContext> ctx;
             try {
                 ctx = prepare(partition);
@@ -220,9 +234,10 @@ public class OracleScanFetchTask extends AbstractScanFetchTask {
         }
 
         @Override
-        protected SnapshottingTask getSnapshottingTask(
+        public SnapshottingTask getSnapshottingTask(
                 OraclePartition partition, OracleOffsetContext previousOffset) {
-            return new SnapshottingTask(false, true);
+            return new SnapshottingTask(
+                    false, true, Collections.emptyList(), Collections.emptyMap(), false);
         }
 
         @Override

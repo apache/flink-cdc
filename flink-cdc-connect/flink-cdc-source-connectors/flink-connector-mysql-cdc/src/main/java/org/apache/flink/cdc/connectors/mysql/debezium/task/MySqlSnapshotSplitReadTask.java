@@ -36,7 +36,9 @@ import io.debezium.connector.mysql.MySqlPartition;
 import io.debezium.connector.mysql.MySqlValueConverters;
 import io.debezium.pipeline.EventDispatcher;
 import io.debezium.pipeline.metrics.SnapshotChangeEventSourceMetrics;
+import io.debezium.pipeline.notification.NotificationService;
 import io.debezium.pipeline.source.AbstractSnapshotChangeEventSource;
+import io.debezium.pipeline.source.SnapshottingTask;
 import io.debezium.pipeline.spi.ChangeRecordEmitter;
 import io.debezium.pipeline.spi.SnapshotResult;
 import io.debezium.relational.Column;
@@ -44,6 +46,7 @@ import io.debezium.relational.RelationalSnapshotChangeEventSource;
 import io.debezium.relational.SnapshotChangeRecordEmitter;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
+import io.debezium.schema.SchemaFactory;
 import io.debezium.spi.topic.TopicNamingStrategy;
 import io.debezium.util.Clock;
 import io.debezium.util.ColumnUtils;
@@ -61,6 +64,7 @@ import java.sql.SQLException;
 import java.sql.Types;
 import java.time.Duration;
 import java.util.Calendar;
+import java.util.Collections;
 
 /** Task to read snapshot split of table. */
 public class MySqlSnapshotSplitReadTask
@@ -98,7 +102,14 @@ public class MySqlSnapshotSplitReadTask
             MySqlSnapshotSplit snapshotSplit,
             SnapshotPhaseHooks hooks,
             boolean isBackfillSkipped) {
-        super(connectorConfig, snapshotChangeEventSourceMetrics);
+        super(
+                connectorConfig,
+                snapshotChangeEventSourceMetrics,
+                new NotificationService<>(
+                        Collections.emptyList(),
+                        connectorConfig,
+                        SchemaFactory.get(),
+                        notification -> {}));
         this.sourceConfig = sourceConfig;
         this.connectorConfig = connectorConfig;
         this.databaseSchema = databaseSchema;
@@ -117,9 +128,9 @@ public class MySqlSnapshotSplitReadTask
     public SnapshotResult<MySqlOffsetContext> execute(
             ChangeEventSourceContext context,
             MySqlPartition partition,
-            MySqlOffsetContext previousOffset)
+            MySqlOffsetContext previousOffset,
+            SnapshottingTask snapshottingTask)
             throws InterruptedException {
-        SnapshottingTask snapshottingTask = getSnapshottingTask(partition, previousOffset);
         final SnapshotContext<MySqlPartition, MySqlOffsetContext> ctx;
         try {
             ctx = prepare(partition);
@@ -207,9 +218,10 @@ public class MySqlSnapshotSplitReadTask
     }
 
     @Override
-    protected SnapshottingTask getSnapshottingTask(
+    public SnapshottingTask getSnapshottingTask(
             MySqlPartition partition, MySqlOffsetContext previousOffset) {
-        return new SnapshottingTask(false, true);
+        return new SnapshottingTask(
+                false, true, Collections.emptyList(), Collections.emptyMap(), false);
     }
 
     @Override

@@ -78,6 +78,20 @@ limitations under the License.
             <artifactId>mysql-connector-java</artifactId>
             <version>8.0.26</version>
             <scope>test</scope>
+            <exclusions>
+                <!-- This driver drags in protobuf-java 3.11.4, which wins dependency
+                     resolution over the 3.19.6 that vitess-client expects. From Debezium
+                     2.4 onwards debezium-connector-vitess ships vitess-client 17, whose
+                     generated code calls GeneratedMessageV3#isStringEmpty - a method added
+                     in protobuf 3.19. With 3.11.4 on the classpath every vtgate gRPC call
+                     dies with NoSuchMethodError inside the gRPC executor thread, where the
+                     error is never surfaced to the caller, so blockingUnaryCall parks
+                     forever and the connector hangs in validation instead of failing. -->
+                <exclusion>
+                    <groupId>com.google.protobuf</groupId>
+                    <artifactId>protobuf-java</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
 

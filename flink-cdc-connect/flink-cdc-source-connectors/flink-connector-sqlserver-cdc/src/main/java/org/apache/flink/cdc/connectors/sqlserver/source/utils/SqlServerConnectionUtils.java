@@ -17,9 +17,8 @@
 
 package org.apache.flink.cdc.connectors.sqlserver.source.utils;
 
-import io.debezium.config.Configuration;
 import io.debezium.connector.sqlserver.SqlServerConnection;
-import io.debezium.connector.sqlserver.SqlServerJdbcConfiguration;
+import io.debezium.connector.sqlserver.SqlServerConnectorConfig;
 import io.debezium.connector.sqlserver.SqlServerValueConverters;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.RelationalDatabaseConnectorConfig;
@@ -38,8 +37,6 @@ public class SqlServerConnectionUtils {
 
     public static SqlServerConnection createSqlServerConnection(
             RelationalDatabaseConnectorConfig connectorConfig) {
-        Configuration dbzConnectorConfig = connectorConfig.getJdbcConfig();
-
         final SqlServerValueConverters valueConverters =
                 new SqlServerValueConverters(
                         connectorConfig.getDecimalMode(),
@@ -47,10 +44,10 @@ public class SqlServerConnectionUtils {
                         connectorConfig.binaryHandlingMode());
         // Debezium 2.0 removed the sourceTimestampMode and classloader-supplier constructor
         // arguments; the constructor is now (config, valueConverters, skippedOperations,
-        // useSingleDatabase). Debezium 2.1 additionally requires the SqlServer-specific
-        // SqlServerJdbcConfiguration for the first argument.
+        // useSingleDatabase). Debezium 2.4 takes the SqlServerConnectorConfig itself as the
+        // first argument (2.1 through 2.3 took a SqlServerJdbcConfiguration).
         return new SqlServerConnection(
-                SqlServerJdbcConfiguration.adapt(dbzConnectorConfig),
+                (SqlServerConnectorConfig) connectorConfig,
                 valueConverters,
                 connectorConfig.getSkippedOperations(),
                 false);
