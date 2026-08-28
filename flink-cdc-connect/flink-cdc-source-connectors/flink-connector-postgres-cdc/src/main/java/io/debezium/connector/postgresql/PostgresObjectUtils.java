@@ -40,6 +40,9 @@ import java.util.Collection;
  * A factory for creating various Debezium objects
  *
  * <p>It is a hack to access package-private constructor in debezium.
+ *
+ * <p>This is a Flink CDC owned class (not a Debezium fork), placed in the {@code io.debezium}
+ * package for access to package-private Debezium members.
  */
 public class PostgresObjectUtils {
     private static final Logger LOGGER = LoggerFactory.getLogger(PostgresObjectUtils.class);

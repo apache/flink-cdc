@@ -10,6 +10,7 @@ import com.ibm.db2.jcc.DB2Driver;
 import io.debezium.DebeziumException;
 import io.debezium.config.CommonConnectorConfig;
 import io.debezium.config.Configuration;
+import io.debezium.connector.db2.platform.Db2PlatformAdapter;
 import io.debezium.jdbc.JdbcConfiguration;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.pipeline.spi.OffsetContext;
@@ -20,10 +21,12 @@ import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
 import io.debezium.util.BoundedConcurrentHashMap;
 import io.debezium.util.Collect;
+import org.apache.kafka.connect.errors.ConnectException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.DatabaseMetaData;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -32,14 +35,20 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+/** {@link JdbcConnection} extension to be used with IBM Db2 */
 /**
- * Copied from Debezium 1.9.8.Final. {@link JdbcConnection} extension to be used with IBM Db2
+ * Copied from Debezium project(2.7.4.Final).
  *
- * @author Horia Chiorean (hchiorea@redhat.com), Jiri Pechanec, Peter Urbanetz
+ * <p>Change 1: override {@code resolveCatalogName} to return the real database name.
+ *
+ * <p>Change 2: override {@code readPrimaryKeyNames} / {@code readTableUniqueIndices} / {@code
+ * readTableNames} to query the JDBC metadata with the schema rather than the catalog, which is how
+ * Db2 exposes them.
  */
 public class Db2Connection extends JdbcConnection {
 
@@ -48,47 +57,12 @@ public class Db2Connection extends JdbcConnection {
 
     private static Logger LOGGER = LoggerFactory.getLogger(Db2Connection.class);
 
-    private static final String CDC_SCHEMA = "ASNCDC";
-
     private static final String STATEMENTS_PLACEHOLDER = "#";
-    private static final String GET_MAX_LSN =
-            "SELECT max(t.SYNCHPOINT) FROM ( SELECT CD_NEW_SYNCHPOINT AS SYNCHPOINT FROM "
-                    + CDC_SCHEMA
-                    + ".IBMSNAP_REGISTER UNION ALL SELECT SYNCHPOINT AS SYNCHPOINT FROM "
-                    + CDC_SCHEMA
-                    + ".IBMSNAP_REGISTER) t";
 
     private static final String LOCK_TABLE = "SELECT * FROM # WITH CS"; // DB2
 
     private static final String LSN_TO_TIMESTAMP =
             "SELECT CURRENT TIMEstamp FROM sysibm.sysdummy1  WHERE ? > X'00000000000000000000000000000000'";
-
-    private static final String GET_ALL_CHANGES_FOR_TABLE =
-            "SELECT "
-                    + "CASE "
-                    + "WHEN IBMSNAP_OPERATION = 'D' AND (LEAD(cdc.IBMSNAP_OPERATION,1,'X') OVER (PARTITION BY cdc.IBMSNAP_COMMITSEQ ORDER BY cdc.IBMSNAP_INTENTSEQ)) ='I' THEN 3 "
-                    + "WHEN IBMSNAP_OPERATION = 'I' AND (LAG(cdc.IBMSNAP_OPERATION,1,'X') OVER (PARTITION BY cdc.IBMSNAP_COMMITSEQ ORDER BY cdc.IBMSNAP_INTENTSEQ)) ='D' THEN 4 "
-                    + "WHEN IBMSNAP_OPERATION = 'D' THEN 1 "
-                    + "WHEN IBMSNAP_OPERATION = 'I' THEN 2 "
-                    + "END "
-                    + "OPCODE,"
-                    + "cdc.* "
-                    + "FROM ASNCDC.# cdc WHERE   IBMSNAP_COMMITSEQ >= ? AND IBMSNAP_COMMITSEQ <= ? "
-                    + "order by IBMSNAP_COMMITSEQ, IBMSNAP_INTENTSEQ";
-
-    private static final String GET_LIST_OF_CDC_ENABLED_TABLES =
-            "select r.SOURCE_OWNER, r.SOURCE_TABLE, r.CD_OWNER, r.CD_TABLE, r.CD_NEW_SYNCHPOINT, r.CD_OLD_SYNCHPOINT, t.TBSPACEID, t.TABLEID , CAST((t.TBSPACEID * 65536 +  t.TABLEID )AS INTEGER )from "
-                    + CDC_SCHEMA
-                    + ".IBMSNAP_REGISTER r left JOIN SYSCAT.TABLES t ON r.SOURCE_OWNER  = t.TABSCHEMA AND r.SOURCE_TABLE = t.TABNAME  WHERE r.SOURCE_OWNER <> ''";
-
-    // No new Tabels 1=0
-    private static final String GET_LIST_OF_NEW_CDC_ENABLED_TABLES =
-            "select CAST((t.TBSPACEID * 65536 +  t.TABLEID )AS INTEGER ) AS OBJECTID, "
-                    + "       CD_OWNER CONCAT '.' CONCAT CD_TABLE, "
-                    + "       CD_NEW_SYNCHPOINT, "
-                    + "       CD_OLD_SYNCHPOINT "
-                    + "from ASNCDC.IBMSNAP_REGISTER  r left JOIN SYSCAT.TABLES t ON r.SOURCE_OWNER  = t.TABSCHEMA AND r.SOURCE_TABLE = t.TABNAME "
-                    + "WHERE r.SOURCE_OWNER <> '' AND 1=0 AND CD_NEW_SYNCHPOINT > ? AND CD_OLD_SYNCHPOINT < ? ";
 
     private static final String GET_LIST_OF_KEY_COLUMNS =
             "SELECT "
@@ -127,15 +101,21 @@ public class Db2Connection extends JdbcConnection {
 
     private final BoundedConcurrentHashMap<Lsn, Instant> lsnToInstantCache;
 
+    private final Db2ConnectorConfig connectorConfig;
+    private final Db2PlatformAdapter platform;
+
     /**
      * Creates a new connection using the supplied configuration.
      *
      * @param config {@link Configuration} instance, may not be null.
      */
-    public Db2Connection(JdbcConfiguration config) {
-        super(config, FACTORY, QUOTED_CHARACTER, QUOTED_CHARACTER);
+    public Db2Connection(Db2ConnectorConfig config) {
+        super(config.getJdbcConfig(), FACTORY, QUOTED_CHARACTER, QUOTED_CHARACTER);
+
+        connectorConfig = config;
         lsnToInstantCache = new BoundedConcurrentHashMap<>(100);
         realDatabaseName = retrieveRealDatabaseName();
+        platform = connectorConfig.getDb2Platform().createAdapter(connectorConfig);
     }
 
     /**
@@ -143,7 +123,7 @@ public class Db2Connection extends JdbcConnection {
      */
     public Lsn getMaxLsn() throws SQLException {
         return queryAndMap(
-                GET_MAX_LSN,
+                platform.getMaxLsnQuery(),
                 singleResultMapper(
                         rs -> {
                             final Lsn ret = Lsn.valueOf(rs.getBytes(1));
@@ -166,7 +146,8 @@ public class Db2Connection extends JdbcConnection {
             TableId tableId, Lsn fromLsn, Lsn toLsn, ResultSetConsumer consumer)
             throws SQLException {
         final String query =
-                GET_ALL_CHANGES_FOR_TABLE.replace(STATEMENTS_PLACEHOLDER, cdcNameForTable(tableId));
+                platform.getAllChangesForTableQuery()
+                        .replace(STATEMENTS_PLACEHOLDER, cdcNameForTable(tableId));
         prepareQuery(
                 query,
                 statement -> {
@@ -197,8 +178,8 @@ public class Db2Connection extends JdbcConnection {
         int idx = 0;
         for (Db2ChangeTable changeTable : changeTables) {
             final String query =
-                    GET_ALL_CHANGES_FOR_TABLE.replace(
-                            STATEMENTS_PLACEHOLDER, changeTable.getCaptureInstance());
+                    platform.getAllChangesForTableQuery()
+                            .replace(STATEMENTS_PLACEHOLDER, changeTable.getCaptureInstance());
             queries[idx] = query;
             // If the table was added in the middle of queried buffer we need
             // to adjust from to the first LSN available
@@ -313,10 +294,9 @@ public class Db2Connection extends JdbcConnection {
     }
 
     public Set<Db2ChangeTable> listOfChangeTables() throws SQLException {
-        final String query = GET_LIST_OF_CDC_ENABLED_TABLES;
 
         return queryAndMap(
-                query,
+                platform.getListOfCdcEnabledTablesQuery(),
                 rs -> {
                     final Set<Db2ChangeTable> changeTables = new HashSet<>();
                     while (rs.next()) {
@@ -329,22 +309,21 @@ public class Db2Connection extends JdbcConnection {
                          */
                         changeTables.add(
                                 new Db2ChangeTable(
-                                        new TableId(
-                                                realDatabaseName, rs.getString(1), rs.getString(2)),
+                                        new TableId("", rs.getString(1), rs.getString(2)),
                                         rs.getString(4),
                                         rs.getInt(9),
                                         Lsn.valueOf(rs.getBytes(5)),
-                                        Lsn.valueOf(rs.getBytes(6))));
+                                        Lsn.valueOf(rs.getBytes(6)),
+                                        connectorConfig.getCdcChangeTablesSchema()));
                     }
                     return changeTables;
                 });
     }
 
     public Set<Db2ChangeTable> listOfNewChangeTables(Lsn fromLsn, Lsn toLsn) throws SQLException {
-        final String query = GET_LIST_OF_NEW_CDC_ENABLED_TABLES;
 
         return prepareQueryAndMap(
-                query,
+                platform.getListOfNewCdcEnabledTablesQuery(),
                 ps -> {
                     ps.setBytes(1, fromLsn.getBinary());
                     ps.setBytes(2, toLsn.getBinary());
@@ -357,7 +336,8 @@ public class Db2Connection extends JdbcConnection {
                                         rs.getString(2),
                                         rs.getInt(1),
                                         Lsn.valueOf(rs.getBytes(3)),
-                                        Lsn.valueOf(rs.getBytes(4))));
+                                        Lsn.valueOf(rs.getBytes(4)),
+                                        connectorConfig.getCdcChangeTablesSchema()));
                     }
                     return changeTables;
                 });
@@ -474,6 +454,13 @@ public class Db2Connection extends JdbcConnection {
     }
 
     @Override
+    public Optional<Boolean> nullsSortLast() {
+        // "The null value is higher than all other values"
+        // https://www.ibm.com/docs/en/db2/11.5?topic=subselect-order-by-clause
+        return Optional.of(true);
+    }
+
+    @Override
     public String quotedTableIdString(TableId tableId) {
         StringBuilder quoted = new StringBuilder();
         if (tableId.schema() != null && !tableId.schema().isEmpty()) {
@@ -481,6 +468,196 @@ public class Db2Connection extends JdbcConnection {
         }
         quoted.append(Db2ObjectNameQuoter.quoteNameIfNecessary(tableId.table()));
         return quoted.toString();
+    }
+
+    @Override
+    public JdbcConnection prepareQuery(
+            String[] multiQuery,
+            StatementPreparer[] preparers,
+            BlockingMultiResultSetConsumer resultConsumer)
+            throws SQLException, InterruptedException {
+        final ResultSet[] resultSets = new ResultSet[multiQuery.length];
+        final PreparedStatement[] preparedStatements = new PreparedStatement[multiQuery.length];
+
+        try {
+            for (int i = 0; i < multiQuery.length; i++) {
+                final String query = multiQuery[i];
+                if (LOGGER.isTraceEnabled()) {
+                    LOGGER.trace("running '{}'", query);
+                }
+                // Purposely create the statement this way
+                final PreparedStatement statement = createPreparedStatement(query);
+                preparedStatements[i] = statement;
+                preparers[i].accept(statement);
+                resultSets[i] = statement.executeQuery();
+            }
+            if (resultConsumer != null) {
+                resultConsumer.accept(resultSets);
+            }
+        } finally {
+            for (ResultSet rs : resultSets) {
+                if (rs != null) {
+                    try {
+                        rs.close();
+                    } catch (Exception ei) {
+                    }
+                }
+            }
+            // Db2 requires closing prepared statements to avoid caching result-set column
+            // structures
+            for (PreparedStatement ps : preparedStatements) {
+                closePreparedStatement(ps);
+            }
+        }
+        return this;
+    }
+
+    @Override
+    public JdbcConnection prepareQueryWithBlockingConsumer(
+            String preparedQueryString,
+            StatementPreparer preparer,
+            BlockingResultSetConsumer resultConsumer)
+            throws SQLException, InterruptedException {
+        // Db2 requires closing prepared statements to avoid caching result-set column structures
+        try (PreparedStatement statement = createPreparedStatement(preparedQueryString)) {
+            preparer.accept(statement);
+            try (ResultSet resultSet = statement.executeQuery(); ) {
+                if (resultConsumer != null) {
+                    resultConsumer.accept(resultSet);
+                }
+            }
+        }
+        return this;
+    }
+
+    @Override
+    public JdbcConnection prepareQuery(String preparedQueryString) throws SQLException {
+        // Db2 requires closing prepared statements to avoid caching result-set column structures
+        try (PreparedStatement statement = createPreparedStatement(preparedQueryString)) {
+            statement.executeQuery();
+        }
+        return this;
+    }
+
+    @Override
+    public JdbcConnection prepareQuery(
+            String preparedQueryString,
+            StatementPreparer preparer,
+            ResultSetConsumer resultConsumer)
+            throws SQLException {
+        // Db2 requires closing prepared statements to avoid caching result-set column structures
+        try (PreparedStatement statement = createPreparedStatement(preparedQueryString)) {
+            preparer.accept(statement);
+            try (ResultSet resultSet = statement.executeQuery(); ) {
+                if (resultConsumer != null) {
+                    resultConsumer.accept(resultSet);
+                }
+            }
+        }
+        return this;
+    }
+
+    @Override
+    public <T> T prepareQueryAndMap(
+            String preparedQueryString, StatementPreparer preparer, ResultSetMapper<T> mapper)
+            throws SQLException {
+        Objects.requireNonNull(mapper, "Mapper must be provided");
+        // Db2 requires closing prepared statements to avoid caching result-set column structures
+        try (PreparedStatement statement = createPreparedStatement(preparedQueryString)) {
+            preparer.accept(statement);
+            try (ResultSet resultSet = statement.executeQuery(); ) {
+                return mapper.apply(resultSet);
+            }
+        }
+    }
+
+    @Override
+    public JdbcConnection prepareUpdate(String stmt, StatementPreparer preparer)
+            throws SQLException {
+        // Db2 requires closing prepared statements to avoid caching result-set column structures
+        try (PreparedStatement statement = createPreparedStatement(stmt)) {
+            if (preparer != null) {
+                preparer.accept(statement);
+            }
+            LOGGER.trace("Executing statement '{}'", stmt);
+            statement.execute();
+        }
+        return this;
+    }
+
+    @Override
+    public JdbcConnection prepareQuery(
+            String preparedQueryString,
+            List<?> parameters,
+            ParameterResultSetConsumer resultConsumer)
+            throws SQLException {
+        // Db2 requires closing prepared statements to avoid caching result-set column structures
+        try (PreparedStatement statement = createPreparedStatement(preparedQueryString)) {
+            int index = 1;
+            for (final Object parameter : parameters) {
+                statement.setObject(index++, parameter);
+            }
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (resultConsumer != null) {
+                    resultConsumer.accept(parameters, resultSet);
+                }
+            }
+        }
+        return this;
+    }
+
+    @Override
+    public TableId createTableId(String databaseName, String schemaName, String tableName) {
+        return new TableId(null, schemaName, tableName);
+    }
+
+    public boolean validateLogPosition(
+            Partition partition, OffsetContext offset, CommonConnectorConfig config) {
+
+        final Lsn storedLsn = ((Db2OffsetContext) offset).getChangePosition().getCommitLsn();
+
+        String oldestFirstChangeQuery =
+                String.format(
+                        "SELECT min(RESTART_SEQ) FROM %s.IBMSNAP_CAPMON;",
+                        connectorConfig.getCdcControlSchema());
+
+        try {
+            final String oldestScn =
+                    singleOptionalValue(oldestFirstChangeQuery, rs -> rs.getString(1));
+
+            if (oldestScn == null) {
+                return false;
+            }
+
+            LOGGER.trace("Oldest SCN in logs is '{}'", oldestScn);
+            return storedLsn == null || Lsn.valueOf(oldestScn).compareTo(storedLsn) < 0;
+        } catch (SQLException e) {
+            throw new DebeziumException("Unable to get last available log position", e);
+        }
+    }
+
+    public <T> T singleOptionalValue(String query, ResultSetExtractor<T> extractor)
+            throws SQLException {
+        return queryAndMap(query, rs -> rs.next() ? extractor.apply(rs) : null);
+    }
+
+    private PreparedStatement createPreparedStatement(String query) {
+        try {
+            LOGGER.trace("Creating prepared statement '{}'", query);
+            return connection().prepareStatement(query);
+        } catch (SQLException e) {
+            throw new ConnectException(e);
+        }
+    }
+
+    private void closePreparedStatement(PreparedStatement statement) {
+        if (statement != null) {
+            try {
+                statement.close();
+            } catch (SQLException e) {
+                // ignored
+            }
+        }
     }
 
     protected String resolveCatalogName(String catalogName) {
@@ -604,39 +781,5 @@ public class Db2Connection extends JdbcConnection {
             }
         }
         return tableIds;
-    }
-
-    /** Added in Debezium 2.6 alongside {@link #validateLogPosition}. */
-    public <T> T singleOptionalValue(String query, ResultSetExtractor<T> extractor)
-            throws SQLException {
-        return queryAndMap(query, rs -> rs.next() ? extractor.apply(rs) : null);
-    }
-
-    /**
-     * Added in Debezium 2.6 and called by {@code Db2ConnectorTask} through a method reference. This
-     * fork shadows the Debezium class, so the method has to exist here too or the embedded engine
-     * fails with {@code NoSuchMethodError}.
-     */
-    public boolean validateLogPosition(
-            Partition partition, OffsetContext offset, CommonConnectorConfig config) {
-
-        final Lsn storedLsn = ((Db2OffsetContext) offset).getChangePosition().getCommitLsn();
-
-        String oldestFirstChangeQuery =
-                String.format("SELECT min(RESTART_SEQ) FROM %s.IBMSNAP_CAPMON;", CDC_SCHEMA);
-
-        try {
-            final String oldestScn =
-                    singleOptionalValue(oldestFirstChangeQuery, rs -> rs.getString(1));
-
-            if (oldestScn == null) {
-                return false;
-            }
-
-            LOGGER.trace("Oldest SCN in logs is '{}'", oldestScn);
-            return storedLsn == null || Lsn.valueOf(oldestScn).compareTo(storedLsn) < 0;
-        } catch (SQLException e) {
-            throw new DebeziumException("Unable to get last available log position", e);
-        }
     }
 }

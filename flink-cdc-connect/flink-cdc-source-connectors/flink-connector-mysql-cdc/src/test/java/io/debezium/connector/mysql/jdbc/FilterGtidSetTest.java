@@ -15,11 +15,12 @@
  * limitations under the License.
  */
 
-package io.debezium.connector.mysql.strategy.mysql;
+package io.debezium.connector.mysql.jdbc;
 
 import io.debezium.config.Configuration;
-import io.debezium.connector.mysql.GtidSet;
-import io.debezium.connector.mysql.strategy.ConnectionConfiguration;
+import io.debezium.connector.binlog.gtid.GtidSet;
+import io.debezium.connector.binlog.jdbc.BinlogConnectionConfiguration;
+import io.debezium.connector.mysql.gtid.MySqlGtidSet;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
@@ -116,14 +117,15 @@ class FilterGtidSetTest {
         Configuration dbzConfig =
                 Configuration.create().with("gtid.new.channel.position", channelPosition).build();
 
-        ConnectionConfiguration mockConnectionConfig = Mockito.mock(ConnectionConfiguration.class);
+        BinlogConnectionConfiguration mockConnectionConfig =
+                Mockito.mock(BinlogConnectionConfiguration.class);
         when(mockConnectionConfig.originalConfig()).thenReturn(dbzConfig);
 
         MySqlConnection connection =
                 Mockito.mock(MySqlConnection.class, Mockito.CALLS_REAL_METHODS);
 
         Field configField =
-                Class.forName("io.debezium.connector.mysql.strategy.AbstractConnectorConnection")
+                Class.forName("io.debezium.connector.binlog.jdbc.BinlogConnectorConnection")
                         .getDeclaredField("connectionConfig");
         configField.setAccessible(true);
         configField.set(connection, mockConnectionConfig);

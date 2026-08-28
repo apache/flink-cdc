@@ -25,7 +25,12 @@ import io.debezium.relational.Tables.TableFilter;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
-/** A bounded cache for table filter results. */
+/**
+ * A bounded cache for table filter results. *
+ *
+ * <p>This is a Flink CDC owned class (not a Debezium fork), placed in the {@code io.debezium}
+ * package for access to package-private Debezium members.
+ */
 public class CachedTableFilter implements TableFilter {
 
     private static final long TABLE_FILTER_CACHE_MAXIMUM_SIZE = 32 * 1024;

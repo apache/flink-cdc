@@ -21,8 +21,8 @@ import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.annotation.PublicEvolving;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 
-import io.debezium.connector.mysql.GtidSet;
-import io.debezium.connector.mysql.strategy.mysql.MySqlGtidSet;
+import io.debezium.connector.binlog.gtid.GtidSet;
+import io.debezium.connector.mysql.gtid.MySqlGtidSet;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.connect.errors.ConnectException;
 

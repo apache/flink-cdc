@@ -21,24 +21,36 @@ import io.debezium.connector.oracle.BaseChangeRecordEmitter;
 import io.debezium.connector.oracle.OracleConnectorConfig;
 import io.debezium.connector.oracle.OracleDatabaseSchema;
 import io.debezium.connector.oracle.logminer.events.EventType;
+import io.debezium.connector.oracle.util.TimestampUtils;
 import io.debezium.data.Envelope.Operation;
 import io.debezium.pipeline.spi.OffsetContext;
 import io.debezium.pipeline.spi.Partition;
+import io.debezium.relational.Column;
 import io.debezium.relational.Table;
 import io.debezium.util.Clock;
+import io.debezium.util.Strings;
+import oracle.jdbc.OracleTypes;
 import oracle.sql.ROWID;
 import org.apache.kafka.connect.data.SchemaAndValue;
 import org.apache.kafka.connect.header.ConnectHeaders;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.sql.Connection;
 import java.util.Optional;
 
 /**
- * Copied from Debezium 1.9.8.Final. Emits change records based on an event read from Oracle
- * LogMiner.
+ * Emits change records based on an event read from Oracle LogMiner.
  *
- * <p>This class add RowId and overrides the emit methods to put rowId in the header.
+ * <p>Copied from Debezium project(2.7.4.Final)..
+ *
+ * <p>Change 1: both constructors gain a trailing {@code String rowId} argument, and {@code
+ * getEmitConnectHeaders()} attaches it as a {@code ROWID} Connect header on every emitted record
+ * (hook added by the forked {@code RelationalChangeRecordEmitter}).
  */
 public class LogMinerChangeRecordEmitter extends BaseChangeRecordEmitter<Object> {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(LogMinerChangeRecordEmitter.class);
 
     private final Operation operation;
     private final String rowId;
@@ -89,6 +101,7 @@ public class LogMinerChangeRecordEmitter extends BaseChangeRecordEmitter<Object>
                 return Operation.CREATE;
             case UPDATE:
             case SELECT_LOB_LOCATOR:
+            case XML_BEGIN:
                 return Operation.UPDATE;
             case DELETE:
                 return Operation.DELETE;
@@ -100,6 +113,33 @@ public class LogMinerChangeRecordEmitter extends BaseChangeRecordEmitter<Object>
     @Override
     public Operation getOperation() {
         return operation;
+    }
+
+    @Override
+    protected Object convertReselectPrimaryKeyColumn(
+            Connection connection, Column column, Object value) {
+        if (value instanceof String) {
+            // LogMiner raw values are always string; otherwise generally null
+            switch (column.jdbcType()) {
+                case OracleTypes.TIMESTAMP:
+                case OracleTypes.DATE:
+                    final String formattedTimestamp =
+                            TimestampUtils.toSqlCompliantFunctionCall((String) value);
+                    if (!Strings.isNullOrBlank(formattedTimestamp)) {
+                        value = convertValueViaQuery(connection, formattedTimestamp);
+                    }
+                    break;
+                case OracleTypes.INTERVALYM:
+                case OracleTypes.INTERVALDS:
+                    // LogMiner provides these values in SQL-compliant query fragments
+                    value = convertValueViaQuery(connection, (String) value);
+                    break;
+                default:
+                    // no -op
+                    break;
+            }
+        }
+        return value;
     }
 
     @Override

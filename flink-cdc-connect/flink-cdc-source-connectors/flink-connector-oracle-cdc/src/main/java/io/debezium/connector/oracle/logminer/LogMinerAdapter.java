@@ -60,11 +60,10 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
- * Copied from Debezium 2.6.2.Final. Flink CDC patch: the pending-transaction probe uses {@code
- * START_SCN <=} rather than {@code <}, so a transaction starting exactly at the current SCN is not
- * missed.
+ * Copied from Debezium project(2.7.4.Final).
  *
- * @author Chris Cranford
+ * <p>Change 1: the pending-transaction probe uses {@code START_SCN <=} rather than {@code <}, so a
+ * transaction starting exactly at the current SCN is not missed.
  */
 public class LogMinerAdapter
         extends AbstractStreamingAdapter<LogMinerStreamingChangeEventSourceMetrics> {

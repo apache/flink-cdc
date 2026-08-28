@@ -42,7 +42,6 @@ import io.debezium.connector.oracle.logminer.parser.XmlBeginParser;
 import io.debezium.data.Envelope;
 import io.debezium.pipeline.EventDispatcher;
 import io.debezium.pipeline.source.spi.ChangeEventSource.ChangeEventSourceContext;
-import io.debezium.relational.Attribute;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
@@ -77,16 +76,19 @@ import java.util.stream.Stream;
 /**
  * An abstract implementation of {@link LogMinerEventProcessor} that all processors should extend.
  *
- * <p>Copied from Debezium 2.6.2.Final. Flink CDC patch: pass {@code dmlEvent.getRowId()} to the
- * {@link LogMinerChangeRecordEmitter} so the ROWID is emitted as a change-event header.
+ * <p>Copied from Debezium project(2.7.4.Final).
  *
- * @author Chris Cranford
+ * <p>Change 1: pass {@code dmlEvent.getRowId()} to the {@link LogMinerChangeRecordEmitter} so the
+ * ROWID is emitted as a change-event header.
  */
 public abstract class AbstractLogMinerEventProcessor<T extends AbstractTransaction>
         implements LogMinerEventProcessor {
 
     private static final Logger LOGGER =
             LoggerFactory.getLogger(AbstractLogMinerEventProcessor.class);
+    private static final Logger ABANDONED_DETAILS_LOGGER =
+            LoggerFactory.getLogger(
+                    AbstractLogMinerEventProcessor.class.getName() + ".AbandonedDetails");
     private static final String NO_SEQUENCE_TRX_ID_SUFFIX = "ffffffff";
     private static final String XML_WRITE_PREAMBLE = "XML_REDO := ";
     private static final String XML_WRITE_PREAMBLE_NULL = XML_WRITE_PREAMBLE + "NULL";
@@ -392,30 +394,12 @@ public abstract class AbstractLogMinerEventProcessor<T extends AbstractTransacti
                     // Special use case where the table has been dropped and purged, and we are
                     // processing an
                     // old event for the table that comes prior to the drop.
-                    LOGGER.info(
+                    LOGGER.debug(
                             "Found DML for dropped table in history with object-id based table name {}.",
                             row.getTableId().table());
-                    for (TableId tableId : schema.tableIds()) {
-                        LOGGER.info("Processing table id '{}'", tableId);
-                        Table table = schema.tableFor(tableId);
-                        for (Attribute attribute : table.attributes()) {
-                            LOGGER.info(
-                                    "Attribute {} with value {}",
-                                    attribute.name(),
-                                    attribute.value());
-                        }
-                        Attribute attribute = table.attributeWithName("OBJECT_ID");
-                        if (attribute != null) {
-                            LOGGER.info(
-                                    "Found table '{}' with object id {}",
-                                    table.id(),
-                                    attribute.asLong());
-                        }
-                        if (attribute != null && attribute.asLong().equals(row.getObjectId())) {
-                            LOGGER.info("Table lookup resolved to '{}'", table.id());
-                            row.setTableId(table.id());
-                            break;
-                        }
+                    final TableId tableId = schema.getTableIdByObjectId(row.getObjectId(), null);
+                    if (tableId != null) {
+                        row.setTableId(tableId);
                     }
                 }
                 if (!tableFilter.isIncluded(row.getTableId())) {
@@ -518,7 +502,12 @@ public abstract class AbstractLogMinerEventProcessor<T extends AbstractTransacti
 
         final T transaction = getAndRemoveTransactionFromCache(transactionId);
         if (transaction == null) {
-            LOGGER.debug("Transaction {} not found in cache, no events to commit.", transactionId);
+            if (!offsetContext.getCommitScn().hasCommitAlreadyBeenHandled(row)) {
+                LOGGER.debug(
+                        "Transaction {} not found in cache with SCN {}, no events to commit.",
+                        transactionId,
+                        row.getScn());
+            }
             handleCommitNotFoundInBuffer(row);
         }
 
@@ -584,6 +573,7 @@ public abstract class AbstractLogMinerEventProcessor<T extends AbstractTransacti
                         offsetContext.setTableId(event.getTableId());
                         offsetContext.setRedoThread(row.getThread());
                         offsetContext.setRsId(event.getRsId());
+                        offsetContext.setRowId(event.getRowId());
 
                         if (event instanceof RedoSqlDmlEvent) {
                             offsetContext.setRedoSql(((RedoSqlDmlEvent) event).getRedoSql());
@@ -649,6 +639,7 @@ public abstract class AbstractLogMinerEventProcessor<T extends AbstractTransacti
 
         offsetContext.setEventScn(commitScn);
         offsetContext.setRsId(row.getRsId());
+        offsetContext.setRowId("");
 
         if (dispatchTransactionCommittedEvent) {
             dispatcher.dispatchTransactionCommittedEvent(
@@ -899,6 +890,8 @@ public abstract class AbstractLogMinerEventProcessor<T extends AbstractTransacti
             offsetContext.setEventScn(row.getScn());
             offsetContext.setRedoThread(row.getThread());
             offsetContext.setRsId(row.getRsId());
+            offsetContext.setRowId("");
+
             dispatcher.dispatchSchemaChangeEvent(
                     partition,
                     offsetContext,
@@ -1340,16 +1333,10 @@ public abstract class AbstractLogMinerEventProcessor<T extends AbstractTransacti
                 }
             } else if (tableId.table().equalsIgnoreCase("UNKNOWN")) {
                 // Object has been dropped and purged.
-                for (TableId schemaTableId : schema.tableIds()) {
-                    final Table table = schema.tableFor(schemaTableId);
-                    final Attribute objectId = table.attributeWithName("OBJECT_ID");
-                    final Attribute dataObjectId = table.attributeWithName("DATA_OBJECT_ID");
-                    if (objectId != null && dataObjectId != null) {
-                        if (row.getObjectId() == objectId.asLong()
-                                && row.getDataObjectId() == dataObjectId.asLong()) {
-                            return table.id();
-                        }
-                    }
+                final TableId resolvedTableId =
+                        schema.getTableIdByObjectId(row.getObjectId(), row.getDataObjectId());
+                if (resolvedTableId != null) {
+                    return resolvedTableId;
                 }
                 throw new DebeziumException(
                         "Failed to resolve UNKNOWN table name by object id lookup");
@@ -1718,12 +1705,13 @@ public abstract class AbstractLogMinerEventProcessor<T extends AbstractTransacti
                                     first = false;
                                 }
                                 LOGGER.warn(
-                                        "Transaction {} (start SCN {}, change time {}, redo thread {}, {} events) is being abandoned.",
+                                        "Transaction {} (start SCN {}, change time {}, redo thread {}, {} events{}) is being abandoned.",
                                         entry.getKey(),
                                         entry.getValue().getStartScn(),
                                         entry.getValue().getChangeTime(),
                                         entry.getValue().getRedoThreadId(),
-                                        entry.getValue().getNumberOfEvents());
+                                        entry.getValue().getNumberOfEvents(),
+                                        getLoggedAbandonedTransactionTableNames(entry.getValue()));
 
                                 cleanupAfterTransactionRemovedFromCache(entry.getValue(), true);
                                 iterator.remove();
@@ -1760,6 +1748,28 @@ public abstract class AbstractLogMinerEventProcessor<T extends AbstractTransacti
                 dispatcher.dispatchHeartbeatEvent(partition, offsetContext);
             }
         }
+    }
+
+    /**
+     * Calculates a list of tables that participate in the abandoned transaction, but only if the
+     * {@link #ABANDONED_DETAILS_LOGGER} logger has {@code DEBUG} logging enabled.
+     *
+     * @param transaction the transaction to inspect events for
+     * @return details about abandoned transactions, or an empty string if logging level is INFO or
+     *     higher.
+     */
+    protected String getLoggedAbandonedTransactionTableNames(T transaction) {
+        if (ABANDONED_DETAILS_LOGGER.isDebugEnabled()) {
+            final Set<String> tableNames = new HashSet<>();
+            final Iterator<LogMinerEvent> eventIterator = getTransactionEventIterator(transaction);
+            while (eventIterator.hasNext()) {
+                final LogMinerEvent event = eventIterator.next();
+                tableNames.add(event.getTableId().identifier());
+            }
+            return String.format(
+                    ", %d tables [%s]", tableNames.size(), String.join(",", tableNames));
+        }
+        return "";
     }
 
     /**

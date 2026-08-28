@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.debezium.connector.sqlserver;
 
 import io.debezium.connector.SnapshotRecord;
@@ -30,6 +31,12 @@ import org.apache.kafka.connect.data.Schema;
 import java.time.Instant;
 import java.util.Map;
 
+/**
+ * Copied from Debezium project(2.7.4.Final)..
+ *
+ * <p>Change 1: {@code Loader.load} accepts {@code event_serial_no} stored as either a String or a
+ * Long — offsets restored from Flink state carry it as a String.
+ */
 public class SqlServerOffsetContext extends CommonOffsetContext<SourceInfo> {
 
     private static final String SNAPSHOT_COMPLETED_KEY = "snapshot_completed";

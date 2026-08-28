@@ -3,15 +3,14 @@
  *
  * Licensed under the Apache Software License version 2.0, available at http://www.apache.org/licenses/LICENSE-2.0
  */
+package io.debezium.connector.mysql.jdbc;
 
-package io.debezium.connector.mysql.strategy.mysql;
-
-import com.mysql.cj.CharsetMapping;
 import io.debezium.DebeziumException;
-import io.debezium.connector.mysql.GtidSet;
-import io.debezium.connector.mysql.MySqlFieldReader;
-import io.debezium.connector.mysql.MySqlTextProtocolFieldReader;
-import io.debezium.connector.mysql.strategy.AbstractConnectorConnection;
+import io.debezium.connector.binlog.gtid.GtidSet;
+import io.debezium.connector.binlog.jdbc.BinlogConnectorConnection;
+import io.debezium.connector.binlog.jdbc.BinlogFieldReader;
+import io.debezium.connector.mysql.gtid.GtidUtils;
+import io.debezium.connector.mysql.gtid.MySqlGtidSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,24 +18,20 @@ import java.sql.SQLException;
 import java.util.function.Predicate;
 
 /**
- * Copied from Debezium project(2.5.4.Final) to add MySQL 8.4+ compatibility.
+ * Copied from Debezium project(2.7.4.Final).
  *
- * <p>MySQL 8.4 removed {@code SHOW MASTER STATUS} in favour of {@code SHOW BINARY LOG STATUS}. The
- * statement to use is probed once, on construction, and exposed through {@link
- * #getShowBinaryLogStatement()} so the snapshot and streaming sources can use the same one.
+ * <p>Change 1: MySQL 8.4 removed {@code SHOW MASTER STATUS} in favour of {@code SHOW BINARY LOG
+ * STATUS}. The statement is probed once, on construction, and exposed through {@link
+ * #getShowBinaryLogStatement()} so the snapshot source can use the same one; {@link
+ * #knownGtidSet()} uses it instead of a hard-coded statement.
  *
- * <p>Added {@link #MYSQL_CLASSIC_SHOW_BINARY_LOG_STATEMENT}, {@link
- * #MYSQL_NEW_SHOW_BINARY_LOG_STATEMENT}, the {@link #showBinaryLogStatement} field, {@link
- * #probeShowBinaryLogStatement()} and {@link #getShowBinaryLogStatement()}; {@link #knownGtidSet()}
- * uses the probed statement instead of a hard-coded {@code SHOW MASTER STATUS}.
+ * <p>Change 2: {@link #filterGtidSet} honours the {@code gtid.new.channel.position} pass-through
+ * property (which Debezium 2.0 removed as a config enum), delegating to {@code GtidUtils} for the
+ * earliest/latest new-channel reconciliation.
  *
- * <p>Also added the single-argument constructor used by Flink CDC's own connection factory.
- *
- * <p>Overrode {@link #connectionString()} so it reports the url actually used to connect. Debezium
- * builds it from the fixed {@code AbstractConnectionConfiguration.URL_PATTERN}, which ignores the
- * pattern {@link MySqlConnectionConfiguration} builds from the user's {@code jdbc.properties.*}.
+ * <p>Change 3: add the single-argument constructor used by Flink CDC's own connection factory.
  */
-public class MySqlConnection extends AbstractConnectorConnection {
+public class MySqlConnection extends BinlogConnectorConnection {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(MySqlConnection.class);
 
@@ -50,15 +45,34 @@ public class MySqlConnection extends AbstractConnectorConnection {
     }
 
     public MySqlConnection(
-            MySqlConnectionConfiguration connectionConfig, MySqlFieldReader fieldReader) {
+            MySqlConnectionConfiguration connectionConfig, BinlogFieldReader fieldReader) {
         super(connectionConfig, fieldReader);
         this.showBinaryLogStatement = probeShowBinaryLogStatement();
     }
 
-    @Override
-    public String connectionString() {
-        return connectionString(
-                ((MySqlConnectionConfiguration) connectionConfig()).getUrlPattern());
+    /**
+     * Returns the statement this server understands for reading the current binary log coordinates.
+     */
+    public String getShowBinaryLogStatement() {
+        return showBinaryLogStatement;
+    }
+
+    private String probeShowBinaryLogStatement() {
+        LOGGER.info("Probing binary log statement.");
+        try {
+            query(MYSQL_NEW_SHOW_BINARY_LOG_STATEMENT, rs -> {});
+            LOGGER.info(
+                    "Successfully found show binary log statement with `{}`.",
+                    MYSQL_NEW_SHOW_BINARY_LOG_STATEMENT);
+            return MYSQL_NEW_SHOW_BINARY_LOG_STATEMENT;
+        } catch (SQLException e) {
+            LOGGER.info(
+                    "Probing with {} failed, fallback to classic {}. Caused by: {}",
+                    MYSQL_NEW_SHOW_BINARY_LOG_STATEMENT,
+                    MYSQL_CLASSIC_SHOW_BINARY_LOG_STATEMENT,
+                    e.getMessage());
+            return MYSQL_CLASSIC_SHOW_BINARY_LOG_STATEMENT;
+        }
     }
 
     @Override
@@ -84,8 +98,10 @@ public class MySqlConnection extends AbstractConnectorConnection {
                     showBinaryLogStatement,
                     rs -> {
                         if (rs.next() && rs.getMetaData().getColumnCount() > 4) {
-                            // GTID set, may be null, blank, or contain a GTID set
-                            return new MySqlGtidSet(rs.getString(5));
+                            return new MySqlGtidSet(
+                                    rs.getString(
+                                            5)); // GTID set, may be null, blank, or contain a GTID
+                            // set
                         }
                         return new MySqlGtidSet("");
                     });
@@ -121,8 +137,10 @@ public class MySqlConnection extends AbstractConnectorConnection {
                     "SELECT @@global.gtid_purged",
                     rs -> {
                         if (rs.next() && rs.getMetaData().getColumnCount() > 0) {
-                            // GTID set, may be null, blank, or contain a GTID set
-                            return new MySqlGtidSet(rs.getString(1));
+                            return new MySqlGtidSet(
+                                    rs.getString(
+                                            1)); // GTID set, may be null, blank, or contain a GTID
+                            // set
                         }
                         return new MySqlGtidSet("");
                     });
@@ -158,9 +176,9 @@ public class MySqlConnection extends AbstractConnectorConnection {
         // Debezium 2.0 removed the gtid.new.channel.position config enum; Flink CDC keeps the
         // behaviour behind the pass-through property of the same name. It defaults to "earliest",
         // matching upstream Debezium 2.0.
-        String newChannelPosition =
+        final String newChannelPosition =
                 connectionConfig().originalConfig().getString("gtid.new.channel.position");
-        boolean useLatest = "latest".equalsIgnoreCase(newChannelPosition);
+        final boolean useLatest = "latest".equalsIgnoreCase(newChannelPosition);
 
         if (!useLatest) {
             final GtidSet knownGtidSet = filteredGtidSet;
@@ -189,54 +207,5 @@ public class MySqlConnection extends AbstractConnectorConnection {
 
         LOGGER.info("Final merged GTID set to use when connecting to MySQL: {}", mergedGtidSet);
         return mergedGtidSet;
-    }
-
-    @Override
-    public boolean isMariaDb() {
-        return false;
-    }
-
-    @Override
-    protected GtidSet createGtidSet(String gtids) {
-        return new MySqlGtidSet(gtids);
-    }
-
-    /**
-     * Returns the statement this server understands for reading the current binary log coordinates.
-     *
-     * <p>MySQL 8.4 removed {@code SHOW MASTER STATUS}; {@code SHOW BINARY LOG STATUS} replaces it.
-     */
-    public String getShowBinaryLogStatement() {
-        return showBinaryLogStatement;
-    }
-
-    private String probeShowBinaryLogStatement() {
-        LOGGER.info("Probing binary log statement.");
-        try {
-            // Attempt to query
-            query(MYSQL_NEW_SHOW_BINARY_LOG_STATEMENT, rs -> {});
-            LOGGER.info(
-                    "Successfully found show binary log statement with `{}`.",
-                    MYSQL_NEW_SHOW_BINARY_LOG_STATEMENT);
-            return MYSQL_NEW_SHOW_BINARY_LOG_STATEMENT;
-        } catch (SQLException e) {
-            LOGGER.info(
-                    "Probing with {} failed, fallback to classic {}. Caused by: {}",
-                    MYSQL_NEW_SHOW_BINARY_LOG_STATEMENT,
-                    MYSQL_CLASSIC_SHOW_BINARY_LOG_STATEMENT,
-                    e.getMessage());
-            return MYSQL_CLASSIC_SHOW_BINARY_LOG_STATEMENT;
-        }
-    }
-
-    public static String getJavaEncodingForCharSet(String charSetName) {
-        return CharsetMappingWrapper.getJavaEncodingForMysqlCharSet(charSetName);
-    }
-
-    /** Helper to gain access to protected method. */
-    private static final class CharsetMappingWrapper extends CharsetMapping {
-        static String getJavaEncodingForMysqlCharSet(String charSetName) {
-            return CharsetMapping.getStaticJavaEncodingForMysqlCharset(charSetName);
-        }
     }
 }

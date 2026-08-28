@@ -21,15 +21,20 @@ import io.debezium.connector.postgresql.spi.SlotState;
 import io.debezium.data.SpecialValueDecimal;
 import io.debezium.jdbc.JdbcConfiguration;
 import io.debezium.jdbc.JdbcConnection;
+import io.debezium.pipeline.source.snapshot.incremental.ChunkQueryBuilder;
+import io.debezium.pipeline.source.snapshot.incremental.RowValueConstructorChunkQueryBuilder;
 import io.debezium.pipeline.spi.OffsetContext;
 import io.debezium.pipeline.spi.Partition;
 import io.debezium.relational.Column;
 import io.debezium.relational.ColumnEditor;
+import io.debezium.relational.RelationalDatabaseConnectorConfig;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
+import io.debezium.spi.schema.DataCollectionId;
 import io.debezium.util.Clock;
 import io.debezium.util.Metronome;
+import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.errors.ConnectException;
 import org.postgresql.core.BaseConnection;
 import org.postgresql.jdbc.PgConnection;
@@ -43,39 +48,41 @@ import org.slf4j.LoggerFactory;
 import java.nio.charset.Charset;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Types;
 import java.time.Duration;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * {@link JdbcConnection} connection extension used for connecting to Postgres instances.
  *
- * @author Horia Chiorean
- *     <p>Copied from Debezium 1.9.8-Final with the following modifications:
- *     <ul>
- *       <li>Constructor PostgresConnection( Configuration config, PostgresValueConverterBuilder
- *           valueConverterBuilder, ConnectionFactory factory) to allow passing a custom
- *           ConnectionFactory
- *       <li>override connection() to return a unwrapped PgConnection (otherwise, it will complain
- *           about HikariProxyConnection cannot be cast to class org.postgresql.core.BaseConnection)
- *       <li>override isTableUniqueIndexIncluded: Copied DBZ-5398 from Debezium 2.0.0.Final to fix
- *           https://github.com/ververica/flink-cdc-connectors/issues/2710. Remove this comment
- *           after bumping debezium version to 2.0.0.Final.
- *       <li>FLINK-38965: Modified doReadTableColumn to filter out columns from other tables that
- *           might be returned due to PostgreSQL LIKE wildcard matching. The underscore '_' matches
- *           any single character, and '%' matches any sequence of characters. For example, when
- *           querying table 'user_sink', the LIKE pattern may also match 'userbsink' (due to '_');
- *           when querying table 'user%data' (where % is a literal character in the table name), the
- *           LIKE pattern may also match 'user_test_data' (due to '%'). See also:
- *           https://github.com/debezium/debezium/blob/main/debezium-core/src/main/java/io/debezium/jdbc/JdbcConnection.java#L1327
- *     </ul>
+ * <p>Copied from Debezium project(2.7.4.Final). with the following modifications:
+ *
+ * <p>Change 1: add the {@code (config, valueConverterBuilder, connectionUsage, factory)}
+ * constructor so Flink CDC can pass a pooled (HikariCP) {@code ConnectionFactory}; the 3-arg
+ * constructor delegates to it with the default {@code FACTORY}.
+ *
+ * <p>Change 2: override {@code connection()} to unwrap {@code HikariProxyConnection} to the
+ * underlying {@code PgConnection} — the replication code casts to {@code
+ * org.postgresql.core.BaseConnection}.
+ *
+ * <p>Change 3 (FLINK-38965): {@code doReadTableColumn} filters out columns of other tables that
+ * JDBC metadata may return because the table name is used as a LIKE pattern ('_' matches any
+ * character, '%' any sequence).
+ *
+ * <p>(The DBZ-5398 {@code isTableUniqueIndexIncluded} patch carried by earlier versions of this
+ * fork is upstream since Debezium 2.0.0 and is no longer a modification.)
  */
 public class PostgresConnection extends JdbcConnection {
 
@@ -139,15 +146,9 @@ public class PostgresConnection extends JdbcConnection {
     }
 
     /**
-     * Creates a Postgres connection using the supplied configuration. If necessary this connection
-     * is able to resolve data type mappings. Such a connection requires a {@link
-     * PostgresValueConverter}, and will provide its own {@link TypeRegistry}. Usually only one such
-     * connection per connector is needed.
-     *
-     * @param config {@link Configuration} instance, may not be null.
-     * @param valueConverterBuilder supplies a configured {@link PostgresValueConverter} for a given
-     *     {@link TypeRegistry}
-     * @param connectionUsage a symbolic name of the connection to be tracked in monitoring tools
+     * Creates a Postgres connection using the supplied configuration and connection factory. See
+     * {@link #PostgresConnection(JdbcConfiguration, PostgresValueConverterBuilder, String)}; this
+     * variant lets Flink CDC supply a pooled connection factory.
      */
     public PostgresConnection(
             JdbcConfiguration config,
@@ -171,7 +172,7 @@ public class PostgresConnection extends JdbcConnection {
                     valueConverterBuilder.build(this.typeRegistry);
             this.defaultValueConverter =
                     new PostgresDefaultValueConverter(
-                            valueConverter, this.getTimestampUtils(), this.typeRegistry);
+                            valueConverter, this.getTimestampUtils(), typeRegistry);
         }
     }
 
@@ -190,6 +191,7 @@ public class PostgresConnection extends JdbcConnection {
                 PostgresConnection::validateServerVersion,
                 "\"",
                 "\"");
+
         if (Objects.isNull(typeRegistry)) {
             this.typeRegistry = null;
             this.defaultValueConverter = null;
@@ -199,7 +201,7 @@ public class PostgresConnection extends JdbcConnection {
                     PostgresValueConverter.of(config, this.getDatabaseCharset(), typeRegistry);
             this.defaultValueConverter =
                     new PostgresDefaultValueConverter(
-                            valueConverter, this.getTimestampUtils(), this.typeRegistry);
+                            valueConverter, this.getTimestampUtils(), typeRegistry);
         }
     }
 
@@ -214,7 +216,7 @@ public class PostgresConnection extends JdbcConnection {
         this(config, null, connectionUsage);
     }
 
-    /** Return an unwrapped PgConnection instead of HikariProxyConnection */
+    /** Return an unwrapped PgConnection instead of HikariProxyConnection. */
     @Override
     public synchronized Connection connection() throws SQLException {
         Connection conn = connection(true);
@@ -256,6 +258,7 @@ public class PostgresConnection extends JdbcConnection {
      * @throws SQLException if there is a problem obtaining the replica identity information for the
      *     given table
      */
+    @VisibleForTesting
     public ReplicaIdentityInfo readReplicaIdentityInfo(TableId tableId) throws SQLException {
         String statement =
                 "SELECT relreplident FROM pg_catalog.pg_class c "
@@ -283,6 +286,76 @@ public class PostgresConnection extends JdbcConnection {
                 });
         return new ReplicaIdentityInfo(
                 ReplicaIdentityInfo.ReplicaIdentity.parseFromDB(replIdentity.toString()));
+    }
+
+    /**
+     * This query retrieves information about the INDEX as long as replica identity is configure
+     * USING INDEX
+     *
+     * @param tableId the identifier of the table
+     * @return Index name linked to replica identity; never null
+     * @throws SQLException if there is a problem obtaining the replica identity and index
+     *     information for the given table
+     */
+    @VisibleForTesting
+    public String readIndexOfReplicaIdentity(TableId tableId) throws SQLException {
+        String statement =
+                "with rel_index as ("
+                        + "select split_part(indexrelid::regclass::text, '.', 1) as index_schema, split_part(indexrelid::regclass::text, '.', 2) as index_name "
+                        + "from pg_catalog.pg_index "
+                        + "where indisreplident "
+                        + ") "
+                        + "SELECT i.index_name "
+                        + "FROM pg_catalog.pg_class c "
+                        + "    LEFT JOIN pg_catalog.pg_namespace n ON c.relnamespace=n.oid "
+                        + "    LEFT join rel_index i on n.nspname = i.index_schema "
+                        + "WHERE n.nspname=? and c.relname=?";
+        String schema =
+                tableId.schema() != null && tableId.schema().length() > 0
+                        ? tableId.schema()
+                        : "public";
+        StringBuilder indexName = new StringBuilder();
+        prepareQuery(
+                statement,
+                stmt -> {
+                    stmt.setString(1, schema);
+                    stmt.setString(2, tableId.table());
+                },
+                rs -> {
+                    if (rs.next()) {
+                        indexName.append(rs.getString(1));
+                    } else {
+                        LOGGER.warn(
+                                "Cannot determine index linked to REPLICA IDENTITY for table '{}'",
+                                tableId);
+                    }
+                });
+        return indexName.toString();
+    }
+
+    /**
+     * Update REPLICA IDENTITY status of a table. This in turn determines how much information is
+     * available for UPDATE and DELETE operations for logical replication.
+     *
+     * @param tableId the identifier of the table
+     * @param replicaIdentityValue Replica Identity value
+     */
+    public void setReplicaIdentityForTable(
+            TableId tableId, ReplicaIdentityInfo replicaIdentityValue) {
+        try {
+            LOGGER.debug("Updating Replica Identity '{}'", tableId.table());
+            execute(
+                    String.format(
+                            "ALTER TABLE %s REPLICA IDENTITY %s;", tableId, replicaIdentityValue));
+        } catch (SQLException e) {
+
+            if (e.getSQLState().equals("42501")) {
+                LOGGER.error(
+                        "Replica identity could not be updated because of lack of privileges", e);
+            } else {
+                LOGGER.error("Unexpected error while attempting to alter Replica Identity", e);
+            }
+        }
     }
 
     /**
@@ -426,17 +499,49 @@ public class PostgresConnection extends JdbcConnection {
         try {
             confirmedFlushedLsn =
                     tryParseLsn(slotName, pluginName, database, rs, "confirmed_flush_lsn");
-        } catch (SQLException e) {
-            LOGGER.info("unable to find confirmed_flushed_lsn, falling back to restart_lsn");
-            try {
-                confirmedFlushedLsn =
-                        tryParseLsn(slotName, pluginName, database, rs, "restart_lsn");
-            } catch (SQLException e2) {
-                throw new ConnectException(
-                        "Neither confirmed_flush_lsn nor restart_lsn could be found");
+            if (confirmedFlushedLsn == null) {
+                LOGGER.info("Failed to obtain valid replication slot, confirmed flush lsn is null");
+                if (!hasIdleTransactions()) {
+                    confirmedFlushedLsn =
+                            tryFallbackToRestartLsn(slotName, pluginName, database, rs);
+                }
             }
+        } catch (SQLException e) {
+            confirmedFlushedLsn = tryFallbackToRestartLsn(slotName, pluginName, database, rs);
         }
 
+        return confirmedFlushedLsn;
+    }
+
+    private boolean hasIdleTransactions() throws SQLException {
+        return queryAndMap(
+                "select * from pg_stat_activity where state like 'idle in transaction' AND application_name != '"
+                        + CONNECTION_GENERAL
+                        + "' AND pid <> pg_backend_pid()",
+                rs -> {
+                    if (rs.next()) {
+                        LOGGER.debug(
+                                "Found at least one idle transaction with pid "
+                                        + rs.getInt("pid")
+                                        + " for application"
+                                        + rs.getString("application_name"));
+                        return true;
+                    } else {
+                        return false;
+                    }
+                });
+    }
+
+    private Lsn tryFallbackToRestartLsn(
+            String slotName, String pluginName, String database, ResultSet rs) {
+        Lsn confirmedFlushedLsn;
+        LOGGER.info("Unable to find confirmed_flushed_lsn, falling back to restart_lsn");
+        try {
+            confirmedFlushedLsn = tryParseLsn(slotName, pluginName, database, rs, "restart_lsn");
+        } catch (SQLException e) {
+            throw new DebeziumException(
+                    "Neither confirmed_flush_lsn nor restart_lsn could be found", e);
+        }
         return confirmedFlushedLsn;
     }
 
@@ -445,7 +550,7 @@ public class PostgresConnection extends JdbcConnection {
         try {
             restartLsn = tryParseLsn(slotName, pluginName, database, rs, "restart_lsn");
         } catch (SQLException e) {
-            throw new ConnectException("restart_lsn could be found");
+            throw new DebeziumException("restart_lsn could be found");
         }
 
         return restartLsn;
@@ -463,7 +568,7 @@ public class PostgresConnection extends JdbcConnection {
         try {
             lsn = Lsn.valueOf(lsnStr);
         } catch (Exception e) {
-            throw new ConnectException(
+            throw new DebeziumException(
                     "Value "
                             + column
                             + " in the pg_replication_slots table for slot = '"
@@ -475,7 +580,7 @@ public class PostgresConnection extends JdbcConnection {
                             + "' is not valid. This is an abnormal situation and the database status should be checked.");
         }
         if (!lsn.isValid()) {
-            throw new ConnectException("Invalid LSN returned from database");
+            throw new DebeziumException("Invalid LSN returned from database");
         }
         return lsn;
     }
@@ -638,6 +743,9 @@ public class PostgresConnection extends JdbcConnection {
                         }
                     });
         }
+
+        serverInfo.withMajorVersion(connection().getMetaData().getDatabaseMajorVersion());
+
         return serverInfo;
     }
 
@@ -670,7 +778,7 @@ public class PostgresConnection extends JdbcConnection {
     @Override
     public String quotedColumnIdString(String columnName) {
         if (columnName.contains("\"")) {
-            columnName = columnName.replaceAll("\"", "\"\"");
+            columnName = columnName.replace("\"", "\"\"");
         }
 
         return super.quotedColumnIdString(columnName);
@@ -825,8 +933,7 @@ public class PostgresConnection extends JdbcConnection {
                             ? value.get()
                             : new SpecialValueDecimal(rs.getBigDecimal(columnIndex));
                 case PgOid.TIME:
-                // To handle time 24:00:00 supported by TIME columns, read the column as a
-                // string.
+                // To handle time 24:00:00 supported by TIME columns, read the column as a string.
                 case PgOid.TIMETZ:
                     // In order to guarantee that we resolve TIMETZ columns with proper microsecond
                     // precision,
@@ -878,11 +985,60 @@ public class PostgresConnection extends JdbcConnection {
         return readTableNames(catalogName, null, null, new String[] {"TABLE", "PARTITIONED TABLE"});
     }
 
-    /**
-     * Added in Debezium 2.6 and called by {@code PostgresConnectorTask} through a method reference.
-     * This fork shadows the Debezium class, so the method has to exist here too or the embedded
-     * engine fails with {@code NoSuchMethodError}.
-     */
+    @Override
+    public <T extends DataCollectionId> ChunkQueryBuilder<T> chunkQueryBuilder(
+            RelationalDatabaseConnectorConfig connectorConfig) {
+        // PostgreSQL definitely must use row value constructors in order to yield optimal results.
+        // See DBZ-5071.
+        return new RowValueConstructorChunkQueryBuilder<>(connectorConfig, this);
+    }
+
+    @Override
+    public Optional<Boolean> nullsSortLast() {
+        // "By default, null values sort as if larger than any non-null value"
+        // https://www.postgresql.org/docs/16/queries-order.html
+        return Optional.of(true);
+    }
+
+    @Override
+    public Map<String, Object> reselectColumns(
+            Table table,
+            List<String> columns,
+            List<String> keyColumns,
+            List<Object> keyValues,
+            Struct source)
+            throws SQLException {
+        final String query =
+                String.format(
+                        "SELECT %s FROM %s WHERE %s",
+                        columns.stream()
+                                .map(this::quotedColumnIdString)
+                                .collect(Collectors.joining(",")),
+                        quotedTableIdString(table.id()),
+                        keyColumns.stream()
+                                .map(key -> key + "=?::" + table.columnWithName(key).typeName())
+                                .collect(Collectors.joining(" AND ")));
+        return reselectColumns(query, table.id(), columns, keyValues);
+    }
+
+    @Override
+    public void setQueryColumnValue(
+            PreparedStatement statement, Column column, int pos, Object value) throws SQLException {
+        final PostgresType resolvedType = typeRegistry.get(column.nativeType());
+
+        if (resolvedType != null && resolvedType.isEnumType()) {
+            // ENUMs require explicit casting so the comparison operators can correctly work
+            statement.setObject(pos, value, Types.OTHER);
+        } else {
+            super.setQueryColumnValue(statement, column, pos, value);
+        }
+    }
+
+    @Override
+    public TableId createTableId(String databaseName, String schemaName, String tableName) {
+        return new TableId(null, schemaName, tableName);
+    }
+
     public boolean validateLogPosition(
             Partition partition, OffsetContext offset, CommonConnectorConfig config) {
 

@@ -7,7 +7,6 @@ package io.debezium.relational;
 
 import io.debezium.data.Envelope.Operation;
 import io.debezium.pipeline.AbstractChangeRecordEmitter;
-import io.debezium.pipeline.spi.ChangeRecordEmitter;
 import io.debezium.pipeline.spi.OffsetContext;
 import io.debezium.pipeline.spi.Partition;
 import io.debezium.schema.DataCollectionSchema;
@@ -21,14 +20,14 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Copied from Debezium 2.3.7.Final.
+ * Base class for {@link io.debezium.pipeline.spi.ChangeRecordEmitter} implementations based on a
+ * relational database.
  *
- * <p>Base class for {@link ChangeRecordEmitter} implementations based on a relational database.
+ * <p>Copied from Debezium project(2.7.4.Final)..
  *
- * <p>This class overrides the emit methods to put some values in the header via {@link
- * #getEmitConnectHeaders()}.
- *
- * @author Gunnar Morling
+ * <p>Change 1: add the {@code getEmitConnectHeaders()} hook and pass its value as the change record
+ * headers in every emit method, so subclasses (e.g. the Oracle LogMiner emitter's ROWID header) can
+ * attach Connect headers to emitted records.
  */
 public abstract class RelationalChangeRecordEmitter<P extends Partition>
         extends AbstractChangeRecordEmitter<P, TableSchema> {
@@ -91,7 +90,7 @@ public abstract class RelationalChangeRecordEmitter<P extends Partition>
         if (skipEmptyMessages() && (newColumnValues == null || newColumnValues.length == 0)) {
             // This case can be hit on UPDATE / DELETE when there's no primary key defined while
             // using certain decoders
-            LOGGER.warn(
+            LOGGER.debug(
                     "no new values found for table '{}' from create message at '{}'; skipping record",
                     tableSchema,
                     getOffset().getSourceInfo());
@@ -198,7 +197,7 @@ public abstract class RelationalChangeRecordEmitter<P extends Partition>
         Struct oldValue = tableSchema.valueFromColumnData(oldColumnValues);
 
         if (skipEmptyMessages() && (oldColumnValues == null || oldColumnValues.length == 0)) {
-            LOGGER.warn(
+            LOGGER.debug(
                     "no old values found for table '{}' from delete message at '{}'; skipping record",
                     tableSchema,
                     getOffset().getSourceInfo());
@@ -251,45 +250,34 @@ public abstract class RelationalChangeRecordEmitter<P extends Partition>
             Struct oldValue,
             Struct newValue)
             throws InterruptedException {
-        ConnectHeaders headers = getEmitConnectHeaders().orElse(new ConnectHeaders());
+        final OffsetContext offset = getOffset();
+        final Struct sourceInfo = offset.getSourceInfo();
+
+        ConnectHeaders headers = new ConnectHeaders();
         headers.add(PK_UPDATE_NEWKEY_FIELD, newKey, tableSchema.keySchema());
 
         Struct envelope =
                 tableSchema
                         .getEnvelopeSchema()
-                        .delete(
-                                oldValue,
-                                getOffset().getSourceInfo(),
-                                getClock().currentTimeAsInstant());
+                        .delete(oldValue, sourceInfo, getClock().currentTimeAsInstant());
         receiver.changeRecord(
-                getPartition(),
-                tableSchema,
-                Operation.DELETE,
-                oldKey,
-                envelope,
-                getOffset(),
-                headers);
+                getPartition(), tableSchema, Operation.DELETE, oldKey, envelope, offset, headers);
 
-        headers = getEmitConnectHeaders().orElse(new ConnectHeaders());
+        headers = new ConnectHeaders();
         headers.add(PK_UPDATE_OLDKEY_FIELD, oldKey, tableSchema.keySchema());
 
         envelope =
                 tableSchema
                         .getEnvelopeSchema()
-                        .create(
-                                newValue,
-                                getOffset().getSourceInfo(),
-                                getClock().currentTimeAsInstant());
+                        .create(newValue, sourceInfo, getClock().currentTimeAsInstant());
         receiver.changeRecord(
-                getPartition(),
-                tableSchema,
-                Operation.CREATE,
-                newKey,
-                envelope,
-                getOffset(),
-                headers);
+                getPartition(), tableSchema, Operation.CREATE, newKey, envelope, offset, headers);
     }
 
+    /**
+     * Returns the Connect headers to attach to emitted change records; {@link Optional#empty()} by
+     * default. Flink CDC addition — see the class javadoc.
+     */
     protected Optional<ConnectHeaders> getEmitConnectHeaders() {
         return Optional.empty();
     }

@@ -6,8 +6,6 @@
 
 package io.debezium.embedded;
 
-import org.apache.flink.cdc.debezium.internal.DebeziumChangeFetcher;
-
 import io.debezium.engine.ChangeEvent;
 import io.debezium.engine.Header;
 import io.debezium.engine.RecordChangeEvent;
@@ -16,8 +14,10 @@ import org.apache.kafka.connect.source.SourceRecord;
 import java.util.List;
 
 /**
- * Copied from Debezium 2.2.1.Final. Make it public to be accessible from {@link
- * DebeziumChangeFetcher}.
+ * Copied from Debezium project(2.7.4.Final)..
+ *
+ * <p>Change 1: the constructor is public so {@code DebeziumChangeConsumer} can construct the event
+ * when handing records to the legacy DataStream source (upstream keeps it package-private).
  */
 public class EmbeddedEngineChangeEvent<K, V, H> implements ChangeEvent<K, V>, RecordChangeEvent<V> {
 
@@ -44,6 +44,7 @@ public class EmbeddedEngineChangeEvent<K, V, H> implements ChangeEvent<K, V>, Re
         return value;
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public List<Header<H>> headers() {
         return headers;
