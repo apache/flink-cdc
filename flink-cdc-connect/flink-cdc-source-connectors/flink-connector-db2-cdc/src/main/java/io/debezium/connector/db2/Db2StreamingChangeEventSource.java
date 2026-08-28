@@ -338,7 +338,8 @@ public class Db2StreamingChangeEventSource
                                                     operation,
                                                     data,
                                                     dataNext,
-                                                    clock));
+                                                    clock,
+                                                    connectorConfig));
                                     tableWithSmallestLsn.next();
                                 }
                             });
@@ -365,6 +366,7 @@ public class Db2StreamingChangeEventSource
         LOGGER.info("Migrating schema to {}", newTable);
         dispatcher.dispatchSchemaChangeEvent(
                 partition,
+                offsetContext,
                 newTable.getSourceTableId(),
                 new Db2SchemaChangeEventEmitter(
                         partition,
@@ -451,6 +453,7 @@ public class Db2StreamingChangeEventSource
                 // obtained from change table
                 dispatcher.dispatchSchemaChangeEvent(
                         partition,
+                        offsetContext,
                         currentTable.getSourceTableId(),
                         new Db2SchemaChangeEventEmitter(
                                 partition,

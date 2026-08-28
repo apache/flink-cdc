@@ -375,6 +375,10 @@ public class MySqlSourceConfigFactory implements Serializable {
         props.setProperty("schema.history.internal.skip.unparseable.ddl", String.valueOf(true));
         props.setProperty("schema.history.internal.prefer.ddl", String.valueOf(true));
         props.setProperty("connect.timeout.ms", String.valueOf(connectTimeout.toMillis()));
+        // Debezium 2.3 changed the default of "database.ssl.mode" from "disabled" to "preferred".
+        // Keep the historical Flink CDC behavior (plain connections unless the user asks for TLS);
+        // user-supplied debezium properties below still override it.
+        props.setProperty("database.ssl.mode", "disabled");
         // the underlying debezium reader should always capture the schema changes and forward them.
         // Note: the includeSchemaChanges parameter is used to control emitting the schema record,
         // only DataStream API program need to emit the schema record, the Table API need not

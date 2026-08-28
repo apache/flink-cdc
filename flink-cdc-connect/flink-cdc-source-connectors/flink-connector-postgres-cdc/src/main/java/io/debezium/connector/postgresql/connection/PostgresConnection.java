@@ -252,7 +252,7 @@ public class PostgresConnection extends JdbcConnection {
      * @throws SQLException if there is a problem obtaining the replica identity information for the
      *     given table
      */
-    public ServerInfo.ReplicaIdentity readReplicaIdentityInfo(TableId tableId) throws SQLException {
+    public ReplicaIdentityInfo readReplicaIdentityInfo(TableId tableId) throws SQLException {
         String statement =
                 "SELECT relreplident FROM pg_catalog.pg_class c "
                         + "LEFT JOIN pg_catalog.pg_namespace n ON c.relnamespace=n.oid "
@@ -277,7 +277,8 @@ public class PostgresConnection extends JdbcConnection {
                                 tableId);
                     }
                 });
-        return ServerInfo.ReplicaIdentity.parseFromDB(replIdentity.toString());
+        return new ReplicaIdentityInfo(
+                ReplicaIdentityInfo.ReplicaIdentity.parseFromDB(replIdentity.toString()));
     }
 
     /**

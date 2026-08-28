@@ -3,7 +3,6 @@
  *
  * Licensed under the Apache Software License version 2.0, available at http://www.apache.org/licenses/LICENSE-2.0
  */
-
 package io.debezium.connector.mysql;
 
 import io.debezium.DebeziumException;
@@ -47,7 +46,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Copied from Debezium project(2.2.1.Final) to fix MySQL 8.x compatibility.
+ * Copied from Debezium project(2.3.7.Final) to fix MySQL 8.x compatibility.
  *
  * <p>Line 338: Use probing methods to determine the statement.
  */
@@ -305,6 +304,7 @@ public class MySqlSnapshotChangeEventSource
 
                     dispatcher.dispatchSchemaChangeEvent(
                             snapshotContext.partition,
+                            snapshotContext.offset,
                             tableId,
                             (receiver) -> receiver.schemaChangeEvent(event));
                 }
@@ -511,12 +511,21 @@ public class MySqlSnapshotChangeEventSource
             RelationalSnapshotContext<MySqlPartition, MySqlOffsetContext> snapshotContext,
             TableId tableId,
             List<String> columns) {
-        String snapshotSelectColumns = columns.stream().collect(Collectors.joining(", "));
+        return Optional.of(getSnapshotSelect(tableId, columns));
+    }
 
-        return Optional.of(
-                String.format(
-                        "SELECT %s FROM `%s`.`%s`",
-                        snapshotSelectColumns, tableId.catalog(), tableId.table()));
+    private String getSnapshotSelect(TableId tableId, List<String> columns) {
+        String snapshotSelectColumns = String.join(", ", columns);
+        return String.format(
+                "SELECT %s FROM `%s`.`%s`",
+                snapshotSelectColumns, tableId.catalog(), tableId.table());
+    }
+
+    @Override
+    protected Optional<String> getSnapshotConnectionFirstSelect(
+            RelationalSnapshotContext<MySqlPartition, MySqlOffsetContext> snapshotContext,
+            TableId tableId) {
+        return Optional.of(getSnapshotSelect(tableId, List.of("*")) + " LIMIT 1");
     }
 
     private boolean isGloballyLocked() {
@@ -569,7 +578,7 @@ public class MySqlSnapshotChangeEventSource
         if (!snapshotContext.capturedTables.isEmpty()) {
             final String tableList =
                     snapshotContext.capturedTables.stream()
-                            .map(tid -> quote(tid))
+                            .map(this::quote)
                             .collect(Collectors.joining(","));
             connection.executeWithoutCommitting("FLUSH TABLES " + tableList + " WITH READ LOCK");
         }
@@ -606,7 +615,7 @@ public class MySqlSnapshotChangeEventSource
             throws SQLException {
         MySqlConnection connection = (MySqlConnection) jdbcConnection;
         final long largeTableRowCount = connectorConfig.rowCountForLargeTable();
-        if (!rowCount.isPresent()
+        if (rowCount.isEmpty()
                 || largeTableRowCount == 0
                 || rowCount.getAsLong() <= largeTableRowCount) {
             return super.readTableStatement(connection, rowCount);
@@ -690,6 +699,7 @@ public class MySqlSnapshotChangeEventSource
             }
             dispatcher.dispatchSchemaChangeEvent(
                     snapshotContext.partition,
+                    snapshotContext.offset,
                     tableId,
                     (receiver) -> receiver.schemaChangeEvent(event));
         }

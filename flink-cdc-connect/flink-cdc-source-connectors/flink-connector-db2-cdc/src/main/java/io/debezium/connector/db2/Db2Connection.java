@@ -263,10 +263,10 @@ public class Db2Connection extends JdbcConnection {
     }
 
     @Override
-    public Optional<Timestamp> getCurrentTimestamp() throws SQLException {
+    public Optional<Instant> getCurrentTimestamp() throws SQLException {
         return queryAndMap(
                 "SELECT CURRENT_TIMESTAMP result FROM sysibm.sysdummy1",
-                rs -> rs.next() ? Optional.of(rs.getTimestamp(1)) : Optional.empty());
+                rs -> rs.next() ? Optional.of(rs.getTimestamp(1).toInstant()) : Optional.empty());
     }
 
     /**

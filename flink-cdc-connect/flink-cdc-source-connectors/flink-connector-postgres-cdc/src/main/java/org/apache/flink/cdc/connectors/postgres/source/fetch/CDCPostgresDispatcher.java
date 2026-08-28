@@ -60,6 +60,8 @@ public class CDCPostgresDispatcher extends PostgresEventDispatcher<TableId>
             SchemaNameAdjuster schemaNameAdjuster) {
         // Debezium 2.0's PostgresEventDispatcher constructor inserts an InconsistentSchemaHandler
         // parameter and takes a built Heartbeat instead of a HeartbeatFactory.
+        // Debezium 2.3 appends a trailing SignalProcessor parameter; Flink CDC uses its own
+        // snapshot mechanism and no Debezium signals, so it is passed as null.
         super(
                 connectorConfig,
                 topicSelector,
@@ -70,7 +72,8 @@ public class CDCPostgresDispatcher extends PostgresEventDispatcher<TableId>
                 null,
                 metadataProvider,
                 heartbeatFactory.createHeartbeat(),
-                schemaNameAdjuster);
+                schemaNameAdjuster,
+                null);
         this.topic = connectorConfig.getLogicalName();
         this.queue = queue;
     }

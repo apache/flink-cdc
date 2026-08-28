@@ -479,7 +479,7 @@ public class SqlServerStreamingChangeEventSource
                                                     data,
                                                     dataNext,
                                                     clock,
-                                                    connectorConfig.skipMessagesWithoutChange()));
+                                                    connectorConfig));
                                     tableWithSmallestLsn.next();
                                 }
                             });
@@ -530,6 +530,7 @@ public class SqlServerStreamingChangeEventSource
         }
         dispatcher.dispatchSchemaChangeEvent(
                 partition,
+                offsetContext,
                 newTable.getSourceTableId(),
                 new SqlServerSchemaChangeEventEmitter(
                         partition,
@@ -658,6 +659,7 @@ public class SqlServerStreamingChangeEventSource
                 offsetContext.event(currentTable.getSourceTableId(), Instant.now());
                 dispatcher.dispatchSchemaChangeEvent(
                         partition,
+                        offsetContext,
                         currentTable.getSourceTableId(),
                         new SqlServerSchemaChangeEventEmitter(
                                 partition,

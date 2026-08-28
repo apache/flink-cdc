@@ -169,7 +169,7 @@ public class SqlServerSourceFetchTaskContext extends JdbcSourceFetchTaskContext 
         this.streamingChangeEventSourceMetrics =
                 changeEventSourceMetricsFactory.getStreamingMetrics(
                         taskContext, queue, metadataProvider);
-        this.errorHandler = new SqlServerErrorHandler(connectorConfig, queue);
+        this.errorHandler = new SqlServerErrorHandler(connectorConfig, queue, null);
     }
 
     /** Loads the connector's persistent offset (if present) via the given loader. */

@@ -114,7 +114,7 @@ public class PostgresStreamingChangeEventSource
     }
 
     @Override
-    public void init() {
+    public void init(PostgresOffsetContext offsetContext) {
         // refresh the schema so we have a latest view of the DB tables
         try {
             taskContext.refreshSchema(connection, true);
@@ -181,7 +181,7 @@ public class PostgresStreamingChangeEventSource
                             connectorConfig.getLogicalName(),
                             KEEP_ALIVE_THREAD_NAME));
 
-            init();
+            init(offsetContext);
 
             // If we need to do a pre-snapshot streaming catch up, we should allow the snapshot
             // transaction to persist

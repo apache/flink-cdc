@@ -227,7 +227,7 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                         // .buffering()
                         .build();
 
-        this.errorHandler = new PostgresErrorHandler(getDbzConnectorConfig(), queue);
+        this.errorHandler = new PostgresErrorHandler(getDbzConnectorConfig(), queue, null);
         this.metadataProvider = PostgresObjectUtils.newEventMetadataProvider();
 
         PostgresConnectorConfig finalDbzConfig = dbzConfig;
