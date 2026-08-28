@@ -36,11 +36,15 @@ import io.debezium.connector.sqlserver.SqlServerPartition;
 import io.debezium.connector.sqlserver.SqlServerStreamingChangeEventSource;
 import io.debezium.pipeline.ErrorHandler;
 import io.debezium.pipeline.EventDispatcher;
+import io.debezium.pipeline.notification.NotificationService;
 import io.debezium.pipeline.source.spi.ChangeEventSource;
 import io.debezium.relational.TableId;
+import io.debezium.schema.SchemaFactory;
 import io.debezium.util.Clock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.Collections;
 
 import static org.apache.flink.cdc.connectors.sqlserver.source.offset.LsnOffset.NO_STOPPING_OFFSET;
 
@@ -123,7 +127,12 @@ public class SqlServerStreamFetchTask implements FetchTask<SourceSplitBase> {
                     eventDispatcher,
                     errorHandler,
                     Clock.system(),
-                    schema);
+                    schema,
+                    new NotificationService<>(
+                            Collections.emptyList(),
+                            connectorConfig,
+                            SchemaFactory.get(),
+                            notification -> {}));
             this.lsnSplit = lsnSplit;
             this.watermarkDispatcher = watermarkDispatcher;
             this.errorHandler = errorHandler;

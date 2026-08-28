@@ -21,7 +21,7 @@ import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
 
-import io.debezium.connector.mysql.MySqlConnection;
+import io.debezium.connector.mysql.strategy.mysql.MySqlConnection;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 

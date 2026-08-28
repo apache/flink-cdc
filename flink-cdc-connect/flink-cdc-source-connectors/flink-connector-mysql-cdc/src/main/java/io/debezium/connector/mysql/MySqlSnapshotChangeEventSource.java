@@ -7,8 +7,9 @@ package io.debezium.connector.mysql;
 
 import io.debezium.DebeziumException;
 import io.debezium.connector.SnapshotRecord;
-import io.debezium.connector.mysql.MySqlConnection.DatabaseLocales;
 import io.debezium.connector.mysql.MySqlOffsetContext.Loader;
+import io.debezium.connector.mysql.strategy.AbstractConnectorConnection;
+import io.debezium.connector.mysql.strategy.AbstractConnectorConnection.DatabaseLocales;
 import io.debezium.data.Envelope;
 import io.debezium.function.BlockingConsumer;
 import io.debezium.jdbc.JdbcConnection;
@@ -40,6 +41,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -54,12 +56,16 @@ import java.util.concurrent.Executors;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import static java.util.function.Predicate.not;
-
 /**
- * Copied from Debezium project(2.4.2.Final) to fix MySQL 8.x compatibility.
+ * Copied from Debezium project(2.5.4.Final).
  *
- * <p>Line 294: Use probing methods to determine the statement.
+ * <p>Flink CDC drives the snapshot itself, so the lifecycle hooks that Debezium uses to mark the
+ * snapshot boundaries are neutralised or moved: {@code connectionCreated} and {@code completed} are
+ * no-ops, and {@code lastSnapshotRecord} only fires once the delayed schema snapshot is done.
+ *
+ * <p>The MySQL 8.4 {@code SHOW BINARY LOG STATUS} handling now lives in {@link
+ * io.debezium.connector.mysql.strategy.mysql.MySqlConnectorAdapter}, which Debezium 2.5 made
+ * responsible for reading the binlog position.
  */
 public class MySqlSnapshotChangeEventSource
         extends RelationalSnapshotChangeEventSource<MySqlPartition, MySqlOffsetContext> {
@@ -68,20 +74,20 @@ public class MySqlSnapshotChangeEventSource
             LoggerFactory.getLogger(MySqlSnapshotChangeEventSource.class);
 
     private final MySqlConnectorConfig connectorConfig;
-    private final MySqlConnection connection;
+    private final AbstractConnectorConnection connection;
     private long globalLockAcquiredAt = -1;
     private long tableLockAcquiredAt = -1;
     private final RelationalTableFilters filters;
     private final MySqlSnapshotChangeEventSourceMetrics metrics;
     private final MySqlDatabaseSchema databaseSchema;
-    private final List<SchemaChangeEvent> schemaEvents = new ArrayList<>();
+    private final Set<SchemaChangeEvent> schemaEvents = new LinkedHashSet<>();
     private Set<TableId> delayedSchemaSnapshotTables = Collections.emptySet();
     private final BlockingConsumer<Function<SourceRecord, SourceRecord>> lastEventProcessor;
     private final Runnable preSnapshotAction;
 
     public MySqlSnapshotChangeEventSource(
             MySqlConnectorConfig connectorConfig,
-            MainConnectionProvidingConnectionFactory<MySqlConnection> connectionFactory,
+            MainConnectionProvidingConnectionFactory<AbstractConnectorConnection> connectionFactory,
             MySqlDatabaseSchema schema,
             EventDispatcher<MySqlPartition, TableId> dispatcher,
             Clock clock,
@@ -148,9 +154,9 @@ public class MySqlSnapshotChangeEventSource
     }
 
     @Override
-    protected SnapshotContext<MySqlPartition, MySqlOffsetContext> prepare(MySqlPartition partition)
-            throws Exception {
-        return new MySqlSnapshotContext(partition);
+    protected SnapshotContext<MySqlPartition, MySqlOffsetContext> prepare(
+            MySqlPartition partition, boolean onDemand) {
+        return new MySqlSnapshotContext(partition, onDemand);
     }
 
     @Override
@@ -166,14 +172,7 @@ public class MySqlSnapshotChangeEventSource
         // -------------------
         // Get the list of databases ...
         LOGGER.info("Read list of available databases");
-        final List<String> databaseNames = new ArrayList<>();
-        connection.query(
-                "SHOW DATABASES",
-                rs -> {
-                    while (rs.next()) {
-                        databaseNames.add(rs.getString(1));
-                    }
-                });
+        final List<String> databaseNames = connection.availableDatabases();
         LOGGER.info("\t list of available databases is: {}", databaseNames);
 
         // ----------------
@@ -231,9 +230,9 @@ public class MySqlSnapshotChangeEventSource
         // same transaction are
         // consistent also with respect to each other.
         //
-        // See: https://dev.mysql.com/doc/refman/5.7/en/set-transaction.html
-        // See: https://dev.mysql.com/doc/refman/5.7/en/innodb-transaction-isolation-levels.html
-        // See: https://dev.mysql.com/doc/refman/5.7/en/innodb-consistent-read.html
+        // See: https://dev.mysql.com/doc/refman/8.2/en/set-transaction.html
+        // See: https://dev.mysql.com/doc/refman/8.2/en/innodb-transaction-isolation-levels.html
+        // See: https://dev.mysql.com/doc/refman/8.2/en/innodb-consistent-read.html
         connection.connection().setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);
         connection.executeWithoutCommitting(
                 "SET SESSION lock_wait_timeout="
@@ -289,7 +288,7 @@ public class MySqlSnapshotChangeEventSource
                 // would implicitly commit our active transaction, and this would break our
                 // consistent snapshot logic.
                 // Therefore, we cannot unlock the tables here!
-                // https://dev.mysql.com/doc/refman/5.7/en/flush.html
+                // https://dev.mysql.com/doc/refman/8.2/en/flush.html
                 LOGGER.warn(
                         "Tables were locked explicitly, but to get a consistent snapshot we cannot release the locks until we've read all tables.");
             }
@@ -333,7 +332,7 @@ public class MySqlSnapshotChangeEventSource
 
                     if (databaseSchema.storeOnlyCapturedTables()
                             && event.getDatabase() != null
-                            && event.getDatabase().length() != 0
+                            && !event.getDatabase().isEmpty()
                             && !connectorConfig
                                     .getTableFilters()
                                     .databaseFilter()
@@ -391,40 +390,11 @@ public class MySqlSnapshotChangeEventSource
         }
         final MySqlOffsetContext offsetContext = MySqlOffsetContext.initial(connectorConfig);
         ctx.offset = offsetContext;
-        LOGGER.info("Read binlog position of MySQL primary server");
-        final String showMasterStmt = connection.getShowBinaryLogStatement();
-        connection.query(
-                showMasterStmt,
-                rs -> {
-                    if (rs.next()) {
-                        final String binlogFilename = rs.getString(1);
-                        final long binlogPosition = rs.getLong(2);
-                        offsetContext.setBinlogStartPoint(binlogFilename, binlogPosition);
-                        if (rs.getMetaData().getColumnCount() > 4) {
-                            // This column exists only in MySQL 5.6.5 or later ...
-                            final String gtidSet =
-                                    rs.getString(
-                                            5); // GTID set, may be null, blank, or contain a GTID
-                            // set
-                            offsetContext.setCompletedGtidSet(gtidSet);
-                            LOGGER.info(
-                                    "\t using binlog '{}' at position '{}' and gtid '{}'",
-                                    binlogFilename,
-                                    binlogPosition,
-                                    gtidSet);
-                        } else {
-                            LOGGER.info(
-                                    "\t using binlog '{}' at position '{}'",
-                                    binlogFilename,
-                                    binlogPosition);
-                        }
-                    } else {
-                        throw new DebeziumException(
-                                "Cannot read the binlog filename and position via '"
-                                        + showMasterStmt
-                                        + "'. Make sure your server is correctly configured");
-                    }
-                });
+
+        connectorConfig
+                .getConnectorAdapter()
+                .setOffsetContextBinlogPositionAndGtidDetailsForSnapshot(offsetContext, connection);
+
         tryStartingSnapshot(ctx);
     }
 
@@ -440,11 +410,7 @@ public class MySqlSnapshotChangeEventSource
                         database,
                         snapshotContext.offset,
                         clock.currentTimeAsInstant());
-        List<SchemaChangeEvent> missingSchemaChangeEvents =
-                schemaChangeEvents.stream()
-                        .filter(not(schemaEvents::contains))
-                        .collect(Collectors.toList());
-        schemaEvents.addAll(missingSchemaChangeEvents);
+        schemaEvents.addAll(new LinkedHashSet<>(schemaChangeEvents));
     }
 
     @Override
@@ -486,12 +452,12 @@ public class MySqlSnapshotChangeEventSource
                                         TableId::catalog, LinkedHashMap::new, Collectors.toList()));
         final Set<String> databases = tablesToRead.keySet();
 
-        if (!snapshottingTask.isBlocking()) {
+        if (!snapshottingTask.isOnDemand()) {
             // Record default charset
             addSchemaEvent(
                     snapshotContext,
                     "",
-                    connection.setStatementFor(connection.readMySqlCharsetSystemVariables()));
+                    connection.setStatementFor(connection.readCharsetSystemVariables()));
         }
 
         for (TableId tableId : capturedSchemaTables) {
@@ -520,7 +486,7 @@ public class MySqlSnapshotChangeEventSource
                             "Interrupted while reading structure of schema " + databases);
                 }
 
-                if (!snapshottingTask.isBlocking()) {
+                if (!snapshottingTask.isOnDemand()) {
                     // in case of blocking snapshot we want to read structures only for collections
                     // specified in the signal
                     LOGGER.info("Reading structure of database '{}'", database);
@@ -589,7 +555,7 @@ public class MySqlSnapshotChangeEventSource
                             .filter(id -> !delayedSchemaSnapshotTables.contains(id))
                             .collect(Collectors.toList());
         }
-        if (realTablesToRead.size() > 0) {
+        if (!realTablesToRead.isEmpty()) {
             CompletionService<Map<TableId, String>> completionService =
                     new ExecutorCompletionService<>(executorService);
             for (TableId tableId : realTablesToRead) {
@@ -755,7 +721,7 @@ public class MySqlSnapshotChangeEventSource
     @Override
     protected Statement readTableStatement(JdbcConnection jdbcConnection, OptionalLong rowCount)
             throws SQLException {
-        MySqlConnection connection = (MySqlConnection) jdbcConnection;
+        AbstractConnectorConnection connection = (AbstractConnectorConnection) jdbcConnection;
         final long largeTableRowCount = connectorConfig.rowCountForLargeTable();
         if (rowCount.isEmpty()
                 || largeTableRowCount == 0
@@ -785,7 +751,7 @@ public class MySqlSnapshotChangeEventSource
      * @return the statement; never null
      * @throws SQLException if there is a problem creating the statement
      */
-    private Statement createStatementWithLargeResultSet(MySqlConnection connection)
+    private Statement createStatementWithLargeResultSet(AbstractConnectorConnection connection)
             throws SQLException {
         int fetchSize = connectorConfig.getSnapshotFetchSize();
         Statement stmt =
@@ -800,8 +766,8 @@ public class MySqlSnapshotChangeEventSource
     private static class MySqlSnapshotContext
             extends RelationalSnapshotContext<MySqlPartition, MySqlOffsetContext> {
 
-        MySqlSnapshotContext(MySqlPartition partition) throws SQLException {
-            super(partition, "");
+        MySqlSnapshotContext(MySqlPartition partition, boolean onDemand) {
+            super(partition, "", onDemand);
         }
     }
 
@@ -827,7 +793,7 @@ public class MySqlSnapshotChangeEventSource
 
             final TableId tableId =
                     event.getTables().isEmpty() ? null : event.getTables().iterator().next().id();
-            if (snapshottingTask.isBlocking()
+            if (snapshottingTask.isOnDemand()
                     && !snapshotContext.capturedTables.contains(tableId)) {
                 LOGGER.debug(
                         "Event {} will be skipped since it's not related to blocking snapshot captured table {}",

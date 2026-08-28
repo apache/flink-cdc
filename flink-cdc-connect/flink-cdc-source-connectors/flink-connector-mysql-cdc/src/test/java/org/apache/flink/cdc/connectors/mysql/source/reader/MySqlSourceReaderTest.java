@@ -55,8 +55,8 @@ import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.Collector;
 import org.apache.flink.util.Preconditions;
 
-import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.connector.mysql.MySqlPartition;
+import io.debezium.connector.mysql.strategy.mysql.MySqlConnection;
 import io.debezium.document.Array;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;

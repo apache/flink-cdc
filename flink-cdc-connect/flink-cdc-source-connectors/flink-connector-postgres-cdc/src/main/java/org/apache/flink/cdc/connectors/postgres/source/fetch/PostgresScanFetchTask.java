@@ -389,16 +389,18 @@ public class PostgresScanFetchTask extends AbstractScanFetchTask {
         }
 
         @Override
-        protected PostgresSnapshotContext prepare(PostgresPartition partition) throws Exception {
-            return new PostgresSnapshotContext(partition);
+        protected PostgresSnapshotContext prepare(PostgresPartition partition, boolean onDemand)
+                throws Exception {
+            return new PostgresSnapshotContext(partition, onDemand);
         }
 
         private static class PostgresSnapshotContext
                 extends RelationalSnapshotChangeEventSource.RelationalSnapshotContext<
                         PostgresPartition, PostgresOffsetContext> {
 
-            public PostgresSnapshotContext(PostgresPartition partition) throws SQLException {
-                super(partition, "");
+            public PostgresSnapshotContext(PostgresPartition partition, boolean onDemand)
+                    throws SQLException {
+                super(partition, "", onDemand);
             }
         }
     }

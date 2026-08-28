@@ -19,6 +19,7 @@ package io.debezium.connector.sqlserver;
 import io.debezium.connector.sqlserver.SqlServerConnectorConfig.SnapshotMode;
 import io.debezium.pipeline.ErrorHandler;
 import io.debezium.pipeline.EventDispatcher;
+import io.debezium.pipeline.notification.NotificationService;
 import io.debezium.pipeline.source.spi.StreamingChangeEventSource;
 import io.debezium.relational.ChangeTable;
 import io.debezium.relational.Table;
@@ -103,6 +104,11 @@ public class SqlServerStreamingChangeEventSource
     private final Clock clock;
     private final SqlServerDatabaseSchema schema;
     private final Duration pollInterval;
+    // Debezium 2.5 added this constructor argument; kept so the signature matches the one
+    // Debezium's own SqlServerChangeEventSourceFactory calls.
+    private final NotificationService<SqlServerPartition, SqlServerOffsetContext>
+            notificationService;
+
     private final SqlServerConnectorConfig connectorConfig;
 
     private final ElapsedTimeStrategy pauseBetweenCommits;
@@ -118,7 +124,9 @@ public class SqlServerStreamingChangeEventSource
             EventDispatcher<SqlServerPartition, TableId> dispatcher,
             ErrorHandler errorHandler,
             Clock clock,
-            SqlServerDatabaseSchema schema) {
+            SqlServerDatabaseSchema schema,
+            NotificationService<SqlServerPartition, SqlServerOffsetContext> notificationService) {
+        this.notificationService = notificationService;
         this.connectorConfig = connectorConfig;
         this.dataConnection = dataConnection;
         this.metadataConnection = metadataConnection;

@@ -43,10 +43,10 @@ import io.debezium.connector.oracle.OracleDatabaseSchema;
 import io.debezium.connector.oracle.OracleErrorHandler;
 import io.debezium.connector.oracle.OracleOffsetContext;
 import io.debezium.connector.oracle.OraclePartition;
-import io.debezium.connector.oracle.OracleStreamingChangeEventSourceMetrics;
 import io.debezium.connector.oracle.OracleTaskContext;
 import io.debezium.connector.oracle.SourceInfo;
 import io.debezium.connector.oracle.logminer.LogMinerOracleOffsetContextLoader;
+import io.debezium.connector.oracle.logminer.LogMinerStreamingChangeEventSourceMetrics;
 import io.debezium.data.Envelope;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.ErrorHandler;
@@ -88,7 +88,7 @@ public class OracleSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
     private OraclePartition partition;
 
     private SnapshotChangeEventSourceMetrics<OraclePartition> snapshotChangeEventSourceMetrics;
-    private OracleStreamingChangeEventSourceMetrics streamingChangeEventSourceMetrics;
+    private LogMinerStreamingChangeEventSourceMetrics streamingChangeEventSourceMetrics;
     private TopicNamingStrategy<TableId> topicSelector;
     private JdbcSourceEventDispatcher<OraclePartition> dispatcher;
     private ChangeEventQueue<DataChangeEvent> queue;
@@ -159,13 +159,13 @@ public class OracleSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
 
         final OracleChangeEventSourceMetricsFactory changeEventSourceMetricsFactory =
                 new OracleChangeEventSourceMetricsFactory(
-                        new OracleStreamingChangeEventSourceMetrics(
+                        new LogMinerStreamingChangeEventSourceMetrics(
                                 taskContext, queue, metadataProvider, connectorConfig));
         this.snapshotChangeEventSourceMetrics =
                 changeEventSourceMetricsFactory.getSnapshotMetrics(
                         taskContext, queue, metadataProvider);
         this.streamingChangeEventSourceMetrics =
-                (OracleStreamingChangeEventSourceMetrics)
+                (LogMinerStreamingChangeEventSourceMetrics)
                         changeEventSourceMetricsFactory.getStreamingMetrics(
                                 taskContext, queue, metadataProvider);
         this.errorHandler = new OracleErrorHandler(connectorConfig, queue, null);
@@ -194,7 +194,7 @@ public class OracleSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
         return snapshotChangeEventSourceMetrics;
     }
 
-    public OracleStreamingChangeEventSourceMetrics getStreamingChangeEventSourceMetrics() {
+    public LogMinerStreamingChangeEventSourceMetrics getStreamingChangeEventSourceMetrics() {
         return streamingChangeEventSourceMetrics;
     }
 

@@ -27,13 +27,13 @@ import org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils;
 
 import com.github.shyiko.mysql.binlog.event.Event;
 import io.debezium.DebeziumException;
-import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
 import io.debezium.connector.mysql.MySqlOffsetContext;
 import io.debezium.connector.mysql.MySqlPartition;
 import io.debezium.connector.mysql.MySqlStreamingChangeEventSource;
 import io.debezium.connector.mysql.MySqlStreamingChangeEventSourceMetrics;
 import io.debezium.connector.mysql.MySqlTaskContext;
+import io.debezium.connector.mysql.strategy.mysql.MySqlConnection;
 import io.debezium.pipeline.ErrorHandler;
 import io.debezium.relational.TableId;
 import io.debezium.util.Clock;
@@ -89,11 +89,14 @@ public class MySqlBinlogSplitReadTask extends MySqlStreamingChangeEventSource {
 
     @Override
     protected void handleEvent(
-            MySqlPartition partition, MySqlOffsetContext offsetContext, Event event) {
+            MySqlPartition partition,
+            MySqlOffsetContext offsetContext,
+            ChangeEventSourceContext context,
+            Event event) {
         if (!eventFilter.test(event)) {
             return;
         }
-        super.handleEvent(partition, offsetContext, event);
+        super.handleEvent(partition, offsetContext, context, event);
         // check do we need to stop for read binlog for snapshot split.
         if (isBoundedRead()) {
             final BinlogOffset currentBinlogOffset =

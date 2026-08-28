@@ -201,7 +201,7 @@ public class Db2ScanFetchTask extends AbstractScanFetchTask {
                 throws InterruptedException {
             final Db2SnapshotContext ctx;
             try {
-                ctx = prepare(partition);
+                ctx = prepare(partition, false);
             } catch (Exception e) {
                 LOG.error("Failed to initialize snapshot context.", e);
                 throw new RuntimeException(e);
@@ -239,8 +239,9 @@ public class Db2ScanFetchTask extends AbstractScanFetchTask {
         }
 
         @Override
-        protected Db2SnapshotContext prepare(Db2Partition partition) throws Exception {
-            return new Db2SnapshotContext(partition);
+        protected Db2SnapshotContext prepare(Db2Partition partition, boolean onDemand)
+                throws Exception {
+            return new Db2SnapshotContext(partition, onDemand);
         }
 
         private void createDataEvents(Db2SnapshotContext snapshotContext, TableId tableId)
@@ -337,8 +338,9 @@ public class Db2ScanFetchTask extends AbstractScanFetchTask {
                 extends RelationalSnapshotChangeEventSource.RelationalSnapshotContext<
                         Db2Partition, Db2OffsetContext> {
 
-            public Db2SnapshotContext(Db2Partition partition) throws SQLException {
-                super(partition, "");
+            public Db2SnapshotContext(Db2Partition partition, boolean onDemand)
+                    throws SQLException {
+                super(partition, "", onDemand);
             }
         }
     }

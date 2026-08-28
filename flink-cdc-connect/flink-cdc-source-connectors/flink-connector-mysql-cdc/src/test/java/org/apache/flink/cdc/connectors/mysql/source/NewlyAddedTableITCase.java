@@ -50,7 +50,7 @@ import org.apache.flink.table.types.utils.TypeConversions;
 import org.apache.flink.types.RowUtils;
 import org.apache.flink.util.ExceptionUtils;
 
-import io.debezium.connector.mysql.MySqlConnection;
+import io.debezium.connector.mysql.strategy.mysql.MySqlConnection;
 import io.debezium.jdbc.JdbcConnection;
 import org.apache.commons.lang3.StringUtils;
 import org.junit.jupiter.api.AfterEach;

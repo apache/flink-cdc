@@ -30,11 +30,13 @@ import com.github.shyiko.mysql.binlog.event.EventHeaderV4;
 import com.github.shyiko.mysql.binlog.event.RotateEventData;
 import io.debezium.config.CommonConnectorConfig;
 import io.debezium.config.Configuration;
-import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
 import io.debezium.connector.mysql.MySqlDatabaseSchema;
 import io.debezium.connector.mysql.MySqlSystemVariables;
 import io.debezium.connector.mysql.MySqlValueConverters;
+import io.debezium.connector.mysql.strategy.ConnectionConfiguration;
+import io.debezium.connector.mysql.strategy.mysql.MySqlConnection;
+import io.debezium.connector.mysql.strategy.mysql.MySqlConnectionConfiguration;
 import io.debezium.jdbc.JdbcConfiguration;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.jdbc.JdbcValueConverters;
@@ -90,7 +92,7 @@ public class DebeziumUtils {
     public static MySqlConnection createMySqlConnection(
             Configuration dbzConfiguration, Properties jdbcProperties) {
         return new MySqlConnection(
-                new MySqlConnection.MySqlConnectionConfiguration(dbzConfiguration, jdbcProperties));
+                new MySqlConnectionConfiguration(dbzConfiguration, jdbcProperties));
     }
 
     /** Creates a new {@link BinaryLogClient} for consuming mysql binlog. */
@@ -194,7 +196,10 @@ public class DebeziumUtils {
                 bigIntUnsignedMode,
                 dbzMySqlConfig.binaryHandlingMode(),
                 timeAdjusterEnabled ? MySqlValueConverters::adjustTemporal : x -> x,
-                MySqlValueConverters::defaultParsingErrorHandler);
+                MySqlValueConverters::defaultParsingErrorHandler,
+                // Debezium 2.5 introduced the MySQL/MariaDB connector "strategy"; the value
+                // converters need the adapter the connector config resolved.
+                dbzMySqlConfig.getConnectorAdapter());
     }
 
     public static List<TableId> discoverCapturedTables(
@@ -253,7 +258,7 @@ public class DebeziumUtils {
 
     public static BinlogOffset findBinlogOffset(
             long targetMs, MySqlConnection connection, MySqlSourceConfig mySqlSourceConfig) {
-        MySqlConnection.MySqlConnectionConfiguration config = connection.connectionConfig();
+        ConnectionConfiguration config = connection.connectionConfig();
         BinaryLogClient client =
                 new BinaryLogClient(
                         config.hostname(), config.port(), config.username(), config.password());
