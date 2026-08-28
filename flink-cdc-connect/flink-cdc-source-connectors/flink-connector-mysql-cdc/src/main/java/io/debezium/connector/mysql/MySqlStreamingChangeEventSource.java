@@ -85,7 +85,7 @@ import java.util.function.Predicate;
 import static io.debezium.util.Strings.isNullOrEmpty;
 
 /**
- * Copied from Debezium 2.1.4.Final.
+ * Copied from Debezium 2.2.1.Final.
  *
  * <p>Flink CDC patches: GTID new-channel-position handling driven by the {@code
  * gtid.new.channel.position} pass-through property (Debezium 2.0 removed the config enum); the O(n)
@@ -655,7 +655,7 @@ public class MySqlStreamingChangeEventSource
             // This is an XA transaction, and we currently ignore these and do nothing ...
             return;
         }
-        if (connectorConfig.getDdlFilter().test(sql)) {
+        if (taskContext.getSchema().ddlFilter().test(sql)) {
             LOGGER.debug("DDL '{}' was filtered out of processing", sql);
             return;
         }
@@ -702,7 +702,8 @@ public class MySqlStreamingChangeEventSource
                                     clock,
                                     Operation.TRUNCATE,
                                     null,
-                                    null));
+                                    null,
+                                    connectorConfig.skipMessagesWithoutChange()));
                 }
                 eventDispatcher.dispatchSchemaChangeEvent(
                         partition,
@@ -916,7 +917,8 @@ public class MySqlStreamingChangeEventSource
                                         clock,
                                         Operation.CREATE,
                                         null,
-                                        row)));
+                                        row,
+                                        connectorConfig.skipMessagesWithoutChange())));
     }
 
     /**
@@ -947,7 +949,8 @@ public class MySqlStreamingChangeEventSource
                                         clock,
                                         Operation.UPDATE,
                                         row.getKey(),
-                                        row.getValue())));
+                                        row.getValue(),
+                                        connectorConfig.skipMessagesWithoutChange())));
     }
 
     /**
@@ -978,7 +981,8 @@ public class MySqlStreamingChangeEventSource
                                         clock,
                                         Operation.DELETE,
                                         row,
-                                        null)));
+                                        null,
+                                        connectorConfig.skipMessagesWithoutChange())));
     }
 
     private <T extends EventData, U> void handleChange(

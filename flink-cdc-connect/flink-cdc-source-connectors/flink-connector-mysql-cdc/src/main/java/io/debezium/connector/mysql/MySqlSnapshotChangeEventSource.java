@@ -9,8 +9,11 @@ package io.debezium.connector.mysql;
 import io.debezium.DebeziumException;
 import io.debezium.connector.SnapshotRecord;
 import io.debezium.connector.mysql.MySqlConnection.DatabaseLocales;
+import io.debezium.connector.mysql.MySqlOffsetContext.Loader;
 import io.debezium.data.Envelope;
 import io.debezium.function.BlockingConsumer;
+import io.debezium.jdbc.JdbcConnection;
+import io.debezium.jdbc.MainConnectionProvidingConnectionFactory;
 import io.debezium.pipeline.EventDispatcher;
 import io.debezium.relational.RelationalSnapshotChangeEventSource;
 import io.debezium.relational.RelationalTableFilters;
@@ -44,7 +47,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Copied from Debezium project(2.1.4.Final) to fix MySQL 8.x compatibility.
+ * Copied from Debezium project(2.2.1.Final) to fix MySQL 8.x compatibility.
  *
  * <p>Line 338: Use probing methods to determine the statement.
  */
@@ -67,15 +70,15 @@ public class MySqlSnapshotChangeEventSource
 
     public MySqlSnapshotChangeEventSource(
             MySqlConnectorConfig connectorConfig,
-            MySqlConnection connection,
+            MainConnectionProvidingConnectionFactory<MySqlConnection> connectionFactory,
             MySqlDatabaseSchema schema,
             EventDispatcher<MySqlPartition, TableId> dispatcher,
             Clock clock,
             MySqlSnapshotChangeEventSourceMetrics metrics,
             BlockingConsumer<Function<SourceRecord, SourceRecord>> lastEventProcessor) {
-        super(connectorConfig, connection, schema, dispatcher, clock, metrics);
+        super(connectorConfig, connectionFactory, schema, dispatcher, clock, metrics);
         this.connectorConfig = connectorConfig;
-        this.connection = connection;
+        this.connection = connectionFactory.mainConnection();
         this.filters = connectorConfig.getTableFilters();
         this.metrics = metrics;
         this.databaseSchema = schema;
@@ -495,7 +498,7 @@ public class MySqlSnapshotChangeEventSource
     }
 
     @Override
-    protected void complete(SnapshotContext<MySqlPartition, MySqlOffsetContext> snapshotContext) {}
+    protected void completed(SnapshotContext<MySqlPartition, MySqlOffsetContext> snapshotContext) {}
 
     /**
      * Generate a valid MySQL query string for the specified table and columns
@@ -599,14 +602,16 @@ public class MySqlSnapshotChangeEventSource
     }
 
     @Override
-    protected Statement readTableStatement(OptionalLong rowCount) throws SQLException {
+    protected Statement readTableStatement(JdbcConnection jdbcConnection, OptionalLong rowCount)
+            throws SQLException {
+        MySqlConnection connection = (MySqlConnection) jdbcConnection;
         final long largeTableRowCount = connectorConfig.rowCountForLargeTable();
         if (!rowCount.isPresent()
                 || largeTableRowCount == 0
                 || rowCount.getAsLong() <= largeTableRowCount) {
-            return super.readTableStatement(rowCount);
+            return super.readTableStatement(connection, rowCount);
         }
-        return createStatementWithLargeResultSet();
+        return createStatementWithLargeResultSet(connection);
     }
 
     /**
@@ -629,7 +634,8 @@ public class MySqlSnapshotChangeEventSource
      * @return the statement; never null
      * @throws SQLException if there is a problem creating the statement
      */
-    private Statement createStatementWithLargeResultSet() throws SQLException {
+    private Statement createStatementWithLargeResultSet(MySqlConnection connection)
+            throws SQLException {
         int fetchSize = connectorConfig.getSnapshotFetchSize();
         Statement stmt =
                 connection
@@ -637,6 +643,12 @@ public class MySqlSnapshotChangeEventSource
                         .createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
         stmt.setFetchSize(fetchSize);
         return stmt;
+    }
+
+    @Override
+    protected MySqlOffsetContext copyOffset(
+            RelationalSnapshotContext<MySqlPartition, MySqlOffsetContext> snapshotContext) {
+        return new Loader(connectorConfig).load(snapshotContext.offset.getOffset());
     }
 
     /** Mutable context which is populated in the course of snapshotting. */

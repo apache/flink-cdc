@@ -144,12 +144,12 @@ public class EmbeddedFlinkDatabaseHistory implements SchemaHistory {
         // do nothing
     }
 
-    @Override
+    // Debezium 2.2 moved storeOnlyCapturedTables()/skipUnparseableDdlStatements() from the
+    // SchemaHistory interface to HistorizedDatabaseSchema; kept here as plain helpers.
     public boolean storeOnlyCapturedTables() {
         return storeOnlyMonitoredTablesDdl;
     }
 
-    @Override
     public boolean skipUnparseableDdlStatements() {
         return skipUnparseableDDL;
     }
