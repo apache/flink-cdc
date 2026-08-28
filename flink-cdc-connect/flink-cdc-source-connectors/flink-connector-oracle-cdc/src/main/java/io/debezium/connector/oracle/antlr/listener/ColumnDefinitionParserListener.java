@@ -31,7 +31,7 @@ import java.util.List;
 /**
  * Parser listener that parses column definitions of Oracle DDL statements.
  *
- * <p>Copied from Debezium project (2.2.1.Final).
+ * <p>Copied from Debezium project (2.4.2.Final).
  *
  * <p>Change: when a column is declared with a schema-qualified object type, Debezium recognises
  * only {@code MDSYS.SDO_GEOMETRY} and otherwise leaves the column editor untouched, so the
@@ -268,6 +268,8 @@ public class ColumnDefinitionParserListener extends BaseParserListener {
                 columnEditor.jdbcType(OracleTypes.OTHER).type("SDO_GEOMETRY").length(1);
             } else if (ctx.native_datatype_element().ROWID() != null) {
                 columnEditor.jdbcType(Types.VARCHAR).type("ROWID");
+            } else if (ctx.native_datatype_element().XMLTYPE() != null) {
+                columnEditor.jdbcType(OracleTypes.SQLXML).type("XMLTYPE");
             } else {
                 columnEditor
                         .jdbcType(OracleTypes.OTHER)

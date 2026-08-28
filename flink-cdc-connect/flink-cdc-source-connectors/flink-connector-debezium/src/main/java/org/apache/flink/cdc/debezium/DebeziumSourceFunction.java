@@ -392,6 +392,13 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
         properties.putIfAbsent("offset.flush.interval.ms", String.valueOf(Long.MAX_VALUE));
         // disable tombstones
         properties.setProperty("tombstones.on.delete", "false");
+        // Debezium 2.4 made the embedded engine restart the connector itself on a retriable
+        // error, retrying forever by default ("errors.max.retries" = -1). Debezium 2.3 and older
+        // had no such loop: the error reached the completion callback, the Flink job failed and
+        // Flink's restart strategy recovered it from the last checkpoint. Keep that behavior - an
+        // engine silently retrying forever looks like a source that simply stopped producing.
+        // Users who want the Debezium-side retries can still set "debezium.errors.max.retries".
+        properties.putIfAbsent("errors.max.retries", "0");
         if (engineInstanceName == null) {
             // not restore from recovery
             engineInstanceName = UUID.randomUUID().toString();
