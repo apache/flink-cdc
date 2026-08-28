@@ -37,7 +37,7 @@ import java.util.OptionalLong;
 import java.util.Properties;
 
 /**
- * Copied from Debezium project(1.9.8.final) to add custom jdbc properties in the jdbc url. The new
+ * Copied from Debezium project(2.1.4.Final) to add custom jdbc properties in the jdbc url. The new
  * parameter {@link MySqlConnectionConfiguration#MySqlConnectionConfiguration(Configuration config,
  * Properties jdbcProperties)} in the constructor of {@link MySqlConnectionConfiguration} will be
  * used to generate the jdbc url pattern, and may overwrite the default value.

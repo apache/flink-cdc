@@ -49,15 +49,22 @@ import java.util.stream.Collectors;
 import static java.lang.Math.toIntExact;
 
 /**
- * Copied from Debezium 1.9.8.Final
+ * Implementation of a {@link ReplicationConnection} for Postgresql. Note that replication
+ * connections in PG cannot execute regular statements but only a limited number of
+ * replication-related commands.
  *
- * <p>The {@link ReplicationConnection} created from {@code createReplicationStream} will hang when
- * the wal logs only contain the keepAliveMessage. Support to set an ending Lsn to stop hanging.
+ * <p>Copied from Debezium 2.1.4.Final.
  *
- * <p>Line 83, 711~713 : add endingPos and its setter.
+ * <p>The {@link ReplicationStream} created from {@code createReplicationStream} will hang when the
+ * wal logs only contain the keepAliveMessage. Support to set an ending Lsn to stop hanging: add the
+ * {@code endingPos} field and its {@code setEndingPos} setter, and the {@code reachEnd} check in
+ * {@code read}/{@code readPending} so the stream stops when {@code endingPos} is reached.
  *
- * <p>Line 571~576, 595~600: ReplicationStream from {@code createReplicationStream} will stop when
- * endingPos reached.
+ * <p>{@code validateSlotIsInExpectedState} is overridden to a no-op: Flink CDC manages the
+ * streaming start position through its own incremental-snapshot offsets, so Debezium 2.1's
+ * slot-advance seek (absent in 2.0.1) must not run.
+ *
+ * @author Horia Chiorean (hchiorea@redhat.com)
  */
 public class PostgresReplicationConnection extends JdbcConnection implements ReplicationConnection {
 
@@ -98,7 +105,6 @@ public class PostgresReplicationConnection extends JdbcConnection implements Rep
      *     closed
      * @param statusUpdateInterval the interval at which the replication connection should
      *     periodically send status
-     * @param doSnapshot whether the connector is doing snapshot
      * @param jdbcConnection general PostgreSQL JDBC connection
      * @param typeRegistry registry with PostgreSQL types
      * @param streamParams additional parameters to pass to the replication stream
@@ -113,7 +119,6 @@ public class PostgresReplicationConnection extends JdbcConnection implements Rep
             PostgresConnectorConfig.AutoCreateMode publicationAutocreateMode,
             PostgresConnectorConfig.LogicalDecoder plugin,
             boolean dropSlotOnClose,
-            boolean doSnapshot,
             Duration statusUpdateInterval,
             PostgresConnection jdbcConnection,
             TypeRegistry typeRegistry,
@@ -351,9 +356,9 @@ public class PostgresReplicationConnection extends JdbcConnection implements Rep
      * creating a replication connection and starting to stream involves a few steps: 1. we create
      * the connection and ensure that a. the slot exists b. the slot isn't currently being used 2.
      * we query to get our potential start position in the slot (lsn) 3. we try and start streaming,
-     * depending on our options (such as in wal2json) this may fail, which can result in the
-     * connection being killed and we need to start the process over if we are using a temporary
-     * slot 4. actually start the streamer
+     * depending on our options this may fail, which can result in the connection being killed and
+     * we need to start the process over if we are using a temporary slot 4. actually start the
+     * streamer
      *
      * <p>This method takes care of all of these and this method queries for a default starting
      * position If you know where you are starting from you should call {@link #startStreaming(Lsn,
@@ -383,6 +388,8 @@ public class PostgresReplicationConnection extends JdbcConnection implements Rep
             LOGGER.debug("starting streaming from LSN '{}'", lsn);
         }
 
+        validateSlotIsInExpectedState(walPosition);
+
         final int maxRetries = connectorConfig.maxRetries();
         final Duration delay = connectorConfig.retryDelay();
         int tryCount = 0;
@@ -408,6 +415,16 @@ public class PostgresReplicationConnection extends JdbcConnection implements Rep
                 }
             }
         }
+    }
+
+    protected void validateSlotIsInExpectedState(WalPositionLocator walPosition)
+            throws SQLException {
+        // Flink CDC drives the streaming start position through its own incremental-snapshot
+        // offset tracking (see the split start LSN passed to startStreaming and the endingPos
+        // watermark), so it must NOT let Debezium seek/advance the replication slot on startup.
+        // Debezium 2.1 added this pg_replication_slot_advance() seek (absent in 2.0.1); advancing
+        // to a Flink-managed offset can raise "invalid target WAL LSN". Keep it a no-op to
+        // preserve the pre-2.1 behavior.
     }
 
     @Override
@@ -489,8 +506,6 @@ public class PostgresReplicationConnection extends JdbcConnection implements Rep
 
         try {
             try {
-                // Debezium 2.0 removed forceRds()/optionsWith(out)Metadata()/setContainsMetadata();
-                // metadata handling now lives inside the decoder via defaultOptions().
                 s = startPgReplicationStream(startLsn, messageDecoder::defaultOptions);
             } catch (PSQLException e) {
                 LOGGER.debug(
@@ -502,24 +517,10 @@ public class PostgresReplicationConnection extends JdbcConnection implements Rep
                     initReplicationSlot();
                 }
 
-                // Debezium 2.0 removed forceRds()/optionsWith(out)Metadata()/setContainsMetadata();
-                // metadata handling now lives inside the decoder via defaultOptions().
                 s = startPgReplicationStream(startLsn, messageDecoder::defaultOptions);
             }
         } catch (PSQLException e) {
-            if (e.getMessage().matches("(?s)ERROR: option .* is unknown.*")) {
-                // It is possible we are connecting to an old wal2json plug-in
-                LOGGER.warn(
-                        "Could not register for streaming with metadata in messages, falling back to messages without metadata");
-
-                // re-init the slot after a failed start of slot, as this
-                // may have closed the slot
-                if (useTemporarySlot()) {
-                    initReplicationSlot();
-                }
-
-                s = startPgReplicationStream(startLsn, messageDecoder::defaultOptions);
-            } else if (e.getMessage()
+            if (e.getMessage()
                     .matches("(?s)ERROR: requested WAL segment .* has already been removed.*")) {
                 LOGGER.error("Cannot rewind to last processed WAL position", e);
                 throw new ConnectException(
@@ -614,7 +615,9 @@ public class PostgresReplicationConnection extends JdbcConnection implements Rep
 
             @Override
             public void flushLsn(Lsn lsn) throws SQLException {
-                doFlushLsn(lsn);
+                if (connectorConfig.isFlushLsnOnSource()) {
+                    doFlushLsn(lsn);
+                }
             }
 
             private void doFlushLsn(Lsn lsn) throws SQLException {
@@ -793,7 +796,6 @@ public class PostgresReplicationConnection extends JdbcConnection implements Rep
                 PostgresConnectorConfig.LogicalDecoder.DECODERBUFS;
         private boolean dropSlotOnClose = DEFAULT_DROP_SLOT_ON_CLOSE;
         private Duration statusUpdateIntervalVal;
-        private boolean doSnapshot;
         private TypeRegistry typeRegistry;
         private PostgresSchema schema;
         private Properties slotStreamParams = new Properties();
@@ -874,12 +876,6 @@ public class PostgresReplicationConnection extends JdbcConnection implements Rep
         }
 
         @Override
-        public Builder doSnapshot(boolean doSnapshot) {
-            this.doSnapshot = doSnapshot;
-            return this;
-        }
-
-        @Override
         public Builder jdbcMetadataConnection(PostgresConnection jdbcConnection) {
             this.jdbcConnection = jdbcConnection;
             return this;
@@ -896,7 +892,6 @@ public class PostgresReplicationConnection extends JdbcConnection implements Rep
                     publicationAutocreateMode,
                     plugin,
                     dropSlotOnClose,
-                    doSnapshot,
                     statusUpdateIntervalVal,
                     jdbcConnection,
                     typeRegistry,

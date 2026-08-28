@@ -44,7 +44,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Copied from Debezium project(1.9.8.Final) to fix MySQL 8.x compatibility.
+ * Copied from Debezium project(2.1.4.Final) to fix MySQL 8.x compatibility.
  *
  * <p>Line 338: Use probing methods to determine the statement.
  */
@@ -643,7 +643,7 @@ public class MySqlSnapshotChangeEventSource
     private static class MySqlSnapshotContext
             extends RelationalSnapshotContext<MySqlPartition, MySqlOffsetContext> {
 
-        public MySqlSnapshotContext(MySqlPartition partition) throws SQLException {
+        MySqlSnapshotContext(MySqlPartition partition) throws SQLException {
             super(partition, "");
         }
     }

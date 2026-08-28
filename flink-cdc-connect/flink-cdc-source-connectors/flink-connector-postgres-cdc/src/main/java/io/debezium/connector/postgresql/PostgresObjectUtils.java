@@ -127,7 +127,10 @@ public class PostgresObjectUtils {
         while (retryCount <= maxRetries) {
             try {
                 LOGGER.info("Creating a new replication connection for {}", taskContext);
-                return taskContext.createReplicationConnection(doSnapshot, postgresConnection);
+                // Debezium 2.1 dropped the doSnapshot parameter from
+                // PostgresTaskContext#createReplicationConnection (it was an unused/dead flag). The
+                // doSnapshot parameter is kept on this wrapper for caller compatibility.
+                return taskContext.createReplicationConnection(postgresConnection);
             } catch (SQLException ex) {
                 retryCount++;
                 if (retryCount > maxRetries) {
