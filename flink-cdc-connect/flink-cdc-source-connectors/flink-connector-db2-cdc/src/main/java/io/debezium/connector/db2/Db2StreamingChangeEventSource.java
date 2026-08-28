@@ -35,7 +35,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
- * Copied from Debezium project(2.1.4.Final)
+ * Copied from Debezium project(2.2.1.Final)
  *
  * <p>A {@link StreamingChangeEventSource} based on DB2 change data capture functionality. A main
  * loop polls database DDL change and change data tables and turns them into change events.
@@ -371,6 +371,7 @@ public class Db2StreamingChangeEventSource
                         offsetContext,
                         newTable,
                         metadataConnection.getTableSchemaFromTable(newTable),
+                        schema,
                         SchemaChangeEventType.ALTER));
     }
 
@@ -456,6 +457,7 @@ public class Db2StreamingChangeEventSource
                                 offsetContext,
                                 currentTable,
                                 dataConnection.getTableSchemaFromTable(currentTable),
+                                schema,
                                 SchemaChangeEventType.CREATE));
             }
             tables.add(currentTable);

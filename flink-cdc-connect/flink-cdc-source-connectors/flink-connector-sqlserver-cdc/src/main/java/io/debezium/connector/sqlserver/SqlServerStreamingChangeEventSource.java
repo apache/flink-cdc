@@ -478,7 +478,8 @@ public class SqlServerStreamingChangeEventSource
                                                     operation,
                                                     data,
                                                     dataNext,
-                                                    clock));
+                                                    clock,
+                                                    connectorConfig.skipMessagesWithoutChange()));
                                     tableWithSmallestLsn.next();
                                 }
                             });
@@ -535,6 +536,7 @@ public class SqlServerStreamingChangeEventSource
                         offsetContext,
                         newTable,
                         tableSchema,
+                        schema,
                         SchemaChangeEventType.ALTER));
         newTable.setSourceTable(tableSchema);
     }
@@ -662,6 +664,7 @@ public class SqlServerStreamingChangeEventSource
                                 offsetContext,
                                 currentTable,
                                 dataConnection.getTableSchemaFromTable(databaseName, currentTable),
+                                schema,
                                 SchemaChangeEventType.CREATE));
             }
 
