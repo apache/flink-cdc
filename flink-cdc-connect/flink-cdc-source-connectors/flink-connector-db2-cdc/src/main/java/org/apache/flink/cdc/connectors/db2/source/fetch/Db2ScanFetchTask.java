@@ -21,10 +21,12 @@ import org.apache.flink.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
 import org.apache.flink.cdc.connectors.base.source.reader.external.AbstractScanFetchTask;
 import org.apache.flink.cdc.connectors.db2.source.fetch.Db2StreamFetchTask.StreamSplitReadTask;
+import org.apache.flink.cdc.debezium.internal.SnapshotterServiceFactory;
 
 import io.debezium.DebeziumException;
 import io.debezium.config.Configuration;
 import io.debezium.connector.db2.Db2Connection;
+import io.debezium.connector.db2.Db2Connector;
 import io.debezium.connector.db2.Db2ConnectorConfig;
 import io.debezium.connector.db2.Db2DatabaseSchema;
 import io.debezium.connector.db2.Db2OffsetContext;
@@ -32,6 +34,7 @@ import io.debezium.connector.db2.Db2Partition;
 import io.debezium.heartbeat.Heartbeat;
 import io.debezium.pipeline.EventDispatcher;
 import io.debezium.pipeline.notification.NotificationService;
+import io.debezium.pipeline.signal.actions.snapshotting.SnapshotConfiguration;
 import io.debezium.pipeline.source.AbstractSnapshotChangeEventSource;
 import io.debezium.pipeline.source.SnapshottingTask;
 import io.debezium.pipeline.source.spi.ChangeEventSource;
@@ -134,14 +137,16 @@ public class Db2ScanFetchTask extends AbstractScanFetchTask {
                         .with(Heartbeat.HEARTBEAT_INTERVAL, 0)
                         .build();
         // task to read wal and backfill for current split
+        Db2ConnectorConfig backfillConnectorConfig = new Db2ConnectorConfig(dezConf);
         return new StreamSplitReadTask(
-                new Db2ConnectorConfig(dezConf),
+                backfillConnectorConfig,
                 context.getConnection(),
                 context.getMetaDataConnection(),
                 context.getEventDispatcher(),
                 context.getWaterMarkDispatcher(),
                 context.getErrorHandler(),
                 context.getDatabaseSchema(),
+                SnapshotterServiceFactory.create(backfillConnectorConfig, Db2Connector.class),
                 backfillBinlogSplit);
     }
 
@@ -236,6 +241,16 @@ public class Db2ScanFetchTask extends AbstractScanFetchTask {
                 Db2Partition partition, Db2OffsetContext previousOffset) {
             return new SnapshottingTask(
                     false, true, Collections.emptyList(), Collections.emptyMap(), false);
+        }
+
+        @Override
+        public SnapshottingTask getBlockingSnapshottingTask(
+                Db2Partition partition,
+                Db2OffsetContext previousOffset,
+                SnapshotConfiguration snapshotConfiguration) {
+            // Debezium 2.6 made this abstract. Flink CDC drives its own split snapshot and never
+            // runs Debezium's signal-based blocking snapshot, so it behaves like the regular one.
+            return getSnapshottingTask(partition, previousOffset);
         }
 
         @Override

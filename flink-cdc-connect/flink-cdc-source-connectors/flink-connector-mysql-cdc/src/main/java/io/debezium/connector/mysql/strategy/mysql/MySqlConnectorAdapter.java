@@ -28,6 +28,7 @@ import io.debezium.pipeline.source.snapshot.incremental.SignalBasedIncrementalSn
 import io.debezium.pipeline.source.spi.DataChangeEventListener;
 import io.debezium.pipeline.source.spi.SnapshotProgressListener;
 import io.debezium.relational.TableId;
+import io.debezium.snapshot.SnapshotterService;
 import io.debezium.spi.schema.DataCollectionId;
 import io.debezium.util.Clock;
 import org.slf4j.Logger;
@@ -42,7 +43,7 @@ import java.util.Map;
  * @author Chris Cranford
  */
 /**
- * Copied from Debezium project(2.5.4.Final) to add MySQL 8.4+ compatibility.
+ * Copied from Debezium project(2.6.2.Final) to add MySQL 8.4+ compatibility.
  *
  * <p>MySQL 8.4 removed {@code SHOW MASTER STATUS} in favour of {@code SHOW BINARY LOG STATUS}. The
  * statement is taken from {@link MySqlConnection#getShowBinaryLogStatement()}, which probes the
@@ -74,7 +75,9 @@ public class MySqlConnectorAdapter implements ConnectorAdapter {
 
     @Override
     public void setOffsetContextBinlogPositionAndGtidDetailsForSnapshot(
-            MySqlOffsetContext offsetContext, AbstractConnectorConnection connection)
+            MySqlOffsetContext offsetContext,
+            AbstractConnectorConnection connection,
+            SnapshotterService snapshotterService)
             throws Exception {
         LOGGER.info("Read binlog position of MySQL primary server");
         final String showMasterStmt = ((MySqlConnection) connection).getShowBinaryLogStatement();
@@ -98,7 +101,7 @@ public class MySqlConnectorAdapter implements ConnectorAdapter {
                                     binlogPosition,
                                     gtidSet);
                         }
-                    } else if (!connectorConfig.getSnapshotMode().shouldStream()) {
+                    } else if (!snapshotterService.getSnapshotter().shouldStream()) {
                         LOGGER.warn(
                                 "Failed retrieving binlog position, continuing as streaming CDC wasn't requested");
                     } else {

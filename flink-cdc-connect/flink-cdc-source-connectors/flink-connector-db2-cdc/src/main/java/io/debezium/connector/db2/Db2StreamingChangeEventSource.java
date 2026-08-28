@@ -13,6 +13,7 @@ import io.debezium.pipeline.source.spi.StreamingChangeEventSource;
 import io.debezium.relational.TableId;
 import io.debezium.schema.DatabaseSchema;
 import io.debezium.schema.SchemaChangeEvent.SchemaChangeEventType;
+import io.debezium.snapshot.SnapshotterService;
 import io.debezium.util.Clock;
 import io.debezium.util.Metronome;
 import org.slf4j.Logger;
@@ -85,6 +86,9 @@ public class Db2StreamingChangeEventSource
     private final Clock clock;
     private final Db2DatabaseSchema schema;
     private final Duration pollInterval;
+    // Debezium 2.6 threads the SnapshotterService through every streaming source.
+    private final SnapshotterService snapshotterService;
+
     private final Db2ConnectorConfig connectorConfig;
 
     public Db2StreamingChangeEventSource(
@@ -94,7 +98,9 @@ public class Db2StreamingChangeEventSource
             EventDispatcher<Db2Partition, TableId> dispatcher,
             ErrorHandler errorHandler,
             Clock clock,
-            Db2DatabaseSchema schema) {
+            Db2DatabaseSchema schema,
+            SnapshotterService snapshotterService) {
+        this.snapshotterService = snapshotterService;
         this.connectorConfig = connectorConfig;
         this.dataConnection = dataConnection;
         this.metadataConnection = metadataConnection;
@@ -111,7 +117,7 @@ public class Db2StreamingChangeEventSource
             Db2Partition partition,
             Db2OffsetContext offsetContext)
             throws InterruptedException {
-        if (!connectorConfig.getSnapshotMode().shouldStream()) {
+        if (!snapshotterService.getSnapshotter().shouldStream()) {
             LOGGER.info("Streaming is not enabled in current configuration");
             return;
         }

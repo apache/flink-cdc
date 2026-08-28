@@ -25,6 +25,7 @@ import io.debezium.relational.ChangeTable;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
 import io.debezium.schema.SchemaChangeEvent.SchemaChangeEventType;
+import io.debezium.snapshot.SnapshotterService;
 import io.debezium.util.Clock;
 import io.debezium.util.ElapsedTimeStrategy;
 import io.debezium.util.Metronome;
@@ -109,6 +110,9 @@ public class SqlServerStreamingChangeEventSource
     private final NotificationService<SqlServerPartition, SqlServerOffsetContext>
             notificationService;
 
+    // Debezium 2.6 threads the SnapshotterService through every streaming source.
+    private final SnapshotterService snapshotterService;
+
     private final SqlServerConnectorConfig connectorConfig;
 
     private final ElapsedTimeStrategy pauseBetweenCommits;
@@ -125,8 +129,10 @@ public class SqlServerStreamingChangeEventSource
             ErrorHandler errorHandler,
             Clock clock,
             SqlServerDatabaseSchema schema,
-            NotificationService<SqlServerPartition, SqlServerOffsetContext> notificationService) {
+            NotificationService<SqlServerPartition, SqlServerOffsetContext> notificationService,
+            SnapshotterService snapshotterService) {
         this.notificationService = notificationService;
+        this.snapshotterService = snapshotterService;
         this.connectorConfig = connectorConfig;
         this.dataConnection = dataConnection;
         this.metadataConnection = metadataConnection;

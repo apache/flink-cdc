@@ -25,10 +25,12 @@ import org.apache.flink.cdc.connectors.base.source.meta.wartermark.WatermarkKind
 import org.apache.flink.cdc.connectors.base.source.reader.external.FetchTask;
 import org.apache.flink.cdc.connectors.sqlserver.source.offset.LsnOffset;
 import org.apache.flink.cdc.connectors.sqlserver.source.reader.fetch.SqlServerScanFetchTask.SqlServerSnapshotSplitChangeEventSourceContext;
+import org.apache.flink.cdc.debezium.internal.SnapshotterServiceFactory;
 
 import io.debezium.DebeziumException;
 import io.debezium.connector.sqlserver.Lsn;
 import io.debezium.connector.sqlserver.SqlServerConnection;
+import io.debezium.connector.sqlserver.SqlServerConnector;
 import io.debezium.connector.sqlserver.SqlServerConnectorConfig;
 import io.debezium.connector.sqlserver.SqlServerDatabaseSchema;
 import io.debezium.connector.sqlserver.SqlServerOffsetContext;
@@ -132,7 +134,8 @@ public class SqlServerStreamFetchTask implements FetchTask<SourceSplitBase> {
                             Collections.emptyList(),
                             connectorConfig,
                             SchemaFactory.get(),
-                            notification -> {}));
+                            notification -> {}),
+                    SnapshotterServiceFactory.create(connectorConfig, SqlServerConnector.class));
             this.lsnSplit = lsnSplit;
             this.watermarkDispatcher = watermarkDispatcher;
             this.errorHandler = errorHandler;

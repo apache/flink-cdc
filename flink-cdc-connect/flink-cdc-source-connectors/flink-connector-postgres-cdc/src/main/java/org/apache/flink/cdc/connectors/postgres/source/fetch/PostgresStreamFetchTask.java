@@ -37,10 +37,10 @@ import io.debezium.connector.postgresql.PostgresTaskContext;
 import io.debezium.connector.postgresql.connection.Lsn;
 import io.debezium.connector.postgresql.connection.PostgresConnection;
 import io.debezium.connector.postgresql.connection.ReplicationConnection;
-import io.debezium.connector.postgresql.spi.Snapshotter;
 import io.debezium.pipeline.ErrorHandler;
 import io.debezium.pipeline.source.spi.ChangeEventSource;
 import io.debezium.relational.TableId;
+import io.debezium.snapshot.SnapshotterService;
 import io.debezium.util.Clock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -85,7 +85,7 @@ public class PostgresStreamFetchTask implements FetchTask<SourceSplitBase> {
         streamSplitReadTask =
                 new StreamSplitReadTask(
                         sourceFetchContext.getDbzConnectorConfig(),
-                        sourceFetchContext.getSnapShotter(),
+                        sourceFetchContext.getSnapshotterService(),
                         sourceFetchContext.getConnection(),
                         sourceFetchContext.getEventDispatcher(),
                         sourceFetchContext.getWaterMarkDispatcher(),
@@ -181,7 +181,7 @@ public class PostgresStreamFetchTask implements FetchTask<SourceSplitBase> {
 
         public StreamSplitReadTask(
                 PostgresConnectorConfig connectorConfig,
-                Snapshotter snapshotter,
+                SnapshotterService snapshotterService,
                 PostgresConnection connection,
                 PostgresEventDispatcher<TableId> eventDispatcher,
                 WatermarkDispatcher watermarkDispatcher,
@@ -194,7 +194,7 @@ public class PostgresStreamFetchTask implements FetchTask<SourceSplitBase> {
 
             super(
                     connectorConfig,
-                    snapshotter,
+                    snapshotterService,
                     connection,
                     eventDispatcher,
                     errorHandler,

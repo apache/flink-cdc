@@ -7,9 +7,13 @@
 package io.debezium.connector.db2;
 
 import com.ibm.db2.jcc.DB2Driver;
+import io.debezium.DebeziumException;
+import io.debezium.config.CommonConnectorConfig;
 import io.debezium.config.Configuration;
 import io.debezium.jdbc.JdbcConfiguration;
 import io.debezium.jdbc.JdbcConnection;
+import io.debezium.pipeline.spi.OffsetContext;
+import io.debezium.pipeline.spi.Partition;
 import io.debezium.relational.Column;
 import io.debezium.relational.ColumnEditor;
 import io.debezium.relational.Table;
@@ -600,5 +604,39 @@ public class Db2Connection extends JdbcConnection {
             }
         }
         return tableIds;
+    }
+
+    /** Added in Debezium 2.6 alongside {@link #validateLogPosition}. */
+    public <T> T singleOptionalValue(String query, ResultSetExtractor<T> extractor)
+            throws SQLException {
+        return queryAndMap(query, rs -> rs.next() ? extractor.apply(rs) : null);
+    }
+
+    /**
+     * Added in Debezium 2.6 and called by {@code Db2ConnectorTask} through a method reference. This
+     * fork shadows the Debezium class, so the method has to exist here too or the embedded engine
+     * fails with {@code NoSuchMethodError}.
+     */
+    public boolean validateLogPosition(
+            Partition partition, OffsetContext offset, CommonConnectorConfig config) {
+
+        final Lsn storedLsn = ((Db2OffsetContext) offset).getChangePosition().getCommitLsn();
+
+        String oldestFirstChangeQuery =
+                String.format("SELECT min(RESTART_SEQ) FROM %s.IBMSNAP_CAPMON;", CDC_SCHEMA);
+
+        try {
+            final String oldestScn =
+                    singleOptionalValue(oldestFirstChangeQuery, rs -> rs.getString(1));
+
+            if (oldestScn == null) {
+                return false;
+            }
+
+            LOGGER.trace("Oldest SCN in logs is '{}'", oldestScn);
+            return storedLsn == null || Lsn.valueOf(oldestScn).compareTo(storedLsn) < 0;
+        } catch (SQLException e) {
+            throw new DebeziumException("Unable to get last available log position", e);
+        }
     }
 }

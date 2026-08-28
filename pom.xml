@@ -78,7 +78,7 @@ limitations under the License.
         <flink.2.x.shaded.guava.version>33.4.0-jre-20.0</flink.2.x.shaded.guava.version>
         <shaded.guava.version>${flink.1.x.shaded.guava.version}</shaded.guava.version>
         <flink.shaded.version>17.0</flink.shaded.version>
-        <debezium.version>2.5.4.Final</debezium.version>
+        <debezium.version>2.6.2.Final</debezium.version>
         <jsr305.version>1.3.9</jsr305.version>
         <tikv.version>3.2.0</tikv.version>
         <geometry.version>2.2.0</geometry.version>
@@ -621,6 +621,21 @@ limitations under the License.
                             <shadeTestJar>false</shadeTestJar>
                             <shadedArtifactAttached>false</shadedArtifactAttached>
                             <createDependencyReducedPom>true</createDependencyReducedPom>
+                            <!-- Debezium 2.6 moved snapshot locking and querying behind
+                                 ServiceLoader SPIs (io.debezium.snapshot.spi.SnapshotLock,
+                                 SnapshotQuery, io.debezium.spi.snapshot.Snapshotter), and both
+                                 debezium-core and each connector jar ship a
+                                 META-INF/services entry for them. Without this transformer the
+                                 shade plugin keeps only one copy of each overlapping file, so
+                                 the connector's implementations are silently dropped from the
+                                 fat jar and the source dies at runtime with "Unable to find
+                                 minimal snapshot lock mode". Nothing catches this at compile
+                                 time or in the unit tests, which do not run against the fat
+                                 jar - only the e2e tests do. -->
+                            <transformers combine.children="append">
+                                <transformer
+                                        implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                            </transformers>
                             <filters combine.children="append">
                                 <filter>
                                     <artifact>*:*</artifact>

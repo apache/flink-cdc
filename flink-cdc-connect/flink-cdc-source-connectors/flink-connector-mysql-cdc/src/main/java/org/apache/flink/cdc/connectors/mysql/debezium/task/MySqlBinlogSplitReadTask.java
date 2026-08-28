@@ -24,9 +24,11 @@ import org.apache.flink.cdc.connectors.mysql.debezium.reader.StoppableChangeEven
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils;
+import org.apache.flink.cdc.debezium.internal.SnapshotterServiceFactory;
 
 import com.github.shyiko.mysql.binlog.event.Event;
 import io.debezium.DebeziumException;
+import io.debezium.connector.mysql.MySqlConnector;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
 import io.debezium.connector.mysql.MySqlOffsetContext;
 import io.debezium.connector.mysql.MySqlPartition;
@@ -69,7 +71,15 @@ public class MySqlBinlogSplitReadTask extends MySqlStreamingChangeEventSource {
             MySqlStreamingChangeEventSourceMetrics metrics,
             MySqlBinlogSplit binlogSplit,
             Predicate<Event> eventFilter) {
-        super(connectorConfig, connection, dispatcher, errorHandler, clock, taskContext, metrics);
+        super(
+                connectorConfig,
+                connection,
+                dispatcher,
+                errorHandler,
+                clock,
+                taskContext,
+                metrics,
+                SnapshotterServiceFactory.create(connectorConfig, MySqlConnector.class));
         this.binlogSplit = binlogSplit;
         this.eventDispatcher = dispatcher;
         this.errorHandler = errorHandler;
