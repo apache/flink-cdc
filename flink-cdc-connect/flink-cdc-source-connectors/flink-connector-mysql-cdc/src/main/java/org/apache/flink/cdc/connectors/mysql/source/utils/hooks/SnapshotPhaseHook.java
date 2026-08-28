@@ -21,7 +21,7 @@ import org.apache.flink.annotation.Internal;
 import org.apache.flink.api.connector.source.SourceSplit;
 import org.apache.flink.util.function.BiConsumerWithException;
 
-import io.debezium.connector.mysql.MySqlConnection;
+import io.debezium.connector.mysql.strategy.mysql.MySqlConnection;
 
 import java.io.Serializable;
 import java.sql.SQLException;

@@ -205,7 +205,7 @@ public class OracleScanFetchTask extends AbstractScanFetchTask {
                 throws InterruptedException {
             final SnapshotContext<OraclePartition, OracleOffsetContext> ctx;
             try {
-                ctx = prepare(partition);
+                ctx = prepare(partition, false);
             } catch (Exception e) {
                 LOG.error("Failed to initialize snapshot context.", e);
                 throw new RuntimeException(e);
@@ -242,16 +242,17 @@ public class OracleScanFetchTask extends AbstractScanFetchTask {
 
         @Override
         protected SnapshotContext<OraclePartition, OracleOffsetContext> prepare(
-                OraclePartition partition) throws Exception {
-            return new OracleSnapshotContext(partition);
+                OraclePartition partition, boolean onDemand) throws Exception {
+            return new OracleSnapshotContext(partition, onDemand);
         }
 
         private static class OracleSnapshotContext
                 extends RelationalSnapshotChangeEventSource.RelationalSnapshotContext<
                         OraclePartition, OracleOffsetContext> {
 
-            public OracleSnapshotContext(OraclePartition partition) throws SQLException {
-                super(partition, "");
+            public OracleSnapshotContext(OraclePartition partition, boolean onDemand)
+                    throws SQLException {
+                super(partition, "", onDemand);
             }
         }
 

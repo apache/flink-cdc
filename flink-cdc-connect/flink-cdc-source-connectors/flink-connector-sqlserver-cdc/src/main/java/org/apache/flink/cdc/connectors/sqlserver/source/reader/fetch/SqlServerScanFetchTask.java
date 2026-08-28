@@ -204,7 +204,7 @@ public class SqlServerScanFetchTask extends AbstractScanFetchTask {
                 throws InterruptedException {
             final SqlServerSnapshotContext ctx;
             try {
-                ctx = prepare(partition);
+                ctx = prepare(partition, false);
             } catch (Exception e) {
                 LOG.error("Failed to initialize snapshot context.", e);
                 throw new RuntimeException(e);
@@ -243,8 +243,9 @@ public class SqlServerScanFetchTask extends AbstractScanFetchTask {
         }
 
         @Override
-        protected SqlServerSnapshotContext prepare(SqlServerPartition partition) throws Exception {
-            return new SqlServerSnapshotContext(partition);
+        protected SqlServerSnapshotContext prepare(SqlServerPartition partition, boolean onDemand)
+                throws Exception {
+            return new SqlServerSnapshotContext(partition, onDemand);
         }
 
         private void createDataEvents(SqlServerSnapshotContext snapshotContext, TableId tableId)
@@ -341,8 +342,9 @@ public class SqlServerScanFetchTask extends AbstractScanFetchTask {
                 extends RelationalSnapshotChangeEventSource.RelationalSnapshotContext<
                         SqlServerPartition, SqlServerOffsetContext> {
 
-            public SqlServerSnapshotContext(SqlServerPartition partition) throws SQLException {
-                super(partition, "");
+            public SqlServerSnapshotContext(SqlServerPartition partition, boolean onDemand)
+                    throws SQLException {
+                super(partition, "", onDemand);
             }
         }
     }

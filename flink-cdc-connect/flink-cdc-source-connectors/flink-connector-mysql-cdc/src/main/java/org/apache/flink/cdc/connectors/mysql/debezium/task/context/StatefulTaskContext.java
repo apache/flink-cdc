@@ -31,14 +31,15 @@ import io.debezium.config.CommonConnectorConfig;
 import io.debezium.connector.AbstractSourceInfo;
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.connector.mysql.GtidSet;
-import io.debezium.connector.mysql.GtidUtils;
 import io.debezium.connector.mysql.MySqlChangeEventSourceMetricsFactory;
-import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
 import io.debezium.connector.mysql.MySqlDatabaseSchema;
 import io.debezium.connector.mysql.MySqlOffsetContext;
 import io.debezium.connector.mysql.MySqlPartition;
 import io.debezium.connector.mysql.MySqlStreamingChangeEventSourceMetrics;
+import io.debezium.connector.mysql.strategy.mysql.GtidUtils;
+import io.debezium.connector.mysql.strategy.mysql.MySqlConnection;
+import io.debezium.connector.mysql.strategy.mysql.MySqlGtidSet;
 import io.debezium.data.Envelope;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.ErrorHandler;
@@ -248,7 +249,10 @@ public class StatefulTaskContext implements AutoCloseable {
             return true; // start at beginning ...
         }
 
-        String availableGtidStr = connection.knownGtidSet();
+        // Debezium 2.5 changed knownGtidSet() to return a GtidSet rather than its string form.
+        GtidSet availableGtidSetFromServer = connection.knownGtidSet();
+        String availableGtidStr =
+                availableGtidSetFromServer == null ? null : availableGtidSetFromServer.toString();
         if (availableGtidStr == null || availableGtidStr.trim().isEmpty()) {
             // Last offsets had GTIDs but the server does not use them ...
             LOG.warn(
@@ -257,7 +261,7 @@ public class StatefulTaskContext implements AutoCloseable {
         }
 
         // Get the GTID set that is available in the server ...
-        GtidSet availableGtidSet = new GtidSet(availableGtidStr);
+        MySqlGtidSet availableGtidSet = new MySqlGtidSet(availableGtidStr);
 
         // GTIDs are enabled
         LOG.info("Merging server GTID set {} with restored GTID set {}", availableGtidSet, gtidStr);
@@ -267,7 +271,7 @@ public class StatefulTaskContext implements AutoCloseable {
         // the GTID. This is done to address the issue of being unable to recover from a checkpoint
         // in certain startup
         // modes.
-        GtidSet gtidSet = GtidUtils.fixRestoredGtidSet(availableGtidSet, new GtidSet(gtidStr));
+        GtidSet gtidSet = GtidUtils.fixRestoredGtidSet(availableGtidSet, new MySqlGtidSet(gtidStr));
         LOG.info("Merged GTID set is {}", gtidSet);
 
         if (gtidSet.isContainedWithin(availableGtidSet)) {

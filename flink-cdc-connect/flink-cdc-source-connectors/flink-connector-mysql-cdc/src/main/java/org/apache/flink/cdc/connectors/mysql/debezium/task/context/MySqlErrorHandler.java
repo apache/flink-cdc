@@ -45,6 +45,14 @@ public class MySqlErrorHandler extends ErrorHandler {
     private static final Pattern NOT_FOUND_TABLE_MSG_PATTERN =
             Pattern.compile(
                     "Encountered change event for table (.+)\\.(.+) whose schema isn't known to this connector");
+    // Debezium <= 2.4 only detected a stale schema deep inside TableSchemaBuilder, which raised a
+    // ConnectException ending with this text. Debezium 2.5 additionally validates the row size
+    // against the known schema up-front and raises a DebeziumException matching the pattern below.
+    private static final String SCHEMA_OUT_OF_SYNC_MSG_SUFFIX =
+            "internal schema representation is probably out of sync with real database schema";
+    private static final Pattern COLUMN_SIZE_MISMATCH_MSG_PATTERN =
+            Pattern.compile(
+                    "Error processing row in .+, internal schema size \\d+, but row size \\d+");
 
     private final MySqlTaskContext context;
     private final MySqlSourceConfig sourceConfig;
@@ -101,12 +109,19 @@ public class MySqlErrorHandler extends ErrorHandler {
     }
 
     private boolean isSchemaOutOfSyncException(Throwable t) {
+        if (!sourceConfig.getStartupOptions().isStreamOnly()) {
+            return false;
+        }
         Throwable rootCause = ExceptionUtils.getRootCause(t);
-        return rootCause instanceof ConnectException
-                && rootCause
-                        .getMessage()
-                        .endsWith(
-                                "internal schema representation is probably out of sync with real database schema")
-                && sourceConfig.getStartupOptions().isStreamOnly();
+        if (rootCause == null || rootCause.getMessage() == null) {
+            return false;
+        }
+        String message = rootCause.getMessage();
+        if (rootCause instanceof ConnectException
+                && message.endsWith(SCHEMA_OUT_OF_SYNC_MSG_SUFFIX)) {
+            return true;
+        }
+        return rootCause instanceof DebeziumException
+                && COLUMN_SIZE_MISMATCH_MSG_PATTERN.matcher(message).find();
     }
 }

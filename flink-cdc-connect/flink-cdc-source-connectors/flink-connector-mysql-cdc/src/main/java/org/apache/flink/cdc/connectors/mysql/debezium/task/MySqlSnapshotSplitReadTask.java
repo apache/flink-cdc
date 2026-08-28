@@ -28,12 +28,12 @@ import org.apache.flink.cdc.connectors.mysql.source.utils.StatementUtils;
 import org.apache.flink.cdc.connectors.mysql.source.utils.hooks.SnapshotPhaseHooks;
 
 import io.debezium.DebeziumException;
-import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
 import io.debezium.connector.mysql.MySqlDatabaseSchema;
 import io.debezium.connector.mysql.MySqlOffsetContext;
 import io.debezium.connector.mysql.MySqlPartition;
 import io.debezium.connector.mysql.MySqlValueConverters;
+import io.debezium.connector.mysql.strategy.mysql.MySqlConnection;
 import io.debezium.pipeline.EventDispatcher;
 import io.debezium.pipeline.metrics.SnapshotChangeEventSourceMetrics;
 import io.debezium.pipeline.notification.NotificationService;
@@ -133,7 +133,7 @@ public class MySqlSnapshotSplitReadTask
             throws InterruptedException {
         final SnapshotContext<MySqlPartition, MySqlOffsetContext> ctx;
         try {
-            ctx = prepare(partition);
+            ctx = prepare(partition, false);
         } catch (Exception e) {
             LOG.error("Failed to initialize snapshot context.", e);
             throw new RuntimeException(e);
@@ -225,16 +225,18 @@ public class MySqlSnapshotSplitReadTask
     }
 
     @Override
-    protected MySqlSnapshotContext prepare(MySqlPartition partition) throws Exception {
-        return new MySqlSnapshotContext(partition);
+    protected MySqlSnapshotContext prepare(MySqlPartition partition, boolean onDemand)
+            throws Exception {
+        return new MySqlSnapshotContext(partition, onDemand);
     }
 
     private static class MySqlSnapshotContext
             extends RelationalSnapshotChangeEventSource.RelationalSnapshotContext<
                     MySqlPartition, MySqlOffsetContext> {
 
-        public MySqlSnapshotContext(MySqlPartition partition) throws SQLException {
-            super(partition, "");
+        public MySqlSnapshotContext(MySqlPartition partition, boolean onDemand)
+                throws SQLException {
+            super(partition, "", onDemand);
         }
     }
 

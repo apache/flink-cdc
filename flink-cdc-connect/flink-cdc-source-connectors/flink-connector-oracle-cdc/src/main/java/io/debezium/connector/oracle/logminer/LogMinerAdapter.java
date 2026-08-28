@@ -18,6 +18,7 @@ package io.debezium.connector.oracle.logminer;
 
 import io.debezium.DebeziumException;
 import io.debezium.config.Configuration;
+import io.debezium.connector.base.ChangeEventQueueMetrics;
 import io.debezium.connector.oracle.AbstractStreamingAdapter;
 import io.debezium.connector.oracle.OracleConnection;
 import io.debezium.connector.oracle.OracleConnectorConfig;
@@ -25,13 +26,13 @@ import io.debezium.connector.oracle.OracleConnectorConfig.TransactionSnapshotBou
 import io.debezium.connector.oracle.OracleDatabaseSchema;
 import io.debezium.connector.oracle.OracleOffsetContext;
 import io.debezium.connector.oracle.OraclePartition;
-import io.debezium.connector.oracle.OracleStreamingChangeEventSourceMetrics;
 import io.debezium.connector.oracle.OracleTaskContext;
 import io.debezium.connector.oracle.Scn;
 import io.debezium.document.Document;
 import io.debezium.pipeline.ErrorHandler;
 import io.debezium.pipeline.EventDispatcher;
 import io.debezium.pipeline.source.snapshot.incremental.SignalBasedIncrementalSnapshotContext;
+import io.debezium.pipeline.source.spi.EventMetadataProvider;
 import io.debezium.pipeline.source.spi.StreamingChangeEventSource;
 import io.debezium.pipeline.spi.OffsetContext;
 import io.debezium.pipeline.txmetadata.TransactionContext;
@@ -58,9 +59,14 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
+ * Copied from Debezium 2.5.4.Final. Flink CDC patch: the pending-transaction probe uses {@code
+ * START_SCN <=} rather than {@code <}, so a transaction starting exactly at the current SCN is not
+ * missed.
+ *
  * @author Chris Cranford
  */
-public class LogMinerAdapter extends AbstractStreamingAdapter {
+public class LogMinerAdapter
+        extends AbstractStreamingAdapter<LogMinerStreamingChangeEventSourceMetrics> {
 
     private static final Duration GET_TRANSACTION_SCN_PAUSE = Duration.ofSeconds(1);
 
@@ -103,7 +109,7 @@ public class LogMinerAdapter extends AbstractStreamingAdapter {
             OracleDatabaseSchema schema,
             OracleTaskContext taskContext,
             Configuration jdbcConfig,
-            OracleStreamingChangeEventSourceMetrics streamingMetrics) {
+            LogMinerStreamingChangeEventSourceMetrics streamingMetrics) {
         return new LogMinerStreamingChangeEventSource(
                 connectorConfig,
                 connection,
@@ -113,6 +119,16 @@ public class LogMinerAdapter extends AbstractStreamingAdapter {
                 schema,
                 jdbcConfig,
                 streamingMetrics);
+    }
+
+    @Override
+    public LogMinerStreamingChangeEventSourceMetrics getStreamingMetrics(
+            OracleTaskContext taskContext,
+            ChangeEventQueueMetrics changeEventQueueMetrics,
+            EventMetadataProvider metadataProvider,
+            OracleConnectorConfig connectorConfig) {
+        return new LogMinerStreamingChangeEventSourceMetrics(
+                taskContext, changeEventQueueMetrics, metadataProvider, connectorConfig);
     }
 
     @Override
@@ -153,6 +169,13 @@ public class LogMinerAdapter extends AbstractStreamingAdapter {
             return determineSnapshotOffset(
                     connectorConfig, conn, currentScn.get(), pendingTransactions, tableName);
         }
+    }
+
+    @Override
+    public OracleOffsetContext copyOffset(
+            OracleConnectorConfig connectorConfig, OracleOffsetContext offsetContext) {
+        return new LogMinerOracleOffsetContextLoader(connectorConfig)
+                .load(offsetContext.getOffset());
     }
 
     private Optional<Scn> getCurrentScn(Scn latestTableDdlScn, OracleConnection connection)
@@ -198,10 +221,22 @@ public class LogMinerAdapter extends AbstractStreamingAdapter {
                     }
                     final String pendingTxStartScn = rs.getString(3);
                     if (!Strings.isNullOrEmpty(pendingTxStartScn)) {
-                        // There is a pending transaction, capture state
-                        transactions.put(
-                                HexConverter.convertToHexString(rs.getBytes(2)),
-                                Scn.valueOf(pendingTxStartScn));
+                        final String transactionId =
+                                HexConverter.convertToHexString(rs.getBytes(2));
+                        final Scn transactionStartScn = Scn.valueOf(pendingTxStartScn);
+                        // There is a use case where if the archive logs do not contain sufficient
+                        // logs where the
+                        // transaction started, LogMiner will return a value of 0 as the START_SCN
+                        // and this can
+                        // unintentionally cause starting from the beginning of time.
+                        if (transactionStartScn.compareTo(Scn.ONE) > 0) {
+                            // There is a pending transaction, capture state
+                            transactions.put(transactionId, transactionStartScn);
+                        } else {
+                            LOGGER.warn(
+                                    "Unable to determine the start SCN, transaction {} will not be included",
+                                    transactionId);
+                        }
                     }
                 }
             } catch (SQLException e) {
