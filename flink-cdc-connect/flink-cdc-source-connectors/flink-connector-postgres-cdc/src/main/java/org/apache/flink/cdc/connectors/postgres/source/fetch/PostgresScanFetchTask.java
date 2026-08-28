@@ -37,6 +37,7 @@ import io.debezium.connector.postgresql.connection.ReplicationConnection;
 import io.debezium.connector.postgresql.spi.SlotState;
 import io.debezium.pipeline.EventDispatcher;
 import io.debezium.pipeline.notification.NotificationService;
+import io.debezium.pipeline.signal.actions.snapshotting.SnapshotConfiguration;
 import io.debezium.pipeline.source.AbstractSnapshotChangeEventSource;
 import io.debezium.pipeline.source.SnapshottingTask;
 import io.debezium.pipeline.source.spi.SnapshotProgressListener;
@@ -142,7 +143,7 @@ public class PostgresScanFetchTask extends AbstractScanFetchTask {
         final PostgresStreamFetchTask.StreamSplitReadTask backfillReadTask =
                 new PostgresStreamFetchTask.StreamSplitReadTask(
                         ctx.getDbzConnectorConfig(),
-                        ctx.getSnapShotter(),
+                        ctx.getSnapshotterService(),
                         ctx.getConnection(),
                         ctx.getEventDispatcher(),
                         ctx.getWaterMarkDispatcher(),
@@ -386,6 +387,16 @@ public class PostgresScanFetchTask extends AbstractScanFetchTask {
                 PostgresPartition partition, PostgresOffsetContext previousOffset) {
             return new SnapshottingTask(
                     false, true, Collections.emptyList(), Collections.emptyMap(), false);
+        }
+
+        @Override
+        public SnapshottingTask getBlockingSnapshottingTask(
+                PostgresPartition partition,
+                PostgresOffsetContext previousOffset,
+                SnapshotConfiguration snapshotConfiguration) {
+            // Debezium 2.6 made this abstract. Flink CDC drives its own split snapshot and never
+            // runs Debezium's signal-based blocking snapshot, so it behaves like the regular one.
+            return getSnapshottingTask(partition, previousOffset);
         }
 
         @Override

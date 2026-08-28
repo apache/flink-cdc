@@ -9,10 +9,12 @@ package io.debezium.connector.postgresql.connection;
 import com.zaxxer.hikari.pool.HikariProxyConnection;
 import io.debezium.DebeziumException;
 import io.debezium.annotation.VisibleForTesting;
+import io.debezium.config.CommonConnectorConfig;
 import io.debezium.config.Configuration;
 import io.debezium.connector.postgresql.CustomPostgresValueConverter;
 import io.debezium.connector.postgresql.PgOid;
 import io.debezium.connector.postgresql.PostgresConnectorConfig;
+import io.debezium.connector.postgresql.PostgresOffsetContext;
 import io.debezium.connector.postgresql.PostgresType;
 import io.debezium.connector.postgresql.PostgresValueConverter;
 import io.debezium.connector.postgresql.TypeRegistry;
@@ -20,6 +22,8 @@ import io.debezium.connector.postgresql.spi.SlotState;
 import io.debezium.data.SpecialValueDecimal;
 import io.debezium.jdbc.JdbcConfiguration;
 import io.debezium.jdbc.JdbcConnection;
+import io.debezium.pipeline.spi.OffsetContext;
+import io.debezium.pipeline.spi.Partition;
 import io.debezium.relational.Column;
 import io.debezium.relational.ColumnEditor;
 import io.debezium.relational.Table;
@@ -874,6 +878,30 @@ public class PostgresConnection extends JdbcConnection {
      */
     public Set<TableId> getAllTableIds(String catalogName) throws SQLException {
         return readTableNames(catalogName, null, null, new String[] {"TABLE", "PARTITIONED TABLE"});
+    }
+
+    /**
+     * Added in Debezium 2.6 and called by {@code PostgresConnectorTask} through a method reference.
+     * This fork shadows the Debezium class, so the method has to exist here too or the embedded
+     * engine fails with {@code NoSuchMethodError}.
+     */
+    public boolean validateLogPosition(
+            Partition partition, OffsetContext offset, CommonConnectorConfig config) {
+
+        final Lsn storedLsn = ((PostgresOffsetContext) offset).lastCommitLsn();
+        final String slotName = ((PostgresConnectorConfig) config).slotName();
+        final String postgresPluginName =
+                ((PostgresConnectorConfig) config).plugin().getPostgresPluginName();
+
+        try {
+            SlotState slotState = getReplicationSlotState(slotName, postgresPluginName);
+            if (slotState == null) {
+                return false;
+            }
+            return storedLsn == null || slotState.slotRestartLsn().compareTo(storedLsn) < 0;
+        } catch (SQLException e) {
+            throw new DebeziumException("Unable to get last available log position", e);
+        }
     }
 
     @FunctionalInterface

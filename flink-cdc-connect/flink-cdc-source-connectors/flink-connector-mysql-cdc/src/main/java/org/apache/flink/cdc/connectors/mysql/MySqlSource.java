@@ -223,10 +223,13 @@ public class MySqlSource {
                     break;
 
                 case SPECIFIC_OFFSETS:
-                    // if binlog offset is specified, 'snapshot.mode=schema_only_recovery' must
-                    // be configured. It only snapshots the schemas, not the data,
-                    // and continue binlog reading from the specified offset
-                    props.setProperty("snapshot.mode", "schema_only_recovery");
+                    // if binlog offset is specified, 'snapshot.mode=recovery' must be
+                    // configured. It only snapshots the schemas, not the data, and continues
+                    // binlog reading from the specified offset.
+                    // Debezium 2.6 kept "schema_only_recovery" as a deprecated alias, but it
+                    // now behaves like "no_data" and no longer recovers the schema history,
+                    // so "recovery" is the mode that preserves the pre-2.6 semantics.
+                    props.setProperty("snapshot.mode", "recovery");
 
                     specificOffset = new DebeziumOffset();
                     Map<String, String> sourcePartition = new HashMap<>();

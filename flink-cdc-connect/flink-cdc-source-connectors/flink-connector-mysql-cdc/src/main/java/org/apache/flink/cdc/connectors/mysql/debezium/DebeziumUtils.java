@@ -196,9 +196,10 @@ public class DebeziumUtils {
                 bigIntUnsignedMode,
                 dbzMySqlConfig.binaryHandlingMode(),
                 timeAdjusterEnabled ? MySqlValueConverters::adjustTemporal : x -> x,
-                MySqlValueConverters::defaultParsingErrorHandler,
                 // Debezium 2.5 introduced the MySQL/MariaDB connector "strategy"; the value
-                // converters need the adapter the connector config resolved.
+                // converters need the adapter the connector config resolved. Debezium 2.6 dropped
+                // the ParsingErrorHandler argument in favour of EventConvertingFailureHandlingMode,
+                // which this constructor defaults to WARN - the previous behaviour.
                 dbzMySqlConfig.getConnectorAdapter());
     }
 

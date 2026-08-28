@@ -24,9 +24,11 @@ import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
 import org.apache.flink.cdc.connectors.base.source.meta.wartermark.WatermarkKind;
 import org.apache.flink.cdc.connectors.base.source.reader.external.FetchTask;
 import org.apache.flink.cdc.connectors.db2.source.offset.LsnOffset;
+import org.apache.flink.cdc.debezium.internal.SnapshotterServiceFactory;
 
 import io.debezium.DebeziumException;
 import io.debezium.connector.db2.Db2Connection;
+import io.debezium.connector.db2.Db2Connector;
 import io.debezium.connector.db2.Db2ConnectorConfig;
 import io.debezium.connector.db2.Db2DatabaseSchema;
 import io.debezium.connector.db2.Db2OffsetContext;
@@ -37,6 +39,7 @@ import io.debezium.pipeline.ErrorHandler;
 import io.debezium.pipeline.EventDispatcher;
 import io.debezium.pipeline.source.spi.ChangeEventSource.ChangeEventSourceContext;
 import io.debezium.relational.TableId;
+import io.debezium.snapshot.SnapshotterService;
 import io.debezium.util.Clock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -67,6 +70,8 @@ public class Db2StreamFetchTask implements FetchTask<SourceSplitBase> {
                         sourceFetchContext.getWaterMarkDispatcher(),
                         sourceFetchContext.getErrorHandler(),
                         sourceFetchContext.getDatabaseSchema(),
+                        SnapshotterServiceFactory.create(
+                                sourceFetchContext.getDbzConnectorConfig(), Db2Connector.class),
                         split);
         RedoLogSplitChangeEventSourceContext changeEventSourceContext =
                 new RedoLogSplitChangeEventSourceContext();
@@ -111,6 +116,7 @@ public class Db2StreamFetchTask implements FetchTask<SourceSplitBase> {
                 WatermarkDispatcher watermarkDispatcher,
                 ErrorHandler errorHandler,
                 Db2DatabaseSchema schema,
+                SnapshotterService snapshotterService,
                 StreamSplit lsnSplit) {
             super(
                     connectorConfig,
@@ -119,7 +125,8 @@ public class Db2StreamFetchTask implements FetchTask<SourceSplitBase> {
                     eventDispatcher,
                     errorHandler,
                     Clock.system(),
-                    schema);
+                    schema,
+                    snapshotterService);
             this.lsnSplit = lsnSplit;
             this.watermarkDispatcher = watermarkDispatcher;
             this.errorHandler = errorHandler;

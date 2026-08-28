@@ -32,6 +32,7 @@ import io.debezium.connector.oracle.logminer.LogMinerOracleOffsetContextLoader;
 import io.debezium.heartbeat.Heartbeat;
 import io.debezium.pipeline.EventDispatcher;
 import io.debezium.pipeline.notification.NotificationService;
+import io.debezium.pipeline.signal.actions.snapshotting.SnapshotConfiguration;
 import io.debezium.pipeline.source.AbstractSnapshotChangeEventSource;
 import io.debezium.pipeline.source.SnapshottingTask;
 import io.debezium.pipeline.source.spi.SnapshotProgressListener;
@@ -238,6 +239,16 @@ public class OracleScanFetchTask extends AbstractScanFetchTask {
                 OraclePartition partition, OracleOffsetContext previousOffset) {
             return new SnapshottingTask(
                     false, true, Collections.emptyList(), Collections.emptyMap(), false);
+        }
+
+        @Override
+        public SnapshottingTask getBlockingSnapshottingTask(
+                OraclePartition partition,
+                OracleOffsetContext previousOffset,
+                SnapshotConfiguration snapshotConfiguration) {
+            // Debezium 2.6 made this abstract. Flink CDC drives its own split snapshot and never
+            // runs Debezium's signal-based blocking snapshot, so it behaves like the regular one.
+            return getSnapshottingTask(partition, previousOffset);
         }
 
         @Override

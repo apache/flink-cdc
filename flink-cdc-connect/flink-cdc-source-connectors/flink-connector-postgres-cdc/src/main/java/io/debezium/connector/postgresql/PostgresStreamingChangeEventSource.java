@@ -14,11 +14,11 @@ import io.debezium.connector.postgresql.connection.ReplicationConnection;
 import io.debezium.connector.postgresql.connection.ReplicationMessage.Operation;
 import io.debezium.connector.postgresql.connection.ReplicationStream;
 import io.debezium.connector.postgresql.connection.WalPositionLocator;
-import io.debezium.connector.postgresql.spi.Snapshotter;
 import io.debezium.heartbeat.Heartbeat;
 import io.debezium.pipeline.ErrorHandler;
 import io.debezium.pipeline.source.spi.StreamingChangeEventSource;
 import io.debezium.relational.TableId;
+import io.debezium.snapshot.SnapshotterService;
 import io.debezium.util.Clock;
 import io.debezium.util.DelayStrategy;
 import io.debezium.util.ElapsedTimeStrategy;
@@ -69,7 +69,7 @@ public class PostgresStreamingChangeEventSource
     private final PostgresTaskContext taskContext;
     private final ReplicationConnection replicationConnection;
     private final AtomicReference<ReplicationStream> replicationStream = new AtomicReference<>();
-    private final Snapshotter snapshotter;
+    private final SnapshotterService snapshotterService;
     private final DelayStrategy pauseNoMessage;
     private final ElapsedTimeStrategy connectionProbeTimer;
 
@@ -90,7 +90,7 @@ public class PostgresStreamingChangeEventSource
 
     public PostgresStreamingChangeEventSource(
             PostgresConnectorConfig connectorConfig,
-            Snapshotter snapshotter,
+            SnapshotterService snapshotterService,
             PostgresConnection connection,
             PostgresEventDispatcher<TableId> dispatcher,
             ErrorHandler errorHandler,
@@ -106,7 +106,7 @@ public class PostgresStreamingChangeEventSource
         this.schema = schema;
         pauseNoMessage = DelayStrategy.constant(taskContext.getConfig().getPollInterval());
         this.taskContext = taskContext;
-        this.snapshotter = snapshotter;
+        this.snapshotterService = snapshotterService;
         this.replicationConnection = replicationConnection;
         this.connectionProbeTimer =
                 ElapsedTimeStrategy.constant(
@@ -129,7 +129,7 @@ public class PostgresStreamingChangeEventSource
             PostgresPartition partition,
             PostgresOffsetContext offsetContext)
             throws InterruptedException {
-        if (!snapshotter.shouldStream()) {
+        if (!snapshotterService.getSnapshotter().shouldStream()) {
             LOGGER.info("Streaming is not enabled in correct configuration");
             return;
         }

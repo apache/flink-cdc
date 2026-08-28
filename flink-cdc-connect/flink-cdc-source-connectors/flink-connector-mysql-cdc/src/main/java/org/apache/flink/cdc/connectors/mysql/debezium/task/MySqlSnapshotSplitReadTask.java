@@ -37,6 +37,7 @@ import io.debezium.connector.mysql.strategy.mysql.MySqlConnection;
 import io.debezium.pipeline.EventDispatcher;
 import io.debezium.pipeline.metrics.SnapshotChangeEventSourceMetrics;
 import io.debezium.pipeline.notification.NotificationService;
+import io.debezium.pipeline.signal.actions.snapshotting.SnapshotConfiguration;
 import io.debezium.pipeline.source.AbstractSnapshotChangeEventSource;
 import io.debezium.pipeline.source.SnapshottingTask;
 import io.debezium.pipeline.spi.ChangeRecordEmitter;
@@ -222,6 +223,16 @@ public class MySqlSnapshotSplitReadTask
             MySqlPartition partition, MySqlOffsetContext previousOffset) {
         return new SnapshottingTask(
                 false, true, Collections.emptyList(), Collections.emptyMap(), false);
+    }
+
+    @Override
+    public SnapshottingTask getBlockingSnapshottingTask(
+            MySqlPartition partition,
+            MySqlOffsetContext previousOffset,
+            SnapshotConfiguration snapshotConfiguration) {
+        // Debezium 2.6 made this abstract. Flink CDC drives its own split snapshot and never
+        // runs Debezium's signal-based blocking snapshot, so it behaves like the regular one.
+        return getSnapshottingTask(partition, previousOffset);
     }
 
     @Override

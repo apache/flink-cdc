@@ -42,6 +42,8 @@ import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
 import io.debezium.schema.SchemaChangeEvent;
 import io.debezium.schema.SchemaChangeEvent.SchemaChangeEventType;
+import io.debezium.snapshot.SnapshotterService;
+import io.debezium.snapshot.mode.NeverSnapshotter;
 import io.debezium.time.Conversions;
 import io.debezium.util.Clock;
 import io.debezium.util.Metronome;
@@ -67,14 +69,13 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Predicate;
 
 /**
- * Copied from Debezium 2.5.4.Final (via the flink-connector-mysql-cdc fork).
+ * Copied from Debezium 2.6.2.Final (via the flink-connector-mysql-cdc fork).
  *
  * <p>Flink CDC patches: the O(n) row iteration in {@code handleChange} (the row list may be a
  * linked list, so {@code get(i)} is O(n)), and the error-message optimisation in {@code wrap()}.
  *
  * <p>The GTID new-channel-position handling lives in {@link
- * io.debezium.connector.mysql.strategy.mysql.MySqlConnection#filterGtidSet}, which Debezium 2.5
- * made responsible for merging the GTID sets.
+ * io.debezium.connector.mysql.strategy.mysql.MySqlConnection#filterGtidSet}.
  *
  * <p>OceanBase-specific diff: skip {@code offsetContext.completeEvent()} for HEARTBEAT events
  * emitted by the OceanBase Binlog Service.
@@ -96,6 +97,7 @@ public class MySqlStreamingChangeEventSource
     private final Clock clock;
     private final EventProcessingFailureHandlingMode eventDeserializationFailureHandlingMode;
     private final EventProcessingFailureHandlingMode inconsistentSchemaHandlingMode;
+    private final SnapshotterService snapshotterService;
 
     private int startingRowNumber = 0;
     private long initialEventsToSkip = 0L;
@@ -187,7 +189,8 @@ public class MySqlStreamingChangeEventSource
             ErrorHandler errorHandler,
             Clock clock,
             MySqlTaskContext taskContext,
-            MySqlStreamingChangeEventSourceMetrics metrics) {
+            MySqlStreamingChangeEventSourceMetrics metrics,
+            SnapshotterService snapshotterService) {
 
         this.taskContext = taskContext;
         this.connectorConfig = connectorConfig;
@@ -201,6 +204,7 @@ public class MySqlStreamingChangeEventSource
         eventDeserializationFailureHandlingMode =
                 connectorConfig.getEventProcessingFailureHandlingMode();
         inconsistentSchemaHandlingMode = connectorConfig.inconsistentSchemaFailureHandlingMode();
+        this.snapshotterService = snapshotterService;
 
         // Set up the log reader ...
         client =
@@ -1057,13 +1061,8 @@ public class MySqlStreamingChangeEventSource
             MySqlPartition partition,
             MySqlOffsetContext offsetContext)
             throws InterruptedException {
-        if (!connectorConfig.getSnapshotMode().shouldStream()) {
-            LOGGER.info(
-                    "Streaming is disabled for snapshot mode {}",
-                    connectorConfig.getSnapshotMode());
-            return;
-        }
-        if (connectorConfig.getSnapshotMode() != MySqlConnectorConfig.SnapshotMode.NEVER) {
+
+        if (!(snapshotterService.getSnapshotter() instanceof NeverSnapshotter)) {
             taskContext.getSchema().assureNonEmptySchema();
         }
         final Set<Operation> skippedOperations = connectorConfig.getSkippedOperations();
