@@ -31,6 +31,7 @@ import org.apache.paimon.flink.FlinkCatalogFactory;
 import org.apache.paimon.flink.sink.Committer;
 import org.apache.paimon.flink.sink.MultiTableCommittable;
 import org.apache.paimon.flink.sink.StoreMultiCommitter;
+import org.apache.paimon.flink.sink.state.OperatorBackendStateStore;
 import org.apache.paimon.manifest.WrappedManifestCommittable;
 import org.apache.paimon.options.Options;
 import org.slf4j.Logger;
@@ -85,7 +86,7 @@ public class PreCommitOperator
                                     getMetricGroup(),
                                     true,
                                     context.isRestored(),
-                                    context.getOperatorStateStore(),
+                                    new OperatorBackendStateStore(context.getOperatorStateStore()),
                                     getRuntimeContext().getTaskInfo().getNumberOfParallelSubtasks(),
                                     getRuntimeContext().getTaskInfo().getIndexOfThisSubtask()));
         }
