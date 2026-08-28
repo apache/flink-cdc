@@ -55,7 +55,7 @@ public class CustomPostgresValueConverter extends PostgresValueConverter {
             PostgresConnectorConfig.HStoreHandlingMode hStoreMode,
             CommonConnectorConfig.BinaryHandlingMode binaryMode,
             PostgresConnectorConfig.IntervalHandlingMode intervalMode,
-            byte[] toastPlaceholder,
+            UnchangedToastedPlaceholder toastPlaceholder,
             int moneyFractionDigits,
             boolean wallClockConversionEnabled) {
         super(
@@ -96,7 +96,7 @@ public class CustomPostgresValueConverter extends PostgresValueConverter {
                 connectorConfig.hStoreHandlingMode(),
                 connectorConfig.binaryHandlingMode(),
                 connectorConfig.intervalHandlingMode(),
-                connectorConfig.getUnavailableValuePlaceholder(),
+                new UnchangedToastedPlaceholder(connectorConfig),
                 connectorConfig.moneyFractionDigits(),
                 wallClockConversionEnabled);
     }

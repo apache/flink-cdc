@@ -31,7 +31,12 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 
-/** A utility class for accessing various Debezium package-private methods. */
+/**
+ * A utility class for accessing various Debezium package-private methods. *
+ *
+ * <p>This is a Flink CDC owned class (not a Debezium fork), placed in the {@code io.debezium}
+ * package for access to package-private Debezium members.
+ */
 public final class Utils {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(Utils.class);

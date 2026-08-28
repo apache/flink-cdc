@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package io.debezium.connector.mysql.strategy.mysql;
+package io.debezium.connector.mysql.gtid;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -25,9 +25,9 @@ import org.junit.jupiter.params.provider.MethodSource;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 
-import static io.debezium.connector.mysql.strategy.mysql.GtidUtils.computeLatestModeGtidSet;
-import static io.debezium.connector.mysql.strategy.mysql.GtidUtils.fixRestoredGtidSet;
-import static io.debezium.connector.mysql.strategy.mysql.GtidUtils.mergeGtidSetInto;
+import static io.debezium.connector.mysql.gtid.GtidUtils.computeLatestModeGtidSet;
+import static io.debezium.connector.mysql.gtid.GtidUtils.fixRestoredGtidSet;
+import static io.debezium.connector.mysql.gtid.GtidUtils.mergeGtidSetInto;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Unit test for {@link GtidUtils}. */

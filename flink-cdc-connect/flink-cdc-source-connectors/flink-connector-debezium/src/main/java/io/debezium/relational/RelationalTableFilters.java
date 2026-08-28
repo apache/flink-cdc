@@ -17,21 +17,24 @@ import java.util.function.Predicate;
 import static io.debezium.relational.RelationalDatabaseConnectorConfig.COLUMN_EXCLUDE_LIST;
 
 /**
- * Copied from Debezium 2.0.1.Final.
+ * Copied from Debezium project(2.7.4.Final)..
  *
- * <p>Line 96: cache table filter results.
+ * <p>Change 1: wrap the table filter in {@link CachedTableFilter} so repeated filter evaluations
+ * (once per change record) hit a cache instead of re-running the predicate chain.
  *
- * <p>Line 138: add a method to update the tableFilter variable.
+ * <p>Change 2: add {@code setDataCollectionFilters} so Flink CDC can replace the table filter after
+ * construction (used by the MySQL source config when the captured-table list is refined).
  */
 public class RelationalTableFilters implements DataCollectionFilters {
 
-    // Filter that filters tables based only on datbase/schema/system table filters but not table
+    // Filter that filters tables based only on database/schema/system table filters but not table
     // filters
     // Represents the list of tables whose schema needs to be captured
     private final TableFilter eligibleTableFilter;
     // Filter that filters tables based on table filters
     private TableFilter tableFilter;
     private final Predicate<String> databaseFilter;
+    private final Predicate<String> schemaFilter;
     private final String excludeColumns;
 
     /**
@@ -102,9 +105,7 @@ public class RelationalTableFilters implements DataCollectionFilters {
                 finalTablePredicate = finalTablePredicate.or(signalDataCollectionPredicate);
             }
         }
-
-        TableFilter initialTableFilter = finalTablePredicate::test;
-        this.tableFilter = CachedTableFilter.from(initialTableFilter);
+        this.tableFilter = CachedTableFilter.from(finalTablePredicate::test);
 
         // Define the database filter using the include and exclude lists for database names ...
         this.databaseFilter =
@@ -116,16 +117,28 @@ public class RelationalTableFilters implements DataCollectionFilters {
                                 config.getString(
                                         RelationalDatabaseConnectorConfig.DATABASE_EXCLUDE_LIST))
                         .build();
+        this.schemaFilter =
+                Selectors.databaseSelector()
+                        .includeDatabases(
+                                config.getString(
+                                        RelationalDatabaseConnectorConfig.SCHEMA_INCLUDE_LIST))
+                        .excludeDatabases(
+                                config.getString(
+                                        RelationalDatabaseConnectorConfig.SCHEMA_EXCLUDE_LIST))
+                        .build();
 
         Predicate<TableId> eligibleSchemaPredicate =
                 config.getBoolean(RelationalDatabaseConnectorConfig.TABLE_IGNORE_BUILTIN)
                         ? systemTablesFilter::isIncluded
                         : x -> true;
 
-        this.schemaSnapshotFilter =
-                config.getBoolean(SchemaHistory.STORE_ONLY_CAPTURED_TABLES_DDL)
-                        ? eligibleSchemaPredicate.and(initialTableFilter::isIncluded)::test
-                        : eligibleSchemaPredicate::test;
+        if (config.getBoolean(SchemaHistory.STORE_ONLY_CAPTURED_TABLES_DDL)) {
+            this.schemaSnapshotFilter = eligibleSchemaPredicate.and(tableFilter::isIncluded)::test;
+        } else if (config.getBoolean(SchemaHistory.STORE_ONLY_CAPTURED_DATABASES_DDL)) {
+            this.schemaSnapshotFilter = finalEligibleTablePredicate::test;
+        } else {
+            this.schemaSnapshotFilter = eligibleSchemaPredicate::test;
+        }
 
         this.excludeColumns = config.getString(COLUMN_EXCLUDE_LIST);
     }
@@ -147,10 +160,15 @@ public class RelationalTableFilters implements DataCollectionFilters {
         return databaseFilter;
     }
 
+    public Predicate<String> schemaFilter() {
+        return schemaFilter;
+    }
+
     public String getExcludeColumns() {
         return excludeColumns;
     }
 
+    /** Replaces the table filter. Flink CDC addition — see the class javadoc. */
     public void setDataCollectionFilters(TableFilter tableFilter) {
         this.tableFilter = tableFilter;
     }

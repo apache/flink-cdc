@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package io.debezium.connector.mysql.strategy.mysql;
+package io.debezium.connector.mysql.gtid;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -25,7 +25,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Predicate;
 
-/** Utils for handling GTIDs. */
+/**
+ * Utils for handling GTIDs. *
+ *
+ * <p>This is a Flink CDC owned class (not a Debezium fork), placed in the {@code io.debezium}
+ * package for access to package-private Debezium members.
+ */
 public class GtidUtils {
 
     /**

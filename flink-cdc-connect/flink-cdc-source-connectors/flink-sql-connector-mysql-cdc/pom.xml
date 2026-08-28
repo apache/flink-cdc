@@ -65,6 +65,7 @@ limitations under the License.
                                     <include>io.debezium:debezium-storage-kafka</include>
                                     <include>io.debezium:debezium-ddl-parser</include>
                                     <include>io.debezium:debezium-connector-mysql</include>
+                                    <include>io.debezium:debezium-connector-binlog</include>
                                     <include>org.apache.flink:flink-cdc-common</include>
                                     <include>org.apache.flink:flink-connector-debezium</include>
                                     <include>org.apache.flink:flink-connector-mysql-cdc</include>

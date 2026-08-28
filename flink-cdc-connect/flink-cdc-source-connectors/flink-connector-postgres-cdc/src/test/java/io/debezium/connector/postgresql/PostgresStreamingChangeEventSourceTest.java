@@ -24,10 +24,11 @@ import io.debezium.connector.postgresql.connection.PostgresConnection;
 import io.debezium.connector.postgresql.connection.PostgresReplicationConnection;
 import io.debezium.connector.postgresql.connection.ReplicationStream;
 import io.debezium.connector.postgresql.connection.WalPositionLocator;
-import io.debezium.connector.postgresql.spi.Snapshotter;
 import io.debezium.pipeline.ErrorHandler;
 import io.debezium.pipeline.source.spi.ChangeEventSource;
 import io.debezium.relational.TableId;
+import io.debezium.snapshot.SnapshotterService;
+import io.debezium.spi.snapshot.Snapshotter;
 import io.debezium.util.Clock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -46,21 +47,22 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Unit test for the idle-publication fixes in {@link PostgresStreamingChangeEventSource}.
+ * Unit test for the idle-publication behaviour of {@link PostgresStreamingChangeEventSource}.
  *
  * <p>On an idle publication the WAL-position search loop blocks forever, because it waits for a
  * decoded WAL message while the only mechanism that would produce one on a quiet database (the
- * heartbeat action query) runs from heartbeat dispatch. The fix backports the two upstream Debezium
- * changes:
+ * heartbeat action query) runs from heartbeat dispatch. The streaming source therefore relies on:
  *
  * <ul>
- *   <li>DBZ-6635 (2.4): dispatch heartbeats from the main streaming loop even before any position
- *       has been completely processed, so the heartbeat action query can generate WAL on a fresh
- *       start;
+ *   <li>DBZ-6635 (2.4): dispatching heartbeats from the main streaming loop even before any
+ *       position has been completely processed, so the heartbeat action query can generate WAL on a
+ *       fresh start;
  *   <li>the 2.7 guard only entering the WAL-position search when {@code searchingEnabled() &&
  *       offsetContext.hasCompletelyProcessedPosition()}, plus dispatching heartbeats while
  *       searching.
  * </ul>
+ *
+ * <p>Flink CDC forked this class, so the behaviour is guarded here rather than upstream.
  */
 class PostgresStreamingChangeEventSourceTest {
 
@@ -81,7 +83,8 @@ class PostgresStreamingChangeEventSourceTest {
                 offsetContext.lastCompletelyProcessedLsn() != null
                         ? offsetContext.lastCompletelyProcessedLsn()
                         : offsetContext.lsn();
-        return new WalPositionLocator(offsetContext.lastCommitLsn(), lsn);
+        return new WalPositionLocator(
+                offsetContext.lastCommitLsn(), lsn, offsetContext.lastProcessedMessageType());
     }
 
     private static PostgresOffsetContext freshStartOffsetContext(
@@ -142,6 +145,8 @@ class PostgresStreamingChangeEventSourceTest {
         final PostgresEventDispatcher<TableId> dispatcher = mock(PostgresEventDispatcher.class);
         final Snapshotter snapshotter = mock(Snapshotter.class);
         when(snapshotter.shouldStream()).thenReturn(true);
+        final SnapshotterService snapshotterService = mock(SnapshotterService.class);
+        when(snapshotterService.getSnapshotter()).thenReturn(snapshotter);
         final PostgresConnection connection = mock(PostgresConnection.class);
         final ErrorHandler errorHandler = mock(ErrorHandler.class);
         final PostgresReplicationConnection replicationConnection =
@@ -156,7 +161,7 @@ class PostgresStreamingChangeEventSourceTest {
         final PostgresStreamingChangeEventSource source =
                 new PostgresStreamingChangeEventSource(
                         connectorConfig,
-                        snapshotter,
+                        snapshotterService,
                         connection,
                         dispatcher,
                         errorHandler,
@@ -168,14 +173,37 @@ class PostgresStreamingChangeEventSourceTest {
         // Run exactly two polls of the streaming loop, then stop the source.
         final AtomicInteger polls = new AtomicInteger();
         final ChangeEventSource.ChangeEventSourceContext context =
-                () -> polls.getAndIncrement() < 2;
+                new ChangeEventSource.ChangeEventSourceContext() {
+                    @Override
+                    public boolean isRunning() {
+                        return polls.getAndIncrement() < 2;
+                    }
 
-        source.execute(context, new PostgresPartition("test_server"), offsetContext);
+                    @Override
+                    public boolean isPaused() {
+                        return false;
+                    }
+
+                    @Override
+                    public void resumeStreaming() {}
+
+                    @Override
+                    public void waitSnapshotCompletion() {}
+
+                    @Override
+                    public void streamingPaused() {}
+
+                    @Override
+                    public void waitStreamingPaused() {}
+                };
+
+        source.execute(context, new PostgresPartition("test_server", "test_db"), offsetContext);
 
         // execute() swallows throwables into the error handler.
         verify(errorHandler, never()).setProducerThrowable(any());
         // One heartbeat dispatch per poll, although no message was ever received.
-        verify(dispatcher, times(2)).dispatchHeartbeatEvent(any(), eq(offsetContext));
+        verify(dispatcher, times(2))
+                .dispatchHeartbeatEventAlsoToIncrementalSnapshot(any(), eq(offsetContext));
         // The WAL-position search was skipped: streaming kept the initial connection.
         verify(replicationConnection, never()).reconnect();
     }

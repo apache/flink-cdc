@@ -30,13 +30,13 @@ import com.github.shyiko.mysql.binlog.event.EventHeaderV4;
 import com.github.shyiko.mysql.binlog.event.RotateEventData;
 import io.debezium.config.CommonConnectorConfig;
 import io.debezium.config.Configuration;
+import io.debezium.connector.binlog.jdbc.BinlogSystemVariables;
+import io.debezium.connector.binlog.jdbc.ConnectionConfiguration;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
 import io.debezium.connector.mysql.MySqlDatabaseSchema;
-import io.debezium.connector.mysql.MySqlSystemVariables;
-import io.debezium.connector.mysql.MySqlValueConverters;
-import io.debezium.connector.mysql.strategy.ConnectionConfiguration;
-import io.debezium.connector.mysql.strategy.mysql.MySqlConnection;
-import io.debezium.connector.mysql.strategy.mysql.MySqlConnectionConfiguration;
+import io.debezium.connector.mysql.jdbc.MySqlConnection;
+import io.debezium.connector.mysql.jdbc.MySqlConnectionConfiguration;
+import io.debezium.connector.mysql.jdbc.MySqlValueConverters;
 import io.debezium.jdbc.JdbcConfiguration;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.jdbc.JdbcValueConverters;
@@ -97,12 +97,15 @@ public class DebeziumUtils {
 
     /** Creates a new {@link BinaryLogClient} for consuming mysql binlog. */
     public static BinaryLogClient createBinaryClient(Configuration dbzConfiguration) {
-        final MySqlConnectorConfig connectorConfig = new MySqlConnectorConfig(dbzConfiguration);
+        // Debezium 2.7 moved hostname/port/user/password off MySqlConnectorConfig onto the
+        // connection configuration.
+        final MySqlConnectionConfiguration connectionConfig =
+                new MySqlConnectionConfiguration(dbzConfiguration);
         return new BinaryLogClient(
-                connectorConfig.hostname(),
-                connectorConfig.port(),
-                connectorConfig.username(),
-                connectorConfig.password());
+                connectionConfig.hostname(),
+                connectionConfig.port(),
+                connectionConfig.username(),
+                connectionConfig.password());
     }
 
     /** Creates a new {@link MySqlDatabaseSchema} to monitor the latest MySql database schemas. */
@@ -196,11 +199,10 @@ public class DebeziumUtils {
                 bigIntUnsignedMode,
                 dbzMySqlConfig.binaryHandlingMode(),
                 timeAdjusterEnabled ? MySqlValueConverters::adjustTemporal : x -> x,
-                // Debezium 2.5 introduced the MySQL/MariaDB connector "strategy"; the value
-                // converters need the adapter the connector config resolved. Debezium 2.6 dropped
-                // the ParsingErrorHandler argument in favour of EventConvertingFailureHandlingMode,
-                // which this constructor defaults to WARN - the previous behaviour.
-                dbzMySqlConfig.getConnectorAdapter());
+                // Debezium 2.6 replaced the ParsingErrorHandler argument with
+                // EventConvertingFailureHandlingMode; 2.7 additionally passes the service registry.
+                dbzMySqlConfig.getEventConvertingFailureHandlingMode(),
+                dbzMySqlConfig.getServiceRegistry());
     }
 
     public static List<TableId> discoverCapturedTables(
@@ -227,7 +229,7 @@ public class DebeziumUtils {
         return !"0"
                 .equals(
                         readMySqlSystemVariables(connection)
-                                .get(MySqlSystemVariables.LOWER_CASE_TABLE_NAMES));
+                                .get(BinlogSystemVariables.LOWER_CASE_TABLE_NAMES));
     }
 
     public static Map<String, String> readMySqlSystemVariables(JdbcConnection connection) {
