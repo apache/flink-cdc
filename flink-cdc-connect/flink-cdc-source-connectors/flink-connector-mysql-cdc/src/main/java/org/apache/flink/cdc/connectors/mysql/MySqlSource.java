@@ -180,6 +180,10 @@ public class MySqlSource {
             props.setProperty("database.password", checkNotNull(password));
             props.setProperty("database.port", String.valueOf(port));
             props.setProperty("schema.history.internal.skip.unparseable.ddl", String.valueOf(true));
+            // Debezium 2.3 changed the default of "database.ssl.mode" from "disabled" to
+            // "preferred". Keep the historical Flink CDC behavior (plain connections unless the
+            // user asks for TLS); user-supplied debezium properties below still override it.
+            props.setProperty("database.ssl.mode", "disabled");
             // debezium use "long" mode to handle unsigned bigint by default,
             // but it'll cause lose of precise when the value is larger than 2^63,
             // so use "precise" mode to avoid it.

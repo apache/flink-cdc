@@ -157,7 +157,7 @@ public class Db2SourceFetchTaskContext extends JdbcSourceFetchTaskContext {
         this.streamingChangeEventSourceMetrics =
                 changeEventSourceMetricsFactory.getStreamingMetrics(
                         taskContext, queue, metadataProvider);
-        this.errorHandler = new ErrorHandler(Db2Connector.class, connectorConfig, queue);
+        this.errorHandler = new ErrorHandler(Db2Connector.class, connectorConfig, queue, null);
     }
 
     /** Loads the connector's persistent offset (if present) via the given loader. */

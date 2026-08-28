@@ -327,7 +327,7 @@ public class OracleScanFetchTask extends AbstractScanFetchTask {
                 Object[] row) {
             snapshotContext.offset.event(tableId, clock.currentTime());
             return new SnapshotChangeRecordEmitter<>(
-                    snapshotContext.partition, snapshotContext.offset, row, clock);
+                    snapshotContext.partition, snapshotContext.offset, row, clock, connectorConfig);
         }
 
         private Threads.Timer getTableScanLogTimer() {

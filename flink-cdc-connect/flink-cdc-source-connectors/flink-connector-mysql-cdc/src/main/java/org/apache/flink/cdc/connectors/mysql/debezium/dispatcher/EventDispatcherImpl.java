@@ -28,6 +28,7 @@ import io.debezium.pipeline.EventDispatcher;
 import io.debezium.pipeline.source.snapshot.incremental.IncrementalSnapshotChangeEventSource;
 import io.debezium.pipeline.source.spi.EventMetadataProvider;
 import io.debezium.pipeline.spi.ChangeEventCreator;
+import io.debezium.pipeline.spi.OffsetContext;
 import io.debezium.pipeline.spi.SchemaChangeEventEmitter;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.HistoryRecord;
@@ -139,6 +140,7 @@ public class EventDispatcherImpl<T extends DataCollectionId>
     @Override
     public void dispatchSchemaChangeEvent(
             MySqlPartition partition,
+            OffsetContext offsetContext,
             T dataCollectionId,
             SchemaChangeEventEmitter schemaChangeEventEmitter)
             throws InterruptedException {
@@ -152,7 +154,7 @@ public class EventDispatcherImpl<T extends DataCollectionId>
         IncrementalSnapshotChangeEventSource<MySqlPartition, T> incrementalEventSource =
                 getIncrementalSnapshotChangeEventSource();
         if (incrementalEventSource != null) {
-            incrementalEventSource.processSchemaChange(partition, dataCollectionId);
+            incrementalEventSource.processSchemaChange(partition, offsetContext, dataCollectionId);
         }
     }
 

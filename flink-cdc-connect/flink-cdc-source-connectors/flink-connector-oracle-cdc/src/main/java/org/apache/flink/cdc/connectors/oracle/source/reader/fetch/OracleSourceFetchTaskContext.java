@@ -168,7 +168,7 @@ public class OracleSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                 (OracleStreamingChangeEventSourceMetrics)
                         changeEventSourceMetricsFactory.getStreamingMetrics(
                                 taskContext, queue, metadataProvider);
-        this.errorHandler = new OracleErrorHandler(connectorConfig, queue);
+        this.errorHandler = new OracleErrorHandler(connectorConfig, queue, null);
     }
 
     @Override

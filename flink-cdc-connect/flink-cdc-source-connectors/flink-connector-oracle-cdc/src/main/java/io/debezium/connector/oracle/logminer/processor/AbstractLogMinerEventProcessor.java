@@ -308,7 +308,9 @@ public abstract class AbstractLogMinerEventProcessor<T extends AbstractTransacti
         // If the reference isn't included, the row will be skipped entirely.
         if (row.getTableId() != null) {
             if (LogWriterFlushStrategy.isFlushTable(
-                    row.getTableId(), connectorConfig.getJdbcConfig().getUser())) {
+                    row.getTableId(),
+                    connectorConfig.getJdbcConfig().getUser(),
+                    connectorConfig.getLogMiningFlushTableName())) {
                 LOGGER.trace("Skipped change associated with flush table '{}'", row.getTableId());
                 return;
             }
@@ -709,6 +711,7 @@ public abstract class AbstractLogMinerEventProcessor<T extends AbstractTransacti
             offsetContext.setRedoThread(row.getThread());
             dispatcher.dispatchSchemaChangeEvent(
                     partition,
+                    offsetContext,
                     tableId,
                     new OracleSchemaChangeEventEmitter(
                             getConfig(),
@@ -1077,6 +1080,7 @@ public abstract class AbstractLogMinerEventProcessor<T extends AbstractTransacti
         offsetContext.event(tableId, Instant.now());
         dispatcher.dispatchSchemaChangeEvent(
                 partition,
+                offsetContext,
                 tableId,
                 new OracleSchemaChangeEventEmitter(
                         connectorConfig,

@@ -343,7 +343,11 @@ public class PostgresScanFetchTask extends AbstractScanFetchTask {
                     snapshotContext.offset.event(table.id(), clock.currentTime());
                     SnapshotChangeRecordEmitter<PostgresPartition> emitter =
                             new SnapshotChangeRecordEmitter<>(
-                                    snapshotContext.partition, snapshotContext.offset, row, clock);
+                                    snapshotContext.partition,
+                                    snapshotContext.offset,
+                                    row,
+                                    clock,
+                                    sourceConfig.getDbzConnectorConfig());
                     eventDispatcher.dispatchSnapshotEvent(
                             snapshotContext.partition, table.id(), emitter, snapshotReceiver);
                 }

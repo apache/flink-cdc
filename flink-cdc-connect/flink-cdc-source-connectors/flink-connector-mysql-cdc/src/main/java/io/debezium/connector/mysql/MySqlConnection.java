@@ -633,6 +633,13 @@ public class MySqlConnection extends JdbcConnection {
             jdbcConfigBuilder.with(
                     JDBC_PROPERTY_CONNECTION_TIME_ZONE, determineConnectionTimeZone(dbConfig));
 
+            // Set and remove options to prevent potential vulnerabilities
+            jdbcConfigBuilder
+                    .with("allowLoadLocalInfile", "false")
+                    .with("allowUrlInLocalInfile", "false")
+                    .with("autoDeserialize", false)
+                    .without("queryInterceptors");
+
             this.jdbcConfig = JdbcConfiguration.adapt(jdbcConfigBuilder.build());
             String driverClassName = this.jdbcConfig.getString(MySqlConnectorConfig.JDBC_DRIVER);
             this.urlPattern = formatJdbcUrl(jdbcProperties);

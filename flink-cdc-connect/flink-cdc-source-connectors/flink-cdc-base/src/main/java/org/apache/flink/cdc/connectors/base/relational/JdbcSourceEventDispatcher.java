@@ -32,6 +32,7 @@ import io.debezium.pipeline.EventDispatcher;
 import io.debezium.pipeline.source.snapshot.incremental.IncrementalSnapshotChangeEventSource;
 import io.debezium.pipeline.source.spi.EventMetadataProvider;
 import io.debezium.pipeline.spi.ChangeEventCreator;
+import io.debezium.pipeline.spi.OffsetContext;
 import io.debezium.pipeline.spi.Partition;
 import io.debezium.pipeline.spi.SchemaChangeEventEmitter;
 import io.debezium.relational.TableId;
@@ -139,6 +140,7 @@ public class JdbcSourceEventDispatcher<P extends Partition> extends EventDispatc
     @Override
     public void dispatchSchemaChangeEvent(
             P partition,
+            OffsetContext offsetContext,
             TableId dataCollectionId,
             SchemaChangeEventEmitter schemaChangeEventEmitter)
             throws InterruptedException {
@@ -152,7 +154,7 @@ public class JdbcSourceEventDispatcher<P extends Partition> extends EventDispatc
         IncrementalSnapshotChangeEventSource<P, TableId> incrementalEventSource =
                 getIncrementalSnapshotChangeEventSource();
         if (incrementalEventSource != null) {
-            incrementalEventSource.processSchemaChange(partition, dataCollectionId);
+            incrementalEventSource.processSchemaChange(partition, offsetContext, dataCollectionId);
         }
     }
 

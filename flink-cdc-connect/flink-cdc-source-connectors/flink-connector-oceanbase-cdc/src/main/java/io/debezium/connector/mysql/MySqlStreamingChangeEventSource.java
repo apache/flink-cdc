@@ -85,7 +85,7 @@ import java.util.function.Predicate;
 import static io.debezium.util.Strings.isNullOrEmpty;
 
 /**
- * Copied from Debezium 2.2.1.Final (via the flink-connector-mysql-cdc fork).
+ * Copied from Debezium 2.3.7.Final (via the flink-connector-mysql-cdc fork).
  *
  * <p>Flink CDC patches: GTID new-channel-position handling driven by the {@code
  * gtid.new.channel.position} pass-through property (Debezium 2.0 removed the config enum); the O(n)
@@ -708,10 +708,11 @@ public class MySqlStreamingChangeEventSource
                                     Operation.TRUNCATE,
                                     null,
                                     null,
-                                    connectorConfig.skipMessagesWithoutChange()));
+                                    connectorConfig));
                 }
                 eventDispatcher.dispatchSchemaChangeEvent(
                         partition,
+                        offsetContext,
                         tableId,
                         (receiver) -> {
                             try {
@@ -923,7 +924,7 @@ public class MySqlStreamingChangeEventSource
                                         Operation.CREATE,
                                         null,
                                         row,
-                                        connectorConfig.skipMessagesWithoutChange())));
+                                        connectorConfig)));
     }
 
     /**
@@ -955,7 +956,7 @@ public class MySqlStreamingChangeEventSource
                                         Operation.UPDATE,
                                         row.getKey(),
                                         row.getValue(),
-                                        connectorConfig.skipMessagesWithoutChange())));
+                                        connectorConfig)));
     }
 
     /**
@@ -987,7 +988,7 @@ public class MySqlStreamingChangeEventSource
                                         Operation.DELETE,
                                         row,
                                         null,
-                                        connectorConfig.skipMessagesWithoutChange())));
+                                        connectorConfig)));
     }
 
     private <T extends EventData, U> void handleChange(

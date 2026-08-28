@@ -36,8 +36,10 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -203,5 +205,15 @@ public class FlinkOffsetBackingStore implements OffsetBackingStore {
                     }
                     return null;
                 });
+    }
+
+    /**
+     * Added in Kafka Connect 3.5 (KAFKA-14304) for exactly-once source support and the offset-reset
+     * REST endpoint. Neither code path is exercised by the Flink embedded engine, which drives
+     * offsets through Flink state, so an empty set is a safe no-op.
+     */
+    @Override
+    public Set<Map<String, Object>> connectorPartitions(String connectorName) {
+        return Collections.emptySet();
     }
 }

@@ -72,6 +72,7 @@ public class MySqlSnapshotSplitReadTask
     private static final Duration LOG_INTERVAL = Duration.ofMillis(10_000);
 
     private final MySqlSourceConfig sourceConfig;
+    private final MySqlConnectorConfig connectorConfig;
     private final MySqlDatabaseSchema databaseSchema;
     private final MySqlConnection jdbcConnection;
     private final EventDispatcherImpl<TableId> dispatcher;
@@ -99,6 +100,7 @@ public class MySqlSnapshotSplitReadTask
             boolean isBackfillSkipped) {
         super(connectorConfig, snapshotChangeEventSourceMetrics);
         this.sourceConfig = sourceConfig;
+        this.connectorConfig = connectorConfig;
         this.databaseSchema = databaseSchema;
         this.jdbcConnection = jdbcConnection;
         this.dispatcher = dispatcher;
@@ -309,7 +311,7 @@ public class MySqlSnapshotSplitReadTask
             MySqlSnapshotContext snapshotContext, TableId tableId, Object[] row) {
         snapshotContext.offset.event(tableId, clock.currentTime());
         return new SnapshotChangeRecordEmitter<>(
-                snapshotContext.partition, snapshotContext.offset, row, clock);
+                snapshotContext.partition, snapshotContext.offset, row, clock, connectorConfig);
     }
 
     private Threads.Timer getTableScanLogTimer() {
