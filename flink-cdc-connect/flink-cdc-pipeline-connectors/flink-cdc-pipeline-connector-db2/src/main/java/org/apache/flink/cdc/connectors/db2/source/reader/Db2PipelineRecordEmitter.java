@@ -26,16 +26,20 @@ import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitState;
 import org.apache.flink.cdc.connectors.base.source.metrics.SourceReaderMetrics;
 import org.apache.flink.cdc.connectors.base.source.reader.IncrementalSourceRecordEmitter;
 import org.apache.flink.cdc.connectors.db2.source.config.Db2SourceConfig;
+import org.apache.flink.cdc.connectors.db2.source.dialect.Db2Dialect;
 import org.apache.flink.cdc.connectors.db2.utils.Db2SchemaUtils;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.cdc.debezium.event.DebeziumEventDeserializationSchema;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
 
+import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.history.TableChanges.TableChange;
 import org.apache.kafka.connect.source.SourceRecord;
 
+import java.sql.SQLException;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 import static org.apache.flink.cdc.connectors.base.source.meta.wartermark.WatermarkEvent.isLowWatermarkEvent;
@@ -45,6 +49,9 @@ import static org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils.isSch
 
 /** The {@link RecordEmitter} implementation for Db2 pipeline connector. */
 public class Db2PipelineRecordEmitter<T> extends IncrementalSourceRecordEmitter<T> {
+
+    private final Db2SourceConfig sourceConfig;
+    private final Db2Dialect dataSourceDialect;
 
     // Track tables that have already sent CreateTableEvent
     private final Set<io.debezium.relational.TableId> alreadySendCreateTableTables;
@@ -62,6 +69,8 @@ public class Db2PipelineRecordEmitter<T> extends IncrementalSourceRecordEmitter<
                 sourceReaderMetrics,
                 sourceConfig.isIncludeSchemaChanges(),
                 offsetFactory);
+        this.sourceConfig = sourceConfig;
+        this.dataSourceDialect = new Db2Dialect(sourceConfig);
         this.alreadySendCreateTableTables = new HashSet<>();
         this.createTableEventCache =
                 ((DebeziumEventDeserializationSchema) debeziumDeserializationSchema)
@@ -105,15 +114,67 @@ public class Db2PipelineRecordEmitter<T> extends IncrementalSourceRecordEmitter<
         }
 
         cacheCreateTableEventsFromSchemas(splitState.toSourceSplit().getTableSchemas());
+        output.collect((T) getOrCreateCreateTableEvent(tableId, splitState));
+        alreadySendCreateTableTables.add(tableId);
+    }
+
+    private CreateTableEvent getOrCreateCreateTableEvent(
+            io.debezium.relational.TableId tableId, SourceSplitState splitState) {
         CreateTableEvent createTableEvent = createTableEventCache.get(tableId);
         if (createTableEvent == null) {
-            throw new IllegalStateException(
-                    "Missing CreateTableEvent for table "
-                            + tableId
-                            + ". Table schema should have been restored before processing records.");
+            createTableEvent = getCreateTableEventFromSplit(tableId, splitState);
         }
-        output.collect((T) createTableEvent);
-        alreadySendCreateTableTables.add(tableId);
+        if (createTableEvent == null) {
+            createTableEvent = getCreateTableEventFromDatabase(tableId);
+        }
+        createTableEventCache.put(tableId, createTableEvent);
+        return createTableEvent;
+    }
+
+    private CreateTableEvent getCreateTableEventFromSplit(
+            io.debezium.relational.TableId tableId, SourceSplitState splitState) {
+        Map<io.debezium.relational.TableId, TableChange> tableSchemas =
+                splitState.toSourceSplit().getTableSchemas();
+        if (tableSchemas == null || tableSchemas.isEmpty()) {
+            return null;
+        }
+        TableChange tableChange = tableSchemas.get(tableId);
+        if (tableChange == null) {
+            // The catalog carried by a split comes from the Db2 system catalog (e.g. "TESTDB"),
+            // while Debezium reports the configured database name in source records (e.g.
+            // "testdb"). The two may differ in case, so fall back to matching on schema and
+            // table name only.
+            for (Map.Entry<io.debezium.relational.TableId, TableChange> entry :
+                    tableSchemas.entrySet()) {
+                if (matchesIgnoringCatalog(entry.getKey(), tableId)) {
+                    tableChange = entry.getValue();
+                    break;
+                }
+            }
+        }
+        if (tableChange == null || tableChange.getTable() == null) {
+            return null;
+        }
+        return buildCreateTableEvent(tableId, Db2SchemaUtils.toSchema(tableChange.getTable()));
+    }
+
+    /** Last resort: read the current table schema from the database itself. */
+    private CreateTableEvent getCreateTableEventFromDatabase(
+            io.debezium.relational.TableId tableId) {
+        org.apache.flink.cdc.common.event.TableId cdcTableId = Db2SchemaUtils.toCdcTableId(tableId);
+        try (JdbcConnection jdbc = dataSourceDialect.openJdbcConnection(sourceConfig)) {
+            return buildCreateTableEvent(
+                    tableId, Db2SchemaUtils.getTableSchema(cdcTableId, jdbc, dataSourceDialect));
+        } catch (SQLException e) {
+            throw new RuntimeException(
+                    "Cannot fetch table schema from database for " + cdcTableId, e);
+        }
+    }
+
+    private static boolean matchesIgnoringCatalog(
+            io.debezium.relational.TableId left, io.debezium.relational.TableId right) {
+        return Objects.equals(left.schema(), right.schema())
+                && Objects.equals(left.table(), right.table());
     }
 
     private void cacheCreateTableEventsFromSchemas(
