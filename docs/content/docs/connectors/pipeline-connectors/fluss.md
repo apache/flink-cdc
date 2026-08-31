@@ -105,7 +105,7 @@ Pipeline Connector Options
       <td>optional</td>
       <td style="word-wrap: break-word;">DEFAULT</td>
       <td>String</td>
-      <td>The partitioning strategy for DataChangeEvent routing. Available values are <code>DEFAULT</code> and <code>FORWARD</code>. <code>DEFAULT</code> hashes primary key tables by primary keys and routes log tables in round-robin mode. <code>FORWARD</code> routes data events to downstream subtasks with the same indices as upstream and is intended for Fluss-to-Fluss data synchronization. The upstream data distribution must match the Fluss table bucket distribution; otherwise, data correctness issues may occur.</td>
+      <td>The partitioning strategy for DataChangeEvent routing. Available values are <code>DEFAULT</code> and <code>FORWARD</code>. <code>DEFAULT</code> hashes primary key tables by primary keys and randomly distributes log table events across downstream subtasks for balanced load. <code>FORWARD</code> routes data events to downstream subtasks with the same indices as upstream and is intended for Fluss-to-Fluss data synchronization. The upstream data distribution must match the Fluss table bucket distribution; otherwise, data correctness issues may occur.</td>
     </tr>
     <tr>
       <td>bucket.key</td>

@@ -23,6 +23,7 @@ import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.function.HashFunction;
+import org.apache.flink.cdc.common.function.HashFunction.HashContext;
 import org.apache.flink.cdc.common.function.HashFunctionProvider;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.runtime.operators.AbstractStreamOperatorAdapter;
@@ -56,7 +57,7 @@ public class BatchRegularPrePartitionOperator
 
     private transient Map<TableId, HashFunction<DataChangeEvent>> cachedHashFunctions;
     private transient volatile Map<TableId, Schema> originalSchemaMap;
-    private transient int subTaskId;
+    private transient HashContext hashContext;
 
     public BatchRegularPrePartitionOperator(
             int downstreamParallelism, HashFunctionProvider<DataChangeEvent> hashFunctionProvider) {
@@ -70,7 +71,10 @@ public class BatchRegularPrePartitionOperator
         super.open();
         cachedHashFunctions = new HashMap<>();
         originalSchemaMap = new HashMap<>();
-        subTaskId = getRuntimeContext().getTaskInfo().getIndexOfThisSubtask();
+        hashContext =
+                HashFunction.createContext(
+                        getRuntimeContext().getTaskInfo().getIndexOfThisSubtask(),
+                        downstreamParallelism);
     }
 
     @Override
@@ -97,7 +101,7 @@ public class BatchRegularPrePartitionOperator
                                 dataChangeEvent,
                                 cachedHashFunctions
                                                 .get(dataChangeEvent.tableId())
-                                                .hashcode(subTaskId, dataChangeEvent)
+                                                .hashcode(hashContext, dataChangeEvent)
                                         % downstreamParallelism)));
     }
 

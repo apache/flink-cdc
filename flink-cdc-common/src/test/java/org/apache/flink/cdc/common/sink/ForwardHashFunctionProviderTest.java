@@ -26,6 +26,7 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Unit tests for {@link ForwardHashFunctionProvider}. */
 class ForwardHashFunctionProviderTest {
@@ -38,6 +39,19 @@ class ForwardHashFunctionProviderTest {
                 new ForwardHashFunctionProvider()
                         .getHashFunction(event.tableId(), Schema.newBuilder().build());
 
-        assertThat(hashFunction.hashcode(3, event)).isEqualTo(3);
+        assertThat(hashFunction.hashcode(HashFunction.createContext(3, 5), event)).isEqualTo(3);
+    }
+
+    @Test
+    void testHashingWithoutContextFails() {
+        DataChangeEvent event =
+                DataChangeEvent.insertEvent(TableId.tableId("customers"), GenericRecordData.of(1));
+        HashFunction<DataChangeEvent> hashFunction =
+                new ForwardHashFunctionProvider()
+                        .getHashFunction(event.tableId(), Schema.newBuilder().build());
+
+        assertThatThrownBy(() -> hashFunction.hashcode(event))
+                .isInstanceOf(UnsupportedOperationException.class)
+                .hasMessageContaining("HashContext");
     }
 }

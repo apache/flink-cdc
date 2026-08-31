@@ -104,7 +104,7 @@ Pipeline Connector Options
       <td>optional</td>
       <td style="word-wrap: break-word;">DEFAULT</td>
       <td>String</td>
-      <td>DataChangeEvent 路由使用的分区策略。可选值为 <code>DEFAULT</code> 和 <code>FORWARD</code>。<code>DEFAULT</code> 对主键表按主键 hash，对 log 表采用 round-robin。<code>FORWARD</code> 将数据事件发送到与上游 subtask 索引相同的下游 subtask，用于 Fluss 到 Fluss 的数据同步。上游数据分布必须与 Fluss 表的分桶策略保持一致，否则可能出现数据正确性问题。</td>
+      <td>DataChangeEvent 路由使用的分区策略。可选值为 <code>DEFAULT</code> 和 <code>FORWARD</code>。<code>DEFAULT</code> 对主键表按主键进行哈希分区，对日志表采用随机分发，将事件分散到各下游 subtask 以实现负载均衡。<code>FORWARD</code> 将数据事件发送到与上游 subtask 索引相同的下游 subtask，用于 Fluss 到 Fluss 的数据同步。上游数据分布必须与 Fluss 表的分桶策略保持一致，否则可能出现数据正确性问题。</td>
     </tr>
     <tr>
       <td>bucket.key</td>

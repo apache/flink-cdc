@@ -21,6 +21,7 @@ import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.function.HashFunction;
+import org.apache.flink.cdc.common.function.HashFunction.HashContext;
 import org.apache.flink.cdc.common.function.HashFunctionProvider;
 import org.apache.flink.cdc.common.schema.Schema;
 
@@ -41,12 +42,13 @@ public class ForwardHashFunctionProvider implements HashFunctionProvider<DataCha
 
         @Override
         public int hashcode(DataChangeEvent event) {
-            return 0;
+            throw new UnsupportedOperationException(
+                    "Forward hash function requires a HashContext.");
         }
 
         @Override
-        public int hashcode(int sourceIndex, DataChangeEvent event) {
-            return sourceIndex;
+        public int hashcode(HashContext context, DataChangeEvent event) {
+            return context.getSourceSubtaskIndex();
         }
     }
 }

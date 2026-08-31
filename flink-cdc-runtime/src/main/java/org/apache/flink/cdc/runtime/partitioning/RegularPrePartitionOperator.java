@@ -24,6 +24,7 @@ import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.function.HashFunction;
+import org.apache.flink.cdc.common.function.HashFunction.HashContext;
 import org.apache.flink.cdc.common.function.HashFunctionProvider;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.runtime.operators.AbstractStreamOperatorAdapter;
@@ -62,7 +63,7 @@ public class RegularPrePartitionOperator extends AbstractStreamOperatorAdapter<P
 
     private transient SchemaEvolutionClient schemaEvolutionClient;
     private transient LoadingCache<TableId, HashFunction<DataChangeEvent>> cachedHashFunctions;
-    private transient int subTaskId;
+    private transient HashContext hashContext;
 
     public RegularPrePartitionOperator(
             OperatorID schemaOperatorId,
@@ -81,7 +82,10 @@ public class RegularPrePartitionOperator extends AbstractStreamOperatorAdapter<P
                 getContainingTask().getEnvironment().getOperatorCoordinatorEventGateway();
         schemaEvolutionClient = new SchemaEvolutionClient(toCoordinator, schemaOperatorId);
         cachedHashFunctions = createCache();
-        subTaskId = getRuntimeContext().getTaskInfo().getIndexOfThisSubtask();
+        hashContext =
+                HashFunction.createContext(
+                        getRuntimeContext().getTaskInfo().getIndexOfThisSubtask(),
+                        downstreamParallelism);
     }
 
     @Override
@@ -109,7 +113,7 @@ public class RegularPrePartitionOperator extends AbstractStreamOperatorAdapter<P
                                 dataChangeEvent,
                                 cachedHashFunctions
                                                 .get(dataChangeEvent.tableId())
-                                                .hashcode(subTaskId, dataChangeEvent)
+                                                .hashcode(hashContext, dataChangeEvent)
                                         % downstreamParallelism)));
     }
 

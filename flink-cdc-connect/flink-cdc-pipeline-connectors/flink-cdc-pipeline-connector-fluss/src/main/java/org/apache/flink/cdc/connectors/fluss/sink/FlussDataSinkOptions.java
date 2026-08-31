@@ -39,7 +39,7 @@ public class FlussDataSinkOptions {
                     .defaultValue(SinkPartitioningStrategy.DEFAULT)
                     .withDescription(
                             "Partitioning strategy for DataChangeEvent routing. "
-                                    + "DEFAULT hashes primary key tables by primary keys and routes log tables in round-robin mode. "
+                                    + "DEFAULT hashes primary key tables by primary keys and randomly distributes log table events across downstream subtasks for balanced load. "
                                     + "FORWARD routes data events to downstream subtasks with the same indices as upstream. "
                                     + "FORWARD is intended for Fluss-to-Fluss data synchronization. "
                                     + "The upstream data distribution must match the Fluss table bucket distribution; otherwise, data correctness issues may occur.");
