@@ -25,6 +25,7 @@ import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
+import org.apache.flink.cdc.common.event.ReorderColumnEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
@@ -43,6 +44,7 @@ import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.function.Function;
@@ -221,6 +223,71 @@ public class SchemaEvolveTest extends SchemaTestBase {
                         genInsert(TABLE_ID, "ISDSBS", 6, "Ferris", 0.001, null, false, null),
                         new FlushEvent(
                                 0, Collections.singletonList(TABLE_ID), dropTableEvent.getType()));
+    }
+
+    @Test
+    void testDistributedSchemaMergeDoesNotEmitReorder() throws Exception {
+        TableId sourceTable1 = TableId.parse("db_3.table_1");
+        TableId sourceTable2 = TableId.parse("db_3.table_2");
+        TableId sinkTable = TableId.parse("db_3.table_merged");
+        CreateTableEvent createTableEvent1 = new CreateTableEvent(sourceTable1, INITIAL_SCHEMA);
+        CreateTableEvent createTableEvent2 = new CreateTableEvent(sourceTable2, INITIAL_SCHEMA);
+        ReorderColumnEvent reorderColumnEvent =
+                new ReorderColumnEvent(
+                        sourceTable1,
+                        Arrays.asList(
+                                ReorderColumnEvent.ColumnMove.first("notes"),
+                                ReorderColumnEvent.ColumnMove.after("id", "name")));
+
+        Assertions.assertThat(
+                        runInHarness(
+                                () ->
+                                        new SchemaOperator(
+                                                ROUTING_RULES,
+                                                RouteMode.ALL_MATCH,
+                                                Duration.ofMinutes(3),
+                                                SchemaChangeBehavior.LENIENT,
+                                                "UTC"),
+                                (op) ->
+                                        new DistributedEventOperatorTestHarness<>(
+                                                op,
+                                                20,
+                                                ROUTING_RULES,
+                                                Duration.ofSeconds(3),
+                                                Duration.ofMinutes(3)),
+                                (operator, harness) -> {
+                                    operator.processElement(wrap(createTableEvent1));
+                                    operator.processElement(wrap(createTableEvent2));
+                                    operator.processElement(wrap(reorderColumnEvent));
+                                    operator.processElement(
+                                            wrap(
+                                                    genInsert(
+                                                            sourceTable1,
+                                                            "SSIF",
+                                                            "new notes",
+                                                            "Alice",
+                                                            1,
+                                                            17.1828f)));
+                                    Assertions.assertThat(harness.getLatestEvolvedSchema(sinkTable))
+                                            .isEqualTo(INITIAL_SCHEMA);
+                                    Assertions.assertThat(harness.isJobFailed()).isFalse();
+                                }))
+                .map(StreamRecord::getValue)
+                .containsExactly(
+                        new FlushEvent(
+                                0,
+                                Collections.singletonList(sinkTable),
+                                createTableEvent1.getType()),
+                        new CreateTableEvent(sinkTable, INITIAL_SCHEMA),
+                        new FlushEvent(
+                                0,
+                                Collections.singletonList(sinkTable),
+                                createTableEvent2.getType()),
+                        new FlushEvent(
+                                0,
+                                Collections.singletonList(sinkTable),
+                                reorderColumnEvent.getType()),
+                        genInsert(sinkTable, "ISFS", 1, "Alice", 17.1828f, "new notes"));
     }
 
     @Test

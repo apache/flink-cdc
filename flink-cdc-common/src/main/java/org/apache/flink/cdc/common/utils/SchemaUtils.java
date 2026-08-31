@@ -22,8 +22,10 @@ import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
+import org.apache.flink.cdc.common.event.ColumnPosition;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
+import org.apache.flink.cdc.common.event.ReorderColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.visitor.SchemaChangeEventVisitor;
 import org.apache.flink.cdc.common.schema.Column;
@@ -118,7 +120,8 @@ public class SchemaUtils {
                 dropTableEvent -> schema,
                 renameColumnEvent -> applyRenameColumnEvent(renameColumnEvent, schema),
                 truncateTableEvent -> schema,
-                alterTableCommentEvent -> schema.copy(alterTableCommentEvent.getComment()));
+                alterTableCommentEvent -> schema.copy(alterTableCommentEvent.getComment()),
+                reorderColumnEvent -> applyReorderColumnEvent(reorderColumnEvent, schema));
     }
 
     private static Schema applyAddColumnEvent(AddColumnEvent event, Schema oldSchema) {
@@ -186,6 +189,75 @@ public class SchemaUtils {
         return oldSchema.copy(columns);
     }
 
+    private static Schema applyReorderColumnEvent(ReorderColumnEvent event, Schema oldSchema) {
+        LinkedList<Column> columns = new LinkedList<>(oldSchema.getColumns());
+        for (ReorderColumnEvent.ColumnMove move : event.getColumnMoves()) {
+            moveColumn(columns, move, event);
+        }
+        return oldSchema.copy(columns);
+    }
+
+    private static void moveColumn(
+            LinkedList<Column> columns,
+            ReorderColumnEvent.ColumnMove move,
+            ReorderColumnEvent event) {
+        Column column = removeMovedColumn(columns, move, event);
+        switch (move.getPosition()) {
+            case FIRST:
+                columns.addFirst(column);
+                return;
+            case LAST:
+                columns.addLast(column);
+                return;
+            case BEFORE:
+                insertColumnRelative(columns, column, move, event, false);
+                return;
+            case AFTER:
+                insertColumnRelative(columns, column, move, event, true);
+                return;
+            default:
+                throw new IllegalArgumentException(
+                        String.format(
+                                "Unable to apply ReorderColumnEvent %s: unsupported position %s",
+                                event, move.getPosition()));
+        }
+    }
+
+    private static Column removeMovedColumn(
+            LinkedList<Column> columns,
+            ReorderColumnEvent.ColumnMove move,
+            ReorderColumnEvent event) {
+        for (int i = 0; i < columns.size(); i++) {
+            Column candidate = columns.get(i);
+            if (candidate.getName().equals(move.getColumnName())) {
+                columns.remove(i);
+                return candidate;
+            }
+        }
+        throw new IllegalArgumentException(
+                String.format(
+                        "Unable to apply ReorderColumnEvent %s: column %s does not exist",
+                        event, move.getColumnName()));
+    }
+
+    private static void insertColumnRelative(
+            LinkedList<Column> columns,
+            Column column,
+            ReorderColumnEvent.ColumnMove move,
+            ReorderColumnEvent event,
+            boolean after) {
+        List<String> columnNames =
+                columns.stream().map(Column::getName).collect(Collectors.toList());
+        int index = columnNames.indexOf(move.getReferenceColumnName());
+        if (index < 0) {
+            throw new IllegalArgumentException(
+                    String.format(
+                            "Unable to apply ReorderColumnEvent %s: referenced column %s does not exist",
+                            event, move.getReferenceColumnName()));
+        }
+        columns.add(after ? index + 1 : index, column);
+    }
+
     private static Schema applyRenameColumnEvent(RenameColumnEvent event, Schema oldSchema) {
         List<Column> columns = new ArrayList<>();
         oldSchema
@@ -249,22 +321,17 @@ public class SchemaUtils {
                                 .getAddedColumns().stream()
                                         .map(
                                                 e -> {
-                                                    if (AddColumnEvent.ColumnPosition.LAST.equals(
-                                                            e.getPosition())) {
-                                                        return new AddColumnEvent
-                                                                .ColumnWithPosition(
+                                                    if (ColumnPosition.LAST.equals(
+                                                            e.getColumnPosition())) {
+                                                        return AddColumnEvent.after(
                                                                 e.getAddColumn(),
-                                                                AddColumnEvent.ColumnPosition.AFTER,
                                                                 referencedColumns.get(
                                                                         referencedColumns.size()
                                                                                 - 1));
-                                                    } else if (AddColumnEvent.ColumnPosition.FIRST
-                                                            .equals(e.getPosition())) {
-                                                        return new AddColumnEvent
-                                                                .ColumnWithPosition(
+                                                    } else if (ColumnPosition.FIRST.equals(
+                                                            e.getColumnPosition())) {
+                                                        return AddColumnEvent.before(
                                                                 e.getAddColumn(),
-                                                                AddColumnEvent.ColumnPosition
-                                                                        .BEFORE,
                                                                 referencedColumns.get(0));
                                                     } else {
                                                         return e;
@@ -306,6 +373,10 @@ public class SchemaUtils {
                 evolvedSchemaChangeEvent = Optional.of(event);
             }
         } else if (event instanceof DropColumnEvent) {
+            if (hasAsterisk) {
+                evolvedSchemaChangeEvent = Optional.of(event);
+            }
+        } else if (event instanceof ReorderColumnEvent) {
             if (hasAsterisk) {
                 evolvedSchemaChangeEvent = Optional.of(event);
             }
@@ -408,6 +479,20 @@ public class SchemaUtils {
                             // We have no way to ensure if a AlterTableCommentEvent has been applied
                             // before. Just assume it's not.
                             return false;
+                        },
+                        reorderColumnEvent -> {
+                            if (!latestSchema.isPresent()) {
+                                return false;
+                            }
+                            try {
+                                return latestSchema
+                                        .get()
+                                        .equals(
+                                                applyReorderColumnEvent(
+                                                        reorderColumnEvent, latestSchema.get()));
+                            } catch (IllegalArgumentException e) {
+                                return false;
+                            }
                         }));
     }
 

@@ -225,15 +225,10 @@ public class SchemaMergingUtils {
                 beforeColumns.remove(columnName);
             } else {
                 if (afterWhichColumnPosition == null) {
-                    appendedColumns.add(
-                            new AddColumnEvent.ColumnWithPosition(
-                                    afterColumn, AddColumnEvent.ColumnPosition.FIRST, null));
+                    appendedColumns.add(AddColumnEvent.first(afterColumn));
                 } else {
                     appendedColumns.add(
-                            new AddColumnEvent.ColumnWithPosition(
-                                    afterColumn,
-                                    AddColumnEvent.ColumnPosition.AFTER,
-                                    afterWhichColumnPosition));
+                            AddColumnEvent.after(afterColumn, afterWhichColumnPosition));
                 }
             }
             afterWhichColumnPosition = afterColumn.getName();

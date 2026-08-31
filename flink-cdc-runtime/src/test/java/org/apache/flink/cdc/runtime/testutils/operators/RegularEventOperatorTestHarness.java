@@ -67,6 +67,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
@@ -101,6 +102,7 @@ public class RegularEventOperatorTestHarness<
     private final int numOutputs;
     private final SchemaCoordinator schemaRegistry;
     private final TestingSchemaRegistryGateway schemaRegistryGateway;
+    private final CollectingMetadataApplier metadataApplier;
     private final LinkedList<StreamRecord<E>> outputRecords = new LinkedList<>();
     private final MockedOperatorCoordinatorContext mockedContext;
 
@@ -117,13 +119,15 @@ public class RegularEventOperatorTestHarness<
         this.mockedContext =
                 new MockedOperatorCoordinatorContext(
                         SCHEMA_OPERATOR_ID, Thread.currentThread().getContextClassLoader());
+        metadataApplier =
+                new CollectingMetadataApplier(
+                        schemaEvolveDuration, enabledEventTypes, errorsOnEventTypes);
         schemaRegistry =
                 new SchemaCoordinator(
                         "SchemaOperator",
                         mockedContext,
                         Executors.newFixedThreadPool(1),
-                        new CollectingMetadataApplier(
-                                schemaEvolveDuration, enabledEventTypes, errorsOnEventTypes),
+                        metadataApplier,
                         new ArrayList<>(),
                         RouteMode.ALL_MATCH,
                         behavior,
@@ -220,6 +224,11 @@ public class RegularEventOperatorTestHarness<
 
     public void clearOutputRecords() {
         outputRecords.clear();
+    }
+
+    public List<SchemaChangeEvent> getAttemptedSchemaChangeEvents() {
+        return Collections.unmodifiableList(
+                new ArrayList<>(metadataApplier.getSchemaChangeEvents()));
     }
 
     public OP getOperator() {

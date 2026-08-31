@@ -17,7 +17,9 @@
 
 package org.apache.flink.cdc.connectors.maxcompute;
 
+import org.apache.flink.cdc.common.event.ReorderColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
+import org.apache.flink.cdc.common.exceptions.UnsupportedSchemaChangeEventException;
 
 import org.junit.jupiter.api.Test;
 
@@ -45,5 +47,19 @@ class MaxComputeMetadataApplierTest {
                 .isFalse();
         assertThat(applier.acceptsSchemaEvolutionType(SchemaChangeEventType.DROP_TABLE)).isFalse();
         assertThat(applier.acceptsSchemaEvolutionType(SchemaChangeEventType.ADD_COLUMN)).isTrue();
+    }
+
+    @Test
+    void testRejectReorderColumnEvent() {
+        MaxComputeMetadataApplier applier = new MaxComputeMetadataApplier(null);
+        ReorderColumnEvent event =
+                new ReorderColumnEvent(
+                        org.apache.flink.cdc.common.event.TableId.tableId("schema", "table"),
+                        java.util.Collections.singletonList(
+                                ReorderColumnEvent.ColumnMove.first("name")));
+        assertThat(applier.getSupportedSchemaEvolutionTypes())
+                .doesNotContain(SchemaChangeEventType.REORDER_COLUMN);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> applier.applySchemaChange(event))
+                .isExactlyInstanceOf(UnsupportedSchemaChangeEventException.class);
     }
 }

@@ -24,6 +24,7 @@ import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.event.ReorderColumnEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
@@ -381,6 +382,54 @@ class AsyncPostTransformFunctionTest {
 
         public Integer eval(Integer value) {
             throw new IllegalStateException("expected transform failure");
+        }
+    }
+
+    @Test
+    void testDerivesReorderEventAroundComputedColumn() throws Exception {
+        Schema outputSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT().notNull())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .physicalColumn("computed", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+        Schema reorderedInput =
+                Schema.newBuilder()
+                        .physicalColumn("name", DataTypes.STRING())
+                        .physicalColumn("id", DataTypes.INT().notNull())
+                        .primaryKey("id")
+                        .build();
+        Schema reorderedOutput =
+                Schema.newBuilder()
+                        .physicalColumn("name", DataTypes.STRING())
+                        .physicalColumn("id", DataTypes.INT().notNull())
+                        .physicalColumn("computed", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+        ReorderColumnEvent reorder =
+                new ReorderColumnEvent(
+                        TABLE_ID,
+                        Collections.singletonList(ReorderColumnEvent.ColumnMove.first("name")));
+        try (OneInputStreamOperatorTestHarness<Event, Event> harness =
+                createHarness(TABLE_ID.identifier(), "*, name AS computed", 10_000L, 1)) {
+            harness.setup(EventSerializer.INSTANCE);
+            harness.open();
+            harness.processElement(new StreamRecord<>(new CreateTableEvent(TABLE_ID, SCHEMA)));
+            waitUntilOutputSize(harness, 1);
+            harness.processElement(new StreamRecord<>(reorder));
+            waitUntilOutputSize(harness, 2);
+            harness.processElement(new StreamRecord<>(insert(reorderedInput, "Alice", 1)));
+            waitUntilOutputSize(harness, 3);
+            assertThat(harness.extractOutputValues())
+                    .containsExactly(
+                            new CreateTableEvent(TABLE_ID, outputSchema),
+                            new ReorderColumnEvent(
+                                    TABLE_ID,
+                                    Collections.singletonList(
+                                            ReorderColumnEvent.ColumnMove.before(
+                                                    "id", "computed"))),
+                            insert(reorderedOutput, "Alice", 1, "Alice"));
         }
     }
 }

@@ -19,9 +19,11 @@ package org.apache.flink.cdc.connectors.kafka.serialization;
 
 import org.apache.flink.api.common.serialization.SerializationSchema;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
+import org.apache.flink.cdc.common.event.ColumnPosition;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.event.ReorderColumnEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataTypes;
@@ -40,12 +42,55 @@ import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.time.ZoneId;
+import java.util.Collections;
 
 /** Tests for {@link CsvSerializationSchema}. */
 class CsvSerializationSchemaTest {
 
     public static final TableId TABLE_1 =
             TableId.tableId("default_namespace", "default_schema", "table1");
+
+    @Test
+    void testSerializePrimaryKeyAfterColumnReorder() throws Exception {
+        SerializationSchema<Event> serializationSchema =
+                KeySerializationFactory.createSerializationSchema(
+                        new Configuration(),
+                        org.apache.flink.cdc.connectors.kafka.sink.KeyFormat.CSV,
+                        ZoneId.systemDefault());
+        serializationSchema.open(new MockInitializationContext());
+
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("col1", DataTypes.STRING())
+                        .physicalColumn("col2", DataTypes.STRING())
+                        .primaryKey("col2")
+                        .build();
+        Assertions.assertThat(serializationSchema.serialize(new CreateTableEvent(TABLE_1, schema)))
+                .isNull();
+        Assertions.assertThat(
+                        serializationSchema.serialize(
+                                new ReorderColumnEvent(
+                                        TABLE_1,
+                                        Collections.singletonList(
+                                                new ReorderColumnEvent.ColumnMove(
+                                                        "col2", ColumnPosition.FIRST, null)))))
+                .isNull();
+
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(RowType.of(DataTypes.STRING(), DataTypes.STRING()));
+        byte[] serialized =
+                serializationSchema.serialize(
+                        DataChangeEvent.insertEvent(
+                                TABLE_1,
+                                generator.generate(
+                                        new Object[] {
+                                            BinaryStringData.fromString("pk-after-reorder"),
+                                            BinaryStringData.fromString("value-1")
+                                        })));
+
+        Assertions.assertThat(new String(serialized))
+                .isEqualTo("\"default_namespace.default_schema.table1\",pk-after-reorder");
+    }
 
     @Test
     void testSerialize() throws Exception {

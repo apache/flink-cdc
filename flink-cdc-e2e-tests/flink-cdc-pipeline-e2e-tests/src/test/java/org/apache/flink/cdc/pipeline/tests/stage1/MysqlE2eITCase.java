@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.pipeline.tests.stage1;
 
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
@@ -37,7 +38,10 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.function.Function;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 /** End-to-end tests for mysql cdc pipeline job. */
 @ParameterizedClass
@@ -597,5 +601,239 @@ class MysqlE2eITCase extends PipelineTestEnvironment {
                 dbNameFormatter,
                 "CreateTableEvent{tableId=%s.products, schema=columns={`id` INT NOT NULL,`name` VARCHAR(255) NOT NULL 'flink',`description` VARCHAR(512),`weight` FLOAT,`enum_c` STRING 'red',`json_c` STRING,`point_c` STRING}, primaryKeys=id, options=()}",
                 "DataChangeEvent{tableId=%s.products, before=[106, hammer, 16oz carpenter's hammer, 1.0, null, null, null], after=[106, hammer, 18oz carpenter hammer, 1.0, null, null, null], op=UPDATE, meta=()}");
+    }
+
+    @Test
+    void testReorderColumns() throws Exception {
+        executeReorderSql(
+                "CREATE TABLE reorder_probe ("
+                        + "id INT NOT NULL, "
+                        + "label VARCHAR(32) NOT NULL, "
+                        + "amount DECIMAL(10, 2) NOT NULL, "
+                        + "priority SMALLINT NOT NULL, "
+                        + "PRIMARY KEY (id))");
+
+        String pipelineJob =
+                String.format(
+                        "source:\n"
+                                + "  type: mysql\n"
+                                + "  hostname: %s\n"
+                                + "  port: 3306\n"
+                                + "  username: %s\n"
+                                + "  password: %s\n"
+                                + "  tables: %s.reorder_probe\n"
+                                + "  server-id: 5400-5404\n"
+                                + "  server-time-zone: UTC\n"
+                                + "\n"
+                                + "sink:\n"
+                                + "  type: values\n"
+                                + "\n"
+                                + "pipeline:\n"
+                                + "  parallelism: %d\n"
+                                + "  schema.change.behavior: evolve",
+                        INTER_CONTAINER_MYSQL_ALIAS,
+                        MYSQL_TEST_USER,
+                        MYSQL_TEST_PASSWORD,
+                        mysqlInventoryDatabase.getDatabaseName(),
+                        parallelism);
+
+        JobID jobId = submitPipelineJob(pipelineJob);
+        waitUntilJobRunning(Duration.ofSeconds(30));
+        waitUntilStreamSplitReady(jobId, parallelism);
+
+        String databaseName = mysqlInventoryDatabase.getDatabaseName();
+        waitUntilSpecificEvent(
+                String.format("CreateTableEvent{tableId=%s.reorder_probe", databaseName));
+
+        executeReorderSql(
+                "INSERT INTO reorder_probe (id, label, amount, priority) "
+                        + "VALUES (1, 'old', 11.11, 7)");
+        waitUntilSpecificEvent(
+                String.format(
+                        "DataChangeEvent{tableId=%s.reorder_probe, before=[], after=[1, old, 11.11, 7], op=INSERT, meta=()}",
+                        databaseName));
+
+        executeReorderSql(
+                "UPDATE reorder_probe "
+                        + "SET label = 'old-updated', amount = 12.34, priority = 6 "
+                        + "WHERE id = 1");
+        waitUntilSpecificEvent(
+                String.format(
+                        "DataChangeEvent{tableId=%s.reorder_probe, before=[1, old, 11.11, 7], after=[1, old-updated, 12.34, 6], op=UPDATE, meta=()}",
+                        databaseName));
+
+        executeReorderSql(
+                "ALTER TABLE reorder_probe "
+                        + "MODIFY COLUMN amount DECIMAL(10, 2) NOT NULL FIRST");
+        waitUntilSpecificEvent(
+                String.format(
+                        "ReorderColumnEvent{tableId=%s.reorder_probe, columnMoves=[ColumnMove{columnName='amount', position=FIRST, referenceColumnName='null'}]}",
+                        databaseName));
+
+        executeReorderSql(
+                "ALTER TABLE reorder_probe " + "MODIFY COLUMN priority SMALLINT NOT NULL AFTER id");
+        waitUntilSpecificEvent(
+                String.format(
+                        "ReorderColumnEvent{tableId=%s.reorder_probe, columnMoves=[ColumnMove{columnName='priority', position=AFTER, referenceColumnName='id'}]}",
+                        databaseName));
+
+        executeReorderSql(
+                "INSERT INTO reorder_probe (id, label, amount, priority) "
+                        + "VALUES (2, 'new', 23.45, 8)");
+        waitUntilSpecificEvent(
+                String.format(
+                        "DataChangeEvent{tableId=%s.reorder_probe, before=[], after=[23.45, 2, 8, new], op=INSERT, meta=()}",
+                        databaseName));
+
+        executeReorderSql(
+                "UPDATE reorder_probe "
+                        + "SET label = 'new-updated', amount = 34.56, priority = 9 "
+                        + "WHERE id = 2");
+        waitUntilSpecificEvent(
+                String.format(
+                        "DataChangeEvent{tableId=%s.reorder_probe, before=[23.45, 2, 8, new], after=[34.56, 2, 9, new-updated], op=UPDATE, meta=()}",
+                        databaseName));
+        executeReorderSql("DELETE FROM reorder_probe WHERE id = 1");
+        waitUntilSpecificEvent(
+                String.format(
+                        "DataChangeEvent{tableId=%s.reorder_probe, before=[12.34, 1, 6, old-updated], after=[], op=DELETE, meta=()}",
+                        databaseName));
+        executeReorderSql(
+                "ALTER TABLE reorder_probe CHANGE COLUMN label display_label VARCHAR(32) NOT NULL FIRST",
+                "INSERT INTO reorder_probe (id, display_label, amount, priority) VALUES (3, 'renamed', 45.67, 4)");
+        waitUntilSpecificEvent(
+                String.format(
+                        "DataChangeEvent{tableId=%s.reorder_probe, before=[], after=[renamed, 45.67, 3, 4], op=INSERT, meta=()}",
+                        databaseName));
+    }
+
+    @Test
+    void testExcludedReorderAndAddColumns() throws Exception {
+        executeReorderSql(
+                "CREATE TABLE excluded_reorder_probe ("
+                        + "id INT NOT NULL, "
+                        + "label VARCHAR(32) NOT NULL, "
+                        + "amount DECIMAL(10, 2) NOT NULL, "
+                        + "priority SMALLINT NOT NULL, "
+                        + "PRIMARY KEY (id))");
+
+        String pipelineJob =
+                String.format(
+                        "source:\n"
+                                + "  type: mysql\n"
+                                + "  hostname: %s\n"
+                                + "  port: 3306\n"
+                                + "  username: %s\n"
+                                + "  password: %s\n"
+                                + "  tables: %s.excluded_reorder_probe\n"
+                                + "  server-id: 5400-5404\n"
+                                + "  server-time-zone: UTC\n"
+                                + "\n"
+                                + "sink:\n"
+                                + "  type: values\n"
+                                + "  exclude.schema.changes:\n"
+                                + "    - reorder.column\n"
+                                + "    - add.column\n"
+                                + "\n"
+                                + "pipeline:\n"
+                                + "  parallelism: %d\n"
+                                + "  schema.change.behavior: evolve",
+                        INTER_CONTAINER_MYSQL_ALIAS,
+                        MYSQL_TEST_USER,
+                        MYSQL_TEST_PASSWORD,
+                        mysqlInventoryDatabase.getDatabaseName(),
+                        parallelism);
+
+        JobID jobId = submitPipelineJob(pipelineJob);
+        waitUntilJobRunning(Duration.ofSeconds(30));
+        waitUntilStreamSplitReady(jobId, parallelism);
+
+        String databaseName = mysqlInventoryDatabase.getDatabaseName();
+        String tableId = databaseName + ".excluded_reorder_probe";
+        waitUntilSpecificEvent(String.format("CreateTableEvent{tableId=%s", tableId));
+
+        String moveLabelFirst =
+                String.format(
+                        "ReorderColumnEvent{tableId=%s, columnMoves=[ColumnMove{columnName='label', position=FIRST, referenceColumnName='null'}]}",
+                        tableId);
+        String moveIdFirst =
+                String.format(
+                        "ReorderColumnEvent{tableId=%s, columnMoves=[ColumnMove{columnName='id', position=FIRST, referenceColumnName='null'}]}",
+                        tableId);
+
+        executeReorderSql(
+                "ALTER TABLE excluded_reorder_probe "
+                        + "MODIFY COLUMN label VARCHAR(32) NOT NULL FIRST, "
+                        + "MODIFY COLUMN id INT NOT NULL FIRST",
+                "INSERT INTO excluded_reorder_probe (id, label, amount, priority) "
+                        + "VALUES (2, 'after-compound', 23.45, 8)");
+        waitUntilSpecificEvent(
+                String.format(
+                        "DataChangeEvent{tableId=%s, before=[], after=[2, after-compound, 23.45, 8], op=INSERT, meta=()}",
+                        tableId));
+
+        String moveHiddenXAfterLabel =
+                String.format(
+                        "ReorderColumnEvent{tableId=%s, columnMoves=[ColumnMove{columnName='hidden_x', position=AFTER, referenceColumnName='label'}]}",
+                        tableId);
+        executeReorderSql(
+                "ALTER TABLE excluded_reorder_probe " + "ADD COLUMN hidden_x VARCHAR(32) FIRST",
+                "ALTER TABLE excluded_reorder_probe " + "ADD COLUMN hidden_y VARCHAR(32) FIRST",
+                "ALTER TABLE excluded_reorder_probe "
+                        + "MODIFY COLUMN hidden_x VARCHAR(32) AFTER label",
+                "INSERT INTO excluded_reorder_probe "
+                        + "(hidden_y, id, label, hidden_x, amount, priority) "
+                        + "VALUES ('hidden-y', 3, 'after-hidden', 'hidden-x', 34.56, 9)");
+        String completionEvent =
+                String.format(
+                        "DataChangeEvent{tableId=%s, before=[], after=[3, after-hidden, 34.56, 9], op=INSERT, meta=()}",
+                        tableId);
+        waitUntilSpecificEvent(taskManagerConsumer, completionEvent);
+
+        String[] expectedReorders = {moveLabelFirst, moveIdFirst, moveHiddenXAfterLabel};
+        for (String expectedReorder : expectedReorders) {
+            waitUntilSpecificEvent(
+                    jobManagerConsumer, "Ignored schema change " + expectedReorder + ".");
+        }
+
+        String jobManagerLog = jobManagerConsumer.toUtf8String();
+        for (String expectedReorder : expectedReorders) {
+            assertThat(jobManagerLog)
+                    .containsOnlyOnce("Ignored schema change " + expectedReorder + ".");
+        }
+        long ignoredReorderCount =
+                Arrays.stream(jobManagerLog.split("\n"))
+                        .filter(
+                                line ->
+                                        line.contains(
+                                                "Ignored schema change ReorderColumnEvent{tableId="
+                                                        + tableId
+                                                        + ","))
+                        .count();
+        assertThat(ignoredReorderCount).isEqualTo(expectedReorders.length);
+
+        String taskManagerLog = taskManagerConsumer.toUtf8String();
+        assertThat(taskManagerLog)
+                .contains(completionEvent)
+                .doesNotContain(expectedReorders)
+                .doesNotContain("ReorderColumnEvent{tableId=" + tableId + ",")
+                .doesNotContain("AddColumnEvent{tableId=" + tableId + ",");
+        waitUntilJobRunning(Duration.ofSeconds(30));
+    }
+
+    private void executeReorderSql(String... statements) throws SQLException {
+        String url =
+                String.format(
+                        "jdbc:mysql://%s:%s/%s",
+                        MYSQL.getHost(),
+                        MYSQL.getDatabasePort(),
+                        mysqlInventoryDatabase.getDatabaseName());
+        try (Connection connection =
+                        DriverManager.getConnection(url, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
+                Statement statement = connection.createStatement()) {
+            for (String sql : statements) {
+                statement.execute(sql);
+            }
+        }
     }
 }

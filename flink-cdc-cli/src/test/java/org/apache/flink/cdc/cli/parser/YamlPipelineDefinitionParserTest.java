@@ -51,6 +51,7 @@ import static org.apache.flink.cdc.common.event.SchemaChangeEventType.CREATE_TAB
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.DROP_COLUMN;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.DROP_TABLE;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.RENAME_COLUMN;
+import static org.apache.flink.cdc.common.event.SchemaChangeEventType.REORDER_COLUMN;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.TRUNCATE_TABLE;
 import static org.apache.flink.cdc.common.pipeline.PipelineOptions.PIPELINE_LOCAL_TIME_ZONE;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -364,6 +365,7 @@ class YamlPipelineDefinitionParserTest {
                         DROP_COLUMN,
                         DROP_TABLE,
                         RENAME_COLUMN,
+                        REORDER_COLUMN,
                         TRUNCATE_TABLE));
         testSchemaEvolutionTypesParsing(
                 "try_evolve",
@@ -377,6 +379,7 @@ class YamlPipelineDefinitionParserTest {
                         DROP_COLUMN,
                         DROP_TABLE,
                         RENAME_COLUMN,
+                        REORDER_COLUMN,
                         TRUNCATE_TABLE));
         testSchemaEvolutionTypesParsing(
                 "evolve",
@@ -388,6 +391,7 @@ class YamlPipelineDefinitionParserTest {
                         ALTER_COLUMN_TYPE,
                         CREATE_TABLE,
                         RENAME_COLUMN,
+                        REORDER_COLUMN,
                         TRUNCATE_TABLE));
         testSchemaEvolutionTypesParsing(
                 "lenient",
@@ -399,7 +403,8 @@ class YamlPipelineDefinitionParserTest {
                         ALTER_COLUMN_TYPE,
                         CREATE_TABLE,
                         DROP_COLUMN,
-                        RENAME_COLUMN));
+                        RENAME_COLUMN,
+                        REORDER_COLUMN));
         testSchemaEvolutionTypesParsing(
                 "lenient",
                 null,
@@ -412,7 +417,22 @@ class YamlPipelineDefinitionParserTest {
                         DROP_COLUMN,
                         DROP_TABLE,
                         RENAME_COLUMN,
+                        REORDER_COLUMN,
                         TRUNCATE_TABLE));
+    }
+
+    @Test
+    void testReorderSchemaEvolutionTypesConfiguration() throws Exception {
+        testSchemaEvolutionTypesParsing(
+                "evolve", "[reorder]", null, ImmutableSet.of(CREATE_TABLE, REORDER_COLUMN));
+        testSchemaEvolutionTypesParsing(
+                "evolve", "[reorder.column]", null, ImmutableSet.of(CREATE_TABLE, REORDER_COLUMN));
+        testSchemaEvolutionTypesParsing(
+                "evolve",
+                "[column]",
+                "[reorder.column]",
+                ImmutableSet.of(
+                        CREATE_TABLE, ADD_COLUMN, ALTER_COLUMN_TYPE, DROP_COLUMN, RENAME_COLUMN));
     }
 
     /**
@@ -432,7 +452,12 @@ class YamlPipelineDefinitionParserTest {
                 "[column]",
                 null,
                 ImmutableSet.of(
-                        ADD_COLUMN, ALTER_COLUMN_TYPE, DROP_COLUMN, RENAME_COLUMN, CREATE_TABLE));
+                        ADD_COLUMN,
+                        ALTER_COLUMN_TYPE,
+                        DROP_COLUMN,
+                        RENAME_COLUMN,
+                        REORDER_COLUMN,
+                        CREATE_TABLE));
 
         // Test case 3: User explicitly excludes create.table, should NOT auto-add
         testSchemaEvolutionTypesParsing(
@@ -941,7 +966,8 @@ class YamlPipelineDefinitionParserTest {
                                     ALTER_COLUMN_TYPE,
                                     ADD_COLUMN,
                                     CREATE_TABLE,
-                                    RENAME_COLUMN)),
+                                    RENAME_COLUMN,
+                                    REORDER_COLUMN)),
                     Collections.singletonList(
                             new RouteDef(
                                     "mydb.default.app_order_.*",
@@ -968,7 +994,8 @@ class YamlPipelineDefinitionParserTest {
                                     ALTER_COLUMN_TYPE,
                                     ADD_COLUMN,
                                     CREATE_TABLE,
-                                    RENAME_COLUMN)),
+                                    RENAME_COLUMN,
+                                    REORDER_COLUMN)),
                     Collections.emptyList(),
                     Collections.emptyList(),
                     Collections.emptyList(),
@@ -1056,7 +1083,8 @@ class YamlPipelineDefinitionParserTest {
                                     ALTER_COLUMN_TYPE,
                                     ADD_COLUMN,
                                     CREATE_TABLE,
-                                    RENAME_COLUMN)),
+                                    RENAME_COLUMN,
+                                    REORDER_COLUMN)),
                     Collections.emptyList(),
                     Collections.singletonList(
                             new TransformDef(
@@ -1093,7 +1121,8 @@ class YamlPipelineDefinitionParserTest {
                                     ALTER_COLUMN_TYPE,
                                     ADD_COLUMN,
                                     CREATE_TABLE,
-                                    RENAME_COLUMN)),
+                                    RENAME_COLUMN,
+                                    REORDER_COLUMN)),
                     Collections.emptyList(),
                     Collections.singletonList(
                             new TransformDef(
@@ -1132,7 +1161,8 @@ class YamlPipelineDefinitionParserTest {
                                     ALTER_COLUMN_TYPE,
                                     ADD_COLUMN,
                                     CREATE_TABLE,
-                                    RENAME_COLUMN)),
+                                    RENAME_COLUMN,
+                                    REORDER_COLUMN)),
                     Collections.emptyList(),
                     Collections.singletonList(
                             new TransformDef(
@@ -1192,7 +1222,8 @@ class YamlPipelineDefinitionParserTest {
                                     ALTER_COLUMN_TYPE,
                                     ADD_COLUMN,
                                     CREATE_TABLE,
-                                    RENAME_COLUMN)),
+                                    RENAME_COLUMN,
+                                    REORDER_COLUMN)),
                     Arrays.asList(
                             new RouteDef(
                                     "mydb.order_.*",

@@ -136,6 +136,7 @@ Here's a full list of configurable schema change event types:
 | `drop.column`       | Drop a column.               |
 | `drop.table`        | Drop a table.                |
 | `rename.column`     | Rename a column.             |
+| `reorder.column`    | Change the order of existing columns. |
 | `truncate.table`    | Truncate a table.            |
 
 Partial matching is supported. For example, passing `drop` into the options above is equivalent to passing `drop.column` and `drop.table`.
@@ -146,6 +147,12 @@ The following YAML configuration is set to include `CreateTableEvent` and column
 
 ```yaml
 sink:
-  include.schema.changes: [create.table, column] # This matches CreateTable, AddColumn, AlterColumnType, RenameColumn, and DropColumn Events
+  include.schema.changes: [create.table, column] # This matches CreateTable, AddColumn, AlterColumnType, RenameColumn, ReorderColumn, and DropColumn Events
   exclude.schema.changes: [drop.column] # This excludes DropColumn Events
 ```
+
+### Column order changes
+
+The MySQL pipeline source emits `ReorderColumnEvent` for `MODIFY COLUMN` and `CHANGE COLUMN` statements with `FIRST` or `AFTER` clauses. Renaming, type changes, and column moves in a compound DDL are applied in statement order. The `reorder` and `column` families both include `reorder.column`.
+
+Kafka updates its serialization schema. Paimon applies physical column moves, while StarRocks only accepts moves that keep primary key columns first and in their existing order. Doris, Fluss, Iceberg, MaxCompute, and OceanBase reject physical column reordering explicitly. In `EVOLVE` mode, an unsupported move fails the job rather than silently misaligning field values. In `TRY_EVOLVE` mode, the framework retains the sink schema and maps subsequent records to that schema. `LENIENT` mode does not reorder the sink columns; record values are mapped to the unchanged column order. Explicitly excluding `reorder.column` also keeps the sink column order unchanged.

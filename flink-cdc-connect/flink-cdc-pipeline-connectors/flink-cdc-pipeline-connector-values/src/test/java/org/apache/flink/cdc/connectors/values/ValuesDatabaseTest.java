@@ -20,12 +20,16 @@ package org.apache.flink.cdc.connectors.values;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
+import org.apache.flink.cdc.common.event.ColumnPosition;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
+import org.apache.flink.cdc.common.event.ReorderColumnEvent;
+import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
+import org.apache.flink.cdc.common.exceptions.UnsupportedSchemaChangeEventException;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
@@ -43,6 +47,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -157,6 +162,217 @@ class ValuesDatabaseTest {
         Assertions.assertThat(metadataAccessor.listSchemas(null)).hasSize(2);
         Assertions.assertThat(metadataAccessor.listTables(null, "default")).hasSize(1);
         Assertions.assertThat(metadataAccessor.getTableSchema(table1)).isEqualTo(schema);
+    }
+
+    @Test
+    void testReorderColumnEventSupportContract() {
+        Assertions.assertThat(metadataApplier.getSupportedSchemaEvolutionTypes())
+                .contains(SchemaChangeEventType.REORDER_COLUMN);
+        Assertions.assertThat(
+                        metadataApplier.acceptsSchemaEvolutionType(
+                                SchemaChangeEventType.REORDER_COLUMN))
+                .isTrue();
+
+        metadataApplier.setAcceptedSchemaEvolutionTypes(
+                Collections.singleton(SchemaChangeEventType.CREATE_TABLE));
+
+        Assertions.assertThat(
+                        metadataApplier.acceptsSchemaEvolutionType(
+                                SchemaChangeEventType.REORDER_COLUMN))
+                .isFalse();
+        Assertions.assertThat(metadataApplier.getSupportedSchemaEvolutionTypes())
+                .contains(SchemaChangeEventType.REORDER_COLUMN);
+    }
+
+    @Test
+    void testErrorOnChangeMetadataApplierStillRejectsReorderColumnEvent() {
+        ReorderColumnEvent reorderEvent =
+                new ReorderColumnEvent(
+                        table1,
+                        Collections.singletonList(
+                                new ReorderColumnEvent.ColumnMove(
+                                        "col2", ColumnPosition.FIRST, null)));
+        MetadataApplier errorOnChangeApplier = new ValuesDatabase.ErrorOnChangeMetadataApplier();
+
+        Assertions.assertThat(errorOnChangeApplier.getSupportedSchemaEvolutionTypes())
+                .containsExactly(SchemaChangeEventType.CREATE_TABLE);
+        Assertions.assertThat(
+                        errorOnChangeApplier.acceptsSchemaEvolutionType(
+                                SchemaChangeEventType.REORDER_COLUMN))
+                .isFalse();
+        Assertions.assertThatThrownBy(() -> errorOnChangeApplier.applySchemaChange(reorderEvent))
+                .isExactlyInstanceOf(UnsupportedSchemaChangeEventException.class)
+                .extracting(
+                        error ->
+                                ((org.apache.flink.cdc.common.exceptions.SchemaEvolveException)
+                                                error)
+                                        .getApplyingEvent())
+                .isEqualTo(reorderEvent);
+    }
+
+    @Test
+    void testApplyCompoundReorderColumnEvent() throws SchemaEvolveException {
+        TableId tableId = TableId.parse("default.default.compound_reorder");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("col1", DataTypes.STRING())
+                        .physicalColumn("col2", DataTypes.STRING())
+                        .physicalColumn("col3", DataTypes.STRING())
+                        .physicalColumn("col4", DataTypes.STRING())
+                        .primaryKey("col1")
+                        .build();
+        metadataApplier.applySchemaChange(new CreateTableEvent(tableId, schema));
+
+        metadataApplier.applySchemaChange(
+                new ReorderColumnEvent(
+                        tableId,
+                        Arrays.asList(
+                                new ReorderColumnEvent.ColumnMove(
+                                        "col4", ColumnPosition.FIRST, null),
+                                new ReorderColumnEvent.ColumnMove(
+                                        "col2", ColumnPosition.AFTER, "col3"))));
+
+        Assertions.assertThat(metadataAccessor.getTableSchema(tableId).getColumnNames())
+                .containsExactly("col4", "col1", "col3", "col2");
+    }
+
+    @Test
+    void testExistingAndNewRecordsUseTheirWriteSchemaAcrossTypeChangeAndReorder()
+            throws SchemaEvolveException {
+        TableId tableId = TableId.parse("default.default.type_and_reorder_history");
+        metadataApplier.applySchemaChange(
+                new CreateTableEvent(
+                        tableId,
+                        Schema.newBuilder()
+                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("payload", DataTypes.STRING())
+                                .primaryKey("id")
+                                .build()));
+        BinaryRecordDataGenerator oldSchemaGenerator =
+                new BinaryRecordDataGenerator(RowType.of(DataTypes.INT(), DataTypes.STRING()));
+        ValuesDatabase.applyDataChangeEvent(
+                DataChangeEvent.insertEvent(
+                        tableId,
+                        oldSchemaGenerator.generate(
+                                new Object[] {4, BinaryStringData.fromString("old-value")})));
+
+        Map<String, DataType> typeMapping = new HashMap<>();
+        typeMapping.put("id", DataTypes.BIGINT());
+        typeMapping.put("payload", DataTypes.BOOLEAN());
+        metadataApplier.applySchemaChange(new AlterColumnTypeEvent(tableId, typeMapping));
+        metadataApplier.applySchemaChange(
+                new ReorderColumnEvent(
+                        tableId,
+                        Collections.singletonList(
+                                new ReorderColumnEvent.ColumnMove(
+                                        "payload", ColumnPosition.FIRST, null))));
+
+        BinaryRecordDataGenerator newSchemaGenerator =
+                new BinaryRecordDataGenerator(RowType.of(DataTypes.BOOLEAN(), DataTypes.BIGINT()));
+        ValuesDatabase.applyDataChangeEvent(
+                DataChangeEvent.insertEvent(
+                        tableId, newSchemaGenerator.generate(new Object[] {true, 5L})));
+
+        Assertions.assertThat(ValuesDatabase.getResults(tableId))
+                .containsExactlyInAnyOrder(
+                        "default.default.type_and_reorder_history:payload=old-value;id=4",
+                        "default.default.type_and_reorder_history:payload=true;id=5");
+    }
+
+    @Test
+    void testUpdateAfterReorderUsesNewWriteSchemaWithoutReinterpretingOldRecords()
+            throws SchemaEvolveException {
+        TableId tableId = TableId.parse("default.default.update_after_reorder");
+        metadataApplier.applySchemaChange(
+                new CreateTableEvent(
+                        tableId,
+                        Schema.newBuilder()
+                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("payload", DataTypes.STRING())
+                                .primaryKey("id")
+                                .build()));
+        BinaryRecordDataGenerator oldSchemaGenerator =
+                new BinaryRecordDataGenerator(RowType.of(DataTypes.INT(), DataTypes.STRING()));
+        ValuesDatabase.applyDataChangeEvent(
+                DataChangeEvent.insertEvent(
+                        tableId,
+                        oldSchemaGenerator.generate(
+                                new Object[] {6, BinaryStringData.fromString("old-six")})));
+        ValuesDatabase.applyDataChangeEvent(
+                DataChangeEvent.insertEvent(
+                        tableId,
+                        oldSchemaGenerator.generate(
+                                new Object[] {7, BinaryStringData.fromString("old-seven")})));
+
+        Map<String, DataType> typeMapping = new HashMap<>();
+        typeMapping.put("id", DataTypes.BIGINT());
+        typeMapping.put("payload", DataTypes.BOOLEAN());
+        metadataApplier.applySchemaChange(new AlterColumnTypeEvent(tableId, typeMapping));
+        metadataApplier.applySchemaChange(
+                new ReorderColumnEvent(
+                        tableId,
+                        Collections.singletonList(
+                                new ReorderColumnEvent.ColumnMove(
+                                        "payload", ColumnPosition.FIRST, null))));
+        BinaryRecordDataGenerator newSchemaGenerator =
+                new BinaryRecordDataGenerator(RowType.of(DataTypes.BOOLEAN(), DataTypes.BIGINT()));
+        ValuesDatabase.applyDataChangeEvent(
+                DataChangeEvent.updateEvent(
+                        tableId,
+                        newSchemaGenerator.generate(new Object[] {false, 7L}),
+                        newSchemaGenerator.generate(new Object[] {true, 7L})));
+
+        Assertions.assertThat(ValuesDatabase.getResults(tableId))
+                .containsExactlyInAnyOrder(
+                        "default.default.update_after_reorder:payload=old-six;id=6",
+                        "default.default.update_after_reorder:payload=true;id=7");
+    }
+
+    @Test
+    void testDeleteOldRecordAfterCompoundPrimaryKeyColumnsAreExchanged()
+            throws SchemaEvolveException {
+        TableId tableId = TableId.parse("default.default.compound_pk");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("key1", DataTypes.STRING())
+                        .physicalColumn("key2", DataTypes.STRING())
+                        .physicalColumn("value", DataTypes.STRING())
+                        .primaryKey("key1", "key2")
+                        .build();
+        metadataApplier.applySchemaChange(new CreateTableEvent(tableId, schema));
+        BinaryRecordDataGenerator oldSchemaGenerator =
+                new BinaryRecordDataGenerator(
+                        RowType.of(DataTypes.STRING(), DataTypes.STRING(), DataTypes.STRING()));
+        ValuesDatabase.applyDataChangeEvent(
+                DataChangeEvent.insertEvent(
+                        tableId,
+                        oldSchemaGenerator.generate(
+                                new Object[] {
+                                    BinaryStringData.fromString("key-a"),
+                                    BinaryStringData.fromString("key-b"),
+                                    BinaryStringData.fromString("old-value")
+                                })));
+
+        metadataApplier.applySchemaChange(
+                new ReorderColumnEvent(
+                        tableId,
+                        Collections.singletonList(
+                                new ReorderColumnEvent.ColumnMove(
+                                        "key2", ColumnPosition.FIRST, null))));
+        BinaryRecordDataGenerator newSchemaGenerator =
+                new BinaryRecordDataGenerator(
+                        RowType.of(DataTypes.STRING(), DataTypes.STRING(), DataTypes.STRING()));
+        ValuesDatabase.applyDataChangeEvent(
+                DataChangeEvent.deleteEvent(
+                        tableId,
+                        newSchemaGenerator.generate(
+                                new Object[] {
+                                    BinaryStringData.fromString("key-b"),
+                                    BinaryStringData.fromString("key-a"),
+                                    BinaryStringData.fromString("old-value")
+                                })));
+
+        Assertions.assertThat(ValuesDatabase.getResults(tableId)).isEmpty();
     }
 
     @Test
