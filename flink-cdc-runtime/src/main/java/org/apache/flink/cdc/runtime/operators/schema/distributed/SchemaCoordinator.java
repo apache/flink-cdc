@@ -59,9 +59,11 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeoutException;
@@ -82,6 +84,10 @@ public class SchemaCoordinator extends SchemaRegistry {
     private transient Map<
                     Integer, Tuple2<SchemaChangeRequest, CompletableFuture<CoordinationResponse>>>
             pendingRequests;
+
+    /** Requests arriving while the current schema evolution round is still running. */
+    private transient Queue<Tuple2<SchemaChangeRequest, CompletableFuture<CoordinationResponse>>>
+            deferredRequests;
 
     /** Tracing sink writers that have flushed successfully. */
     protected transient Set<Integer> flushedSinkWriters;
@@ -133,6 +139,7 @@ public class SchemaCoordinator extends SchemaRegistry {
         super.start();
         this.evolvingStatus = new AtomicReference<>(RequestStatus.IDLE);
         this.pendingRequests = new ConcurrentHashMap<>();
+        this.deferredRequests = new ConcurrentLinkedQueue<>();
         this.flushedSinkWriters = ConcurrentHashMap.newKeySet();
         this.upstreamSchemaTable = HashBasedTable.create();
         this.alreadyHandledSchemaChangeEvents = HashMultimap.create();
@@ -216,6 +223,7 @@ public class SchemaCoordinator extends SchemaRegistry {
                 (index, tuple) -> {
                     tuple.f1.completeExceptionally(t);
                 });
+        deferredRequests.forEach(tuple -> tuple.f1.completeExceptionally(t));
     }
 
     // -------------------------
@@ -226,6 +234,14 @@ public class SchemaCoordinator extends SchemaRegistry {
             SchemaChangeRequest request, CompletableFuture<CoordinationResponse> responseFuture)
             throws Exception {
         LOG.info("Coordinator received schema change request {}.", request);
+        if (evolvingStatus.get() == RequestStatus.EVOLVING) {
+            LOG.info(
+                    "Schema evolution is in progress. Deferring request {} to the next round.",
+                    request);
+            deferredRequests.add(Tuple2.of(request, responseFuture));
+            return;
+        }
+
         if (!request.isNoOpRequest()) {
             LOG.info("It's not an align request, will try to deduplicate.");
             int eventSourcePartitionId = request.getSourceSubTaskId();
@@ -353,10 +369,20 @@ public class SchemaCoordinator extends SchemaRegistry {
                     .ifPresent(schema -> evolvedSchemaView.put(tableId, schema));
         }
 
+        runInEventLoop(
+                () -> finishSchemaChange(evolvedSchemaView, successfullyAppliedSchemaChangeEvents),
+                "Finishing schema change");
+    }
+
+    private void finishSchemaChange(
+            Map<TableId, Schema> evolvedSchemaView,
+            List<SchemaChangeEvent> successfullyAppliedSchemaChangeEvents)
+            throws Throwable {
         List<Tuple2<SchemaChangeRequest, CompletableFuture<CoordinationResponse>>> futures =
                 new ArrayList<>(pendingRequests.values());
 
-        // Restore coordinator internal states first...
+        // Restore coordinator internal states first. Since this runs in the coordinator event loop,
+        // new requests cannot observe IDLE before deferred requests have been promoted.
         pendingRequests.clear();
 
         LOG.info("Finished schema evolving. Switching from EVOLVING to IDLE.");
@@ -364,9 +390,15 @@ public class SchemaCoordinator extends SchemaRegistry {
                 evolvingStatus.compareAndSet(RequestStatus.EVOLVING, RequestStatus.IDLE),
                 "RequestStatus should be EVOLVING when schema evolving finishes.");
 
-        // ... and broadcast affected schema changes to mapper and release upstream then.
-        // Make sure we've cleaned-up internal state before this, or we may receive new requests in
-        // a dirty state.
+        try {
+            processDeferredRequests();
+        } catch (Throwable t) {
+            futures.forEach(tuple -> tuple.f1.completeExceptionally(t));
+            throw t;
+        }
+
+        // Broadcast affected schema changes to mapper and release upstream after internal state has
+        // been cleaned up.
         futures.forEach(
                 tuple -> {
                     LOG.info(
@@ -378,6 +410,23 @@ public class SchemaCoordinator extends SchemaRegistry {
                                             evolvedSchemaView,
                                             successfullyAppliedSchemaChangeEvents)));
                 });
+    }
+
+    private void processDeferredRequests() throws Exception {
+        if (deferredRequests.isEmpty()) {
+            return;
+        }
+
+        int deferredRequestCount = deferredRequests.size();
+        LOG.info("Processing {} deferred schema change requests.", deferredRequestCount);
+        for (int i = 0; i < deferredRequestCount; i++) {
+            Tuple2<SchemaChangeRequest, CompletableFuture<CoordinationResponse>> deferredRequest =
+                    deferredRequests.peek();
+            if (deferredRequest != null) {
+                handleSchemaEvolveRequest(deferredRequest.f0, deferredRequest.f1);
+                deferredRequests.poll();
+            }
+        }
     }
 
     private Tuple2<Set<TableId>, List<SchemaChangeEvent>> deduceEvolvedSchemaChanges() {
