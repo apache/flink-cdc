@@ -34,6 +34,7 @@ import org.apache.flink.cdc.composer.definition.PipelineDef;
 import org.apache.flink.cdc.composer.definition.SinkDef;
 import org.apache.flink.cdc.composer.definition.SourceDef;
 import org.apache.flink.cdc.composer.definition.TransformDef;
+import org.apache.flink.cdc.composer.definition.UdfDef;
 import org.apache.flink.cdc.connectors.values.ValuesDatabase;
 import org.apache.flink.cdc.connectors.values.factory.ValuesDataFactory;
 import org.apache.flink.cdc.connectors.values.sink.ValuesDataSinkOptions;
@@ -128,6 +129,42 @@ class FlinkPipelineAiFunctionITCase {
     }
 
     @Test
+    void testSpecializedTextAiFunctionsInProjection() throws Exception {
+        String[] output =
+                runAiFunctionTest(
+                        "id, "
+                                + "AI_CLASSIFY('testModel', content, 'positive,negative') AS classified, "
+                                + "AI_TRANSLATE('testModel', content, 'auto', 'en') AS translated, "
+                                + "AI_SUMMARIZE('testModel', content, 100) AS summarized, "
+                                + "AI_SENTIMENT('testModel', content) AS sentiment, "
+                                + "AI_EXTRACT('testModel', content, 'name:string') AS extracted, "
+                                + "AI_MASK('testModel', content, 'name') AS masked",
+                        List.of(ModelDef.of("testModel", "dummy", Collections.emptyMap())));
+
+        assertThat(output)
+                .containsExactly(
+                        "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT NOT NULL,`classified` VARIANT,`translated` VARIANT,`summarized` VARIANT,`sentiment` VARIANT,`extracted` VARIANT,`masked` VARIANT}, primaryKeys=id, options=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, {\"category\":\"dummy\",\"confidence\":1}, {\"detected_language\":\"en\",\"translated_text\":\"dummy translation\"}, {\"summary\":\"dummy summary\"}, {\"confidence\":1,\"label\":\"neutral\",\"score\":0}, {\"extracted_json\":{\"name\":\"dummy\"}}, {\"detected_entities\":\"name\",\"masked_text\":\"d***y\"}], op=INSERT, meta=()}");
+    }
+
+    @Test
+    void testSameNamedUdfTakesPrecedenceOverAiFunction() throws Exception {
+        String[] output =
+                runAiFunctionTest(
+                        "id, AI_SENTIMENT(id) AS sentiment",
+                        List.of(ModelDef.of("unusedModel", "dummy", Collections.emptyMap())),
+                        List.of(
+                                new UdfDef(
+                                        "ai_sentiment",
+                                        "org.apache.flink.cdc.udf.examples.java.AddOneFunctionClass")));
+
+        assertThat(output)
+                .containsExactly(
+                        "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT NOT NULL,`sentiment` STRING}, primaryKeys=id, options=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, 2], op=INSERT, meta=()}");
+    }
+
+    @Test
     void testAiEmbedInProjection() throws Exception {
         String[] output =
                 runAiFunctionTest(
@@ -140,18 +177,24 @@ class FlinkPipelineAiFunctionITCase {
     }
 
     private String[] runAiFunctionTest(String projection, List<ModelDef> models) throws Exception {
+        return runAiFunctionTest(projection, models, Collections.emptyList());
+    }
+
+    private String[] runAiFunctionTest(
+            String projection, List<ModelDef> models, List<UdfDef> udfFunctions) throws Exception {
         URL modelJar = createDummyModelJar().toUri().toURL();
         ClassLoader originalClassLoader = Thread.currentThread().getContextClassLoader();
         try (URLClassLoader modelClassLoader =
                 new DummyModelClassLoader(modelJar, originalClassLoader)) {
             Thread.currentThread().setContextClassLoader(modelClassLoader);
-            return runAiFunctionTest(projection, models, modelJar);
+            return runAiFunctionTest(projection, models, udfFunctions, modelJar);
         } finally {
             Thread.currentThread().setContextClassLoader(originalClassLoader);
         }
     }
 
-    private String[] runAiFunctionTest(String projection, List<ModelDef> models, URL modelJar)
+    private String[] runAiFunctionTest(
+            String projection, List<ModelDef> models, List<UdfDef> udfFunctions, URL modelJar)
             throws Exception {
         FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
 
@@ -212,7 +255,7 @@ class FlinkPipelineAiFunctionITCase {
                         sinkDef,
                         Collections.emptyList(),
                         Collections.singletonList(transformDef),
-                        Collections.emptyList(),
+                        udfFunctions,
                         models,
                         pipelineConfig);
 

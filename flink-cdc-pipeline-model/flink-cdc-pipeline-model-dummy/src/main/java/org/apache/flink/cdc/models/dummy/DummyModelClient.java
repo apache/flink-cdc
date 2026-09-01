@@ -37,6 +37,24 @@ public class DummyModelClient implements AiModelClient, SupportsTextGeneration, 
         if (debug) {
             System.out.printf("Received prompt: %s%nUser input: %s%n", systemPrompt, userInput);
         }
+        if (systemPrompt.contains("\"category\"")) {
+            return "{\"category\":\"dummy\",\"confidence\":1.0}";
+        }
+        if (systemPrompt.contains("\"translated_text\"")) {
+            return "{\"translated_text\":\"dummy translation\",\"detected_language\":\"en\"}";
+        }
+        if (systemPrompt.contains("\"summary\"")) {
+            return "{\"summary\":\"dummy summary\"}";
+        }
+        if (systemPrompt.contains("\"score\"")) {
+            return "{\"score\":0.0,\"label\":\"neutral\",\"confidence\":1.0}";
+        }
+        if (systemPrompt.contains("\"extracted_json\"")) {
+            return "{\"extracted_json\":{\"name\":\"dummy\"}}";
+        }
+        if (systemPrompt.contains("\"masked_text\"")) {
+            return "{\"masked_text\":\"d***y\",\"detected_entities\":\"name\"}";
+        }
         return "{\"result\":\"dummy response\"}";
     }
 

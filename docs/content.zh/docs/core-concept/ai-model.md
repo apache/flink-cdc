@@ -24,11 +24,30 @@ under the License.
 
 # AI 模型
 
-AI 模型可用于 transform 表达式中的文本补全和 embedding。
+AI 模型可用于 transform 表达式中的文本生成、文本分析和 embedding。
+
+## AI Functions
+
+模型名称必须是字符串常量，并引用 `pipeline.model` 中声明的模型。文本函数要求模型客户端支持文本生成，`AI_EMBED` 要求模型客户端支持 embedding；Pipeline 会在执行前校验引用模型的 capability 是否匹配。
+
+所有文本函数都会将模型返回的 JSON 解析为 `VARIANT`。
+
+| 函数 | 说明 | JSON 字段 |
+|------|------|-----------|
+| `AI_COMPLETE(model, input, system_prompt)` | 使用调用方提供的 system prompt 补全文本。 | `result` |
+| `AI_CLASSIFY(model, input, labels)` | 将输入分类到给定标签之一。 | `category`、`confidence` |
+| `AI_TRANSLATE(model, input, source_lang, target_lang)` | 翻译输入；`source_lang` 可传 `auto` 自动识别。 | `translated_text`、`detected_language` |
+| `AI_SUMMARIZE(model, input, max_length)` | 在指定字符数内生成摘要。 | `summary` |
+| `AI_SENTIMENT(model, input)` | 分析文本情感。 | `score`、`label`、`confidence` |
+| `AI_EXTRACT(model, input, schema)` | 按 schema 字符串描述提取字段。 | `extracted_json` |
+| `AI_MASK(model, input, entities)` | 对指定实体类型进行脱敏。 | `masked_text`、`detected_entities` |
+| `AI_EMBED(model, input)` | 生成 embedding 向量。 | 不返回 JSON，而是返回 `ARRAY<FLOAT>`。 |
+
+六个专用文本函数使用内置英文 prompt 模板，但输入文本可以是任意语言。输入为 `NULL` 时直接返回 `NULL`，且不会调用模型；模型返回 `NULL` 时也返回 `NULL`。非空文本响应必须是语法合法的 JSON，否则当前记录处理失败，错误信息会标明具体 AI 函数。运行时只校验 JSON 语法，不校验响应字段是否存在或字段类型是否匹配。
 
 ## OpenAI-compatible 模型客户端
 
-AI 模型客户端可供 transform 中的 `AI_COMPLETE` 和 `AI_EMBED` 函数引用。使用时，需要通过 `--jar` 将模型实现 JAR（例如 `flink-cdc-pipeline-model-openai-compatible`）添加到 Pipeline 命令中。
+AI 模型客户端可供上述 AI Functions 引用。使用时，需要通过 `--jar` 将模型实现 JAR（例如 `flink-cdc-pipeline-model-openai-compatible`）添加到 Pipeline 命令中。
 
 OpenAI-compatible 客户端支持调用实现 OpenAI Chat Completions 和 Embeddings REST API 的服务。
 
@@ -40,6 +59,7 @@ transform:
     projection: >-
       *,
       AI_COMPLETE('completion_model', content, '总结输入内容') AS summary,
+      AI_SENTIMENT('completion_model', content) AS sentiment,
       AI_EMBED('embedding_model', content) AS embedding
 
 pipeline:
@@ -71,11 +91,11 @@ pipeline:
 | `model` | 是 | 发送给服务端的模型名称；`model-name` 作为废弃别名仍可使用。 |
 | `endpoint` | 是 | OpenAI-compatible 服务的 Base URL。 |
 | `api-key` | 是 | 请求认证使用的 Bearer Token。 |
-| `system-prompt` | 否 | 添加在 `AI_COMPLETE` 生成的 system prompt 之前。 |
+| `system-prompt` | 否 | 添加在所有文本 AI Function 的 prompt 之前。 |
 | `user-prompt` | 否 | 在输入之后追加一条 user message。 |
 | `temperature`、`top-p`、`stop`、`max-tokens` | 否 | 常用文本生成参数。 |
 | `presence-penalty`、`frequency-penalty`、`n`、`seed` | 否 | 其他文本生成参数。 |
-| `response-format` | 否 | 支持 `json_object`；AI completion 的结果必须是合法 JSON。 |
+| `response-format` | 否 | 支持 `json_object`；文本 AI Function 的结果必须是合法 JSON。 |
 | `content-type` | 否 | `text`（默认）或 `image_url`。 |
 | `dimension` | 否 | 请求的 embedding 维度。 |
 | `extra-header`、`extra-body` | 否 | JSON 对象格式的厂商自定义请求头或请求体字段。 |
