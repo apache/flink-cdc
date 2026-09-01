@@ -22,8 +22,7 @@ import org.apache.flink.cdc.common.types.DataTypes;
 
 /** Built-in AI embedding function definitions with configurable input and output types. */
 public enum AiEmbeddingFunctionDef {
-    AI_EMBED("AI_EMBED", DataTypes.STRING(), DataTypes.ARRAY(DataTypes.FLOAT())),
-    AI_IMAGE_EMBED("AI_IMAGE_EMBED", DataTypes.BYTES(), DataTypes.ARRAY(DataTypes.FLOAT()));
+    AI_EMBED("AI_EMBED", DataTypes.STRING(), DataTypes.ARRAY(DataTypes.FLOAT()));
 
     private final String functionName;
     private final DataType inputType;

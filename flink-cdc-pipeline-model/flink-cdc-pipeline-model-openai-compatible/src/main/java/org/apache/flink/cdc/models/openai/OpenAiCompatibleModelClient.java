@@ -64,6 +64,15 @@ public class OpenAiCompatibleModelClient
 
     private static final Logger LOG = LoggerFactory.getLogger(OpenAiCompatibleModelClient.class);
 
+    private static final byte[] PNG_SIGNATURE =
+            new byte[] {(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
+    private static final byte[] JPEG_SIGNATURE = new byte[] {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF};
+    private static final byte[] GIF87A_SIGNATURE = new byte[] {0x47, 0x49, 0x46, 0x38, 0x37, 0x61};
+    private static final byte[] GIF89A_SIGNATURE = new byte[] {0x47, 0x49, 0x46, 0x38, 0x39, 0x61};
+    private static final byte[] RIFF_SIGNATURE = new byte[] {0x52, 0x49, 0x46, 0x46};
+    private static final byte[] WEBP_SIGNATURE = new byte[] {0x57, 0x45, 0x42, 0x50};
+    private static final int WEBP_SIGNATURE_OFFSET = 8;
+
     private static final long serialVersionUID = 1L;
 
     private final String endpoint;
@@ -226,45 +235,34 @@ public class OpenAiCompatibleModelClient
         if (bytes == null || bytes.length == 0) {
             throw new IllegalArgumentException("Image bytes must not be null or empty.");
         }
-        if (bytes.length >= 8
-                && (bytes[0] & 0xFF) == 0x89
-                && bytes[1] == 0x50
-                && bytes[2] == 0x4E
-                && bytes[3] == 0x47
-                && bytes[4] == 0x0D
-                && bytes[5] == 0x0A
-                && bytes[6] == 0x1A
-                && bytes[7] == 0x0A) {
+        if (matchesSignature(bytes, 0, PNG_SIGNATURE)) {
             return "image/png";
         }
-        if (bytes.length >= 3
-                && (bytes[0] & 0xFF) == 0xFF
-                && (bytes[1] & 0xFF) == 0xD8
-                && (bytes[2] & 0xFF) == 0xFF) {
+        if (matchesSignature(bytes, 0, JPEG_SIGNATURE)) {
             return "image/jpeg";
         }
-        if (bytes.length >= 6
-                && bytes[0] == 0x47
-                && bytes[1] == 0x49
-                && bytes[2] == 0x46
-                && bytes[3] == 0x38
-                && (bytes[4] == 0x37 || bytes[4] == 0x39)
-                && bytes[5] == 0x61) {
+        if (matchesSignature(bytes, 0, GIF87A_SIGNATURE)
+                || matchesSignature(bytes, 0, GIF89A_SIGNATURE)) {
             return "image/gif";
         }
-        if (bytes.length >= 12
-                && bytes[0] == 0x52
-                && bytes[1] == 0x49
-                && bytes[2] == 0x46
-                && bytes[3] == 0x46
-                && bytes[8] == 0x57
-                && bytes[9] == 0x45
-                && bytes[10] == 0x42
-                && bytes[11] == 0x50) {
+        if (matchesSignature(bytes, 0, RIFF_SIGNATURE)
+                && matchesSignature(bytes, WEBP_SIGNATURE_OFFSET, WEBP_SIGNATURE)) {
             return "image/webp";
         }
         throw new IllegalArgumentException(
                 "Unrecognized image format. Supported formats: PNG, JPEG, GIF, WebP.");
+    }
+
+    private static boolean matchesSignature(byte[] bytes, int offset, byte[] signature) {
+        if (bytes.length < offset + signature.length) {
+            return false;
+        }
+        for (int i = 0; i < signature.length; i++) {
+            if (bytes[offset + i] != signature[i]) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private void applyCompletionParams(ChatCompletionCreateParams.Builder builder) {

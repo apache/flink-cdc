@@ -19,25 +19,57 @@ package org.apache.flink.cdc.runtime.ai;
 
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
+import org.apache.flink.cdc.common.types.RowType;
 
-/** Built-in AI image-to-text function definitions. */
+/** Built-in AI image function definitions. */
 public enum AiImageFunctionDef {
-    AI_IMAGE_COMPLETE("AI_IMAGE_COMPLETE", DataTypes.STRING());
+    AI_IMAGE_COMPLETE(
+            "AI_IMAGE_COMPLETE",
+            RowType.of(
+                    new DataType[] {DataTypes.BYTES(), DataTypes.STRING()},
+                    new String[] {"image", "prompt"}),
+            DataTypes.STRING(),
+            Capability.IMAGE_TEXT_GENERATION),
+
+    AI_IMAGE_EMBED(
+            "AI_IMAGE_EMBED",
+            RowType.of(new DataType[] {DataTypes.BYTES()}, new String[] {"image"}),
+            DataTypes.ARRAY(DataTypes.FLOAT()),
+            Capability.IMAGE_EMBEDDING);
+
+    /** Capability required by an image AI function. */
+    public enum Capability {
+        IMAGE_TEXT_GENERATION,
+        IMAGE_EMBEDDING
+    }
 
     private final String functionName;
+    private final RowType inputType;
     private final DataType outputType;
+    private final Capability capability;
 
-    AiImageFunctionDef(String functionName, DataType outputType) {
+    AiImageFunctionDef(
+            String functionName, RowType inputType, DataType outputType, Capability capability) {
         this.functionName = functionName;
+        this.inputType = inputType;
         this.outputType = outputType;
+        this.capability = capability;
     }
 
     public String getFunctionName() {
         return functionName;
     }
 
-    /** The type of the generated value (STRING for image-to-text completion). */
+    /** Returns the parameter types after the model argument. */
+    public RowType getInputType() {
+        return inputType;
+    }
+
     public DataType getOutputType() {
         return outputType;
+    }
+
+    public Capability getCapability() {
+        return capability;
     }
 }

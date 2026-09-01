@@ -87,9 +87,7 @@ public class AiFunctionSqlOperatorTable {
                         CalciteDataTypeConverter.convertCalciteType(
                                 opBinding.getTypeFactory(), def.getOutputType()),
                 null,
-                // modelName (STRING), image (BINARY), prompt (STRING)
-                OperandTypes.family(
-                        SqlTypeFamily.STRING, SqlTypeFamily.BINARY, SqlTypeFamily.STRING),
+                OperandTypes.family(toSqlTypeFamiliesWithModelArgument(def.getInputType())),
                 SqlFunctionCategory.USER_DEFINED_FUNCTION);
     }
 
@@ -101,6 +99,15 @@ public class AiFunctionSqlOperatorTable {
         List<SqlTypeFamily> families = new ArrayList<>();
         families.add(SqlTypeFamily.STRING); // modelName
         families.add(SqlTypeFamily.STRING); // input
+        for (DataType fieldType : inputType.getFieldTypes()) {
+            families.add(toSqlTypeFamily(fieldType));
+        }
+        return families.toArray(new SqlTypeFamily[0]);
+    }
+
+    private static SqlTypeFamily[] toSqlTypeFamiliesWithModelArgument(RowType inputType) {
+        List<SqlTypeFamily> families = new ArrayList<>();
+        families.add(SqlTypeFamily.STRING);
         for (DataType fieldType : inputType.getFieldTypes()) {
             families.add(toSqlTypeFamily(fieldType));
         }

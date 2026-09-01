@@ -184,38 +184,40 @@ class AiFunctionParserTest {
 
     @Test
     void testSameNamedUdfTakesPrecedenceOverImageAiFunction() {
-        Set<String> udfNames = Set.of("ai_image_embed");
+        assertSameNamedUdfTakesPrecedenceOverImageAiFunction(
+                "AI_IMAGE_COMPLETE", "ai_image_complete");
+        assertSameNamedUdfTakesPrecedenceOverImageAiFunction("AI_IMAGE_EMBED", "ai_image_embed");
+    }
+
+    private static void assertSameNamedUdfTakesPrecedenceOverImageAiFunction(
+            String functionName, String udfName) {
+        String projection = functionName + "(id) AS udf_output";
+        Set<String> udfNames = Set.of(udfName);
 
         assertThatCode(
                         () ->
                                 TransformParser.validateAiModelReferences(
-                                        "AI_IMAGE_EMBED(id) AS embedding",
-                                        null,
-                                        Collections.emptySet(),
-                                        udfNames))
+                                        projection, null, Collections.emptySet(), udfNames))
                 .doesNotThrowAnyException();
         assertThatCode(
                         () ->
                                 TransformParser.validateAiModelCapabilities(
-                                        "AI_IMAGE_EMBED(id) AS embedding",
-                                        null,
-                                        Collections.emptyMap(),
-                                        udfNames))
+                                        projection, null, Collections.emptyMap(), udfNames))
                 .doesNotThrowAnyException();
 
         List<ProjectionColumn> columns =
                 TransformParser.generateProjectionColumns(
-                        "AI_IMAGE_EMBED(id) AS embedding",
+                        projection,
                         COLUMNS,
                         List.of(
                                 new UserDefinedFunctionDescriptor(
-                                        "ai_image_embed",
+                                        udfName,
                                         "org.apache.flink.cdc.udf.examples.java.AddOneFunctionClass")),
                         new SupportedMetadataColumn[0]);
 
         assertThat(columns)
                 .extracting(ProjectionColumn::getScriptExpression)
-                .containsExactly("__udf_ai_image_embed.eval($0)");
+                .containsExactly("__udf_" + udfName + ".eval($0)");
         assertThat(columns)
                 .extracting(ProjectionColumn::getDataType)
                 .containsExactly(DataTypes.STRING());
