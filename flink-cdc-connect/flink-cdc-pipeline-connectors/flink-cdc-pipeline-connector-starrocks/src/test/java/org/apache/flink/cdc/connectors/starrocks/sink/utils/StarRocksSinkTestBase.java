@@ -207,6 +207,25 @@ public class StarRocksSinkTestBase extends TestLogger {
         return results;
     }
 
+    public List<String> inspectColumnComments(TableId tableId) throws SQLException {
+        List<String> results = new ArrayList<>();
+        ResultSet rs =
+                STARROCKS_CONTAINER
+                        .createConnection("")
+                        .createStatement()
+                        .executeQuery(
+                                String.format(
+                                        "SELECT COLUMN_NAME, COLUMN_COMMENT FROM information_schema.columns "
+                                                + "WHERE TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s' "
+                                                + "ORDER BY ORDINAL_POSITION",
+                                        tableId.getSchemaName(), tableId.getTableName()));
+
+        while (rs.next()) {
+            results.add(rs.getString("COLUMN_NAME") + " | " + rs.getString("COLUMN_COMMENT"));
+        }
+        return results;
+    }
+
     public List<String> fetchTableContent(TableId tableId, int columnCount) throws SQLException {
         List<String> results = new ArrayList<>();
         ResultSet rs =
