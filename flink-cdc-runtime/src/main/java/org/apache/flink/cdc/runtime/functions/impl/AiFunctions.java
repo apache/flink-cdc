@@ -19,6 +19,8 @@ package org.apache.flink.cdc.runtime.functions.impl;
 
 import org.apache.flink.cdc.common.model.AiModelClient;
 import org.apache.flink.cdc.common.model.abilities.SupportsEmbedding;
+import org.apache.flink.cdc.common.model.abilities.SupportsImageEmbedding;
+import org.apache.flink.cdc.common.model.abilities.SupportsImageTextGeneration;
 import org.apache.flink.cdc.common.model.abilities.SupportsTextGeneration;
 import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.common.types.variant.BinaryVariant;
@@ -108,6 +110,33 @@ public class AiFunctions {
                     "Model " + model.getClass().getName() + " does not support embedding");
         }
         float[] embedding = ((SupportsEmbedding) model).embed(input);
+        return embedding == null ? null : Floats.asList(embedding);
+    }
+
+    /** Dispatches image-to-text AI functions. */
+    public static String aiImageComplete(AiModelClient model, byte[] image, String prompt) {
+        if (image == null) {
+            return null;
+        }
+        if (!(model instanceof SupportsImageTextGeneration)) {
+            throw new UnsupportedOperationException(
+                    "Model "
+                            + model.getClass().getName()
+                            + " does not support image text generation");
+        }
+        return ((SupportsImageTextGeneration) model).generateTextFromImage(image, prompt);
+    }
+
+    /** Dispatches image embedding AI functions. */
+    public static List<Float> aiImageEmbed(AiModelClient model, byte[] image) {
+        if (image == null) {
+            return null;
+        }
+        if (!(model instanceof SupportsImageEmbedding)) {
+            throw new UnsupportedOperationException(
+                    "Model " + model.getClass().getName() + " does not support image embedding");
+        }
+        float[] embedding = ((SupportsImageEmbedding) model).embedImage(image);
         return embedding == null ? null : Floats.asList(embedding);
     }
 

@@ -24,11 +24,12 @@ under the License.
 
 # AI Model
 
-AI models can be used in transform expressions for text generation, text analysis, and embedding.
+AI models can be used in transform expressions for text generation, text analysis, embedding, and
+image understanding.
 
 ## AI Functions
 
-The model name must be a string constant that refers to a model declared in `pipeline.model`. Text functions require a model client that implements text generation, while `AI_EMBED` requires embedding support. The pipeline validates the referenced model capability before execution.
+The model name must be a string constant that refers to a model declared in `pipeline.model`. Text functions require a model client that implements text generation, while embedding and image functions require their corresponding capabilities. The pipeline validates the referenced model capability before execution.
 
 All text functions return `VARIANT` values parsed from the model's JSON response.
 
@@ -43,13 +44,30 @@ All text functions return `VARIANT` values parsed from the model's JSON response
 | `AI_MASK(model, input, entities)` | Masks the requested entity types. | `masked_text`, `detected_entities` |
 | `AI_EMBED(model, input)` | Creates an embedding vector. | Returns `ARRAY<FLOAT>` instead of JSON. |
 
+The following multimodal functions accept image data from a `BYTES` column:
+
+| Function | Description | Return type |
+|----------|-------------|-------------|
+| `AI_IMAGE_COMPLETE(model, image, prompt)` | Generates text from an image and a natural-language prompt. | `STRING` |
+| `AI_IMAGE_EMBED(model, image)` | Converts an image into an embedding vector. | `ARRAY<FLOAT>` |
+
+The OpenAI-compatible model client supports `AI_IMAGE_COMPLETE` through standard vision chat. It
+detects PNG, JPEG, GIF, and WebP images and sends the image as a Base64 data URL. A `NULL` image
+returns `NULL` without invoking the model, while empty or unrecognized image data is rejected before
+the request is sent.
+
+`AI_IMAGE_EMBED` currently provides only the framework function and provider capability. The
+OpenAI-compatible model client does not implement image embedding, and the community distribution
+does not yet include a production provider for it. Users who need image embedding must wait for a
+follow-up provider implementation.
+
 The specialized text functions use built-in English prompt templates, but their input may be in any language. If the input is `NULL`, the function returns `NULL` without invoking the model. A `NULL` model response also produces `NULL`. A non-null text response must be syntactically valid JSON; otherwise, record processing fails with an error that identifies the AI function. The runtime validates JSON syntax but does not validate the presence or types of individual response fields.
 
 ## OpenAI-compatible Model Client
 
 AI model clients can be referenced by the AI functions above. Add the model implementation JAR, such as `flink-cdc-pipeline-model-openai-compatible`, to the pipeline command with `--jar`.
 
-The OpenAI-compatible client supports chat completions and text embeddings against endpoints that implement the corresponding OpenAI REST APIs.
+The OpenAI-compatible client supports chat completions, vision chat, and text embeddings against endpoints that implement the corresponding OpenAI REST APIs.
 
 System prompts, function prompts, and input text may contain either English or Chinese content.
 
@@ -60,6 +78,7 @@ transform:
       *,
       AI_COMPLETE('completion_model', content, 'Summarize the input') AS summary,
       AI_SENTIMENT('completion_model', content) AS sentiment,
+      AI_IMAGE_COMPLETE('vision_model', image, 'Describe the image') AS image_description,
       AI_EMBED('embedding_model', content) AS embedding
 
 pipeline:
@@ -80,6 +99,12 @@ pipeline:
         endpoint: https://api.example.com/v1
         api-key: <api-key>
         dimension: 768
+    - name: vision_model
+      type: openai-compatible
+      options:
+        model: gpt-4o-mini
+        endpoint: https://api.example.com/v1
+        api-key: <api-key>
 ```
 
 Do not store API keys in source control. Supply them through the secret-management mechanism of your deployment environment.

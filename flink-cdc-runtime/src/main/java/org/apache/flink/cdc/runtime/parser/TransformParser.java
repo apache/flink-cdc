@@ -20,6 +20,8 @@ package org.apache.flink.cdc.runtime.parser;
 import org.apache.flink.api.common.io.ParseException;
 import org.apache.flink.cdc.common.model.AiModelClient;
 import org.apache.flink.cdc.common.model.abilities.SupportsEmbedding;
+import org.apache.flink.cdc.common.model.abilities.SupportsImageEmbedding;
+import org.apache.flink.cdc.common.model.abilities.SupportsImageTextGeneration;
 import org.apache.flink.cdc.common.model.abilities.SupportsTextGeneration;
 import org.apache.flink.cdc.common.pipeline.DecimalPrecisionMode;
 import org.apache.flink.cdc.common.schema.Column;
@@ -27,6 +29,7 @@ import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.runtime.ai.AiEmbeddingFunctionDef;
+import org.apache.flink.cdc.runtime.ai.AiImageFunctionDef;
 import org.apache.flink.cdc.runtime.ai.AiTextFunctionDef;
 import org.apache.flink.cdc.runtime.operators.transform.ProjectionColumn;
 import org.apache.flink.cdc.runtime.operators.transform.UserDefinedFunctionDescriptor;
@@ -1004,6 +1007,18 @@ public class TransformParser {
                             "Model '%s' referenced by %s does not support text generation.",
                             modelName,
                             functionName);
+                } else if (isImageTextAiFunction(functionName)) {
+                    Preconditions.checkArgument(
+                            modelClient instanceof SupportsImageTextGeneration,
+                            "Model '%s' referenced by %s does not support image text generation.",
+                            modelName,
+                            functionName);
+                } else if (isImageEmbeddingAiFunction(functionName)) {
+                    Preconditions.checkArgument(
+                            modelClient instanceof SupportsImageEmbedding,
+                            "Model '%s' referenced by %s does not support image embedding.",
+                            modelName,
+                            functionName);
                 } else {
                     Preconditions.checkArgument(
                             modelClient instanceof SupportsEmbedding,
@@ -1040,7 +1055,10 @@ public class TransformParser {
     }
 
     private static boolean isAiFunction(String functionName) {
-        return isTextAiFunction(functionName) || isEmbeddingAiFunction(functionName);
+        return isTextAiFunction(functionName)
+                || isEmbeddingAiFunction(functionName)
+                || isImageTextAiFunction(functionName)
+                || isImageEmbeddingAiFunction(functionName);
     }
 
     private static boolean isTextAiFunction(String functionName) {
@@ -1059,6 +1077,21 @@ public class TransformParser {
             }
         }
         return false;
+    }
+
+    private static boolean isImageTextAiFunction(String functionName) {
+        for (AiImageFunctionDef function : AiImageFunctionDef.values()) {
+            if (function.getFunctionName().equalsIgnoreCase(functionName)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isImageEmbeddingAiFunction(String functionName) {
+        return AiEmbeddingFunctionDef.AI_IMAGE_EMBED
+                .getFunctionName()
+                .equalsIgnoreCase(functionName);
     }
 
     public static boolean hasAsterisk(@Nullable String projection) {

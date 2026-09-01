@@ -19,10 +19,17 @@ package org.apache.flink.cdc.models.dummy;
 
 import org.apache.flink.cdc.common.model.AiModelClient;
 import org.apache.flink.cdc.common.model.abilities.SupportsEmbedding;
+import org.apache.flink.cdc.common.model.abilities.SupportsImageEmbedding;
+import org.apache.flink.cdc.common.model.abilities.SupportsImageTextGeneration;
 import org.apache.flink.cdc.common.model.abilities.SupportsTextGeneration;
 
 /** Deterministic AI model client used by tests. */
-public class DummyModelClient implements AiModelClient, SupportsTextGeneration, SupportsEmbedding {
+public class DummyModelClient
+        implements AiModelClient,
+                SupportsTextGeneration,
+                SupportsEmbedding,
+                SupportsImageTextGeneration,
+                SupportsImageEmbedding {
 
     private static final long serialVersionUID = 1L;
 
@@ -61,6 +68,24 @@ public class DummyModelClient implements AiModelClient, SupportsTextGeneration, 
     @Override
     public float[] embed(String text) {
         return new float[] {3f, 1f, 4f, 1f, 5f, 9f, 2f, 6f};
+    }
+
+    @Override
+    public String generateTextFromImage(byte[] image, String prompt) {
+        if (debug) {
+            System.out.printf(
+                    "Received image of %d bytes%nPrompt: %s%n",
+                    image == null ? 0 : image.length, prompt);
+        }
+        return "A dummy description of the image.";
+    }
+
+    @Override
+    public float[] embedImage(byte[] image) {
+        if (debug) {
+            System.out.printf("Received image of %d bytes%n", image == null ? 0 : image.length);
+        }
+        return new float[] {2f, 7f, 1f, 8f, 2f, 8f};
     }
 
     @Override

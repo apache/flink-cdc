@@ -19,6 +19,8 @@ package org.apache.flink.cdc.runtime.functions.impl;
 
 import org.apache.flink.cdc.common.model.AiModelClient;
 import org.apache.flink.cdc.common.model.abilities.SupportsEmbedding;
+import org.apache.flink.cdc.common.model.abilities.SupportsImageEmbedding;
+import org.apache.flink.cdc.common.model.abilities.SupportsImageTextGeneration;
 import org.apache.flink.cdc.common.model.abilities.SupportsTextGeneration;
 
 import org.junit.jupiter.api.Test;
@@ -33,13 +35,19 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class AiFunctionsTest {
 
     private static class TestModelClient
-            implements AiModelClient, SupportsTextGeneration, SupportsEmbedding {
+            implements AiModelClient,
+                    SupportsTextGeneration,
+                    SupportsEmbedding,
+                    SupportsImageTextGeneration,
+                    SupportsImageEmbedding {
 
         private static final long serialVersionUID = 1L;
 
         private final String response;
         private final List<String> prompts = new ArrayList<>();
         private int embedCalls;
+        private int imageTextCalls;
+        private int imageEmbedCalls;
 
         private TestModelClient() {
             this("{\"result\":\"ABC\"}");
@@ -59,6 +67,18 @@ class AiFunctionsTest {
         public float[] embed(String text) {
             embedCalls++;
             return new float[] {0.1f, 0.2f, 0.3f};
+        }
+
+        @Override
+        public String generateTextFromImage(byte[] image, String prompt) {
+            imageTextCalls++;
+            return "image has " + image.length + " bytes, prompt: " + prompt;
+        }
+
+        @Override
+        public float[] embedImage(byte[] image) {
+            imageEmbedCalls++;
+            return new float[] {0.9f, 0.8f, 0.7f};
         }
     }
 
@@ -114,6 +134,18 @@ class AiFunctionsTest {
     }
 
     @Test
+    void testImageAiFunctions() {
+        TestModelClient model = new TestModelClient();
+        byte[] image = new byte[] {1, 2, 3, 4};
+
+        assertThat(AiFunctions.aiImageComplete(model, image, "Describe the image"))
+                .isEqualTo("image has 4 bytes, prompt: Describe the image");
+        assertThat(AiFunctions.aiImageEmbed(model, image)).containsExactly(0.9f, 0.8f, 0.7f);
+        assertThat(model.imageTextCalls).isOne();
+        assertThat(model.imageEmbedCalls).isOne();
+    }
+
+    @Test
     void testUnsupportedCapabilities() {
         UnsupportedModelClient model = new UnsupportedModelClient();
 
@@ -123,6 +155,12 @@ class AiFunctionsTest {
         assertThatThrownBy(() -> AiFunctions.aiEmbed(model, "input"))
                 .isInstanceOf(UnsupportedOperationException.class)
                 .hasMessageContaining("does not support embedding");
+        assertThatThrownBy(() -> AiFunctions.aiImageComplete(model, new byte[] {1, 2}, "describe"))
+                .isInstanceOf(UnsupportedOperationException.class)
+                .hasMessageContaining("does not support image text generation");
+        assertThatThrownBy(() -> AiFunctions.aiImageEmbed(model, new byte[] {1, 2}))
+                .isInstanceOf(UnsupportedOperationException.class)
+                .hasMessageContaining("does not support image embedding");
     }
 
     @Test
@@ -153,8 +191,12 @@ class AiFunctionsTest {
 
         assertThat(AiFunctions.aiClassify(model, null, "positive,negative")).isNull();
         assertThat(AiFunctions.aiEmbed(model, null)).isNull();
+        assertThat(AiFunctions.aiImageComplete(model, null, "describe")).isNull();
+        assertThat(AiFunctions.aiImageEmbed(model, null)).isNull();
         assertThat(model.prompts).isEmpty();
         assertThat(model.embedCalls).isZero();
+        assertThat(model.imageTextCalls).isZero();
+        assertThat(model.imageEmbedCalls).isZero();
     }
 
     @Test

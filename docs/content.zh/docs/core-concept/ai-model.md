@@ -24,11 +24,11 @@ under the License.
 
 # AI 模型
 
-AI 模型可用于 transform 表达式中的文本生成、文本分析和 embedding。
+AI 模型可用于 transform 表达式中的文本生成、文本分析、embedding 和图片理解。
 
 ## AI Functions
 
-模型名称必须是字符串常量，并引用 `pipeline.model` 中声明的模型。文本函数要求模型客户端支持文本生成，`AI_EMBED` 要求模型客户端支持 embedding；Pipeline 会在执行前校验引用模型的 capability 是否匹配。
+模型名称必须是字符串常量，并引用 `pipeline.model` 中声明的模型。文本、embedding 和图片函数分别要求模型客户端实现对应的 capability；Pipeline 会在执行前校验引用模型的 capability 是否匹配。
 
 所有文本函数都会将模型返回的 JSON 解析为 `VARIANT`。
 
@@ -43,13 +43,24 @@ AI 模型可用于 transform 表达式中的文本生成、文本分析和 embed
 | `AI_MASK(model, input, entities)` | 对指定实体类型进行脱敏。 | `masked_text`、`detected_entities` |
 | `AI_EMBED(model, input)` | 生成 embedding 向量。 | 不返回 JSON，而是返回 `ARRAY<FLOAT>`。 |
 
+以下多模态函数从 `BYTES` 字段读取图片数据：
+
+| 函数 | 说明 | 返回类型 |
+|------|------|----------|
+| `AI_IMAGE_COMPLETE(model, image, prompt)` | 根据图片和自然语言 prompt 生成文本。 | `STRING` |
+| `AI_IMAGE_EMBED(model, image)` | 将图片转换为 embedding 向量。 | `ARRAY<FLOAT>` |
+
+OpenAI-compatible 模型客户端通过标准 vision chat 支持 `AI_IMAGE_COMPLETE`。客户端会识别 PNG、JPEG、GIF 和 WebP 图片，并将图片编码为 Base64 data URL。图片为 `NULL` 时直接返回 `NULL`，且不会调用模型；图片为空或格式无法识别时，会在发送请求前报错。
+
+`AI_IMAGE_EMBED` 当前只提供框架函数和 provider capability。OpenAI-compatible 模型客户端不实现图片 embedding，社区发行包目前也没有可用于生产的图片 embedding provider。需要图片向量化的用户需要等待后续 provider 实现。
+
 六个专用文本函数使用内置英文 prompt 模板，但输入文本可以是任意语言。输入为 `NULL` 时直接返回 `NULL`，且不会调用模型；模型返回 `NULL` 时也返回 `NULL`。非空文本响应必须是语法合法的 JSON，否则当前记录处理失败，错误信息会标明具体 AI 函数。运行时只校验 JSON 语法，不校验响应字段是否存在或字段类型是否匹配。
 
 ## OpenAI-compatible 模型客户端
 
 AI 模型客户端可供上述 AI Functions 引用。使用时，需要通过 `--jar` 将模型实现 JAR（例如 `flink-cdc-pipeline-model-openai-compatible`）添加到 Pipeline 命令中。
 
-OpenAI-compatible 客户端支持调用实现 OpenAI Chat Completions 和 Embeddings REST API 的服务。
+OpenAI-compatible 客户端支持调用实现 OpenAI Chat Completions、vision chat 和 Embeddings REST API 的服务。
 
 system prompt、函数 prompt 和输入文本均支持英文或中文内容。
 
@@ -60,6 +71,7 @@ transform:
       *,
       AI_COMPLETE('completion_model', content, '总结输入内容') AS summary,
       AI_SENTIMENT('completion_model', content) AS sentiment,
+      AI_IMAGE_COMPLETE('vision_model', image, '描述这张图片') AS image_description,
       AI_EMBED('embedding_model', content) AS embedding
 
 pipeline:
@@ -80,6 +92,12 @@ pipeline:
         endpoint: https://api.example.com/v1
         api-key: <api-key>
         dimension: 768
+    - name: vision_model
+      type: openai-compatible
+      options:
+        model: gpt-4o-mini
+        endpoint: https://api.example.com/v1
+        api-key: <api-key>
 ```
 
 不要将 API Key 提交到代码仓库中，请通过部署环境的密钥管理机制提供。

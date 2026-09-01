@@ -21,6 +21,8 @@ import org.apache.flink.cdc.common.factories.Factory;
 import org.apache.flink.cdc.common.model.AiModelClient;
 import org.apache.flink.cdc.common.model.ModelContext;
 import org.apache.flink.cdc.common.model.abilities.SupportsEmbedding;
+import org.apache.flink.cdc.common.model.abilities.SupportsImageEmbedding;
+import org.apache.flink.cdc.common.model.abilities.SupportsImageTextGeneration;
 import org.apache.flink.cdc.common.model.abilities.SupportsTextGeneration;
 import org.apache.flink.table.api.ValidationException;
 
@@ -73,7 +75,9 @@ class OpenAiCompatibleModelClientFactoryTest {
         assertThat(client)
                 .isInstanceOf(OpenAiCompatibleModelClient.class)
                 .isInstanceOf(SupportsTextGeneration.class)
-                .isInstanceOf(SupportsEmbedding.class);
+                .isInstanceOf(SupportsEmbedding.class)
+                .isInstanceOf(SupportsImageTextGeneration.class)
+                .isNotInstanceOf(SupportsImageEmbedding.class);
     }
 
     @Test
