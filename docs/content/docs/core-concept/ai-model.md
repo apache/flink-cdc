@@ -56,10 +56,11 @@ detects PNG, JPEG, GIF, and WebP images and sends the image as a Base64 data URL
 returns `NULL` without invoking the model, while empty or unrecognized image data is rejected before
 the request is sent.
 
-`AI_IMAGE_EMBED` currently provides only the framework function and provider capability. The
-OpenAI-compatible model client does not implement image embedding, and the community distribution
-does not yet include a production provider for it. Users who need image embedding must wait for a
-follow-up provider implementation.
+`AI_IMAGE_EMBED` currently provides only the framework function and provider capability. The OpenAI
+API does not define a standard image embedding protocol, so image embedding requires a
+provider-specific implementation. The OpenAI-compatible model client does not implement image
+embedding, and the community distribution does not yet include a production provider for it. Users
+who need image embedding must wait for a follow-up provider implementation.
 
 The specialized text functions use built-in English prompt templates, but their input may be in any language. If the input is `NULL`, the function returns `NULL` without invoking the model. A `NULL` model response also produces `NULL`. A non-null text response must be syntactically valid JSON; otherwise, record processing fails with an error that identifies the AI function. The runtime validates JSON syntax but does not validate the presence or types of individual response fields.
 

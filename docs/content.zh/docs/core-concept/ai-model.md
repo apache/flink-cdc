@@ -52,7 +52,7 @@ AI 模型可用于 transform 表达式中的文本生成、文本分析、embedd
 
 OpenAI-compatible 模型客户端通过标准 vision chat 支持 `AI_IMAGE_COMPLETE`。客户端会识别 PNG、JPEG、GIF 和 WebP 图片，并将图片编码为 Base64 data URL。图片为 `NULL` 时直接返回 `NULL`，且不会调用模型；图片为空或格式无法识别时，会在发送请求前报错。
 
-`AI_IMAGE_EMBED` 当前只提供框架函数和 provider capability。OpenAI-compatible 模型客户端不实现图片 embedding，社区发行包目前也没有可用于生产的图片 embedding provider。需要图片向量化的用户需要等待后续 provider 实现。
+`AI_IMAGE_EMBED` 当前只提供框架函数和 provider capability。OpenAI API 目前没有定义标准的图片向量化协议，因此图片 embedding 需要由具体 provider 单独实现。OpenAI-compatible 模型客户端不实现图片 embedding，社区发行包目前也没有可用于生产的图片 embedding provider。需要图片向量化的用户需要等待后续 provider 实现。
 
 六个专用文本函数使用内置英文 prompt 模板，但输入文本可以是任意语言。输入为 `NULL` 时直接返回 `NULL`，且不会调用模型；模型返回 `NULL` 时也返回 `NULL`。非空文本响应必须是语法合法的 JSON，否则当前记录处理失败，错误信息会标明具体 AI 函数。运行时只校验 JSON 语法，不校验响应字段是否存在或字段类型是否匹配。
 
