@@ -101,6 +101,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
     final boolean parseOnlineSchemaChanges;
     private final boolean useLegacyJsonFormat;
     private final boolean assignUnboundedChunkFirst;
+    private final long binlogPositionLagIntervalMs;
 
     private final boolean appendOnly;
 
@@ -144,6 +145,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
             boolean parseOnlineSchemaChanges,
             boolean useLegacyJsonFormat,
             boolean assignUnboundedChunkFirst,
+            long binlogPositionLagIntervalMs,
             boolean appendOnly) {
         this.physicalSchema = physicalSchema;
         this.port = port;
@@ -177,6 +179,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
         this.skipSnapshotBackFill = skipSnapshotBackFill;
         this.useLegacyJsonFormat = useLegacyJsonFormat;
         this.assignUnboundedChunkFirst = assignUnboundedChunkFirst;
+        this.binlogPositionLagIntervalMs = binlogPositionLagIntervalMs;
         this.appendOnly = appendOnly;
     }
 
@@ -241,6 +244,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                             .parseOnLineSchemaChanges(parseOnlineSchemaChanges)
                             .useLegacyJsonFormat(useLegacyJsonFormat)
                             .assignUnboundedChunkFirst(assignUnboundedChunkFirst)
+                            .binlogPositionLagIntervalMs(binlogPositionLagIntervalMs)
                             .build();
             return SourceProvider.of(parallelSource);
         } else {
@@ -330,6 +334,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                         parseOnlineSchemaChanges,
                         useLegacyJsonFormat,
                         assignUnboundedChunkFirst,
+                        binlogPositionLagIntervalMs,
                         appendOnly);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
@@ -376,6 +381,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 && parseOnlineSchemaChanges == that.parseOnlineSchemaChanges
                 && useLegacyJsonFormat == that.useLegacyJsonFormat
                 && assignUnboundedChunkFirst == that.assignUnboundedChunkFirst
+                && binlogPositionLagIntervalMs == that.binlogPositionLagIntervalMs
                 && Objects.equals(appendOnly, that.appendOnly);
     }
 
@@ -413,6 +419,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 parseOnlineSchemaChanges,
                 useLegacyJsonFormat,
                 assignUnboundedChunkFirst,
+                binlogPositionLagIntervalMs,
                 appendOnly);
     }
 

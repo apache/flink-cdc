@@ -432,6 +432,19 @@ Flink SQL> SELECT * FROM orders;
       </td>
     </tr>
     <tr>
+      <td>scan.binlog.position-lag.interval.ms</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">-1</td>
+      <td>Long</td>
+      <td>
+        获取 master binlog 状态以计算延迟指标的时间间隔（毫秒）。<br>
+        默认值 -1 表示关闭该功能。设置为正值（如 10000）时，连接器会按此间隔定期执行 SHOW MASTER STATUS 查询，并计算两个延迟指标：<br>
+        <li>currentBinlogTransactionLag：基于 GTID 的事务数延迟（非 GTID 模式下报告 -1）</li>
+        <li>currentBinlogBytePositionLag：基于 binlog 文件和位置的字节位置延迟</li>
+        注意：该指标仅在 binlog 增量读取阶段生效，snapshot 全量阶段不会产出此指标。开启此功能会对 MySQL 服务器产生额外的周期性查询。<br>
+      </td>
+    </tr>
+    <tr>
       <td>scan.incremental.snapshot.backfill.skip</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>

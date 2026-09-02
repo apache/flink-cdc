@@ -25,6 +25,8 @@ import org.apache.flink.runtime.metrics.MetricNames;
 /** A collection class for handling metrics in {@link MySqlSourceReader}. */
 public class MySqlSourceReaderMetrics {
 
+    public static final String CURRENT_BINLOG_TRANSACTION_LAG = "currentBinlogTransactionLag";
+    public static final String CURRENT_BINLOG_BYTE_POSITION_LAG = "currentBinlogBytePositionLag";
     public static final long UNDEFINED = -1;
 
     private final MetricGroup metricGroup;
@@ -35,6 +37,19 @@ public class MySqlSourceReaderMetrics {
      */
     private volatile long fetchDelay = UNDEFINED;
 
+    /**
+     * The binlog transaction lag between current consumed offset and the latest master offset. This
+     * metric is meaningful only in GTID mode. Reports -1 when GTID is not available.
+     */
+    private volatile long binlogTransactionLag = UNDEFINED;
+
+    /**
+     * The binlog byte position lag between current consumed offset and the latest master offset.
+     * Reports exact byte difference for same-file comparison and an estimate for cross-file.
+     * Reports -1 when position information is not available.
+     */
+    private volatile long binlogBytePositionLag = UNDEFINED;
+
     public MySqlSourceReaderMetrics(MetricGroup metricGroup) {
         this.metricGroup = metricGroup;
     }
@@ -44,11 +59,34 @@ public class MySqlSourceReaderMetrics {
                 MetricNames.CURRENT_FETCH_EVENT_TIME_LAG, (Gauge<Long>) this::getFetchDelay);
     }
 
+    public void registerBinlogLagMetrics() {
+        metricGroup.gauge(
+                CURRENT_BINLOG_TRANSACTION_LAG, (Gauge<Long>) this::getBinlogTransactionLag);
+        metricGroup.gauge(
+                CURRENT_BINLOG_BYTE_POSITION_LAG, (Gauge<Long>) this::getBinlogBytePositionLag);
+    }
+
     public long getFetchDelay() {
         return fetchDelay;
     }
 
     public void recordFetchDelay(long fetchDelay) {
         this.fetchDelay = fetchDelay;
+    }
+
+    public long getBinlogTransactionLag() {
+        return binlogTransactionLag;
+    }
+
+    public void recordBinlogTransactionLag(long lag) {
+        this.binlogTransactionLag = lag;
+    }
+
+    public long getBinlogBytePositionLag() {
+        return binlogBytePositionLag;
+    }
+
+    public void recordBinlogBytePositionLag(long lag) {
+        this.binlogBytePositionLag = lag;
     }
 }
