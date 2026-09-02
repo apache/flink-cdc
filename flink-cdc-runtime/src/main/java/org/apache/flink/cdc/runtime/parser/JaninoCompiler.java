@@ -30,6 +30,7 @@ import org.apache.flink.cdc.common.types.DecimalType;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.common.utils.StringUtils;
 import org.apache.flink.cdc.runtime.ai.AiEmbeddingFunctionDef;
+import org.apache.flink.cdc.runtime.ai.AiImageFunctionDef;
 import org.apache.flink.cdc.runtime.ai.AiTextFunctionDef;
 import org.apache.flink.cdc.runtime.operators.transform.UserDefinedFunctionDescriptor;
 import org.apache.flink.cdc.runtime.parser.metadata.MetadataColumns;
@@ -1109,6 +1110,11 @@ public class JaninoCompiler {
             }
         }
         for (AiEmbeddingFunctionDef def : AiEmbeddingFunctionDef.values()) {
+            if (def.getFunctionName().equals(upperCaseName)) {
+                return true;
+            }
+        }
+        for (AiImageFunctionDef def : AiImageFunctionDef.values()) {
             if (def.getFunctionName().equals(upperCaseName)) {
                 return true;
             }

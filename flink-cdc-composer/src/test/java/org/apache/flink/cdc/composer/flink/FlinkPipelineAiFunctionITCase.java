@@ -176,6 +176,32 @@ class FlinkPipelineAiFunctionITCase {
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, [3.0, 1.0, 4.0, 1.0, 5.0, 9.0, 2.0, 6.0]], op=INSERT, meta=()}");
     }
 
+    @Test
+    void testAiImageCompleteInProjection() throws Exception {
+        String[] output =
+                runAiFunctionTest(
+                        "id, AI_IMAGE_COMPLETE('visionModel', image, 'Describe the image') AS description",
+                        List.of(ModelDef.of("visionModel", "dummy", Collections.emptyMap())));
+
+        assertThat(output)
+                .containsExactly(
+                        "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT NOT NULL,`description` STRING}, primaryKeys=id, options=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, A dummy description of the image.], op=INSERT, meta=()}");
+    }
+
+    @Test
+    void testAiImageEmbedInProjection() throws Exception {
+        String[] output =
+                runAiFunctionTest(
+                        "id, AI_IMAGE_EMBED('imageEmbedModel', image) AS embedding",
+                        List.of(ModelDef.of("imageEmbedModel", "dummy", Collections.emptyMap())));
+
+        assertThat(output)
+                .containsExactly(
+                        "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT NOT NULL,`embedding` ARRAY<FLOAT>}, primaryKeys=id, options=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, [2.0, 7.0, 1.0, 8.0, 2.0, 8.0]], op=INSERT, meta=()}");
+    }
+
     private String[] runAiFunctionTest(String projection, List<ModelDef> models) throws Exception {
         return runAiFunctionTest(projection, models, Collections.emptyList());
     }
@@ -204,6 +230,7 @@ class FlinkPipelineAiFunctionITCase {
                 Schema.newBuilder()
                         .physicalColumn("id", DataTypes.INT())
                         .physicalColumn("content", DataTypes.STRING())
+                        .physicalColumn("image", DataTypes.BYTES())
                         .primaryKey("id")
                         .build();
         BinaryRecordDataGenerator generator =
@@ -216,7 +243,9 @@ class FlinkPipelineAiFunctionITCase {
                         tableId,
                         generator.generate(
                                 new Object[] {
-                                    1, BinaryStringData.fromString("I love this product")
+                                    1,
+                                    BinaryStringData.fromString("I love this product"),
+                                    new byte[] {1, 2, 3, 4}
                                 })));
         ValuesDataSourceHelper.setSourceEvents(Collections.singletonList(events));
 

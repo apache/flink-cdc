@@ -17,8 +17,10 @@
 
 package org.apache.flink.cdc.models.openai;
 
+import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.model.AiModelClient;
 import org.apache.flink.cdc.common.model.abilities.SupportsEmbedding;
+import org.apache.flink.cdc.common.model.abilities.SupportsImageTextGeneration;
 import org.apache.flink.cdc.common.model.abilities.SupportsTextGeneration;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -33,6 +35,7 @@ import com.openai.errors.OpenAIServiceException;
 import com.openai.models.chat.completions.ChatCompletion;
 import com.openai.models.chat.completions.ChatCompletionContentPart;
 import com.openai.models.chat.completions.ChatCompletionContentPartImage;
+import com.openai.models.chat.completions.ChatCompletionContentPartText;
 import com.openai.models.chat.completions.ChatCompletionCreateParams;
 import com.openai.models.embeddings.CreateEmbeddingResponse;
 import com.openai.models.embeddings.Embedding;
@@ -44,6 +47,7 @@ import javax.annotation.Nullable;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -53,9 +57,21 @@ import java.util.function.Supplier;
 
 /** AI model client that connects to an OpenAI-compatible endpoint. */
 public class OpenAiCompatibleModelClient
-        implements AiModelClient, SupportsTextGeneration, SupportsEmbedding {
+        implements AiModelClient,
+                SupportsTextGeneration,
+                SupportsEmbedding,
+                SupportsImageTextGeneration {
 
     private static final Logger LOG = LoggerFactory.getLogger(OpenAiCompatibleModelClient.class);
+
+    private static final byte[] PNG_SIGNATURE =
+            new byte[] {(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
+    private static final byte[] JPEG_SIGNATURE = new byte[] {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF};
+    private static final byte[] GIF87A_SIGNATURE = new byte[] {0x47, 0x49, 0x46, 0x38, 0x37, 0x61};
+    private static final byte[] GIF89A_SIGNATURE = new byte[] {0x47, 0x49, 0x46, 0x38, 0x39, 0x61};
+    private static final byte[] RIFF_SIGNATURE = new byte[] {0x52, 0x49, 0x46, 0x46};
+    private static final byte[] WEBP_SIGNATURE = new byte[] {0x57, 0x45, 0x42, 0x50};
+    private static final int WEBP_SIGNATURE_OFFSET = 8;
 
     private static final long serialVersionUID = 1L;
 
@@ -109,6 +125,15 @@ public class OpenAiCompatibleModelClient
         return executeWithRetry("embedding", () -> createEmbedding(text));
     }
 
+    @Override
+    public String generateTextFromImage(byte[] image, String prompt) {
+        if (image == null) {
+            return null;
+        }
+        String imageDataUrl = buildImageDataUrl(image);
+        return executeWithRetry("image completion", () -> completeImage(imageDataUrl, prompt));
+    }
+
     private String complete(String systemPrompt, String userInput) {
         ChatCompletionCreateParams.Builder builder =
                 ChatCompletionCreateParams.builder().model(model);
@@ -148,6 +173,96 @@ public class OpenAiCompatibleModelClient
                         () ->
                                 new IllegalStateException(
                                         "OpenAI-compatible text completion returned no text content."));
+    }
+
+    private String completeImage(String imageDataUrl, String prompt) {
+        ChatCompletionContentPart imagePart =
+                ChatCompletionContentPart.ofImageUrl(
+                        ChatCompletionContentPartImage.builder()
+                                .imageUrl(
+                                        ChatCompletionContentPartImage.ImageUrl.builder()
+                                                .url(imageDataUrl)
+                                                .build())
+                                .build());
+        ChatCompletionContentPart textPart =
+                ChatCompletionContentPart.ofText(
+                        ChatCompletionContentPartText.builder()
+                                .text(prompt != null ? prompt : "")
+                                .build());
+
+        ChatCompletionCreateParams.Builder builder =
+                ChatCompletionCreateParams.builder().model(model);
+        if (configuredSystemPrompt != null) {
+            builder.addSystemMessage(configuredSystemPrompt);
+        }
+        builder.addUserMessageOfArrayOfContentParts(List.of(textPart, imagePart));
+        if (params.userPrompt != null) {
+            builder.addUserMessage(params.userPrompt);
+        }
+        applyCompletionParams(builder);
+        builder.putAllAdditionalHeaders(headersOrEmpty());
+        builder.putAllAdditionalBodyProperties(bodyOrEmpty());
+
+        ChatCompletion completion = currentClient().chat().completions().create(builder.build());
+        if (completion.choices().isEmpty()) {
+            throw new IllegalStateException(
+                    "OpenAI-compatible image completion returned no choices.");
+        }
+        return completion
+                .choices()
+                .get(0)
+                .message()
+                .content()
+                .orElseThrow(
+                        () ->
+                                new IllegalStateException(
+                                        "OpenAI-compatible image completion returned no text content."));
+    }
+
+    private static String buildImageDataUrl(byte[] image) {
+        return "data:"
+                + detectImageMimeType(image)
+                + ";base64,"
+                + Base64.getEncoder().encodeToString(image);
+    }
+
+    /**
+     * Detects the MIME type of an image from its leading magic bytes. Throws {@link
+     * IllegalArgumentException} when the format cannot be recognized or the input is empty.
+     */
+    @VisibleForTesting
+    static String detectImageMimeType(byte[] bytes) {
+        if (bytes == null || bytes.length == 0) {
+            throw new IllegalArgumentException("Image bytes must not be null or empty.");
+        }
+        if (matchesSignature(bytes, 0, PNG_SIGNATURE)) {
+            return "image/png";
+        }
+        if (matchesSignature(bytes, 0, JPEG_SIGNATURE)) {
+            return "image/jpeg";
+        }
+        if (matchesSignature(bytes, 0, GIF87A_SIGNATURE)
+                || matchesSignature(bytes, 0, GIF89A_SIGNATURE)) {
+            return "image/gif";
+        }
+        if (matchesSignature(bytes, 0, RIFF_SIGNATURE)
+                && matchesSignature(bytes, WEBP_SIGNATURE_OFFSET, WEBP_SIGNATURE)) {
+            return "image/webp";
+        }
+        throw new IllegalArgumentException(
+                "Unrecognized image format. Supported formats: PNG, JPEG, GIF, WebP.");
+    }
+
+    private static boolean matchesSignature(byte[] bytes, int offset, byte[] signature) {
+        if (bytes.length < offset + signature.length) {
+            return false;
+        }
+        for (int i = 0; i < signature.length; i++) {
+            if (bytes[offset + i] != signature[i]) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private void applyCompletionParams(ChatCompletionCreateParams.Builder builder) {

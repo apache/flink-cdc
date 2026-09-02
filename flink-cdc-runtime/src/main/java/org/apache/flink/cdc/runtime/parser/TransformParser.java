@@ -20,6 +20,8 @@ package org.apache.flink.cdc.runtime.parser;
 import org.apache.flink.api.common.io.ParseException;
 import org.apache.flink.cdc.common.model.AiModelClient;
 import org.apache.flink.cdc.common.model.abilities.SupportsEmbedding;
+import org.apache.flink.cdc.common.model.abilities.SupportsImageEmbedding;
+import org.apache.flink.cdc.common.model.abilities.SupportsImageTextGeneration;
 import org.apache.flink.cdc.common.model.abilities.SupportsTextGeneration;
 import org.apache.flink.cdc.common.pipeline.DecimalPrecisionMode;
 import org.apache.flink.cdc.common.schema.Column;
@@ -27,6 +29,7 @@ import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.runtime.ai.AiEmbeddingFunctionDef;
+import org.apache.flink.cdc.runtime.ai.AiImageFunctionDef;
 import org.apache.flink.cdc.runtime.ai.AiTextFunctionDef;
 import org.apache.flink.cdc.runtime.operators.transform.ProjectionColumn;
 import org.apache.flink.cdc.runtime.operators.transform.UserDefinedFunctionDescriptor;
@@ -998,12 +1001,16 @@ public class TransformParser {
                         "Model '%s' referenced by %s has not been declared.",
                         modelName,
                         functionName);
+                AiImageFunctionDef imageFunction = findImageAiFunction(functionName);
                 if (isTextAiFunction(functionName)) {
                     Preconditions.checkArgument(
                             modelClient instanceof SupportsTextGeneration,
                             "Model '%s' referenced by %s does not support text generation.",
                             modelName,
                             functionName);
+                } else if (imageFunction != null) {
+                    validateImageAiModelCapability(
+                            imageFunction, modelClient, modelName, functionName);
                 } else {
                     Preconditions.checkArgument(
                             modelClient instanceof SupportsEmbedding,
@@ -1024,6 +1031,32 @@ public class TransformParser {
         }
     }
 
+    private static void validateImageAiModelCapability(
+            AiImageFunctionDef function,
+            AiModelClient modelClient,
+            String modelName,
+            String functionName) {
+        switch (function.getCapability()) {
+            case IMAGE_TEXT_GENERATION:
+                Preconditions.checkArgument(
+                        modelClient instanceof SupportsImageTextGeneration,
+                        "Model '%s' referenced by %s does not support image text generation.",
+                        modelName,
+                        functionName);
+                break;
+            case IMAGE_EMBEDDING:
+                Preconditions.checkArgument(
+                        modelClient instanceof SupportsImageEmbedding,
+                        "Model '%s' referenced by %s does not support image embedding.",
+                        modelName,
+                        functionName);
+                break;
+            default:
+                throw new IllegalArgumentException(
+                        "Unsupported capability for image AI function " + functionName);
+        }
+    }
+
     private static String resolveAiModelName(SqlCall call) {
         SqlNode modelArgument = call.operand(0);
         Preconditions.checkArgument(
@@ -1040,7 +1073,9 @@ public class TransformParser {
     }
 
     private static boolean isAiFunction(String functionName) {
-        return isTextAiFunction(functionName) || isEmbeddingAiFunction(functionName);
+        return isTextAiFunction(functionName)
+                || isEmbeddingAiFunction(functionName)
+                || findImageAiFunction(functionName) != null;
     }
 
     private static boolean isTextAiFunction(String functionName) {
@@ -1059,6 +1094,16 @@ public class TransformParser {
             }
         }
         return false;
+    }
+
+    @Nullable
+    private static AiImageFunctionDef findImageAiFunction(String functionName) {
+        for (AiImageFunctionDef function : AiImageFunctionDef.values()) {
+            if (function.getFunctionName().equalsIgnoreCase(functionName)) {
+                return function;
+            }
+        }
+        return null;
     }
 
     public static boolean hasAsterisk(@Nullable String projection) {

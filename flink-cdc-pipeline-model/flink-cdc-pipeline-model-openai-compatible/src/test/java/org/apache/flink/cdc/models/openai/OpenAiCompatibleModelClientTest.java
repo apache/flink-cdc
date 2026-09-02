@@ -162,6 +162,95 @@ class OpenAiCompatibleModelClientTest {
     }
 
     @Test
+    void testImageCompletionUsesStandardVisionChatRequest() throws Exception {
+        server.enqueue(jsonResponse(200, COMPLETION_RESPONSE));
+        Map<String, String> options = baseOptions();
+        options.put("system-prompt", "You are a vision assistant.");
+        options.put("user-prompt", "Answer briefly.");
+        options.put("temperature", "0.2");
+        options.put("extra-header", "{\"X-Vision\":\"enabled\"}");
+        options.put("extra-body", "{\"vendor_flag\":true}");
+        client = createAndOpenClient(options);
+
+        byte[] png =
+                new byte[] {
+                    (byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x01, 0x02, 0x03
+                };
+        assertThat(client.generateTextFromImage(png, "What is in this image?"))
+                .isEqualTo("{\"result\":\"done\"}");
+
+        RecordedRequest request = server.takeRequest();
+        assertThat(request.getPath()).isEqualTo("/v1/chat/completions");
+        assertThat(request.getHeader("X-Vision")).isEqualTo("enabled");
+        JsonNode body = objectMapper.readTree(request.getBody().readUtf8());
+        assertThat(body.at("/messages/0/role").asText()).isEqualTo("system");
+        assertThat(body.at("/messages/0/content").asText())
+                .isEqualTo("You are a vision assistant.");
+        assertThat(body.at("/messages/1/content/0/type").asText()).isEqualTo("text");
+        assertThat(body.at("/messages/1/content/0/text").asText())
+                .isEqualTo("What is in this image?");
+        assertThat(body.at("/messages/1/content/1/type").asText()).isEqualTo("image_url");
+        assertThat(body.at("/messages/1/content/1/image_url/url").asText())
+                .isEqualTo("data:image/png;base64,iVBORw0KGgoBAgM=");
+        assertThat(body.at("/messages/2/content").asText()).isEqualTo("Answer briefly.");
+        assertThat(body.path("temperature").asDouble()).isEqualTo(0.2d);
+        assertThat(body.path("vendor_flag").asBoolean()).isTrue();
+    }
+
+    @Test
+    void testImageMimeTypeDetection() {
+        assertThat(
+                        OpenAiCompatibleModelClient.detectImageMimeType(
+                                new byte[] {(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A}))
+                .isEqualTo("image/png");
+        assertThat(
+                        OpenAiCompatibleModelClient.detectImageMimeType(
+                                new byte[] {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF}))
+                .isEqualTo("image/jpeg");
+        assertThat(
+                        OpenAiCompatibleModelClient.detectImageMimeType(
+                                new byte[] {0x47, 0x49, 0x46, 0x38, 0x39, 0x61}))
+                .isEqualTo("image/gif");
+        assertThat(
+                        OpenAiCompatibleModelClient.detectImageMimeType(
+                                new byte[] {
+                                    0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50
+                                }))
+                .isEqualTo("image/webp");
+    }
+
+    @Test
+    void testNullAndInvalidImageInputsDoNotSendRequests() {
+        client = createAndOpenClient(baseOptions());
+
+        assertThat(client.generateTextFromImage(null, "describe")).isNull();
+        assertThatThrownBy(() -> client.generateTextFromImage(new byte[0], "describe"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("must not be null or empty");
+        assertThatThrownBy(
+                        () ->
+                                client.generateTextFromImage(
+                                        new byte[] {0x01, 0x02, 0x03}, "describe"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Unrecognized image format");
+        assertThat(server.getRequestCount()).isZero();
+    }
+
+    @Test
+    void testRetryableImageCompletionErrorIsRetried() {
+        server.enqueue(jsonResponse(429, ERROR_RESPONSE));
+        server.enqueue(jsonResponse(200, COMPLETION_RESPONSE));
+        Map<String, String> options = baseOptions();
+        options.put("retry-num", "2");
+        options.put("retry-backoff-base-interval", "1 ms");
+        client = createAndOpenClient(options);
+
+        byte[] jpeg = new byte[] {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF};
+        assertThat(client.generateTextFromImage(jpeg, "describe")).contains("done");
+        assertThat(server.getRequestCount()).isEqualTo(2);
+    }
+
+    @Test
     void testTextEmbedding() throws Exception {
         server.enqueue(jsonResponse(200, EMBEDDING_RESPONSE));
         Map<String, String> options = baseOptions();

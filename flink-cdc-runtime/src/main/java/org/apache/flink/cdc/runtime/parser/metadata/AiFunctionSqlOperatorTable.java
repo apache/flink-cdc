@@ -20,6 +20,7 @@ package org.apache.flink.cdc.runtime.parser.metadata;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.runtime.ai.AiEmbeddingFunctionDef;
+import org.apache.flink.cdc.runtime.ai.AiImageFunctionDef;
 import org.apache.flink.cdc.runtime.ai.AiTextFunctionDef;
 import org.apache.flink.cdc.runtime.typeutils.CalciteDataTypeConverter;
 
@@ -36,7 +37,7 @@ import org.apache.calcite.sql.util.SqlOperatorTables;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Creates SqlOperatorTable from {@link AiTextFunctionDef} definitions. */
+/** Creates an SqlOperatorTable containing the built-in AI functions. */
 public class AiFunctionSqlOperatorTable {
 
     private AiFunctionSqlOperatorTable() {}
@@ -49,6 +50,9 @@ public class AiFunctionSqlOperatorTable {
         }
         for (AiEmbeddingFunctionDef def : AiEmbeddingFunctionDef.values()) {
             functions.add(createEmbeddingSqlFunction(def));
+        }
+        for (AiImageFunctionDef def : AiImageFunctionDef.values()) {
+            functions.add(createImageSqlFunction(def));
         }
         return SqlOperatorTables.of(functions);
     }
@@ -75,6 +79,18 @@ public class AiFunctionSqlOperatorTable {
                 SqlFunctionCategory.USER_DEFINED_FUNCTION);
     }
 
+    private static SqlFunction createImageSqlFunction(AiImageFunctionDef def) {
+        return new SqlFunction(
+                def.getFunctionName(),
+                SqlKind.OTHER_FUNCTION,
+                opBinding ->
+                        CalciteDataTypeConverter.convertCalciteType(
+                                opBinding.getTypeFactory(), def.getOutputType()),
+                null,
+                OperandTypes.family(toSqlTypeFamiliesWithModelArgument(def.getInputType())),
+                SqlFunctionCategory.USER_DEFINED_FUNCTION);
+    }
+
     /**
      * Converts inputType to SqlTypeFamily array, prepending additional parameters: modelName
      * (STRING) and input (STRING).
@@ -83,6 +99,15 @@ public class AiFunctionSqlOperatorTable {
         List<SqlTypeFamily> families = new ArrayList<>();
         families.add(SqlTypeFamily.STRING); // modelName
         families.add(SqlTypeFamily.STRING); // input
+        for (DataType fieldType : inputType.getFieldTypes()) {
+            families.add(toSqlTypeFamily(fieldType));
+        }
+        return families.toArray(new SqlTypeFamily[0]);
+    }
+
+    private static SqlTypeFamily[] toSqlTypeFamiliesWithModelArgument(RowType inputType) {
+        List<SqlTypeFamily> families = new ArrayList<>();
+        families.add(SqlTypeFamily.STRING);
         for (DataType fieldType : inputType.getFieldTypes()) {
             families.add(toSqlTypeFamily(fieldType));
         }
@@ -103,6 +128,9 @@ public class AiFunctionSqlOperatorTable {
                 return SqlTypeFamily.APPROXIMATE_NUMERIC;
             case BOOLEAN:
                 return SqlTypeFamily.BOOLEAN;
+            case BINARY:
+            case VARBINARY:
+                return SqlTypeFamily.BINARY;
             default:
                 return SqlTypeFamily.ANY;
         }
