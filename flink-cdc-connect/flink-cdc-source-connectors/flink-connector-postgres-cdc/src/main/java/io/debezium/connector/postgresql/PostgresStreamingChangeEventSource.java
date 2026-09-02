@@ -187,7 +187,15 @@ public class PostgresStreamingChangeEventSource
 
             this.lastCompletelyProcessedLsn = replicationStream.get().startLsn();
 
-            if (walPosition.searchingEnabled()) {
+            // Only search for the WAL resume position when the stored offset has actually
+            // processed a position. On a fresh start (nothing processed yet) the search loop
+            // would block forever waiting for a decoded message: on an idle publication no WAL
+            // is produced, and the heartbeat action query that would generate some only runs
+            // from the main streaming loop, which this search precedes. Skipping the search here
+            // still starts streaming from the stored LSN, so no events are missed. This mirrors
+            // the fix Debezium shipped in 2.7, which added the hasCompletelyProcessedPosition()
+            // guard to searchingEnabled().
+            if (walPosition.searchingEnabled() && offsetContext.hasCompletelyProcessedPosition()) {
                 searchWalPosition(context, stream, walPosition);
                 try {
                     if (!isInPreSnapshotCatchUpStreaming(offsetContext)) {
