@@ -32,6 +32,7 @@ import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.cdc.debezium.event.DebeziumEventDeserializationSchema;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
 
+import io.debezium.connector.postgresql.TypeRegistry;
 import io.debezium.connector.postgresql.connection.PostgresConnection;
 import io.debezium.data.Envelope;
 import io.debezium.relational.Table;
@@ -65,6 +66,8 @@ public class PostgresPipelineRecordEmitter<T> extends PostgresSourceRecordEmitte
     private final Set<TableId> alreadySendCreateTableTables;
     private final boolean includeDatabaseInTableId;
     private final Map<TableId, CreateTableEvent> createTableEventCache;
+
+    private TypeRegistry typeRegistry;
 
     public PostgresPipelineRecordEmitter(
             DebeziumDeserializationSchema<T> debeziumDeserializationSchema,
@@ -128,7 +131,11 @@ public class PostgresPipelineRecordEmitter<T> extends PostgresSourceRecordEmitte
         }
         List<SchemaChangeEvent> schemaChangeEvents =
                 inferSchemaChangeEvent(
-                        schemaAfter.id(), schemaBefore, schemaAfter, sourceConfig, postgresDialect);
+                        schemaAfter.id(),
+                        schemaBefore,
+                        schemaAfter,
+                        sourceConfig,
+                        getTypeRegistry());
         LOG.info("Inferred Schema change events: {}", schemaChangeEvents);
         schemaChangeEvents.forEach(
                 schemaChangeEvent -> {
@@ -203,6 +210,15 @@ public class PostgresPipelineRecordEmitter<T> extends PostgresSourceRecordEmitte
                             includeDatabaseInTableId),
                     schema);
         }
+    }
+
+    private TypeRegistry getTypeRegistry() {
+        if (typeRegistry == null) {
+            try (PostgresConnection jdbc = postgresDialect.openJdbcConnection()) {
+                typeRegistry = jdbc.getTypeRegistry();
+            }
+        }
+        return typeRegistry;
     }
 
     private TableId getTableId(SourceRecord dataRecord) {
