@@ -103,6 +103,7 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
 
     void setup(boolean parallelismSnapshot) {
         TestValuesTableFactory.clearAllData();
+        tEnv.getConfig().set("table.exec.sink.require-on-conflict", "false");
         RestartStrategyUtils.configureNoRestartStrategy(env);
         if (parallelismSnapshot) {
             env.setParallelism(4);
