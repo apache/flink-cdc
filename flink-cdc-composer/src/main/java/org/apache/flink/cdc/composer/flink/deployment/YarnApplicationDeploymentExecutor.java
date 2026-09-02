@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.composer.flink.deployment;
 
+import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.composer.PipelineDeploymentExecutor;
 import org.apache.flink.cdc.composer.PipelineExecution;
@@ -59,8 +60,8 @@ public class YarnApplicationDeploymentExecutor implements PipelineDeploymentExec
             LoggerFactory.getLogger(YarnApplicationDeploymentExecutor.class);
 
     private static final String FLINK_CDC_HOME_ENV_VAR = "FLINK_CDC_HOME";
-    private static final String FLINK_CDC_DIST_JAR_PATTERN =
-            "^flink-cdc-dist-(\\d+(\\.\\d+)*)(-SNAPSHOT)?\\.jar$";
+    private static final String FLINK_CDC_DIST_JAR_PREFIX = "flink-cdc-dist-";
+    private static final String JAR_SUFFIX = ".jar";
     private static final String APPLICATION_MAIN_CLASS = "org.apache.flink.cdc.cli.CliExecutor";
 
     @Override
@@ -128,7 +129,16 @@ public class YarnApplicationDeploymentExecutor implements PipelineDeploymentExec
                 flinkCDCHomeFromEnvVar,
                 "FLINK_CDC_HOME is not correctly set in environment variable, current FLINK_CDC_HOME is: "
                         + flinkCDCHomeFromEnvVar);
-        Path flinkCDCLibPath = new Path(flinkCDCHomeFromEnvVar, "lib");
+        return getFlinkCDCDistJar(new Path(flinkCDCHomeFromEnvVar, "lib"));
+    }
+
+    /**
+     * Finds the Flink CDC dist jar under the given lib directory. The jar is matched by name prefix
+     * instead of a version pattern, because binaries released since 3.6.0 are built once per Flink
+     * minor version and carry an extra suffix, e.g. {@code flink-cdc-dist-3.6.0-1.20.jar}.
+     */
+    @VisibleForTesting
+    static String getFlinkCDCDistJar(Path flinkCDCLibPath) throws IOException {
         if (!flinkCDCLibPath.getFileSystem().exists(flinkCDCLibPath)
                 || !flinkCDCLibPath.getFileSystem().getFileStatus(flinkCDCLibPath).isDir()) {
             throw new RuntimeException(
@@ -141,7 +151,10 @@ public class YarnApplicationDeploymentExecutor implements PipelineDeploymentExec
                 Arrays.stream(fileStatuses)
                         .filter(status -> !status.isDir())
                         .map(FileStatus::getPath)
-                        .filter(path -> path.getName().matches(FLINK_CDC_DIST_JAR_PATTERN))
+                        .filter(
+                                path ->
+                                        path.getName().startsWith(FLINK_CDC_DIST_JAR_PREFIX)
+                                                && path.getName().endsWith(JAR_SUFFIX))
                         .findFirst();
 
         if (distJars.isPresent()) {
