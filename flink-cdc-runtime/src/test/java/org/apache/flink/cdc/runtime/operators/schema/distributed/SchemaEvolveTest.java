@@ -35,7 +35,10 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.runtime.operators.AbstractStreamOperatorAdapter;
 import org.apache.flink.cdc.runtime.operators.schema.common.SchemaTestBase;
+import org.apache.flink.cdc.runtime.operators.schema.distributed.event.SchemaChangeRequest;
 import org.apache.flink.cdc.runtime.testutils.operators.DistributedEventOperatorTestHarness;
+import org.apache.flink.cdc.runtime.testutils.operators.MockedOperatorCoordinatorContext;
+import org.apache.flink.cdc.runtime.testutils.schema.CollectingMetadataApplier;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.util.function.BiConsumerWithException;
 
@@ -45,6 +48,7 @@ import org.junit.jupiter.api.Test;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.LinkedList;
+import java.util.concurrent.Executors;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -220,7 +224,170 @@ public class SchemaEvolveTest extends SchemaTestBase {
                                 truncateTableEvent.getType()),
                         genInsert(TABLE_ID, "ISDSBS", 6, "Ferris", 0.001, null, false, null),
                         new FlushEvent(
-                                0, Collections.singletonList(TABLE_ID), dropTableEvent.getType()));
+                                0, Collections.singletonList(TABLE_ID), dropTableEvent.getType()),
+                        dropTableEvent);
+    }
+
+    @Test
+    void testDropAndRecreateTable() throws Exception {
+        Schema schemaV1 =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .build();
+        Schema schemaV2 =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.BIGINT())
+                        .physicalColumn("score", DataTypes.INT())
+                        .build();
+        CreateTableEvent createTableV1 = new CreateTableEvent(TABLE_ID, schemaV1);
+        DropTableEvent dropTableEvent = new DropTableEvent(TABLE_ID);
+        CreateTableEvent createTableV2 = new CreateTableEvent(TABLE_ID, schemaV2);
+
+        Assertions.assertThat(
+                        runInHarness(
+                                () ->
+                                        new SchemaOperator(
+                                                ROUTING_RULES,
+                                                RouteMode.ALL_MATCH,
+                                                Duration.ofMinutes(3),
+                                                SchemaChangeBehavior.EVOLVE,
+                                                "UTC"),
+                                (SchemaOperator op) ->
+                                        new DistributedEventOperatorTestHarness<>(
+                                                op,
+                                                20,
+                                                Duration.ofSeconds(3),
+                                                Duration.ofMinutes(3)),
+                                (operator, harness) -> {
+                                    operator.processElement(wrap(createTableV1));
+                                    operator.processElement(wrap(dropTableEvent));
+                                    operator.processElement(wrap(createTableV2));
+                                    operator.processElement(
+                                            wrap(genInsert(TABLE_ID, "LI", 1L, 100)));
+                                }))
+                .map(StreamRecord::getValue)
+                .containsExactly(
+                        new FlushEvent(
+                                0, Collections.singletonList(TABLE_ID), createTableV1.getType()),
+                        createTableV1,
+                        new FlushEvent(
+                                0, Collections.singletonList(TABLE_ID), dropTableEvent.getType()),
+                        dropTableEvent,
+                        new FlushEvent(
+                                0, Collections.singletonList(TABLE_ID), createTableV2.getType()),
+                        createTableV2,
+                        genInsert(TABLE_ID, "LI", 1L, 100));
+    }
+
+    @Test
+    void testDropTableClearsAllSourcePartitionSchemas() throws Exception {
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .build();
+        CreateTableEvent createTableEvent = new CreateTableEvent(TABLE_ID, schema);
+        DropTableEvent dropTableEvent = new DropTableEvent(TABLE_ID);
+
+        Assertions.assertThat(
+                        runInHarness(
+                                () ->
+                                        new SchemaOperator(
+                                                ROUTING_RULES,
+                                                RouteMode.ALL_MATCH,
+                                                Duration.ofMinutes(3),
+                                                SchemaChangeBehavior.EVOLVE,
+                                                "UTC"),
+                                (SchemaOperator op) ->
+                                        new DistributedEventOperatorTestHarness<>(
+                                                op,
+                                                20,
+                                                Duration.ofSeconds(3),
+                                                Duration.ofMinutes(3)),
+                                (operator, harness) -> {
+                                    operator.processElement(wrap(createTableEvent, 0, 0));
+                                    harness.clearOutputRecords();
+
+                                    // Simulate a stale schema copy for the same table id in
+                                    // another source partition.
+                                    operator.processElement(wrap(createTableEvent, 1, 0));
+                                    harness.clearOutputRecords();
+
+                                    operator.processElement(wrap(dropTableEvent, 0, 0));
+                                }))
+                .map(StreamRecord::getValue)
+                .containsExactly(
+                        new FlushEvent(
+                                0, Collections.singletonList(TABLE_ID), dropTableEvent.getType()),
+                        dropTableEvent);
+    }
+
+    @Test
+    void testDropTableEventMatchesOnlyAffectedSinkTable() throws Exception {
+        SchemaCoordinator coordinator =
+                new SchemaCoordinator(
+                        "schema-coordinator",
+                        new MockedOperatorCoordinatorContext(
+                                DistributedEventOperatorTestHarness.SCHEMA_OPERATOR_ID,
+                                Thread.currentThread().getContextClassLoader()),
+                        Executors.newSingleThreadExecutor(),
+                        new CollectingMetadataApplier(Duration.ZERO),
+                        ROUTING_RULES,
+                        RouteMode.ALL_MATCH,
+                        SchemaChangeBehavior.EVOLVE,
+                        Duration.ofMinutes(3));
+        coordinator.start();
+        try {
+            LinkedList<SchemaChangeRequest> schemaChangeRequests = new LinkedList<>();
+
+            // A one-to-one dropped source table only affects its identical sink table.
+            schemaChangeRequests.add(
+                    new SchemaChangeRequest(
+                            0, 0, new DropTableEvent(TableId.parse("db_1.table_1"))));
+            Assertions.assertThat(
+                            coordinator.containsDropTableEventForSinkTable(
+                                    schemaChangeRequests, TableId.parse("db_1.table_1")))
+                    .isTrue();
+            Assertions.assertThat(
+                            coordinator.containsDropTableEventForSinkTable(
+                                    schemaChangeRequests, TableId.parse("db_1.table_2")))
+                    .isFalse();
+
+            // A re-routed dropped source table affects the routed sink table, not its source name.
+            schemaChangeRequests.clear();
+            schemaChangeRequests.add(
+                    new SchemaChangeRequest(
+                            0, 0, new DropTableEvent(TableId.parse("db_2.table_1"))));
+            Assertions.assertThat(
+                            coordinator.containsDropTableEventForSinkTable(
+                                    schemaChangeRequests, TableId.parse("db_2.table_2")))
+                    .isTrue();
+            Assertions.assertThat(
+                            coordinator.containsDropTableEventForSinkTable(
+                                    schemaChangeRequests, TableId.parse("db_2.table_1")))
+                    .isFalse();
+
+            // A broadcast dropped source table can affect multiple routed sink tables.
+            schemaChangeRequests.clear();
+            schemaChangeRequests.add(
+                    new SchemaChangeRequest(
+                            0, 0, new DropTableEvent(TableId.parse("db_4.table_1"))));
+            Assertions.assertThat(
+                            coordinator.containsDropTableEventForSinkTable(
+                                    schemaChangeRequests, TableId.parse("db_4.table_a")))
+                    .isTrue();
+            Assertions.assertThat(
+                            coordinator.containsDropTableEventForSinkTable(
+                                    schemaChangeRequests, TableId.parse("db_4.table_b")))
+                    .isTrue();
+            Assertions.assertThat(
+                            coordinator.containsDropTableEventForSinkTable(
+                                    schemaChangeRequests, TableId.parse("db_4.table_d")))
+                    .isFalse();
+        } finally {
+            coordinator.close();
+        }
     }
 
     @Test
@@ -333,6 +500,48 @@ public class SchemaEvolveTest extends SchemaTestBase {
                         genInsert(TABLE_ID, "ISFS", 4, "Derrida", null, null),
                         genInsert(TABLE_ID, "ISFS", 5, "Eve", null, null),
                         genInsert(TABLE_ID, "ISFS", 6, "Ferris", null, null));
+    }
+
+    @Test
+    void testIgnoreDropTableRejectsLaterDataWithoutRecreate() {
+        CreateTableEvent createTableEvent = new CreateTableEvent(TABLE_ID, INITIAL_SCHEMA);
+        DropTableEvent dropTableEvent = new DropTableEvent(TABLE_ID);
+
+        Assertions.assertThatThrownBy(
+                        () ->
+                                runInHarness(
+                                        () ->
+                                                new SchemaOperator(
+                                                        ROUTING_RULES,
+                                                        RouteMode.ALL_MATCH,
+                                                        Duration.ofMinutes(3),
+                                                        SchemaChangeBehavior.IGNORE,
+                                                        "UTC"),
+                                        (op) ->
+                                                new DistributedEventOperatorTestHarness<>(
+                                                        op,
+                                                        20,
+                                                        Duration.ofSeconds(3),
+                                                        Duration.ofMinutes(3)),
+                                        (operator, harness) -> {
+                                            operator.processElement(wrap(createTableEvent));
+                                            harness.clearOutputRecords();
+
+                                            operator.processElement(wrap(dropTableEvent));
+                                            harness.clearOutputRecords();
+
+                                            operator.processElement(
+                                                    wrap(
+                                                            genInsert(
+                                                                    TABLE_ID,
+                                                                    "ISFS",
+                                                                    2,
+                                                                    "Bob",
+                                                                    31.415926f,
+                                                                    "late")));
+                                        }))
+                .isExactlyInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Unable to coerce data record");
     }
 
     @Test

@@ -20,6 +20,7 @@ package org.apache.flink.cdc.runtime.partitioning;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
+import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
@@ -36,10 +37,11 @@ import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Unit test for {@link RegularPrePartitionOperator}. */
+/** Unit test for pre-partition operators. */
 class PrePartitionOperatorTest {
     private static final TableId CUSTOMERS =
             TableId.tableId("my_company", "my_branch", "customers");
@@ -70,6 +72,60 @@ class PrePartitionOperatorTest {
                         .isEqualTo(
                                 new StreamRecord<>(
                                         PartitioningEvent.ofRegular(createTableEvent, i)));
+            }
+        }
+    }
+
+    @Test
+    void testBroadcastingDropTableEvent() throws Exception {
+        try (RegularEventOperatorTestHarness<RegularPrePartitionOperator, PartitioningEvent>
+                testHarness = createTestHarness()) {
+            // Initialization
+            testHarness.open();
+
+            RegularPrePartitionOperator operator = testHarness.getOperator();
+            DropTableEvent dropTableEvent = new DropTableEvent(CUSTOMERS);
+            operator.processElement(new StreamRecord<>(dropTableEvent));
+
+            assertThat(testHarness.getOutputRecords()).hasSize(DOWNSTREAM_PARALLELISM);
+            for (int i = 0; i < DOWNSTREAM_PARALLELISM; i++) {
+                assertThat(testHarness.getOutputRecords().poll())
+                        .isEqualTo(
+                                new StreamRecord<>(PartitioningEvent.ofRegular(dropTableEvent, i)));
+            }
+        }
+    }
+
+    @Test
+    void testDistributedDropTableEventDoesNotRecreateHashFunction() throws Exception {
+        AtomicInteger hashFunctionCreations = new AtomicInteger();
+        DistributedPrePartitionOperator operator =
+                new DistributedPrePartitionOperator(
+                        DOWNSTREAM_PARALLELISM,
+                        (tableId, schema) -> {
+                            hashFunctionCreations.incrementAndGet();
+                            return event -> 0;
+                        });
+        try (RegularEventOperatorTestHarness<DistributedPrePartitionOperator, PartitioningEvent>
+                testHarness =
+                        RegularEventOperatorTestHarness.with(operator, DOWNSTREAM_PARALLELISM)) {
+            testHarness.open();
+
+            CreateTableEvent createTableEvent = new CreateTableEvent(CUSTOMERS, CUSTOMERS_SCHEMA);
+            operator.processElement(new StreamRecord<>(createTableEvent));
+            assertThat(hashFunctionCreations).hasValue(1);
+            testHarness.clearOutputRecords();
+
+            DropTableEvent dropTableEvent = new DropTableEvent(CUSTOMERS);
+            operator.processElement(new StreamRecord<>(dropTableEvent));
+
+            assertThat(hashFunctionCreations).hasValue(1);
+            assertThat(testHarness.getOutputRecords()).hasSize(DOWNSTREAM_PARALLELISM);
+            for (int i = 0; i < DOWNSTREAM_PARALLELISM; i++) {
+                assertThat(testHarness.getOutputRecords().poll())
+                        .isEqualTo(
+                                new StreamRecord<>(
+                                        PartitioningEvent.ofDistributed(dropTableEvent, 0, i)));
             }
         }
     }

@@ -21,6 +21,7 @@ import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
+import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Column;
@@ -312,6 +313,46 @@ class PreTransformOperatorTest {
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
                 .isEqualTo(new StreamRecord<>(updateEventExpect));
         transformFunctionEventEventOperatorTestHarness.close();
+    }
+
+    @Test
+    void testDropAndRecreateTable() throws Exception {
+        PreTransformOperator transform =
+                PreTransformOperator.newBuilder()
+                        .addTransform(
+                                CUSTOMERS_TABLEID.identifier(),
+                                "*, concat(col1,col2) col12",
+                                null,
+                                "col2",
+                                "col12",
+                                "key1=value1,key2=value2",
+                                null,
+                                new SupportedMetadataColumn[0])
+                        .build();
+        RegularEventOperatorTestHarness<PreTransformOperator, Event> harness =
+                RegularEventOperatorTestHarness.with(transform, 1);
+        harness.open();
+
+        transform.processElement(
+                new StreamRecord<>(new CreateTableEvent(CUSTOMERS_TABLEID, CUSTOMERS_SCHEMA)));
+        Assertions.assertThat(harness.getOutputRecords().poll())
+                .isEqualTo(
+                        new StreamRecord<>(new CreateTableEvent(CUSTOMERS_TABLEID, EXPECT_SCHEMA)));
+
+        DropTableEvent dropTableEvent = new DropTableEvent(CUSTOMERS_TABLEID);
+        transform.processElement(new StreamRecord<>(dropTableEvent));
+        Assertions.assertThat(harness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(dropTableEvent));
+
+        transform.processElement(
+                new StreamRecord<>(
+                        new CreateTableEvent(CUSTOMERS_TABLEID, CUSTOMERS_LATEST_SCHEMA)));
+        Assertions.assertThat(harness.getOutputRecords().poll())
+                .isEqualTo(
+                        new StreamRecord<>(
+                                new CreateTableEvent(CUSTOMERS_TABLEID, EXPECT_LATEST_SCHEMA)));
+
+        harness.close();
     }
 
     @Test
