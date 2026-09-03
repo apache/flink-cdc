@@ -241,6 +241,11 @@ public class Db2SourceBuilder<T> {
         return this;
     }
 
+    public Db2SourceBuilder<T> recordsPerSecond(double recordsPerSecond) {
+        this.configFactory.recordsPerSecond(recordsPerSecond);
+        return this;
+    }
+
     /**
      * Build the {@link Db2IncrementalSource}.
      *

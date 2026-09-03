@@ -260,6 +260,11 @@ public class OracleSourceBuilder<T> {
         return this;
     }
 
+    public OracleSourceBuilder<T> recordsPerSecond(double recordsPerSecond) {
+        this.configFactory.recordsPerSecond(recordsPerSecond);
+        return this;
+    }
+
     /**
      * Build the {@link OracleIncrementalSource}.
      *
