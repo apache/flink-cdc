@@ -30,7 +30,10 @@ import io.debezium.connector.sqlserver.SqlServerOffsetContext;
 import io.debezium.connector.sqlserver.SqlServerPartition;
 import io.debezium.heartbeat.Heartbeat;
 import io.debezium.pipeline.EventDispatcher;
+import io.debezium.pipeline.notification.NotificationService;
+import io.debezium.pipeline.signal.actions.snapshotting.SnapshotConfiguration;
 import io.debezium.pipeline.source.AbstractSnapshotChangeEventSource;
+import io.debezium.pipeline.source.SnapshottingTask;
 import io.debezium.pipeline.source.spi.ChangeEventSource;
 import io.debezium.pipeline.source.spi.SnapshotProgressListener;
 import io.debezium.pipeline.spi.ChangeRecordEmitter;
@@ -39,6 +42,7 @@ import io.debezium.relational.RelationalSnapshotChangeEventSource;
 import io.debezium.relational.SnapshotChangeRecordEmitter;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
+import io.debezium.schema.SchemaFactory;
 import io.debezium.util.Clock;
 import io.debezium.util.ColumnUtils;
 import io.debezium.util.Strings;
@@ -51,6 +55,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
+import java.util.Collections;
 
 import static org.apache.flink.cdc.connectors.sqlserver.source.utils.SqlServerUtils.buildSplitScanQuery;
 import static org.apache.flink.cdc.connectors.sqlserver.source.utils.SqlServerUtils.readTableSplitDataStatement;
@@ -83,7 +88,10 @@ public class SqlServerScanFetchTask extends AbstractScanFetchTask {
                 snapshotSplitReadTask.execute(
                         changeEventSourceContext,
                         sourceFetchContext.getPartition(),
-                        sourceFetchContext.getOffsetContext());
+                        sourceFetchContext.getOffsetContext(),
+                        snapshotSplitReadTask.getSnapshottingTask(
+                                sourceFetchContext.getPartition(),
+                                sourceFetchContext.getOffsetContext()));
         // execute stream read task
         if (!snapshotResult.isCompletedOrSkipped()) {
             taskRunning = false;
@@ -169,7 +177,14 @@ public class SqlServerScanFetchTask extends AbstractScanFetchTask {
                 EventDispatcher<SqlServerPartition, TableId> eventDispatcher,
                 EventDispatcher.SnapshotReceiver<SqlServerPartition> snapshotReceiver,
                 SnapshotSplit snapshotSplit) {
-            super(connectorConfig, snapshotProgressListener);
+            super(
+                    connectorConfig,
+                    snapshotProgressListener,
+                    new NotificationService<>(
+                            Collections.emptyList(),
+                            connectorConfig,
+                            SchemaFactory.get(),
+                            notification -> {}));
             this.offsetContext = previousOffset;
             this.connectorConfig = connectorConfig;
             this.databaseSchema = databaseSchema;
@@ -185,12 +200,12 @@ public class SqlServerScanFetchTask extends AbstractScanFetchTask {
         public SnapshotResult<SqlServerOffsetContext> execute(
                 ChangeEventSourceContext context,
                 SqlServerPartition partition,
-                SqlServerOffsetContext previousOffset)
+                SqlServerOffsetContext previousOffset,
+                SnapshottingTask snapshottingTask)
                 throws InterruptedException {
-            SnapshottingTask snapshottingTask = getSnapshottingTask(partition, previousOffset);
             final SqlServerSnapshotContext ctx;
             try {
-                ctx = prepare(partition);
+                ctx = prepare(partition, false);
             } catch (Exception e) {
                 LOG.error("Failed to initialize snapshot context.", e);
                 throw new RuntimeException(e);
@@ -222,14 +237,26 @@ public class SqlServerScanFetchTask extends AbstractScanFetchTask {
         }
 
         @Override
-        protected SnapshottingTask getSnapshottingTask(
+        public SnapshottingTask getSnapshottingTask(
                 SqlServerPartition partition, SqlServerOffsetContext previousOffset) {
-            return new SnapshottingTask(false, true);
+            return new SnapshottingTask(
+                    false, true, Collections.emptyList(), Collections.emptyMap(), false);
         }
 
         @Override
-        protected SqlServerSnapshotContext prepare(SqlServerPartition partition) throws Exception {
-            return new SqlServerSnapshotContext(partition);
+        public SnapshottingTask getBlockingSnapshottingTask(
+                SqlServerPartition partition,
+                SqlServerOffsetContext previousOffset,
+                SnapshotConfiguration snapshotConfiguration) {
+            // Debezium 2.6 made this abstract. Flink CDC drives its own split snapshot and never
+            // runs Debezium's signal-based blocking snapshot, so it behaves like the regular one.
+            return getSnapshottingTask(partition, previousOffset);
+        }
+
+        @Override
+        protected SqlServerSnapshotContext prepare(SqlServerPartition partition, boolean onDemand)
+                throws Exception {
+            return new SqlServerSnapshotContext(partition, onDemand);
         }
 
         private void createDataEvents(SqlServerSnapshotContext snapshotContext, TableId tableId)
@@ -283,8 +310,7 @@ public class SqlServerScanFetchTask extends AbstractScanFetchTask {
 
                 while (rs.next()) {
                     rows++;
-                    final Object[] row =
-                            jdbcConnection.rowToArray(table, databaseSchema, rs, columnArray);
+                    final Object[] row = jdbcConnection.rowToArray(table, rs, columnArray);
                     if (logTimer.expired()) {
                         long stop = clock.currentTimeInMillis();
                         LOG.info(
@@ -316,7 +342,7 @@ public class SqlServerScanFetchTask extends AbstractScanFetchTask {
                 SqlServerSnapshotContext snapshotContext, TableId tableId, Object[] row) {
             snapshotContext.offset.event(tableId, clock.currentTime());
             return new SnapshotChangeRecordEmitter<>(
-                    snapshotContext.partition, snapshotContext.offset, row, clock);
+                    snapshotContext.partition, snapshotContext.offset, row, clock, connectorConfig);
         }
 
         private Threads.Timer getTableScanLogTimer() {
@@ -327,8 +353,9 @@ public class SqlServerScanFetchTask extends AbstractScanFetchTask {
                 extends RelationalSnapshotChangeEventSource.RelationalSnapshotContext<
                         SqlServerPartition, SqlServerOffsetContext> {
 
-            public SqlServerSnapshotContext(SqlServerPartition partition) throws SQLException {
-                super(partition, "");
+            public SqlServerSnapshotContext(SqlServerPartition partition, boolean onDemand)
+                    throws SQLException {
+                super(partition, "", onDemand);
             }
         }
     }
@@ -348,5 +375,25 @@ public class SqlServerScanFetchTask extends AbstractScanFetchTask {
         public boolean isRunning() {
             return taskRunning;
         }
+
+        // The following methods are only used by Debezium's signal-based blocking snapshot,
+        // which Flink CDC does not use, so they are no-ops here.
+
+        @Override
+        public boolean isPaused() {
+            return false;
+        }
+
+        @Override
+        public void resumeStreaming() throws InterruptedException {}
+
+        @Override
+        public void waitSnapshotCompletion() throws InterruptedException {}
+
+        @Override
+        public void streamingPaused() {}
+
+        @Override
+        public void waitStreamingPaused() throws InterruptedException {}
     }
 }

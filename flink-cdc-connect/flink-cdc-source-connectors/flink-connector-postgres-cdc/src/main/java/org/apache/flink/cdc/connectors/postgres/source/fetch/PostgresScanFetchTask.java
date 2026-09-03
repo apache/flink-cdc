@@ -36,13 +36,17 @@ import io.debezium.connector.postgresql.connection.PostgresReplicationConnection
 import io.debezium.connector.postgresql.connection.ReplicationConnection;
 import io.debezium.connector.postgresql.spi.SlotState;
 import io.debezium.pipeline.EventDispatcher;
+import io.debezium.pipeline.notification.NotificationService;
+import io.debezium.pipeline.signal.actions.snapshotting.SnapshotConfiguration;
 import io.debezium.pipeline.source.AbstractSnapshotChangeEventSource;
+import io.debezium.pipeline.source.SnapshottingTask;
 import io.debezium.pipeline.source.spi.SnapshotProgressListener;
 import io.debezium.pipeline.spi.SnapshotResult;
 import io.debezium.relational.RelationalSnapshotChangeEventSource;
 import io.debezium.relational.SnapshotChangeRecordEmitter;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
+import io.debezium.schema.SchemaFactory;
 import io.debezium.util.Clock;
 import io.debezium.util.ColumnUtils;
 import io.debezium.util.Strings;
@@ -53,6 +57,7 @@ import org.slf4j.LoggerFactory;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -111,7 +116,11 @@ public class PostgresScanFetchTask extends AbstractScanFetchTask {
                 new StoppableChangeEventSourceContext();
         SnapshotResult<PostgresOffsetContext> snapshotResult =
                 snapshotSplitReadTask.execute(
-                        changeEventSourceContext, ctx.getPartition(), ctx.getOffsetContext());
+                        changeEventSourceContext,
+                        ctx.getPartition(),
+                        ctx.getOffsetContext(),
+                        snapshotSplitReadTask.getSnapshottingTask(
+                                ctx.getPartition(), ctx.getOffsetContext()));
 
         if (!snapshotResult.isCompletedOrSkipped()) {
             taskRunning = false;
@@ -134,7 +143,7 @@ public class PostgresScanFetchTask extends AbstractScanFetchTask {
         final PostgresStreamFetchTask.StreamSplitReadTask backfillReadTask =
                 new PostgresStreamFetchTask.StreamSplitReadTask(
                         ctx.getDbzConnectorConfig(),
-                        ctx.getSnapShotter(),
+                        ctx.getSnapshotterService(),
                         ctx.getConnection(),
                         ctx.getEventDispatcher(),
                         ctx.getWaterMarkDispatcher(),
@@ -232,7 +241,14 @@ public class PostgresScanFetchTask extends AbstractScanFetchTask {
                 PostgresEventDispatcher<TableId> eventDispatcher,
                 SnapshotProgressListener snapshotProgressListener,
                 SnapshotSplit snapshotSplit) {
-            super(connectorConfig, snapshotProgressListener);
+            super(
+                    connectorConfig,
+                    snapshotProgressListener,
+                    new NotificationService<>(
+                            Collections.emptyList(),
+                            connectorConfig,
+                            SchemaFactory.get(),
+                            notification -> {}));
             this.jdbcConnection = jdbcConnection;
             this.sourceConfig = sourceConfig;
             this.snapshotProgressListener = snapshotProgressListener;
@@ -343,7 +359,11 @@ public class PostgresScanFetchTask extends AbstractScanFetchTask {
                     snapshotContext.offset.event(table.id(), clock.currentTime());
                     SnapshotChangeRecordEmitter<PostgresPartition> emitter =
                             new SnapshotChangeRecordEmitter<>(
-                                    snapshotContext.partition, snapshotContext.offset, row, clock);
+                                    snapshotContext.partition,
+                                    snapshotContext.offset,
+                                    row,
+                                    clock,
+                                    sourceConfig.getDbzConnectorConfig());
                     eventDispatcher.dispatchSnapshotEvent(
                             snapshotContext.partition, table.id(), emitter, snapshotReceiver);
                 }
@@ -363,22 +383,35 @@ public class PostgresScanFetchTask extends AbstractScanFetchTask {
         }
 
         @Override
-        protected SnapshottingTask getSnapshottingTask(
+        public SnapshottingTask getSnapshottingTask(
                 PostgresPartition partition, PostgresOffsetContext previousOffset) {
-            return new SnapshottingTask(false, true);
+            return new SnapshottingTask(
+                    false, true, Collections.emptyList(), Collections.emptyMap(), false);
         }
 
         @Override
-        protected PostgresSnapshotContext prepare(PostgresPartition partition) throws Exception {
-            return new PostgresSnapshotContext(partition);
+        public SnapshottingTask getBlockingSnapshottingTask(
+                PostgresPartition partition,
+                PostgresOffsetContext previousOffset,
+                SnapshotConfiguration snapshotConfiguration) {
+            // Debezium 2.6 made this abstract. Flink CDC drives its own split snapshot and never
+            // runs Debezium's signal-based blocking snapshot, so it behaves like the regular one.
+            return getSnapshottingTask(partition, previousOffset);
+        }
+
+        @Override
+        protected PostgresSnapshotContext prepare(PostgresPartition partition, boolean onDemand)
+                throws Exception {
+            return new PostgresSnapshotContext(partition, onDemand);
         }
 
         private static class PostgresSnapshotContext
                 extends RelationalSnapshotChangeEventSource.RelationalSnapshotContext<
                         PostgresPartition, PostgresOffsetContext> {
 
-            public PostgresSnapshotContext(PostgresPartition partition) throws SQLException {
-                super(partition, "");
+            public PostgresSnapshotContext(PostgresPartition partition, boolean onDemand)
+                    throws SQLException {
+                super(partition, "", onDemand);
             }
         }
     }

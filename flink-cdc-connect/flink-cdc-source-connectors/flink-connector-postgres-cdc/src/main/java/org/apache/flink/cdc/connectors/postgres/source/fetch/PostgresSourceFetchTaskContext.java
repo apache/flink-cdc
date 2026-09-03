@@ -33,11 +33,13 @@ import org.apache.flink.cdc.connectors.postgres.source.schema.PostgresSchemaReco
 import org.apache.flink.cdc.connectors.postgres.source.schema.RelationAwarePostgresSchema;
 import org.apache.flink.cdc.connectors.postgres.source.utils.ChunkUtils;
 import org.apache.flink.cdc.connectors.postgres.source.utils.PostgresSourceRecordUtils;
+import org.apache.flink.cdc.debezium.internal.SnapshotterServiceFactory;
 import org.apache.flink.table.types.logical.RowType;
 
 import io.debezium.DebeziumException;
 import io.debezium.config.Configuration;
 import io.debezium.connector.base.ChangeEventQueue;
+import io.debezium.connector.postgresql.PostgresConnector;
 import io.debezium.connector.postgresql.PostgresConnectorConfig;
 import io.debezium.connector.postgresql.PostgresErrorHandler;
 import io.debezium.connector.postgresql.PostgresEventDispatcher;
@@ -46,10 +48,8 @@ import io.debezium.connector.postgresql.PostgresOffsetContext;
 import io.debezium.connector.postgresql.PostgresPartition;
 import io.debezium.connector.postgresql.PostgresSchema;
 import io.debezium.connector.postgresql.PostgresTaskContext;
-import io.debezium.connector.postgresql.PostgresTopicSelector;
 import io.debezium.connector.postgresql.connection.PostgresConnection;
 import io.debezium.connector.postgresql.connection.ReplicationConnection;
-import io.debezium.connector.postgresql.spi.Snapshotter;
 import io.debezium.data.Envelope;
 import io.debezium.heartbeat.Heartbeat;
 import io.debezium.heartbeat.HeartbeatFactory;
@@ -63,7 +63,8 @@ import io.debezium.relational.Column;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
-import io.debezium.schema.TopicSelector;
+import io.debezium.snapshot.SnapshotterService;
+import io.debezium.spi.topic.TopicNamingStrategy;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.errors.RetriableException;
 import org.apache.kafka.connect.source.SourceRecord;
@@ -77,7 +78,6 @@ import static io.debezium.connector.AbstractSourceInfo.TABLE_NAME_KEY;
 import static io.debezium.connector.postgresql.PostgresConnectorConfig.DROP_SLOT_ON_STOP;
 import static io.debezium.connector.postgresql.PostgresConnectorConfig.PLUGIN_NAME;
 import static io.debezium.connector.postgresql.PostgresConnectorConfig.SLOT_NAME;
-import static io.debezium.connector.postgresql.PostgresConnectorConfig.SNAPSHOT_MODE;
 import static io.debezium.connector.postgresql.PostgresObjectUtils.createReplicationConnection;
 import static io.debezium.connector.postgresql.PostgresObjectUtils.newPostgresValueConverterBuilder;
 
@@ -99,7 +99,7 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
     private CDCPostgresDispatcher postgresDispatcher;
     private EventMetadataProvider metadataProvider;
     private SnapshotChangeEventSourceMetrics<PostgresPartition> snapshotChangeEventSourceMetrics;
-    private Snapshotter snapShotter;
+    private SnapshotterService snapshotterService;
 
     public PostgresSourceFetchTaskContext(
             JdbcSourceConfig sourceConfig, PostgresDialect dataSourceDialect) {
@@ -169,10 +169,10 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                                     .build());
         }
         setDbzConnectorConfig(dbzConfig);
-        PostgresConnectorConfig.SnapshotMode snapshotMode =
-                PostgresConnectorConfig.SnapshotMode.parse(
-                        dbzConfig.getConfig().getString(SNAPSHOT_MODE));
-        this.snapShotter = snapshotMode.getSnapshotter(dbzConfig.getConfig());
+        // Debezium 2.6 replaced the Postgres-specific Snapshotter SPI with the core
+        // SnapshotterService, which is resolved from the connector config's service registry.
+        this.snapshotterService =
+                SnapshotterServiceFactory.create(dbzConfig, PostgresConnector.class);
 
         PostgresConnection.PostgresValueConverterBuilder valueConverterBuilder =
                 newPostgresValueConverterBuilder(dbzConfig);
@@ -180,7 +180,10 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                 new PostgresConnection(
                         dbzConfig.getJdbcConfig(), valueConverterBuilder, CONNECTION_NAME);
 
-        TopicSelector<TableId> topicSelector = PostgresTopicSelector.create(dbzConfig);
+        TopicNamingStrategy<TableId> topicSelector =
+                dbzConfig.getTopicNamingStrategy(
+                        io.debezium.connector.postgresql.PostgresConnectorConfig
+                                .TOPIC_NAMING_STRATEGY);
 
         try {
             this.schema =
@@ -198,7 +201,8 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
         this.offsetContext =
                 loadStartingOffsetState(
                         new PostgresOffsetContext.Loader(dbzConfig), sourceSplitBase);
-        this.partition = new PostgresPartition(dbzConfig.getLogicalName());
+        this.partition =
+                new PostgresPartition(dbzConfig.getLogicalName(), dbzConfig.databaseName());
         this.taskContext = PostgresObjectUtils.newTaskContext(dbzConfig, schema, topicSelector);
 
         if (replicationConnection == null) {
@@ -206,7 +210,9 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                     createReplicationConnection(
                             this.taskContext,
                             jdbcConnection,
-                            this.snapShotter.shouldSnapshot(),
+                            this.snapshotterService
+                                    .getSnapshotter()
+                                    .shouldSnapshotData(false, false),
                             dbzConfig);
         }
 
@@ -224,7 +230,7 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                         // .buffering()
                         .build();
 
-        this.errorHandler = new PostgresErrorHandler(getDbzConnectorConfig(), queue);
+        this.errorHandler = new PostgresErrorHandler(getDbzConnectorConfig(), queue, null);
         this.metadataProvider = PostgresObjectUtils.newEventMetadataProvider();
 
         PostgresConnectorConfig finalDbzConfig = dbzConfig;
@@ -373,8 +379,8 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
         return snapshotChangeEventSourceMetrics;
     }
 
-    public Snapshotter getSnapShotter() {
-        return snapShotter;
+    public SnapshotterService getSnapshotterService() {
+        return snapshotterService;
     }
 
     public String getSlotName() {

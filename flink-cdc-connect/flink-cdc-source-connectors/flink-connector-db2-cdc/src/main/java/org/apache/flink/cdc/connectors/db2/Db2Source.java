@@ -61,8 +61,9 @@ public class Db2Source {
             props.setProperty("database.user", checkNotNull(username));
             props.setProperty("database.password", checkNotNull(password));
             props.setProperty("database.dbname", checkNotNull(database));
-            props.setProperty("database.server.name", DB2_DATABASE_SERVER_NAME); // Hard-coded here
-            props.setProperty("database.history.skip.unparseable.ddl", String.valueOf(true));
+            // Debezium 2.0 renamed "database.server.name" to "topic.prefix".
+            props.setProperty("topic.prefix", DB2_DATABASE_SERVER_NAME); // Hard-coded here
+            props.setProperty("schema.history.internal.skip.unparseable.ddl", String.valueOf(true));
 
             if (tableList != null) {
                 props.setProperty("table.include.list", String.join(",", tableList));

@@ -36,8 +36,10 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -90,10 +92,14 @@ public class FlinkOffsetBackingStore implements OffsetBackingStore {
         String engineName = (String) conf.get(EmbeddedEngine.ENGINE_NAME.name());
         Converter keyConverter = new JsonConverter();
         Converter valueConverter = new JsonConverter();
-        keyConverter.configure(config.originals(), true);
-        Map<String, Object> valueConfigs = new HashMap<>(conf);
-        valueConfigs.put("schemas.enable", false);
-        valueConverter.configure(valueConfigs, true);
+        // Debezium 2.0's embedded engine serializes offset keys/values as raw JSON without the
+        // {"schema":...,"payload":...} envelope. Disable schemas on BOTH converters so the key we
+        // seed here matches the key the engine looks up on recovery (otherwise the restored offset
+        // is never found and the connector falls back to a schema-only-recovery snapshot).
+        Map<String, Object> converterConfigs = new HashMap<>(conf);
+        converterConfigs.put("schemas.enable", false);
+        keyConverter.configure(converterConfigs, true);
+        valueConverter.configure(converterConfigs, false);
         OffsetStorageWriter offsetWriter =
                 new OffsetStorageWriter(
                         this,
@@ -199,5 +205,15 @@ public class FlinkOffsetBackingStore implements OffsetBackingStore {
                     }
                     return null;
                 });
+    }
+
+    /**
+     * Added in Kafka Connect 3.5 (KAFKA-14304) for exactly-once source support and the offset-reset
+     * REST endpoint. Neither code path is exercised by the Flink embedded engine, which drives
+     * offsets through Flink state, so an empty set is a safe no-op.
+     */
+    @Override
+    public Set<Map<String, Object>> connectorPartitions(String connectorName) {
+        return Collections.emptySet();
     }
 }

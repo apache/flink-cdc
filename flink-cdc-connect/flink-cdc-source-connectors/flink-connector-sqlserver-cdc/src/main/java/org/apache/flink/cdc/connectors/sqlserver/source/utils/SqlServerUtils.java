@@ -24,19 +24,19 @@ import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.FlinkRuntimeException;
 
+import io.debezium.config.CommonConnectorConfig;
 import io.debezium.connector.sqlserver.Lsn;
 import io.debezium.connector.sqlserver.SourceInfo;
 import io.debezium.connector.sqlserver.SqlServerConnection;
 import io.debezium.connector.sqlserver.SqlServerConnectorConfig;
 import io.debezium.connector.sqlserver.SqlServerDatabaseSchema;
-import io.debezium.connector.sqlserver.SqlServerTopicSelector;
 import io.debezium.connector.sqlserver.SqlServerValueConverters;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.Column;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
-import io.debezium.schema.TopicSelector;
-import io.debezium.util.SchemaNameAdjuster;
+import io.debezium.schema.SchemaNameAdjuster;
+import io.debezium.spi.topic.TopicNamingStrategy;
 import org.apache.kafka.connect.source.SourceRecord;
 
 import javax.annotation.Nullable;
@@ -229,8 +229,8 @@ public class SqlServerUtils {
 
     public static SqlServerDatabaseSchema createSqlServerDatabaseSchema(
             SqlServerConnectorConfig connectorConfig, SqlServerConnection connection) {
-        TopicSelector<TableId> topicSelector =
-                SqlServerTopicSelector.defaultSelector(connectorConfig);
+        TopicNamingStrategy<TableId> topicSelector =
+                connectorConfig.getTopicNamingStrategy(CommonConnectorConfig.TOPIC_NAMING_STRATEGY);
         SchemaNameAdjuster schemaNameAdjuster = SchemaNameAdjuster.create();
         SqlServerValueConverters valueConverters =
                 new SqlServerValueConverters(
@@ -350,10 +350,32 @@ public class SqlServerUtils {
         return sql.toString();
     }
 
+    /**
+     * Builds SQL Server's fully qualified name for the table, including the database.
+     *
+     * <p>Debezium 2.0 replaced the single-database {@code database.dbname} option with the
+     * multi-database {@code database.names}, and {@code SqlServerConnection} only appends {@code
+     * ;databaseName=...} to the JDBC URL when it is in single-database mode. The connection is
+     * therefore no longer bound to the captured database, so an unqualified {@code
+     * [schema].[table]} resolves against whichever database the session happens to point at and
+     * fails with "Invalid object name". Emitting the three-part name makes every query independent
+     * of the session's current database context.
+     */
     private static String quoteSchemaAndTable(TableId tableId) {
         StringBuilder quoted = new StringBuilder();
 
-        if (tableId.schema() != null && !tableId.schema().isEmpty()) {
+        boolean hasCatalog = tableId.catalog() != null && !tableId.catalog().isEmpty();
+        boolean hasSchema = tableId.schema() != null && !tableId.schema().isEmpty();
+
+        if (hasCatalog) {
+            quoted.append(quote(tableId.catalog())).append(".");
+            // A three-part name must keep the schema position, even when it is empty, otherwise
+            // the database name would be read as the schema: [db]..[table], not [db].[table].
+            if (hasSchema) {
+                quoted.append(quote(tableId.schema()));
+            }
+            quoted.append(".");
+        } else if (hasSchema) {
             quoted.append(quote(tableId.schema())).append(".");
         }
 
@@ -370,7 +392,7 @@ public class SqlServerUtils {
     }
 
     public static String quote(TableId tableId) {
-        return String.format("%s.%s", quote(tableId.schema()), quote(tableId.table()));
+        return quoteSchemaAndTable(tableId);
     }
 
     private static void addPrimaryKeyColumnsToCondition(

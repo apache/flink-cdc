@@ -356,7 +356,9 @@ public class MySqlSourceConfigFactory implements Serializable {
     public MySqlSourceConfig createConfig(int subtaskId, String serverName) {
         checkSupportCheckpointsAfterTasksFinished(closeIdleReaders);
         Properties props = new Properties();
-        props.setProperty("database.server.name", serverName);
+        // Debezium 2.0 renamed "database.server.name" to "topic.prefix"; getLogicalName() returns
+        // this value, keeping the {server=<serverName>} offset partition key unchanged.
+        props.setProperty("topic.prefix", serverName);
         props.setProperty("database.hostname", checkNotNull(hostname));
         props.setProperty("database.user", checkNotNull(username));
         props.setProperty("database.password", checkNotNull(password));
@@ -366,12 +368,17 @@ public class MySqlSourceConfigFactory implements Serializable {
         props.setProperty("database.serverTimezone", serverTimeZone);
         // database history
         props.setProperty(
-                "database.history", EmbeddedFlinkDatabaseHistory.class.getCanonicalName());
+                "schema.history.internal", EmbeddedFlinkDatabaseHistory.class.getCanonicalName());
         props.setProperty(
-                "database.history.instance.name", UUID.randomUUID().toString() + "_" + subtaskId);
-        props.setProperty("database.history.skip.unparseable.ddl", String.valueOf(true));
-        props.setProperty("database.history.refer.ddl", String.valueOf(true));
+                "schema.history.internal.instance.name",
+                UUID.randomUUID().toString() + "_" + subtaskId);
+        props.setProperty("schema.history.internal.skip.unparseable.ddl", String.valueOf(true));
+        props.setProperty("schema.history.internal.prefer.ddl", String.valueOf(true));
         props.setProperty("connect.timeout.ms", String.valueOf(connectTimeout.toMillis()));
+        // Debezium 2.3 changed the default of "database.ssl.mode" from "disabled" to "preferred".
+        // Keep the historical Flink CDC behavior (plain connections unless the user asks for TLS);
+        // user-supplied debezium properties below still override it.
+        props.setProperty("database.ssl.mode", "disabled");
         // the underlying debezium reader should always capture the schema changes and forward them.
         // Note: the includeSchemaChanges parameter is used to control emitting the schema record,
         // only DataStream API program need to emit the schema record, the Table API need not
@@ -393,6 +400,14 @@ public class MySqlSourceConfigFactory implements Serializable {
         if (serverIdRange != null) {
             int serverId = serverIdRange.getServerId(subtaskId);
             props.setProperty("database.server.id", String.valueOf(serverId));
+        } else {
+            // Debezium 2.0 made "database.server.id" a required option (1.9 assigned a random
+            // default in the 5400-6400 range). Preserve that behavior when the user does not
+            // configure a server id, offsetting by the subtask id to avoid collisions between
+            // parallel binlog clients.
+            props.setProperty(
+                    "database.server.id",
+                    String.valueOf(5400 + subtaskId + new java.util.Random().nextInt(1000)));
         }
         if (databaseList != null) {
             props.setProperty("database.include.list", String.join(",", databaseList));

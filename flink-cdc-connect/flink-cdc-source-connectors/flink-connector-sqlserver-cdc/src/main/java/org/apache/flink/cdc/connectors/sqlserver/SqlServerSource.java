@@ -124,13 +124,22 @@ public class SqlServerSource {
             // all other connectors, since it is used as a prefix for all Kafka topic names
             // emanating from this connector. Only alphanumeric characters and underscores should be
             // used.
-            props.setProperty("database.server.name", DATABASE_SERVER_NAME);
+            // Debezium 2.0 renamed "database.server.name" to "topic.prefix".
+            props.setProperty("topic.prefix", DATABASE_SERVER_NAME);
             props.setProperty("database.hostname", checkNotNull(hostname));
             props.setProperty("database.user", checkNotNull(username));
             props.setProperty("database.password", checkNotNull(password));
             props.setProperty("database.port", String.valueOf(port));
-            props.setProperty("database.history.skip.unparseable.ddl", String.valueOf(true));
+            props.setProperty("schema.history.internal.skip.unparseable.ddl", String.valueOf(true));
             props.setProperty("database.dbname", checkNotNull(database));
+            // Debezium 2.0 replaced "database.dbname" with the multi-database
+            // "database.names"; it is a required option and validation fails when it is empty.
+            props.setProperty("database.names", checkNotNull(database));
+            // The mssql-jdbc driver bundled with Debezium 2.x defaults "encrypt" to true,
+            // while the 9.x driver used by Debezium 1.9 defaulted it to false. Keep the
+            // historical Flink CDC behavior; users can opt into TLS with
+            // "debezium.database.encrypt".
+            props.setProperty("database.encrypt", "false");
 
             if (tableList != null) {
                 props.setProperty("table.include.list", String.join(",", tableList));

@@ -48,6 +48,13 @@ limitations under the License.
             </exclusions>
         </dependency>
 
+        <!-- Debezium 2.7 split the shared binlog engine out of the MySQL connector. -->
+        <dependency>
+            <groupId>io.debezium</groupId>
+            <artifactId>debezium-connector-binlog</artifactId>
+            <version>${debezium.version}</version>
+        </dependency>
+
         <dependency>
             <groupId>io.debezium</groupId>
             <artifactId>debezium-connector-mysql</artifactId>

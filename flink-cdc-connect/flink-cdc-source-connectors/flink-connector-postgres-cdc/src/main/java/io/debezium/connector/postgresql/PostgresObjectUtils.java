@@ -25,7 +25,7 @@ import io.debezium.connector.postgresql.connection.ReplicationConnection;
 import io.debezium.connector.postgresql.spi.SlotState;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges;
-import io.debezium.schema.TopicSelector;
+import io.debezium.spi.topic.TopicNamingStrategy;
 import io.debezium.util.Clock;
 import io.debezium.util.Metronome;
 import org.slf4j.Logger;
@@ -40,6 +40,9 @@ import java.util.Collection;
  * A factory for creating various Debezium objects
  *
  * <p>It is a hack to access package-private constructor in debezium.
+ *
+ * <p>This is a Flink CDC owned class (not a Debezium fork), placed in the {@code io.debezium}
+ * package for access to package-private Debezium members.
  */
 public class PostgresObjectUtils {
     private static final Logger LOGGER = LoggerFactory.getLogger(PostgresObjectUtils.class);
@@ -49,7 +52,7 @@ public class PostgresObjectUtils {
             PostgresConnection connection,
             PostgresConnectorConfig config,
             TypeRegistry typeRegistry,
-            TopicSelector<TableId> topicSelector,
+            TopicNamingStrategy<TableId> topicSelector,
             PostgresValueConverter valueConverter)
             throws SQLException {
         RelationAwarePostgresSchema schema =
@@ -67,7 +70,7 @@ public class PostgresObjectUtils {
             PostgresConnection connection,
             PostgresConnectorConfig config,
             TypeRegistry typeRegistry,
-            TopicSelector<TableId> topicSelector,
+            TopicNamingStrategy<TableId> topicSelector,
             PostgresValueConverter valueConverter,
             Collection<TableChanges.TableChange> tableChanges)
             throws SQLException {
@@ -85,7 +88,7 @@ public class PostgresObjectUtils {
     public static PostgresTaskContext newTaskContext(
             PostgresConnectorConfig connectorConfig,
             PostgresSchema schema,
-            TopicSelector<TableId> topicSelector) {
+            TopicNamingStrategy<TableId> topicSelector) {
         return new PostgresTaskContext(connectorConfig, schema, topicSelector);
     }
 
@@ -127,7 +130,10 @@ public class PostgresObjectUtils {
         while (retryCount <= maxRetries) {
             try {
                 LOGGER.info("Creating a new replication connection for {}", taskContext);
-                return taskContext.createReplicationConnection(doSnapshot, postgresConnection);
+                // Debezium 2.1 dropped the doSnapshot parameter from
+                // PostgresTaskContext#createReplicationConnection (it was an unused/dead flag). The
+                // doSnapshot parameter is kept on this wrapper for caller compatibility.
+                return taskContext.createReplicationConnection(postgresConnection);
             } catch (SQLException ex) {
                 retryCount++;
                 if (retryCount > maxRetries) {

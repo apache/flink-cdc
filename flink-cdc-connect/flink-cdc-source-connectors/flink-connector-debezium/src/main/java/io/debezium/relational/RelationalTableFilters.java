@@ -9,30 +9,32 @@ import io.debezium.config.Configuration;
 import io.debezium.relational.Selectors.TableIdToStringMapper;
 import io.debezium.relational.Selectors.TableSelectionPredicateBuilder;
 import io.debezium.relational.Tables.TableFilter;
-import io.debezium.relational.history.DatabaseHistory;
+import io.debezium.relational.history.SchemaHistory;
 import io.debezium.schema.DataCollectionFilters;
 
 import java.util.function.Predicate;
 
-import static io.debezium.relational.RelationalDatabaseConnectorConfig.COLUMN_BLACKLIST;
 import static io.debezium.relational.RelationalDatabaseConnectorConfig.COLUMN_EXCLUDE_LIST;
 
 /**
- * Copied from Debezium 1.9.8.Final.
+ * Copied from Debezium project(2.7.4.Final)..
  *
- * <p>Line 98: cache table filter results.
+ * <p>Change 1: wrap the table filter in {@link CachedTableFilter} so repeated filter evaluations
+ * (once per change record) hit a cache instead of re-running the predicate chain.
  *
- * <p>Line 148: add a method to update the tableFilter variable.
+ * <p>Change 2: add {@code setDataCollectionFilters} so Flink CDC can replace the table filter after
+ * construction (used by the MySQL source config when the captured-table list is refined).
  */
 public class RelationalTableFilters implements DataCollectionFilters {
 
-    // Filter that filters tables based only on datbase/schema/system table filters but not table
+    // Filter that filters tables based only on database/schema/system table filters but not table
     // filters
     // Represents the list of tables whose schema needs to be captured
     private final TableFilter eligibleTableFilter;
     // Filter that filters tables based on table filters
     private TableFilter tableFilter;
     private final Predicate<String> databaseFilter;
+    private final Predicate<String> schemaFilter;
     private final String excludeColumns;
 
     /**
@@ -45,26 +47,23 @@ public class RelationalTableFilters implements DataCollectionFilters {
     public RelationalTableFilters(
             Configuration config,
             TableFilter systemTablesFilter,
-            TableIdToStringMapper tableIdMapper) {
+            TableIdToStringMapper tableIdMapper,
+            boolean useCatalogBeforeSchema) {
         // Define the filter that provides the list of tables that could be captured if configured
         final TableSelectionPredicateBuilder eligibleTables =
                 Selectors.tableSelector()
                         .includeDatabases(
-                                config.getFallbackStringProperty(
-                                        RelationalDatabaseConnectorConfig.DATABASE_INCLUDE_LIST,
-                                        RelationalDatabaseConnectorConfig.DATABASE_WHITELIST))
+                                config.getString(
+                                        RelationalDatabaseConnectorConfig.DATABASE_INCLUDE_LIST))
                         .excludeDatabases(
-                                config.getFallbackStringProperty(
-                                        RelationalDatabaseConnectorConfig.DATABASE_EXCLUDE_LIST,
-                                        RelationalDatabaseConnectorConfig.DATABASE_BLACKLIST))
+                                config.getString(
+                                        RelationalDatabaseConnectorConfig.DATABASE_EXCLUDE_LIST))
                         .includeSchemas(
-                                config.getFallbackStringProperty(
-                                        RelationalDatabaseConnectorConfig.SCHEMA_INCLUDE_LIST,
-                                        RelationalDatabaseConnectorConfig.SCHEMA_WHITELIST))
+                                config.getString(
+                                        RelationalDatabaseConnectorConfig.SCHEMA_INCLUDE_LIST))
                         .excludeSchemas(
-                                config.getFallbackStringProperty(
-                                        RelationalDatabaseConnectorConfig.SCHEMA_EXCLUDE_LIST,
-                                        RelationalDatabaseConnectorConfig.SCHEMA_BLACKLIST));
+                                config.getString(
+                                        RelationalDatabaseConnectorConfig.SCHEMA_EXCLUDE_LIST));
         final Predicate<TableId> eligibleTablePredicate = eligibleTables.build();
 
         Predicate<TableId> finalEligibleTablePredicate =
@@ -78,14 +77,12 @@ public class RelationalTableFilters implements DataCollectionFilters {
         Predicate<TableId> tablePredicate =
                 eligibleTables
                         .includeTables(
-                                config.getFallbackStringProperty(
-                                        RelationalDatabaseConnectorConfig.TABLE_INCLUDE_LIST,
-                                        RelationalDatabaseConnectorConfig.TABLE_WHITELIST),
+                                config.getString(
+                                        RelationalDatabaseConnectorConfig.TABLE_INCLUDE_LIST),
                                 tableIdMapper)
                         .excludeTables(
-                                config.getFallbackStringProperty(
-                                        RelationalDatabaseConnectorConfig.TABLE_EXCLUDE_LIST,
-                                        RelationalDatabaseConnectorConfig.TABLE_BLACKLIST),
+                                config.getString(
+                                        RelationalDatabaseConnectorConfig.TABLE_EXCLUDE_LIST),
                                 tableIdMapper)
                         .build();
 
@@ -93,21 +90,41 @@ public class RelationalTableFilters implements DataCollectionFilters {
                 config.getBoolean(RelationalDatabaseConnectorConfig.TABLE_IGNORE_BUILTIN)
                         ? tablePredicate.and(systemTablesFilter::isIncluded)
                         : tablePredicate;
-
-        TableFilter initialTableFilter = finalTablePredicate::test;
-        this.tableFilter = CachedTableFilter.from(initialTableFilter);
+        String signalDataCollection =
+                config.getString(RelationalDatabaseConnectorConfig.SIGNAL_DATA_COLLECTION);
+        if (signalDataCollection != null) {
+            TableId signalDataCollectionTableId =
+                    TableId.parse(signalDataCollection, useCatalogBeforeSchema);
+            if (!finalTablePredicate.test(signalDataCollectionTableId)) {
+                final Predicate<TableId> signalDataCollectionPredicate =
+                        Selectors.tableSelector()
+                                .includeTables(
+                                        tableIdMapper.toString(signalDataCollectionTableId),
+                                        tableIdMapper)
+                                .build();
+                finalTablePredicate = finalTablePredicate.or(signalDataCollectionPredicate);
+            }
+        }
+        this.tableFilter = CachedTableFilter.from(finalTablePredicate::test);
 
         // Define the database filter using the include and exclude lists for database names ...
         this.databaseFilter =
                 Selectors.databaseSelector()
                         .includeDatabases(
-                                config.getFallbackStringProperty(
-                                        RelationalDatabaseConnectorConfig.DATABASE_INCLUDE_LIST,
-                                        RelationalDatabaseConnectorConfig.DATABASE_WHITELIST))
+                                config.getString(
+                                        RelationalDatabaseConnectorConfig.DATABASE_INCLUDE_LIST))
                         .excludeDatabases(
-                                config.getFallbackStringProperty(
-                                        RelationalDatabaseConnectorConfig.DATABASE_EXCLUDE_LIST,
-                                        RelationalDatabaseConnectorConfig.DATABASE_BLACKLIST))
+                                config.getString(
+                                        RelationalDatabaseConnectorConfig.DATABASE_EXCLUDE_LIST))
+                        .build();
+        this.schemaFilter =
+                Selectors.databaseSelector()
+                        .includeDatabases(
+                                config.getString(
+                                        RelationalDatabaseConnectorConfig.SCHEMA_INCLUDE_LIST))
+                        .excludeDatabases(
+                                config.getString(
+                                        RelationalDatabaseConnectorConfig.SCHEMA_EXCLUDE_LIST))
                         .build();
 
         Predicate<TableId> eligibleSchemaPredicate =
@@ -115,13 +132,15 @@ public class RelationalTableFilters implements DataCollectionFilters {
                         ? systemTablesFilter::isIncluded
                         : x -> true;
 
-        this.schemaSnapshotFilter =
-                config.getBoolean(DatabaseHistory.STORE_ONLY_CAPTURED_TABLES_DDL)
-                        ? eligibleSchemaPredicate.and(initialTableFilter::isIncluded)::test
-                        : eligibleSchemaPredicate::test;
+        if (config.getBoolean(SchemaHistory.STORE_ONLY_CAPTURED_TABLES_DDL)) {
+            this.schemaSnapshotFilter = eligibleSchemaPredicate.and(tableFilter::isIncluded)::test;
+        } else if (config.getBoolean(SchemaHistory.STORE_ONLY_CAPTURED_DATABASES_DDL)) {
+            this.schemaSnapshotFilter = finalEligibleTablePredicate::test;
+        } else {
+            this.schemaSnapshotFilter = eligibleSchemaPredicate::test;
+        }
 
-        this.excludeColumns =
-                config.getFallbackStringProperty(COLUMN_EXCLUDE_LIST, COLUMN_BLACKLIST);
+        this.excludeColumns = config.getString(COLUMN_EXCLUDE_LIST);
     }
 
     @Override
@@ -141,10 +160,15 @@ public class RelationalTableFilters implements DataCollectionFilters {
         return databaseFilter;
     }
 
+    public Predicate<String> schemaFilter() {
+        return schemaFilter;
+    }
+
     public String getExcludeColumns() {
         return excludeColumns;
     }
 
+    /** Replaces the table filter. Flink CDC addition — see the class javadoc. */
     public void setDataCollectionFilters(TableFilter tableFilter) {
         this.tableFilter = tableFilter;
     }

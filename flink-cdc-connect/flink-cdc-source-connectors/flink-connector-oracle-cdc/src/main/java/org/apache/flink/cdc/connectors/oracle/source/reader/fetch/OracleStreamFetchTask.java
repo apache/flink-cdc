@@ -22,15 +22,17 @@ import org.apache.flink.cdc.connectors.base.WatermarkDispatcher;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
 import org.apache.flink.cdc.connectors.base.source.reader.external.FetchTask;
+import org.apache.flink.cdc.debezium.internal.SnapshotterServiceFactory;
 
 import io.debezium.config.Configuration;
 import io.debezium.connector.oracle.OracleConnection;
+import io.debezium.connector.oracle.OracleConnector;
 import io.debezium.connector.oracle.OracleConnectorConfig;
 import io.debezium.connector.oracle.OracleDatabaseSchema;
 import io.debezium.connector.oracle.OracleOffsetContext;
 import io.debezium.connector.oracle.OraclePartition;
-import io.debezium.connector.oracle.OracleStreamingChangeEventSourceMetrics;
 import io.debezium.connector.oracle.logminer.LogMinerStreamingChangeEventSource;
+import io.debezium.connector.oracle.logminer.LogMinerStreamingChangeEventSourceMetrics;
 import io.debezium.connector.oracle.logminer.processor.LogMinerEventProcessor;
 import io.debezium.pipeline.ErrorHandler;
 import io.debezium.pipeline.EventDispatcher;
@@ -104,7 +106,7 @@ public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
 
         private final OracleDatabaseSchema schema;
 
-        private final OracleStreamingChangeEventSourceMetrics metrics;
+        private final LogMinerStreamingChangeEventSourceMetrics metrics;
 
         public RedoLogSplitReadTask(
                 OracleConnectorConfig connectorConfig,
@@ -114,7 +116,7 @@ public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
                 ErrorHandler errorHandler,
                 OracleDatabaseSchema schema,
                 Configuration jdbcConfig,
-                OracleStreamingChangeEventSourceMetrics metrics,
+                LogMinerStreamingChangeEventSourceMetrics metrics,
                 StreamSplit redoLogSplit) {
             super(
                     connectorConfig,
@@ -124,7 +126,8 @@ public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
                     Clock.SYSTEM,
                     schema,
                     jdbcConfig,
-                    metrics);
+                    metrics,
+                    SnapshotterServiceFactory.create(connectorConfig, OracleConnector.class));
             this.redoLogSplit = redoLogSplit;
             this.eventDispatcher = eventDispatcher;
             this.watermarkDispatcher = watermarkDispatcher;

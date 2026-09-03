@@ -66,6 +66,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.function.Supplier;
 
 import static org.apache.flink.core.io.InputStatus.MORE_AVAILABLE;
@@ -267,8 +268,20 @@ public class OracleSourceReaderTest extends OracleSourceTestBase {
                 Arrays.stream(captureTables)
                         .map(tableName -> ORACLE_SCHEMA + "." + tableName)
                         .toArray(String[]::new);
+        // Every other Oracle test in this repository pins log.mining.strategy to online_catalog;
+        // this one was the sole outlier and relied on Debezium's redo_log_catalog default. That
+        // strategy mines with DICT_FROM_REDO_LOGS + DDL_DICT_TRACKING, which requires the data
+        // dictionary that DBMS_LOGMNR_D.BUILD wrote into the redo logs to still be reachable from
+        // every log added to the session. The incremental snapshot backfill opens a mining session
+        // per split over a very narrow SCN range, and under Debezium 2.x that combination fails
+        // with "ORA-01291: missing log file". online_catalog needs no dictionary in the logs and
+        // is what this connector is documented and otherwise tested with.
+        Properties debeziumProperties = new Properties();
+        debeziumProperties.setProperty("log.mining.strategy", "online_catalog");
+
         return (OracleSourceConfig)
                 new OracleSourceConfigFactory()
+                        .debeziumProperties(debeziumProperties)
                         .startupOptions(StartupOptions.initial())
                         .databaseList(ORACLE_DATABASE)
                         .tableList(captureTableIds)

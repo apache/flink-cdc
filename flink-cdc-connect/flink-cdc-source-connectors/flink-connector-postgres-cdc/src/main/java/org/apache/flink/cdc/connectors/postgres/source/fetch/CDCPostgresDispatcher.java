@@ -36,8 +36,8 @@ import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
 import io.debezium.schema.DataCollectionFilters;
 import io.debezium.schema.DatabaseSchema;
-import io.debezium.schema.TopicSelector;
-import io.debezium.util.SchemaNameAdjuster;
+import io.debezium.schema.SchemaNameAdjuster;
+import io.debezium.spi.topic.TopicNamingStrategy;
 import org.apache.kafka.connect.source.SourceRecord;
 
 import java.util.Map;
@@ -50,7 +50,7 @@ public class CDCPostgresDispatcher extends PostgresEventDispatcher<TableId>
 
     public CDCPostgresDispatcher(
             PostgresConnectorConfig connectorConfig,
-            TopicSelector topicSelector,
+            TopicNamingStrategy topicSelector,
             DatabaseSchema schema,
             ChangeEventQueue queue,
             DataCollectionFilters.DataCollectionFilter filter,
@@ -58,6 +58,10 @@ public class CDCPostgresDispatcher extends PostgresEventDispatcher<TableId>
             EventMetadataProvider metadataProvider,
             HeartbeatFactory heartbeatFactory,
             SchemaNameAdjuster schemaNameAdjuster) {
+        // Debezium 2.0's PostgresEventDispatcher constructor inserts an InconsistentSchemaHandler
+        // parameter and takes a built Heartbeat instead of a HeartbeatFactory.
+        // Debezium 2.3 appends a trailing SignalProcessor parameter; Flink CDC uses its own
+        // snapshot mechanism and no Debezium signals, so it is passed as null.
         super(
                 connectorConfig,
                 topicSelector,
@@ -65,10 +69,12 @@ public class CDCPostgresDispatcher extends PostgresEventDispatcher<TableId>
                 queue,
                 filter,
                 changeEventCreator,
+                null,
                 metadataProvider,
-                heartbeatFactory,
-                schemaNameAdjuster);
-        this.topic = topicSelector.getPrimaryTopic();
+                heartbeatFactory.createHeartbeat(),
+                schemaNameAdjuster,
+                null);
+        this.topic = connectorConfig.getLogicalName();
         this.queue = queue;
     }
 
