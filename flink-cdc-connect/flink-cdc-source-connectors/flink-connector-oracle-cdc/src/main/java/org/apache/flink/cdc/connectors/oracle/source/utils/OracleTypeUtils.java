@@ -66,7 +66,9 @@ public class OracleTypeUtils {
                 return DataTypes.DOUBLE();
             case Types.NUMERIC:
             case Types.DECIMAL:
-                return DataTypes.DECIMAL(column.length(), column.scale().orElse(0));
+                int precision = normalizeDecimalPrecision(column.length());
+                int scale = normalizeDecimalScale(column.scale().orElse(0), precision);
+                return DataTypes.DECIMAL(precision, scale);
             case Types.DATE:
                 return DataTypes.DATE();
             case Types.TIMESTAMP:
@@ -88,5 +90,19 @@ public class OracleTypeUtils {
                                 "Don't support Oracle type '%s' yet, jdbcType:'%s'.",
                                 column.typeName(), column.jdbcType()));
         }
+    }
+
+    private static int normalizeDecimalPrecision(int precision) {
+        if (precision <= 0) {
+            return 38;
+        }
+        return Math.min(precision, 38);
+    }
+
+    private static int normalizeDecimalScale(int scale, int precision) {
+        if (scale < 0) {
+            return 0;
+        }
+        return Math.min(scale, precision);
     }
 }

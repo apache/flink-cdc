@@ -32,6 +32,7 @@ import org.apache.flink.table.factories.FactoryUtil;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -53,6 +54,7 @@ import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_IN
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_STARTUP_MODE;
+import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_STARTUP_TIMESTAMP_MILLIS;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND;
 import static org.apache.flink.cdc.connectors.base.utils.ObjectUtils.doubleCompare;
@@ -67,6 +69,13 @@ import static org.apache.flink.util.Preconditions.checkState;
 public class OracleTableSourceFactory implements DynamicTableSourceFactory {
 
     private static final String IDENTIFIER = "oracle-cdc";
+    private static final String DEBEZIUM_DATABASE_CONNECTION_ADAPTER =
+            "debezium.database.connection.adapter";
+    private static final String ADAPTER_XSTREAM = "xstream";
+    private static final String XSTREAM_BACKFILL_VALIDATION_MESSAGE =
+            "Oracle XStream does not support bounded backfill. Set "
+                    + "'scan.incremental.snapshot.backfill.skip' = 'true' when using "
+                    + "'debezium.database.connection.adapter' = 'xstream'.";
 
     @Override
     public DynamicTableSource createDynamicTableSource(Context context) {
@@ -117,6 +126,9 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
         boolean scanNewlyAddedTableEnabled = config.get(SCAN_NEWLY_ADDED_TABLE_ENABLED);
         boolean assignUnboundedChunkFirst =
                 config.get(SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED);
+        validateXStreamBackfillCompatibility(
+                context.getCatalogTable().getOptions().get(DEBEZIUM_DATABASE_CONNECTION_ADAPTER),
+                skipSnapshotBackfill);
 
         if (enableParallelRead) {
             validateIntegerOption(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE, splitSize, 1);
@@ -195,6 +207,7 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
         options.add(SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP);
         options.add(SCAN_NEWLY_ADDED_TABLE_ENABLED);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED);
+        options.add(SCAN_STARTUP_TIMESTAMP_MILLIS);
         return options;
     }
 
@@ -204,6 +217,7 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
     private static final String SCAN_STARTUP_MODE_VALUE_SPECIFIC_OFFSETS = "specific-offset";
     private static final String SCAN_STARTUP_MODE_VALUE_SPECIFIC_OFFSETS_PREFIX =
             "scan.startup.specific-offset.";
+    private static final String SCAN_STARTUP_MODE_VALUE_TIMESTAMP = "timestamp";
 
     private static StartupOptions getStartupOptions(
             ReadableConfig config, Map<String, String> options) {
@@ -219,14 +233,17 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
             case SCAN_STARTUP_MODE_VALUE_SPECIFIC_OFFSETS:
                 Map<String, String> offsetMap = getSpecificOffsetMap(options);
                 return StartupOptions.specificOffset(offsetMap);
+            case SCAN_STARTUP_MODE_VALUE_TIMESTAMP:
+                return StartupOptions.timestamp(config.get(SCAN_STARTUP_TIMESTAMP_MILLIS));
             default:
                 throw new ValidationException(
                         String.format(
-                                "Invalid value for option '%s'. Supported values are [%s, %s, %s], but was: %s",
+                                "Invalid value for option '%s'. Supported values are [%s, %s, %s, %s], but was: %s",
                                 SCAN_STARTUP_MODE.key(),
                                 SCAN_STARTUP_MODE_VALUE_INITIAL,
                                 SCAN_STARTUP_MODE_VALUE_SNAPSHOT,
                                 SCAN_STARTUP_MODE_VALUE_LATEST,
+                                SCAN_STARTUP_MODE_VALUE_TIMESTAMP,
                                 modeString));
         }
     }
@@ -277,5 +294,12 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
                         0.0d,
                         1.0d,
                         distributionFactorLower));
+    }
+
+    static void validateXStreamBackfillCompatibility(String adapter, boolean skipSnapshotBackfill) {
+        String normalizedAdapter = adapter == null ? "" : adapter.trim().toLowerCase(Locale.ROOT);
+        if (ADAPTER_XSTREAM.equals(normalizedAdapter) && !skipSnapshotBackfill) {
+            throw new ValidationException(XSTREAM_BACKFILL_VALIDATION_MESSAGE);
+        }
     }
 }
