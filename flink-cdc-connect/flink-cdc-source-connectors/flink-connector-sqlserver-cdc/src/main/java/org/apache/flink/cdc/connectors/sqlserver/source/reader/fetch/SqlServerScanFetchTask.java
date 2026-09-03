@@ -274,7 +274,7 @@ public class SqlServerScanFetchTask extends AbstractScanFetchTask {
                                     snapshotSplit.getSplitStart(),
                                     snapshotSplit.getSplitEnd(),
                                     snapshotSplit.getSplitKeyType().getFieldCount(),
-                                    connectorConfig.getQueryFetchSize());
+                                    connectorConfig.getSnapshotFetchSize());
                     ResultSet rs = selectStatement.executeQuery()) {
 
                 ColumnUtils.ColumnArray columnArray = ColumnUtils.toArray(rs, table);
