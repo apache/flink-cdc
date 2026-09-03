@@ -26,10 +26,80 @@ under the License.
 
 # Kafka Pipeline Connector
 
-The Kafka Pipeline connector can be used as the *Data Sink* of the pipeline, and write data to [Kafka](https://kafka.apache.org). This document describes how to set up the Kafka Pipeline connector.
+The Kafka Pipeline connector can be used as a *Data Source* or *Data Sink* of the pipeline. As a source, it consumes Debezium JSON or Canal JSON changelog records and converts inferred schema changes into pipeline schema events.
 
 ## What can the connector do?
 * Data synchronization
+* Consume Debezium JSON or Canal JSON changelog records
+* Infer create table, add column, and compatible column type widening events
+
+Kafka Source
+----------------
+
+The following pipeline consumes Debezium JSON from multiple Kafka partitions and writes it to StarRocks:
+
+```yaml
+source:
+  type: kafka
+  name: Kafka Debezium Source
+  topic: inventory.customers
+  group-id: flink-cdc-kafka-source
+  scan.startup.mode: group-offsets
+  properties.bootstrap.servers: localhost:9092
+
+transform:
+  - source-table: inventory.\.*
+    primary-keys: id
+
+sink:
+  type: starrocks
+  name: StarRocks Sink
+  jdbc-url: jdbc:mysql://localhost:9030
+  load-url: localhost:8030
+  username: root
+  password: ""
+
+pipeline:
+  name: Kafka to StarRocks Pipeline
+  parallelism: 4
+  schema.change.behavior: lenient
+```
+
+Kafka source options:
+
+* `topic`: one topic or a comma-separated topic list.
+* `topic-pattern`: a regular expression for discovering topics. Configure exactly one of `topic` and `topic-pattern`.
+* `group-id` (required unless `properties.group.id` is set): Kafka consumer group.
+* `scan.startup.mode`: `group-offsets` (default), `earliest-offset`, `latest-offset`, `timestamp`, or `specific-offsets`.
+* `scan.startup.timestamp-millis`: required when `scan.startup.mode` is `timestamp`.
+* `scan.startup.specific-offsets`: required when `scan.startup.mode` is `specific-offsets`. Use `partition:0,offset:42;partition:1,offset:300` when exactly one `topic` is configured, or include a topic in each entry such as `topic:dbz.customers,partition:0,offset:42`. Partitions that are not listed start from the earliest offset.
+* `tables`: optional inclusion patterns matched against Debezium `source.db`/`source.table` or Canal `database`/`table` (same selector syntax as the MySQL source, for example `inventory.customers` or `inventory.\\.*`).
+* `tables.exclude`: optional exclusion patterns. Can be used alone or together with `tables`.
+* `value.format`: `debezium-json` (default) or `canal-json`.
+* `properties.bootstrap.servers` (required) and `properties.*`: Kafka consumer properties.
+
+Primary keys are not inferred from Debezium JSON. Assign them with a pipeline `transform` `primary-keys` option. Canal JSON uses `pkNames` as the table primary key when present; transform can still override them. A StarRocks sink still requires a primary key before it can create a table.
+
+Debezium JSON values must include the `schema` and `payload` fields. Values without an embedded schema cannot reliably describe column type changes and are rejected.
+
+Canal JSON values use `mysqlType` for column types and `pkNames` for primary keys. `INSERT`/`UPDATE`/`DELETE` are consumed; `isDdl=true` and other `type` values are skipped. Canal `UPDATE` records often put only changed columns in `old`: the source builds a full before image by overlaying `old` onto `data`.
+
+The transform primary key determines downstream partitioning and upsert semantics, but it cannot restore ordering already lost in Kafka. Producers must still send changes for the same logical primary key to the same Kafka partition.
+
+### Schema evolution and multiple partitions
+
+Kafka only guarantees ordering within a partition. The source therefore merges schemas monotonically across the partitions assigned to each source subtask and the distributed schema coordinator merges them again across subtasks. Old records arriving after a newer schema are converted to the widest known schema instead of reverting it.
+
+The source supports:
+
+* creating a table from the first record seen for a table;
+* adding nullable columns;
+* keeping a monotonic column superset: dropped or renamed source columns are retained (NOT NULL columns become nullable) and new names are added. Historical rows have nulls in new columns; later rows have nulls in old columns. The source does not emit drop or rename events;
+* compatible type widening, such as `INT` to `BIGINT`, `INT` to `STRING`, or increasing decimal precision. Kafka Connect `string` is always mapped to `STRING` (MySQL `CHAR`/`VARCHAR`/`TEXT` all become `string` in Debezium JSON). Replaying from an old offset that spans an `INT` → `STRING` change converts historical integer values to strings instead of failing.
+
+Narrowing types and incompatible type changes fail explicitly. Use `schema.change.behavior: lenient` for a parallel Kafka source.
+
+When replaying from an old offset, an empty target table follows the historical `CREATE → ADD/ALTER` sequence. An existing StarRocks table must be a compatible superset. Replayed create/add/alter operations are idempotent; extra target columns must be nullable or have defaults. Replaying rows is safe for primary-key tables through upserts. Duplicate-key tables should be cleared or replaced before a full replay.
 
 How to create Pipeline
 ----------------

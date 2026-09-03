@@ -42,8 +42,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.apache.flink.cdc.connectors.starrocks.sink.StarRocksUtils.toStarRocksDataType;
@@ -134,6 +137,16 @@ public class StarRocksMetadataApplier implements MetadataApplier {
         }
 
         try {
+            Optional<StarRocksTable> existingTable =
+                    catalog.getTable(
+                            starRocksTable.getDatabaseName(), starRocksTable.getTableName());
+            if (existingTable.isPresent()) {
+                validateExistingTable(createTableEvent, existingTable.get(), starRocksTable);
+                LOG.info(
+                        "Table already exists with a compatible schema, event: {}",
+                        createTableEvent);
+                return;
+            }
             catalog.createTable(starRocksTable, true);
             LOG.info("Successful to create table, event: {}", createTableEvent);
         } catch (StarRocksCatalogException e) {
@@ -144,6 +157,7 @@ public class StarRocksMetadataApplier implements MetadataApplier {
 
     private void applyAddColumn(AddColumnEvent addColumnEvent) throws SchemaEvolveException {
         List<StarRocksColumn> addColumns = new ArrayList<>();
+        StarRocksTable existingTable = getRequiredTable(addColumnEvent);
         for (AddColumnEvent.ColumnWithPosition columnWithPosition :
                 addColumnEvent.getAddedColumns()) {
             // we will ignore position information, and always add the column to the last.
@@ -163,7 +177,25 @@ public class StarRocksMetadataApplier implements MetadataApplier {
                                     StarRocksUtils.convertInvalidTimestampDefaultValue(
                                             column.getDefaultValueExpression(), column.getType()));
             toStarRocksDataType(column, false, builder, tableCreateConfig.getUnicodeCharMaxBytes());
-            addColumns.add(builder.build());
+            StarRocksColumn targetColumn = builder.build();
+            StarRocksColumn existingColumn = existingTable.getColumn(targetColumn.getColumnName());
+            if (existingColumn == null) {
+                addColumns.add(targetColumn);
+            } else if (isSameOrWider(existingColumn, targetColumn)) {
+                LOG.info(
+                        "Column {} already exists with a compatible type, skipping replayed add column event.",
+                        targetColumn.getColumnName());
+            } else {
+                throw new SchemaEvolveException(
+                        addColumnEvent,
+                        String.format(
+                                "Existing column %s is incompatible with replayed column %s",
+                                existingColumn, targetColumn),
+                        null);
+            }
+        }
+        if (addColumns.isEmpty()) {
+            return;
         }
 
         TableId tableId = addColumnEvent.tableId();
@@ -317,6 +349,7 @@ public class StarRocksMetadataApplier implements MetadataApplier {
         try {
             TableId tableId = event.tableId();
             Map<String, DataType> typeMapping = event.getTypeMapping();
+            StarRocksTable existingTable = getRequiredTable(event);
 
             for (Map.Entry<String, DataType> entry : typeMapping.entrySet()) {
                 StarRocksColumn.Builder builder =
@@ -326,11 +359,147 @@ public class StarRocksMetadataApplier implements MetadataApplier {
                         false,
                         builder,
                         tableCreateConfig.getUnicodeCharMaxBytes());
+                StarRocksColumn targetColumn = builder.build();
+                StarRocksColumn existingColumn = existingTable.getColumn(entry.getKey());
+                if (existingColumn == null) {
+                    throw new SchemaEvolveException(
+                            event, "Cannot alter non-existing column " + entry.getKey(), null);
+                }
+                if (isSameOrWider(existingColumn, targetColumn)
+                        && isSameOrWider(targetColumn, existingColumn)) {
+                    LOG.info(
+                            "Column {} is already at type {}, skipping replayed alter column event.",
+                            entry.getKey(),
+                            existingColumn.getDataType());
+                    continue;
+                }
+                if (!isSameOrWider(targetColumn, existingColumn)) {
+                    throw new SchemaEvolveException(
+                            event,
+                            String.format(
+                                    "Cannot safely widen column %s from %s to %s",
+                                    entry.getKey(), existingColumn, targetColumn),
+                            null);
+                }
                 catalog.alterColumnType(
-                        tableId.getSchemaName(), tableId.getTableName(), builder.build());
+                        tableId.getSchemaName(),
+                        tableId.getTableName(),
+                        targetColumn,
+                        schemaChangeConfig.getTimeoutSecond());
             }
         } catch (Exception e) {
+            if (e instanceof SchemaEvolveException) {
+                throw (SchemaEvolveException) e;
+            }
             throw new SchemaEvolveException(event, "fail to apply alter column type event", e);
+        }
+    }
+
+    private StarRocksTable getRequiredTable(SchemaChangeEvent event) {
+        TableId tableId = event.tableId();
+        try {
+            return catalog.getTable(tableId.getSchemaName(), tableId.getTableName())
+                    .orElseThrow(
+                            () ->
+                                    new SchemaEvolveException(
+                                            event, "Table " + tableId + " does not exist", null));
+        } catch (StarRocksCatalogException e) {
+            throw new SchemaEvolveException(event, "Failed to inspect table " + tableId, e);
+        }
+    }
+
+    private void validateExistingTable(
+            CreateTableEvent event, StarRocksTable actual, StarRocksTable expected) {
+        List<String> actualKeys = actual.getTableKeys().orElse(new ArrayList<>());
+        List<String> expectedKeys = expected.getTableKeys().orElse(new ArrayList<>());
+        if (!actualKeys.equals(expectedKeys)) {
+            throw new SchemaEvolveException(
+                    event,
+                    String.format(
+                            "Existing table primary keys %s differ from inferred primary keys %s",
+                            actualKeys, expectedKeys),
+                    null);
+        }
+
+        Map<String, StarRocksColumn> expectedColumns = new HashMap<>();
+        for (StarRocksColumn expectedColumn : expected.getColumns()) {
+            expectedColumns.put(expectedColumn.getColumnName(), expectedColumn);
+            StarRocksColumn actualColumn = actual.getColumn(expectedColumn.getColumnName());
+            if (actualColumn == null || !isSameOrWider(actualColumn, expectedColumn)) {
+                throw new SchemaEvolveException(
+                        event,
+                        String.format(
+                                "Existing column %s is missing or incompatible with inferred column %s",
+                                actualColumn, expectedColumn),
+                        null);
+            }
+        }
+
+        for (StarRocksColumn actualColumn : actual.getColumns()) {
+            if (!expectedColumns.containsKey(actualColumn.getColumnName())
+                    && !actualColumn.isNullable()
+                    && !actualColumn.getDefaultValue().isPresent()) {
+                throw new SchemaEvolveException(
+                        event,
+                        String.format(
+                                "Existing extra column %s is non-nullable and has no default value",
+                                actualColumn.getColumnName()),
+                        null);
+            }
+        }
+    }
+
+    private boolean isSameOrWider(StarRocksColumn wider, StarRocksColumn narrower) {
+        if (narrower.isNullable() && !wider.isNullable()) {
+            return false;
+        }
+
+        String widerType = wider.getDataType().toUpperCase(Locale.ROOT);
+        String narrowerType = narrower.getDataType().toUpperCase(Locale.ROOT);
+        if (widerType.equals(narrowerType)) {
+            if ("CHAR".equals(widerType) || "VARCHAR".equals(widerType)) {
+                return wider.getColumnSize().orElse(0) >= narrower.getColumnSize().orElse(0);
+            }
+            if ("DECIMAL".equals(widerType)) {
+                int widerPrecision = wider.getColumnSize().orElse(0);
+                int widerScale = wider.getDecimalDigits().orElse(0);
+                int narrowerPrecision = narrower.getColumnSize().orElse(0);
+                int narrowerScale = narrower.getDecimalDigits().orElse(0);
+                return widerScale >= narrowerScale
+                        && widerPrecision - widerScale >= narrowerPrecision - narrowerScale;
+            }
+            return true;
+        }
+
+        if ("VARCHAR".equals(widerType) && "CHAR".equals(narrowerType)) {
+            return wider.getColumnSize().orElse(0) >= narrower.getColumnSize().orElse(0);
+        }
+        if ("VARCHAR".equals(widerType) || "STRING".equals(widerType)) {
+            return numericTypeRank(narrowerType) >= 0 || "BOOLEAN".equals(narrowerType);
+        }
+        int widerRank = numericTypeRank(widerType);
+        int narrowerRank = numericTypeRank(narrowerType);
+        return widerRank >= 0 && narrowerRank >= 0 && widerRank >= narrowerRank;
+    }
+
+    private int numericTypeRank(String type) {
+        switch (type) {
+            case "TINYINT":
+                return 0;
+            case "SMALLINT":
+                return 1;
+            case "INT":
+                return 2;
+            case "BIGINT":
+                return 3;
+            case "LARGEINT":
+                return 4;
+            case "FLOAT":
+                return 5;
+            case "DOUBLE":
+                return 6;
+            default:
+                return -1;
         }
     }
 

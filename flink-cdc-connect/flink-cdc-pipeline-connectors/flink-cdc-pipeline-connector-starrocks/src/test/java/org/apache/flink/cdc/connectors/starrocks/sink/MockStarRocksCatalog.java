@@ -97,6 +97,71 @@ public class MockStarRocksCatalog extends StarRocksEnrichedCatalog {
     }
 
     @Override
+    public void alterColumnType(
+            String databaseName, String tableName, StarRocksColumn column, long timeoutSecond)
+            throws StarRocksCatalogException {
+        Map<String, StarRocksTable> dbTables = tables.get(databaseName);
+        if (dbTables == null) {
+            throw new StarRocksCatalogException(
+                    String.format("database %s does not exist", databaseName));
+        }
+        StarRocksTable oldTable = dbTables.get(tableName);
+        if (oldTable == null) {
+            throw new StarRocksCatalogException(
+                    String.format("table %s.%s does not exist", databaseName, tableName));
+        }
+        List<StarRocksColumn> newColumns = new ArrayList<>();
+        boolean found = false;
+        for (StarRocksColumn existing : oldTable.getColumns()) {
+            if (existing.getColumnName().equals(column.getColumnName())) {
+                found = true;
+                newColumns.add(
+                        new StarRocksColumn.Builder()
+                                .setColumnName(column.getColumnName())
+                                .setOrdinalPosition(newColumns.size())
+                                .setDataType(column.getDataType())
+                                .setNullable(column.isNullable())
+                                .setDefaultValue(column.getDefaultValue().orElse(null))
+                                .setColumnSize(column.getColumnSize().orElse(null))
+                                .setDecimalDigits(column.getDecimalDigits().orElse(null))
+                                .setColumnComment(column.getColumnComment().orElse(null))
+                                .build());
+            } else {
+                newColumns.add(
+                        new StarRocksColumn.Builder()
+                                .setColumnName(existing.getColumnName())
+                                .setOrdinalPosition(newColumns.size())
+                                .setDataType(existing.getDataType())
+                                .setNullable(existing.isNullable())
+                                .setDefaultValue(existing.getDefaultValue().orElse(null))
+                                .setColumnSize(existing.getColumnSize().orElse(null))
+                                .setDecimalDigits(existing.getDecimalDigits().orElse(null))
+                                .setColumnComment(existing.getColumnComment().orElse(null))
+                                .build());
+            }
+        }
+        if (!found) {
+            throw new StarRocksCatalogException(
+                    String.format(
+                            "column %s does not exist in %s.%s",
+                            column.getColumnName(), databaseName, tableName));
+        }
+        dbTables.put(
+                tableName,
+                new StarRocksTable.Builder()
+                        .setDatabaseName(oldTable.getDatabaseName())
+                        .setTableName(oldTable.getTableName())
+                        .setTableType(oldTable.getTableType())
+                        .setColumns(newColumns)
+                        .setTableKeys(oldTable.getTableKeys().orElse(null))
+                        .setDistributionKeys(oldTable.getDistributionKeys().orElse(null))
+                        .setNumBuckets(oldTable.getNumBuckets().orElse(null))
+                        .setComment(oldTable.getComment().orElse(null))
+                        .setTableProperties(oldTable.getProperties())
+                        .build());
+    }
+
+    @Override
     public void alterAddColumns(
             String databaseName,
             String tableName,

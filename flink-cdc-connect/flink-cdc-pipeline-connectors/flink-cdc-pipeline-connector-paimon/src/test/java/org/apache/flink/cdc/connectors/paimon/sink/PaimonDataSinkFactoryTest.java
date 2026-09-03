@@ -205,5 +205,14 @@ class PaimonDataSinkFactoryTest {
                 .asString()
                 .hasSize(39) // 3 ("yux") + 36 (Random UUID)
                 .startsWith("yux");
+
+        PaimonDataSink paimonDataSink = (PaimonDataSink) dataSink;
+        Assertions.assertThat(((FlinkSinkProvider) paimonDataSink.getEventSinkProvider()).getSink())
+                .extracting("parallelMetadataSource")
+                .isEqualTo(false);
+        paimonDataSink.setParallelMetadataSource(true);
+        Assertions.assertThat(((FlinkSinkProvider) paimonDataSink.getEventSinkProvider()).getSink())
+                .extracting("parallelMetadataSource")
+                .isEqualTo(true);
     }
 }

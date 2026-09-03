@@ -19,13 +19,18 @@ package org.apache.flink.cdc.connectors.starrocks.sink;
 
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
+import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.common.types.BigIntType;
 import org.apache.flink.cdc.common.types.BooleanType;
 import org.apache.flink.cdc.common.types.DecimalType;
+import org.apache.flink.cdc.common.types.DoubleType;
+import org.apache.flink.cdc.common.types.FloatType;
 import org.apache.flink.cdc.common.types.IntType;
 import org.apache.flink.cdc.common.types.SmallIntType;
 import org.apache.flink.cdc.common.types.TimeType;
@@ -183,6 +188,151 @@ class StarRocksMetadataApplierTest {
                         .setTableProperties(Collections.singletonMap("replication_num", "5"))
                         .build();
         Assertions.assertThat(actualTable).isEqualTo(expectTable);
+    }
+
+    @Test
+    void testReplayHistoricalSchemaAgainstWiderExistingTable() {
+        TableId tableId = TableId.parse("test.replay_tbl");
+        Schema currentSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", new BigIntType(false))
+                        .physicalColumn("new_col", new IntType())
+                        .primaryKey("id")
+                        .build();
+        metadataApplier.applySchemaChange(new CreateTableEvent(tableId, currentSchema));
+
+        Schema historicalSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", new IntType(false))
+                        .primaryKey("id")
+                        .build();
+        metadataApplier.applySchemaChange(new CreateTableEvent(tableId, historicalSchema));
+        metadataApplier.applySchemaChange(
+                new AddColumnEvent(
+                        tableId,
+                        Collections.singletonList(
+                                new AddColumnEvent.ColumnWithPosition(
+                                        Column.physicalColumn("new_col", new IntType())))));
+        metadataApplier.applySchemaChange(
+                new AlterColumnTypeEvent(
+                        tableId, Collections.singletonMap("id", new BigIntType(false))));
+
+        StarRocksTable actualTable =
+                catalog.getTable(tableId.getSchemaName(), tableId.getTableName()).orElse(null);
+        Assertions.assertThat(actualTable).isNotNull();
+        Assertions.assertThat(actualTable.getColumn("id").getDataType())
+                .isEqualToIgnoringCase("bigint");
+        Assertions.assertThat(actualTable.getColumn("new_col")).isNotNull();
+    }
+
+    @Test
+    void testRejectNarrowingAlterColumnType() {
+        TableId tableId = TableId.parse("test.narrow_alter_tbl");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", new BigIntType(false))
+                        .physicalColumn("number", new DoubleType())
+                        .primaryKey("id")
+                        .build();
+        metadataApplier.applySchemaChange(new CreateTableEvent(tableId, schema));
+
+        Assertions.assertThatThrownBy(
+                        () ->
+                                metadataApplier.applySchemaChange(
+                                        new AlterColumnTypeEvent(
+                                                tableId,
+                                                Collections.singletonMap(
+                                                        "id", new IntType(false)))))
+                .isInstanceOfSatisfying(
+                        SchemaEvolveException.class,
+                        exception ->
+                                Assertions.assertThat(exception.getExceptionMessage())
+                                        .contains("Cannot safely widen"));
+
+        Assertions.assertThatThrownBy(
+                        () ->
+                                metadataApplier.applySchemaChange(
+                                        new AlterColumnTypeEvent(
+                                                tableId,
+                                                Collections.singletonMap(
+                                                        "number", new FloatType()))))
+                .isInstanceOfSatisfying(
+                        SchemaEvolveException.class,
+                        exception ->
+                                Assertions.assertThat(exception.getExceptionMessage())
+                                        .contains("Cannot safely widen"));
+
+        StarRocksTable actualTable =
+                catalog.getTable(tableId.getSchemaName(), tableId.getTableName()).orElse(null);
+        Assertions.assertThat(actualTable).isNotNull();
+        Assertions.assertThat(actualTable.getColumn("id").getDataType())
+                .isEqualToIgnoringCase("bigint");
+        Assertions.assertThat(actualTable.getColumn("number").getDataType())
+                .isEqualToIgnoringCase("double");
+    }
+
+    @Test
+    void testRejectCreateTableWhenExistingTableMissesInferredColumn() {
+        TableId tableId = TableId.parse("test.narrow_existing_tbl");
+        Schema existingSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", new IntType(false))
+                        .physicalColumn("name", new IntType())
+                        .primaryKey("id")
+                        .build();
+        metadataApplier.applySchemaChange(new CreateTableEvent(tableId, existingSchema));
+
+        Schema firstMessageSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", new IntType(false))
+                        .physicalColumn("name", new IntType())
+                        .physicalColumn("email", new IntType())
+                        .primaryKey("id")
+                        .build();
+
+        Assertions.assertThatThrownBy(
+                        () ->
+                                metadataApplier.applySchemaChange(
+                                        new CreateTableEvent(tableId, firstMessageSchema)))
+                .isInstanceOfSatisfying(
+                        SchemaEvolveException.class,
+                        exception ->
+                                Assertions.assertThat(exception.getExceptionMessage())
+                                        .contains("missing or incompatible")
+                                        .contains("email"));
+
+        StarRocksTable actualTable =
+                catalog.getTable(tableId.getSchemaName(), tableId.getTableName()).orElse(null);
+        Assertions.assertThat(actualTable).isNotNull();
+        Assertions.assertThat(actualTable.getColumn("email")).isNull();
+    }
+
+    @Test
+    void testRejectReplayWhenPrimaryKeysDiffer() {
+        TableId tableId = TableId.parse("test.incompatible_replay_tbl");
+        Schema currentSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", new IntType(false))
+                        .physicalColumn("other_id", new IntType(false))
+                        .primaryKey("other_id")
+                        .build();
+        metadataApplier.applySchemaChange(new CreateTableEvent(tableId, currentSchema));
+
+        Schema historicalSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", new IntType(false))
+                        .primaryKey("id")
+                        .build();
+
+        Assertions.assertThatThrownBy(
+                        () ->
+                                metadataApplier.applySchemaChange(
+                                        new CreateTableEvent(tableId, historicalSchema)))
+                .isInstanceOfSatisfying(
+                        SchemaEvolveException.class,
+                        exception ->
+                                Assertions.assertThat(exception.getExceptionMessage())
+                                        .contains("primary keys"));
     }
 
     @Test
