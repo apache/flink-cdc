@@ -171,6 +171,21 @@ pipeline:
       <td>The chunk size (number of rows) of table snapshot, captured tables are split into multiple chunks when read the snapshot of table.</td>
     </tr>
     <tr>
+      <td>scan.incremental.snapshot.chunk.key-column</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>The chunk key column(s) used to split table snapshots into chunks.
+        By default, the chunk key is the first column of the primary key.
+        For tables <b>without a primary key</b>, this option is <b>required</b> and the specified column must be <code>NOT NULL</code>.
+        A non-primary-key column can be used, but this may lead to slower query performance.
+        <br>
+        Multiple tables can be assigned different chunk keys using the format <code>&lt;table-pattern&gt;:&lt;column&gt;</code>,
+        with entries separated by semicolons (<code>;</code>).
+        For example: <code>db1.table_[0-9]+:col1;db2.orders:col2</code>.
+      </td>
+    </tr>
+    <tr>
       <td>scan.snapshot.fetch.size</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">1024</td>
