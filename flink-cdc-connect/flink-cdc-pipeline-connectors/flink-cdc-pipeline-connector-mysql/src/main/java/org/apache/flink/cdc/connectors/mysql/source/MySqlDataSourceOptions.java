@@ -93,6 +93,21 @@ public class MySqlDataSourceOptions {
                     .withDescription(
                             "The chunk size (number of rows) of table snapshot, captured tables are split into multiple chunks when read the snapshot of table.");
 
+    public static final ConfigOption<String> SCAN_SNAPSHOT_HOSTNAME =
+            ConfigOptions.key("scan.snapshot.hostname")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "Optional IP address or hostname of a MySQL read replica to use for snapshot and metadata "
+                                    + "queries (table discovery, chunk splitting). When set, all snapshot data reads and metadata "
+                                    + "operations are routed to this instance, reducing load on the primary writer. "
+                                    + "Binlog position tracking and changelog streaming always use the primary writer instance. "
+                                    + "WARNING: At-least-once semantics only. When this option is set, exactly-once "
+                                    + "guarantees cannot be maintained because the binlog positions recorded during snapshot "
+                                    + "scanning originate from the primary writer while the data is read from the replica, and "
+                                    + "storage replication lag (even in the millisecond range, as with Aurora/RDS) means the "
+                                    + "two positions may not be perfectly consistent.");
+
     public static final ConfigOption<Integer> SCAN_SNAPSHOT_FETCH_SIZE =
             ConfigOptions.key("scan.snapshot.fetch.size")
                     .intType()
