@@ -241,10 +241,9 @@ spec:
   imagePullPolicy: Always
   job:
     args:
-      - '--use-mini-cluster'
       - /opt/flink/flink-cdc-{{< param Version >}}/conf/mysql-to-doris.yaml
-    entryClass: org.apache.flink.cdc.cli.CliFrontend
-    jarURI: 'local:///opt/flink/flink-cdc-{{< param Version >}}/lib/flink-cdc-dist-{{< param Version >}}.jar'
+    entryClass: org.apache.flink.cdc.cli.CliExecutor
+    jarURI: 'local:///opt/flink/lib/flink-cdc-dist-{{< param Version >}}.jar'
     parallelism: 1
     state: running
     upgradeMode: savepoint
@@ -276,7 +275,7 @@ spec:
 ```
 {{< hint info >}}
 1. 由于Flink的类加载机制，参数`classloader.resolve-order`必须设置为`parent-first`。 
-2. Flink CDC默认提交作业到远程Flink集群，在Operator模式下，您需要通过指定`--use-mini-cluster`参数在pod内部启动一个Standalone Flink集群。  
+2. `entryClass`必须设置为`org.apache.flink.cdc.cli.CliExecutor`，它是Flink **native application mode** 的入口类。Pipeline 定义文件路径通过`args`传入，由 JobManager 读取并构建作业图，作业随后在独立的 TaskManager 上执行。  
 {{< /hint >}}
 
 ### 提交Flink CDC作业
@@ -290,8 +289,3 @@ kubectl apply -f flink-cdc-pipeline-job.yaml
 flinkdeployment.flink.apache.org/flink-cdc-pipeline-job created
 ```
 如您需要查看日志、暴露Flink Web UI等，请参考：[Flink Kubernetes Operator文档](https://nightlies.apache.org/flink/flink-kubernetes-operator-docs-main/docs/concepts/overview/)。
-
-
-{{< hint info >}}  
-请注意，目前不支持使用**native application mode**提交作业。  
-{{< /hint >}}
