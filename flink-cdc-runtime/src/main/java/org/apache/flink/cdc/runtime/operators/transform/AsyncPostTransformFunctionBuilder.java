@@ -1,0 +1,130 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.flink.cdc.runtime.operators.transform;
+
+import org.apache.flink.api.java.tuple.Tuple3;
+import org.apache.flink.cdc.common.model.AiModelClient;
+import org.apache.flink.cdc.common.pipeline.DecimalPrecisionMode;
+import org.apache.flink.cdc.common.pipeline.PipelineOptions;
+import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
+
+import javax.annotation.Nullable;
+
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/** Builder of {@link AsyncPostTransformFunction}. */
+public class AsyncPostTransformFunctionBuilder {
+
+    private final List<TransformRule> transformRules = new ArrayList<>();
+    private String timezone;
+    private DecimalPrecisionMode decimalPrecisionMode = DecimalPrecisionMode.UP_TO_19;
+    private final List<Tuple3<String, String, Map<String, String>>> udfFunctions =
+            new ArrayList<>();
+    private final Map<String, AiModelClient> modelClients = new LinkedHashMap<>();
+    private int asyncWorkerThreads = 16;
+
+    public AsyncPostTransformFunctionBuilder addTransform(
+            String tableInclusions,
+            @Nullable String projection,
+            @Nullable String filter,
+            String primaryKey,
+            String partitionKey,
+            String tableOptions,
+            String postTransformConverter,
+            SupportedMetadataColumn[] supportedMetadataColumns) {
+        return addTransform(
+                tableInclusions,
+                projection,
+                filter,
+                primaryKey,
+                partitionKey,
+                tableOptions,
+                ",",
+                postTransformConverter,
+                supportedMetadataColumns);
+    }
+
+    public AsyncPostTransformFunctionBuilder addTransform(
+            String tableInclusions,
+            @Nullable String projection,
+            @Nullable String filter,
+            String primaryKey,
+            String partitionKey,
+            String tableOptions,
+            String tableOptionsDelimiter,
+            String postTransformConverter,
+            SupportedMetadataColumn[] supportedMetadataColumns) {
+        transformRules.add(
+                new TransformRule(
+                        tableInclusions,
+                        projection,
+                        filter,
+                        primaryKey,
+                        partitionKey,
+                        tableOptions,
+                        tableOptionsDelimiter,
+                        postTransformConverter,
+                        supportedMetadataColumns));
+        return this;
+    }
+
+    public AsyncPostTransformFunctionBuilder addTimezone(String timezone) {
+        if (PipelineOptions.PIPELINE_LOCAL_TIME_ZONE.defaultValue().equals(timezone)) {
+            this.timezone = ZoneId.systemDefault().toString();
+        } else {
+            this.timezone = timezone;
+        }
+        return this;
+    }
+
+    public AsyncPostTransformFunctionBuilder addDecimalPrecisionMode(
+            DecimalPrecisionMode decimalPrecisionMode) {
+        this.decimalPrecisionMode = decimalPrecisionMode;
+        return this;
+    }
+
+    public AsyncPostTransformFunctionBuilder addUdfFunctions(
+            List<Tuple3<String, String, Map<String, String>>> udfFunctions) {
+        this.udfFunctions.addAll(udfFunctions);
+        return this;
+    }
+
+    public AsyncPostTransformFunctionBuilder addModelClients(Map<String, AiModelClient> clients) {
+        this.modelClients.putAll(clients);
+        return this;
+    }
+
+    public AsyncPostTransformFunctionBuilder addAsyncWorkerThreads(int asyncWorkerThreads) {
+        this.asyncWorkerThreads = asyncWorkerThreads;
+        return this;
+    }
+
+    public AsyncPostTransformFunction build() {
+        return new AsyncPostTransformFunction(
+                transformRules,
+                timezone,
+                decimalPrecisionMode,
+                udfFunctions,
+                modelClients,
+                asyncWorkerThreads);
+    }
+}

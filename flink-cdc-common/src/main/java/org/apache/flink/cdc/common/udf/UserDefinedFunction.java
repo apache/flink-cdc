@@ -23,6 +23,10 @@ import org.apache.flink.cdc.common.types.DataType;
 /**
  * Base interface for creating a UDF in transform projection and filtering expressions. You should
  * define at least one {@code eval} method.
+ *
+ * <p>When {@code transform.async-execution.enabled} is enabled, the same UDF instance may be
+ * invoked concurrently. Implementations used in asynchronous transforms must therefore be
+ * thread-safe.
  */
 @PublicEvolving
 public interface UserDefinedFunction {
