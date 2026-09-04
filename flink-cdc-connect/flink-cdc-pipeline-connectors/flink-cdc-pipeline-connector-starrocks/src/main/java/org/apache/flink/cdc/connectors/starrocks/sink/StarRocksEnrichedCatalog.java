@@ -28,6 +28,9 @@ import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.util.Optional;
 
 /** An enriched {@code StarRocksCatalog} with more schema evolution abilities. */
@@ -112,6 +115,23 @@ public class StarRocksEnrichedCatalog extends StarRocksCatalog {
         Preconditions.checkArgument(
                 !StringUtils.isNullOrWhitespaceOnly(column.getColumnName()),
                 "column name cannot be null or empty.");
+        if (column.getDefaultValue().isEmpty()) {
+            Optional<String> existingDefault =
+                    getColumnDefaultValue(databaseName, tableName, column.getColumnName());
+            if (existingDefault.isPresent()) {
+                column =
+                        new StarRocksColumn.Builder()
+                                .setColumnName(column.getColumnName())
+                                .setOrdinalPosition(column.getOrdinalPosition())
+                                .setDataType(column.getDataType())
+                                .setNullable(column.isNullable())
+                                .setDefaultValue(existingDefault.get())
+                                .setColumnSize(column.getColumnSize().orElse(null))
+                                .setDecimalDigits(column.getDecimalDigits().orElse(null))
+                                .setColumnComment(column.getColumnComment().orElse(null))
+                                .build();
+            }
+        }
         String alterSql = buildAlterColumnTypeSql(databaseName, tableName, buildColumnStmt(column));
         try {
             long startTimeMillis = System.currentTimeMillis();
@@ -168,6 +188,43 @@ public class StarRocksEnrichedCatalog extends StarRocksCatalog {
             m.invoke(this, sql);
         } catch (InvocationTargetException | NoSuchMethodException | IllegalAccessException e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    private Optional<String> getColumnDefaultValue(
+            String databaseName, String tableName, String columnName) {
+        String querySql =
+                "SELECT `COLUMN_DEFAULT` FROM `information_schema`.`COLUMNS` "
+                        + "WHERE `TABLE_SCHEMA`=? AND `TABLE_NAME`=? AND `COLUMN_NAME`=?";
+        try (Connection connection = getConnection();
+                PreparedStatement statement = connection.prepareStatement(querySql)) {
+            statement.setObject(1, databaseName);
+            statement.setObject(2, tableName);
+            statement.setObject(3, columnName);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (resultSet.next()) {
+                    String defaultValue = resultSet.getString("COLUMN_DEFAULT");
+                    return Optional.ofNullable(defaultValue);
+                }
+            }
+        } catch (Exception e) {
+            LOG.warn(
+                    "Failed to get column default value for {}.{}.{}",
+                    databaseName,
+                    tableName,
+                    columnName,
+                    e);
+        }
+        return Optional.empty();
+    }
+
+    private Connection getConnection() {
+        try {
+            Method m = getClass().getSuperclass().getDeclaredMethod("getConnection");
+            m.setAccessible(true);
+            return (Connection) m.invoke(this);
+        } catch (InvocationTargetException | NoSuchMethodException | IllegalAccessException e) {
+            throw new RuntimeException("Failed to get connection from StarRocksCatalog", e);
         }
     }
 
