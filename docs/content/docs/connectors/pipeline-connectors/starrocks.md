@@ -255,7 +255,7 @@ pipeline:
     otherwise you must set the option.
 
 * For schema change synchronization
-  * supports create/drop/truncate table, add/drop/rename columns and alter column types
+  * supports create/drop/truncate table, add/drop/rename columns, alter column types, and alter table comments for StarRocks 3.1 or later
   * the new column will always be added to the last position
   * if your StarRocks version is 3.2 or later, and using the connector to create table automatically,
     you can set `table.create.properties.fast_schema_evolution` to `true` to speed up the schema change.

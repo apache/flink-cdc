@@ -22,6 +22,7 @@ import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
+import org.apache.flink.cdc.common.event.AlterTableCommentEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
@@ -378,6 +379,29 @@ class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
                         "name | varchar(57) | YES | false | null");
 
         assertEqualsInOrder(expected, actual);
+    }
+
+    @Test
+    void testStarRocksAlterTableComment() throws Exception {
+        TableId tableId =
+                TableId.tableId(
+                        StarRocksContainer.STARROCKS_DATABASE_NAME,
+                        StarRocksContainer.STARROCKS_TABLE_NAME);
+
+        Schema schema =
+                Schema.newBuilder()
+                        .column(new PhysicalColumn("id", DataTypes.INT().notNull(), null))
+                        .column(new PhysicalColumn("name", DataTypes.STRING(), null))
+                        .primaryKey("id")
+                        .comment("old table comment")
+                        .build();
+
+        runJobWithEvents(
+                Arrays.asList(
+                        new CreateTableEvent(tableId, schema),
+                        new AlterTableCommentEvent(tableId, "new table comment")));
+
+        Assertions.assertThat(inspectTableComment(tableId)).isEqualTo("new table comment");
     }
 
     @Test

@@ -34,9 +34,12 @@ public class MockStarRocksCatalog extends StarRocksEnrichedCatalog {
     /** database name -> table name -> table. */
     private final Map<String, Map<String, StarRocksTable>> tables;
 
+    private boolean supportsAlterTableComment;
+
     public MockStarRocksCatalog() {
         super("jdbc:mysql://127.0.0.1:9030", "root", "");
         this.tables = new HashMap<>();
+        this.supportsAlterTableComment = true;
     }
 
     @Override
@@ -94,6 +97,33 @@ public class MockStarRocksCatalog extends StarRocksEnrichedCatalog {
             throw new StarRocksCatalogException(
                     String.format("table %s.%s already exists", databaseName, tableName));
         }
+    }
+
+    public void setSupportsAlterTableComment(boolean supportsAlterTableComment) {
+        this.supportsAlterTableComment = supportsAlterTableComment;
+    }
+
+    @Override
+    public boolean supportsAlterTableComment() {
+        return supportsAlterTableComment;
+    }
+
+    @Override
+    public void alterTableComment(String databaseName, String tableName, String comment)
+            throws StarRocksCatalogException {
+        Map<String, StarRocksTable> dbTables = tables.get(databaseName);
+        if (dbTables == null) {
+            throw new StarRocksCatalogException(
+                    String.format("database %s does not exist", databaseName));
+        }
+
+        StarRocksTable oldTable = dbTables.get(tableName);
+        if (oldTable == null) {
+            throw new StarRocksCatalogException(
+                    String.format("table %s.%s does not exist", databaseName, tableName));
+        }
+
+        dbTables.put(tableName, copyTableWithComment(oldTable, comment));
     }
 
     @Override
@@ -194,5 +224,19 @@ public class MockStarRocksCatalog extends StarRocksEnrichedCatalog {
                         .setTableProperties(oldTable.getProperties())
                         .build();
         dbTables.put(tableName, newTable);
+    }
+
+    private StarRocksTable copyTableWithComment(StarRocksTable oldTable, String comment) {
+        return new StarRocksTable.Builder()
+                .setDatabaseName(oldTable.getDatabaseName())
+                .setTableName(oldTable.getTableName())
+                .setTableType(oldTable.getTableType())
+                .setColumns(oldTable.getColumns())
+                .setTableKeys(oldTable.getTableKeys().orElse(null))
+                .setDistributionKeys(oldTable.getDistributionKeys().orElse(null))
+                .setNumBuckets(oldTable.getNumBuckets().orElse(null))
+                .setComment(comment)
+                .setTableProperties(oldTable.getProperties())
+                .build();
     }
 }
