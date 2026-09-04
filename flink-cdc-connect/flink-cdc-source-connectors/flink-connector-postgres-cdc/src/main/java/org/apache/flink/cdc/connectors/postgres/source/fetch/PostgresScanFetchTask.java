@@ -252,8 +252,7 @@ public class PostgresScanFetchTask extends AbstractScanFetchTask {
                 throws Exception {
             final PostgresSnapshotContext ctx = (PostgresSnapshotContext) snapshotContext;
             ctx.offset = offsetContext;
-
-            refreshSchema(databaseSchema, jdbcConnection, true);
+            
             createDataEvents(ctx, snapshotSplit.getTableId());
 
             return SnapshotResult.completed(ctx.offset);
