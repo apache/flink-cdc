@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.mysql.source.config;
 
 import org.apache.flink.cdc.common.annotation.Internal;
+import org.apache.flink.cdc.common.route.TableIdRouter;
 import org.apache.flink.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory;
 import org.apache.flink.cdc.connectors.mysql.source.MySqlSource;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
@@ -68,6 +69,7 @@ public class MySqlSourceConfigFactory implements Serializable {
     private boolean includeHeartbeatEvents = false;
     private boolean includeTransactionMetadataEvents = false;
     private boolean scanNewlyAddedTableEnabled = false;
+    private boolean scanBinlogNewlyAddedTableEnabled = false;
     private boolean closeIdleReaders = false;
     private Properties jdbcProperties;
     private Duration heartbeatInterval = MySqlSourceOptions.HEARTBEAT_INTERVAL.defaultValue();
@@ -258,6 +260,17 @@ public class MySqlSourceConfigFactory implements Serializable {
         return this;
     }
 
+    /**
+     * Whether to capture newly added tables in binlog reading phase without snapshot. This option
+     * can only be used with stream-only startup modes. Cannot be enabled together with {@link
+     * #scanNewlyAddedTableEnabled(boolean)}.
+     */
+    public MySqlSourceConfigFactory scanBinlogNewlyAddedTableEnabled(
+            boolean scanBinlogNewlyAddedTableEnabled) {
+        this.scanBinlogNewlyAddedTableEnabled = scanBinlogNewlyAddedTableEnabled;
+        return this;
+    }
+
     /** Custom properties that will overwrite the default JDBC connection URL. */
     public MySqlSourceConfigFactory jdbcProperties(Properties jdbcProperties) {
         this.jdbcProperties = jdbcProperties;
@@ -397,8 +410,21 @@ public class MySqlSourceConfigFactory implements Serializable {
         if (databaseList != null) {
             props.setProperty("database.include.list", String.join(",", databaseList));
         }
+        // Validate: Two modes are mutually exclusive
+        if (scanBinlogNewlyAddedTableEnabled && scanNewlyAddedTableEnabled) {
+            throw new IllegalArgumentException(
+                    "Cannot enable both 'scan.binlog.newly-added-table.enabled' and "
+                            + "'scan.newly-added-table.enabled' as they may cause duplicate data");
+        }
+
         if (tableList != null) {
-            props.setProperty("table.include.list", String.join(",", tableList));
+            if (scanBinlogNewlyAddedTableEnabled) {
+                props.setProperty(
+                        "table.include.list",
+                        TableIdRouter.convertTableListToRegExpPattern(String.join(",", tableList)));
+            } else {
+                props.setProperty("table.include.list", String.join(",", tableList));
+            }
         }
         if (serverTimeZone != null) {
             props.setProperty("database.serverTimezone", serverTimeZone);
@@ -436,6 +462,7 @@ public class MySqlSourceConfigFactory implements Serializable {
                 includeHeartbeatEvents,
                 includeTransactionMetadataEvents,
                 scanNewlyAddedTableEnabled,
+                scanBinlogNewlyAddedTableEnabled,
                 closeIdleReaders,
                 props,
                 jdbcProperties,
