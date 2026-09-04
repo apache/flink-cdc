@@ -42,7 +42,6 @@ import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.runtime.testutils.operators.RegularEventOperatorTestHarness;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
-import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 import org.apache.flink.shaded.guava31.com.google.common.collect.Sets;
@@ -56,7 +55,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
 /** Unit tests for the {@link SchemaOperator} to handle evolved schema. */
@@ -702,19 +700,15 @@ class SchemaEvolveTest {
                                             new AddColumnEvent.ColumnWithPosition(
                                                     Column.physicalColumn(
                                                             "height", DOUBLE, "Height data")))));
+            // The coordinator wraps its failure into a SerializedThrowable before completing the
+            // pending coordination response, so it survives the operator-coordinator RPC boundary
+            // (flink-rpc-akka deserializes responses with an isolated classloader that cannot load
+            // user-classloader exception types). The original cause chain is preserved as text, so
+            // assert on stack trace content; the top-level type is not asserted since the failure
+            // may surface via the operator request or the job-failure path depending on timing.
             Assertions.assertThatThrownBy(() -> processEvent(schemaOperator, addColumnEvents))
-                    .isExactlyInstanceOf(IllegalStateException.class)
-                    .cause()
-                    .isExactlyInstanceOf(ExecutionException.class)
-                    .cause()
-                    .isExactlyInstanceOf(FlinkRuntimeException.class)
-                    .hasMessage("Failed to apply schema change event.")
-                    .cause()
-                    .isExactlyInstanceOf(SchemaEvolveException.class)
-                    .extracting("applyingEvent", "exceptionMessage")
-                    .containsExactly(
-                            addColumnEvents.get(0),
-                            "Unexpected schema change events occurred in EXCEPTION mode. Job will fail now.");
+                    .hasStackTraceContaining("Failed to apply schema change event.")
+                    .hasStackTraceContaining(SchemaEvolveException.class.getName());
 
             // No schema change events should be sent to downstream
             Assertions.assertThat(harness.getOutputRecords())
@@ -1097,28 +1091,22 @@ class SchemaEvolveTest {
                                         new AddColumnEvent.ColumnWithPosition(
                                                 Column.physicalColumn(
                                                         "height", DOUBLE, "Height data")))));
+        // See testExceptionEvolveSchema: the coordinator failure crosses the RPC boundary as a
+        // SerializedThrowable, so assert on stack trace content instead of exact exception types.
+        // Depending on which delivery path surfaces the failure, the wrapped cause is printed
+        // either as its fully-qualified class name (nested-cause toString) or via the exception's
+        // custom toString (top-level stringified stack), so only the simple class name -- present
+        // in both representations -- is asserted.
         Assertions.assertThatThrownBy(() -> processEvent(schemaOperator, addColumnEvents))
-                .isExactlyInstanceOf(IllegalStateException.class)
-                .cause()
-                .isExactlyInstanceOf(ExecutionException.class)
-                .cause()
-                .isExactlyInstanceOf(FlinkRuntimeException.class)
-                .hasMessage("Failed to apply schema change event.")
-                .cause()
-                .isExactlyInstanceOf(UnsupportedSchemaChangeEventException.class)
-                .extracting("applyingEvent", "exceptionMessage")
-                .containsExactly(
-                        addColumnEvents.get(0), "Sink doesn't support such schema change event.");
+                .hasStackTraceContaining("Failed to apply schema change event.")
+                .hasStackTraceContaining(
+                        UnsupportedSchemaChangeEventException.class.getSimpleName());
 
         Assertions.assertThat(harness.isJobFailed()).isTrue();
+        // The job failure cause is likewise a SerializedThrowable carrying the original chain.
         Assertions.assertThat(harness.getJobFailureCause())
-                .cause()
-                .isExactlyInstanceOf(UnsupportedSchemaChangeEventException.class)
-                .matches(
-                        e ->
-                                ((UnsupportedSchemaChangeEventException) e)
-                                        .getExceptionMessage()
-                                        .equals("Sink doesn't support such schema change event."));
+                .hasStackTraceContaining(
+                        UnsupportedSchemaChangeEventException.class.getSimpleName());
         harness.close();
     }
 

@@ -49,4 +49,16 @@ public class ValuesDataSinkOptions {
                     .defaultValue(false)
                     .withDescription(
                             "True if a runtime error should be thrown when handling schema change events.");
+
+    public static final ConfigOption<String> ERROR_ON_SCHEMA_CHANGE_EXCEPTION_CLASS =
+            ConfigOptions.key("error.on.schema.change.exception.class")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "Fully-qualified name of a Throwable class to attach as the cause of the "
+                                    + "error thrown when error.on.schema.change is enabled. The class is "
+                                    + "instantiated reflectively (via its String constructor) on the "
+                                    + "SchemaRegistry coordinator, so it only needs to be present on the "
+                                    + "JobManager classpath. Used for testing failure propagation across "
+                                    + "the operator-coordinator RPC boundary.");
 }
