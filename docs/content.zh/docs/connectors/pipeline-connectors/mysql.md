@@ -656,7 +656,7 @@ source:
       </td>
       <td>
       MySQL 中的空间数据类型将转换为具有固定 Json 格式的字符串。
-      请参考 MySQL <a href="#a-name-id-003-a">空间数据类型映射</a> 章节了解更多详细信息。
+      请参考 MySQL <a href="#空间数据类型映射">空间数据类型映射</a> 章节了解更多详细信息。
       </td>
     </tr>
     </tbody>
