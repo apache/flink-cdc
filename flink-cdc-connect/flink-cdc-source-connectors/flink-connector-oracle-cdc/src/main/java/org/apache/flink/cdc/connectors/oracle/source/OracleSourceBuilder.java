@@ -261,6 +261,15 @@ public class OracleSourceBuilder<T> {
     }
 
     /**
+     * Whether to execute ANALYZE TABLE before querying ALL_TABLES.NUM_ROWS for approximate row
+     * count during incremental snapshot chunk planning.
+     */
+    public OracleSourceBuilder<T> analyzeTableForApproximateRowCountEnabled(boolean enabled) {
+        this.configFactory.analyzeTableForApproximateRowCountEnabled(enabled);
+        return this;
+    }
+
+    /**
      * Build the {@link OracleIncrementalSource}.
      *
      * @return a OracleParallelSource with the settings made for this builder.
