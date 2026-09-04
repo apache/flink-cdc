@@ -27,6 +27,7 @@ import org.apache.flink.cdc.connectors.mysql.source.assigners.MySqlSnapshotSplit
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
+import org.apache.flink.cdc.connectors.mysql.source.offset.MysqlGtidStrategy;
 import org.apache.flink.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
@@ -1668,7 +1669,8 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
                             : initializeEffectiveOffset(
                                     mySqlSplit.asBinlogSplit().getStartingOffset(),
                                     getConnection(),
-                                    getSourceConfig());
+                                    getSourceConfig(),
+                                    MysqlGtidStrategy.DIALECT);
 
             LOG.info("Starting offset is initialized to {}", offset);
 

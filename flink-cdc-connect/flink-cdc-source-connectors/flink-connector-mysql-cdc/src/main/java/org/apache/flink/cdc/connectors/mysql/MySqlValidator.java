@@ -20,6 +20,8 @@ package org.apache.flink.cdc.connectors.mysql;
 import org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOptions;
+import org.apache.flink.cdc.connectors.mysql.source.offset.MariaDbGtidStrategy;
+import org.apache.flink.cdc.connectors.mysql.source.offset.MysqlGtidStrategy;
 import org.apache.flink.cdc.debezium.Validator;
 import org.apache.flink.table.api.TableException;
 import org.apache.flink.table.api.ValidationException;
@@ -69,11 +71,20 @@ public class MySqlValidator implements Validator {
     @Override
     public void validate() {
         try (JdbcConnection connection = createJdbcConnection(sourceConfig, dbzProperties)) {
-            checkVersion(connection);
-            checkBinlogFormat(connection);
-            checkBinlogRowImage(connection);
-            checkBinlogRowValueOptions(connection);
-            checkTimeZone(connection);
+            String resolvedDialect =
+                    sourceConfig != null
+                            ? DebeziumUtils.discoverDialect(connection, sourceConfig.getDialect())
+                            : MysqlGtidStrategy.DIALECT;
+            if (MariaDbGtidStrategy.DIALECT.equalsIgnoreCase(resolvedDialect)) {
+                checkBinlogFormat(connection);
+                LOG.info("MariaDB dialect detected; skipping MySQL-only validation checks.");
+            } else {
+                checkVersion(connection);
+                checkBinlogFormat(connection);
+                checkBinlogRowImage(connection);
+                checkBinlogRowValueOptions(connection);
+                checkTimeZone(connection);
+            }
         } catch (SQLException ex) {
             throw new TableException(
                     "Unexpected error while connecting to MySQL and validating", ex);
