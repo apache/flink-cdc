@@ -60,6 +60,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
 import java.sql.SQLException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -379,6 +380,52 @@ class PostgresSourceITCase extends PostgresTestBase {
                         "+I[1019, user_20, Shanghai, 123567891234]",
                         "+I[2000, user_21, Shanghai, 123567891234]");
         assertEqualsInAnyOrder(expectedRecords, records);
+    }
+
+    @Test
+    void testSnapshotOnlyModeReleasesReplicationSlot() throws Exception {
+        ResolvedSchema customersSchema =
+                new ResolvedSchema(
+                        Arrays.asList(
+                                physical("Id", BIGINT().notNull()),
+                                physical("Name", STRING()),
+                                physical("address", STRING()),
+                                physical("phone_number", STRING())),
+                        new ArrayList<>(),
+                        UniqueConstraint.primaryKey("pk", Collections.singletonList("id")));
+        TestTable table = new TestTable(customersSchema);
+        PostgresSourceBuilder.PostgresIncrementalSource<RowData> source =
+                PostgresSourceBuilder.PostgresIncrementalSource.<RowData>builder()
+                        .hostname(customDatabase.getHost())
+                        .port(customDatabase.getDatabasePort())
+                        .username(customDatabase.getUsername())
+                        .password(customDatabase.getPassword())
+                        .database(customDatabase.getDatabaseName())
+                        .decodingPluginName("pgoutput")
+                        .slotName(slotName)
+                        .tableList(new TestTableId("customer", "Customers").toString())
+                        .startupOptions(StartupOptions.snapshot())
+                        // Multiple splits have different high watermarks. No captured DML or
+                        // heartbeat advances the stream split's starting offset to its end.
+                        .splitSize(2)
+                        .heartbeatInterval(Duration.ZERO)
+                        .deserializer(table.getDeserializer())
+                        .build();
+
+        try (StreamExecutionEnvironment env =
+                StreamExecutionEnvironment.getExecutionEnvironment()) {
+            env.enableCheckpointing(1000);
+            env.setParallelism(1);
+            try (CloseableIterator<RowData> iterator =
+                    env.fromSource(source, WatermarkStrategy.noWatermarks(), "Snapshot Only Source")
+                            .executeAndCollect()) {
+                // Request more than the 21 rows to wait for the bounded source to finish.
+                assertThat(fetchRowData(iterator, 22, table::stringify)).hasSize(21);
+            }
+            try (PostgresConnection connection = getConnection()) {
+                assertThat(getSlotCount(connection)).isZero();
+            }
+        }
     }
 
     @Test
@@ -1351,6 +1398,23 @@ class PostgresSourceITCase extends PostgresTestBase {
         // NOTE: it requires ANALYZE or VACUUM to be run first in PostgreSQL.
         final String query = String.format("SELECT COUNT(1) FROM %s", tableId.toString());
 
+        return jdbc.queryAndMap(
+                query,
+                rs -> {
+                    if (!rs.next()) {
+                        throw new SQLException(
+                                String.format(
+                                        "No result returned after running query [%s]", query));
+                    }
+                    return rs.getLong(1);
+                });
+    }
+
+    private long getSlotCount(JdbcConnection jdbc) throws SQLException {
+        final String query =
+                String.format(
+                        "SELECT count(*) FROM pg_replication_slots WHERE slot_name = '%s'",
+                        slotName);
         return jdbc.queryAndMap(
                 query,
                 rs -> {
