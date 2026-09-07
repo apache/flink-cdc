@@ -212,6 +212,16 @@ public final class GenericArrayData implements ArrayData {
     }
 
     @Override
+    public TimeData getTime(int pos, int precision) {
+        Object value = getObject(pos);
+        if (value instanceof TimeData) {
+            return (TimeData) value;
+        }
+        // Kept for arrays produced by older callers that used millisecond integers for TIME.
+        return TimeData.fromMillisOfDay((int) value);
+    }
+
+    @Override
     public byte[] getBinary(int pos) {
         return (byte[]) getObject(pos);
     }

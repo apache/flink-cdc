@@ -306,6 +306,11 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
         RecordData snapshotRecord = ((DataChangeEvent) snapshotResults.get(0)).after();
         Assertions.assertThat(recordFields(snapshotRecord, TIME_TYPES_WITH_ADAPTIVE))
                 .isEqualTo(expectedSnapshot);
+        // Without sub-millisecond retention the TIME(6) entry above and the value read back both
+        // truncate to 18:00:22.123, so the comparison passes while the microseconds are already
+        // gone. Assert the microsecond-of-day directly so the expectation cannot pass vacuously.
+        Assertions.assertThat(snapshotRecord.getTime(4, 6).toMicroOfDay())
+                .isEqualTo(64_822_123_456L);
     }
 
     @Test

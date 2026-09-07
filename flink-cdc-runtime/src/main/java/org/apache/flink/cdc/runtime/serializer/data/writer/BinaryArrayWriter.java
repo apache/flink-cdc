@@ -21,6 +21,7 @@ import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.data.binary.BinaryArrayData;
 import org.apache.flink.cdc.common.data.binary.BinarySegmentUtils;
 import org.apache.flink.cdc.common.types.DataType;
+import org.apache.flink.cdc.common.types.DataTypeChecks;
 import org.apache.flink.core.memory.MemorySegmentFactory;
 
 import java.io.Serializable;
@@ -126,8 +127,14 @@ public final class BinaryArrayWriter extends AbstractBinaryWriter {
                 break;
             case INTEGER:
             case DATE:
-            case TIME_WITHOUT_TIME_ZONE:
                 setNullInt(pos);
+                break;
+            case TIME_WITHOUT_TIME_ZONE:
+                if (DataTypeChecks.getPrecision(type) <= 3) {
+                    setNullInt(pos);
+                } else {
+                    setNullLong(pos);
+                }
                 break;
             case BIGINT:
             case TIMESTAMP_WITHOUT_TIME_ZONE:
@@ -248,8 +255,11 @@ public final class BinaryArrayWriter extends AbstractBinaryWriter {
                 return BinaryArrayWriter::setNullShort;
             case INTEGER:
             case DATE:
-            case TIME_WITHOUT_TIME_ZONE:
                 return BinaryArrayWriter::setNullInt;
+            case TIME_WITHOUT_TIME_ZONE:
+                return DataTypeChecks.getPrecision(elementType) <= 3
+                        ? BinaryArrayWriter::setNullInt
+                        : BinaryArrayWriter::setNullLong;
             case FLOAT:
                 return BinaryArrayWriter::setNullFloat;
             case DOUBLE:

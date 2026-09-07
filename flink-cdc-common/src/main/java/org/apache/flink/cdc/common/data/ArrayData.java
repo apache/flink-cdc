@@ -72,6 +72,16 @@ public interface ArrayData {
     /** Returns the double value at the given position. */
     double getDouble(int pos);
 
+    /**
+     * Returns the time value at the given position using its declared precision.
+     *
+     * <p>The default keeps binary compatibility for implementations that still expose TIME as a
+     * millisecond integer. Precision-aware implementations override it.
+     */
+    default TimeData getTime(int pos, int precision) {
+        return TimeData.fromMillisOfDay(getInt(pos));
+    }
+
     /** Returns the string value at the given position. */
     StringData getString(int pos);
 
@@ -180,8 +190,11 @@ public interface ArrayData {
                 break;
             case INTEGER:
             case DATE:
-            case TIME_WITHOUT_TIME_ZONE:
                 elementGetter = ArrayData::getInt;
+                break;
+            case TIME_WITHOUT_TIME_ZONE:
+                final int timePrecision = getPrecision(elementType);
+                elementGetter = (array, pos) -> array.getTime(pos, timePrecision);
                 break;
             case BIGINT:
                 elementGetter = ArrayData::getLong;

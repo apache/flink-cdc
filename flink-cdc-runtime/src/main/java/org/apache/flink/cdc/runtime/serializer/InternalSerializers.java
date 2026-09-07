@@ -67,7 +67,7 @@ public class InternalSerializers {
             case DATE:
                 return DateDataSerializer.INSTANCE;
             case TIME_WITHOUT_TIME_ZONE:
-                return TimeDataSerializer.INSTANCE;
+                return new TimeDataSerializer(getPrecision(type));
             case BIGINT:
                 return LongSerializer.INSTANCE;
             case FLOAT:

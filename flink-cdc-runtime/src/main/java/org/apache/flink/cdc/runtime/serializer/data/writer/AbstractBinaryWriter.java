@@ -236,7 +236,11 @@ abstract class AbstractBinaryWriter implements BinaryWriter {
 
     @Override
     public void writeTime(int pos, TimeData value, int precision) {
-        writeInt(pos, value.toMillisOfDay());
+        if (precision <= 3) {
+            writeInt(pos, value.toMillisOfDay());
+        } else {
+            writeLong(pos, Long.MIN_VALUE | value.toNanoOfDay());
+        }
     }
 
     @Override

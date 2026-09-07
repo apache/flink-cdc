@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.common.converter;
 
+import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.types.ArrayType;
 import org.apache.flink.cdc.common.types.BigIntType;
 import org.apache.flink.cdc.common.types.BinaryType;
@@ -124,7 +125,14 @@ public class JavaObjectConverter {
 
         @Override
         public Function<Object, LocalTime> visit(TimeType timeType) {
-            return CommonConverter::convertToLocalTime;
+            return value -> {
+                LocalTime time = CommonConverter.convertToLocalTime(value);
+                // Preserve the historical pass-through behavior for Java LocalTime values. An
+                // internal TimeData value is normalized to the declared logical precision.
+                return value instanceof TimeData
+                        ? CommonConverter.truncateTime(time, timeType.getPrecision())
+                        : time;
+            };
         }
 
         @Override
