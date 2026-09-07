@@ -32,6 +32,7 @@ import org.apache.flink.cdc.common.types.TimestampType;
 import org.apache.flink.cdc.common.types.ZonedTimestampType;
 import org.apache.flink.cdc.common.types.variant.BinaryVariantBuilder;
 import org.apache.flink.cdc.common.types.variant.Variant;
+import org.apache.flink.cdc.runtime.serializer.data.writer.BinaryRecordDataWriter;
 
 import org.junit.jupiter.api.Test;
 
@@ -43,6 +44,31 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /** Unit tests for {@link BinaryRecordDataGenerator}. */
 class BinaryRecordDataGeneratorTest {
+
+    @Test
+    void preservesHighPrecisionTimeAndReadsLegacyMilliseconds() {
+        BinaryRecordData precise =
+                new BinaryRecordDataGenerator(
+                                RowType.of(DataTypes.TIME(3), DataTypes.TIME(6), DataTypes.TIME(9)))
+                        .generate(
+                                new Object[] {
+                                    TimeData.fromNanoOfDay(3_723_123_000_000L),
+                                    TimeData.fromNanoOfDay(3_723_123_456_000L),
+                                    TimeData.fromNanoOfDay(3_723_123_456_789L)
+                                });
+
+        assertThat(precise.getTime(0, 3).toNanoOfDay()).isEqualTo(3_723_123_000_000L);
+        assertThat(precise.getTime(1, 6).toNanoOfDay()).isEqualTo(3_723_123_456_000L);
+        assertThat(precise.getTime(1, 0).toNanoOfDay()).isEqualTo(3_723_123_456_000L);
+        assertThat(precise.getTime(2, 9).toNanoOfDay()).isEqualTo(3_723_123_456_789L);
+        assertThat(precise.getTime(2).toNanoOfDay()).isEqualTo(3_723_123_456_789L);
+
+        BinaryRecordData legacy = new BinaryRecordData(1);
+        BinaryRecordDataWriter writer = new BinaryRecordDataWriter(legacy);
+        writer.writeInt(0, 3_723_123);
+        writer.complete();
+        assertThat(legacy.getTime(0, 6).toNanoOfDay()).isEqualTo(3_723_123_000_000L);
+    }
 
     @Test
     void testOf() {

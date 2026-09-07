@@ -3072,7 +3072,7 @@ class FlinkPipelineTransformITCase {
         assertThat(outputEvents)
                 .containsExactlyInAnyOrder(
                         "CreateTableEvent{tableId=default_namespace.default_schema.my_table, schema=columns={`id` INT NOT NULL,`date_0` DATE,`time_0` TIME(0),`time_3` TIME(3),`time_6` TIME(6),`time_9` TIME(9),`date_0_str` STRING,`time_0_str` STRING,`time_3_str` STRING,`time_6_str` STRING,`time_9_str` STRING}, primaryKeys=id, options=()}",
-                        "DataChangeEvent{tableId=default_namespace.default_schema.my_table, before=[], after=[1, 1999-12-31, 21:48:25, 21:48:25.123, 21:48:25.123, 21:48:25.123, 1999-12-31, 21:48:25, 21:48:25.123, 21:48:25.123, 21:48:25.123], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.my_table, before=[], after=[1, 1999-12-31, 21:48:25, 21:48:25.123, 21:48:25.123456, 21:48:25.123456789, 1999-12-31, 21:48:25, 21:48:25.123, 21:48:25.123456, 21:48:25.123456789], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.my_table, before=[], after=[2, null, null, null, null, null, null, null, null, null, null], op=INSERT, meta=()}");
     }
 
@@ -3508,10 +3508,13 @@ class FlinkPipelineTransformITCase {
                         .toInstant(ZoneOffset.UTC);
 
         long milliSecondsInOneDay = 24 * 60 * 60 * 1000;
+        // LOCALTIME and CURRENT_TIME are TIME(0), so only whole seconds are part of their declared
+        // type. Comparing against the millisecond-of-day of CURRENT_TIMESTAMP would require the
+        // runtime to carry a fraction the column type does not have.
         assertThat(TimeData.fromIsoLocalTimeString(localTime))
                 .isEqualTo(
-                        TimeData.fromMillisOfDay(
-                                (int) (instant.toEpochMilli() % milliSecondsInOneDay)));
+                        TimeData.fromSecondOfDay(
+                                (int) (instant.toEpochMilli() % milliSecondsInOneDay / 1000)));
 
         String localDate = tokens.get(5);
         assertThat(DateData.fromIsoLocalDateString(localDate))

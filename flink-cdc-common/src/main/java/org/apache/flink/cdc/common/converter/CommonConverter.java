@@ -185,15 +185,17 @@ public class CommonConverter {
                 "Cannot convert " + obj + " of type " + obj.getClass() + " to DATE DATA.");
     }
 
-    static TimeData convertToTimeData(Object obj) {
+    static TimeData convertToTimeData(Object obj, int precision) {
+        LocalTime time;
         if (obj instanceof TimeData) {
-            return (TimeData) obj;
+            time = ((TimeData) obj).toLocalTime();
+        } else if (obj instanceof LocalTime) {
+            time = (LocalTime) obj;
+        } else {
+            throw new RuntimeException(
+                    "Cannot convert " + obj + " of type " + obj.getClass() + " to TIME DATA.");
         }
-        if (obj instanceof LocalTime) {
-            return TimeData.fromLocalTime((LocalTime) obj);
-        }
-        throw new RuntimeException(
-                "Cannot convert " + obj + " of type " + obj.getClass() + " to TIME DATA.");
+        return TimeData.fromLocalTime(truncateTime(time, precision));
     }
 
     static TimestampData convertToTimestampData(Object obj) {
@@ -340,6 +342,17 @@ public class CommonConverter {
         }
         throw new RuntimeException(
                 "Cannot convert " + obj + " of type " + obj.getClass() + " to LOCAL TIME.");
+    }
+
+    static LocalTime truncateTime(LocalTime time, int precision) {
+        if (precision < 0 || precision > 9) {
+            throw new IllegalArgumentException("TIME precision must be between 0 and 9");
+        }
+        int factor = 1;
+        for (int remaining = 9 - precision; remaining > 0; remaining--) {
+            factor *= 10;
+        }
+        return time.withNano(time.getNano() / factor * factor);
     }
 
     static LocalDateTime convertToLocalDateTime(Object obj) {

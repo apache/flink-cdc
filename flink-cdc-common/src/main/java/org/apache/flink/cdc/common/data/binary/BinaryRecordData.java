@@ -228,6 +228,21 @@ public final class BinaryRecordData extends BinarySection implements RecordData,
     @Override
     public TimeData getTime(int pos) {
         assertIndexIsValid(pos);
+        return decodeTime(pos);
+    }
+
+    @Override
+    public TimeData getTime(int pos, int precision) {
+        assertIndexIsValid(pos);
+        return decodeTime(pos);
+    }
+
+    private TimeData decodeTime(int pos) {
+        long encoded = getLong(pos);
+        if (encoded < 0) {
+            return TimeData.fromNanoOfDay(encoded & Long.MAX_VALUE);
+        }
+        // Rows written before nanosecond TIME support used the first four bytes of the slot.
         return TimeData.fromMillisOfDay(getInt(pos));
     }
 
