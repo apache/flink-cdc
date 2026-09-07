@@ -58,4 +58,7 @@ public interface FlussDeserializer<T> extends Serializable {
     default List<T> restoreState(TablePath tablePath, int schemaId, RowType rowType) {
         return Collections.emptyList();
     }
+
+    /** Removes all state retained for an unsubscribed table. */
+    default void removeState(TablePath tablePath) {}
 }

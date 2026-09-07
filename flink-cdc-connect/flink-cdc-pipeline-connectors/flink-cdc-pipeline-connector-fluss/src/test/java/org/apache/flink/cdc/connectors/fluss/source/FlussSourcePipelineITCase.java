@@ -73,6 +73,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Predicate;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static org.apache.fluss.config.ConfigOptions.BOOTSTRAP_SERVERS;
@@ -751,6 +753,299 @@ public class FlussSourcePipelineITCase {
     }
 
     @Test
+    void testSubscriptionRemovalStopsTableAndReaddStartsNewLifecycle() throws Exception {
+        String subscriptionTable = "subscription_removal_list";
+        String tableA = "subscription_removal_a";
+        String tableB = "subscription_removal_b";
+        createSubscriptionTables(subscriptionTable, tableA, tableB);
+
+        FlussSource<Event> source =
+                createFlussSourceWithTableSubscriber(
+                        DATABASE_NAME + "." + subscriptionTable, "earliest", Duration.ofSeconds(1));
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.setParallelism(1);
+        CloseableIterator<Event> iter =
+                env.fromSource(
+                                source,
+                                WatermarkStrategy.noWatermarks(),
+                                "FlussSource",
+                                new EventTypeInfo())
+                        .executeAndCollect("SubscriptionRemovalTest");
+        List<Event> events = Collections.synchronizedList(new ArrayList<>());
+        Thread collector = startCollector(iter, events, "subscription-removal");
+        try {
+            awaitEvents(
+                    events,
+                    collected ->
+                            eventsForTable(collected, tableA).size() >= 2
+                                    && eventsForTable(collected, tableB).size() >= 2,
+                    COLLECT_TIMEOUT);
+            int initialEventCount = snapshotEvents(events).size();
+
+            tBatchEnv
+                    .executeSql(
+                            String.format(
+                                    "DELETE FROM %s WHERE table_name = '%s.%s'",
+                                    subscriptionTable, DATABASE_NAME, tableB))
+                    .await();
+            Thread.sleep(Duration.ofSeconds(4).toMillis());
+            tBatchEnv.executeSql(String.format("INSERT INTO %s VALUES (2, 'a2')", tableA)).await();
+            tBatchEnv.executeSql(String.format("INSERT INTO %s VALUES (2, 'b2')", tableB)).await();
+
+            awaitEvents(
+                    events,
+                    collected ->
+                            convertToStringList(
+                                            eventsForTable(collected, tableA),
+                                            DataTypes.INT(),
+                                            DataTypes.STRING())
+                                    .contains("+I[2, a2]"),
+                    COLLECT_TIMEOUT);
+            Thread.sleep(Duration.ofSeconds(2).toMillis());
+            List<Event> removalSnapshot = snapshotEvents(events);
+            List<Event> afterRemoval =
+                    removalSnapshot.subList(initialEventCount, removalSnapshot.size());
+            assertThat(convertToStringList(afterRemoval, DataTypes.INT(), DataTypes.STRING()))
+                    .contains("+I[2, a2]")
+                    .doesNotContain("+I[2, b2]");
+
+            int readdBaseline = snapshotEvents(events).size();
+            tBatchEnv
+                    .executeSql(
+                            String.format(
+                                    "INSERT INTO %s VALUES ('%s.%s')",
+                                    subscriptionTable, DATABASE_NAME, tableB))
+                    .await();
+            Thread.sleep(Duration.ofSeconds(4).toMillis());
+            tBatchEnv.executeSql(String.format("INSERT INTO %s VALUES (3, 'b3')", tableB)).await();
+
+            awaitEvents(
+                    events,
+                    collected ->
+                            hasCreateTableEvent(eventsForTable(collected, tableB))
+                                    && convertToStringList(
+                                                    eventsForTable(collected, tableB),
+                                                    DataTypes.INT(),
+                                                    DataTypes.STRING())
+                                            .contains("+I[3, b3]"),
+                    COLLECT_TIMEOUT);
+            List<Event> readdSnapshot = snapshotEvents(events);
+            List<Event> readdedEvents = readdSnapshot.subList(readdBaseline, readdSnapshot.size());
+            assertThat(readdedEvents).filteredOn(CreateTableEvent.class::isInstance).hasSize(1);
+            assertThat(convertToStringList(readdedEvents, DataTypes.INT(), DataTypes.STRING()))
+                    .contains("+I[1, subscription_removal_b1]", "+I[2, b2]", "+I[3, b3]");
+        } finally {
+            iter.close();
+            collector.join(5000);
+        }
+    }
+
+    @Test
+    void testSavepointRestoreDoesNotResubscribeRemovedTable(@TempDir Path tmpDir) throws Exception {
+        String subscriptionTable = "subscription_savepoint_remove_list";
+        String tableA = "subscription_savepoint_remove_a";
+        String tableB = "subscription_savepoint_remove_b";
+        createSubscriptionTables(subscriptionTable, tableA, tableB);
+
+        JobClient jobClient =
+                startSubscriptionSource(
+                        DATABASE_NAME + "." + subscriptionTable,
+                        "SubscriptionSavepointRemovalPhase1");
+        try {
+            // A1 and B1 must be consumed and checkpointed before the subscription changes.
+            Thread.sleep(Duration.ofSeconds(10).toMillis());
+            String savepointPath =
+                    jobClient
+                            .stopWithSavepoint(
+                                    false,
+                                    tmpDir.toAbsolutePath().toString(),
+                                    SavepointFormatType.CANONICAL)
+                            .get();
+            jobClient = null;
+
+            tBatchEnv
+                    .executeSql(
+                            String.format(
+                                    "DELETE FROM %s WHERE table_name = '%s.%s'",
+                                    subscriptionTable, DATABASE_NAME, tableB))
+                    .await();
+            tBatchEnv.executeSql(String.format("INSERT INTO %s VALUES (2, 'a2')", tableA)).await();
+            tBatchEnv.executeSql(String.format("INSERT INTO %s VALUES (2, 'b2')", tableB)).await();
+
+            try (RestoredSubscription restored =
+                    startRestoredSubscription(
+                            savepointPath,
+                            DATABASE_NAME + "." + subscriptionTable,
+                            "SubscriptionSavepointRemovalPhase2")) {
+                List<Event> events = restored.events;
+                awaitEvents(
+                        events,
+                        collected ->
+                                convertToStringList(
+                                                eventsForTable(collected, tableA),
+                                                DataTypes.INT(),
+                                                DataTypes.STRING())
+                                        .contains("+I[2, a2]"),
+                        COLLECT_TIMEOUT);
+                Thread.sleep(Duration.ofSeconds(4).toMillis());
+                List<Event> restoredEvents = snapshotEvents(events);
+                assertThat(eventsForTable(restoredEvents, tableB)).isEmpty();
+            }
+        } finally {
+            if (jobClient != null) {
+                jobClient.cancel().get();
+            }
+        }
+    }
+
+    @Test
+    void testSavepointRestoreReaddedTableStartsNewEarliestLifecycle(@TempDir Path tmpDir)
+            throws Exception {
+        String subscriptionTable = "subscription_savepoint_readd_list";
+        String tableA = "subscription_savepoint_readd_a";
+        String tableB = "subscription_savepoint_readd_b";
+        createSubscriptionTables(subscriptionTable, tableA, tableB);
+
+        JobClient jobClient =
+                startSubscriptionSource(
+                        DATABASE_NAME + "." + subscriptionTable,
+                        "SubscriptionSavepointReaddPhase1");
+        try {
+            // B1 must be consumed and checkpointed before removal distinguishes a new lifecycle.
+            Thread.sleep(Duration.ofSeconds(10).toMillis());
+            tBatchEnv
+                    .executeSql(
+                            String.format(
+                                    "DELETE FROM %s WHERE table_name = '%s.%s'",
+                                    subscriptionTable, DATABASE_NAME, tableB))
+                    .await();
+            // Wait through multiple discovery cycles before capturing the removal state.
+            Thread.sleep(Duration.ofSeconds(4).toMillis());
+            String savepointPath =
+                    jobClient
+                            .stopWithSavepoint(
+                                    false,
+                                    tmpDir.toAbsolutePath().toString(),
+                                    SavepointFormatType.CANONICAL)
+                            .get();
+            jobClient = null;
+            tBatchEnv
+                    .executeSql(
+                            String.format(
+                                    "INSERT INTO %s VALUES ('%s.%s')",
+                                    subscriptionTable, DATABASE_NAME, tableB))
+                    .await();
+
+            try (RestoredSubscription restored =
+                    startRestoredSubscription(
+                            savepointPath,
+                            DATABASE_NAME + "." + subscriptionTable,
+                            "SubscriptionSavepointReaddPhase2")) {
+                List<Event> events = restored.events;
+                awaitEvents(
+                        events,
+                        collected ->
+                                hasCreateTableEvent(eventsForTable(collected, tableB))
+                                        && convertToStringList(
+                                                        eventsForTable(collected, tableB),
+                                                        DataTypes.INT(),
+                                                        DataTypes.STRING())
+                                                .contains("+I[1, " + tableB + "1]"),
+                        COLLECT_TIMEOUT);
+                tBatchEnv
+                        .executeSql(String.format("INSERT INTO %s VALUES (2, 'b2')", tableB))
+                        .await();
+                awaitEvents(
+                        events,
+                        collected ->
+                                convertToStringList(
+                                                eventsForTable(collected, tableB),
+                                                DataTypes.INT(),
+                                                DataTypes.STRING())
+                                        .contains("+I[2, b2]"),
+                        COLLECT_TIMEOUT);
+                List<Event> restoredEvents = snapshotEvents(events);
+                List<Event> readdedEvents = eventsForTable(restoredEvents, tableB);
+                assertThat(readdedEvents).filteredOn(CreateTableEvent.class::isInstance).hasSize(1);
+                assertThat(convertToStringList(readdedEvents, DataTypes.INT(), DataTypes.STRING()))
+                        .contains("+I[1, " + tableB + "1]", "+I[2, b2]");
+            }
+        } finally {
+            if (jobClient != null) {
+                jobClient.cancel().get();
+            }
+        }
+    }
+
+    @Test
+    void testSameCheckpointWindowRemovalAndReaddRollsBackAsContinuation(@TempDir Path tmpDir)
+            throws Exception {
+        String subscriptionTable = "subscription_savepoint_rollback_list";
+        String tableB = "subscription_savepoint_rollback_b";
+        createSubscriptionTables(subscriptionTable, tableB);
+
+        JobClient jobClient =
+                startSubscriptionSource(
+                        DATABASE_NAME + "." + subscriptionTable,
+                        "SubscriptionSavepointRollbackPhase1");
+        try {
+            // B1 must be consumed and checkpointed in N before the same-window changes.
+            Thread.sleep(Duration.ofSeconds(10).toMillis());
+            String savepointPath =
+                    jobClient
+                            .stopWithSavepoint(
+                                    false,
+                                    tmpDir.toAbsolutePath().toString(),
+                                    SavepointFormatType.CANONICAL)
+                            .get();
+            jobClient = null;
+
+            tBatchEnv
+                    .executeSql(
+                            String.format(
+                                    "DELETE FROM %s WHERE table_name = '%s.%s'",
+                                    subscriptionTable, DATABASE_NAME, tableB))
+                    .await();
+            tBatchEnv
+                    .executeSql(
+                            String.format(
+                                    "INSERT INTO %s VALUES ('%s.%s')",
+                                    subscriptionTable, DATABASE_NAME, tableB))
+                    .await();
+            tBatchEnv.executeSql(String.format("INSERT INTO %s VALUES (2, 'b2')", tableB)).await();
+
+            try (RestoredSubscription restored =
+                    startRestoredSubscription(
+                            savepointPath,
+                            DATABASE_NAME + "." + subscriptionTable,
+                            "SubscriptionSavepointRollbackPhase2")) {
+                List<Event> events = restored.events;
+                awaitEvents(
+                        events,
+                        collected ->
+                                convertToStringList(
+                                                eventsForTable(collected, tableB),
+                                                DataTypes.INT(),
+                                                DataTypes.STRING())
+                                        .contains("+I[2, b2]"),
+                        COLLECT_TIMEOUT);
+                List<String> restoredData =
+                        convertToStringList(
+                                eventsForTable(snapshotEvents(events), tableB),
+                                DataTypes.INT(),
+                                DataTypes.STRING());
+                assertThat(restoredData)
+                        .contains("+I[2, b2]")
+                        .doesNotContain("+I[1, " + tableB + "1]");
+            }
+        } finally {
+            if (jobClient != null) {
+                jobClient.cancel().get();
+            }
+        }
+    }
+
+    @Test
     void testNewPartitionDiscovery() throws Exception {
         String tableName = "part_discover_table";
         tBatchEnv
@@ -883,6 +1178,113 @@ public class FlussSourcePipelineITCase {
 
     // ======================== Helper methods ========================
 
+    private JobClient startSubscriptionSource(String subscriptionTableFqn, String jobName)
+            throws Exception {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.setParallelism(1);
+        env.enableCheckpointing(200);
+        env.fromSource(
+                        createFlussSourceWithTableSubscriber(
+                                subscriptionTableFqn, "earliest", Duration.ofSeconds(1)),
+                        WatermarkStrategy.noWatermarks(),
+                        "FlussSource",
+                        new EventTypeInfo())
+                .uid("fluss-source")
+                .sinkTo(new DiscardingSink<>())
+                .uid("discard-sink");
+        return env.executeAsync(jobName);
+    }
+
+    private RestoredSubscription startRestoredSubscription(
+            String savepointPath, String subscriptionTableFqn, String jobName) throws Exception {
+        org.apache.flink.configuration.Configuration restoreConf =
+                new org.apache.flink.configuration.Configuration();
+        restoreConf.setString("execution.savepoint.path", savepointPath);
+        StreamExecutionEnvironment restoreEnv =
+                StreamExecutionEnvironment.getExecutionEnvironment(restoreConf);
+        restoreEnv.setParallelism(1);
+        restoreEnv.enableCheckpointing(200);
+        CloseableIterator<Event> iter =
+                restoreEnv
+                        .fromSource(
+                                createFlussSourceWithTableSubscriber(
+                                        subscriptionTableFqn, "earliest", Duration.ofSeconds(1)),
+                                WatermarkStrategy.noWatermarks(),
+                                "FlussSource",
+                                new EventTypeInfo())
+                        .uid("fluss-source")
+                        .executeAndCollect(jobName);
+        List<Event> events = Collections.synchronizedList(new ArrayList<>());
+        return new RestoredSubscription(iter, events, startCollector(iter, events, jobName));
+    }
+
+    private static final class RestoredSubscription implements AutoCloseable {
+
+        private final CloseableIterator<Event> iter;
+        private final List<Event> events;
+        private final Thread collector;
+
+        private RestoredSubscription(
+                CloseableIterator<Event> iter, List<Event> events, Thread collector) {
+            this.iter = iter;
+            this.events = events;
+            this.collector = collector;
+        }
+
+        @Override
+        public void close() throws Exception {
+            iter.close();
+            collector.join(5000);
+        }
+    }
+
+    private void createSubscriptionTables(String subscriptionTable, String... tableNames)
+            throws Exception {
+        tBatchEnv
+                .executeSql(
+                        String.format(
+                                "CREATE TABLE %s (table_name STRING, PRIMARY KEY (table_name) NOT ENFORCED)",
+                                subscriptionTable))
+                .await();
+        for (String tableName : tableNames) {
+            tBatchEnv
+                    .executeSql(
+                            String.format(
+                                    "CREATE TABLE %s (id INT, val STRING, PRIMARY KEY (id) NOT ENFORCED)",
+                                    tableName))
+                    .await();
+            tBatchEnv
+                    .executeSql(
+                            String.format("INSERT INTO %s VALUES (1, '%s1')", tableName, tableName))
+                    .await();
+            tBatchEnv
+                    .executeSql(
+                            String.format(
+                                    "INSERT INTO %s VALUES ('%s.%s')",
+                                    subscriptionTable, DATABASE_NAME, tableName))
+                    .await();
+        }
+    }
+
+    private static Thread startCollector(
+            CloseableIterator<Event> iter, List<Event> events, String collectorName) {
+        Thread collector =
+                new Thread(
+                        () -> {
+                            try {
+                                while (iter.hasNext()) {
+                                    events.add(iter.next());
+                                }
+                            } catch (Exception ignored) {
+                                // Iterator close terminates the collector.
+                            }
+                        },
+                        collectorName + "-collector");
+        collector.setDaemon(true);
+        collector.start();
+        return collector;
+    }
+
     private FlussSource<Event> createFlussSource(
             String database, String tablePattern, String startupMode) {
         return createFlussSourceWithDiscoveryInterval(
@@ -968,7 +1370,7 @@ public class FlussSourcePipelineITCase {
      * tablePattern is translated to regex {@code .*}.
      */
     private static String toFqnRegex(String database, String tablePattern) {
-        return java.util.regex.Pattern.quote(database) + "\\." + tablePattern.replace("*", ".*");
+        return Pattern.quote(database) + "\\." + tablePattern.replace("*", ".*");
     }
 
     /**
@@ -1008,6 +1410,33 @@ public class FlussSourcePipelineITCase {
     private List<Event> collectAllEvents(
             FlussSource<Event> source, int expectedCount, Duration timeout) throws Exception {
         return collectAllEvents(source, expectedCount, timeout, 2);
+    }
+
+    private static void awaitEvents(
+            List<Event> events, Predicate<List<Event>> condition, Duration timeout)
+            throws InterruptedException {
+        long deadline = System.nanoTime() + timeout.toNanos();
+        while (!condition.test(snapshotEvents(events)) && System.nanoTime() < deadline) {
+            Thread.sleep(50L);
+        }
+        assertThat(condition.test(snapshotEvents(events))).isTrue();
+    }
+
+    private static List<Event> snapshotEvents(List<Event> events) {
+        synchronized (events) {
+            return new ArrayList<>(events);
+        }
+    }
+
+    private static List<Event> eventsForTable(List<Event> events, String tableName) {
+        return events.stream()
+                .filter(ChangeEvent.class::isInstance)
+                .filter(event -> ((ChangeEvent) event).tableId().getTableName().equals(tableName))
+                .collect(Collectors.toList());
+    }
+
+    private static boolean hasCreateTableEvent(List<Event> events) {
+        return events.stream().anyMatch(CreateTableEvent.class::isInstance);
     }
 
     private List<Event> collectAllEvents(

@@ -38,7 +38,7 @@ import java.util.Set;
 public class FlussSourceEnumStateSerializer
         implements SimpleVersionedSerializer<FlussSourceEnumState> {
 
-    private static final int VERSION = 1;
+    private static final int VERSION = 2;
     private final FlussSplitSerializer splitSerializer = new FlussSplitSerializer();
 
     @Override
@@ -71,12 +71,20 @@ public class FlussSourceEnumStateSerializer
             }
             // Serialize KV snapshot lease ID
             out.writeUTF(state.getLeaseId());
+            out.writeInt(state.getPendingRemovalTablePaths().size());
+            for (TablePath tablePath : state.getPendingRemovalTablePaths()) {
+                out.writeUTF(tablePath.getDatabaseName());
+                out.writeUTF(tablePath.getTableName());
+            }
             return baos.toByteArray();
         }
     }
 
     @Override
     public FlussSourceEnumState deserialize(int version, byte[] serialized) throws IOException {
+        if (version != 1 && version != VERSION) {
+            throw new IOException("Unknown Fluss source enumerator state version: " + version);
+        }
         try (ByteArrayInputStream bais = new ByteArrayInputStream(serialized);
                 DataInputViewStreamWrapper in = new DataInputViewStreamWrapper(bais)) {
             int pathCount = in.readInt();
@@ -97,7 +105,16 @@ public class FlussSourceEnumStateSerializer
                 remaining.add(
                         splitSerializer.deserialize(splitSerializer.getVersion(), splitBytes));
             }
-            return new FlussSourceEnumState(assignedPaths, remaining, in.readUTF());
+            String leaseId = in.readUTF();
+            Set<TablePath> pendingRemovalTablePaths = new LinkedHashSet<>();
+            if (version == VERSION) {
+                int pendingRemovalCount = in.readInt();
+                for (int i = 0; i < pendingRemovalCount; i++) {
+                    pendingRemovalTablePaths.add(TablePath.of(in.readUTF(), in.readUTF()));
+                }
+            }
+            return new FlussSourceEnumState(
+                    assignedPaths, remaining, leaseId, pendingRemovalTablePaths);
         }
     }
 }

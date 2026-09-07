@@ -31,8 +31,10 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * A {@link RecordEmitter} that uses a {@link FlussDeserializer} to convert {@link
@@ -62,6 +64,8 @@ public class FlussRecordEmitter<T> implements RecordEmitter<FlussSourceRecord, T
     /** Pending events to emit on the first record for each table after state restoration. */
     private final Map<TablePath, List<T>> pendingTableEvents = new HashMap<>();
 
+    private final Set<TablePath> inactiveTablePaths = new HashSet<>();
+
     public FlussRecordEmitter(FlussDeserializer<T> deserializer) {
         this.deserializer = deserializer;
     }
@@ -72,6 +76,9 @@ public class FlussRecordEmitter<T> implements RecordEmitter<FlussSourceRecord, T
             throws Exception {
         // Emit pending events for this table before processing the actual record.
         TablePath tablePath = element.getTablePath();
+        if (inactiveTablePaths.contains(tablePath)) {
+            return;
+        }
         List<T> pendingEvents = pendingTableEvents.remove(tablePath);
         if (pendingEvents != null) {
             for (T event : pendingEvents) {
@@ -141,6 +148,7 @@ public class FlussRecordEmitter<T> implements RecordEmitter<FlussSourceRecord, T
      * return pending events for emission on the first record.
      */
     public void applySplit(FlussSplitBase split) {
+        inactiveTablePaths.remove(split.getTablePath());
         if (split.getSchemaId() != null && split.getRowType() != null) {
             TablePath tablePath = split.getTablePath();
             List<T> pendingEvents =
@@ -155,5 +163,12 @@ public class FlussRecordEmitter<T> implements RecordEmitter<FlussSourceRecord, T
                         });
             }
         }
+    }
+
+    /** Stops emitting a table and discards its restored schema state. */
+    public void removeTable(TablePath tablePath) {
+        inactiveTablePaths.add(tablePath);
+        pendingTableEvents.remove(tablePath);
+        deserializer.removeState(tablePath);
     }
 }
