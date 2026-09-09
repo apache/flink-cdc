@@ -30,6 +30,11 @@ public class MockedOperatorCoordinatorContext extends MockOperatorCoordinatorCon
         super(operatorID, userCodeClassLoader);
     }
 
+    public MockedOperatorCoordinatorContext(
+            OperatorID operatorID, int parallelism, ClassLoader userCodeClassLoader) {
+        super(operatorID, parallelism, userCodeClassLoader);
+    }
+
     private Throwable failureCause;
 
     @Override

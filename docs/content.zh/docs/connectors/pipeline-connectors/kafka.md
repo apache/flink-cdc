@@ -26,12 +26,74 @@ under the License.
 
 # Kafka Pipeline 连接器
 
-Kafka Pipeline 连接器可以用作 Pipeline 的 *Data Sink*，将数据写入[Kafka](https://kafka.apache.org)。 本文档介绍如何设置 Kafka Pipeline 连接器。
+Kafka Pipeline 连接器可以用作 Pipeline 的 *Data Source* 或 *Data Sink*。作为 Source 时，它消费 Debezium JSON 或 Canal JSON Changelog，并将推断出的表结构变化转换为 Pipeline Schema 事件。
 
 ## 连接器的功能
 * 自动建表
 * 表结构变更同步
 * 数据实时同步
+* 消费 Debezium JSON 或 Canal JSON Changelog
+
+Kafka Source
+----------------
+
+下面的 Pipeline 从 Kafka 多分区消费 Debezium JSON，并写入 StarRocks：
+
+```yaml
+source:
+  type: kafka
+  name: Kafka Debezium Source
+  topic: inventory.customers
+  group-id: flink-cdc-kafka-source
+  scan.startup.mode: group-offsets
+  properties.bootstrap.servers: localhost:9092
+
+transform:
+  - source-table: inventory.\.*
+    primary-keys: id
+
+sink:
+  type: starrocks
+  name: StarRocks Sink
+  jdbc-url: jdbc:mysql://localhost:9030
+  load-url: localhost:8030
+  username: root
+  password: ""
+
+pipeline:
+  name: Kafka to StarRocks Pipeline
+  parallelism: 4
+  schema.change.behavior: lenient
+```
+
+Kafka Source 配置项：
+
+* `topic`：单个 Topic 或逗号分隔的 Topic 列表。
+* `topic-pattern`：用于动态发现 Topic 的正则表达式；`topic` 与 `topic-pattern` 必须且只能配置一个。
+* `group-id`（未配置 `properties.group.id` 时必填）：Kafka Consumer Group。
+* `scan.startup.mode`：`group-offsets`（默认）、`earliest-offset`、`latest-offset`、`timestamp` 或 `specific-offsets`。
+* `scan.startup.timestamp-millis`：当 `scan.startup.mode` 为 `timestamp` 时必填。
+* `scan.startup.specific-offsets`：当 `scan.startup.mode` 为 `specific-offsets` 时必填。仅配置一个 `topic` 时可写 `partition:0,offset:42;partition:1,offset:300`；多 Topic 或 `topic-pattern` 时每条必须带 topic，例如 `topic:dbz.customers,partition:0,offset:42`。未列出的分区从 earliest offset 开始。
+* `tables`：可选，按 Debezium `source.db`/`source.table` 或 Canal `database`/`table` 做包含过滤，语法与 MySQL source 的 `tables` 相同，例如 `inventory.customers` 或 `inventory.\\.*`。
+* `tables.exclude`：可选，排除匹配的表，可单独使用，也可与 `tables` 同时使用。
+* `value.format`：`debezium-json`（默认）或 `canal-json`。
+* `properties.bootstrap.servers`（必填）及 `properties.*`：Kafka Consumer 参数。
+
+Debezium JSON 不推断主键，请在 Pipeline 的 `transform` 中通过 `primary-keys` 指定。Canal JSON 会使用消息里的 `pkNames` 作为主键，仍可用 transform 覆盖。写入 StarRocks 前表必须具备主键。
+
+Debezium JSON 的 value 必须同时包含 `schema` 与 `payload`。不包含 schema 的 value 无法可靠识别字段类型变化，因此会被拒绝。
+
+Canal JSON 用 `mysqlType` 推断列类型、用 `pkNames` 作为主键。只消费 `INSERT`/`UPDATE`/`DELETE`；`isDdl=true` 以及其他 `type` 会被跳过。Canal 的 `UPDATE` 往往只在 `old` 里放变更列，Source 会用 `old` 覆盖 `data` 拼出完整 before。
+
+Transform 中的主键用于下游分区和 upsert 语义，但无法恢复 Kafka 中已经丢失的顺序；生产端仍需保证相同逻辑主键的变更进入同一个 Kafka 分区。
+
+### Schema Evolution 与多分区
+
+Kafka 只保证分区内有序。Source 会先在每个 Source subtask 内对其负责分区的 schema 做单调扩宽，再由 distributed schema coordinator 跨 subtask 合并。新 schema 出现后到达的旧格式消息会被转换到当前最宽 schema，不会触发类型回退。
+
+Source 支持首次发现表时建表、增加 nullable 字段，以及把 schema 做成单调超集：源端删列或改名时会保留旧列（NOT NULL 会改为 nullable）并加入新列名，不会发出 Drop/Rename。历史行的新列为 null，之后行的旧列为 null。另外支持 `INT → BIGINT`、`INT → STRING`、Decimal 精度扩大等兼容扩宽。Kafka Connect 的 `string` 一律映射为 `STRING`（MySQL 的 `CHAR`/`VARCHAR`/`TEXT` 在 Debezium JSON 中都是 `string`）。从旧 offset 重放并跨过 `INT → STRING` 时，历史整型值会被转成字符串，而不会失败。类型缩窄、不兼容类型变化会明确失败。并行 Kafka Source 应配置 `schema.change.behavior: lenient`。
+
+从旧 offset 重刷时，空目标表会按历史顺序执行 `CREATE → ADD/ALTER`。已有 StarRocks 表必须是历史 schema 的兼容超集；重复的 Create/Add/Alter 会按幂等方式处理，目标表额外字段必须 nullable 或有默认值。StarRocks 主键表可以通过 upsert 覆盖旧记录；duplicate-key 表全量重刷前应清表或改写新表。
 
 如何创建 Pipeline
 ----------------

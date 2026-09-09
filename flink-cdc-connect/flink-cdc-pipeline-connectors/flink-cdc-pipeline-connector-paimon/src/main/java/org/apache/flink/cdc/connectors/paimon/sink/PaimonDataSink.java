@@ -25,6 +25,7 @@ import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.common.sink.EventSinkProvider;
 import org.apache.flink.cdc.common.sink.FlinkSinkProvider;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
+import org.apache.flink.cdc.common.sink.SupportsParallelMetadataSource;
 import org.apache.flink.cdc.connectors.paimon.sink.v2.PaimonEventSink;
 import org.apache.flink.cdc.connectors.paimon.sink.v2.PaimonRecordSerializer;
 
@@ -36,7 +37,7 @@ import java.util.List;
 import java.util.Map;
 
 /** A {@link DataSink} for Paimon connector that supports schema evolution. */
-public class PaimonDataSink implements DataSink, Serializable {
+public class PaimonDataSink implements DataSink, SupportsParallelMetadataSource, Serializable {
 
     // options for creating Paimon catalog.
     private final Options options;
@@ -53,6 +54,8 @@ public class PaimonDataSink implements DataSink, Serializable {
     private final ZoneId zoneId;
 
     public final String schemaOperatorUid;
+
+    private boolean parallelMetadataSource;
 
     public PaimonDataSink(
             Options options,
@@ -74,7 +77,18 @@ public class PaimonDataSink implements DataSink, Serializable {
     @Override
     public EventSinkProvider getEventSinkProvider() {
         return FlinkSinkProvider.of(
-                new PaimonEventSink(options, commitUser, serializer, schemaOperatorUid, zoneId));
+                new PaimonEventSink(
+                        options,
+                        commitUser,
+                        serializer,
+                        schemaOperatorUid,
+                        zoneId,
+                        parallelMetadataSource));
+    }
+
+    @Override
+    public void setParallelMetadataSource(boolean parallelMetadataSource) {
+        this.parallelMetadataSource = parallelMetadataSource;
     }
 
     @Override

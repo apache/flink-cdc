@@ -34,6 +34,8 @@ import java.util.Set;
 public class FlushEventAlignmentOperator extends AbstractStreamOperatorAdapter<Event>
         implements OneInputStreamOperator<Event, Event> {
 
+    private final boolean decodeReplicatedSource;
+
     private transient int totalTasksNumber;
 
     /**
@@ -45,8 +47,13 @@ public class FlushEventAlignmentOperator extends AbstractStreamOperatorAdapter<E
     private transient int currentSubTaskId;
 
     public FlushEventAlignmentOperator() {
+        this(false);
+    }
+
+    public FlushEventAlignmentOperator(boolean decodeReplicatedSource) {
         // It's necessary to avoid unpredictable outcomes of Event shuffling.
         this.chainingStrategy = ChainingStrategy.ALWAYS;
+        this.decodeReplicatedSource = decodeReplicatedSource;
     }
 
     @Override
@@ -73,7 +80,9 @@ public class FlushEventAlignmentOperator extends AbstractStreamOperatorAdapter<E
                 output.collect(
                         new StreamRecord<>(
                                 new FlushEvent(
-                                        sourceSubTaskId,
+                                        decodeReplicatedSource
+                                                ? Math.floorDiv(sourceSubTaskId, totalTasksNumber)
+                                                : sourceSubTaskId,
                                         bucketWrapperFlushEvent.getTableIds(),
                                         bucketWrapperFlushEvent.getSchemaChangeEventType())));
                 sourceTaskIdToAssignBucketSubTaskIds.remove(sourceSubTaskId);

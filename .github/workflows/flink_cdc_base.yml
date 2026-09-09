@@ -99,7 +99,7 @@ jobs:
           python3 -m pip install --disable-pip-version-check pemja==0.5.7
 
       - name: Compile and test
-        timeout-minutes: 90
+        timeout-minutes: 120
         run: |
           . .github/workflows/utils.sh
           jvm_timezone=$(random_timezone)

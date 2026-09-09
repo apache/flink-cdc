@@ -29,6 +29,7 @@ import org.apache.flink.cdc.common.pipeline.RuntimeExecutionMode;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.common.sink.DefaultDataChangeEventHashFunctionProvider;
+import org.apache.flink.cdc.common.sink.SupportsParallelMetadataSource;
 import org.apache.flink.cdc.common.sink.TableIdHashFunctionProvider;
 import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.composer.PipelineComposer;
@@ -172,6 +173,10 @@ public class FlinkPipelineComposer implements PipelineComposer {
                 resolveHashFunctionProvider(pipelineDefConfig, sinkDefinedHashFunctionProvider);
 
         boolean isParallelMetadataSource = dataSource.isParallelMetadataSource();
+        if (dataSink instanceof SupportsParallelMetadataSource) {
+            ((SupportsParallelMetadataSource) dataSink)
+                    .setParallelMetadataSource(isParallelMetadataSource);
+        }
 
         // O ---> Source
         DataStream<Event> stream =

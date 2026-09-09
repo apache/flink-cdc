@@ -15,19 +15,23 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.connectors.kafka.json.debezium;
+package org.apache.flink.cdc.connectors.kafka.json.canal;
 
-/** Debezium JSON struct. */
-public class DebeziumJsonStruct {
+/** Canal JSON struct. */
+public class CanalJsonStruct {
 
-    enum DebeziumStruct {
-        SCHEMA(0, "schema"),
-        PAYLOAD(1, "payload");
+    enum CanalStruct {
+        OLD(0, "old"),
+        DATA(1, "data"),
+        TYPE(2, "type"),
+        DATABASE(3, "database"),
+        TABLE(4, "table"),
+        PK_NAMES(5, "pkNames");
 
         private final int position;
         private final String fieldName;
 
-        DebeziumStruct(int position, String fieldName) {
+        CanalStruct(int position, String fieldName) {
             this.position = position;
             this.fieldName = fieldName;
         }
@@ -41,16 +45,15 @@ public class DebeziumJsonStruct {
         }
     }
 
-    enum DebeziumPayload {
-        BEFORE(0, "before"),
-        AFTER(1, "after"),
-        OPERATION(2, "op"),
-        SOURCE(3, "source");
+    enum CanalMeta {
+        MYSQL_TYPE(0, "mysqlType"),
+        IS_DDL(1, "isDdl"),
+        TS(2, "ts");
 
         private final int position;
         private final String fieldName;
 
-        DebeziumPayload(int position, String fieldName) {
+        CanalMeta(int position, String fieldName) {
             this.position = position;
             this.fieldName = fieldName;
         }
@@ -64,46 +67,24 @@ public class DebeziumJsonStruct {
         }
     }
 
-    enum DebeziumSource {
-        DATABASE(0, "db"),
-        TABLE(1, "table");
+    enum CanalOperation {
+        INSERT("INSERT"),
+        UPDATE("UPDATE"),
+        DELETE("DELETE");
 
-        private final int position;
         private final String fieldName;
 
-        DebeziumSource(int position, String fieldName) {
-            this.position = position;
+        CanalOperation(String fieldName) {
             this.fieldName = fieldName;
-        }
-
-        public int getPosition() {
-            return position;
         }
 
         public String getFieldName() {
             return fieldName;
         }
-    }
 
-    enum DebeziumOperation {
-        READ("r"),
-        CREATE("c"),
-        UPDATE("u"),
-        DELETE("d");
-
-        private final String code;
-
-        DebeziumOperation(String code) {
-            this.code = code;
-        }
-
-        public String getCode() {
-            return code;
-        }
-
-        static DebeziumOperation fromCode(String code) {
-            for (DebeziumOperation operation : values()) {
-                if (operation.code.equals(code)) {
+        static CanalOperation fromFieldName(String fieldName) {
+            for (CanalOperation operation : values()) {
+                if (operation.fieldName.equalsIgnoreCase(fieldName)) {
                     return operation;
                 }
             }

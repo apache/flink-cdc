@@ -27,6 +27,7 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.utils.DataTypeUtils;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.connectors.kafka.json.TableSchemaInfo;
+import org.apache.flink.cdc.connectors.kafka.json.canal.CanalJsonStruct.CanalOperation;
 import org.apache.flink.formats.common.TimestampFormat;
 import org.apache.flink.formats.json.JsonFormatOptions;
 import org.apache.flink.formats.json.JsonRowDataSerializationSchema;
@@ -44,6 +45,12 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static java.lang.String.format;
+import static org.apache.flink.cdc.connectors.kafka.json.canal.CanalJsonStruct.CanalStruct.DATA;
+import static org.apache.flink.cdc.connectors.kafka.json.canal.CanalJsonStruct.CanalStruct.DATABASE;
+import static org.apache.flink.cdc.connectors.kafka.json.canal.CanalJsonStruct.CanalStruct.OLD;
+import static org.apache.flink.cdc.connectors.kafka.json.canal.CanalJsonStruct.CanalStruct.PK_NAMES;
+import static org.apache.flink.cdc.connectors.kafka.json.canal.CanalJsonStruct.CanalStruct.TABLE;
+import static org.apache.flink.cdc.connectors.kafka.json.canal.CanalJsonStruct.CanalStruct.TYPE;
 import static org.apache.flink.table.types.utils.TypeConversions.fromLogicalToDataType;
 
 /**
@@ -55,10 +62,6 @@ import static org.apache.flink.table.types.utils.TypeConversions.fromLogicalToDa
 public class CanalJsonSerializationSchema implements SerializationSchema<Event> {
 
     private static final long serialVersionUID = 1L;
-
-    private static final StringData OP_INSERT = StringData.fromString("INSERT");
-    private static final StringData OP_DELETE = StringData.fromString("DELETE");
-    private static final StringData OP_UPDATE = StringData.fromString("UPDATE");
 
     private transient GenericRowData reuseGenericRowData;
 
@@ -139,11 +142,13 @@ public class CanalJsonSerializationSchema implements SerializationSchema<Event> 
 
         DataChangeEvent dataChangeEvent = (DataChangeEvent) event;
         reuseGenericRowData.setField(
-                3, StringData.fromString(dataChangeEvent.tableId().getSchemaName()));
+                DATABASE.getPosition(),
+                StringData.fromString(dataChangeEvent.tableId().getSchemaName()));
         reuseGenericRowData.setField(
-                4, StringData.fromString(dataChangeEvent.tableId().getTableName()));
+                TABLE.getPosition(),
+                StringData.fromString(dataChangeEvent.tableId().getTableName()));
         reuseGenericRowData.setField(
-                5,
+                PK_NAMES.getPosition(),
                 new GenericArrayData(
                         jsonSerializers
                                 .get(dataChangeEvent.tableId())
@@ -155,9 +160,9 @@ public class CanalJsonSerializationSchema implements SerializationSchema<Event> 
         try {
             switch (dataChangeEvent.op()) {
                 case INSERT:
-                    reuseGenericRowData.setField(0, null);
+                    reuseGenericRowData.setField(OLD.getPosition(), null);
                     reuseGenericRowData.setField(
-                            1,
+                            DATA.getPosition(),
                             new GenericArrayData(
                                     new RowData[] {
                                         jsonSerializers
@@ -165,15 +170,16 @@ public class CanalJsonSerializationSchema implements SerializationSchema<Event> 
                                                 .getRowDataFromRecordData(
                                                         dataChangeEvent.after(), false)
                                     }));
-                    reuseGenericRowData.setField(2, OP_INSERT);
+                    reuseGenericRowData.setField(
+                            TYPE.getPosition(), toStringData(CanalOperation.INSERT));
                     return jsonSerializers
                             .get(dataChangeEvent.tableId())
                             .getSerializationSchema()
                             .serialize(reuseGenericRowData);
                 case DELETE:
-                    reuseGenericRowData.setField(0, null);
+                    reuseGenericRowData.setField(OLD.getPosition(), null);
                     reuseGenericRowData.setField(
-                            1,
+                            DATA.getPosition(),
                             new GenericArrayData(
                                     new RowData[] {
                                         jsonSerializers
@@ -181,7 +187,8 @@ public class CanalJsonSerializationSchema implements SerializationSchema<Event> 
                                                 .getRowDataFromRecordData(
                                                         dataChangeEvent.before(), false)
                                     }));
-                    reuseGenericRowData.setField(2, OP_DELETE);
+                    reuseGenericRowData.setField(
+                            TYPE.getPosition(), toStringData(CanalOperation.DELETE));
                     return jsonSerializers
                             .get(dataChangeEvent.tableId())
                             .getSerializationSchema()
@@ -189,7 +196,7 @@ public class CanalJsonSerializationSchema implements SerializationSchema<Event> 
                 case UPDATE:
                 case REPLACE:
                     reuseGenericRowData.setField(
-                            0,
+                            OLD.getPosition(),
                             new GenericArrayData(
                                     new RowData[] {
                                         jsonSerializers
@@ -198,7 +205,7 @@ public class CanalJsonSerializationSchema implements SerializationSchema<Event> 
                                                         dataChangeEvent.before(), false)
                                     }));
                     reuseGenericRowData.setField(
-                            1,
+                            DATA.getPosition(),
                             new GenericArrayData(
                                     new RowData[] {
                                         jsonSerializers
@@ -206,7 +213,8 @@ public class CanalJsonSerializationSchema implements SerializationSchema<Event> 
                                                 .getRowDataFromRecordData(
                                                         dataChangeEvent.after(), false)
                                     }));
-                    reuseGenericRowData.setField(2, OP_UPDATE);
+                    reuseGenericRowData.setField(
+                            TYPE.getPosition(), toStringData(CanalOperation.UPDATE));
                     return jsonSerializers
                             .get(dataChangeEvent.tableId())
                             .getSerializationSchema()
@@ -222,6 +230,10 @@ public class CanalJsonSerializationSchema implements SerializationSchema<Event> 
         }
     }
 
+    private static StringData toStringData(CanalOperation operation) {
+        return StringData.fromString(operation.getFieldName());
+    }
+
     /**
      * Refer to <a
      * href="https://nightlies.apache.org/flink/flink-docs-master/docs/connectors/table/formats/canal/#available-metadata">Canal
@@ -230,12 +242,16 @@ public class CanalJsonSerializationSchema implements SerializationSchema<Event> 
     private static RowType createJsonRowType(DataType databaseSchema) {
         return (RowType)
                 DataTypes.ROW(
-                                DataTypes.FIELD("old", DataTypes.ARRAY(databaseSchema)),
-                                DataTypes.FIELD("data", DataTypes.ARRAY(databaseSchema)),
-                                DataTypes.FIELD("type", DataTypes.STRING()),
-                                DataTypes.FIELD("database", DataTypes.STRING()),
-                                DataTypes.FIELD("table", DataTypes.STRING()),
-                                DataTypes.FIELD("pkNames", DataTypes.ARRAY(DataTypes.STRING())))
+                                DataTypes.FIELD(
+                                        OLD.getFieldName(), DataTypes.ARRAY(databaseSchema)),
+                                DataTypes.FIELD(
+                                        DATA.getFieldName(), DataTypes.ARRAY(databaseSchema)),
+                                DataTypes.FIELD(TYPE.getFieldName(), DataTypes.STRING()),
+                                DataTypes.FIELD(DATABASE.getFieldName(), DataTypes.STRING()),
+                                DataTypes.FIELD(TABLE.getFieldName(), DataTypes.STRING()),
+                                DataTypes.FIELD(
+                                        PK_NAMES.getFieldName(),
+                                        DataTypes.ARRAY(DataTypes.STRING())))
                         .getLogicalType();
     }
 }

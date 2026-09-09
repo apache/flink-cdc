@@ -14,3 +14,4 @@
 # limitations under the License.
 
 org.apache.flink.cdc.connectors.kafka.sink.KafkaDataSinkFactory
+org.apache.flink.cdc.connectors.kafka.source.KafkaDataSourceFactory

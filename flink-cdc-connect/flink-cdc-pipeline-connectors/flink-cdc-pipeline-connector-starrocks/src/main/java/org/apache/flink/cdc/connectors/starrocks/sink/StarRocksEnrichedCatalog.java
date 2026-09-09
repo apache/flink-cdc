@@ -106,7 +106,8 @@ public class StarRocksEnrichedCatalog extends StarRocksCatalog {
         }
     }
 
-    public void alterColumnType(String databaseName, String tableName, StarRocksColumn column)
+    public void alterColumnType(
+            String databaseName, String tableName, StarRocksColumn column, long timeoutSecond)
             throws StarRocksCatalogException {
         checkTableArgument(databaseName, tableName);
         Preconditions.checkArgument(
@@ -115,7 +116,7 @@ public class StarRocksEnrichedCatalog extends StarRocksCatalog {
         String alterSql = buildAlterColumnTypeSql(databaseName, tableName, buildColumnStmt(column));
         try {
             long startTimeMillis = System.currentTimeMillis();
-            executeUpdateStatement(alterSql);
+            executeAlter(databaseName, tableName, alterSql, timeoutSecond);
             LOG.info(
                     "Success to alter table {}.{} modify column type, duration: {}ms, sql: {}",
                     databaseName,
@@ -158,14 +159,27 @@ public class StarRocksEnrichedCatalog extends StarRocksCatalog {
                 "ALTER TABLE `%s`.`%s` MODIFY COLUMN %s", databaseName, tableName, columnStmt);
     }
 
-    private void executeUpdateStatement(String sql) throws StarRocksCatalogException {
+    protected void executeAlter(
+            String databaseName, String tableName, String alterSql, long timeoutSecond) {
+        invokeParent(
+                "executeAlter",
+                new Class<?>[] {String.class, String.class, String.class, long.class},
+                databaseName,
+                tableName,
+                alterSql,
+                timeoutSecond);
+    }
+
+    protected void executeUpdateStatement(String sql) throws StarRocksCatalogException {
+        invokeParent("executeUpdateStatement", new Class<?>[] {String.class}, sql);
+    }
+
+    private void invokeParent(String methodName, Class<?>[] parameterTypes, Object... args) {
         try {
-            Method m =
-                    getClass()
-                            .getSuperclass()
-                            .getDeclaredMethod("executeUpdateStatement", String.class);
-            m.setAccessible(true);
-            m.invoke(this, sql);
+            Method method =
+                    getClass().getSuperclass().getDeclaredMethod(methodName, parameterTypes);
+            method.setAccessible(true);
+            method.invoke(this, args);
         } catch (InvocationTargetException | NoSuchMethodException | IllegalAccessException e) {
             throw new RuntimeException(e);
         }
