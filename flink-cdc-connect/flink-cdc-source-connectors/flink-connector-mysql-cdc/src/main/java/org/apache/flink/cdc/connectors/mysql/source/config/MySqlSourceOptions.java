@@ -292,4 +292,14 @@ public class MySqlSourceOptions {
                     .defaultValue(true)
                     .withDescription(
                             "Whether to assign the unbounded chunks first during snapshot reading phase. This might help reduce the risk of the TaskManager experiencing an out-of-memory (OOM) error when taking a snapshot of the largest unbounded chunk.");
+
+    public static final ConfigOption<Long> BINLOG_POSITION_LAG_INTERVAL_MS =
+            ConfigOptions.key("scan.binlog.position-lag.interval.ms")
+                    .longType()
+                    .defaultValue(-1L)
+                    .withDescription(
+                            "The interval in milliseconds to fetch master binlog status for lag metrics. "
+                                    + "A value of -1 (default) disables the feature. When set to a positive value, "
+                                    + "the connector periodically executes SHOW MASTER STATUS at this interval "
+                                    + "to calculate binlog transaction lag and byte position lag.");
 }

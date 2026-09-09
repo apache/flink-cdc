@@ -78,6 +78,8 @@ public class MySqlSourceConfigFactory implements Serializable {
     private boolean treatTinyInt1AsBoolean = true;
     private boolean useLegacyJsonFormat = true;
     private boolean assignUnboundedChunkFirst = false;
+    private long binlogPositionLagIntervalMs =
+            MySqlSourceOptions.BINLOG_POSITION_LAG_INTERVAL_MS.defaultValue();
 
     public MySqlSourceConfigFactory hostname(String hostname) {
         this.hostname = hostname;
@@ -341,6 +343,16 @@ public class MySqlSourceConfigFactory implements Serializable {
         return this;
     }
 
+    /**
+     * The interval in milliseconds to fetch master binlog status for lag metrics. A value of -1
+     * (default) disables the feature. When set to a positive value, the connector periodically
+     * executes SHOW MASTER STATUS at this interval.
+     */
+    public MySqlSourceConfigFactory binlogPositionLagIntervalMs(long intervalMs) {
+        this.binlogPositionLagIntervalMs = intervalMs;
+        return this;
+    }
+
     /** Creates a new {@link MySqlSourceConfig} for the given subtask {@code subtaskId}. */
     public MySqlSourceConfig createConfig(int subtaskId) {
         // hard code server name, because we don't need to distinguish it, docs:
@@ -444,6 +456,7 @@ public class MySqlSourceConfigFactory implements Serializable {
                 parseOnLineSchemaChanges,
                 treatTinyInt1AsBoolean,
                 useLegacyJsonFormat,
-                assignUnboundedChunkFirst);
+                assignUnboundedChunkFirst,
+                binlogPositionLagIntervalMs);
     }
 }

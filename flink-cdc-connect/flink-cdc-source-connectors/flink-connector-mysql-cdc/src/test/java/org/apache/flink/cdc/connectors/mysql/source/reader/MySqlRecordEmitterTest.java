@@ -48,6 +48,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static io.debezium.config.CommonConnectorConfig.TRANSACTION_TOPIC;
 import static io.debezium.connector.mysql.MySqlConnectorConfig.SERVER_NAME;
@@ -94,7 +95,62 @@ class MySqlRecordEmitterTest {
                 .isEqualByComparingTo(fakeOffset);
     }
 
+    @Test
+    void testBinlogPositionLagMetricIsUpdated() throws Exception {
+        MySqlSourceReaderMetrics metrics =
+                new MySqlSourceReaderMetrics(
+                        UnregisteredMetricGroups.createUnregisteredOperatorMetricGroup());
+        metrics.registerMetrics();
+        metrics.registerBinlogLagMetrics();
+
+        AtomicReference<BinlogOffset> masterOffset =
+                new AtomicReference<>(BinlogOffset.ofBinlogFilePosition("mysql-bin.000001", 10000));
+
+        MySqlRecordEmitter<String> emitter =
+                new MySqlRecordEmitter<>(
+                        new DebeziumDeserializationSchema<String>() {
+                            @Override
+                            public void deserialize(SourceRecord record, Collector<String> out) {
+                                out.collect("record");
+                            }
+
+                            @Override
+                            public TypeInformation<String> getProducedType() {
+                                return TypeInformation.of(String.class);
+                            }
+                        },
+                        metrics,
+                        false,
+                        false,
+                        false,
+                        masterOffset,
+                        10_000L);
+
+        MySqlBinlogSplitState splitState = createBinlogSplitState();
+        splitState.setStartingOffset(BinlogOffset.ofBinlogFilePosition("mysql-bin.000001", 3000));
+
+        // Emit a data change event to trigger reportBinlogLag through the public path
+        SourceRecord dataEvent = createDataChangeEvent("test.table", 3000);
+        TestingReaderOutput<String> readerOutput = new TestingReaderOutput<>();
+        emitter.emitRecord(SourceRecords.fromSingleRecord(dataEvent), readerOutput, splitState);
+
+        Assertions.assertThat(metrics.getBinlogBytePositionLag()).isEqualTo(7000);
+    }
+
     private MySqlRecordEmitter<Void> createRecordEmitter() {
+        return createRecordEmitter(new AtomicReference<>());
+    }
+
+    private MySqlRecordEmitter<Void> createRecordEmitter(
+            AtomicReference<BinlogOffset> latestMasterOffset) {
+        MySqlSourceReaderMetrics metrics =
+                new MySqlSourceReaderMetrics(
+                        UnregisteredMetricGroups.createUnregisteredOperatorMetricGroup());
+        return createRecordEmitter(metrics, latestMasterOffset);
+    }
+
+    private MySqlRecordEmitter<Void> createRecordEmitter(
+            MySqlSourceReaderMetrics metrics, AtomicReference<BinlogOffset> latestMasterOffset) {
         return new MySqlRecordEmitter<>(
                 new DebeziumDeserializationSchema<Void>() {
                     @Override
@@ -107,11 +163,12 @@ class MySqlRecordEmitterTest {
                         return TypeInformation.of(Void.class);
                     }
                 },
-                new MySqlSourceReaderMetrics(
-                        UnregisteredMetricGroups.createUnregisteredOperatorMetricGroup()),
+                metrics,
                 false,
                 false,
-                false);
+                false,
+                latestMasterOffset,
+                -1L);
     }
 
     @Test
@@ -375,7 +432,9 @@ class MySqlRecordEmitterTest {
                         UnregisteredMetricGroups.createUnregisteredOperatorMetricGroup()),
                 false,
                 false,
-                includeTransactionMetadataEvents);
+                includeTransactionMetadataEvents,
+                new AtomicReference<>(),
+                -1L);
     }
 
     private SourceRecord createTransactionMetadataEvent(

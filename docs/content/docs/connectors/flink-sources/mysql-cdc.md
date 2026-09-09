@@ -457,6 +457,19 @@ Only valid for cdc 1.x version. During a snapshot operation, the connector will 
       </td>
     </tr>
     <tr>
+      <td>scan.binlog.position-lag.interval.ms</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">-1</td>
+      <td>Long</td>
+      <td>
+        The interval in milliseconds to fetch master binlog status for lag metrics.<br>
+        A value of -1 (default) disables the feature. When set to a positive value (e.g. 10000), the connector periodically executes SHOW MASTER STATUS at this interval to calculate two lag metrics:<br>
+        <li>currentBinlogTransactionLag: GTID-based transaction count lag (reports -1 when GTID is unavailable)</li>
+        <li>currentBinlogBytePositionLag: byte position lag based on binlog file and position</li>
+        Note: this metric is only reported during the binlog (incremental) reading phase; it is not available during the snapshot (full) phase. Enabling this feature adds periodic queries to the MySQL server.<br>
+      </td>
+    </tr>
+    <tr>
       <td>scan.incremental.snapshot.backfill.skip</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>

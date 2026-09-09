@@ -80,6 +80,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -1195,7 +1196,8 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
                         finishedSplitsInfo.size());
 
         // step-3: test read binlog split
-        BinlogSplitReader binlogReader = new BinlogSplitReader(statefulTaskContext, 0);
+        BinlogSplitReader binlogReader =
+                new BinlogSplitReader(statefulTaskContext, 0, new AtomicReference<>());
         binlogReader.submitSplit(binlogSplit);
 
         List<SourceRecord> sourceRecords =
@@ -1215,7 +1217,8 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
         StatefulTaskContext statefulTaskContext =
                 new StatefulTaskContext(sourceConfig, binaryLogClient, mySqlConnection);
         MySqlBinlogSplit split = createBinlogSplit(sourceConfig);
-        BinlogSplitReader reader = new BinlogSplitReader(statefulTaskContext, 0);
+        BinlogSplitReader reader =
+                new BinlogSplitReader(statefulTaskContext, 0, new AtomicReference<>());
 
         // Mock an exception occurring during stream split reading by setting the error handler
         // and stopping the change event source to test exception handling
@@ -1245,7 +1248,8 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
                         ? new TestStatefulTaskContext(
                                 sourceConfig, binaryLogClient, mySqlConnection)
                         : new StatefulTaskContext(sourceConfig, binaryLogClient, mySqlConnection),
-                0);
+                0,
+                new AtomicReference<>());
     }
 
     private MySqlBinlogSplit createBinlogSplit(MySqlSourceConfig sourceConfig) throws Exception {
@@ -1397,7 +1401,8 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
                         finishedSplitsInfo.size());
 
         // step-3: test read binlog split
-        BinlogSplitReader binlogReader = new BinlogSplitReader(statefulTaskContext, 0);
+        BinlogSplitReader binlogReader =
+                new BinlogSplitReader(statefulTaskContext, 0, new AtomicReference<>());
         binlogReader.submitSplit(binlogSplit);
 
         // step-4: make some binlog events

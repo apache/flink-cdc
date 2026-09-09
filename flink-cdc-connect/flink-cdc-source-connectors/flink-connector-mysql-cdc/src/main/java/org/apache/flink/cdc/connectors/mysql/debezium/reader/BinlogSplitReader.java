@@ -62,10 +62,12 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
 
 import static org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils.createBinaryClient;
 import static org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils.createMySqlConnection;
+import static org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils.currentBinlogOffset;
 import static org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils.isEndWatermarkEvent;
 
 /**
@@ -97,17 +99,28 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
 
     private static final long READER_CLOSE_TIMEOUT = 30L;
 
-    public BinlogSplitReader(MySqlSourceConfig sourceConfig, int subtaskId) {
+    private long lastFetchMasterStatusTime = 0;
+    private final AtomicReference<BinlogOffset> latestMasterOffset;
+
+    public BinlogSplitReader(
+            MySqlSourceConfig sourceConfig,
+            int subtaskId,
+            AtomicReference<BinlogOffset> latestMasterOffset) {
         this(
                 new StatefulTaskContext(
                         sourceConfig,
                         createBinaryClient(sourceConfig.getDbzConfiguration()),
                         createMySqlConnection(sourceConfig)),
-                subtaskId);
+                subtaskId,
+                latestMasterOffset);
     }
 
-    public BinlogSplitReader(StatefulTaskContext statefulTaskContext, int subtaskId) {
+    public BinlogSplitReader(
+            StatefulTaskContext statefulTaskContext,
+            int subtaskId,
+            AtomicReference<BinlogOffset> latestMasterOffset) {
         this.statefulTaskContext = statefulTaskContext;
+        this.latestMasterOffset = latestMasterOffset;
         ThreadFactory threadFactory =
                 new ThreadFactoryBuilder().setNameFormat("binlog-reader-" + subtaskId).build();
         this.executorService = Executors.newSingleThreadExecutor(threadFactory);
@@ -166,6 +179,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
     @Override
     public Iterator<SourceRecords> pollSplitRecords() throws InterruptedException {
         checkReadException();
+
         final List<SourceRecord> sourceRecords = new ArrayList<>();
         if (currentTaskRunning) {
             List<DataChangeEvent> batch = queue.poll();
@@ -219,6 +233,24 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
                     sourceRecords.add(event.getRecord());
                 }
             }
+
+            // Fetch master offset AFTER polling records, so master reflects the latest
+            // state and is always >= the records we just polled.
+            if (statefulTaskContext.getSourceConfig().isBinlogPositionLagEnabled()) {
+                long now = System.currentTimeMillis();
+                long interval =
+                        statefulTaskContext.getSourceConfig().getBinlogPositionLagIntervalMs();
+                if (now - lastFetchMasterStatusTime > interval) {
+                    lastFetchMasterStatusTime = now;
+                    try {
+                        latestMasterOffset.set(
+                                currentBinlogOffset(statefulTaskContext.getConnection()));
+                    } catch (Exception e) {
+                        LOG.warn("Failed to fetch master binlog offset for lag metric", e);
+                    }
+                }
+            }
+
             List<SourceRecords> sourceRecordsSet = new ArrayList<>();
             sourceRecordsSet.add(new SourceRecords(sourceRecords));
             return sourceRecordsSet.iterator();

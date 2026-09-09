@@ -23,6 +23,7 @@ import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplit;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplitState;
 import org.apache.flink.cdc.connectors.mysql.source.split.SourceRecords;
+import org.apache.flink.cdc.connectors.mysql.source.utils.BinlogLagCalculator;
 import org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.cdc.debezium.history.FlinkJsonTableChangeSerializer;
@@ -37,6 +38,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Iterator;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * The {@link RecordEmitter} implementation for {@link MySqlSourceReader}.
@@ -56,19 +58,28 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
     private final boolean includeHeartbeatEvents;
     private final boolean includeTransactionMetadataEvents;
     private final OutputCollector<T> outputCollector;
+    private final AtomicReference<BinlogOffset> latestMasterOffset;
+    private final BinlogLagCalculator lagCalculator = new BinlogLagCalculator();
+    private final long binlogPositionLagIntervalMs;
+
+    private long lastReportBinlogLagTime = 0;
 
     public MySqlRecordEmitter(
             DebeziumDeserializationSchema<T> debeziumDeserializationSchema,
             MySqlSourceReaderMetrics sourceReaderMetrics,
             boolean includeSchemaChanges,
             boolean includeHeartbeatEvents,
-            boolean includeTransactionMetadataEvents) {
+            boolean includeTransactionMetadataEvents,
+            AtomicReference<BinlogOffset> latestMasterOffset,
+            long binlogPositionLagIntervalMs) {
         this.debeziumDeserializationSchema = debeziumDeserializationSchema;
         this.sourceReaderMetrics = sourceReaderMetrics;
         this.includeSchemaChanges = includeSchemaChanges;
         this.includeHeartbeatEvents = includeHeartbeatEvents;
         this.includeTransactionMetadataEvents = includeTransactionMetadataEvents;
         this.outputCollector = new OutputCollector<>();
+        this.latestMasterOffset = latestMasterOffset;
+        this.binlogPositionLagIntervalMs = binlogPositionLagIntervalMs;
     }
 
     @Override
@@ -105,9 +116,11 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
         } else if (RecordUtils.isDataChangeRecord(element)) {
             updateStartingOffsetForSplit(splitState, element);
             reportMetrics(element);
+            reportBinlogLag(splitState);
             emitElement(element, output);
         } else if (RecordUtils.isHeartbeatEvent(element)) {
             updateStartingOffsetForSplit(splitState, element);
+            reportBinlogLag(splitState);
             if (includeHeartbeatEvents) {
                 emitElement(element, output);
             }
@@ -149,6 +162,36 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
                 sourceReaderMetrics.recordFetchDelay(fetchTimestamp - messageTimestamp);
             }
         }
+    }
+
+    private void reportBinlogLag(MySqlSplitState splitState) {
+        if (binlogPositionLagIntervalMs <= 0 || !splitState.isBinlogSplitState()) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        if (now - lastReportBinlogLagTime < binlogPositionLagIntervalMs) {
+            return;
+        }
+        BinlogOffset currentOffset = splitState.asBinlogSplitState().getStartingOffset();
+        BinlogOffset masterOffset = latestMasterOffset.get();
+        if (currentOffset == null || masterOffset == null) {
+            return;
+        }
+        lastReportBinlogLagTime = now;
+        BinlogLagCalculator.LagResult result =
+                lagCalculator.calculateLag(currentOffset, masterOffset);
+        if (result.getTransactionLag() >= 0) {
+            sourceReaderMetrics.recordBinlogTransactionLag(result.getTransactionLag());
+        }
+        if (result.getBytePositionLag() >= 0) {
+            sourceReaderMetrics.recordBinlogBytePositionLag(result.getBytePositionLag());
+        }
+        LOG.debug(
+                "Binlog lag - transaction: {}, bytePosition: {}, current: {}, master: {}",
+                result.getTransactionLag(),
+                result.getBytePositionLag(),
+                currentOffset,
+                masterOffset);
     }
 
     private static class OutputCollector<T> implements Collector<T> {

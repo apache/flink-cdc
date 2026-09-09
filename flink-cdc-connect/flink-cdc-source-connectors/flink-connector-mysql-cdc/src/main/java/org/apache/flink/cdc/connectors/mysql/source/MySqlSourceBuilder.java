@@ -313,6 +313,15 @@ public class MySqlSourceBuilder<T> {
     }
 
     /**
+     * The interval in milliseconds to fetch master binlog status for lag metrics. A value of -1
+     * (default) disables the feature.
+     */
+    public MySqlSourceBuilder<T> binlogPositionLagIntervalMs(long intervalMs) {
+        this.configFactory.binlogPositionLagIntervalMs(intervalMs);
+        return this;
+    }
+
+    /**
      * Build the {@link MySqlSource}.
      *
      * @return a MySqlParallelSource with the settings made for this builder.
