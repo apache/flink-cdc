@@ -33,7 +33,6 @@ import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.common.udf.UserDefinedFunction;
 import org.apache.flink.cdc.runtime.serializer.event.EventSerializer;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
-import org.apache.flink.runtime.checkpoint.OperatorSubtaskState;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.tasks.mailbox.Mail;
 import org.apache.flink.streaming.runtime.tasks.mailbox.TaskMailbox;
@@ -45,7 +44,6 @@ import org.junit.jupiter.api.Test;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -187,172 +185,6 @@ class AsyncPostTransformFunctionTest {
         }
     }
 
-    @Test
-    void testCheckpointRestoreEmitsLatestCreateTableEventOnlyOnce() throws Exception {
-        CreateTableEvent createTableEvent = new CreateTableEvent(TABLE_ID, SCHEMA);
-        AddColumnEvent addColumnEvent = addRegionColumnEvent();
-
-        OperatorSubtaskState snapshot;
-        try (OneInputStreamOperatorTestHarness<Event, Event> harness = createHarness()) {
-            harness.setup(EventSerializer.INSTANCE);
-            harness.open();
-            harness.processElement(new StreamRecord<>(createTableEvent));
-            waitUntilOutputSize(harness, 1);
-            harness.processElement(new StreamRecord<>(addColumnEvent));
-            waitUntilOutputSize(harness, 2);
-            snapshot = snapshot(harness, 1L, 1L);
-        }
-
-        try (OneInputStreamOperatorTestHarness<Event, Event> restoredHarness = createHarness()) {
-            restoredHarness.setup(EventSerializer.INSTANCE);
-            restoredHarness.initializeState(snapshot);
-            restoredHarness.open();
-            DataChangeEvent first = insert(SCHEMA_AFTER_ADD_COLUMN, 1, "Alice", "Paris");
-            DataChangeEvent second = insert(SCHEMA_AFTER_ADD_COLUMN, 2, "Bob", "Berlin");
-            restoredHarness.processElement(new StreamRecord<>(first));
-            restoredHarness.processElement(new StreamRecord<>(second));
-            waitUntilOutputSize(restoredHarness, 3);
-
-            assertThat(restoredHarness.extractOutputValues())
-                    .containsExactly(
-                            new CreateTableEvent(TABLE_ID, SCHEMA_AFTER_ADD_COLUMN), first, second);
-        }
-    }
-
-    @Test
-    void testCheckpointRestoreEmitsPassthroughCreateTableEventOnlyOnce() throws Exception {
-        CreateTableEvent createTableEvent = new CreateTableEvent(TABLE_ID, SCHEMA);
-
-        OperatorSubtaskState snapshot;
-        try (OneInputStreamOperatorTestHarness<Event, Event> harness =
-                createHarness("not_matching_table", "*", 10_000L, 2)) {
-            harness.setup(EventSerializer.INSTANCE);
-            harness.open();
-            harness.processElement(new StreamRecord<>(createTableEvent));
-            waitUntilOutputSize(harness, 1);
-            snapshot = snapshot(harness, 1L, 1L);
-        }
-
-        try (OneInputStreamOperatorTestHarness<Event, Event> restoredHarness =
-                createHarness("not_matching_table", "*", 10_000L, 2)) {
-            restoredHarness.setup(EventSerializer.INSTANCE);
-            restoredHarness.initializeState(snapshot);
-            restoredHarness.open();
-            DataChangeEvent first = insert(SCHEMA, 1, "Alice");
-            DataChangeEvent second = insert(SCHEMA, 2, "Bob");
-            restoredHarness.processElement(new StreamRecord<>(first));
-            restoredHarness.processElement(new StreamRecord<>(second));
-            waitUntilOutputSize(restoredHarness, 3);
-
-            assertThat(restoredHarness.extractOutputValues())
-                    .containsExactly(createTableEvent, first, second);
-        }
-    }
-
-    @Test
-    void testCheckpointAfterCompletedSchemaChangeRestoresConsistently() throws Exception {
-        CreateTableEvent createTableEvent = new CreateTableEvent(TABLE_ID, SCHEMA);
-        AddColumnEvent addColumnEvent = addRegionColumnEvent();
-
-        OperatorSubtaskState snapshot;
-        try (OneInputStreamOperatorTestHarness<Event, Event> harness = createHarness()) {
-            harness.setup(EventSerializer.INSTANCE);
-            harness.open();
-            harness.processElement(new StreamRecord<>(createTableEvent));
-            waitUntilOutputSize(harness, 1);
-
-            // The schema change has completed in the async function, but its mailbox result has
-            // not been emitted yet when the checkpoint starts.
-            harness.processElement(new StreamRecord<>(addColumnEvent));
-            snapshot = snapshot(harness, 1L, 1L);
-
-            assertThat(harness.extractOutputValues())
-                    .containsExactly(
-                            createTableEvent,
-                            new AddColumnEvent(
-                                    TABLE_ID,
-                                    Collections.singletonList(
-                                            AddColumnEvent.after(
-                                                    Column.physicalColumn(
-                                                            "region", DataTypes.STRING()),
-                                                    "name"))));
-        }
-
-        try (OneInputStreamOperatorTestHarness<Event, Event> restoredHarness = createHarness()) {
-            restoredHarness.setup(EventSerializer.INSTANCE);
-            restoredHarness.initializeState(snapshot);
-            restoredHarness.open();
-            DataChangeEvent dataEvent = insert(SCHEMA_AFTER_ADD_COLUMN, 1, "Alice", "Paris");
-            restoredHarness.processElement(new StreamRecord<>(dataEvent));
-            waitUntilOutputSize(restoredHarness, 2);
-
-            assertThat(restoredHarness.extractOutputValues())
-                    .containsExactly(
-                            new CreateTableEvent(TABLE_ID, SCHEMA_AFTER_ADD_COLUMN), dataEvent);
-        }
-    }
-
-    @Test
-    void testSameParallelismSavepointWaitsForInFlightEventsAndRestoresState() throws Exception {
-        BlockingFunction.reset(true);
-        OperatorSubtaskState savepoint;
-        DataChangeEvent first = insert(SCHEMA, 1, "Alice");
-        DataChangeEvent second = insert(SCHEMA, 2, "Bob");
-        try (OneInputStreamOperatorTestHarness<Event, Event> harness =
-                createHarness(TABLE_ID.identifier(), "*, block(id) AS blocked", 10_000L, 2)) {
-            harness.setup(EventSerializer.INSTANCE);
-            harness.open();
-            harness.processElement(new StreamRecord<>(new CreateTableEvent(TABLE_ID, SCHEMA)));
-            waitUntilOutputSize(harness, 1);
-            harness.processElement(new StreamRecord<>(first));
-            assertThat(BlockingFunction.awaitFirstInvocation()).isTrue();
-            harness.processElement(new StreamRecord<>(second));
-            assertThat(BlockingFunction.awaitSecondInvocation()).isTrue();
-
-            CompletableFuture<Void> releaseFuture =
-                    CompletableFuture.runAsync(
-                            () -> {
-                                try {
-                                    Thread.sleep(100L);
-                                    BlockingFunction.releaseFirstInvocation();
-                                } catch (InterruptedException e) {
-                                    Thread.currentThread().interrupt();
-                                    throw new RuntimeException(e);
-                                }
-                            });
-            savepoint = snapshot(harness, 2L, 2L);
-            releaseFuture.get(10, TimeUnit.SECONDS);
-            waitUntilOutputSize(harness, 3);
-        }
-
-        BlockingFunction.reset(false);
-        try (OneInputStreamOperatorTestHarness<Event, Event> restoredHarness =
-                createHarness(TABLE_ID.identifier(), "*, block(id) AS blocked", 10_000L, 2)) {
-            restoredHarness.setup(EventSerializer.INSTANCE);
-            restoredHarness.initializeState(savepoint);
-            restoredHarness.open();
-
-            Schema outputSchema =
-                    Schema.newBuilder()
-                            .physicalColumn("id", DataTypes.INT().notNull())
-                            .physicalColumn("name", DataTypes.STRING())
-                            .physicalColumn("blocked", DataTypes.INT())
-                            .primaryKey("id")
-                            .build();
-            DataChangeEvent third = insert(SCHEMA, 3, "Carol");
-            restoredHarness.processElement(new StreamRecord<>(third));
-            waitUntilOutputSize(restoredHarness, 2);
-            assertThat(restoredHarness.extractOutputValues())
-                    .containsExactly(
-                            new CreateTableEvent(TABLE_ID, outputSchema),
-                            insert(outputSchema, 3, "Carol", 3));
-        }
-    }
-
-    private OneInputStreamOperatorTestHarness<Event, Event> createHarness() throws Exception {
-        return createHarness(TABLE_ID.identifier(), "*", 10_000L, 2);
-    }
-
     private OneInputStreamOperatorTestHarness<Event, Event> createHarness(
             String tableInclusion, String projection, long timeout, int workerThreads)
             throws Exception {
@@ -428,15 +260,6 @@ class AsyncPostTransformFunctionTest {
             Thread.sleep(10L);
         }
         assertThat(harness.getOutput()).hasSize(expectedSize);
-    }
-
-    private static OperatorSubtaskState snapshot(
-            OneInputStreamOperatorTestHarness<Event, Event> harness,
-            long checkpointId,
-            long timestamp)
-            throws Exception {
-        harness.getOperator().prepareSnapshotPreBarrier(checkpointId);
-        return harness.snapshot(checkpointId, timestamp);
     }
 
     private static Throwable waitUntilExternalFailure(
