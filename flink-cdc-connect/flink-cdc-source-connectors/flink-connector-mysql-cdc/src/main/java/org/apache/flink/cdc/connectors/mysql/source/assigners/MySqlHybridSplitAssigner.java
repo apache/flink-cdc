@@ -183,6 +183,31 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
     }
 
     @Override
+    public int getRemainingSplitsCount() {
+        return snapshotSplitAssigner.getRemainingSplitsCount();
+    }
+
+    @Override
+    public int getRemainingTablesCount() {
+        return snapshotSplitAssigner.getRemainingTablesCount();
+    }
+
+    @Override
+    public int getAssignedSplitsCount() {
+        return snapshotSplitAssigner.getAssignedSplitsCount();
+    }
+
+    @Override
+    public int getFinishedSplitsCount() {
+        return snapshotSplitAssigner.getFinishedSplitsCount();
+    }
+
+    @Override
+    public int getAlreadyProcessedTablesCount() {
+        return snapshotSplitAssigner.getAlreadyProcessedTablesCount();
+    }
+
+    @Override
     public boolean noMoreSplits() {
         return snapshotSplitAssigner.noMoreSplits() && isBinlogSplitAssigned;
     }

@@ -36,6 +36,7 @@ import org.apache.flink.cdc.connectors.mysql.source.events.FinishedSnapshotSplit
 import org.apache.flink.cdc.connectors.mysql.source.events.FinishedSnapshotSplitsRequestEvent;
 import org.apache.flink.cdc.connectors.mysql.source.events.LatestFinishedSplitsNumberEvent;
 import org.apache.flink.cdc.connectors.mysql.source.events.LatestFinishedSplitsNumberRequestEvent;
+import org.apache.flink.cdc.connectors.mysql.source.metrics.MySqlSourceEnumeratorMetrics;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
 import org.apache.flink.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
@@ -99,12 +100,22 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
     @Override
     public void start() {
         splitAssigner.open();
+        registerMetrics();
         requestBinlogSplitUpdateIfNeed();
         this.context.callAsync(
                 this::getRegisteredReader,
                 this::syncWithReaders,
                 CHECK_EVENT_INTERVAL,
                 CHECK_EVENT_INTERVAL);
+    }
+
+    private void registerMetrics() {
+        try {
+            new MySqlSourceEnumeratorMetrics(context.metricGroup(), splitAssigner);
+        } catch (Throwable t) {
+            // Defensive: never fail enumerator start because of metric registration.
+            LOG.warn("Failed to register MySQL CDC enumerator metrics.", t);
+        }
     }
 
     @Override
