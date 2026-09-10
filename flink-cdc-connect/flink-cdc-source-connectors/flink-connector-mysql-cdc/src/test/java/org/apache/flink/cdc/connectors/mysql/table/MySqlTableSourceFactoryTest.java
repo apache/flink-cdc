@@ -52,6 +52,7 @@ import static org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOpt
 import static org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOptions.CONNECT_TIMEOUT;
 import static org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOptions.HEARTBEAT_INTERVAL;
 import static org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOptions.PARSE_ONLINE_SCHEMA_CHANGES;
+import static org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_BINLOG_NEWLY_ADDED_TABLE_ENABLED;
 import static org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP;
 import static org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
 import static org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED;
@@ -121,6 +122,7 @@ class MySqlTableSourceFactoryTest {
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         StartupOptions.initial(),
                         false,
+                        SCAN_BINLOG_NEWLY_ADDED_TABLE_ENABLED.defaultValue(),
                         false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
@@ -172,6 +174,7 @@ class MySqlTableSourceFactoryTest {
                         StartupOptions.initial(),
                         false,
                         false,
+                        false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
                         "testCol",
@@ -218,6 +221,7 @@ class MySqlTableSourceFactoryTest {
                         StartupOptions.initial(),
                         false,
                         false,
+                        false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
                         null,
@@ -260,6 +264,7 @@ class MySqlTableSourceFactoryTest {
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         StartupOptions.latest(),
+                        false,
                         false,
                         false,
                         new Properties(),
@@ -322,6 +327,7 @@ class MySqlTableSourceFactoryTest {
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         StartupOptions.initial(),
                         true,
+                        false,
                         true,
                         jdbcProperties,
                         Duration.ofMillis(15213),
@@ -382,6 +388,7 @@ class MySqlTableSourceFactoryTest {
                         StartupOptions.specificOffset(offsetFile, offsetPos),
                         false,
                         false,
+                        false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
                         null,
@@ -422,6 +429,7 @@ class MySqlTableSourceFactoryTest {
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         StartupOptions.initial(),
+                        false,
                         false,
                         false,
                         new Properties(),
@@ -465,6 +473,7 @@ class MySqlTableSourceFactoryTest {
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         StartupOptions.earliest(),
+                        false,
                         false,
                         false,
                         new Properties(),
@@ -511,6 +520,7 @@ class MySqlTableSourceFactoryTest {
                         StartupOptions.timestamp(0L),
                         false,
                         false,
+                        false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
                         null,
@@ -551,6 +561,7 @@ class MySqlTableSourceFactoryTest {
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         StartupOptions.latest(),
+                        false,
                         false,
                         false,
                         new Properties(),
@@ -598,6 +609,7 @@ class MySqlTableSourceFactoryTest {
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         StartupOptions.initial(),
+                        false,
                         false,
                         false,
                         new Properties(),
@@ -801,6 +813,7 @@ class MySqlTableSourceFactoryTest {
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         StartupOptions.initial(),
+                        false,
                         false,
                         false,
                         new Properties(),

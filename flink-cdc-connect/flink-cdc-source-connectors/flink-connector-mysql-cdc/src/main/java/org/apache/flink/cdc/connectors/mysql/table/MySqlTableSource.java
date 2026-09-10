@@ -93,6 +93,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
     private final double distributionFactorLower;
     private final StartupOptions startupOptions;
     private final boolean scanNewlyAddedTableEnabled;
+    private final boolean scanBinlogNewlyAddedTableEnabled;
     private final boolean closeIdleReaders;
     private final Properties jdbcProperties;
     private final Duration heartbeatInterval;
@@ -136,6 +137,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
             double distributionFactorLower,
             StartupOptions startupOptions,
             boolean scanNewlyAddedTableEnabled,
+            boolean scanBinlogNewlyAddedTableEnabled,
             boolean closeIdleReaders,
             Properties jdbcProperties,
             Duration heartbeatInterval,
@@ -166,6 +168,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
         this.distributionFactorLower = distributionFactorLower;
         this.startupOptions = startupOptions;
         this.scanNewlyAddedTableEnabled = scanNewlyAddedTableEnabled;
+        this.scanBinlogNewlyAddedTableEnabled = scanBinlogNewlyAddedTableEnabled;
         this.closeIdleReaders = closeIdleReaders;
         this.jdbcProperties = jdbcProperties;
         this.parseOnlineSchemaChanges = parseOnlineSchemaChanges;
@@ -233,6 +236,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                             .startupOptions(startupOptions)
                             .deserializer(deserializer)
                             .scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled)
+                            .scanBinlogNewlyAddedTableEnabled(scanBinlogNewlyAddedTableEnabled)
                             .closeIdleReaders(closeIdleReaders)
                             .jdbcProperties(jdbcProperties)
                             .heartbeatInterval(heartbeatInterval)
@@ -322,6 +326,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                         distributionFactorLower,
                         startupOptions,
                         scanNewlyAddedTableEnabled,
+                        scanBinlogNewlyAddedTableEnabled,
                         closeIdleReaders,
                         jdbcProperties,
                         heartbeatInterval,
@@ -353,6 +358,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 && distributionFactorUpper == that.distributionFactorUpper
                 && distributionFactorLower == that.distributionFactorLower
                 && scanNewlyAddedTableEnabled == that.scanNewlyAddedTableEnabled
+                && scanBinlogNewlyAddedTableEnabled == that.scanBinlogNewlyAddedTableEnabled
                 && closeIdleReaders == that.closeIdleReaders
                 && Objects.equals(physicalSchema, that.physicalSchema)
                 && Objects.equals(hostname, that.hostname)
@@ -405,6 +411,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 producedDataType,
                 metadataKeys,
                 scanNewlyAddedTableEnabled,
+                scanBinlogNewlyAddedTableEnabled,
                 closeIdleReaders,
                 jdbcProperties,
                 heartbeatInterval,
