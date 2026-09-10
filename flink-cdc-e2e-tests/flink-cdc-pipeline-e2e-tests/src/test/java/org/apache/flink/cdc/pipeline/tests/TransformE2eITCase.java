@@ -1435,10 +1435,13 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                         .toInstant(ZoneOffset.UTC);
 
         long milliSecondsInOneDay = 24 * 60 * 60 * 1000;
+        // LOCALTIME and CURRENT_TIME are TIME(0), so only whole seconds are part of their declared
+        // type. Comparing against the millisecond-of-day of CURRENT_TIMESTAMP would require the
+        // runtime to carry a fraction the column type does not have.
         assertThat(TimeData.fromIsoLocalTimeString(localTime))
                 .isEqualTo(
-                        TimeData.fromMillisOfDay(
-                                (int) (instant.toEpochMilli() % milliSecondsInOneDay)));
+                        TimeData.fromSecondOfDay(
+                                (int) (instant.toEpochMilli() % milliSecondsInOneDay / 1000)));
 
         String localDate = tokens.get(5);
         assertThat(DateData.fromIsoLocalDateString(localDate))
