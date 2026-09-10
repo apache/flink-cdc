@@ -293,10 +293,13 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
                     DateData.fromEpochDay(18460),
                     TimeData.fromLocalTime(LocalTime.parse("18:00:22")),
                     TimeData.fromLocalTime(LocalTime.parse("18:00:22.123")),
-                    // The snapshot phase reads TIME columns through java.sql.Time, which only
-                    // carries milliseconds, so time_6_c arrives truncated no matter how the
-                    // runtime represents it. Microsecond retention is asserted on the change
-                    // stream below.
+                    // PostgresScanFetchTask reads snapshot rows with a bare
+                    // ResultSet#getObject, which yields a java.sql.Time carrying only
+                    // milliseconds, so time_6_c arrives truncated no matter how the runtime
+                    // represents it. PostgresConnection#getColumnValue already reads TIME as a
+                    // string for exactly that reason, and FLINK-39748 routes the snapshot path
+                    // through it; this expectation has to become 18:00:22.123456 again once that
+                    // lands. Microsecond retention is asserted on the change stream below.
                     TimeData.fromLocalTime(LocalTime.parse("18:00:22.123")),
                     TimestampData.fromLocalDateTime(LocalDateTime.parse("2020-07-17T18:00:22")),
                     TimestampData.fromLocalDateTime(LocalDateTime.parse("2020-07-17T18:00:22.123")),
@@ -355,8 +358,8 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
                     DateData.fromEpochDay(18460),
                     TimeData.fromLocalTime(LocalTime.parse("18:00:22")),
                     TimeData.fromLocalTime(LocalTime.parse("18:00:22.123")),
-                    // Truncated by the java.sql.Time based snapshot read, see the change-stream
-                    // assertion below.
+                    // Truncated by the java.sql.Time based snapshot read, as in the adaptive
+                    // case above; see the change-stream assertion below.
                     TimeData.fromLocalTime(LocalTime.parse("18:00:22.123")),
                     TimestampData.fromLocalDateTime(LocalDateTime.parse("2020-07-17T18:00:22")),
                     TimestampData.fromLocalDateTime(LocalDateTime.parse("2020-07-17T18:00:22.123")),
@@ -1119,9 +1122,10 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
      * Inserts a {@code time_types} row whose {@code time_6_c} value is {@code 19:00:22.123456} and
      * returns the microsecond-of-day the pipeline emits for that column from the change stream.
      *
-     * <p>The snapshot phase reads TIME columns with {@code ResultSet#getObject}, which yields a
-     * {@link java.sql.Time} carrying only milliseconds, so sub-millisecond retention can only be
-     * observed on the change stream.
+     * <p>The snapshot phase reads TIME columns with a bare {@code ResultSet#getObject}, which
+     * yields a {@link java.sql.Time} carrying only milliseconds, so sub-millisecond retention can
+     * only be observed on the change stream until FLINK-39748 routes the snapshot path through
+     * {@code PostgresConnection#getColumnValue}.
      */
     private long streamedMicroOfDayOfTime6Column(CloseableIterator<Event> events, int id)
             throws Exception {
