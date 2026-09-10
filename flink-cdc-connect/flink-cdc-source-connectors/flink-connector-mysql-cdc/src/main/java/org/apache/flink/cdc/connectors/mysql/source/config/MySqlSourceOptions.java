@@ -292,4 +292,15 @@ public class MySqlSourceOptions {
                     .defaultValue(true)
                     .withDescription(
                             "Whether to assign the unbounded chunks first during snapshot reading phase. This might help reduce the risk of the TaskManager experiencing an out-of-memory (OOM) error when taking a snapshot of the largest unbounded chunk.");
+    public static final ConfigOption<String> SCAN_DIALECT =
+            ConfigOptions.key("scan.dialect")
+                    .stringType()
+                    .defaultValue("auto")
+                    .withDescription(
+                            "The database dialect of the source server: one of \"mysql\", \"mariadb\" or \"auto\". "
+                                    + "When \"auto\"(default), the dialect is detect from SELECT VERSION() at startup."
+                                    + "Pin it to \"mysql\"/\"mariadb\" to skip detection. The resolved dialect selects"
+                                    + "the GTID strategy used to read the binlog stream and to cap the restored GTID"
+                                    + "set on recovery, so MariaDB sources advance and resume from MariaDB GTIDs"
+                                    + "(domian-server-sequence) rather than MySQL GTIDs (UUID:txn).");
 }

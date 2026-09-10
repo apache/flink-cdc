@@ -21,6 +21,8 @@ import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOptions;
 import org.apache.flink.cdc.connectors.mysql.source.config.ServerIdRange;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffsetBuilder;
+import org.apache.flink.cdc.connectors.mysql.source.offset.GtidStrategies;
+import org.apache.flink.cdc.connectors.mysql.source.offset.MariaDbGtidStrategy;
 import org.apache.flink.cdc.connectors.mysql.source.utils.ObjectUtils;
 import org.apache.flink.cdc.connectors.mysql.utils.OptionUtils;
 import org.apache.flink.cdc.debezium.table.DebeziumOptions;
@@ -52,6 +54,7 @@ import static org.apache.flink.util.Preconditions.checkState;
 
 /** Factory for creating configured instance of {@link MySqlTableSource}. */
 public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
+
     private static final Logger LOGGER = LoggerFactory.getLogger(MySqlTableSourceFactory.class);
 
     private static final String IDENTIFIER = "mysql-cdc";
@@ -90,6 +93,8 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                 config.get(MySqlSourceOptions.CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
         boolean scanNewlyAddedTableEnabled =
                 config.get(MySqlSourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED);
+        String dialect = config.get(MySqlSourceOptions.SCAN_DIALECT);
+        validateDialect(dialect);
         Duration heartbeatInterval = config.get(MySqlSourceOptions.HEARTBEAT_INTERVAL);
         String chunkKeyColumn =
                 config.getOptional(MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN)
@@ -109,6 +114,8 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
 
         boolean appendOnly =
                 config.get(MySqlSourceOptions.SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED);
+
+        validateDialectRuntimeSupport(dialect, enableParallelRead);
 
         if (enableParallelRead) {
             validatePrimaryKeyIfEnableParallel(physicalSchema, chunkKeyColumn);
@@ -156,7 +163,8 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                 parseOnLineSchemaChanges,
                 useLegacyJsonFormat,
                 assignUnboundedChunkFirst,
-                appendOnly);
+                appendOnly,
+                dialect);
     }
 
     @Override
@@ -198,6 +206,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         options.add(MySqlSourceOptions.CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
         options.add(MySqlSourceOptions.CONNECT_MAX_RETRIES);
         options.add(MySqlSourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED);
+        options.add(MySqlSourceOptions.SCAN_DIALECT);
         options.add(MySqlSourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
         options.add(MySqlSourceOptions.HEARTBEAT_INTERVAL);
         options.add(MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN);
@@ -321,6 +330,31 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
             }
         }
         return serverIdValue;
+    }
+
+    private static void validateDialect(String dialect) {
+        if (!GtidStrategies.isSupportedDialect(dialect)) {
+            throw new ValidationException(
+                    String.format(
+                            "Invalid value for option '%s'. Supported values are [mysql, mariadb, auto], but was: %s",
+                            MySqlSourceOptions.SCAN_DIALECT.key(), dialect));
+        }
+    }
+
+    /**
+     * MariaDB dialect wires its GTID read/recovery path through the incremental-snapshot (parallel)
+     * source only. Fail fast when "dialect=mariadb" is combined with the legacy no-incremental
+     * reader instead of silently falling back to the MySQL GTID path, which would neither advance
+     * nor resume from MariaDB GTIDs.
+     */
+    private static void validateDialectRuntimeSupport(String dialect, boolean enableParallelRead) {
+        if (MariaDbGtidStrategy.DIALECT.equalsIgnoreCase(dialect) && !enableParallelRead) {
+            throw new ValidationException(
+                    String.format(
+                            "Option '%s' = 'mariadb' requires '%s' = 'true'",
+                            MySqlSourceOptions.SCAN_DIALECT.key(),
+                            MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED.key()));
+        }
     }
 
     /** Checks the value of given integer option is valid. */
