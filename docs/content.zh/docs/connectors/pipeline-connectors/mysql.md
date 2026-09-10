@@ -342,6 +342,16 @@ pipeline:
         例如，更新快照阶段已更新的值，或删除快照阶段已删除的数据。这些重放的 binlog 事件应进行特殊处理。
     </tr>
     <tr>
+      <td>scan.rate-limit.records-per-second</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">-1</td>
+      <td>Long</td>
+      <td>
+        数据读取的限速配置（快照和 binlog 阶段均生效），单位为每秒记录数。<br>
+        默认值 -1 表示不限速。
+      </td>
+    </tr>
+    <tr>
       <td>metadata.list</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
