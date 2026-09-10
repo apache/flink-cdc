@@ -331,6 +331,17 @@ pipeline:
       </td>
     </tr>
     <tr>
+      <td>scan.emit.create-table-events.in-batch.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        是否在快照初始化阶段批量发送所有 CreateTableEvent。<br>
+        开启后，所有表的 Schema 会在处理数据记录前一次性获取并发送，降低大量表场景下的 Schema 协调开销。<br>
+        默认为 false。
+      </td>
+    </tr>
+    <tr>
       <td>scan.incremental.snapshot.backfill.skip</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>

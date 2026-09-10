@@ -78,6 +78,7 @@ public class MySqlSourceConfigFactory implements Serializable {
     private boolean treatTinyInt1AsBoolean = true;
     private boolean useLegacyJsonFormat = true;
     private boolean assignUnboundedChunkFirst = false;
+    private boolean emitCreateTableEventsInBatchEnabled = false;
 
     public MySqlSourceConfigFactory hostname(String hostname) {
         this.hostname = hostname;
@@ -341,6 +342,16 @@ public class MySqlSourceConfigFactory implements Serializable {
         return this;
     }
 
+    /**
+     * Whether to emit all CreateTableEvents in batch during initialization phase. Defaults to
+     * false.
+     */
+    public MySqlSourceConfigFactory emitCreateTableEventsInBatchEnabled(
+            boolean emitCreateTableEventsInBatchEnabled) {
+        this.emitCreateTableEventsInBatchEnabled = emitCreateTableEventsInBatchEnabled;
+        return this;
+    }
+
     /** Creates a new {@link MySqlSourceConfig} for the given subtask {@code subtaskId}. */
     public MySqlSourceConfig createConfig(int subtaskId) {
         // hard code server name, because we don't need to distinguish it, docs:
@@ -444,6 +455,7 @@ public class MySqlSourceConfigFactory implements Serializable {
                 parseOnLineSchemaChanges,
                 treatTinyInt1AsBoolean,
                 useLegacyJsonFormat,
-                assignUnboundedChunkFirst);
+                assignUnboundedChunkFirst,
+                emitCreateTableEventsInBatchEnabled);
     }
 }

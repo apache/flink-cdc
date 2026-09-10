@@ -76,6 +76,7 @@ import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOption
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.PASSWORD;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.PORT;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_BINLOG_NEWLY_ADDED_TABLE_ENABLED;
+import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_EMIT_CREATE_TABLE_EVENTS_IN_BATCH_ENABLED;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN;
@@ -167,6 +168,8 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         boolean useLegacyJsonFormat = config.get(USE_LEGACY_JSON_FORMAT);
         boolean isAssignUnboundedChunkFirst =
                 config.get(SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED);
+        boolean emitCreateTableEventsInBatchEnabled =
+                config.get(SCAN_EMIT_CREATE_TABLE_EVENTS_IN_BATCH_ENABLED);
 
         validateIntegerOption(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE, splitSize, 1);
         validateIntegerOption(CHUNK_META_GROUP_SIZE, splitMetaGroupSize, 1);
@@ -220,6 +223,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
                         .treatTinyInt1AsBoolean(treatTinyInt1AsBoolean)
                         .useLegacyJsonFormat(useLegacyJsonFormat)
                         .assignUnboundedChunkFirst(isAssignUnboundedChunkFirst)
+                        .emitCreateTableEventsInBatchEnabled(emitCreateTableEventsInBatchEnabled)
                         .skipSnapshotBackfill(skipSnapshotBackfill);
 
         List<TableId> tableIds = MySqlSchemaUtils.listTables(configFactory.createConfig(0), null);
@@ -357,6 +361,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         options.add(TREAT_TINYINT1_AS_BOOLEAN_ENABLED);
         options.add(PARSE_ONLINE_SCHEMA_CHANGES);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED);
+        options.add(SCAN_EMIT_CREATE_TABLE_EVENTS_IN_BATCH_ENABLED);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP);
         return options;
     }

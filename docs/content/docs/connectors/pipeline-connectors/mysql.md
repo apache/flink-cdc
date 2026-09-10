@@ -351,6 +351,17 @@ pipeline:
       </td>
     </tr>
     <tr>
+      <td>scan.emit.create-table-events.in-batch.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        Whether to emit all CreateTableEvents in batch during snapshot initialization.<br>
+        When enabled, all table schemas are fetched and emitted together before processing data records, reducing schema coordination overhead for large table counts.<br>
+        Defaults to false.
+      </td>
+    </tr>
+    <tr>
       <td>scan.incremental.snapshot.backfill.skip</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>
