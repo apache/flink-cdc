@@ -25,7 +25,7 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.composer.definition.TransformDef;
-import org.apache.flink.cdc.runtime.operators.transform.AsyncPostTransformOperatorFactory;
+import org.apache.flink.cdc.runtime.operators.transform.async.AsyncPostTransformOperatorFactory;
 import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;

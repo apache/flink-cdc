@@ -130,6 +130,8 @@ under the License.
 | `transform.async-execution.capacity` | 异步执行中最多允许同时处理的 PostTransform 事件数，默认值为 100。                                                                                                                                                                                                                                                                                                                                                                                                                 | optional          |
 | `transform.async-execution.worker-threads` | 每个异步 PostTransform 任务使用的工作线程数，默认值为 16。                                                                                                                                                                                                                                                                                                                                                                                                               | optional          |
 
+> **实验性且不稳定：** 异步 PostTransform 执行目前是实验性功能，其配置和行为可能会在未来版本中发生变化。
+
 异步 PostTransform 适用于 AI 模型调用等 I/O 密集型表达式。DataChangeEvent 可能并发调用 UDF 和 AI 模型客户端，但输出和所有 SchemaChangeEvent 仍保持有序，因此 UDF 和 AI 模型客户端实现必须是线程安全的。为保证 schema 状态一致，checkpoint 或 savepoint 前会等待尚未完成的异步请求，长时间运行的请求可能会延长 checkpoint 时间。savepoint 只支持在并行度不变时恢复，并且不能在从已有 savepoint 恢复时开启或关闭此选项。
 
 注意：虽然上述参数都是可选的，但至少需要指定其中一个。`pipeline` 部分是必需的，不能为空。

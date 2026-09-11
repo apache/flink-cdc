@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.runtime.operators.transform;
+package org.apache.flink.cdc.runtime.operators.transform.async;
 
 import org.apache.flink.api.common.functions.OpenContext;
 import org.apache.flink.api.common.state.ListState;
@@ -29,6 +29,7 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.model.AiModelClient;
 import org.apache.flink.cdc.common.pipeline.DecimalPrecisionMode;
 import org.apache.flink.cdc.common.utils.Preconditions;
+import org.apache.flink.cdc.runtime.operators.transform.TransformRule;
 import org.apache.flink.runtime.state.FunctionInitializationContext;
 import org.apache.flink.runtime.state.FunctionSnapshotContext;
 import org.apache.flink.streaming.api.checkpoint.CheckpointedFunction;
@@ -71,7 +72,7 @@ public class AsyncPostTransformFunction extends RichAsyncFunction<Event, Event>
     private static final long EXECUTOR_SHUTDOWN_TIMEOUT_SECONDS = 30L;
     private static final Logger LOG = LoggerFactory.getLogger(AsyncPostTransformFunction.class);
 
-    private final PostTransformProcessor processor;
+    private final AsyncPostTransformProcessor processor;
     private final int asyncWorkerThreads;
 
     private transient ExecutorService executorService;
@@ -94,7 +95,7 @@ public class AsyncPostTransformFunction extends RichAsyncFunction<Event, Event>
         Preconditions.checkArgument(
                 asyncWorkerThreads > 0, "Async worker threads must be greater than 0.");
         this.processor =
-                new PostTransformProcessor(
+                new AsyncPostTransformProcessor(
                         transformRules, timezone, decimalPrecisionMode, udfFunctions, modelClients);
         this.asyncWorkerThreads = asyncWorkerThreads;
     }

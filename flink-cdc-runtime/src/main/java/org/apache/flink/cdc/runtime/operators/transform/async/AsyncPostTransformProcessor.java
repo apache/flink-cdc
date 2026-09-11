@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.runtime.operators.transform;
+package org.apache.flink.cdc.runtime.operators.transform.async;
 
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
@@ -35,6 +35,17 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.udf.UserDefinedFunctionContext;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
+import org.apache.flink.cdc.runtime.operators.transform.PostTransformChangeInfo;
+import org.apache.flink.cdc.runtime.operators.transform.PostTransformer;
+import org.apache.flink.cdc.runtime.operators.transform.ProjectionColumn;
+import org.apache.flink.cdc.runtime.operators.transform.TransformContext;
+import org.apache.flink.cdc.runtime.operators.transform.TransformExpressionCompiler;
+import org.apache.flink.cdc.runtime.operators.transform.TransformFilter;
+import org.apache.flink.cdc.runtime.operators.transform.TransformFilterProcessor;
+import org.apache.flink.cdc.runtime.operators.transform.TransformProjection;
+import org.apache.flink.cdc.runtime.operators.transform.TransformProjectionProcessor;
+import org.apache.flink.cdc.runtime.operators.transform.TransformRule;
+import org.apache.flink.cdc.runtime.operators.transform.UserDefinedFunctionDescriptor;
 import org.apache.flink.cdc.runtime.operators.transform.converter.PostTransformConverters;
 import org.apache.flink.cdc.runtime.operators.transform.exceptions.TransformException;
 import org.apache.flink.cdc.runtime.parser.TransformParser;
@@ -77,11 +88,11 @@ import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.common.utils.Preconditions.checkNotNull;
 
-/** Shared processor for synchronous and asynchronous post-transform execution. */
-class PostTransformProcessor implements Serializable {
+/** Processor for asynchronous post-transform execution. */
+class AsyncPostTransformProcessor implements Serializable {
 
     private static final long serialVersionUID = 1L;
-    private static final Logger LOG = LoggerFactory.getLogger(PostTransformProcessor.class);
+    private static final Logger LOG = LoggerFactory.getLogger(AsyncPostTransformProcessor.class);
     private static final int TABLE_STATE_VERSION = 2;
 
     private final String timezone;
@@ -108,7 +119,7 @@ class PostTransformProcessor implements Serializable {
             filterProcessorCaches;
     private transient LoadingCache<TableId, Optional<PostTransformer>> transformersCache;
 
-    PostTransformProcessor(
+    AsyncPostTransformProcessor(
             List<TransformRule> transformRules,
             String timezone,
             DecimalPrecisionMode decimalPrecisionMode,

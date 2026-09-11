@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.runtime.operators.transform;
+package org.apache.flink.cdc.runtime.operators.transform.async;
 
 import org.apache.flink.annotation.Internal;
 import org.apache.flink.cdc.common.event.Event;

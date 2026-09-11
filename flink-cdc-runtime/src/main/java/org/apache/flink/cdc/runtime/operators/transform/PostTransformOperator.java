@@ -17,18 +17,55 @@
 
 package org.apache.flink.cdc.runtime.operators.transform;
 
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
+import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.cdc.common.converter.JavaObjectConverter;
+import org.apache.flink.cdc.common.data.RecordData;
+import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
+import org.apache.flink.cdc.common.event.ChangeEvent;
+import org.apache.flink.cdc.common.event.CreateTableEvent;
+import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.event.SchemaChangeEvent;
+import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.model.AiModelClient;
 import org.apache.flink.cdc.common.pipeline.DecimalPrecisionMode;
+import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.common.schema.Selectors;
+import org.apache.flink.cdc.common.udf.UserDefinedFunctionContext;
+import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.runtime.operators.AbstractStreamOperatorAdapter;
+import org.apache.flink.cdc.runtime.operators.transform.converter.PostTransformConverters;
+import org.apache.flink.cdc.runtime.operators.transform.exceptions.TransformException;
+import org.apache.flink.cdc.runtime.parser.TransformParser;
+import org.apache.flink.cdc.runtime.typeutils.BinaryInternalObjectConverter;
+import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
+import org.apache.flink.util.FlinkRuntimeException;
+
+import org.apache.flink.shaded.guava31.com.google.common.cache.CacheBuilder;
+import org.apache.flink.shaded.guava31.com.google.common.cache.CacheLoader;
+import org.apache.flink.shaded.guava31.com.google.common.cache.LoadingCache;
+import org.apache.flink.shaded.guava31.com.google.common.collect.HashBasedTable;
+import org.apache.flink.shaded.guava31.com.google.common.collect.Table;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import javax.annotation.Nullable;
 
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
+
+import static org.apache.flink.cdc.common.utils.Preconditions.checkNotNull;
 
 /**
  * A data process function that performs column filtering, calculated column evaluation & final
@@ -38,8 +75,32 @@ public class PostTransformOperator extends AbstractStreamOperatorAdapter<Event>
         implements OneInputStreamOperator<Event, Event>, Serializable {
 
     private static final long serialVersionUID = 1L;
+    private static final Logger LOG = LoggerFactory.getLogger(PostTransformOperator.class);
 
-    private final PostTransformProcessor processor;
+    private final String timezone;
+    private final DecimalPrecisionMode decimalPrecisionMode;
+    private final List<TransformRule> transformRules;
+    private final Map<TableId, Boolean> hasAsteriskMap;
+    private final Map<TableId, List<String>> projectedColumnsMap;
+    private final Map<TableId, PostTransformChangeInfo> postTransformInfoMap;
+
+    // Tuple3 items are: function name, class path, and extra options.
+    private final List<Tuple3<String, String, Map<String, String>>> udfFunctions;
+
+    // Serializable AI model clients keyed by model name, e.g. myModel.
+    private final Map<String, AiModelClient> modelClients;
+
+    private transient List<PostTransformer> transformers;
+    private transient List<UserDefinedFunctionDescriptor> udfDescriptors;
+    private transient List<Object> udfFunctionInstances;
+
+    // Querying a TransformProjectionProcessor with an upstream TableId and effective
+    // post-transformer.
+    private transient Table<TableId, PostTransformer, TransformProjectionProcessor>
+            projectionProcessors;
+    private transient Table<TableId, PostTransformer, TransformFilterProcessor> filterProcessors;
+
+    private transient LoadingCache<TableId, Optional<PostTransformer>> transformersCache;
 
     public static PostTransformOperatorBuilder newBuilder() {
         return new PostTransformOperatorBuilder();
@@ -51,40 +112,501 @@ public class PostTransformOperator extends AbstractStreamOperatorAdapter<Event>
             DecimalPrecisionMode decimalPrecisionMode,
             List<Tuple3<String, String, Map<String, String>>> udfFunctions,
             Map<String, AiModelClient> modelClients) {
-        this.processor =
-                new PostTransformProcessor(
-                        transformRules, timezone, decimalPrecisionMode, udfFunctions, modelClients);
+        this.timezone = timezone;
+        this.decimalPrecisionMode = decimalPrecisionMode;
+        this.transformRules = transformRules;
+        this.hasAsteriskMap = new HashMap<>();
+        this.projectedColumnsMap = new HashMap<>();
+        this.postTransformInfoMap = new ConcurrentHashMap<>();
+        this.udfFunctions = udfFunctions;
+        this.modelClients = modelClients;
     }
 
     @Override
     public void open() throws Exception {
         super.open();
-        processor.open();
+
+        // Initialize multi-key lookup tables
+        this.projectionProcessors = HashBasedTable.create();
+        this.filterProcessors = HashBasedTable.create();
+
+        // Initialize AI model clients
+        initializeAiModelClients();
+
+        // Be sure to initialize UDF related fields before creating transformers
+        initializeUdf();
+
+        this.transformers = createTransformers();
+        this.transformersCache =
+                CacheBuilder.newBuilder()
+                        .maximumSize(1024)
+                        .build(
+                                new CacheLoader<>() {
+                                    @Override
+                                    public Optional<PostTransformer> load(TableId tableId) {
+                                        return getEffectiveTransformer(tableId);
+                                    }
+                                });
     }
 
     @Override
     public void close() throws Exception {
-        try {
-            processor.close();
-        } finally {
-            super.close();
-        }
+        super.close();
+        TransformExpressionCompiler.cleanUp();
+        destroyUdf();
+        destroyAiModelClients();
     }
 
     @Override
-    public void processElement(StreamRecord<Event> element) {
-        Event event = element.getValue();
+    public void processElement(StreamRecord<Event> element) throws Exception {
         try {
-            Optional<Event> result = processor.process(event);
-            if (result.isPresent()) {
-                if (result.get() == event) {
-                    output.collect(element);
-                } else {
-                    output.collect(new StreamRecord<>(result.get()));
+            processElementInternal(element);
+        } catch (Exception e) {
+            Event event = element.getValue();
+            TableId tableId = null;
+            Schema schemaBefore = null;
+            Schema schemaAfter = null;
+
+            if (event instanceof ChangeEvent) {
+                tableId = ((ChangeEvent) event).tableId();
+                PostTransformChangeInfo info = postTransformInfoMap.get(tableId);
+                if (info != null) {
+                    schemaBefore = info.getPreTransformedSchema();
+                    schemaAfter = info.getPostTransformedSchema();
                 }
             }
-        } catch (Exception e) {
-            throw processor.wrapTransformException("post-transform", event, e);
+
+            throw new TransformException(
+                    "post-transform", event, tableId, schemaBefore, schemaAfter, e);
+        }
+    }
+
+    private void processElementInternal(StreamRecord<Event> element) {
+        Event event = element.getValue();
+        if (event == null) {
+            return;
+        }
+
+        // Reject processing non-schema or data change events.
+        if (!(event instanceof ChangeEvent)) {
+            throw new UnsupportedOperationException("Unexpected stream record event: " + event);
+        }
+
+        ChangeEvent changeEvent = (ChangeEvent) event;
+        TableId tableId = changeEvent.tableId();
+        Optional<PostTransformer> transformer = transformersCache.getUnchecked(tableId);
+
+        // Short-circuit if there's no effective transformers.
+        if (transformer.isEmpty()) {
+            output.collect(element);
+            return;
+        }
+
+        if (event instanceof CreateTableEvent) {
+            processCreateTableEvent((CreateTableEvent) event, transformer.get())
+                    .map(StreamRecord::new)
+                    .ifPresent(output::collect);
+            invalidateCache(tableId);
+        } else if (event instanceof SchemaChangeEvent) {
+            processSchemaChangeEvent((SchemaChangeEvent) event, transformer.get())
+                    .map(StreamRecord::new)
+                    .ifPresent(output::collect);
+            invalidateCache(tableId);
+        } else if (event instanceof DataChangeEvent) {
+            processDataChangeEvent((DataChangeEvent) event, transformer.get())
+                    .map(StreamRecord::new)
+                    .ifPresent(output::collect);
+        } else {
+            throw new UnsupportedOperationException("Unexpected stream record event: " + event);
+        }
+    }
+
+    // -------------------
+    // Key methods for processing upstream events.
+    // -------------------
+
+    /**
+     * Apply effective transform rules to {@link CreateTableEvent}s based on effective transformers.
+     */
+    private Optional<Event> processCreateTableEvent(
+            CreateTableEvent event, PostTransformer effectiveTransformer) {
+        TableId tableId = event.tableId();
+        Schema preSchema = event.getSchema();
+
+        Schema postSchema =
+                SchemaUtils.ensurePkNonNull(transformSchema(preSchema, effectiveTransformer));
+
+        // Update transform info map
+        postTransformInfoMap.put(
+                tableId, PostTransformChangeInfo.of(tableId, preSchema, postSchema));
+
+        // Update "if-table-has-been–wildcard–matched" map
+        boolean wildcardMatched =
+                effectiveTransformer.getProjection().isPresent()
+                        && TransformParser.hasAsterisk(
+                                effectiveTransformer.getProjection().get().getProjection());
+
+        hasAsteriskMap.put(tableId, wildcardMatched);
+        projectedColumnsMap.put(
+                tableId,
+                preSchema.getColumnNames().stream()
+                        .filter(postSchema.getColumnNames()::contains)
+                        .collect(Collectors.toList()));
+
+        return Optional.of(new CreateTableEvent(tableId, postSchema));
+    }
+
+    /**
+     * Apply effective transform rules to other {@link SchemaChangeEvent}s based on effective
+     * transformers and existing {@link PostTransformChangeInfo}.
+     */
+    private Optional<Event> processSchemaChangeEvent(
+            SchemaChangeEvent event, PostTransformer effectiveTransformer) {
+        TableId tableId = event.tableId();
+        PostTransformChangeInfo info = checkNotNull(postTransformInfoMap.get(tableId));
+
+        // Apply schema change event to the pre-transformed schema
+        Schema prevPreSchema = info.getPreTransformedSchema();
+        Schema nextPreSchema = SchemaUtils.applySchemaChangeEvent(prevPreSchema, event);
+
+        Schema nextPostSchema =
+                SchemaUtils.ensurePkNonNull(transformSchema(nextPreSchema, effectiveTransformer));
+
+        // Update transform info map
+        postTransformInfoMap.put(
+                tableId, PostTransformChangeInfo.of(tableId, nextPreSchema, nextPostSchema));
+
+        // Prepare transformed schema change events
+        Schema prevPostSchema = info.getPostTransformedSchema();
+        List<String> columnNamesBeforeChange = prevPostSchema.getColumnNames();
+
+        if (hasAsteriskMap.getOrDefault(tableId, true)) {
+            // See comments in PreTransformOperator#cacheChangeSchema method.
+            return SchemaUtils.transformSchemaChangeEvent(true, columnNamesBeforeChange, event)
+                    .map(Event.class::cast);
+        } else {
+            return SchemaUtils.transformSchemaChangeEvent(
+                            false, projectedColumnsMap.get(tableId), event)
+                    .map(Event.class::cast);
+        }
+    }
+
+    /** Apply projection rules to given {@link DataChangeEvent}. */
+    private Optional<Event> processDataChangeEvent(
+            DataChangeEvent event, PostTransformer effectiveTransformer) {
+        TableId tableId = event.tableId();
+        PostTransformChangeInfo info = checkNotNull(postTransformInfoMap.get(tableId));
+
+        // Prepare transform context
+        TransformContext context = new TransformContext();
+        context.epochTime = System.currentTimeMillis();
+        context.meta = event.meta();
+
+        String beforeOp = event.opTypeString(false);
+        String afterOp = event.opTypeString(true);
+        TransformProjectionProcessor projectionProcessor =
+                getProjectionProcessor(tableId, effectiveTransformer);
+        TransformFilterProcessor filterProcessor =
+                getFilterProcessor(tableId, effectiveTransformer);
+
+        BinaryRecordData beforeRow = null;
+        BinaryRecordData afterRow = null;
+        boolean beforeFilterPassed = false;
+        boolean afterFilterPassed = false;
+
+        if (event.before() != null) {
+            context.opType = beforeOp;
+            Tuple2<BinaryRecordData, Boolean> result =
+                    transformRecord(
+                            event.before(), info, projectionProcessor, filterProcessor, context);
+            beforeRow = result.f0;
+            beforeFilterPassed = result.f1;
+        }
+        if (event.after() != null) {
+            context.opType = afterOp;
+            Tuple2<BinaryRecordData, Boolean> result =
+                    transformRecord(
+                            event.after(), info, projectionProcessor, filterProcessor, context);
+            afterRow = result.f0;
+            afterFilterPassed = result.f1;
+        }
+        // For UPDATE events, before and after filter results may differ, requiring op type
+        // conversion:
+        //   before=Y, after=Y -> UPDATE;  before=Y, after=N -> DELETE;
+        //   before=N, after=Y -> INSERT;  before=N, after=N -> drop.
+        DataChangeEvent finalEvent;
+        switch (event.op()) {
+            case INSERT:
+            case REPLACE:
+                if (!afterFilterPassed) {
+                    return Optional.empty();
+                }
+                finalEvent = DataChangeEvent.projectRecords(event, beforeRow, afterRow);
+                break;
+            case DELETE:
+                if (!beforeFilterPassed) {
+                    return Optional.empty();
+                }
+                finalEvent = DataChangeEvent.projectRecords(event, beforeRow, afterRow);
+                break;
+            case UPDATE:
+                if (beforeFilterPassed && afterFilterPassed) {
+                    finalEvent = DataChangeEvent.projectRecords(event, beforeRow, afterRow);
+                } else if (beforeFilterPassed) {
+                    finalEvent = DataChangeEvent.deleteEvent(tableId, beforeRow, event.meta());
+                } else if (afterFilterPassed) {
+                    finalEvent = DataChangeEvent.insertEvent(tableId, afterRow, event.meta());
+                } else {
+                    return Optional.empty();
+                }
+                break;
+            default:
+                throw new UnsupportedOperationException(
+                        "Unsupported operation type: " + event.op());
+        }
+
+        if (effectiveTransformer.getPostTransformConverter().isPresent()) {
+            return effectiveTransformer
+                    .getPostTransformConverter()
+                    .get()
+                    .convert(finalEvent)
+                    .map(Event.class::cast);
+        }
+        return Optional.of(finalEvent);
+    }
+
+    /**
+     * Generates transformed version of schema based on upstream schema and effective transformer.
+     */
+    private Schema transformSchema(Schema preSchema, PostTransformer transformer) {
+        List<ProjectionColumn> projectionColumns =
+                TransformParser.generateProjectionColumns(
+                        transformer
+                                .getProjection()
+                                .map(TransformProjection::getProjection)
+                                .orElse(null),
+                        preSchema.getColumns(),
+                        udfDescriptors,
+                        transformer.getSupportedMetadataColumns(),
+                        decimalPrecisionMode);
+        return preSchema.copy(
+                projectionColumns.stream()
+                        .map(ProjectionColumn::getColumn)
+                        .collect(Collectors.toList()));
+    }
+
+    /** Projects given {@link RecordData} based on given processor. */
+    private Tuple2<BinaryRecordData, Boolean> transformRecord(
+            RecordData recordData,
+            PostTransformChangeInfo info,
+            @Nullable TransformProjectionProcessor projectionProcessor,
+            @Nullable TransformFilterProcessor filterProcessor,
+            TransformContext context) {
+        RecordData.FieldGetter[] preFieldGetters = info.getPreTransformedFieldGetters();
+        Schema preSchema = info.getPreTransformedSchema();
+        Schema postSchema = info.getPostTransformedSchema();
+        BinaryRecordDataGenerator postGenerator = info.getPostTransformedRecordDataGenerator();
+
+        Object[] preRow = new Object[preFieldGetters.length];
+        for (int i = 0; i < preFieldGetters.length; i++) {
+            preRow[i] =
+                    JavaObjectConverter.convertToJava(
+                            preFieldGetters[i].getFieldOrNull(recordData),
+                            preSchema.getColumnDataTypes().get(i));
+        }
+
+        Object[] postRow =
+                projectionProcessor != null ? projectionProcessor.project(preRow, context) : preRow;
+
+        // Filter predicate test might refer to both PreTransformed only columns (that have been
+        // eliminated from transform result) and PostTransformed only columns (that do not exist
+        // until expression evaluation finishes). So we need pass both rows to FilterProcessor.
+        boolean filterPassed =
+                filterProcessor == null || filterProcessor.test(preRow, postRow, context);
+
+        Object[] postRowBinary = new Object[postSchema.getColumnCount()];
+        for (int i = 0; i < postRow.length; i++) {
+            postRowBinary[i] =
+                    BinaryInternalObjectConverter.convertToInternal(
+                            postRow[i], postSchema.getColumnDataTypes().get(i));
+        }
+        return Tuple2.of(postGenerator.generate(postRowBinary), filterPassed);
+    }
+
+    // -------------------
+    // Convenience methods for coping with transient fields.
+    // -------------------
+
+    /** Obtain effective transformer based on given {@link TableId}. */
+    private Optional<PostTransformer> getEffectiveTransformer(TableId tableId) {
+        for (PostTransformer transformer : transformers) {
+            if (transformer.getSelectors().isMatch(tableId)) {
+                return Optional.of(transformer);
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Get the unique {@link TransformProjectionProcessor} based on provided {@link TableId} and
+     * {@link PostTransformer}.
+     */
+    private TransformProjectionProcessor getProjectionProcessor(
+            TableId tableId, PostTransformer postTransformer) {
+        if (!projectionProcessors.contains(tableId, postTransformer)) {
+            PostTransformChangeInfo changeInfo = postTransformInfoMap.get(tableId);
+            projectionProcessors.put(
+                    tableId,
+                    postTransformer,
+                    new TransformProjectionProcessor(
+                            changeInfo,
+                            postTransformer
+                                    .getProjection()
+                                    .map(TransformProjection::getProjection)
+                                    .orElse(null),
+                            timezone,
+                            decimalPrecisionMode,
+                            udfDescriptors,
+                            udfFunctionInstances,
+                            postTransformer.getSupportedMetadataColumns(),
+                            modelClients));
+        }
+        return projectionProcessors.get(tableId, postTransformer);
+    }
+
+    /**
+     * Get the unique {@link TransformFilterProcessor} based on provided {@link TableId} and {@link
+     * PostTransformer}.
+     */
+    private TransformFilterProcessor getFilterProcessor(
+            TableId tableId, PostTransformer postTransformer) {
+        if (!filterProcessors.contains(tableId, postTransformer)) {
+            if (!postTransformer.getFilter().isPresent()) {
+                filterProcessors.put(
+                        tableId,
+                        postTransformer,
+                        TransformFilterProcessor.ofNoOp(decimalPrecisionMode));
+            } else {
+                PostTransformChangeInfo changeInfo = postTransformInfoMap.get(tableId);
+                filterProcessors.put(
+                        tableId,
+                        postTransformer,
+                        TransformFilterProcessor.of(
+                                changeInfo,
+                                postTransformer.getFilter().orElse(null),
+                                timezone,
+                                decimalPrecisionMode,
+                                udfDescriptors,
+                                udfFunctionInstances,
+                                postTransformer.getSupportedMetadataColumns(),
+                                modelClients));
+            }
+        }
+        return filterProcessors.get(tableId, postTransformer);
+    }
+
+    /**
+     * Flush caches saved for given {@link TableId}. Be sure to invalidate caches after its schema
+     * has been changed!
+     */
+    private void invalidateCache(TableId tableId) {
+        projectionProcessors.row(tableId).clear();
+        filterProcessors.row(tableId).clear();
+    }
+
+    private List<PostTransformer> createTransformers() {
+        List<PostTransformer> list = new ArrayList<>();
+        for (TransformRule rule : transformRules) {
+            String projection = rule.getProjection();
+            String filterExpression = rule.getFilter();
+            String tableInclusions = rule.getTableInclusions();
+            Selectors selectors =
+                    new Selectors.SelectorsBuilder().includeTables(tableInclusions).build();
+            PostTransformer apply =
+                    new PostTransformer(
+                            selectors,
+                            TransformProjection.of(projection).orElse(null),
+                            TransformFilter.of(filterExpression).orElse(null),
+                            PostTransformConverters.of(rule.getPostTransformConverter())
+                                    .orElse(null),
+                            rule.getSupportedMetadataColumns());
+            list.add(apply);
+        }
+        return list;
+    }
+
+    private void initializeUdf() {
+        this.udfDescriptors =
+                udfFunctions.stream()
+                        .map(UserDefinedFunctionDescriptor::new)
+                        .collect(Collectors.toList());
+        this.udfFunctionInstances = new ArrayList<>();
+
+        for (UserDefinedFunctionDescriptor udf : udfDescriptors) {
+            try {
+                Class<?> clazz = Class.forName(udf.getClasspath());
+                Object udfInstance = clazz.getDeclaredConstructor().newInstance();
+                udfFunctionInstances.add(udfInstance);
+
+                if (udf.isCdcPipelineUdf()) {
+                    // We use reflection to invoke UDF methods since we may add more methods
+                    // into UserDefinedFunction interface, thus the provided UDF classes
+                    // might not be compatible with the interface definition in CDC common.
+                    UserDefinedFunctionContext userDefinedFunctionContext =
+                            () -> Configuration.fromMap(udf.getParameters());
+                    udfInstance
+                            .getClass()
+                            .getMethod("open", UserDefinedFunctionContext.class)
+                            .invoke(udfInstance, userDefinedFunctionContext);
+                }
+                // Do nothing for Flink-style UDF since their lifecycle hooks are not supported
+            } catch (ReflectiveOperationException e) {
+                throw new RuntimeException("Failed to instantiate UDF function " + udf, e);
+            }
+        }
+    }
+
+    private void destroyUdf() {
+        if (udfDescriptors == null || udfFunctionInstances == null) {
+            return;
+        }
+        for (int i = 0; i < udfDescriptors.size(); i++) {
+            UserDefinedFunctionDescriptor udf = udfDescriptors.get(i);
+            try {
+                if (udf.isCdcPipelineUdf()) {
+                    Object udfInstance = udfFunctionInstances.get(i);
+                    udfInstance.getClass().getMethod("close").invoke(udfInstance);
+                }
+                // Do nothing for Flink-style UDF since their lifecycle hooks are not supported
+            } catch (ReflectiveOperationException e) {
+                throw new RuntimeException("Failed to destroy UDF " + udf, e);
+            }
+        }
+        udfDescriptors.clear();
+        udfFunctionInstances.clear();
+    }
+
+    private void initializeAiModelClients() {
+        for (Map.Entry<String, AiModelClient> entry : modelClients.entrySet()) {
+            try {
+                entry.getValue().open();
+                LOG.info("Successfully opened AI model client '{}'.", entry.getKey());
+            } catch (Exception e) {
+                LOG.error("Failed to open AI model client '{}'.", entry.getKey(), e);
+                throw new FlinkRuntimeException(
+                        "Failed to initialize AI model: " + entry.getKey(), e);
+            }
+        }
+    }
+
+    private void destroyAiModelClients() {
+        for (Map.Entry<String, AiModelClient> entry : modelClients.entrySet()) {
+            try {
+                entry.getValue().close();
+                LOG.info("Successfully closed AI model client '{}'.", entry.getKey());
+            } catch (Exception e) {
+                LOG.warn("Failed to close AI model client '{}'.", entry.getKey(), e);
+            }
         }
     }
 }
