@@ -203,8 +203,6 @@ public class TransformTranslator {
                         .map(this::modelToUDFTuple)
                         .collect(Collectors.toList()));
         Map<String, AiModelClient> modelClients = loadModelClients(models, env);
-        validateModelCapabilities(
-                transforms, modelClients, getUserDefinedFunctionNames(udfFunctions, models));
         asyncPostTransformFunctionBuilder.addModelClients(modelClients);
         asyncPostTransformFunctionBuilder.addAsyncWorkerThreads(asyncTransformWorkerThreads);
 
