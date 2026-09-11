@@ -58,22 +58,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /** E2e tests for the {@link PreTransformOperator} and {@link PostTransformOperator}. */
 @ParameterizedClass(name = "asyncTransform: {0} parallelism: {1}")
-@CsvSource(value = {
-        "false,1",
-        "true,1",
-        "false,4",
-        "true,4",
-})
+@CsvSource(
+        value = {
+            "false,1", "true,1", "false,4", "true,4",
+        })
 class TransformE2eITCase extends PipelineTestEnvironment {
     private static final Logger LOG = LoggerFactory.getLogger(TransformE2eITCase.class);
     private static final Duration ASYNC_RESTORE_TIMEOUT = Duration.ofMinutes(3);
 
     protected final UniqueDatabase transformTestDatabase =
             new UniqueDatabase(MYSQL, "transform_test", MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
-
-    TransformE2eITCase(int parallelism) {
-        super(parallelism);
-    }
 
     private final Function<String, String> dbNameFormatter =
             (s) -> {
@@ -83,7 +77,8 @@ class TransformE2eITCase extends PipelineTestEnvironment {
 
     private final boolean asyncTransform;
 
-    TransformE2eITCase(boolean asyncTransform) {
+    TransformE2eITCase(boolean asyncTransform, int parallelism) {
+        super(parallelism);
         this.asyncTransform = asyncTransform;
     }
 
