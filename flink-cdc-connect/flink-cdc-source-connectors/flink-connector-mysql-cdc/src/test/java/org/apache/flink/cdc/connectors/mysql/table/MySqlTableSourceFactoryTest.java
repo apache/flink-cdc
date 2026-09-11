@@ -129,7 +129,8 @@ class MySqlTableSourceFactoryTest {
                         PARSE_ONLINE_SCHEMA_CHANGES.defaultValue(),
                         USE_LEGACY_JSON_FORMAT.defaultValue(),
                         SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST.defaultValue(),
-                        false);
+                        false,
+                        null);
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
@@ -179,7 +180,8 @@ class MySqlTableSourceFactoryTest {
                         PARSE_ONLINE_SCHEMA_CHANGES.defaultValue(),
                         USE_LEGACY_JSON_FORMAT.defaultValue(),
                         SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST.defaultValue(),
-                        false);
+                        false,
+                        null);
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
@@ -225,7 +227,8 @@ class MySqlTableSourceFactoryTest {
                         PARSE_ONLINE_SCHEMA_CHANGES.defaultValue(),
                         USE_LEGACY_JSON_FORMAT.defaultValue(),
                         SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST.defaultValue(),
-                        false);
+                        false,
+                        null);
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
@@ -269,7 +272,8 @@ class MySqlTableSourceFactoryTest {
                         PARSE_ONLINE_SCHEMA_CHANGES.defaultValue(),
                         USE_LEGACY_JSON_FORMAT.defaultValue(),
                         SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST.defaultValue(),
-                        false);
+                        false,
+                        null);
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
@@ -290,6 +294,8 @@ class MySqlTableSourceFactoryTest {
         options.put("scan.incremental.close-idle-reader.enabled", "true");
         options.put("scan.incremental.snapshot.backfill.skip", "true");
         options.put("use.legacy.json.format", "true");
+        options.put("scan.incremental.snapshot.enabled", "true");
+        options.put("scan.snapshot.filter", "id > 200");
 
         DynamicTableSource actualSource = createTableSource(options);
         Properties dbzProperties = new Properties();
@@ -311,7 +317,7 @@ class MySqlTableSourceFactoryTest {
                         ZoneId.of("Asia/Shanghai"),
                         dbzProperties,
                         "4321",
-                        false,
+                        true,
                         SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
                         CHUNK_META_GROUP_SIZE.defaultValue(),
                         SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
@@ -330,7 +336,8 @@ class MySqlTableSourceFactoryTest {
                         PARSE_ONLINE_SCHEMA_CHANGES.defaultValue(),
                         true,
                         SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST.defaultValue(),
-                        false);
+                        false,
+                        "id > 200");
         Assertions.assertThat(actualSource)
                 .isEqualTo(expectedSource)
                 .isInstanceOf(MySqlTableSource.class);
@@ -389,7 +396,8 @@ class MySqlTableSourceFactoryTest {
                         PARSE_ONLINE_SCHEMA_CHANGES.defaultValue(),
                         USE_LEGACY_JSON_FORMAT.defaultValue(),
                         SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST.defaultValue(),
-                        false);
+                        false,
+                        null);
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
@@ -431,7 +439,8 @@ class MySqlTableSourceFactoryTest {
                         PARSE_ONLINE_SCHEMA_CHANGES.defaultValue(),
                         USE_LEGACY_JSON_FORMAT.defaultValue(),
                         SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST.defaultValue(),
-                        false);
+                        false,
+                        null);
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
@@ -474,7 +483,8 @@ class MySqlTableSourceFactoryTest {
                         PARSE_ONLINE_SCHEMA_CHANGES.defaultValue(),
                         USE_LEGACY_JSON_FORMAT.defaultValue(),
                         SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST.defaultValue(),
-                        false);
+                        false,
+                        null);
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
@@ -518,7 +528,8 @@ class MySqlTableSourceFactoryTest {
                         PARSE_ONLINE_SCHEMA_CHANGES.defaultValue(),
                         USE_LEGACY_JSON_FORMAT.defaultValue(),
                         SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST.defaultValue(),
-                        false);
+                        false,
+                        null);
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
@@ -560,7 +571,8 @@ class MySqlTableSourceFactoryTest {
                         PARSE_ONLINE_SCHEMA_CHANGES.defaultValue(),
                         USE_LEGACY_JSON_FORMAT.defaultValue(),
                         SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST.defaultValue(),
-                        false);
+                        false,
+                        null);
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
@@ -607,7 +619,8 @@ class MySqlTableSourceFactoryTest {
                         PARSE_ONLINE_SCHEMA_CHANGES.defaultValue(),
                         USE_LEGACY_JSON_FORMAT.defaultValue(),
                         SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST.defaultValue(),
-                        false);
+                        false,
+                        null);
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys = Arrays.asList("op_ts", "database_name");
 
@@ -768,6 +781,17 @@ class MySqlTableSourceFactoryTest {
                         String.format(
                                 "The table-name '%s' is not a valid regular expression",
                                 "*_invalid_table"));
+
+        // validate snapshot filter requires parallel read enabled
+        Assertions.assertThatThrownBy(
+                        () -> {
+                            Map<String, String> properties = getAllOptions();
+                            properties.put("scan.incremental.snapshot.enabled", "false");
+                            properties.put("scan.snapshot.filter", "id > 100");
+                            createTableSource(properties);
+                        })
+                .hasStackTraceContaining(
+                        "Option 'scan.snapshot.filter' can only be used when 'scan.incremental.snapshot.enabled' is enabled");
     }
 
     @Test
@@ -810,7 +834,8 @@ class MySqlTableSourceFactoryTest {
                         true,
                         true,
                         true,
-                        false);
+                        false,
+                        null);
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 

@@ -55,6 +55,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -83,6 +84,7 @@ import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOption
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
+import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_SNAPSHOT_FILTERS;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_STARTUP_MODE;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_FILE;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_GTID_SET;
@@ -112,6 +114,8 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
     private static final Logger LOG = LoggerFactory.getLogger(MySqlDataSourceFactory.class);
 
     public static final String IDENTIFIER = "mysql";
+    public static final String SNAPSHOT_FILTER_TABLE_KEY = "table";
+    public static final String SNAPSHOT_FILTER_FILTER_KEY = "filter";
 
     @Override
     public DataSource createDataSource(Context context) {
@@ -284,9 +288,76 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
             LOG.info("Add chunkKeyColumn {}.", chunkKeyColumnMap);
             configFactory.chunkKeyColumn(chunkKeyColumnMap);
         }
+
+        List<Map<String, String>> snapshotFilters = config.get(SCAN_SNAPSHOT_FILTERS);
+        if (snapshotFilters != null && !snapshotFilters.isEmpty()) {
+            Map<String, String> snapshotFiltersMap =
+                    parseAndValidateSnapshotFilters(snapshotFilters);
+            LOG.info("Add snapshotFilters {}.", snapshotFiltersMap);
+            configFactory.snapshotFilters(snapshotFiltersMap);
+        }
+
         String metadataList = config.get(METADATA_LIST);
         List<MySqlReadableMetadata> readableMetadataList = listReadableMetadata(metadataList);
         return new MySqlDataSource(configFactory, readableMetadataList);
+    }
+
+    /**
+     * Parses and validates snapshot filters configuration.
+     *
+     * @param snapshotFilters List of filter entries, each containing 'table' and 'filter' keys
+     * @return LinkedHashMap preserving insertion order, mapping table patterns to filter
+     *     expressions
+     * @throws ValidationException If any entry is missing required keys or contains duplicate table
+     *     patterns
+     */
+    private Map<String, String> parseAndValidateSnapshotFilters(
+            List<Map<String, String>> snapshotFilters) {
+        Map<String, String> result = new LinkedHashMap<>();
+
+        for (int i = 0; i < snapshotFilters.size(); i++) {
+            Map<String, String> entry = snapshotFilters.get(i);
+
+            // Validate required keys
+            String table = entry.get(SNAPSHOT_FILTER_TABLE_KEY);
+            String filter = entry.get(SNAPSHOT_FILTER_FILTER_KEY);
+
+            if (table == null || table.trim().isEmpty()) {
+                throw new ValidationException(
+                        String.format(
+                                "Snapshot filter entry at index %d is missing required key '%s'. "
+                                        + "Each entry must contain both '%s' and '%s' keys.",
+                                i,
+                                SNAPSHOT_FILTER_TABLE_KEY,
+                                SNAPSHOT_FILTER_TABLE_KEY,
+                                SNAPSHOT_FILTER_FILTER_KEY));
+            }
+
+            if (filter == null || filter.trim().isEmpty()) {
+                throw new ValidationException(
+                        String.format(
+                                "Snapshot filter entry at index %d is missing required key '%s'. "
+                                        + "Each entry must contain both '%s' and '%s' keys.",
+                                i,
+                                SNAPSHOT_FILTER_FILTER_KEY,
+                                SNAPSHOT_FILTER_TABLE_KEY,
+                                SNAPSHOT_FILTER_FILTER_KEY));
+            }
+
+            // Check for duplicates
+            if (result.containsKey(table)) {
+                throw new ValidationException(
+                        String.format(
+                                "Duplicate table pattern '%s' found in snapshot filters at index %d. "
+                                        + "Each table pattern can only appear once. "
+                                        + "Previous definition: '%s', Current definition: '%s'.",
+                                table, i, result.get(table), filter));
+            }
+
+            result.put(table, filter);
+        }
+
+        return result;
     }
 
     private List<MySqlReadableMetadata> listReadableMetadata(String metadataList) {
@@ -358,6 +429,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         options.add(PARSE_ONLINE_SCHEMA_CHANGES);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP);
+        options.add(SCAN_SNAPSHOT_FILTERS);
         return options;
     }
 
