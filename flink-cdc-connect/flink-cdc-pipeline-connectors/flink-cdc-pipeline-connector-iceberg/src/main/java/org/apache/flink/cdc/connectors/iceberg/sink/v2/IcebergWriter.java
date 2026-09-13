@@ -166,10 +166,12 @@ public class IcebergWriter
                     writerMap.computeIfAbsent(
                             tableId, tableId1 -> writerFactoryMap.get(tableId1).create());
             TableSchemaWrapper tableSchemaWrapper = schemaMap.get(tableId);
-            RowData rowData =
+            List<RowData> rowDataList =
                     RowDataUtils.convertDataChangeEventToRowData(
                             dataChangeEvent, tableSchemaWrapper.getFieldGetters());
-            writer.write(rowData);
+            for (RowData rowData : rowDataList) {
+                writer.write(rowData);
+            }
         } else {
             SchemaChangeEvent schemaChangeEvent = (SchemaChangeEvent) event;
             TableId tableId = schemaChangeEvent.tableId();
