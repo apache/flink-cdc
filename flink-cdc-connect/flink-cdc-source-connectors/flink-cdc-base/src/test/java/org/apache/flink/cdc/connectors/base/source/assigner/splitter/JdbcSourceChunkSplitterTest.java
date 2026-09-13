@@ -17,17 +17,25 @@
 
 package org.apache.flink.cdc.connectors.base.source.assigner.splitter;
 
+import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
+import org.apache.flink.cdc.connectors.base.dialect.JdbcDataSourceDialect;
+import org.apache.flink.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import org.apache.flink.table.api.DataTypes;
 
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.Column;
+import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
+import io.debezium.relational.history.TableChanges;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 import javax.annotation.Nullable;
 
 import java.sql.SQLException;
+import java.sql.Types;
+import java.util.Collection;
 
 /** Tests for {@link JdbcSourceChunkSplitter}. */
 class JdbcSourceChunkSplitterTest {
@@ -57,14 +65,76 @@ class JdbcSourceChunkSplitterTest {
         Assertions.assertThat(result).isNull();
     }
 
+    /**
+     * The JDBC connection is shared by every job on the same JobManager through a bounded pool, so
+     * the splitter must not hold one while idle: nothing is acquired in {@code open()}, and the
+     * connection is returned as soon as a table has been split.
+     */
+    @Test
+    void testConnectionIsAcquiredLazilyAndReleasedWhenTableIsSplit() throws Exception {
+        TableId tableId = TableId.parse("db.schema.table");
+        Column idColumn = Column.editor().name("id").type("INT").jdbcType(Types.INTEGER).create();
+        Table table =
+                Table.editor()
+                        .tableId(tableId)
+                        .addColumn(idColumn)
+                        .setPrimaryKeyNames("id")
+                        .create();
+
+        JdbcConnection connection = Mockito.mock(JdbcConnection.class);
+        JdbcDataSourceDialect dialect = Mockito.mock(JdbcDataSourceDialect.class);
+        Mockito.when(dialect.openJdbcConnection(Mockito.any())).thenReturn(connection);
+        Mockito.when(dialect.queryTableSchema(Mockito.any(), Mockito.eq(tableId)))
+                .thenReturn(
+                        new TableChanges.TableChange(TableChanges.TableChangeType.CREATE, table));
+
+        JdbcSourceConfig sourceConfig = Mockito.mock(JdbcSourceConfig.class);
+        Mockito.when(sourceConfig.getSplitSize()).thenReturn(8096);
+        Mockito.when(sourceConfig.getDistributionFactorUpper()).thenReturn(1000.0d);
+        Mockito.when(sourceConfig.getDistributionFactorLower()).thenReturn(0.05d);
+
+        JdbcSourceChunkSplitter splitter =
+                new TestingJdbcSourceChunkSplitter(
+                        sourceConfig, dialect, new Object[] {1, 100}, 100L);
+
+        splitter.open();
+        Mockito.verify(dialect, Mockito.never()).openJdbcConnection(Mockito.any());
+
+        Collection<SnapshotSplit> splits = splitter.generateSplits(tableId);
+
+        Assertions.assertThat(splits).hasSize(1);
+        Assertions.assertThat(splitter.hasNextChunk()).isFalse();
+        Mockito.verify(dialect, Mockito.times(1)).openJdbcConnection(Mockito.any());
+        Mockito.verify(connection, Mockito.times(1)).close();
+
+        splitter.close();
+        splitter.close();
+        Mockito.verify(connection, Mockito.times(1)).close();
+    }
+
     /** Minimal testing implementation that stubs out JDBC interactions. */
     private static class TestingJdbcSourceChunkSplitter extends JdbcSourceChunkSplitter {
 
         @Nullable private final Object nextChunkMaxResult;
+        private final Object[] minMax;
+        private final long approximateRowCnt;
 
         TestingJdbcSourceChunkSplitter(@Nullable Object nextChunkMaxResult) {
             super(null, null, null, null, null);
             this.nextChunkMaxResult = nextChunkMaxResult;
+            this.minMax = new Object[] {null, null};
+            this.approximateRowCnt = 0L;
+        }
+
+        TestingJdbcSourceChunkSplitter(
+                JdbcSourceConfig sourceConfig,
+                JdbcDataSourceDialect dialect,
+                Object[] minMax,
+                long approximateRowCnt) {
+            super(sourceConfig, dialect, null, null, null);
+            this.nextChunkMaxResult = null;
+            this.minMax = minMax;
+            this.approximateRowCnt = approximateRowCnt;
         }
 
         @Override
@@ -79,9 +149,15 @@ class JdbcSourceChunkSplitterTest {
         }
 
         @Override
+        protected Object[] queryMinMax(JdbcConnection jdbc, TableId tableId, Column splitColumn)
+                throws SQLException {
+            return minMax;
+        }
+
+        @Override
         protected Long queryApproximateRowCnt(JdbcConnection jdbc, TableId tableId)
                 throws SQLException {
-            return 0L;
+            return approximateRowCnt;
         }
 
         @Override
