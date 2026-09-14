@@ -46,6 +46,7 @@ public class SinkDef {
     @Nullable private final String name;
     private final Configuration config;
     private final Set<SchemaChangeEventType> includedSchemaEvolutionTypes;
+    private final boolean existingTableSchemaExpansionEnabled;
 
     public SinkDef(String type, @Nullable String name, Configuration config) {
         this.type = type;
@@ -53,6 +54,7 @@ public class SinkDef {
         this.config = config;
         this.includedSchemaEvolutionTypes =
                 Arrays.stream(SchemaChangeEventTypeFamily.ALL).collect(Collectors.toSet());
+        this.existingTableSchemaExpansionEnabled = false;
     }
 
     public SinkDef(
@@ -60,10 +62,20 @@ public class SinkDef {
             @Nullable String name,
             Configuration config,
             Set<SchemaChangeEventType> includedSchemaEvolutionTypes) {
+        this(type, name, config, includedSchemaEvolutionTypes, false);
+    }
+
+    public SinkDef(
+            String type,
+            @Nullable String name,
+            Configuration config,
+            Set<SchemaChangeEventType> includedSchemaEvolutionTypes,
+            boolean existingTableSchemaExpansionEnabled) {
         this.type = type;
         this.name = name;
         this.config = config;
         this.includedSchemaEvolutionTypes = includedSchemaEvolutionTypes;
+        this.existingTableSchemaExpansionEnabled = existingTableSchemaExpansionEnabled;
     }
 
     public String getType() {
@@ -82,6 +94,10 @@ public class SinkDef {
         return includedSchemaEvolutionTypes;
     }
 
+    public boolean isExistingTableSchemaExpansionEnabled() {
+        return existingTableSchemaExpansionEnabled;
+    }
+
     @Override
     public String toString() {
         return "SinkDef{"
@@ -95,6 +111,8 @@ public class SinkDef {
                 + config
                 + ", includedSchemaEvolutionTypes="
                 + includedSchemaEvolutionTypes
+                + ", existingTableSchemaExpansionEnabled="
+                + existingTableSchemaExpansionEnabled
                 + '}';
     }
 
@@ -111,11 +129,18 @@ public class SinkDef {
                 && Objects.equals(name, sinkDef.name)
                 && Objects.equals(config, sinkDef.config)
                 && Objects.equals(
-                        includedSchemaEvolutionTypes, sinkDef.includedSchemaEvolutionTypes);
+                        includedSchemaEvolutionTypes, sinkDef.includedSchemaEvolutionTypes)
+                && existingTableSchemaExpansionEnabled
+                        == sinkDef.existingTableSchemaExpansionEnabled;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(type, name, config, includedSchemaEvolutionTypes);
+        return Objects.hash(
+                type,
+                name,
+                config,
+                includedSchemaEvolutionTypes,
+                existingTableSchemaExpansionEnabled);
     }
 }

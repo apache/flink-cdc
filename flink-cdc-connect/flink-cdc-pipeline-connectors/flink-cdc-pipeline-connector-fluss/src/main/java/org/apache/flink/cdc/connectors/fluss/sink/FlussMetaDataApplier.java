@@ -25,7 +25,10 @@ import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.SchemaChangeEventTypeFamily;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Column;
+import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.common.sink.ExistingTableSchemaExpansionSupport;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
+import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.table.api.ValidationException;
 
 import org.apache.fluss.client.Connection;
@@ -45,16 +48,19 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.CREATE_TABLE;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.DROP_TABLE;
+import static org.apache.flink.cdc.connectors.fluss.utils.FlussConversions.toCdcSchema;
+import static org.apache.flink.cdc.connectors.fluss.utils.FlussConversions.toCdcType;
 import static org.apache.flink.cdc.connectors.fluss.utils.FlussConversions.toFlussTable;
 import static org.apache.flink.cdc.connectors.fluss.utils.FlussConversions.toFlussType;
 
 /** {@link MetadataApplier} for fluss. */
-public class FlussMetaDataApplier implements MetadataApplier {
+public class FlussMetaDataApplier implements MetadataApplier, ExistingTableSchemaExpansionSupport {
     private static final Logger LOG = LoggerFactory.getLogger(FlussMetaDataApplier.class);
     private final Configuration flussClientConfig;
     private final Map<String, String> tableProperties;
@@ -88,7 +94,41 @@ public class FlussMetaDataApplier implements MetadataApplier {
 
     @Override
     public Set<SchemaChangeEventType> getSupportedSchemaEvolutionTypes() {
-        return Arrays.stream(SchemaChangeEventTypeFamily.TABLE).collect(Collectors.toSet());
+        Set<SchemaChangeEventType> supportedEventTypes =
+                Arrays.stream(SchemaChangeEventTypeFamily.TABLE).collect(Collectors.toSet());
+        supportedEventTypes.add(SchemaChangeEventType.ADD_COLUMN);
+        return supportedEventTypes;
+    }
+
+    @Override
+    public Optional<ExistingTableSchemaExpansionSupport> getExistingTableSchemaExpansionSupport() {
+        return Optional.of(this);
+    }
+
+    @Override
+    public Optional<Schema> getExistingTableSchema(TableId tableId) {
+        TablePath tablePath = new TablePath(tableId.getSchemaName(), tableId.getTableName());
+        try (Connection connection = ConnectionFactory.createConnection(flussClientConfig);
+                Admin admin = connection.getAdmin()) {
+            if (!admin.tableExists(tablePath).get()) {
+                return Optional.empty();
+            }
+            TableInfo tableInfo = admin.getTableInfo(tablePath).get();
+            return Optional.of(toCdcSchema(tableInfo.getSchema(), tableInfo.getPartitionKeys()));
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to get Fluss table schema for " + tableId, e);
+        }
+    }
+
+    @Override
+    public DataType normalizeToTargetDataType(
+            TableId tableId, String columnName, DataType pipelineDataType) {
+        return toCdcType(toFlussType(pipelineDataType));
+    }
+
+    @Override
+    public boolean isColumnNameCaseSensitive() {
+        return true;
     }
 
     @Override

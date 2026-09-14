@@ -75,6 +75,18 @@ pipeline:
 在此模式下，所有架构更改事件都将被 `SchemaOperator` 默默接收，并且永远不会尝试将它们应用于下游接收器。
 当您的下游接收器尚未准备好进行任何架构更改，但想要继续从未更改的列中接收数据时，这很有用。
 
+## 已有目标表的安全 Schema 扩展
+
+在 Sink 中将 `existing-table.schema-expansion.enabled` 设置为 `true` 后，初始 `CreateTableEvent` 遇到已有目标表时，框架会尝试进行安全 Schema 扩展。对于实现了该能力的 Sink，框架可能将缺失的普通非键物理列按 nullable 补充，并安全拓宽普通非键列类型；派生的 DDL 事件会记录在日志中。
+
+该配置默认值为 `false`。关闭它不会关闭 Sink 自身的 Schema 处理逻辑。框架只会派生 `include.schema.changes` 已启用且 Sink 支持的 DDL 类型；不支持、不安全或执行失败的扩展会继续交给 Sink，框架不会因此引入新的 fail-fast。
+
+```yaml
+sink:
+  type: paimon
+  existing-table.schema-expansion.enabled: true
+```
+
 ## 按类型配置行为
 
 有时，将所有架构更改事件同步到下游可能并不合适。
@@ -83,9 +95,9 @@ pipeline:
 
 ### 选项
 
-| Option Key               | 注释                                              | 是否可选 |
-|--------------------------|-------------------------------------------------|------|
-| `include.schema.changes` | 要应用的结构变更事件类型。如果未指定，则默认包含所有类型。                   | 是    |
+| Option Key               | 注释                                    | 是否可选 |
+|--------------------------|---------------------------------------|------|
+| `include.schema.changes` | 要应用的结构变更事件类型。如果未指定，则默认包含所有类型。          | 是    |
 | `exclude.schema.changes` | 不希望应用的结构变更事件类型。其优先级高于 `include.schema.changes`。 | 是    |
 
 > 在 Lenient 模式下，`TruncateTableEvent` 和 `DropTableEvent` 默认会被忽略。在任何其他模式下，默认不会忽略任何事件。

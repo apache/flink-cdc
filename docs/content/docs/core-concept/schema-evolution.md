@@ -73,6 +73,18 @@ This is the default schema evolution behavior.
 In this mode, all schema change events will be silently swallowed by `SchemaOperator` and never attempt to apply them to downstream sink.
 This is useful when your downstream sink is unready for any schema changes, but wants to keep receiving data from unchanged columns.
 
+## Existing Table Schema Expansion
+
+Set the sink option `existing-table.schema-expansion.enabled` to `true` to try safe schema expansion when the initial `CreateTableEvent` encounters an existing target table. For sinks that implement this capability, the framework may add missing non-key physical columns as nullable columns and safely widen non-key column types. Derived DDL events are logged.
+
+The default is `false`. Disabling this option does not disable the sink's own schema handling. The framework only derives DDL types that are enabled by `include.schema.changes` and supported by the sink; unsupported, unsafe, or failed expansions are delegated to the sink without introducing a framework fail-fast.
+
+```yaml
+sink:
+  type: paimon
+  existing-table.schema-expansion.enabled: true
+```
+
 ## Per-Event Type Control
 
 Sometimes, it may not be suitable to synchronize all schema change events to downstream.
@@ -81,9 +93,9 @@ This could be achieved by setting `include.schema.changes` and `exclude.schema.c
 
 ### Options
 
-| Option Key               | meaning                                                                                                   | optional/required |
-|--------------------------|-----------------------------------------------------------------------------------------------------------|-------------------|
-| `include.schema.changes` | Schema change event types to be included. Include all types by default if not specified.                  | optional          |
+| Option Key               | meaning                                                                                                    | optional/required |
+|--------------------------|------------------------------------------------------------------------------------------------------------|-------------------|
+| `include.schema.changes` | Schema change event types to be included. Include all types by default if not specified.                   | optional          |
 | `exclude.schema.changes` | Schema change event types **not** to be included. It has a higher priority than `include.schema.changes`. | optional          |
 
 > In Lenient mode, `TruncateTableEvent` and `DropTableEvent` will be ignored by default. In any other mode, no events will be ignored by default.

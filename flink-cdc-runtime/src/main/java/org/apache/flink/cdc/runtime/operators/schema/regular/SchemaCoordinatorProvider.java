@@ -42,6 +42,7 @@ public class SchemaCoordinatorProvider implements OperatorCoordinator.Provider {
     private final List<RouteRule> routingRules;
     private final RouteMode routeMode;
     private final SchemaChangeBehavior schemaChangeBehavior;
+    private final boolean existingTableSchemaExpansionEnabled;
     private final Duration rpcTimeout;
 
     public SchemaCoordinatorProvider(
@@ -52,12 +53,33 @@ public class SchemaCoordinatorProvider implements OperatorCoordinator.Provider {
             RouteMode routeMode,
             SchemaChangeBehavior schemaChangeBehavior,
             Duration rpcTimeout) {
+        this(
+                operatorID,
+                operatorName,
+                metadataApplier,
+                routingRules,
+                routeMode,
+                schemaChangeBehavior,
+                false,
+                rpcTimeout);
+    }
+
+    public SchemaCoordinatorProvider(
+            OperatorID operatorID,
+            String operatorName,
+            MetadataApplier metadataApplier,
+            List<RouteRule> routingRules,
+            RouteMode routeMode,
+            SchemaChangeBehavior schemaChangeBehavior,
+            boolean existingTableSchemaExpansionEnabled,
+            Duration rpcTimeout) {
         this.operatorID = operatorID;
         this.operatorName = operatorName;
         this.metadataApplier = metadataApplier;
         this.routingRules = routingRules;
         this.routeMode = routeMode;
         this.schemaChangeBehavior = schemaChangeBehavior;
+        this.existingTableSchemaExpansionEnabled = existingTableSchemaExpansionEnabled;
         this.rpcTimeout = rpcTimeout;
     }
 
@@ -81,6 +103,7 @@ public class SchemaCoordinatorProvider implements OperatorCoordinator.Provider {
                 routingRules,
                 routeMode,
                 schemaChangeBehavior,
+                existingTableSchemaExpansionEnabled,
                 rpcTimeout);
     }
 }

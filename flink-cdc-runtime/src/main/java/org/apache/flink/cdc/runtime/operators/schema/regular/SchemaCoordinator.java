@@ -105,6 +105,28 @@ public class SchemaCoordinator extends SchemaRegistry {
             RouteMode routeMode,
             SchemaChangeBehavior schemaChangeBehavior,
             Duration rpcTimeout) {
+        this(
+                operatorName,
+                context,
+                coordinatorExecutor,
+                metadataApplier,
+                routes,
+                routeMode,
+                schemaChangeBehavior,
+                false,
+                rpcTimeout);
+    }
+
+    public SchemaCoordinator(
+            String operatorName,
+            OperatorCoordinator.Context context,
+            ExecutorService coordinatorExecutor,
+            MetadataApplier metadataApplier,
+            List<RouteRule> routes,
+            RouteMode routeMode,
+            SchemaChangeBehavior schemaChangeBehavior,
+            boolean existingTableSchemaExpansionEnabled,
+            Duration rpcTimeout) {
         super(
                 context,
                 operatorName,
@@ -113,6 +135,7 @@ public class SchemaCoordinator extends SchemaRegistry {
                 routes,
                 routeMode,
                 schemaChangeBehavior,
+                existingTableSchemaExpansionEnabled,
                 rpcTimeout);
         this.schemaChangeThreadPool = Executors.newSingleThreadExecutor();
     }
@@ -455,6 +478,7 @@ public class SchemaCoordinator extends SchemaRegistry {
 
     private boolean applyAndUpdateEvolvedSchemaChange(SchemaChangeEvent schemaChangeEvent) {
         try {
+            expandExistingTableSchemaIfNeeded(schemaChangeEvent);
             metadataApplier.applySchemaChange(schemaChangeEvent);
             schemaManager.applyEvolvedSchemaChange(schemaChangeEvent);
             LOG.info(

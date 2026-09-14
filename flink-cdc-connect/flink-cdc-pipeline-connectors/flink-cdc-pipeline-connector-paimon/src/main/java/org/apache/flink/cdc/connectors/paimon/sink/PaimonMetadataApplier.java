@@ -30,8 +30,11 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.event.visitor.SchemaChangeEventVisitor;
 import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
+import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.common.sink.ExistingTableSchemaExpansionSupport;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
+import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.connectors.paimon.sink.utils.TypeUtils;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.Sets;
@@ -50,7 +53,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.common.utils.Preconditions.checkArgument;
 import static org.apache.flink.cdc.common.utils.Preconditions.checkNotNull;
@@ -59,7 +64,7 @@ import static org.apache.flink.cdc.common.utils.Preconditions.checkNotNull;
  * A {@code MetadataApplier} that applies metadata changes to Paimon. Support primary key table
  * only.
  */
-public class PaimonMetadataApplier implements MetadataApplier {
+public class PaimonMetadataApplier implements MetadataApplier, ExistingTableSchemaExpansionSupport {
 
     private static final Logger LOG = LoggerFactory.getLogger(PaimonMetadataApplier.class);
 
@@ -112,6 +117,54 @@ public class PaimonMetadataApplier implements MetadataApplier {
                 SchemaChangeEventType.DROP_COLUMN,
                 SchemaChangeEventType.RENAME_COLUMN,
                 SchemaChangeEventType.ALTER_COLUMN_TYPE);
+    }
+
+    @Override
+    public Optional<ExistingTableSchemaExpansionSupport> getExistingTableSchemaExpansionSupport() {
+        return Optional.of(this);
+    }
+
+    @Override
+    public Optional<Schema> getExistingTableSchema(TableId tableId) {
+        if (catalog == null) {
+            catalog = FlinkCatalogFactory.createPaimonCatalog(catalogOptions);
+        }
+        try {
+            Table table =
+                    catalog.getTable(
+                            new Identifier(tableId.getSchemaName(), tableId.getTableName()));
+            Schema.Builder builder = Schema.newBuilder();
+            builder.setColumns(
+                    table.rowType().getFields().stream()
+                            .map(
+                                    field ->
+                                            Column.physicalColumn(
+                                                    field.name(),
+                                                    TypeUtils.toCDCDataType(field.type()),
+                                                    field.description()))
+                            .collect(Collectors.toList()));
+            builder.primaryKey(table.primaryKeys());
+            builder.partitionKey(table.partitionKeys());
+            table.comment().ifPresent(builder::comment);
+            builder.options(table.options());
+            return Optional.of(builder.build());
+        } catch (Catalog.TableNotExistException e) {
+            return Optional.empty();
+        }
+    }
+
+    @Override
+    public DataType normalizeToTargetDataType(
+            TableId tableId, String columnName, DataType pipelineDataType) {
+        return TypeUtils.toCDCDataType(TypeUtils.toPaimonDataType(pipelineDataType));
+    }
+
+    @Override
+    public boolean isColumnNameCaseSensitive() {
+        if (catalog == null) {
+            catalog = FlinkCatalogFactory.createPaimonCatalog(catalogOptions);
+        }
+        return catalog.caseSensitive();
     }
 
     @Override
