@@ -64,6 +64,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
@@ -102,7 +103,7 @@ public class SchemaCoordinator extends SchemaRegistry {
             alreadyHandledSchemaChangeEvents;
 
     /** Executor service to execute schema change. */
-    private final ExecutorService schemaChangeThreadPool;
+    private transient ExecutorService schemaChangeThreadPool;
 
     public SchemaCoordinator(
             String operatorName,
@@ -131,13 +132,46 @@ public class SchemaCoordinator extends SchemaRegistry {
     @Override
     public void start() throws Exception {
         super.start();
+        reinitializeTransientState();
+        LOG.info(
+                "Started SchemaRegistry for {}. Parallelism: {}", operatorName, currentParallelism);
+    }
+
+    @Override
+    protected void reinitializeTransientState() {
+        if (pendingRequests != null) {
+            pendingRequests.forEach(
+                    (index, tuple) ->
+                            tuple.f1.completeExceptionally(
+                                    new FlinkRuntimeException(
+                                            "Schema coordinator request was cancelled by checkpoint reset.")));
+        }
         this.evolvingStatus = new AtomicReference<>(RequestStatus.IDLE);
         this.pendingRequests = new ConcurrentHashMap<>();
         this.flushedSinkWriters = ConcurrentHashMap.newKeySet();
         this.upstreamSchemaTable = HashBasedTable.create();
         this.alreadyHandledSchemaChangeEvents = HashMultimap.create();
-        LOG.info(
-                "Started SchemaRegistry for {}. Parallelism: {}", operatorName, currentParallelism);
+        if (schemaChangeThreadPool == null || schemaChangeThreadPool.isShutdown()) {
+            schemaChangeThreadPool = Executors.newSingleThreadExecutor();
+        }
+    }
+
+    @Override
+    protected void quiesceSchemaChangeExecutor() throws Exception {
+        schemaChangeThreadPool.shutdownNow();
+        if (!schemaChangeThreadPool.awaitTermination(
+                rpcTimeout.toMillis(), TimeUnit.MILLISECONDS)) {
+            throw new TimeoutException("Schema change executor did not terminate during reset.");
+        }
+    }
+
+    @Override
+    protected void handleUnrecoverableError(String taskDescription, Throwable t) {
+        super.handleUnrecoverableError(taskDescription, t);
+        if (pendingRequests != null) {
+            pendingRequests.forEach((index, tuple) -> tuple.f1.completeExceptionally(t));
+        }
+        LOG.info("Current upstream table state: {}", upstreamSchemaTable);
     }
 
     @Override
@@ -206,16 +240,6 @@ public class SchemaCoordinator extends SchemaRegistry {
     protected void handleFlushSuccessEvent(FlushSuccessEvent event) throws Exception {
         LOG.info("Sink subtask {} succeed flushing.", event.getSinkSubTaskId());
         flushedSinkWriters.add(event.getSinkSubTaskId());
-    }
-
-    @Override
-    protected void handleUnrecoverableError(String taskDescription, Throwable t) {
-        super.handleUnrecoverableError(taskDescription, t);
-        LOG.info("Current upstream table state: {}", upstreamSchemaTable);
-        pendingRequests.forEach(
-                (index, tuple) -> {
-                    tuple.f1.completeExceptionally(t);
-                });
     }
 
     // -------------------------
@@ -472,12 +496,8 @@ public class SchemaCoordinator extends SchemaRegistry {
                     schemaChangeEvent);
             return true;
         } catch (Throwable t) {
-            handleUnrecoverableError(
-                    "Apply schema change event - " + schemaChangeEvent,
-                    new FlinkRuntimeException(
-                            "Failed to apply schema change event " + schemaChangeEvent + ".", t));
-            context.failJob(t);
-            throw t;
+            throw new FlinkRuntimeException(
+                    "Failed to apply schema change event " + schemaChangeEvent + ".", t);
         }
     }
 

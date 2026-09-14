@@ -64,6 +64,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
@@ -74,7 +75,7 @@ public class SchemaCoordinator extends SchemaRegistry {
     private static final Logger LOG = LoggerFactory.getLogger(SchemaCoordinator.class);
 
     /** Executor service to execute schema change. */
-    private final ExecutorService schemaChangeThreadPool;
+    private transient ExecutorService schemaChangeThreadPool;
 
     /**
      * Sink writers which have sent flush success events for the request.<br>
@@ -119,8 +120,32 @@ public class SchemaCoordinator extends SchemaRegistry {
     @Override
     public void start() throws Exception {
         super.start();
+        reinitializeTransientState();
+    }
+
+    @Override
+    protected void reinitializeTransientState() {
+        if (pendingRequests != null) {
+            pendingRequests.forEach(
+                    (index, tuple) ->
+                            tuple.f1.completeExceptionally(
+                                    new FlinkRuntimeException(
+                                            "Schema coordinator request was cancelled by checkpoint reset.")));
+        }
         this.flushedSinkWriters = new ConcurrentHashMap<>();
         this.pendingRequests = new ConcurrentHashMap<>();
+        if (schemaChangeThreadPool == null || schemaChangeThreadPool.isShutdown()) {
+            schemaChangeThreadPool = Executors.newSingleThreadExecutor();
+        }
+    }
+
+    @Override
+    protected void quiesceSchemaChangeExecutor() throws Exception {
+        schemaChangeThreadPool.shutdownNow();
+        if (!schemaChangeThreadPool.awaitTermination(
+                rpcTimeout.toMillis(), TimeUnit.MILLISECONDS)) {
+            throw new TimeoutException("Schema change executor did not terminate during reset.");
+        }
     }
 
     @Override
@@ -227,10 +252,9 @@ public class SchemaCoordinator extends SchemaRegistry {
         super.handleUnrecoverableError(taskDescription, t);
 
         // For each pending future, release it exceptionally before quitting
-        pendingRequests.forEach(
-                (index, tuple) -> {
-                    tuple.f1.completeExceptionally(t);
-                });
+        if (pendingRequests != null) {
+            pendingRequests.forEach((index, tuple) -> tuple.f1.completeExceptionally(t));
+        }
     }
 
     /**
