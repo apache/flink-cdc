@@ -44,6 +44,7 @@ public class SchemaOperatorFactory extends SimpleOperatorFactory<Event>
     private final List<RouteRule> routingRules;
     private final RouteMode routeMode;
     private final SchemaChangeBehavior schemaChangeBehavior;
+    private final boolean existingTableSchemaExpansionEnabled;
     private final Duration rpcTimeout;
 
     public SchemaOperatorFactory(
@@ -53,6 +54,24 @@ public class SchemaOperatorFactory extends SimpleOperatorFactory<Event>
             Duration rpcTimeout,
             SchemaChangeBehavior schemaChangeBehavior,
             String timezone) {
+        this(
+                metadataApplier,
+                routingRules,
+                routeMode,
+                rpcTimeout,
+                schemaChangeBehavior,
+                false,
+                timezone);
+    }
+
+    public SchemaOperatorFactory(
+            MetadataApplier metadataApplier,
+            List<RouteRule> routingRules,
+            RouteMode routeMode,
+            Duration rpcTimeout,
+            SchemaChangeBehavior schemaChangeBehavior,
+            boolean existingTableSchemaExpansionEnabled,
+            String timezone) {
         super(
                 new SchemaOperator(
                         routingRules, routeMode, rpcTimeout, schemaChangeBehavior, timezone));
@@ -60,6 +79,7 @@ public class SchemaOperatorFactory extends SimpleOperatorFactory<Event>
         this.routingRules = routingRules;
         this.routeMode = routeMode;
         this.schemaChangeBehavior = schemaChangeBehavior;
+        this.existingTableSchemaExpansionEnabled = existingTableSchemaExpansionEnabled;
         this.rpcTimeout = rpcTimeout;
     }
 
@@ -73,6 +93,7 @@ public class SchemaOperatorFactory extends SimpleOperatorFactory<Event>
                 routingRules,
                 routeMode,
                 schemaChangeBehavior,
+                existingTableSchemaExpansionEnabled,
                 rpcTimeout);
     }
 }

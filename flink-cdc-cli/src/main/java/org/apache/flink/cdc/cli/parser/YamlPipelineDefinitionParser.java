@@ -76,6 +76,8 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     private static final String NAME_KEY = "name";
     private static final String INCLUDE_SCHEMA_EVOLUTION_TYPES = "include.schema.changes";
     private static final String EXCLUDE_SCHEMA_EVOLUTION_TYPES = "exclude.schema.changes";
+    private static final String EXISTING_TABLE_SCHEMA_EXPANSION_ENABLED =
+            "existing-table.schema-expansion.enabled";
 
     // Route keys
     private static final String ROUTE_SOURCE_TABLE_KEY = "source-table";
@@ -224,6 +226,13 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         List<String> includedSETypes = new ArrayList<>();
         List<String> excludedSETypes = new ArrayList<>();
         boolean excludedFieldNotPresent = sinkNode.get(EXCLUDE_SCHEMA_EVOLUTION_TYPES) == null;
+        boolean existingTableSchemaExpansionEnabled =
+                Optional.ofNullable(sinkNode.get(EXISTING_TABLE_SCHEMA_EXPANSION_ENABLED))
+                        .map(
+                                node ->
+                                        parseBooleanOption(
+                                                EXISTING_TABLE_SCHEMA_EXPANSION_ENABLED, node))
+                        .orElse(false);
 
         Optional.ofNullable(sinkNode.get(INCLUDE_SCHEMA_EVOLUTION_TYPES))
                 .ifPresent(e -> e.forEach(tag -> includedSETypes.add(tag.asText())));
@@ -266,6 +275,7 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         if (sinkNode instanceof ObjectNode) {
             ((ObjectNode) sinkNode).remove(INCLUDE_SCHEMA_EVOLUTION_TYPES);
             ((ObjectNode) sinkNode).remove(EXCLUDE_SCHEMA_EVOLUTION_TYPES);
+            ((ObjectNode) sinkNode).remove(EXISTING_TABLE_SCHEMA_EXPANSION_ENABLED);
         }
 
         Map<String, String> sinkMap =
@@ -281,7 +291,22 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         // "name" field is optional
         String name = sinkMap.remove(NAME_KEY);
 
-        return new SinkDef(type, name, Configuration.fromMap(sinkMap), declaredSETypes);
+        return new SinkDef(
+                type,
+                name,
+                Configuration.fromMap(sinkMap),
+                declaredSETypes,
+                existingTableSchemaExpansionEnabled);
+    }
+
+    private static boolean parseBooleanOption(String optionName, JsonNode optionValue) {
+        String value = optionValue.asText();
+        Preconditions.checkArgument(
+                "true".equalsIgnoreCase(value) || "false".equalsIgnoreCase(value),
+                "Option \"%s\" must be a boolean, but was \"%s\".",
+                optionName,
+                value);
+        return Boolean.parseBoolean(value);
     }
 
     private RouteDef toRouteDef(JsonNode routeNode) {

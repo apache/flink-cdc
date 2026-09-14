@@ -498,6 +498,42 @@ class YamlPipelineDefinitionParserTest {
     }
 
     @Test
+    void testExistingTableSchemaExpansionOptionParsing() throws Exception {
+        PipelineDef enabledPipeline =
+                new YamlPipelineDefinitionParser()
+                        .parse(
+                                "source:\n"
+                                        + "  type: foo\n"
+                                        + "sink:\n"
+                                        + "  type: bar\n"
+                                        + "  existing-table.schema-expansion.enabled: true\n",
+                                new Configuration());
+
+        assertThat(enabledPipeline.getSink().isExistingTableSchemaExpansionEnabled()).isTrue();
+        assertThat(enabledPipeline.getSink().getConfig().toMap())
+                .doesNotContainKey("existing-table.schema-expansion.enabled");
+
+        PipelineDef defaultPipeline =
+                new YamlPipelineDefinitionParser()
+                        .parse("source:\n  type: foo\nsink:\n  type: bar\n", new Configuration());
+        assertThat(defaultPipeline.getSink().isExistingTableSchemaExpansionEnabled()).isFalse();
+
+        assertThatThrownBy(
+                        () ->
+                                new YamlPipelineDefinitionParser()
+                                        .parse(
+                                                "source:\n"
+                                                        + "  type: foo\n"
+                                                        + "sink:\n"
+                                                        + "  type: bar\n"
+                                                        + "  existing-table.schema-expansion.enabled: invalid\n",
+                                                new Configuration()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining(
+                        "Option \"existing-table.schema-expansion.enabled\" must be a boolean");
+    }
+
+    @Test
     void testParsingFactoryBasedModel() throws Exception {
         String yaml =
                 "source:\n"

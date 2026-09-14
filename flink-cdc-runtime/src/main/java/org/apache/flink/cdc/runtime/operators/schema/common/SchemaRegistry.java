@@ -19,6 +19,8 @@ package org.apache.flink.cdc.runtime.operators.schema.common;
 
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
+import org.apache.flink.cdc.common.event.CreateTableEvent;
+import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.RouteMode;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
@@ -92,6 +94,7 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
     protected final List<RouteRule> routingRules;
     protected final RouteMode routeMode;
     protected final SchemaChangeBehavior behavior;
+    protected final boolean existingTableSchemaExpansionEnabled;
 
     // -------------------------
     // Dynamically initialized transient fields (after coordinator starts)
@@ -101,6 +104,7 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
     protected transient Map<Integer, Throwable> failedReasons;
     protected transient SchemaManager schemaManager;
     protected transient TableIdRouter router;
+    protected transient ExistingTableSchemaExpander existingTableSchemaExpander;
 
     private final Object lifecycleLock = new Object();
     private volatile boolean resetting;
@@ -114,6 +118,7 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
             List<RouteRule> routingRules,
             RouteMode routeMode,
             SchemaChangeBehavior schemaChangeBehavior,
+            boolean existingTableSchemaExpansionEnabled,
             Duration rpcTimeout) {
         this.context = context;
         this.operatorName = operatorName;
@@ -123,6 +128,7 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
         this.routeMode = routeMode;
         this.rpcTimeout = rpcTimeout;
         this.behavior = schemaChangeBehavior;
+        this.existingTableSchemaExpansionEnabled = existingTableSchemaExpansionEnabled;
     }
 
     // ---------------
@@ -145,6 +151,28 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
             this.schemaManager = new SchemaManager();
         }
         this.router = new TableIdRouter(routingRules, routeMode);
+        if (existingTableSchemaExpansionEnabled) {
+            try {
+                metadataApplier
+                        .getExistingTableSchemaExpansionSupport()
+                        .ifPresent(
+                                support ->
+                                        this.existingTableSchemaExpander =
+                                                new ExistingTableSchemaExpander(
+                                                        metadataApplier, support, behavior));
+            } catch (Exception e) {
+                LOG.warn(
+                        "Failed to initialize existing target table schema expansion. The sink's original schema handling will be used.",
+                        e);
+            }
+        }
+    }
+
+    /** Tries optional target schema expansion without changing the sink's failure behavior. */
+    protected void expandExistingTableSchemaIfNeeded(SchemaChangeEvent schemaChangeEvent) {
+        if (existingTableSchemaExpander != null && schemaChangeEvent instanceof CreateTableEvent) {
+            existingTableSchemaExpander.expand((CreateTableEvent) schemaChangeEvent);
+        }
     }
 
     @Override

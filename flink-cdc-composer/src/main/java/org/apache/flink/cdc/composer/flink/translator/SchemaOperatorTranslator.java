@@ -42,6 +42,7 @@ import java.util.List;
 @Internal
 public class SchemaOperatorTranslator {
     private final SchemaChangeBehavior schemaChangeBehavior;
+    private final boolean existingTableSchemaExpansionEnabled;
     private final String schemaOperatorUid;
     private final Duration rpcTimeOut;
     private final String timezone;
@@ -51,7 +52,17 @@ public class SchemaOperatorTranslator {
             String schemaOperatorUid,
             Duration rpcTimeOut,
             String timezone) {
+        this(schemaChangeBehavior, false, schemaOperatorUid, rpcTimeOut, timezone);
+    }
+
+    public SchemaOperatorTranslator(
+            SchemaChangeBehavior schemaChangeBehavior,
+            boolean existingTableSchemaExpansionEnabled,
+            String schemaOperatorUid,
+            Duration rpcTimeOut,
+            String timezone) {
         this.schemaChangeBehavior = schemaChangeBehavior;
+        this.existingTableSchemaExpansionEnabled = existingTableSchemaExpansionEnabled;
         this.schemaOperatorUid = schemaOperatorUid;
         this.rpcTimeOut = rpcTimeOut;
         this.timezone = timezone;
@@ -146,6 +157,7 @@ public class SchemaOperatorTranslator {
                                 routeMode,
                                 rpcTimeOut,
                                 schemaChangeBehavior,
+                                existingTableSchemaExpansionEnabled,
                                 timezone));
         stream.uid(schemaOperatorUid).setParallelism(parallelism);
         return stream;
@@ -171,7 +183,12 @@ public class SchemaOperatorTranslator {
                         "SchemaBatchOperator",
                         new EventTypeInfo(),
                         new BatchSchemaOperator(
-                                routingRules, routeMode, metadataApplier, timezone));
+                                routingRules,
+                                routeMode,
+                                metadataApplier,
+                                schemaChangeBehavior,
+                                existingTableSchemaExpansionEnabled,
+                                timezone));
         stream.uid(schemaOperatorUid).setParallelism(parallelism);
         return stream;
     }
@@ -213,6 +230,7 @@ public class SchemaOperatorTranslator {
                                 routeMode,
                                 rpcTimeOut,
                                 schemaChangeBehavior,
+                                existingTableSchemaExpansionEnabled,
                                 timezone))
                 .uid(schemaOperatorUid)
                 .setParallelism(parallelism);

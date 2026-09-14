@@ -30,6 +30,7 @@ import org.apache.flink.cdc.common.route.TableIdRouter;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.runtime.operators.AbstractStreamOperatorAdapter;
+import org.apache.flink.cdc.runtime.operators.schema.common.ExistingTableSchemaExpander;
 import org.apache.flink.cdc.runtime.operators.schema.common.SchemaDerivator;
 import org.apache.flink.cdc.runtime.operators.schema.common.SchemaManager;
 import org.apache.flink.streaming.api.graph.StreamConfig;
@@ -60,12 +61,15 @@ public class BatchSchemaOperator extends AbstractStreamOperatorAdapter<Event>
     private final String timezone;
     private final List<RouteRule> routingRules;
     private final RouteMode routeMode;
+    private final SchemaChangeBehavior schemaChangeBehavior;
+    private final boolean existingTableSchemaExpansionEnabled;
 
     // Transient fields that are set during open()
     private transient volatile Map<TableId, Schema> originalSchemaMap;
     private transient volatile Map<TableId, Schema> evolvedSchemaMap;
     private transient TableIdRouter router;
     private transient SchemaDerivator derivator;
+    private transient ExistingTableSchemaExpander existingTableSchemaExpander;
     protected transient SchemaManager schemaManager;
     protected MetadataApplier metadataApplier;
     private boolean alreadyMergedCreateTableTables = false;
@@ -75,11 +79,29 @@ public class BatchSchemaOperator extends AbstractStreamOperatorAdapter<Event>
             RouteMode routeMode,
             MetadataApplier metadataApplier,
             String timezone) {
+        this(
+                routingRules,
+                routeMode,
+                metadataApplier,
+                SchemaChangeBehavior.IGNORE,
+                false,
+                timezone);
+    }
+
+    public BatchSchemaOperator(
+            List<RouteRule> routingRules,
+            RouteMode routeMode,
+            MetadataApplier metadataApplier,
+            SchemaChangeBehavior schemaChangeBehavior,
+            boolean existingTableSchemaExpansionEnabled,
+            String timezone) {
         this.chainingStrategy = ChainingStrategy.ALWAYS;
         this.timezone = timezone;
         this.routingRules = routingRules;
         this.routeMode = routeMode;
         this.metadataApplier = metadataApplier;
+        this.schemaChangeBehavior = schemaChangeBehavior;
+        this.existingTableSchemaExpansionEnabled = existingTableSchemaExpansionEnabled;
     }
 
     @Override
@@ -98,6 +120,23 @@ public class BatchSchemaOperator extends AbstractStreamOperatorAdapter<Event>
         this.router = new TableIdRouter(routingRules, routeMode);
         this.derivator = new SchemaDerivator();
         this.schemaManager = new SchemaManager(SchemaChangeBehavior.IGNORE);
+        if (existingTableSchemaExpansionEnabled) {
+            try {
+                metadataApplier
+                        .getExistingTableSchemaExpansionSupport()
+                        .ifPresent(
+                                support ->
+                                        this.existingTableSchemaExpander =
+                                                new ExistingTableSchemaExpander(
+                                                        metadataApplier,
+                                                        support,
+                                                        schemaChangeBehavior));
+            } catch (Exception e) {
+                LOG.warn(
+                        "Failed to initialize existing target table schema expansion. The sink's original schema handling will be used.",
+                        e);
+            }
+        }
     }
 
     /**
@@ -170,6 +209,10 @@ public class BatchSchemaOperator extends AbstractStreamOperatorAdapter<Event>
 
     private boolean applyAndUpdateEvolvedSchemaChange(SchemaChangeEvent schemaChangeEvent) {
         try {
+            if (existingTableSchemaExpander != null
+                    && schemaChangeEvent instanceof CreateTableEvent) {
+                existingTableSchemaExpander.expand((CreateTableEvent) schemaChangeEvent);
+            }
             metadataApplier.applySchemaChange(schemaChangeEvent);
             schemaManager.applyEvolvedSchemaChange(schemaChangeEvent);
             LOG.info(
