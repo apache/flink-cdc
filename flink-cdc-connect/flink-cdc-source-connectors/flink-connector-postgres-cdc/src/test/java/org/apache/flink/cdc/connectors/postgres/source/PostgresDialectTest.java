@@ -21,6 +21,7 @@ import org.apache.flink.cdc.connectors.postgres.PostgresTestBase;
 import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfigFactory;
 import org.apache.flink.cdc.connectors.postgres.testutils.UniqueDatabase;
 
+import io.debezium.connector.postgresql.connection.PostgresConnection;
 import io.debezium.relational.TableId;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -95,6 +96,24 @@ class PostgresDialectTest extends PostgresTestBase {
                 dialectOfInventoryDatabase2.discoverDataCollections(
                         configFactoryOfInventoryDatabase2.create(0));
         Assertions.assertThat(tableIdsOfInventoryDatabase2).isEmpty();
+    }
+
+    @Test
+    void testJdbcConnectionApplicationName() throws Exception {
+        customDatabase.createAndInitialize();
+        PostgresSourceConfigFactory configFactory =
+                getMockPostgresSourceConfigFactory(customDatabase, "customer", "Customers", 1);
+        PostgresDialect dialect = new PostgresDialect(configFactory.create(0));
+
+        try (PostgresConnection connection = dialect.openJdbcConnection()) {
+            connection.query(
+                    "SHOW application_name",
+                    resultSet -> {
+                        Assertions.assertThat(resultSet.next()).isTrue();
+                        Assertions.assertThat(resultSet.getString(1))
+                                .isEqualTo("postgres-cdc-connector");
+                    });
+        }
     }
 
     @Test
