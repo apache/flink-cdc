@@ -21,6 +21,7 @@ import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
 
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -158,6 +159,56 @@ class MysqlE2eITCase extends PipelineTestEnvironment {
                 "DataChangeEvent{tableId=%s.products, before=[110, jacket, water resistent white wind breaker, 0.2, null, null, null, 1], after=[110, jacket, new water resistent white wind breaker, 0.5, null, null, null, 1], op=UPDATE, meta=()}",
                 "DataChangeEvent{tableId=%s.products, before=[111, scooter, Big 2-wheel scooter , 5.18, null, null, null, 1], after=[111, scooter, Big 2-wheel scooter , 5.17, null, null, null, 1], op=UPDATE, meta=()}",
                 "DataChangeEvent{tableId=%s.products, before=[111, scooter, Big 2-wheel scooter , 5.17, null, null, null, 1], after=[], op=DELETE, meta=()}");
+    }
+
+    @Test
+    void testTableCommentWithTransform() throws Exception {
+        String mysqlJdbcUrl =
+                String.format(
+                        "jdbc:mysql://%s:%s/%s",
+                        MYSQL.getHost(),
+                        MYSQL.getDatabasePort(),
+                        mysqlInventoryDatabase.getDatabaseName());
+        try (Connection conn =
+                        DriverManager.getConnection(
+                                mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
+                Statement stat = conn.createStatement()) {
+            stat.execute("ALTER TABLE products COMMENT = 'mysql table comment through transform';");
+        }
+
+        String pipelineJob =
+                String.format(
+                        "source:\n"
+                                + "  type: mysql\n"
+                                + "  hostname: %s\n"
+                                + "  port: 3306\n"
+                                + "  username: %s\n"
+                                + "  password: %s\n"
+                                + "  tables: %s.products\n"
+                                + "  server-id: 5400-5404\n"
+                                + "  server-time-zone: UTC\n"
+                                + "  include-comments.enabled: true\n"
+                                + "\n"
+                                + "transform:\n"
+                                + "  - source-table: \\.*.\\.*\n"
+                                + "    projection: \\*\n"
+                                + "\n"
+                                + "sink:\n"
+                                + "  type: values",
+                        INTER_CONTAINER_MYSQL_ALIAS,
+                        MYSQL_TEST_USER,
+                        MYSQL_TEST_PASSWORD,
+                        mysqlInventoryDatabase.getDatabaseName());
+
+        submitPipelineJob(pipelineJob);
+        waitUntilJobRunning(Duration.ofSeconds(30));
+        waitUntilLogContains(
+                taskManagerConsumer,
+                String.format(
+                        "CreateTableEvent{tableId=%s.products",
+                        mysqlInventoryDatabase.getDatabaseName()));
+        Assertions.assertThat(taskManagerConsumer.toUtf8String())
+                .contains("comment=mysql table comment through transform");
     }
 
     @Test
