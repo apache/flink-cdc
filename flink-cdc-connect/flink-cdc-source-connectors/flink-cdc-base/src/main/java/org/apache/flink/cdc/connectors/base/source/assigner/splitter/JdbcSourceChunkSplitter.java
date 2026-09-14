@@ -67,7 +67,8 @@ public abstract class JdbcSourceChunkSplitter implements ChunkSplitter {
     @Nullable private ChunkSplitterState.ChunkBound nextChunkStart;
     @Nullable private Integer nextChunkId;
 
-    private JdbcConnection jdbcConnection;
+    @Nullable private JdbcConnection jdbcConnection;
+    private boolean closed;
     private Table currentSplittingTable;
     private TableChanges.TableChange currentSchema;
     private Column splitColumn;
@@ -163,24 +164,32 @@ public abstract class JdbcSourceChunkSplitter implements ChunkSplitter {
 
     @Override
     public void close() {
-        releaseConnection();
+        synchronized (lock) {
+            closed = true;
+            releaseConnection();
+        }
     }
 
     private JdbcConnection getConnection() {
-        if (jdbcConnection == null) {
-            jdbcConnection = dialect.openJdbcConnection(sourceConfig);
+        synchronized (lock) {
+            Preconditions.checkState(!closed, "The chunk splitter has been closed.");
+            if (jdbcConnection == null) {
+                jdbcConnection = dialect.openJdbcConnection(sourceConfig);
+            }
+            return jdbcConnection;
         }
-        return jdbcConnection;
     }
 
     private void releaseConnection() {
-        if (jdbcConnection != null) {
-            try {
-                jdbcConnection.close();
-            } catch (Exception e) {
-                LOG.warn("Failed to close the JDBC connection of the chunk splitter.", e);
-            } finally {
-                jdbcConnection = null;
+        synchronized (lock) {
+            if (jdbcConnection != null) {
+                try {
+                    jdbcConnection.close();
+                } catch (Exception e) {
+                    LOG.warn("Failed to close the JDBC connection of the chunk splitter.", e);
+                } finally {
+                    jdbcConnection = null;
+                }
             }
         }
     }
