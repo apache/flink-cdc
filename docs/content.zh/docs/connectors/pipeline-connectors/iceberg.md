@@ -259,6 +259,98 @@ Pipeline 连接器选项
 
 * 不支持精确一次（Exactly-Once）语义。连接器采用至少一次（At-Least-Once）+ 主键幂等写入的方式保证数据一致性。
 
+表维护
+-----------------
+
+Iceberg sink 可以在流式 CDC 作业中直接接入 Iceberg 1.10.1 的 `TableMaintenance` API，支持 `RewriteDataFiles`（binpack 数据文件合并）、`ExpireSnapshots`（快照过期）和 `DeleteOrphanFiles`（孤儿文件清理）。维护功能默认关闭，各维护任务也需要单独开启。
+
+支持 CDC 自动创建目标表，**无需提前建表**。省略 `sink.maintenance.tables` 时，提交客户端会发现 source 实际同步的表（应用包含和排除规则），按 pipeline 的路由规则及匹配模式推导最终目标表，并去重。目前支持 MySQL、PostgreSQL、Oracle 和 SQL Server pipeline source；PostgreSQL 还会遵循 `table-id.include-database` 配置。其他 source 需要显式配置 `sink.maintenance.tables`。
+
+如果只需维护部分表，可选填 `sink.maintenance.tables`，使用路由后的最终目标标识符，以分号分隔；显式列表优先，不再执行自动推导。标识符为不带引号的 `database.table` 或 `namespace.database.table`，各部分仅包含 ASCII 字母、数字、下划线或连字符。此可选列表不支持匹配表达式。自动推导的表名直接保留原始名称，支持中文以及 `$`、`;` 等字符，不会按此配置列表重新解析。
+
+提交时只确定目标表集合。目标表不存在时，维护算子等待 CDC 按原有 `CreateTableEvent` 流程建表；等待不会阻塞算子启动和 checkpoint，也不会执行文件清理。表出现后，维护开始观测提交并按配置触发。推导结果为空会拒绝提交；不同标识符解析到同一个 Iceberg 表 UUID 也会报错，提交时校验已有表，运行时通过共用一个 catalog 连接的校验算子，在各目标首次就绪时校验并记录标识符和 UUID，后续轮询不再重复加载所有目标。提交后新增的表不会自动加入维护，需重新提交作业。提交客户端需要具备源端元数据访问权限。请使用同一构建版本的 CDC runtime/composer、source 连接器和 Iceberg 连接器；只替换 Iceberg 连接器，无法给旧版 CDC 安装增加提交时推导能力。
+
+请在 Flink 配置中开启 checkpoint（例如 `execution.checkpointing.interval: 60 s`），并使用流式执行模式。集群需要提供匹配 Flink 版本的 `flink-table-runtime`，Iceberg 的孤儿清理使用它读取元数据。CDC 将通过就绪检查的表变化流交给原生 `TableMaintenance.forChangeStream(...).add(...).append()`，由 Iceberg 生成触发、锁、任务、错误流和聚合拓扑。CDC composer 在完整 `StreamGraph` 生成后、提交前适配特定算子，将依赖表元数据的初始化延迟到首次输入，并补齐 catalog 的关闭；原生状态算子的状态和图中的 UID、连线保持不变。Flink 2.x 使用公开的算子工厂 setter；Flink 1.20 由兼容层校验并访问对应字段。此适配依赖 Iceberg 的内部 API 和 Flink 算子实现，升级任一组件时都需验证。维护拓扑为每张表增加监控 source 和任务算子，复用 sink 的 catalog 及 `hadoop.conf.*` 配置。除了 CDC 算子所需的 slot，还需为维护任务的 slot sharing group 分配资源。
+
+以下 sink 配置在观测到 10 次提交或经过一小时后尝试合并文件，每天执行快照过期，每周检查孤儿文件：
+
+```yaml
+sink:
+  type: iceberg
+  catalog.properties.type: hadoop
+  catalog.properties.warehouse: /path/warehouse
+  sink.maintenance.enabled: true
+  # 可选：只维护指定的目标表；省略时根据 source 和 route 自动推导。
+  # sink.maintenance.tables: sales.orders;sales.customers
+  sink.maintenance.uid-prefix: sales-maintenance
+  sink.maintenance.parallelism: 2
+  sink.maintenance.lock.jdbc.uri: jdbc:postgresql://lock-db:5432/iceberg
+  sink.maintenance.lock.jdbc.properties.user: maintenance
+  sink.maintenance.lock.jdbc.properties.password: <password>
+  sink.maintenance.lock.jdbc.init-lock-tables: true
+  sink.maintenance.rewrite-data-files.enabled: true
+  sink.maintenance.rewrite-data-files.commit-count: 10
+  sink.maintenance.rewrite-data-files.interval: 1 h
+  sink.maintenance.expire-snapshots.enabled: true
+  sink.maintenance.expire-snapshots.interval: 1 d
+  sink.maintenance.expire-snapshots.max-age: 7 d
+  sink.maintenance.expire-snapshots.retain-last: 100
+  sink.maintenance.delete-orphan-files.enabled: true
+  sink.maintenance.delete-orphan-files.interval: 7 d
+  sink.maintenance.delete-orphan-files.min-age: 7 d
+```
+
+JDBC 数据库用于持久化维护锁，与表的 catalog 类型无关。将 JDBC 驱动放入 CDC 安装目录的 `lib`，使提交客户端可以加载驱动，并通过 CLI 的 `--jar` 参数将驱动提交给作业；确保 Flink worker 可以访问数据库。`--jar` 只负责将 JAR 加入作业依赖，不会将它加入提交客户端的 classpath。首次使用时可将 `lock.jdbc.init-lock-tables` 设为 `true`，或提前建立 Iceberg 所需的锁表。初始化由提交客户端统一执行一次，因此客户端也需要访问数据库；运行中的算子不会竞争建表。建表后请使用 `false`。恢复时保持数据库、凭据和 UID 前缀稳定。不要通过多个维护作业同时维护同一张表，也不能同时开启原有的 `sink.compaction.enabled`。
+
+### 维护配置
+
+下列配置项均以 `sink.maintenance.` 为前缀，统一应用于所有选中的目标表。任务专属配置仅在相应任务开启时生效。
+
+| 配置项 | 默认值 | 说明 |
+| --- | --- | --- |
+| `enabled` | `false` | 开启维护拓扑，必须至少开启一项维护任务。 |
+| `tables` | 无 | 可选，以分号分隔的目标表标识符；省略时在提交阶段根据 source 实际同步表及 route 推导。 |
+| `uid-prefix` | `iceberg-maintenance` | 稳定的算子 UID 和锁身份前缀，不同独立 pipeline 应使用不同前缀。 |
+| `parallelism` | `1` | 每张表维护任务的默认并行度；监控和调度算子保持单并行度。 |
+| `slot-sharing-group` | `iceberg-maintenance` | 维护算子的 slot sharing group。 |
+| `rate-limit` | `1 min` | 表轮询间隔和最小调度间隔，必须为正整数秒。 |
+| `lock-check-delay` | `30 s` | 获取维护锁失败后的重试等待时间。 |
+| `max-read-back` | `100` | 每次轮询最多检查的快照数，也适用于启动时。 |
+| `lock.jdbc.uri` | 无 | 必填，保存维护锁的 JDBC 数据库 URL。 |
+| `lock.jdbc.init-lock-tables` | `false` | 提交时创建尚不存在的 Iceberg 锁表。 |
+| `lock.jdbc.properties.*` | 无 | JDBC 连接属性，例如后缀 `user` 对应 Iceberg 的 `jdbc.user`。 |
+| `rewrite-data-files.enabled` | `false` | 开启数据文件重写。 |
+| `rewrite-data-files.interval` | `1 h` | 数据文件重写的时间触发间隔。 |
+| `rewrite-data-files.commit-count` | 无 | 按观测到的非 replace 快照提交数增加触发条件。 |
+| `rewrite-data-files.data-file-count` | 无 | 按新增数据文件数增加触发条件。 |
+| `rewrite-data-files.target-file-size-bytes` | `536870912` | 重写目标文件大小，单位为字节，默认 512 MiB。 |
+| `rewrite-data-files.min-input-files` | `5` | 重写规划使用的输入文件数阈值。 |
+| `rewrite-data-files.delete-file-threshold` | `2147483647` | 单个数据文件关联的 delete file 数量达到此阈值时可被选中重写。 |
+| `rewrite-data-files.max-rewrite-bytes` | `10737418240` | 每轮重写的最大输入字节数，默认 10 GiB。文件组上限取此预算与 100 GiB 的较小值，大分区可分多轮处理；单个输入文件超过预算时，需要调大此值。 |
+| `expire-snapshots.enabled` | `false` | 开启快照过期及不再被引用的文件清理。 |
+| `expire-snapshots.interval` | `1 d` | 快照过期的时间触发间隔。 |
+| `expire-snapshots.commit-count` | 无 | 快照过期的额外提交次数触发条件。 |
+| `expire-snapshots.max-age` | `7 d` | 快照过期的时间阈值。 |
+| `expire-snapshots.retain-last` | `100` | 最少保留的快照数量。 |
+| `delete-orphan-files.enabled` | `false` | 开启表存储位置下的孤儿文件清理。 |
+| `delete-orphan-files.interval` | `7 d` | 孤儿文件清理的时间触发间隔。 |
+| `delete-orphan-files.min-age` | `7 d` | 孤儿候选文件的最小年龄，必须至少为 3 天。 |
+| `delete-batch-size` | `1000` | 快照过期和孤儿清理的文件删除批大小。 |
+
+### 触发、保留与恢复
+
+每张表的每个任务独立计算触发条件，同一任务的多个条件按 **OR** 组合。例如同时配置 `commit-count: 10` 和 `interval: 1 h`，满足其中任一条件即可触发。监控 source 读取的是 Iceberg 快照，不是 CDC 提交消息或 checkpoint 次数；空 checkpoint 不增加计数。其他 writer 的提交也可被观测到，维护产生的 `replace` 快照会跳过。首次启动可能计入已有快照历史，超出 `max-read-back` 或已经过期的历史不会计入。请按表的提交频率配置轮询间隔和回溯上限。
+
+表尚未创建时不会向调度器发送变更，时间触发也不会启动。表已经存在但没有新快照时，监控 source 也会产生空变更，因此空闲表仍可按时间触发。执行时间可能受到轮询、限速、锁和前序任务耗时的影响。同一张表的维护任务串行执行。达到触发阈值只表示开始一次规划，重写规划仍可能找不到符合条件的文件。可以通过 Iceberg 的维护日志和指标查看任务结果。维护任务失败时，CDC 作业可能仍继续运行，因此需要单独监控维护结果，不能只检查作业状态。后续触发可以再次尝试执行该任务。
+
+快照过期必须保留读取任务、增量消费者和 CDC 恢复所需的历史。应同时配置年龄和最少保留数量，以覆盖所需保留窗口；Iceberg 的分支和标签也会影响快照保留。孤儿清理会永久删除旧的未引用文件，其中可能包含长时间运行的 writer 尚未提交的文件。最小年龄必须大于最长写入、停机和恢复时间，并且不同表必须使用独立的存储位置。3 天的校验下限并不能保证所有部署的保留窗口都足够安全。
+
+连接器会刷新 Iceberg 1.10 孤儿清理算子使用的快照列表，以识别新提交和已经过期的快照。对于没有已提交快照的表，会推迟孤儿清理，保护空表元数据；表属性 `gc.enabled` 为 `false` 时也会阻止清理。Iceberg 会将这些尝试记录为失败任务并输出诊断信息，存在快照且允许垃圾回收后，可在后续触发中继续清理。孤儿文件扫描使用 Iceberg 原生的 FileIO 前缀列举能力，以保留表的存储配置，包括 CDC 的 `hadoop.conf.*` 参数。孤儿清理要求 FileIO 实现 `SupportsPrefixOperations`，文件删除要求实现 `SupportsBulkOperations`；Iceberg 的 `HadoopFileIO` 和 `S3FileIO` 均支持这两项能力。延迟加载和此兼容适配要求 catalog 返回 Iceberg `BaseTable` 实例，内置 catalog 满足此条件。
+
+有状态算子的 UID 由前缀、目标表标识符和已启用任务集合生成，调整表配置顺序不会改变 UID。从 checkpoint 或 savepoint 恢复时，请保持这些设置和锁配置稳定。由于 Iceberg 按任务索引保存状态，修改任务集合会生成新的 UID，常规恢复会拒绝无法匹配的旧维护状态。这类修改需要显式使用新的维护状态。底层 API 和任务行为参见 [Iceberg Flink maintenance 文档](https://iceberg.apache.org/docs/1.10.1/flink-maintenance/)。
+
+从 checkpoint 或 savepoint 恢复提交时，会再次根据源端当前元数据执行推导。请保持最终目标表集合稳定；如果源表或路由发生变化，可先显式配置原目标表列表，以保留维护拓扑，再按需迁移状态。
+
 数据类型映射
 ----------------
 <div class="wy-table-responsive">

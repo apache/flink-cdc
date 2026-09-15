@@ -20,11 +20,13 @@ package org.apache.flink.cdc.connectors.mysql.source;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.common.source.EventSourceProvider;
 import org.apache.flink.cdc.common.source.FlinkSourceProvider;
 import org.apache.flink.cdc.common.source.MetadataAccessor;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
+import org.apache.flink.cdc.common.source.SupportsTableDiscovery;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import org.apache.flink.cdc.connectors.mysql.source.reader.MySqlPipelineRecordEmitter;
@@ -36,10 +38,11 @@ import io.debezium.relational.RelationalDatabaseConnectorConfig;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /** A {@link DataSource} for mysql cdc connector. */
 @Internal
-public class MySqlDataSource implements DataSource {
+public class MySqlDataSource implements DataSource, SupportsTableDiscovery {
 
     private final MySqlSourceConfigFactory configFactory;
     private final MySqlSourceConfig sourceConfig;
@@ -88,6 +91,22 @@ public class MySqlDataSource implements DataSource {
                                         isTableIdCaseInsensitive));
 
         return FlinkSourceProvider.of(source);
+    }
+
+    @Override
+    public List<TableId> listCapturedTables() {
+        return getMetadataAccessor().listTables(null, null).stream()
+                .filter(table -> sourceConfig.getDatabaseFilter().test(table.getSchemaName()))
+                .filter(
+                        table ->
+                                sourceConfig
+                                        .getTableFilter()
+                                        .test(
+                                                new io.debezium.relational.TableId(
+                                                        table.getSchemaName(),
+                                                        null,
+                                                        table.getTableName())))
+                .collect(Collectors.toList());
     }
 
     @Override

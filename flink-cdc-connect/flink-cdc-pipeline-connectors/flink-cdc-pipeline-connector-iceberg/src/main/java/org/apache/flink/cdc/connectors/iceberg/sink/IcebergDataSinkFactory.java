@@ -26,6 +26,7 @@ import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.connectors.iceberg.sink.utils.OptionUtils;
 import org.apache.flink.cdc.connectors.iceberg.sink.v2.compaction.CompactionOptions;
+import org.apache.flink.cdc.connectors.iceberg.sink.v2.maintenance.MaintenanceOptions;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 
@@ -57,7 +58,13 @@ public class IcebergDataSinkFactory implements DataSinkFactory {
     public DataSink createDataSink(Context context) {
         FactoryHelper.createFactoryHelper(this, context)
                 .validateExcept(
-                        PREFIX_TABLE_PROPERTIES, PREFIX_CATALOG_PROPERTIES, PREFIX_HADOOP_CONF);
+                        PREFIX_TABLE_PROPERTIES,
+                        PREFIX_CATALOG_PROPERTIES,
+                        PREFIX_HADOOP_CONF,
+                        MaintenanceOptions.JDBC_PROPERTIES_PREFIX);
+
+        MaintenanceOptions maintenanceOptions =
+                MaintenanceOptions.fromConfiguration(context.getFactoryConfiguration());
 
         Map<String, String> allOptions = context.getFactoryConfiguration().toMap();
         OptionUtils.printOptions(IDENTIFIER, allOptions);
@@ -120,7 +127,8 @@ public class IcebergDataSinkFactory implements DataSinkFactory {
                 schemaOperatorUid,
                 compactionOptions,
                 jobIdPrefix,
-                hadoopConfOptions);
+                hadoopConfOptions,
+                maintenanceOptions);
     }
 
     static Map<String, String> extractHadoopConfOptions(Map<String, String> allOptions) {
@@ -169,6 +177,7 @@ public class IcebergDataSinkFactory implements DataSinkFactory {
         options.add(IcebergDataSinkOptions.SINK_COMPACTION_COMMIT_INTERVAL);
         options.add(IcebergDataSinkOptions.SINK_COMPACTION_PARALLELISM);
         options.add(IcebergDataSinkOptions.JOB_ID_PREFIX);
+        options.addAll(MaintenanceOptions.supportedOptions());
         return options;
     }
 }
