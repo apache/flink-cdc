@@ -132,13 +132,13 @@ public class SchemaCoordinator extends SchemaRegistry {
     @Override
     public void start() throws Exception {
         super.start();
-        reinitializeTransientState();
+        initialize();
         LOG.info(
                 "Started SchemaRegistry for {}. Parallelism: {}", operatorName, currentParallelism);
     }
 
     @Override
-    protected void reinitializeTransientState() {
+    protected void initialize() {
         if (pendingRequests != null) {
             pendingRequests.forEach(
                     (index, tuple) ->
@@ -157,7 +157,7 @@ public class SchemaCoordinator extends SchemaRegistry {
     }
 
     @Override
-    protected void quiesceSchemaChangeExecutor() throws Exception {
+    protected void shutdown() throws Exception {
         schemaChangeThreadPool.shutdownNow();
         if (!schemaChangeThreadPool.awaitTermination(
                 rpcTimeout.toMillis(), TimeUnit.MILLISECONDS)) {

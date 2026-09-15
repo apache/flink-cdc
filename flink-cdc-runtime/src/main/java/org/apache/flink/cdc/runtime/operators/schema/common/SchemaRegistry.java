@@ -165,11 +165,14 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
     /** Restore schema registry state from byte array. */
     protected abstract void restore(byte[] checkpointData) throws Exception;
 
-    /** Stops schema-change work from the previous coordinator generation. */
-    protected abstract void quiesceSchemaChangeExecutor() throws Exception;
+    /**
+     * Stops schema-change work from the previous coordinator generation. Implementations must block
+     * until the previous generation's worker has fully exited, within {@link #rpcTimeout}.
+     */
+    protected abstract void shutdown() throws Exception;
 
-    /** Recreates transient state after a coordinator reset. */
-    protected abstract void reinitializeTransientState();
+    /** (Re)initializes transient state, both on {@link #start()} and after a coordinator reset. */
+    protected abstract void initialize();
 
     // ------------------------------------
     // Overridable event & request handlers
@@ -351,14 +354,14 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
             generation++;
         }
         awaitCoordinatorExecutor();
-        quiesceSchemaChangeExecutor();
+        shutdown();
         if (checkpointData == null) {
             schemaManager = new SchemaManager();
         } else {
             restore(checkpointData);
         }
         initializeBaseRuntimeState();
-        reinitializeTransientState();
+        initialize();
         synchronized (lifecycleLock) {
             resetting = false;
         }
