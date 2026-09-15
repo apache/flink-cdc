@@ -27,7 +27,6 @@ import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.common.source.SupportsTableDiscovery;
 import org.apache.flink.cdc.composer.definition.PipelineDef;
 
-import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -75,8 +74,6 @@ public final class TargetTableDiscovery {
                         pipeline.getRouteMode());
         return capturedTables.stream()
                 .flatMap(table -> router.route(table).stream())
-                .distinct()
-                .sorted(Comparator.comparing(TableId::identifier))
                 .collect(Collectors.toList());
     }
 }

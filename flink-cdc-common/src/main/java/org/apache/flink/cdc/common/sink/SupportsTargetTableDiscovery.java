@@ -27,8 +27,10 @@ import java.util.function.Supplier;
 @Internal
 public interface SupportsTargetTableDiscovery {
     /**
-     * Loads routed target tables only if required by the sink configuration. The supplier is valid
-     * during this call only and must not be retained or serialized into the runtime topology.
+     * Loads routed target tables only if required by the sink configuration. Results may contain
+     * duplicates and have no guaranteed order; the sink is responsible for any normalization. The
+     * supplier is valid during this call only and must not be retained or serialized into the
+     * runtime topology.
      */
     void discoverTargetTables(Supplier<List<TableId>> targetTables);
 }

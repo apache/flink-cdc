@@ -206,6 +206,9 @@ public final class TableMaintenanceTopology {
         String uid = uidSuffix(options, tableId);
         DeferredTableLoader loader =
                 new DeferredTableLoader(tableLoader(catalogLoader, tableId), tableName(tableId));
+        TaskRegistration registration =
+                new TaskRegistration(
+                        adapter, loader, options.get(MaintenanceOptions.DELETE_BATCH_SIZE));
         JdbcLockFactory lockFactory =
                 new JdbcLockFactory(
                         options.get(MaintenanceOptions.JDBC_URI),
@@ -223,16 +226,12 @@ public final class TableMaintenanceTopology {
                     new RewriteDataFiles.Builder() {
                         @Override
                         protected TableLoader tableLoader() {
-                            TableLoader bound = super.tableLoader();
-                            adapter.register(
+                            return registration.register(
+                                    super.tableLoader(),
                                     uidSuffix(),
                                     tableName(),
                                     taskName(),
-                                    index(),
-                                    bound,
-                                    loader,
-                                    options.get(MaintenanceOptions.DELETE_BATCH_SIZE));
-                            return bound;
+                                    index());
                         }
                     };
             rewrite.scheduleOnInterval(options.get(MaintenanceOptions.REWRITE_INTERVAL))
@@ -260,16 +259,12 @@ public final class TableMaintenanceTopology {
                     new ExpireSnapshots.Builder() {
                         @Override
                         protected TableLoader tableLoader() {
-                            TableLoader bound = super.tableLoader();
-                            adapter.register(
+                            return registration.register(
+                                    super.tableLoader(),
                                     uidSuffix(),
                                     tableName(),
                                     taskName(),
-                                    index(),
-                                    bound,
-                                    loader,
-                                    options.get(MaintenanceOptions.DELETE_BATCH_SIZE));
-                            return bound;
+                                    index());
                         }
                     };
             expire.scheduleOnInterval(options.get(MaintenanceOptions.EXPIRE_INTERVAL))
@@ -287,16 +282,12 @@ public final class TableMaintenanceTopology {
                     new RefreshingDeleteOrphanFilesBuilder() {
                         @Override
                         protected TableLoader tableLoader() {
-                            TableLoader bound = super.tableLoader();
-                            adapter.register(
+                            return registration.register(
+                                    super.tableLoader(),
                                     uidSuffix(),
                                     tableName(),
                                     taskName(),
-                                    index(),
-                                    bound,
-                                    loader,
-                                    options.get(MaintenanceOptions.DELETE_BATCH_SIZE));
-                            return bound;
+                                    index());
                         }
                     };
             orphan.scheduleOnInterval(options.get(MaintenanceOptions.ORPHAN_INTERVAL))
@@ -334,6 +325,29 @@ public final class TableMaintenanceTopology {
 
     private static TableLoader tableLoader(CatalogLoader catalogLoader, TableId tableId) {
         return TableLoader.fromCatalog(catalogLoader, TableIdentifier.parse(tableId.identifier()));
+    }
+
+    /** Shares submission-time registration across native maintenance builders. */
+    private static final class TaskRegistration {
+        private final MaintenanceGraphAdapter adapter;
+        private final DeferredTableLoader deletionLoader;
+        private final int deleteBatchSize;
+
+        private TaskRegistration(
+                MaintenanceGraphAdapter adapter,
+                DeferredTableLoader deletionLoader,
+                int deleteBatchSize) {
+            this.adapter = adapter;
+            this.deletionLoader = deletionLoader;
+            this.deleteBatchSize = deleteBatchSize;
+        }
+
+        private TableLoader register(
+                TableLoader bound, String uid, String tableName, String taskName, int index) {
+            adapter.register(
+                    uid, tableName, taskName, index, bound, deletionLoader, deleteBatchSize);
+            return bound;
+        }
     }
 
     /** Uses the same catalog resolution and Hadoop options as the CDC writer. */

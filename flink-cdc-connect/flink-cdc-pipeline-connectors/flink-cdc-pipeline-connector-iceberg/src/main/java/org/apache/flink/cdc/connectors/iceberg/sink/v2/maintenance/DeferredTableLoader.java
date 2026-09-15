@@ -127,7 +127,11 @@ final class DeferredTableLoader implements TableLoader {
 
         @Override
         public FileIO io() {
-            return deletionIO == null ? super.io() : deletionIO;
+            if (deletionIO != null) {
+                return deletionIO;
+            }
+            // Runtime functions need the real FileIO's prefix and bulk-operation capabilities.
+            return loader.isReady() ? loader.actualTable().io() : super.io();
         }
 
         @Override
@@ -147,6 +151,7 @@ final class DeferredTableLoader implements TableLoader {
     private static final class DeferredOperations implements TableOperations {
         private final DeferredTableLoader loader;
         private final FileIO io;
+        private FileIO metadataIO;
 
         private DeferredOperations(DeferredTableLoader loader) {
             this.loader = loader;
@@ -174,9 +179,14 @@ final class DeferredTableLoader implements TableLoader {
 
         @Override
         public FileIO io() {
-            // Scan tasks serialize the actual FileIO class and properties as JSON. Only the
-            // submission-time deletion operators may capture the deferred serializable handle.
-            return loader.isReady() ? loader.actualTable().io() : io;
+            if (!loader.isReady()) {
+                return io;
+            }
+            if (metadataIO == null) {
+                // Metadata tasks reconstruct their FileIO from JSON, without the table loader.
+                metadataIO = HadoopConfigurationFileIO.wrap(loader.actualTable().io());
+            }
+            return metadataIO;
         }
 
         @Override

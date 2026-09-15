@@ -102,6 +102,8 @@ class TableMaintenanceTopologyTest {
                                         conf,
                                         java.util.Arrays.asList(
                                                 TableId.parse("sales.users"),
+                                                TableId.parse("sales.orders"),
+                                                TableId.parse("sales.users"),
                                                 TableId.parse("sales.orders")))))
                 .isEqualTo(first);
         conf.put("sink.maintenance.tables", "sales.orders;sales.users");
