@@ -25,8 +25,10 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 
+import java.net.URI;
 import java.net.URL;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
@@ -101,7 +103,17 @@ public class FactoryDiscoveryUtils {
                 return Optional.empty();
             }
             url = new URL(urlString);
-            if (Files.isDirectory(Paths.get(url.toURI()))) {
+            Path jarPath = resolveLocalPath(url);
+            if (jarPath == null) {
+                LOG.warn(
+                        "Cannot resolve the code source location \"{}\" of factory class \"{}\" to "
+                                + "a local path. Assuming the JAR is already on the classpath of "
+                                + "both JobManager and TaskManagers, and will not upload it.",
+                        url,
+                        factory.getClass().getCanonicalName());
+                return Optional.empty();
+            }
+            if (Files.isDirectory(jarPath)) {
                 LOG.warn(
                         "The factory class \"{}\" is contained by directory \"{}\" instead of JAR. "
                                 + "This might happen in integration test. Will ignore the directory.",
@@ -109,7 +121,7 @@ public class FactoryDiscoveryUtils {
                         url);
                 return Optional.empty();
             }
-            return Optional.of(url);
+            return Optional.of(jarPath.toUri().toURL());
         } catch (Exception e) {
             throw new RuntimeException(
                     String.format(
@@ -118,4 +130,37 @@ public class FactoryDiscoveryUtils {
                     e);
         }
     }
+
+    /**
+     * Resolves the code source location of a factory class to a local {@link Path}.
+     *
+     * <p>{@code Paths.get(URI)} requires a hierarchical URI. A code source location is not always
+     * hierarchical: when Flink runs in application mode and picks up the JARs under {@code usrlib},
+     * the user code class loader is built with <em>relative</em> URLs such as {@code
+     * file:usrlib/foo.jar}. Such a URL has no authority and its path does not start with a slash,
+     * which makes the URI opaque and {@code Paths.get(URI)} throw {@code IllegalArgumentException:
+     * URI is not hierarchical}.
+     *
+     * @return the resolved absolute path, or {@code null} if the location cannot be mapped to a
+     *     local file at all.
+     */
+    private static Path resolveLocalPath(URL url) {
+        try {
+            URI uri = url.toURI();
+            if (!uri.isOpaque()) {
+                return Paths.get(uri).toAbsolutePath();
+            }
+            // Opaque URI, e.g. the relative "file:usrlib/foo.jar" described above. The
+            // scheme-specific part is the path itself, which is resolved against the working
+            // directory of the process.
+            String schemeSpecificPart = uri.getSchemeSpecificPart();
+            if (schemeSpecificPart == null || schemeSpecificPart.isEmpty()) {
+                return null;
+            }
+            return Paths.get(schemeSpecificPart).toAbsolutePath();
+        } catch (Exception e) {
+            return null;
+        }
+    }
 }
+
