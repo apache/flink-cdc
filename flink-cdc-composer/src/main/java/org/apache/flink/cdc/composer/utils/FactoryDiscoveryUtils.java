@@ -144,7 +144,7 @@ public class FactoryDiscoveryUtils {
      * @return the resolved absolute path, or {@code null} if the location cannot be mapped to a
      *     local file at all.
      */
-    private static Path resolveLocalPath(URL url) {
+    public static Path resolveLocalPath(URL url) {
         try {
             URI uri = url.toURI();
             if (!uri.isOpaque()) {
