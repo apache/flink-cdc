@@ -347,6 +347,8 @@ JDBC 数据库用于持久化维护锁，与表的 catalog 类型无关。将 JD
 
 连接器会刷新 Iceberg 1.10 孤儿清理算子使用的快照列表，以识别新提交和已经过期的快照。对于没有已提交快照的表，会推迟孤儿清理，保护空表元数据；表属性 `gc.enabled` 为 `false` 时也会阻止清理。Iceberg 会将这些尝试记录为失败任务并输出诊断信息，存在快照且允许垃圾回收后，可在后续触发中继续清理。孤儿文件扫描使用 Iceberg 原生的 FileIO 前缀列举能力，以保留表的存储配置，包括 CDC 的 `hadoop.conf.*` 参数。孤儿清理要求 FileIO 实现 `SupportsPrefixOperations`，文件删除要求实现 `SupportsBulkOperations`；Iceberg 的 `HadoopFileIO` 和 `S3FileIO` 均支持这两项能力。延迟加载和此兼容适配要求 catalog 返回 Iceberg `BaseTable` 实例，内置 catalog 满足此条件。
 
+元数据扫描任务会在 JSON 中携带生效的 Hadoop 配置，以及原始 FileIO 实现类和 properties，确保下游元数据读取算子重建 split 后仍保留 `hadoop.conf.*`；这些参数既用于候选文件枚举，也用于读取 manifest。不依赖 Hadoop 配置的 FileIO 保留原生序列化方式。
+
 有状态算子的 UID 由前缀、目标表标识符和已启用任务集合生成，调整表配置顺序不会改变 UID。从 checkpoint 或 savepoint 恢复时，请保持这些设置和锁配置稳定。由于 Iceberg 按任务索引保存状态，修改任务集合会生成新的 UID，常规恢复会拒绝无法匹配的旧维护状态。这类修改需要显式使用新的维护状态。底层 API 和任务行为参见 [Iceberg Flink maintenance 文档](https://iceberg.apache.org/docs/1.10.1/flink-maintenance/)。
 
 从 checkpoint 或 savepoint 恢复提交时，会再次根据源端当前元数据执行推导。请保持最终目标表集合稳定；如果源表或路由发生变化，可先显式配置原目标表列表，以保留维护拓扑，再按需迁移状态。

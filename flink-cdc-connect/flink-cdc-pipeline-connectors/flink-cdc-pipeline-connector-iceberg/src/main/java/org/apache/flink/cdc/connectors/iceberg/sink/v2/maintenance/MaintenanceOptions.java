@@ -301,6 +301,7 @@ public final class MaintenanceOptions implements Serializable {
         return get(ENABLED) && tables.isEmpty() && !configuration.contains(TABLES);
     }
 
+    /** Validates and normalizes targets from any discovery provider before building maintenance. */
     public MaintenanceOptions withDiscoveredTables(List<TableId> discoveredTables) {
         checkArgument(
                 requiresTableDiscovery(), "Maintenance target tables are already configured.");

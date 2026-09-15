@@ -77,16 +77,18 @@ class TargetTableDiscoveryTest {
     }
 
     @Test
-    void preservesUnroutedTablesAndProducesStableDistinctOrder() {
+    void passesUnroutedTablesToTheSinkForNormalization() {
         RecordingSink sink = new RecordingSink(true);
         TargetTableDiscovery.initialize(
                 pipeline(RouteMode.ALL_MATCH), source("db.z", "db.a", "db.z"), sink);
-        assertThat(sink.tables).containsExactly(TableId.parse("db.a"), TableId.parse("db.z"));
+        assertThat(sink.tables)
+                .containsExactlyInAnyOrder(
+                        TableId.parse("db.z"), TableId.parse("db.a"), TableId.parse("db.z"));
     }
 
     @ParameterizedTest
     @EnumSource(RouteMode.class)
-    void honorsRouteModeAndDeduplicatesMergedTargets(RouteMode mode) {
+    void honorsRouteModeAndPassesMergedTargetsToTheSink(RouteMode mode) {
         RecordingSink sink = new RecordingSink(true);
         TargetTableDiscovery.initialize(
                 pipeline(
@@ -97,13 +99,18 @@ class TargetTableDiscoveryTest {
                 sink);
         if (mode == RouteMode.ALL_MATCH) {
             assertThat(sink.tables)
-                    .containsExactly(
+                    .containsExactlyInAnyOrder(
+                            TableId.parse("sales.orders"),
                             TableId.parse("audit.orders"),
-                            TableId.parse("db.unmatched"),
-                            TableId.parse("sales.orders"));
+                            TableId.parse("sales.orders"),
+                            TableId.parse("audit.orders"),
+                            TableId.parse("db.unmatched"));
         } else {
             assertThat(sink.tables)
-                    .containsExactly(TableId.parse("db.unmatched"), TableId.parse("sales.orders"));
+                    .containsExactlyInAnyOrder(
+                            TableId.parse("sales.orders"),
+                            TableId.parse("sales.orders"),
+                            TableId.parse("db.unmatched"));
         }
     }
 
@@ -118,7 +125,8 @@ class TargetTableDiscoveryTest {
                 source("db.orders", "db.customers_7"),
                 sink);
         assertThat(sink.tables)
-                .containsExactly(TableId.parse("sales.customers_7"), TableId.parse("sales.orders"));
+                .containsExactlyInAnyOrder(
+                        TableId.parse("sales.customers_7"), TableId.parse("sales.orders"));
     }
 
     @Test
