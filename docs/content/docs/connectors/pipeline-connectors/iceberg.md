@@ -259,6 +259,98 @@ Usage Notes
 
 * Exactly-once semantics are not supported. The connector uses at-least-once + the table's primary key for idempotent writing.
 
+Table Maintenance
+-----------------
+
+The Iceberg sink directly integrates Iceberg 1.10.1's `TableMaintenance` API into the streaming CDC job. It supports `RewriteDataFiles` (binpack data file compaction), `ExpireSnapshots`, and `DeleteOrphanFiles`. Maintenance is disabled by default; each task must also be enabled explicitly.
+
+Target tables can be **created by CDC after the job starts**; pre-creation is not required. When `sink.maintenance.tables` is omitted, the submission client discovers the tables captured by the source (including its inclusion and exclusion rules), applies the pipeline's routing rules and route mode, and deduplicates the final target identifiers. Discovery currently supports the MySQL, PostgreSQL, Oracle, and SQL Server pipeline sources. For PostgreSQL, the discovered identifiers also respect `table-id.include-database`. Other sources must configure `sink.maintenance.tables` explicitly.
+
+To maintain only selected tables, set `sink.maintenance.tables` to semicolon-separated final target identifiers after routing; this explicit list takes precedence over discovery. Identifiers must be unquoted `database.table` or `namespace.database.table`, containing ASCII letters, digits, underscores, or hyphens. Patterns are not supported in this optional list. Automatically discovered names retain their literal components, including Unicode and characters such as `$` and `;`; they are not parsed as this configuration list.
+
+Submission fixes the target table set. If a target is missing, maintenance waits for CDC to create it through the normal `CreateTableEvent` flow. Waiting does not block operator startup or checkpoints and performs no file cleanup. Once the table exists, maintenance observes commits and schedules its tasks. Empty discovery fails submission. Different identifiers resolving to the same Iceberg table UUID also fail validation: existing tables are checked on submission and a shared runtime validator checks each target once when it becomes ready, using one catalog connection. It records the validated identifiers and UUIDs so subsequent polls do not reload every target. Tables added after submission are not included until the job is submitted again. Source discovery requires metadata access from the submission client. Use the matching CDC runtime/composer, source connector, and Iceberg connector builds; replacing only the Iceberg connector does not add submission-time discovery to an older CDC installation.
+
+Enable checkpointing in the Flink configuration (for example, `execution.checkpointing.interval: 60 s`) and use streaming execution mode. The cluster must provide `flink-table-runtime` matching its Flink version, as Iceberg uses it to read metadata during orphan cleanup. CDC passes table changes through a readiness gate to native `TableMaintenance.forChangeStream(...).add(...).append()`. Iceberg builds the trigger, lock, task, error, and aggregation topology. After the full `StreamGraph` is generated and before submission, the CDC composer adapts specific operators to defer metadata-dependent initialization until their first input and close their catalogs. Native operator state, graph UIDs, and edges are preserved. Flink 2.x uses the public operator-factory setter; the Flink 1.20 compatibility layer validates and accesses the corresponding field. The adaptation uses internal Iceberg APIs and Flink operator implementations and must be verified when upgrading either component. Maintenance adds a monitoring source and task operators for each table, using the same catalog and `hadoop.conf.*` settings as the sink. Provision slots for the maintenance slot sharing group as well as the CDC operators.
+
+The following sink configuration rewrites files after 10 observed commits or one hour, expires snapshots daily, and checks for orphan files weekly:
+
+```yaml
+sink:
+  type: iceberg
+  catalog.properties.type: hadoop
+  catalog.properties.warehouse: /path/warehouse
+  sink.maintenance.enabled: true
+  # Optional: limit maintenance to these routed targets.
+  # sink.maintenance.tables: sales.orders;sales.customers
+  sink.maintenance.uid-prefix: sales-maintenance
+  sink.maintenance.parallelism: 2
+  sink.maintenance.lock.jdbc.uri: jdbc:postgresql://lock-db:5432/iceberg
+  sink.maintenance.lock.jdbc.properties.user: maintenance
+  sink.maintenance.lock.jdbc.properties.password: <password>
+  sink.maintenance.lock.jdbc.init-lock-tables: true
+  sink.maintenance.rewrite-data-files.enabled: true
+  sink.maintenance.rewrite-data-files.commit-count: 10
+  sink.maintenance.rewrite-data-files.interval: 1 h
+  sink.maintenance.expire-snapshots.enabled: true
+  sink.maintenance.expire-snapshots.interval: 1 d
+  sink.maintenance.expire-snapshots.max-age: 7 d
+  sink.maintenance.expire-snapshots.retain-last: 100
+  sink.maintenance.delete-orphan-files.enabled: true
+  sink.maintenance.delete-orphan-files.interval: 7 d
+  sink.maintenance.delete-orphan-files.min-age: 7 d
+```
+
+The JDBC database stores maintenance locks independently of the table catalog. Put the JDBC driver in the CDC installation's `lib` directory so the submission client can load it, and supply that driver with the CLI `--jar` argument to include it in the job. Make the database reachable from the Flink workers. The `--jar` argument adds job dependencies; it does not add them to the submission client's classpath. Set `lock.jdbc.init-lock-tables` to `true` for initial creation, or provision Iceberg's lock table beforehand. Initialization runs once on the submission client and also requires connectivity from that client; workers never race to create the table. Use `false` after provisioning. Keep the database, credentials, and UID prefix stable across recovery. Do not run multiple maintenance jobs against the same table concurrently, and do not enable the legacy `sink.compaction.enabled` together with this feature.
+
+### Maintenance options
+
+All keys below have the prefix `sink.maintenance.`. Settings apply to every selected target table. Task-specific settings take effect when that task is enabled.
+
+| Key | Default | Description |
+| --- | --- | --- |
+| `enabled` | `false` | Enable the maintenance topology. Requires at least one enabled task. |
+| `tables` | (none) | Optional semicolon-separated target identifiers. If omitted, derive targets from the captured source tables and routing rules at submission. |
+| `uid-prefix` | `iceberg-maintenance` | Stable operator UID and lock identity prefix. Use a different prefix for each independent pipeline. |
+| `parallelism` | `1` | Default task parallelism per table. Monitoring and scheduling remain single-parallelism operators. |
+| `slot-sharing-group` | `iceberg-maintenance` | Slot sharing group for maintenance operators. |
+| `rate-limit` | `1 min` | Table polling interval and minimum scheduling interval; a positive whole number of seconds. |
+| `lock-check-delay` | `30 s` | Delay before retrying a held maintenance lock. |
+| `max-read-back` | `100` | Maximum snapshots examined per poll, including at startup. |
+| `lock.jdbc.uri` | (none) | Required JDBC URL for persistent maintenance locks. |
+| `lock.jdbc.init-lock-tables` | `false` | Create the Iceberg lock table on submission if it does not exist. |
+| `lock.jdbc.properties.*` | (none) | JDBC connection properties. For example, suffix `user` is passed as Iceberg's `jdbc.user`. |
+| `rewrite-data-files.enabled` | `false` | Enable data file rewriting. |
+| `rewrite-data-files.interval` | `1 h` | Time trigger for rewriting. |
+| `rewrite-data-files.commit-count` | (none) | Additional trigger based on observed non-replace snapshot commits. |
+| `rewrite-data-files.data-file-count` | (none) | Additional trigger based on added data files. |
+| `rewrite-data-files.target-file-size-bytes` | `536870912` | Target output file size (512 MiB). |
+| `rewrite-data-files.min-input-files` | `5` | Input file count threshold used by the rewrite planner. |
+| `rewrite-data-files.delete-file-threshold` | `2147483647` | Associated delete file count that makes a data file eligible for rewriting. |
+| `rewrite-data-files.max-rewrite-bytes` | `10737418240` | Maximum input bytes to rewrite per run (10 GiB). File groups are capped at the smaller of this budget and 100 GiB, so large partitions can be processed across runs. A single input file larger than the budget requires increasing it. |
+| `expire-snapshots.enabled` | `false` | Enable snapshot expiration and cleanup of files no longer referenced. |
+| `expire-snapshots.interval` | `1 d` | Time trigger for snapshot expiration. |
+| `expire-snapshots.commit-count` | (none) | Additional commit-count trigger for expiration. |
+| `expire-snapshots.max-age` | `7 d` | Age threshold for expiring snapshots. |
+| `expire-snapshots.retain-last` | `100` | Minimum number of snapshots to retain. |
+| `delete-orphan-files.enabled` | `false` | Enable orphan file deletion under the table location. |
+| `delete-orphan-files.interval` | `7 d` | Time trigger for orphan cleanup. |
+| `delete-orphan-files.min-age` | `7 d` | Minimum age of orphan candidates; must be at least 3 days. |
+| `delete-batch-size` | `1000` | Deletion batch size for expiration and orphan cleanup. |
+
+### Triggers, retention, and recovery
+
+Triggers are evaluated independently for each task and table. A task's configured conditions are combined with **OR**: `commit-count: 10` and `interval: 1 h` permit either condition to trigger it. The monitor reads Iceberg snapshots, not CDC committable messages or checkpoint counts. Empty checkpoints do not increase the count. Commits from other writers are observable, while `replace` snapshots generated by maintenance are skipped. On startup the monitor can count existing history; history beyond `max-read-back`, or history already expired, is not counted. Choose the polling interval and read-back bound for the table's commit rate.
+
+Before a target exists, the readiness gate suppresses changes and time triggers for that table. After creation, the monitor also emits empty changes when no new snapshot exists, so interval triggers continue on idle tables. Timing is approximate: polling, rate limits, lock availability, and earlier tasks can delay execution. Only one maintenance task per table runs at a time. The thresholds trigger a planning attempt; the rewrite planner may find no eligible files. Iceberg exposes maintenance logs and metrics for task outcomes. A maintenance task can report failure while the CDC job continues running; monitor these outcomes separately from job status. Later triggers can attempt the task again.
+
+Expiration must preserve snapshots needed by readers, incremental consumers, and CDC recovery. Configure both age and minimum snapshot count for the required retention window; branches and tags also affect Iceberg retention. Orphan cleanup permanently removes unreferenced old files, including potentially uncommitted files from long-running writers. Its minimum age must exceed the longest write, outage, and recovery window, and each table must have its own storage location. The 3-day validation floor alone does not establish a safe retention window for every deployment.
+
+The connector refreshes the snapshot list used by Iceberg 1.10's orphan metadata listing, so it observes new commits and expired snapshots. It defers orphan cleanup for tables without a committed snapshot to protect empty-table metadata, and prevents cleanup when the table property `gc.enabled` is `false`. Iceberg records these attempts as failed tasks with a diagnostic message, and later triggers can proceed after a snapshot exists and garbage collection is enabled. Orphan listing uses Iceberg's native FileIO prefix listing so it retains the table's storage configuration, including CDC's `hadoop.conf.*` settings. The FileIO must implement `SupportsPrefixOperations` for orphan cleanup and `SupportsBulkOperations` for file deletion; Iceberg's `HadoopFileIO` and `S3FileIO` support both. Deferred loading and the orphan-cleanup adapter require the catalog to return Iceberg `BaseTable` instances, as the built-in catalogs do.
+
+Stateful operator UIDs are derived from the UID prefix, target identifier, and enabled task set, so reordering the table list does not change them. Keep these settings and the lock configuration stable when restoring checkpoints or savepoints. Changing the enabled task set generates new UIDs because Iceberg stores task state by index; normal restore rejects the unmatched old maintenance state. Such changes require explicitly starting fresh maintenance state. Refer to [Iceberg Flink maintenance](https://iceberg.apache.org/docs/1.10.1/flink-maintenance/) for the underlying APIs and task behavior.
+
+When restoring from a checkpoint or savepoint, discovery runs again against the source's current metadata. Keep the resolved target set stable; if source tables or routes have changed, use an explicit list to preserve the original maintenance topology before intentionally migrating its state.
+
 Data Type Mapping
 ----------------
 <div class="wy-table-responsive">

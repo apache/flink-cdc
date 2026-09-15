@@ -20,11 +20,13 @@ package org.apache.flink.cdc.connectors.postgres.source;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.common.source.EventSourceProvider;
 import org.apache.flink.cdc.common.source.FlinkSourceProvider;
 import org.apache.flink.cdc.common.source.MetadataAccessor;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
+import org.apache.flink.cdc.common.source.SupportsTableDiscovery;
 import org.apache.flink.cdc.connectors.base.config.SourceConfig;
 import org.apache.flink.cdc.connectors.base.source.jdbc.JdbcIncrementalSource;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceRecords;
@@ -35,6 +37,7 @@ import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConf
 import org.apache.flink.cdc.connectors.postgres.source.offset.PostgresOffsetFactory;
 import org.apache.flink.cdc.connectors.postgres.source.reader.PostgresPipelineRecordEmitter;
 import org.apache.flink.cdc.connectors.postgres.table.PostgreSQLReadableMetadata;
+import org.apache.flink.cdc.connectors.postgres.utils.PostgresSchemaUtils;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.cdc.debezium.event.DebeziumEventDeserializationSchema;
 import org.apache.flink.cdc.debezium.table.DebeziumChangelogMode;
@@ -42,10 +45,11 @@ import org.apache.flink.connector.base.source.reader.RecordEmitter;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /** A {@link DataSource} for Postgres cdc connector. */
 @Internal
-public class PostgresDataSource implements DataSource {
+public class PostgresDataSource implements DataSource, SupportsTableDiscovery {
 
     private final PostgresSourceConfigFactory configFactory;
     private final PostgresSourceConfig postgresSourceConfig;
@@ -87,6 +91,19 @@ public class PostgresDataSource implements DataSource {
                         postgresSourceConfig);
 
         return FlinkSourceProvider.of(source);
+    }
+
+    @Override
+    public List<TableId> listCapturedTables() {
+        return new PostgresDialect(postgresSourceConfig)
+                .discoverDataCollections(postgresSourceConfig).stream()
+                        .map(
+                                table ->
+                                        PostgresSchemaUtils.toCdcTableId(
+                                                table,
+                                                postgresSourceConfig.getDatabaseList().get(0),
+                                                postgresSourceConfig.isIncludeDatabaseInTableId()))
+                        .collect(Collectors.toList());
     }
 
     @Override

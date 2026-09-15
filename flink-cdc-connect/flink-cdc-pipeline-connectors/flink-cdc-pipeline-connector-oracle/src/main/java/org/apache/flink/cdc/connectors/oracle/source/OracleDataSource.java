@@ -19,10 +19,12 @@ package org.apache.flink.cdc.connectors.oracle.source;
 
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.common.source.EventSourceProvider;
 import org.apache.flink.cdc.common.source.FlinkSourceProvider;
 import org.apache.flink.cdc.common.source.MetadataAccessor;
+import org.apache.flink.cdc.common.source.SupportsTableDiscovery;
 import org.apache.flink.cdc.connectors.oracle.source.config.OracleSourceConfig;
 import org.apache.flink.cdc.connectors.oracle.source.config.OracleSourceConfigFactory;
 import org.apache.flink.cdc.connectors.oracle.source.meta.offset.RedoLogOffsetFactory;
@@ -43,7 +45,8 @@ import java.util.stream.Stream;
  * A {@link DynamicTableSource} that describes how to create a Oracle redo log from a logical
  * description.
  */
-public class OracleDataSource implements DataSource, SupportsReadingMetadata {
+public class OracleDataSource
+        implements DataSource, SupportsTableDiscovery, SupportsReadingMetadata {
 
     private final OracleSourceConfig sourceConfig;
     private final OracleSourceConfigFactory configFactory;
@@ -78,6 +81,14 @@ public class OracleDataSource implements DataSource, SupportsReadingMetadata {
                 new OracleTableSourceReader(
                         configFactory, deserializer, offsetFactory, oracleDialect);
         return FlinkSourceProvider.of(oracleChangeEventSource);
+    }
+
+    @Override
+    public List<TableId> listCapturedTables() {
+        return new OracleDialect()
+                .discoverDataCollections(sourceConfig).stream()
+                        .map(table -> TableId.tableId(table.schema(), table.table()))
+                        .collect(Collectors.toList());
     }
 
     @Override
