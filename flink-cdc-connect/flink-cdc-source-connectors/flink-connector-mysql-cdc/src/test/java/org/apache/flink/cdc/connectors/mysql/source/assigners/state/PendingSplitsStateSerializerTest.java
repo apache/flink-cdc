@@ -124,9 +124,8 @@ class PendingSplitsStateSerializerTest {
 
     @Test
     void testSerializeAndDeserializeReleasedHybridState() throws Exception {
-        // The "light" state produced after releasing the snapshot metadata must
-        // round-trip with no serializer format change (VERSION is unchanged): it is just a normal
-        // state with empty maps.
+        // The "light" state produced after releasing the snapshot metadata must round-trip, and
+        // the persisted released flag (PendingSplitsStateSerializer v6) must survive.
         HybridPendingSplitsState released = getTestReleasedHybridPendingSplitsState();
         PendingSplitsState roundTripped = serializeAndDeserializeSourceEnumState(released);
         Assertions.assertThat(roundTripped).isEqualTo(released);
@@ -137,8 +136,29 @@ class PendingSplitsStateSerializerTest {
         Assertions.assertThat(snapshot.getSplitFinishedOffsets()).isEmpty();
         Assertions.assertThat(snapshot.getTableSchemas()).isEmpty();
         Assertions.assertThat(snapshot.getAlreadyProcessedTables()).isNotEmpty();
+        Assertions.assertThat(snapshot.isSnapshotMetaReleased()).isTrue();
         Assertions.assertThat(((HybridPendingSplitsState) roundTripped).isBinlogSplitAssigned())
                 .isTrue();
+    }
+
+    @Test
+    void testDeserializeV5SnapshotStateDefaultsReleasedFlagToFalse() throws Exception {
+        // A v5 checkpoint written before FLINK-39775 has no released-flag byte. For a snapshot
+        // state that byte is the last one written, so a v6 stream without its final byte is exactly
+        // the v5 wire format. Deserializing it under the current version must default
+        // snapshotMetaReleased to false and otherwise round-trip unchanged.
+        SnapshotPendingSplitsState state = getTestSnapshotPendingSplitsState(false);
+        PendingSplitsStateSerializer serializer =
+                new PendingSplitsStateSerializer(MySqlSplitSerializer.INSTANCE);
+        byte[] v6 = serializer.serialize(state);
+        byte[] v5 = Arrays.copyOf(v6, v6.length - 1);
+
+        PendingSplitsState restored = serializer.deserialize(5, v5);
+
+        Assertions.assertThat(restored).isInstanceOf(SnapshotPendingSplitsState.class);
+        Assertions.assertThat(((SnapshotPendingSplitsState) restored).isSnapshotMetaReleased())
+                .isFalse();
+        Assertions.assertThat(restored).isEqualTo(state);
     }
 
     static PendingSplitsState serializeAndDeserializeSourceEnumState(PendingSplitsState state)
@@ -240,7 +260,8 @@ class PendingSplitsStateSerializerTest {
                         new ArrayList<>(),
                         false,
                         true,
-                        ChunkSplitterState.NO_SPLITTING_TABLE_STATE);
+                        ChunkSplitterState.NO_SPLITTING_TABLE_STATE,
+                        true);
         return new HybridPendingSplitsState(snapshotState, true);
     }
 

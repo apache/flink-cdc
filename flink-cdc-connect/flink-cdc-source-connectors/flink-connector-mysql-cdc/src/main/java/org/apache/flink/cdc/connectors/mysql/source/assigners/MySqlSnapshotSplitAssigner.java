@@ -130,6 +130,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                 isTableIdCaseSensitive,
                 true,
                 ChunkSplitterState.NO_SPLITTING_TABLE_STATE,
+                false,
                 enumeratorContext);
     }
 
@@ -151,6 +152,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                 checkpoint.isTableIdCaseSensitive(),
                 checkpoint.isRemainingTablesCheckpointed(),
                 checkpoint.getChunkSplitterState(),
+                checkpoint.isSnapshotMetaReleased(),
                 enumeratorContext);
     }
 
@@ -167,6 +169,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
             boolean isTableIdCaseSensitive,
             boolean isRemainingTablesCheckpointed,
             ChunkSplitterState chunkSplitterState,
+            boolean snapshotMetaReleased,
             SplitEnumeratorContext<MySqlSplit> enumeratorContext) {
         this.sourceConfig = sourceConfig;
         this.currentParallelism = currentParallelism;
@@ -184,14 +187,9 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
         this.partition =
                 new MySqlPartition(sourceConfig.getMySqlConnectorConfig().getLogicalName());
         this.enumeratorContext = enumeratorContext;
-        // Reconstruct the released flag when restoring from a released "light" checkpoint
-        // (snapshot finished, heavy metadata maps empty, tables already processed). The flag is
-        // not checkpointed, so recovering it here keeps post-restore behavior consistent with the
-        // run that released.
-        this.snapshotMetaReleased =
-                AssignerStatus.isAssigningFinished(assignerStatus)
-                        && assignedSplits.isEmpty()
-                        && !alreadyProcessedTables.isEmpty();
+        // The released flag is persisted in the checkpoint (PendingSplitsStateSerializer v6), so
+        // restore it directly rather than inferring it from the state shape.
+        this.snapshotMetaReleased = snapshotMetaReleased;
     }
 
     @Override
@@ -473,7 +471,8 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                         remainingTables,
                         isTableIdCaseSensitive,
                         true,
-                        chunkSplitter.snapshotState(checkpointId));
+                        chunkSplitter.snapshotState(checkpointId),
+                        snapshotMetaReleased);
         // we need a complete checkpoint before mark this assigner to be finished, to wait for
         // all records of snapshot splits are completely processed
         if (checkpointIdToFinish == null

@@ -86,7 +86,8 @@ public class MySqlSourceReader<T>
      * Generation the reader learned from its served meta groups, echoed in {@link
      * BinlogSplitMetaAssembledEvent} so the coordinator can drop a stale signal from a failed
      * attempt. Stays {@link BinlogSplitMetaAssembledEvent#COMPLETE_WITHOUT_META_GENERATION} for an
-     * inline split that requested none.
+     * inline split that requested none. Not checkpointed: on restart it resets to that sentinel,
+     * which is safe because a reader reports the sentinel only while it holds a complete split.
      */
     private long binlogAssignmentGeneration =
             BinlogSplitMetaAssembledEvent.COMPLETE_WITHOUT_META_GENERATION;

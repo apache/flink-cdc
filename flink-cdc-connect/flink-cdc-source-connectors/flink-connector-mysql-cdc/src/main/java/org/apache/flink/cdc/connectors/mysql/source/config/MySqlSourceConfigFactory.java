@@ -37,6 +37,7 @@ import java.util.UUID;
 
 import static org.apache.flink.cdc.connectors.mysql.source.utils.EnvironmentUtils.checkSupportCheckpointsAfterTasksFinished;
 import static org.apache.flink.util.Preconditions.checkNotNull;
+import static org.apache.flink.util.Preconditions.checkState;
 
 /** A factory to construct {@link MySqlSourceConfig}. */
 @Internal
@@ -367,6 +368,12 @@ public class MySqlSourceConfigFactory implements Serializable {
     /** Creates a new {@link MySqlSourceConfig} for the given subtask {@code subtaskId}. */
     public MySqlSourceConfig createConfig(int subtaskId, String serverName) {
         checkSupportCheckpointsAfterTasksFinished(closeIdleReaders);
+        checkState(
+                !(scanNewlyAddedTableEnabled && releaseSnapshotMetadataEnabled),
+                "scan.incremental.snapshot.metadata.release.enabled and "
+                        + "scan.newly-added-table.enabled cannot both be enabled: releasing the "
+                        + "snapshot split metadata would drop the assigned splits, finished offsets "
+                        + "and table schemas that newly-added-table scanning needs.");
         Properties props = new Properties();
         props.setProperty("database.server.name", serverName);
         props.setProperty("database.hostname", checkNotNull(hostname));

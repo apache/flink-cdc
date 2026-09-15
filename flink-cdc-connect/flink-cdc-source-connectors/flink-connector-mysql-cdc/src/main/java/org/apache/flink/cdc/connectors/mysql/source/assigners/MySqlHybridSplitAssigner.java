@@ -192,24 +192,31 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
             if (split.isSnapshotSplit()) {
                 snapshotSplits.add(split);
             } else {
-                // we don't store the split, but will re-create binlog split later
+                // The binlog split is handed back for re-assignment; we don't store it, but will
+                // re-create it later. Mark it unassigned and invalidate any in-flight assembly.
                 isBinlogSplitAssigned = false;
-                // re-creating the binlog split: the reader must re-assemble and re-report
-                // before the snapshot metadata can be released again. Bumping the generation
-                // invalidates any assembled event still in flight from the failed attempt.
-                binlogSplitMetaAssembled = false;
-                checkpointIdToReleaseMeta = null;
-                binlogAssignmentGeneration++;
+                onBinlogReaderReset();
             }
         }
         snapshotSplitAssigner.addSplits(snapshotSplits);
     }
 
+    /**
+     * Invalidates any in-flight binlog split assembly when the binlog reader resets, so a stale
+     * assembled event from the failed attempt cannot arm a release. Also runs when the split is not
+     * handed back, since a checkpoint-covered reset produces an empty add-back.
+     */
+    public void onBinlogReaderReset() {
+        binlogSplitMetaAssembled = false;
+        checkpointIdToReleaseMeta = null;
+        binlogAssignmentGeneration++;
+    }
+
     @Override
     public PendingSplitsState snapshotState(long checkpointId) {
         // Schedule the metadata release once the binlog split is assigned and the reader has
-        // assembled it; it happens in notifyCheckpointComplete. Gated behind the opt-in, and
-        // skipped when newly-added-table scan is on, since that flow may still need the metadata.
+        // assembled it; it happens in notifyCheckpointComplete. Gated behind the opt-in; the
+        // newly-added-table term is defensive, since createConfig already rejects enabling both.
         if (isBinlogSplitAssigned
                 && binlogSplitMetaAssembled
                 && checkpointIdToReleaseMeta == null

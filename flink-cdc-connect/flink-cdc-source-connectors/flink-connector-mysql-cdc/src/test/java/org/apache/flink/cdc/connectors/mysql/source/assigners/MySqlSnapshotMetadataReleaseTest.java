@@ -24,6 +24,7 @@ import org.apache.flink.cdc.connectors.mysql.source.assigners.state.SnapshotPend
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import org.apache.flink.cdc.connectors.mysql.source.enumerator.MySqlSourceEnumerator;
+import org.apache.flink.cdc.connectors.mysql.source.events.BinlogSplitAssignedEvent;
 import org.apache.flink.cdc.connectors.mysql.source.events.BinlogSplitMetaAssembledEvent;
 import org.apache.flink.cdc.connectors.mysql.source.events.BinlogSplitMetaRequestEvent;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
@@ -129,18 +130,13 @@ class MySqlSnapshotMetadataReleaseTest {
     }
 
     @Test
-    void testNoReleaseWhenScanNewlyAddedTableEnabled() {
-        MySqlHybridSplitAssigner assigner = buildFinishedSnapshotAssigner(true);
-        assigner.getNext();
-        assigner.onBinlogSplitMetaAssembled(assigner.getBinlogAssignmentGeneration());
-
-        assigner.snapshotState(1L);
-        assigner.notifyCheckpointComplete(1L);
-
-        // release is gated off because newly-added-table scanning may need the metadata again
-        assertThat(assigner.isSnapshotMetaReleased()).isFalse();
-        assertAssignedSplitsSize(assigner, 2, NUM_FINISHED_SPLITS);
-        assigner.close();
+    void testFailFastWhenBothOptionsEnabled() {
+        // Enabling both metadata release and scan.newly-added-table is contradictory: the release
+        // would drop the metadata the newly-added-table flow needs. Reject it at config build time
+        // rather than silently disabling the release.
+        assertThatThrownBy(() -> buildConfig(true, true))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("cannot both be enabled");
     }
 
     @Test
@@ -240,14 +236,90 @@ class MySqlSnapshotMetadataReleaseTest {
     }
 
     @Test
+    void testEmptyAddBackFromBinlogReaderInvalidatesStaleAssembledEvent() {
+        // A reader holding the binlog split can reset without its split being handed back: when the
+        // assignment is already checkpoint-covered, Flink restores the split from the reader's own
+        // state and calls addSplitsBack with an empty list. The generation must still be bumped and
+        // any scheduled release cancelled, otherwise a delayed assembled event from the failed
+        // attempt would arm an unsafe release while the restored reader still needs the metadata.
+        MySqlHybridSplitAssigner assigner = buildFinishedSnapshotAssigner(false);
+        assigner.getNext(); // enter the binlog phase; the binlog split is assigned
+
+        MySqlSourceEnumerator enumerator =
+                new MySqlSourceEnumerator(
+                        getMySqlSplitEnumeratorContext(),
+                        buildConfig(false, true),
+                        assigner,
+                        Boundedness.CONTINUOUS_UNBOUNDED);
+
+        // subtask 0 reports it holds the binlog split, then assembles it and schedules a release
+        enumerator.handleSourceEvent(0, new BinlogSplitAssignedEvent());
+        long staleGeneration = assigner.getBinlogAssignmentGeneration();
+        assigner.onBinlogSplitMetaAssembled(staleGeneration);
+        assigner.snapshotState(1L); // schedules release at checkpoint 1
+
+        // subtask 0 resets, but its assignment was checkpoint-covered, so Flink hands nothing back
+        enumerator.addSplitsBack(Collections.emptyList(), 0);
+
+        // completing checkpoint 1 must NOT release: the reset cancelled the schedule
+        assigner.notifyCheckpointComplete(1L);
+        assertThat(assigner.isSnapshotMetaReleased()).isFalse();
+        assertThat(assigner.getBinlogAssignmentGeneration()).isGreaterThan(staleGeneration);
+
+        // a delayed assembled event from the failed attempt (old generation) is now ignored
+        assigner.onBinlogSplitMetaAssembled(staleGeneration);
+        assigner.snapshotState(2L);
+        assigner.notifyCheckpointComplete(2L);
+        assertThat(assigner.isSnapshotMetaReleased()).isFalse();
+
+        assigner.close();
+    }
+
+    @Test
+    void testStaleBinlogSplitAssignedEventDoesNotCorruptHolder() {
+        // A delayed BinlogSplitAssignedEvent from a failed attempt must not overwrite the live
+        // binlog holder. If it did, the empty-add-back reset detection (which keys off
+        // binlogSplitTaskId) would be defeated and a stale assembled event could arm an unsafe
+        // release. Here the real holder is subtask 1; a stale assigned event from subtask 0 arrives
+        // and must be ignored, so the later empty add-back from subtask 1 still cancels the
+        // release.
+        MySqlHybridSplitAssigner assigner = buildFinishedSnapshotAssigner(false);
+        assigner.getNext(); // enter the binlog phase
+
+        MySqlSourceEnumerator enumerator =
+                new MySqlSourceEnumerator(
+                        getMySqlSplitEnumeratorContext(),
+                        buildConfig(false, true),
+                        assigner,
+                        Boundedness.CONTINUOUS_UNBOUNDED);
+
+        // subtask 1 is the live binlog holder; a stale assigned event from subtask 0 must be
+        // ignored
+        enumerator.handleSourceEvent(1, new BinlogSplitAssignedEvent());
+        enumerator.handleSourceEvent(0, new BinlogSplitAssignedEvent());
+
+        long staleGeneration = assigner.getBinlogAssignmentGeneration();
+        assigner.onBinlogSplitMetaAssembled(staleGeneration);
+        assigner.snapshotState(1L); // schedules release at checkpoint 1
+
+        // the real holder (subtask 1) resets with an empty add-back; because binlogSplitTaskId was
+        // not corrupted to 0, the reset is still detected and the scheduled release is cancelled
+        enumerator.addSplitsBack(Collections.emptyList(), 1);
+        assigner.notifyCheckpointComplete(1L);
+        assertThat(assigner.isSnapshotMetaReleased()).isFalse();
+        assertThat(assigner.getBinlogAssignmentGeneration()).isGreaterThan(staleGeneration);
+
+        assigner.close();
+    }
+
+    @Test
     void testRestoreFromReleasedLightState() {
         MySqlHybridSplitAssigner assigner = buildReleasedLightAssigner();
 
         // No binlog split is re-created and no tables are re-discovered after a light restore.
         assertThat(assigner.getNext()).isEmpty();
-        // The released flag is reconstructed from the light checkpoint (finished snapshot, empty
-        // heavy maps, tables already processed), so after restore the assigner knows the metadata
-        // was already released.
+        // The released flag is restored from the persisted checkpoint value, so after restore the
+        // assigner knows the metadata was already released.
         assertThat(assigner.isSnapshotMetaReleased()).isTrue();
 
         // The state stays light (empty heavy maps, binlog split still assigned).
@@ -268,19 +340,60 @@ class MySqlSnapshotMetadataReleaseTest {
     }
 
     @Test
+    void testReleasedFlagNotInferredWhenSnapshotSplitsRemain() {
+        // The released flag is persisted (PendingSplitsStateSerializer v6), not inferred from state
+        // shape. A finished parallelism-1 state that never released (flag defaults false) must
+        // restore as not-released even with non-empty remainingSplits and empty assignedSplits.
+        // This guards against anyone re-introducing shape-based inference, which previously
+        // false-positived here and crash-looped createBinlogSplit, feature-off jobs included.
+        List<TableId> alreadyProcessedTables = Lists.newArrayList(new TableId(null, DB, TABLE));
+        RowType splitKeyType =
+                (RowType) DataTypes.ROW(DataTypes.FIELD("id", DataTypes.BIGINT())).getLogicalType();
+        List<MySqlSchemalessSnapshotSplit> remainingSplits = new ArrayList<>();
+        remainingSplits.add(
+                new MySqlSchemalessSnapshotSplit(
+                        new TableId(null, DB, TABLE),
+                        DB + "." + TABLE + ":0",
+                        splitKeyType,
+                        null,
+                        new Object[] {2},
+                        BinlogOffset.ofBinlogFilePosition("mysql-bin.00001", 1)));
+        SnapshotPendingSplitsState snapshotState =
+                new SnapshotPendingSplitsState(
+                        alreadyProcessedTables,
+                        remainingSplits,
+                        new LinkedHashMap<>(),
+                        new HashMap<>(),
+                        new HashMap<>(),
+                        AssignerStatus.INITIAL_ASSIGNING_FINISHED,
+                        new ArrayList<>(),
+                        false,
+                        true,
+                        ChunkSplitterState.NO_SPLITTING_TABLE_STATE);
+        HybridPendingSplitsState checkpoint = new HybridPendingSplitsState(snapshotState, false);
+        MySqlHybridSplitAssigner assigner =
+                new MySqlHybridSplitAssigner(
+                        buildConfig(false, true), 1, checkpoint, getMySqlSplitEnumeratorContext());
+
+        assertThat(assigner.isSnapshotMetaReleased()).isFalse();
+        assigner.close();
+    }
+
+    @Test
     void testFailFastWhenNewlyAddedEnabledOnReleasedRestore() {
         // A job that released its metadata cannot later enable scan.newly-added-table, because the
         // metadata that flow needs is gone. Restoring such a state with the flag on must fail fast
         // with a clear error rather than silently corrupting the binlog split.
-        assertThatThrownBy(() -> buildReleasedLightAssigner(true))
+        assertThatThrownBy(() -> buildReleasedLightAssigner(true, false))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("scan.newly-added-table.enabled cannot be turned on");
     }
 
     @Test
     void testStaleBinlogMetaRequestAfterLightRestoreIsIgnored() {
-        // After restoring from a released light checkpoint the released flag is reconstructed, so
-        // the enumerator still ignores a stray meta request instead of rebuilding and throwing.
+        // After restoring from a released light checkpoint the released flag is restored from the
+        // persisted checkpoint value, so the enumerator still ignores a stray meta request instead
+        // of rebuilding and throwing.
         MySqlHybridSplitAssigner assigner = buildReleasedLightAssigner();
         assertThat(assigner.isSnapshotMetaReleased()).isTrue();
 
@@ -413,11 +526,11 @@ class MySqlSnapshotMetadataReleaseTest {
      * finished status are retained.
      */
     private MySqlHybridSplitAssigner buildReleasedLightAssigner() {
-        return buildReleasedLightAssigner(false);
+        return buildReleasedLightAssigner(false, true);
     }
 
     private MySqlHybridSplitAssigner buildReleasedLightAssigner(
-            boolean scanNewlyAddedTableEnabled) {
+            boolean scanNewlyAddedTableEnabled, boolean releaseSnapshotMetadataEnabled) {
         List<TableId> alreadyProcessedTables = Lists.newArrayList(new TableId(null, DB, TABLE));
         SnapshotPendingSplitsState snapshotState =
                 new SnapshotPendingSplitsState(
@@ -430,10 +543,11 @@ class MySqlSnapshotMetadataReleaseTest {
                         new ArrayList<>(),
                         false,
                         true,
-                        ChunkSplitterState.NO_SPLITTING_TABLE_STATE);
+                        ChunkSplitterState.NO_SPLITTING_TABLE_STATE,
+                        true);
         HybridPendingSplitsState checkpoint = new HybridPendingSplitsState(snapshotState, true);
         return new MySqlHybridSplitAssigner(
-                buildConfig(scanNewlyAddedTableEnabled, true),
+                buildConfig(scanNewlyAddedTableEnabled, releaseSnapshotMetadataEnabled),
                 4,
                 checkpoint,
                 getMySqlSplitEnumeratorContext());

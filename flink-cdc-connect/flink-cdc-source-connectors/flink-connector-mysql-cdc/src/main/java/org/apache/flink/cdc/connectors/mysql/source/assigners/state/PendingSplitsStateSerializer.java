@@ -45,8 +45,7 @@ import java.util.Map;
  */
 public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<PendingSplitsState> {
 
-    // TODO: need proper implementation of the new version
-    private static final int VERSION = 5;
+    private static final int VERSION = 6;
     private static final ThreadLocal<DataOutputSerializer> SERIALIZER_CACHE =
             ThreadLocal.withInitial(() -> new DataOutputSerializer(64));
 
@@ -110,6 +109,7 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
             case 3:
             case 4:
             case 5:
+            case 6:
                 return deserializePendingSplitsState(version, serialized);
             default:
                 throw new IOException("Unknown version: " + version);
@@ -176,6 +176,8 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
                             new Object[] {chunkSplitterState.getNextChunkStart().getValue()}));
             out.writeInt(chunkSplitterState.getNextChunkId());
         }
+        // v6 (FLINK-39775): whether the snapshot split metadata has been released.
+        out.writeBoolean(state.isSnapshotMetaReleased());
     }
 
     private void serializeHybridPendingSplitsState(
@@ -299,6 +301,12 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
                 nextChunkId = in.readInt();
             }
         }
+        // v6 (FLINK-39775): the released flag is persisted; older versions never released, so it
+        // defaults to false.
+        boolean snapshotMetaReleased = false;
+        if (version >= 6) {
+            snapshotMetaReleased = in.readBoolean();
+        }
         return new SnapshotPendingSplitsState(
                 alreadyProcessedTables,
                 remainingSchemalessSplits,
@@ -314,7 +322,8 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
                         : new ChunkSplitterState(
                                 splittingTableId,
                                 ChunkSplitterState.ChunkBound.middleOf(nextChunkStart),
-                                nextChunkId));
+                                nextChunkId),
+                snapshotMetaReleased);
     }
 
     private HybridPendingSplitsState deserializeHybridPendingSplitsState(

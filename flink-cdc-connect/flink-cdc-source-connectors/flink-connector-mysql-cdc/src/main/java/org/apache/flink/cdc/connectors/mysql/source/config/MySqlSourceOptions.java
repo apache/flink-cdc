@@ -253,9 +253,10 @@ public class MySqlSourceOptions {
                                     + " offsets and table schemas) held by the source coordinator once the"
                                     + " source has entered the binlog phase, to reduce JobManager memory"
                                     + " pressure on jobs with a very large number of snapshot splits. Disabled"
-                                    + " by default. This is incompatible with scan.newly-added-table.enabled:"
-                                    + " a job that releases the metadata cannot later enable newly-added-table"
-                                    + " scanning, because that flow still needs the released metadata.");
+                                    + " by default. The release happens only after a checkpoint completes, so it has no"
+                                    + " effect without checkpointing. Cannot be enabled together with"
+                                    + " scan.newly-added-table.enabled (the job fails to start), since that"
+                                    + " flow needs the metadata that would be released.");
 
     @Experimental
     public static final ConfigOption<String> SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN =

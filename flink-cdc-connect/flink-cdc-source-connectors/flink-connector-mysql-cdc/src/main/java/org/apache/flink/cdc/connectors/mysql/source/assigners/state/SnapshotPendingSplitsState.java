@@ -75,6 +75,9 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
     /** The data structure to record the state of a {@link ChunkSplitter}. */
     private final ChunkSplitterState chunkSplitterState;
 
+    /** Whether the heavyweight snapshot split metadata has been released (FLINK-39775). */
+    private final boolean snapshotMetaReleased;
+
     public SnapshotPendingSplitsState(
             List<TableId> alreadyProcessedTables,
             List<MySqlSchemalessSnapshotSplit> remainingSplits,
@@ -86,6 +89,32 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
             boolean isTableIdCaseSensitive,
             boolean isRemainingTablesCheckpointed,
             ChunkSplitterState chunkSplitterState) {
+        this(
+                alreadyProcessedTables,
+                remainingSplits,
+                assignedSplits,
+                tableSchemas,
+                splitFinishedOffsets,
+                assignerStatus,
+                remainingTables,
+                isTableIdCaseSensitive,
+                isRemainingTablesCheckpointed,
+                chunkSplitterState,
+                false);
+    }
+
+    public SnapshotPendingSplitsState(
+            List<TableId> alreadyProcessedTables,
+            List<MySqlSchemalessSnapshotSplit> remainingSplits,
+            LinkedHashMap<String, MySqlSchemalessSnapshotSplit> assignedSplits,
+            Map<TableId, TableChange> tableSchemas,
+            Map<String, BinlogOffset> splitFinishedOffsets,
+            AssignerStatus assignerStatus,
+            List<TableId> remainingTables,
+            boolean isTableIdCaseSensitive,
+            boolean isRemainingTablesCheckpointed,
+            ChunkSplitterState chunkSplitterState,
+            boolean snapshotMetaReleased) {
         // FLINK-38061: make defensive copy to avoid potential concurrent modification of the
         // collections.
         this.alreadyProcessedTables = new ArrayList<>(alreadyProcessedTables);
@@ -98,6 +127,7 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
         this.isRemainingTablesCheckpointed = isRemainingTablesCheckpointed;
         this.tableSchemas = new HashMap<>(tableSchemas);
         this.chunkSplitterState = chunkSplitterState;
+        this.snapshotMetaReleased = snapshotMetaReleased;
     }
 
     public List<TableId> getAlreadyProcessedTables() {
@@ -140,6 +170,11 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
         return chunkSplitterState;
     }
 
+    /** Whether the heavyweight snapshot split metadata has been released (FLINK-39775). */
+    public boolean isSnapshotMetaReleased() {
+        return snapshotMetaReleased;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {
@@ -157,7 +192,8 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
                 && Objects.equals(remainingSplits, that.remainingSplits)
                 && Objects.equals(assignedSplits, that.assignedSplits)
                 && Objects.equals(splitFinishedOffsets, that.splitFinishedOffsets)
-                && Objects.equals(chunkSplitterState, that.chunkSplitterState);
+                && Objects.equals(chunkSplitterState, that.chunkSplitterState)
+                && snapshotMetaReleased == that.snapshotMetaReleased;
     }
 
     @Override
@@ -171,7 +207,8 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
                 assignerStatus,
                 isTableIdCaseSensitive,
                 isRemainingTablesCheckpointed,
-                chunkSplitterState);
+                chunkSplitterState,
+                snapshotMetaReleased);
     }
 
     @Override
@@ -195,6 +232,8 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
                 + isRemainingTablesCheckpointed
                 + ", chunkSplitterState="
                 + chunkSplitterState
+                + ", snapshotMetaReleased="
+                + snapshotMetaReleased
                 + '}';
     }
 }

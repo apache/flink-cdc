@@ -127,6 +127,17 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
         if (binlogSplit.isPresent()) {
             LOG.info("The enumerator adds add binlog split back: {}", binlogSplit);
             this.binlogSplitTaskId = null;
+            // The split is coming back to the coordinator; addSplits below resets the assembly.
+        } else if (binlogSplitTaskId != null
+                && binlogSplitTaskId.equals(subtaskId)
+                && splitAssigner instanceof MySqlHybridSplitAssigner) {
+            // The binlog holder reset but handed nothing back (a checkpoint-covered reset the
+            // reader restores itself), so addSplits will not see it; invalidate the assembly here.
+            LOG.info(
+                    "The binlog reader on subtask {} reset without handing its split back; "
+                            + "invalidating any assembled binlog split metadata.",
+                    subtaskId);
+            ((MySqlHybridSplitAssigner) splitAssigner).onBinlogReaderReset();
         }
         if (!CollectionUtil.isNullOrEmpty(splits)) {
             splitAssigner.addSplits(splits);
@@ -180,7 +191,18 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
             LOG.info(
                     "The enumerator receives notice from subtask {} for the binlog split assignment. ",
                     subtaskId);
-            binlogSplitTaskId = subtaskId;
+            // Only learn the holder from this event when it is unknown (e.g. after a coordinator
+            // restart). A real reassignment sets it via assignSplits, so an event naming a
+            // different subtask than the known holder is stale and must not overwrite it.
+            if (binlogSplitTaskId == null) {
+                binlogSplitTaskId = subtaskId;
+            } else if (!binlogSplitTaskId.equals(subtaskId)) {
+                LOG.info(
+                        "Ignoring a stale binlog split assigned event from subtask {}; the binlog "
+                                + "split is currently held by subtask {}.",
+                        subtaskId,
+                        binlogSplitTaskId);
+            }
         } else if (sourceEvent instanceof BinlogSplitMetaAssembledEvent) {
             LOG.info(
                     "The enumerator receives notice from subtask {} that the binlog split metadata has been fully assembled. ",
