@@ -19,11 +19,15 @@ package org.apache.flink.cdc.connectors.iceberg.sink.v2.maintenance;
 
 import org.apache.flink.util.InstantiationUtil;
 
+import org.apache.iceberg.DataFiles;
+import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.SerializableTable;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.exceptions.NoSuchTableException;
 import org.apache.iceberg.flink.TableLoader;
 import org.apache.iceberg.hadoop.HadoopTables;
+import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.io.SupportsBulkOperations;
 import org.apache.iceberg.types.Types;
@@ -105,6 +109,56 @@ class DeferredTableLoaderTest {
             ((SupportsBulkOperations) io).deleteFiles(Collections.singletonList(orphan.toString()));
             assertThat(Files.exists(orphan)).isFalse();
             assertThat(Files.exists(directory.resolve("orders/metadata"))).isTrue();
+        }
+    }
+
+    @Test
+    void reloadsMetadataAfterTheCachedSnapshotExpires() throws Exception {
+        String location = directory.resolve("orders").toString();
+        Table created =
+                new HadoopTables(new org.apache.hadoop.conf.Configuration())
+                        .create(
+                                new Schema(
+                                        Types.NestedField.required(1, "id", Types.LongType.get())),
+                                location);
+        String firstFile = location + "/data/first.parquet";
+        String secondFile = location + "/data/second.parquet";
+        created.newAppend()
+                .appendFile(
+                        DataFiles.builder(created.spec())
+                                .withPath(firstFile)
+                                .withFileSizeInBytes(100)
+                                .withRecordCount(1)
+                                .build())
+                .commit();
+        try (DeferredTableLoader loader =
+                new DeferredTableLoader(
+                        TableLoader.fromHadoopTable(
+                                location, new org.apache.hadoop.conf.Configuration()),
+                        "sales.orders")) {
+            loader.open();
+            Table cached = loader.loadTable();
+            long expiredSnapshot = cached.currentSnapshot().snapshotId();
+            String expiredManifestList = cached.currentSnapshot().manifestListLocation();
+            created.newAppend()
+                    .appendFile(
+                            DataFiles.builder(created.spec())
+                                    .withPath(secondFile)
+                                    .withFileSizeInBytes(100)
+                                    .withRecordCount(1)
+                                    .build())
+                    .commit();
+            created.expireSnapshots().expireSnapshotId(expiredSnapshot).commit();
+            assertThat(created.io().newInputFile(expiredManifestList).exists()).isFalse();
+
+            Table planningTable = SerializableTable.copyOf(loader.loadTable());
+            try (CloseableIterable<FileScanTask> tasks = planningTable.newScan().planFiles()) {
+                assertThat(tasks)
+                        .extracting(task -> task.file().path().toString())
+                        .containsExactlyInAnyOrder(firstFile, secondFile);
+            }
+            assertThat(planningTable.currentSnapshot().snapshotId())
+                    .isEqualTo(created.currentSnapshot().snapshotId());
         }
     }
 

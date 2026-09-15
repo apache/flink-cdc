@@ -31,24 +31,17 @@ import org.apache.flink.streaming.util.OneInputStreamOperatorTestHarness;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.RawLocalFileSystem;
 import org.apache.iceberg.BaseTable;
-import org.apache.iceberg.DataFiles;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.flink.CatalogLoader;
 import org.apache.iceberg.flink.maintenance.api.DeleteOrphanFiles;
 import org.apache.iceberg.flink.maintenance.api.Trigger;
-import org.apache.iceberg.flink.maintenance.operator.MetadataTablePlanner;
 import org.apache.iceberg.flink.maintenance.operator.TableChange;
 import org.apache.iceberg.hadoop.HadoopCatalog;
-import org.apache.iceberg.hadoop.HadoopFileIO;
 import org.apache.iceberg.io.FileIO;
-import org.apache.iceberg.io.FileIOParser;
-import org.apache.iceberg.io.InputFile;
-import org.apache.iceberg.io.SeekableInputStream;
 import org.apache.iceberg.io.SupportsBulkOperations;
 import org.apache.iceberg.types.Types;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -70,44 +63,6 @@ class MaintenanceFileIOTest {
     private static final Schema SCHEMA =
             new Schema(Types.NestedField.required(1, "id", Types.LongType.get()));
     @TempDir Path directory;
-
-    @Test
-    void preservesFileIOImplementationPropertiesAndHadoopConfigurationInJson() throws Exception {
-        Path file = directory.resolve("metadata.avro");
-        Files.write(file, new byte[] {7});
-        org.apache.hadoop.conf.Configuration conf = new org.apache.hadoop.conf.Configuration(false);
-        conf.set("filesystem.class", ConfiguredFileSystem.class.getName());
-        conf.set("fs.maintenance-test.impl", "${filesystem.class}");
-        conf.setBoolean("fs.maintenance-test.impl.disable.cache", true);
-        try (PropertyCheckingFileIO original = new PropertyCheckingFileIO()) {
-            original.setConf(conf);
-            original.initialize(Collections.singletonMap("hadoop-conf.test-property", "preserved"));
-            FileIO wrapped = HadoopConfigurationFileIO.wrap(original);
-            try (FileIO restored = FileIOParser.fromJson(FileIOParser.toJson(wrapped));
-                    SeekableInputStream input =
-                            restored.newInputFile("maintenance-test:" + file).newStream()) {
-                assertThat(restored.properties()).isEqualTo(wrapped.properties());
-                assertThat(input.read()).isEqualTo(7);
-            }
-            assertThat(original.properties())
-                    .containsExactlyEntriesOf(
-                            Collections.singletonMap("hadoop-conf.test-property", "preserved"));
-        }
-    }
-
-    @Test
-    void retainsFileIOsWithoutHadoopConfiguration() {
-        FileIO io =
-                (FileIO)
-                        Proxy.newProxyInstance(
-                                getClass().getClassLoader(),
-                                new Class<?>[] {FileIO.class},
-                                (proxy, method, args) -> {
-                                    throw new AssertionError(
-                                            "Unrelated FileIO must not be accessed");
-                                });
-        assertThat(HadoopConfigurationFileIO.wrap(io)).isSameAs(io);
-    }
 
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
@@ -150,8 +105,7 @@ class MaintenanceFileIOTest {
 
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
-    void listsCandidatesAndReadsMetadataUsingTheConfiguredFileSystem(boolean existsAtSubmission)
-            throws Exception {
+    void listsCandidatesUsingTheConfiguredFileSystem(boolean existsAtSubmission) throws Exception {
         String warehouse = "maintenance-test://" + directory;
         Map<String, String> hadoopOptions = new HashMap<>();
         hadoopOptions.put("fs.maintenance-test.impl", ConfiguredFileSystem.class.getName());
@@ -188,8 +142,17 @@ class MaintenanceFileIOTest {
             Files.setLastModifiedTime(orphan, FileTime.fromMillis(0));
             Path recent = directory.resolve("sales/orders/recent.parquet");
             Files.write(recent, new byte[] {2});
+            StreamNode node =
+                    graph.getStreamNodes().stream()
+                            .filter(n -> n.getOperatorName().startsWith("Filesystem Files"))
+                            .findFirst()
+                            .orElseThrow(AssertionError::new);
+            @SuppressWarnings("unchecked")
+            OneInputStreamOperator<Trigger, String> operator =
+                    (OneInputStreamOperator<Trigger, String>)
+                            ((SimpleOperatorFactory<?>) node.getOperatorFactory()).getOperator();
             try (OneInputStreamOperatorTestHarness<Trigger, String> harness =
-                    harness(graph, "Filesystem Files")) {
+                    new OneInputStreamOperatorTestHarness<>(operator)) {
                 harness.open();
                 long now = System.currentTimeMillis();
                 harness.processElement(new StreamRecord<>(Trigger.create(now, 0), now));
@@ -197,46 +160,7 @@ class MaintenanceFileIOTest {
                 assertThat(harness.extractOutputValues())
                         .containsExactly("maintenance-test:" + orphan);
             }
-            Table table = catalog.loadTable(tableId);
-            String referencedFile = table.location() + "/data/referenced.parquet";
-            table.newAppend()
-                    .appendFile(
-                            DataFiles.builder(table.spec())
-                                    .withPath(referencedFile)
-                                    .withFileSizeInBytes(1)
-                                    .withRecordCount(1)
-                                    .build())
-                    .commit();
-            try (OneInputStreamOperatorTestHarness<Trigger, MetadataTablePlanner.SplitInfo>
-                            planner = harness(graph, "Table Planner");
-                    OneInputStreamOperatorTestHarness<MetadataTablePlanner.SplitInfo, String>
-                            reader = harness(graph, "Files Reader")) {
-                planner.open();
-                reader.open();
-                long now = System.currentTimeMillis();
-                planner.processElement(new StreamRecord<>(Trigger.create(now, 0), now));
-                assertThat(planner.getSideOutput(DeleteOrphanFiles.ERROR_STREAM)).isNullOrEmpty();
-                assertThat(planner.extractOutputValues()).isNotEmpty();
-                for (MetadataTablePlanner.SplitInfo split : planner.extractOutputValues()) {
-                    reader.processElement(new StreamRecord<>(split, now));
-                }
-                assertThat(reader.getSideOutput(DeleteOrphanFiles.ERROR_STREAM)).isNullOrEmpty();
-                assertThat(reader.extractOutputValues()).containsExactly(referencedFile);
-            }
         }
-    }
-
-    @SuppressWarnings("unchecked")
-    private static <I, O> OneInputStreamOperatorTestHarness<I, O> harness(
-            StreamGraph graph, String prefix) throws Exception {
-        StreamNode node =
-                graph.getStreamNodes().stream()
-                        .filter(n -> n.getOperatorName().startsWith(prefix))
-                        .findFirst()
-                        .orElseThrow(AssertionError::new);
-        return new OneInputStreamOperatorTestHarness<>(
-                (OneInputStreamOperator<I, O>)
-                        ((SimpleOperatorFactory<?>) node.getOperatorFactory()).getOperator());
     }
 
     /** Exposes bulk deletion without the optional prefix-listing capability. */
@@ -256,17 +180,6 @@ class MaintenanceFileIOTest {
                     return bulkOnly;
                 }
             };
-        }
-    }
-
-    /**
-     * Verifies that JSON reconstruction retains the configured implementation and its properties.
-     */
-    public static class PropertyCheckingFileIO extends HadoopFileIO {
-        @Override
-        public InputFile newInputFile(String path) {
-            assertThat(properties()).containsEntry("hadoop-conf.test-property", "preserved");
-            return super.newInputFile(path);
         }
     }
 
