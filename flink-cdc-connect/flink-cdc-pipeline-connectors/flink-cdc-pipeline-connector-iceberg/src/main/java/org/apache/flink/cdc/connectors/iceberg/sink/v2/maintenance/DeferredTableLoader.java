@@ -66,6 +66,10 @@ final class DeferredTableLoader implements TableLoader {
         if (facade == null) {
             facade = new DeferredTable(this, tableName);
         }
+        if (loaded != null) {
+            // Native planners reload through this loader before copying table metadata.
+            loaded.refresh();
+        }
         return facade;
     }
 
@@ -151,7 +155,6 @@ final class DeferredTableLoader implements TableLoader {
     private static final class DeferredOperations implements TableOperations {
         private final DeferredTableLoader loader;
         private final FileIO io;
-        private FileIO metadataIO;
 
         private DeferredOperations(DeferredTableLoader loader) {
             this.loader = loader;
@@ -179,14 +182,7 @@ final class DeferredTableLoader implements TableLoader {
 
         @Override
         public FileIO io() {
-            if (!loader.isReady()) {
-                return io;
-            }
-            if (metadataIO == null) {
-                // Metadata tasks reconstruct their FileIO from JSON, without the table loader.
-                metadataIO = HadoopConfigurationFileIO.wrap(loader.actualTable().io());
-            }
-            return metadataIO;
+            return loader.isReady() ? loader.actualTable().io() : io;
         }
 
         @Override
