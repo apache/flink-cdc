@@ -95,15 +95,19 @@ public class PostgresDataSource implements DataSource, SupportsTableDiscovery {
 
     @Override
     public List<TableId> listCapturedTables() {
-        return new PostgresDialect(postgresSourceConfig)
-                .discoverDataCollections(postgresSourceConfig).stream()
-                        .map(
-                                table ->
-                                        PostgresSchemaUtils.toCdcTableId(
-                                                table,
-                                                postgresSourceConfig.getDatabaseList().get(0),
-                                                postgresSourceConfig.isIncludeDatabaseInTableId()))
-                        .collect(Collectors.toList());
+        return createTableDiscoveryDialect().discoverDataCollections(postgresSourceConfig).stream()
+                .map(
+                        table ->
+                                PostgresSchemaUtils.toCdcTableId(
+                                        table,
+                                        postgresSourceConfig.getDatabaseList().get(0),
+                                        postgresSourceConfig.isIncludeDatabaseInTableId()))
+                .collect(Collectors.toList());
+    }
+
+    @VisibleForTesting
+    PostgresDialect createTableDiscoveryDialect() {
+        return new PostgresDialect(postgresSourceConfig);
     }
 
     @Override

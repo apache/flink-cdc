@@ -77,13 +77,14 @@ public class SqlServerDataSource implements DataSource, SupportsTableDiscovery {
 
     @Override
     public List<TableId> listCapturedTables() {
-        return new SqlServerDialect(sqlServerSourceConfig)
-                .discoverDataCollections(sqlServerSourceConfig).stream()
-                        .map(
-                                table ->
-                                        TableId.tableId(
-                                                table.catalog(), table.schema(), table.table()))
-                        .collect(Collectors.toList());
+        return createTableDiscoveryDialect().discoverDataCollections(sqlServerSourceConfig).stream()
+                .map(table -> TableId.tableId(table.catalog(), table.schema(), table.table()))
+                .collect(Collectors.toList());
+    }
+
+    @VisibleForTesting
+    SqlServerDialect createTableDiscoveryDialect() {
+        return new SqlServerDialect(sqlServerSourceConfig);
     }
 
     @Override
