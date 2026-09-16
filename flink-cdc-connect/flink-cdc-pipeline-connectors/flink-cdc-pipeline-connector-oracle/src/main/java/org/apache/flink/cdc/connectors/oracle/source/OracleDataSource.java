@@ -85,10 +85,14 @@ public class OracleDataSource
 
     @Override
     public List<TableId> listCapturedTables() {
-        return new OracleDialect()
-                .discoverDataCollections(sourceConfig).stream()
-                        .map(table -> TableId.tableId(table.schema(), table.table()))
-                        .collect(Collectors.toList());
+        return createTableDiscoveryDialect().discoverDataCollections(sourceConfig).stream()
+                .map(table -> TableId.tableId(table.schema(), table.table()))
+                .collect(Collectors.toList());
+    }
+
+    @VisibleForTesting
+    OracleDialect createTableDiscoveryDialect() {
+        return new OracleDialect();
     }
 
     @Override
