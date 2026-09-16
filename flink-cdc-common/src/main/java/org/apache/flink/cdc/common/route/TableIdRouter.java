@@ -121,7 +121,9 @@ public class TableIdRouter {
             try {
                 routes.add(
                         new Tuple3<>(
-                                Pattern.compile(convertTableListToRegExpPattern(rule.sourceTable)),
+                                Pattern.compile(
+                                        convertTableListToRegExpPattern(rule.sourceTable),
+                                        Pattern.CASE_INSENSITIVE),
                                 rule.sinkTable,
                                 rule.replaceSymbol));
             } catch (PatternSyntaxException e) {
