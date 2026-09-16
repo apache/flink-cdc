@@ -118,12 +118,6 @@ public class SchemaCoordinator extends SchemaRegistry {
     }
 
     @Override
-    public void start() throws Exception {
-        super.start();
-        initialize();
-    }
-
-    @Override
     protected void initialize() {
         if (pendingRequests != null) {
             pendingRequests.forEach(

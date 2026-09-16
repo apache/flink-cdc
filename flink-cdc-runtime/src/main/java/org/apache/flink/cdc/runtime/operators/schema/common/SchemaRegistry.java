@@ -132,6 +132,9 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
     public void start() throws Exception {
         LOG.info("Starting SchemaRegistry - {}.", operatorName);
         initializeBaseRuntimeState();
+        initialize();
+        LOG.info(
+                "Started SchemaRegistry for {}. Parallelism: {}", operatorName, currentParallelism);
     }
 
     private void initializeBaseRuntimeState() {
