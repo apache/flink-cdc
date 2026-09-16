@@ -78,6 +78,8 @@ public class MySqlSourceConfigFactory implements Serializable {
     private boolean treatTinyInt1AsBoolean = true;
     private boolean useLegacyJsonFormat = true;
     private boolean assignUnboundedChunkFirst = false;
+    private boolean skipBinlogDeserializationOfUnsubscribedTables =
+            MySqlSourceOptions.SCAN_BINLOG_SKIP_UNSUBSCRIBED_TABLES_ENABLED.defaultValue();
 
     public MySqlSourceConfigFactory hostname(String hostname) {
         this.hostname = hostname;
@@ -341,6 +343,14 @@ public class MySqlSourceConfigFactory implements Serializable {
         return this;
     }
 
+    /** Whether to skip deserialization of binlog row events for unsubscribed tables. */
+    public MySqlSourceConfigFactory skipBinlogDeserializationOfUnsubscribedTables(
+            boolean skipBinlogDeserializationOfUnsubscribedTables) {
+        this.skipBinlogDeserializationOfUnsubscribedTables =
+                skipBinlogDeserializationOfUnsubscribedTables;
+        return this;
+    }
+
     /** Creates a new {@link MySqlSourceConfig} for the given subtask {@code subtaskId}. */
     public MySqlSourceConfig createConfig(int subtaskId) {
         // hard code server name, because we don't need to distinguish it, docs:
@@ -444,6 +454,7 @@ public class MySqlSourceConfigFactory implements Serializable {
                 parseOnLineSchemaChanges,
                 treatTinyInt1AsBoolean,
                 useLegacyJsonFormat,
-                assignUnboundedChunkFirst);
+                assignUnboundedChunkFirst,
+                skipBinlogDeserializationOfUnsubscribedTables);
     }
 }
