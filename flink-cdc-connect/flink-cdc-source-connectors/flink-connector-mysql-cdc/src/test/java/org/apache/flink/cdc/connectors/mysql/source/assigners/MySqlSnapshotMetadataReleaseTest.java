@@ -18,8 +18,11 @@
 package org.apache.flink.cdc.connectors.mysql.source.assigners;
 
 import org.apache.flink.api.connector.source.Boundedness;
+import org.apache.flink.cdc.connectors.mysql.MySqlTestUtils;
+import org.apache.flink.cdc.connectors.mysql.source.MySqlSource;
 import org.apache.flink.cdc.connectors.mysql.source.assigners.state.ChunkSplitterState;
 import org.apache.flink.cdc.connectors.mysql.source.assigners.state.HybridPendingSplitsState;
+import org.apache.flink.cdc.connectors.mysql.source.assigners.state.PendingSplitsStateSerializer;
 import org.apache.flink.cdc.connectors.mysql.source.assigners.state.SnapshotPendingSplitsState;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
@@ -31,6 +34,7 @@ import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSchemalessSnapshotSplit;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplit;
+import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplitSerializer;
 import org.apache.flink.cdc.connectors.mysql.source.utils.MockMySqlSplitEnumeratorEnumeratorContext;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
 import org.apache.flink.table.api.DataTypes;
@@ -39,6 +43,7 @@ import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.shaded.guava31.com.google.common.collect.Lists;
 
 import io.debezium.relational.TableId;
+import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.jupiter.api.Test;
 
 import java.time.ZoneId;
@@ -390,6 +395,54 @@ class MySqlSnapshotMetadataReleaseTest {
     }
 
     @Test
+    void testFailFastWhenReleaseDisabledOnReleasedRestore() {
+        // A job that already released its snapshot metadata cannot be restarted with the release
+        // option turned off. The metadata is gone from state, and writing the lighter v5 format
+        // would drop the released marker, so restoring such a state with the option off must fail
+        // fast rather than silently corrupt the binlog split.
+        assertThatThrownBy(() -> buildReleasedLightAssigner(false, false))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining(
+                        "scan.incremental.snapshot.metadata.release.enabled cannot be turned off");
+    }
+
+    @Test
+    void testEnumeratorSerializerWritesV6OnlyWhenReleaseEnabled() {
+        // The real wiring: MySqlSource.getEnumeratorCheckpointSerializer() picks the serializer
+        // version from the option, so a release-enabled job writes v6 and a default-off job keeps
+        // writing v5.
+        assertThat(buildSource(true).getEnumeratorCheckpointSerializer().getVersion()).isEqualTo(6);
+        assertThat(buildSource(false).getEnumeratorCheckpointSerializer().getVersion())
+                .isEqualTo(5);
+    }
+
+    @Test
+    void testReleasedStateSerializedThenRestoredWithOptionOffFailsFast() throws Exception {
+        // End to end: a released state serialized by the release-on serializer (v6, flag true),
+        // then
+        // restored with the option off, must deserialize the flag as true and fail fast rather than
+        // silently dropping the marker by rewriting the v5 format.
+        HybridPendingSplitsState released = buildReleasedHybridCheckpoint();
+        PendingSplitsStateSerializer serializer =
+                new PendingSplitsStateSerializer(MySqlSplitSerializer.INSTANCE, true);
+        byte[] bytes = serializer.serialize(released);
+        HybridPendingSplitsState restored =
+                (HybridPendingSplitsState) serializer.deserialize(serializer.getVersion(), bytes);
+        assertThat(restored.getSnapshotPendingSplits().isSnapshotMetaReleased()).isTrue();
+
+        assertThatThrownBy(
+                        () ->
+                                new MySqlHybridSplitAssigner(
+                                        buildConfig(false, false),
+                                        4,
+                                        restored,
+                                        getMySqlSplitEnumeratorContext()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining(
+                        "scan.incremental.snapshot.metadata.release.enabled cannot be turned off");
+    }
+
+    @Test
     void testStaleBinlogMetaRequestAfterLightRestoreIsIgnored() {
         // After restoring from a released light checkpoint the released flag is restored from the
         // persisted checkpoint value, so the enumerator still ignores a stray meta request instead
@@ -531,6 +584,14 @@ class MySqlSnapshotMetadataReleaseTest {
 
     private MySqlHybridSplitAssigner buildReleasedLightAssigner(
             boolean scanNewlyAddedTableEnabled, boolean releaseSnapshotMetadataEnabled) {
+        return new MySqlHybridSplitAssigner(
+                buildConfig(scanNewlyAddedTableEnabled, releaseSnapshotMetadataEnabled),
+                4,
+                buildReleasedHybridCheckpoint(),
+                getMySqlSplitEnumeratorContext());
+    }
+
+    private HybridPendingSplitsState buildReleasedHybridCheckpoint() {
         List<TableId> alreadyProcessedTables = Lists.newArrayList(new TableId(null, DB, TABLE));
         SnapshotPendingSplitsState snapshotState =
                 new SnapshotPendingSplitsState(
@@ -545,11 +606,20 @@ class MySqlSnapshotMetadataReleaseTest {
                         true,
                         ChunkSplitterState.NO_SPLITTING_TABLE_STATE,
                         true);
-        HybridPendingSplitsState checkpoint = new HybridPendingSplitsState(snapshotState, true);
-        return new MySqlHybridSplitAssigner(
-                buildConfig(scanNewlyAddedTableEnabled, releaseSnapshotMetadataEnabled),
-                4,
-                checkpoint,
-                getMySqlSplitEnumeratorContext());
+        return new HybridPendingSplitsState(snapshotState, true);
+    }
+
+    private MySqlSource<SourceRecord> buildSource(boolean releaseSnapshotMetadataEnabled) {
+        return MySqlSource.<SourceRecord>builder()
+                .hostname("localhost")
+                .port(3306)
+                .databaseList(DB)
+                .tableList(DB + "." + TABLE)
+                .username("user")
+                .password("password")
+                .serverTimeZone("UTC")
+                .deserializer(new MySqlTestUtils.ForwardDeserializeSchema())
+                .releaseSnapshotMetadataEnabled(releaseSnapshotMetadataEnabled)
+                .build();
     }
 }

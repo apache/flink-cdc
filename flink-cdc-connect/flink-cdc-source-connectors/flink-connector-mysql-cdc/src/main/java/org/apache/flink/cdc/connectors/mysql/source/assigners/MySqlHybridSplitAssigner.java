@@ -130,6 +130,17 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
                             + "state, or keep metadata release disabled if newly-added-table scanning "
                             + "is required.");
         }
+        // Fail fast if a job that already released its snapshot metadata is restarted with the
+        // release option off. The metadata is gone from state, so falling back to the v5 format
+        // would drop the released marker. Keep the option enabled or start from a fresh state.
+        if (!sourceConfig.isReleaseSnapshotMetadataEnabled()
+                && snapshotSplitAssigner.isSnapshotMetaReleased()) {
+            throw new IllegalStateException(
+                    "scan.incremental.snapshot.metadata.release.enabled cannot be turned off for a "
+                            + "job that already released its snapshot split metadata. The assigned "
+                            + "splits, finished offsets and table schemas are no longer in state. "
+                            + "Keep the option enabled, or start the job from a fresh state.");
+        }
     }
 
     @Override

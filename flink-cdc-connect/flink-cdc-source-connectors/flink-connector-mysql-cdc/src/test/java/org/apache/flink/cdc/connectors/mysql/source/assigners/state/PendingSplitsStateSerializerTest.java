@@ -96,7 +96,7 @@ class PendingSplitsStateSerializerTest {
     @MethodSource("params")
     void testRepeatedSerializationCache(PendingSplitsState state) throws Exception {
         final PendingSplitsStateSerializer serializer =
-                new PendingSplitsStateSerializer(MySqlSplitSerializer.INSTANCE);
+                new PendingSplitsStateSerializer(MySqlSplitSerializer.INSTANCE, true);
 
         final byte[] ser1 = serializer.serialize(state);
         final byte[] ser2 = serializer.serialize(state);
@@ -108,7 +108,7 @@ class PendingSplitsStateSerializerTest {
     @MethodSource("params")
     void testOutputIsFinallyCleared(PendingSplitsState state) throws Exception {
         final PendingSplitsStateSerializer serializer =
-                new PendingSplitsStateSerializer(MySqlSplitSerializer.INSTANCE);
+                new PendingSplitsStateSerializer(MySqlSplitSerializer.INSTANCE, true);
 
         final byte[] ser1 = serializer.serialize(state);
         state.serializedFormCache = null;
@@ -149,7 +149,7 @@ class PendingSplitsStateSerializerTest {
         // snapshotMetaReleased to false and otherwise round-trip unchanged.
         SnapshotPendingSplitsState state = getTestSnapshotPendingSplitsState(false);
         PendingSplitsStateSerializer serializer =
-                new PendingSplitsStateSerializer(MySqlSplitSerializer.INSTANCE);
+                new PendingSplitsStateSerializer(MySqlSplitSerializer.INSTANCE, true);
         byte[] v6 = serializer.serialize(state);
         byte[] v5 = Arrays.copyOf(v6, v6.length - 1);
 
@@ -161,10 +161,61 @@ class PendingSplitsStateSerializerTest {
         Assertions.assertThat(restored).isEqualTo(state);
     }
 
+    @Test
+    void testReleaseDisabledJobKeepsWritingV5Format() throws Exception {
+        // A job that leaves scan.incremental.snapshot.metadata.release.enabled off must keep
+        // writing
+        // the v5 format (no released flag), so it can still be restored by an older connector
+        // build.
+        SnapshotPendingSplitsState state = getTestSnapshotPendingSplitsState(false);
+        PendingSplitsStateSerializer v5Serializer =
+                new PendingSplitsStateSerializer(MySqlSplitSerializer.INSTANCE, false);
+        PendingSplitsStateSerializer v6Serializer =
+                new PendingSplitsStateSerializer(MySqlSplitSerializer.INSTANCE, true);
+
+        Assertions.assertThat(v5Serializer.getVersion()).isEqualTo(5);
+        Assertions.assertThat(v6Serializer.getVersion()).isEqualTo(6);
+
+        byte[] v6 = v6Serializer.serialize(state);
+        // Clear the lazily cached serialized form so the v5 serializer re-serializes the state.
+        state.serializedFormCache = null;
+        byte[] v5 = v5Serializer.serialize(state);
+
+        // For a snapshot state the released flag is the final byte, so the v5 bytes are exactly the
+        // v6 bytes without that trailing byte, i.e. the format an older connector wrote.
+        Assertions.assertThat(v5).isEqualTo(Arrays.copyOf(v6, v6.length - 1));
+
+        // A default-off job restores its own v5 checkpoint with the flag defaulting to false.
+        PendingSplitsState restored = v5Serializer.deserialize(5, v5);
+        Assertions.assertThat(restored).isEqualTo(state);
+        Assertions.assertThat(((SnapshotPendingSplitsState) restored).isSnapshotMetaReleased())
+                .isFalse();
+    }
+
+    @Test
+    void testReleaseDisabledSerializerRoundTripsHybridStateAtV5() throws Exception {
+        // The option-off serializer round-trips a hybrid state at v5 (the released flag is written
+        // for neither the snapshot part nor read back), leaving the flag false.
+        HybridPendingSplitsState state = getTestHybridPendingSplitsState(false);
+        PendingSplitsStateSerializer v5Serializer =
+                new PendingSplitsStateSerializer(MySqlSplitSerializer.INSTANCE, false);
+
+        byte[] serialized = v5Serializer.serialize(state);
+        PendingSplitsState restored =
+                v5Serializer.deserialize(v5Serializer.getVersion(), serialized);
+
+        Assertions.assertThat(restored).isEqualTo(state);
+        Assertions.assertThat(
+                        ((HybridPendingSplitsState) restored)
+                                .getSnapshotPendingSplits()
+                                .isSnapshotMetaReleased())
+                .isFalse();
+    }
+
     static PendingSplitsState serializeAndDeserializeSourceEnumState(PendingSplitsState state)
             throws Exception {
         final PendingSplitsStateSerializer serializer =
-                new PendingSplitsStateSerializer(MySqlSplitSerializer.INSTANCE);
+                new PendingSplitsStateSerializer(MySqlSplitSerializer.INSTANCE, true);
         byte[] serialized = serializer.serialize(state);
         return serializer.deserialize(serializer.getVersion(), serialized);
     }

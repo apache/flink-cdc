@@ -45,7 +45,13 @@ import java.util.Map;
  */
 public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<PendingSplitsState> {
 
-    private static final int VERSION = 6;
+    // Checkpoint format version. Version 6 (FLINK-39775) additionally persists the
+    // snapshot-metadata released flag, and is written only when metadata release is enabled. A job
+    // that leaves the option off keeps writing version 5, so it can still be restored by an older
+    // connector build that does not understand the flag.
+    private static final int VERSION_WITHOUT_RELEASED_FLAG = 5;
+    private static final int VERSION_WITH_RELEASED_FLAG = 6;
+
     private static final ThreadLocal<DataOutputSerializer> SERIALIZER_CACHE =
             ThreadLocal.withInitial(() -> new DataOutputSerializer(64));
 
@@ -54,19 +60,27 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
     private static final int HYBRID_PENDING_SPLITS_STATE_FLAG = 3;
 
     private final SimpleVersionedSerializer<MySqlSplit> splitSerializer;
+    private final boolean releaseSnapshotMetadataEnabled;
 
-    public PendingSplitsStateSerializer(SimpleVersionedSerializer<MySqlSplit> splitSerializer) {
+    public PendingSplitsStateSerializer(
+            SimpleVersionedSerializer<MySqlSplit> splitSerializer,
+            boolean releaseSnapshotMetadataEnabled) {
         this.splitSerializer = splitSerializer;
+        this.releaseSnapshotMetadataEnabled = releaseSnapshotMetadataEnabled;
     }
 
     @Override
     public int getVersion() {
-        return VERSION;
+        return releaseSnapshotMetadataEnabled
+                ? VERSION_WITH_RELEASED_FLAG
+                : VERSION_WITHOUT_RELEASED_FLAG;
     }
 
     @Override
     public byte[] serialize(PendingSplitsState state) throws IOException {
-        // optimization: the splits lazily cache their own serialized form
+        // optimization: the splits lazily cache their own serialized form. A job serializes with a
+        // single serializer whose released-flag setting is fixed, so the cached payload never mixes
+        // the v5 and v6 forms; the cache is transient and starts null after a restore.
         if (state.serializedFormCache != null) {
             return state.serializedFormCache;
         }
@@ -176,8 +190,11 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
                             new Object[] {chunkSplitterState.getNextChunkStart().getValue()}));
             out.writeInt(chunkSplitterState.getNextChunkId());
         }
-        // v6 (FLINK-39775): whether the snapshot split metadata has been released.
-        out.writeBoolean(state.isSnapshotMetaReleased());
+        // v6 (FLINK-39775): the released flag is written only when release is enabled. A job with
+        // the option off keeps the v5 format and stays restorable by an older connector build.
+        if (releaseSnapshotMetadataEnabled) {
+            out.writeBoolean(state.isSnapshotMetaReleased());
+        }
     }
 
     private void serializeHybridPendingSplitsState(
