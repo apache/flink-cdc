@@ -154,6 +154,10 @@ public abstract class PipelineTestEnvironment extends TestLogger {
                     "taskmanager.memory.jvm-metaspace.size: 512mb");
     public static final String FLINK_PROPERTIES = String.join("\n", EXTERNAL_PROPS);
 
+    protected String getFlinkProperties() {
+        return FLINK_PROPERTIES;
+    }
+
     @Nullable protected RestClusterClient<StandaloneClusterId> restClusterClient;
 
     protected GenericContainer<?> jobManager;
@@ -189,7 +193,7 @@ public abstract class PipelineTestEnvironment extends TestLogger {
                         .withNetwork(NETWORK)
                         .withNetworkAliases(INTER_CONTAINER_JM_ALIAS)
                         .withExposedPorts(JOB_MANAGER_REST_PORT)
-                        .withEnv("FLINK_PROPERTIES", FLINK_PROPERTIES)
+                        .withEnv("FLINK_PROPERTIES", getFlinkProperties())
                         .withCreateContainerCmdModifier(cmd -> cmd.withVolumes(sharedVolume))
                         .withLogConsumer(jobManagerConsumer);
 
@@ -211,7 +215,7 @@ public abstract class PipelineTestEnvironment extends TestLogger {
                         .withCommand("taskmanager")
                         .withNetwork(NETWORK)
                         .withNetworkAliases(INTER_CONTAINER_TM_ALIAS)
-                        .withEnv("FLINK_PROPERTIES", FLINK_PROPERTIES)
+                        .withEnv("FLINK_PROPERTIES", getFlinkProperties())
                         .dependsOn(jobManager)
                         .withVolumesFrom(jobManager, BindMode.READ_WRITE)
                         .withLogConsumer(taskManagerConsumer);

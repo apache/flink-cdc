@@ -55,6 +55,8 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.BooleanSupplier;
 
@@ -100,6 +102,10 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
     protected transient SchemaManager schemaManager;
     protected transient TableIdRouter router;
 
+    private final Object lifecycleLock = new Object();
+    private volatile boolean resetting;
+    private volatile long generation;
+
     protected SchemaRegistry(
             OperatorCoordinator.Context context,
             String operatorName,
@@ -125,6 +131,13 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
     @Override
     public void start() throws Exception {
         LOG.info("Starting SchemaRegistry - {}.", operatorName);
+        initializeBaseRuntimeState();
+        initialize();
+        LOG.info(
+                "Started SchemaRegistry for {}. Parallelism: {}", operatorName, currentParallelism);
+    }
+
+    private void initializeBaseRuntimeState() {
         this.currentParallelism = context.currentParallelism();
         this.activeSinkWriters = ConcurrentHashMap.newKeySet();
         this.failedReasons = new ConcurrentHashMap<>();
@@ -154,6 +167,15 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
 
     /** Restore schema registry state from byte array. */
     protected abstract void restore(byte[] checkpointData) throws Exception;
+
+    /**
+     * Stops schema-change work from the previous coordinator generation. Implementations must block
+     * until the previous generation's worker has fully exited, within {@link #rpcTimeout}.
+     */
+    protected abstract void shutdown() throws Exception;
+
+    /** (Re)initializes transient state, both on {@link #start()} and after a coordinator reset. */
+    protected abstract void initialize();
 
     // ------------------------------------
     // Overridable event & request handlers
@@ -258,6 +280,7 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
                         handleCustomCoordinationRequest(request, future);
                     }
                 },
+                future,
                 "Handling request - %s",
                 request);
         return future;
@@ -313,7 +336,11 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
     public final void checkpointCoordinator(
             long checkpointId, CompletableFuture<byte[]> completableFuture) throws Exception {
         LOG.info("Going to start checkpoint No.{}", checkpointId);
-        runInEventLoop(() -> snapshot(completableFuture), "Taking checkpoint - %d", checkpointId);
+        runInEventLoop(
+                () -> snapshot(completableFuture),
+                completableFuture,
+                "Taking checkpoint - %d",
+                checkpointId);
     }
 
     @Override
@@ -325,10 +352,22 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
     public final void resetToCheckpoint(long checkpointId, @Nullable byte[] checkpointData)
             throws Exception {
         LOG.info("Going to restore from checkpoint No.{}", checkpointId);
-        if (checkpointData == null) {
-            return;
+        synchronized (lifecycleLock) {
+            resetting = true;
+            generation++;
         }
-        restore(checkpointData);
+        awaitCoordinatorExecutor();
+        shutdown();
+        if (checkpointData == null) {
+            schemaManager = new SchemaManager();
+        } else {
+            restore(checkpointData);
+        }
+        initializeBaseRuntimeState();
+        initialize();
+        synchronized (lifecycleLock) {
+            resetting = false;
+        }
     }
 
     // ---------------------------
@@ -344,19 +383,63 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
             final ThrowingRunnable<Throwable> action,
             final String actionName,
             final Object... actionNameFormatParameters) {
+        runInEventLoop(action, null, actionName, actionNameFormatParameters);
+    }
+
+    private void runInEventLoop(
+            final ThrowingRunnable<Throwable> action,
+            @Nullable CompletableFuture<?> cancellationFuture,
+            final String actionName,
+            final Object... actionNameFormatParameters) {
+        final long actionGeneration;
+        synchronized (lifecycleLock) {
+            if (resetting) {
+                reject(cancellationFuture);
+                return;
+            }
+            actionGeneration = generation;
+        }
         coordinatorExecutor.execute(
                 () -> {
+                    synchronized (lifecycleLock) {
+                        if (resetting || actionGeneration != generation) {
+                            reject(cancellationFuture);
+                            return;
+                        }
+                    }
                     try {
                         action.run();
                     } catch (Throwable t) {
-                        // if we have a JVM critical error, promote it immediately, there is a good
+                        // if we have a JVM critical error, promote it immediately, there is a
+                        // good
                         // chance the logging or job failing will not succeed anymore
                         ExceptionUtils.rethrowIfFatalErrorOrOOM(t);
-                        handleUnrecoverableError(
-                                String.format(actionName, actionNameFormatParameters), t);
-                        context.failJob(t);
+                        synchronized (lifecycleLock) {
+                            if (resetting || actionGeneration != generation) {
+                                reject(cancellationFuture);
+                                return;
+                            }
+                            failJob(String.format(actionName, actionNameFormatParameters), t);
+                        }
                     }
                 });
+    }
+
+    private void awaitCoordinatorExecutor() throws Exception {
+        Future<?> barrier = coordinatorExecutor.submit(() -> {});
+        try {
+            barrier.get(rpcTimeout.toMillis(), TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw e;
+        }
+    }
+
+    private void reject(@Nullable CompletableFuture<?> future) {
+        if (future != null) {
+            future.completeExceptionally(
+                    new FlinkRuntimeException("Schema coordinator is resetting."));
+        }
     }
 
     /**
@@ -391,10 +474,15 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
     }
 
     protected <T extends Throwable> void failJob(String taskDescription, T t) {
-        ExceptionUtils.rethrowIfFatalErrorOrOOM(t);
-        LOG.error("An exception was triggered from {}. Job will fail now.", taskDescription, t);
-        handleUnrecoverableError(taskDescription, t);
-        context.failJob(t);
+        synchronized (lifecycleLock) {
+            ExceptionUtils.rethrowIfFatalErrorOrOOM(t);
+            if (resetting) {
+                return;
+            }
+            LOG.error("An exception was triggered from {}. Job will fail now.", taskDescription, t);
+            handleUnrecoverableError(taskDescription, t);
+            context.failJob(t);
+        }
     }
 
     // ------------------------
