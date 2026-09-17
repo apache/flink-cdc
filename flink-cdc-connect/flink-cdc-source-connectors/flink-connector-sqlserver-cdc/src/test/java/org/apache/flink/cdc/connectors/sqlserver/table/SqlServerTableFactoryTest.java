@@ -301,7 +301,8 @@ class SqlServerTableFactoryTest {
                         JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED
                                 .defaultValue(),
                         JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED
-                                .defaultValue());
+                                .defaultValue(),
+                        JdbcSourceOptions.RECORDS_PER_SECOND.defaultValue());
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
