@@ -637,7 +637,7 @@ class PostTransformOperatorTest {
                                     1,
                                     1L,
                                     DateData.fromEpochDay(1704471599),
-                                    TimeData.fromMillisOfDay(1704471),
+                                    TimeData.fromSecondOfDay(1704),
                                     TimestampData.fromMillis(1704471599),
                                     3.14f,
                                     3.14d,

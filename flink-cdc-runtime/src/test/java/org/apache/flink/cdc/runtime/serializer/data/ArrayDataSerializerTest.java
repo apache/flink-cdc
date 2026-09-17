@@ -22,6 +22,7 @@ import org.apache.flink.cdc.common.data.GenericArrayData;
 import org.apache.flink.cdc.common.data.GenericMapData;
 import org.apache.flink.cdc.common.data.MapData;
 import org.apache.flink.cdc.common.data.StringData;
+import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.binary.BinaryArrayData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.types.DataTypes;
@@ -161,5 +162,26 @@ class ArrayDataSerializerTest extends SerializerTestBase<ArrayData> {
         ArrayData arrayData2 = values.getArray(keyIndex);
         assertThat(arrayData2.getInt(0)).isEqualTo(44);
         assertThat(arrayData2.getInt(1)).isEqualTo(45);
+    }
+
+    @Test
+    void preservesHighPrecisionTimeInArraysAndMaps() {
+        long nanos = 3_723_123_456_789L;
+        ArrayDataSerializer arraySerializer = new ArrayDataSerializer(DataTypes.TIME(9));
+        BinaryArrayData times =
+                arraySerializer.toBinaryArray(
+                        new GenericArrayData(new Object[] {TimeData.fromNanoOfDay(nanos), null}));
+
+        assertThat(times.getTime(0, 9).toNanoOfDay()).isEqualTo(nanos);
+        assertThat(times.isNullAt(1)).isTrue();
+
+        Map<BinaryStringData, TimeData> source = new HashMap<>();
+        source.put(BinaryStringData.fromString("precise"), TimeData.fromNanoOfDay(nanos));
+        MapDataSerializer mapSerializer =
+                new MapDataSerializer(DataTypes.STRING(), DataTypes.TIME(9));
+        MapData map = mapSerializer.toBinaryMap(new GenericMapData(source));
+        int valueIndex = map.keyArray().getString(0).toString().equals("precise") ? 0 : -1;
+        assertThat(valueIndex).isZero();
+        assertThat(map.valueArray().getTime(valueIndex, 9).toNanoOfDay()).isEqualTo(nanos);
     }
 }
