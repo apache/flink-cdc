@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.pipeline.tests;
+package org.apache.flink.cdc.pipeline.tests.stage2;
 
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.JobStatus;
@@ -24,6 +24,7 @@ import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
 
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedClass;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.testcontainers.containers.Container.ExecResult;
@@ -45,7 +46,13 @@ import java.util.jar.JarOutputStream;
 import java.util.stream.Collectors;
 
 /** End-to-end recovery coverage for regular and distributed schema coordinators. */
+@ParameterizedClass
+@ValueSource(ints = {1, 4})
 class SchemaCoordinatorRecoveryE2eITCase extends PipelineTestEnvironment {
+
+    SchemaCoordinatorRecoveryE2eITCase(int parallelism) {
+        super(parallelism);
+    }
 
     private static final Duration JOB_TIMEOUT = Duration.ofMinutes(2);
 
