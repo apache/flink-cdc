@@ -706,6 +706,56 @@ class PostTransformOperatorTest {
     }
 
     @Test
+    void testReplaceEventMetadataTransform() throws Exception {
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
+                        .addTransform(
+                                METADATA_TABLEID.identifier(),
+                                "*, __data_event_type__",
+                                " __table_name__ = 'metadata_table' ")
+                        .build();
+        RegularEventOperatorTestHarness<PostTransformOperator, Event>
+                transformFunctionEventEventOperatorTestHarness =
+                        RegularEventOperatorTestHarness.with(transform, 1);
+        Schema expectedSchema =
+                Schema.newBuilder()
+                        .physicalColumn("col1", DataTypes.STRING().notNull())
+                        .physicalColumn("__data_event_type__", DataTypes.STRING().notNull())
+                        .primaryKey("col1")
+                        .build();
+
+        transformFunctionEventEventOperatorTestHarness.open();
+
+        CreateTableEvent createTableEvent = new CreateTableEvent(METADATA_TABLEID, METADATA_SCHEMA);
+        BinaryRecordDataGenerator recordDataGenerator =
+                new BinaryRecordDataGenerator(((RowType) METADATA_SCHEMA.toRowDataType()));
+        BinaryRecordDataGenerator expectedRecordDataGenerator =
+                new BinaryRecordDataGenerator(((RowType) expectedSchema.toRowDataType()));
+        DataChangeEvent replaceEvent =
+                DataChangeEvent.replaceEvent(
+                        METADATA_TABLEID,
+                        recordDataGenerator.generate(new Object[] {new BinaryStringData("1")}));
+        DataChangeEvent replaceEventExpect =
+                DataChangeEvent.replaceEvent(
+                        METADATA_TABLEID,
+                        expectedRecordDataGenerator.generate(
+                                new Object[] {
+                                    new BinaryStringData("1"), new BinaryStringData("+U")
+                                }));
+
+        transform.processElement(new StreamRecord<>(createTableEvent));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(
+                        new StreamRecord<>(new CreateTableEvent(METADATA_TABLEID, expectedSchema)));
+        transform.processElement(new StreamRecord<>(replaceEvent));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(replaceEventExpect));
+        transformFunctionEventEventOperatorTestHarness.close();
+    }
+
+    @Test
     void testMetadataASTransform() throws Exception {
         PostTransformOperator transform =
                 PostTransformOperator.newBuilder()

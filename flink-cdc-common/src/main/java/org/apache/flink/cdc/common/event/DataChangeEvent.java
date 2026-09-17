@@ -87,6 +87,8 @@ public class DataChangeEvent implements ChangeEvent, Serializable {
                 return isAfter ? "+U" : "-U";
             case DELETE:
                 return "-D";
+            case REPLACE:
+                return "+U";
             default:
                 throw new UnsupportedOperationException("Unknown operation type: " + op);
         }
