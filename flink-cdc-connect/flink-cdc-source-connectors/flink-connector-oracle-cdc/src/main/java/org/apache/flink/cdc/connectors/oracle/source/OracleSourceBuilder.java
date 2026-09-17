@@ -261,6 +261,16 @@ public class OracleSourceBuilder<T> {
     }
 
     /**
+     * Whether to release the finished snapshot split metadata from the coordinator after entering
+     * the stream phase, to reduce JobManager memory pressure (FLINK-39775).
+     */
+    public OracleSourceBuilder<T> releaseSnapshotMetadataEnabled(
+            boolean releaseSnapshotMetadataEnabled) {
+        this.configFactory.releaseSnapshotMetadataEnabled(releaseSnapshotMetadataEnabled);
+        return this;
+    }
+
+    /**
      * Build the {@link OracleIncrementalSource}.
      *
      * @return a OracleParallelSource with the settings made for this builder.

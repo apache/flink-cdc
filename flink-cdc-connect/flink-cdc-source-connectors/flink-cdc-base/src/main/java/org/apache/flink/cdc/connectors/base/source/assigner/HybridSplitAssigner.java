@@ -124,6 +124,31 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
         this.splitMetaGroupSize = splitMetaGroupSize;
         this.offsetFactory = offsetFactory;
         this.enumeratorContext = enumeratorContext;
+        // Fail fast on an incompatible restore. A job that released its snapshot metadata cannot
+        // later enable scan.newly-added-table, because the splits and schemas that flow needs are
+        // gone.
+        if (sourceConfig.isScanNewlyAddedTableEnabled()
+                && isStreamSplitAssigned
+                && snapshotSplitAssigner.isSnapshotMetaReleased()) {
+            throw new IllegalStateException(
+                    "scan.newly-added-table.enabled cannot be turned on for a job that previously "
+                            + "released its snapshot split metadata "
+                            + "(scan.incremental.snapshot.metadata.release.enabled=true). The "
+                            + "assigned splits, finished offsets and table schemas needed to capture "
+                            + "newly added tables are no longer in state. Start the job from a fresh "
+                            + "state, or keep metadata release disabled if newly-added-table scanning "
+                            + "is required.");
+        }
+        // Fail fast if a job that already released its snapshot metadata is restarted with the
+        // release option off. Falling back to the v8 format would drop the released marker.
+        if (!sourceConfig.isReleaseSnapshotMetadataEnabled()
+                && snapshotSplitAssigner.isSnapshotMetaReleased()) {
+            throw new IllegalStateException(
+                    "scan.incremental.snapshot.metadata.release.enabled cannot be turned off for a "
+                            + "job that already released its snapshot split metadata. The assigned "
+                            + "splits, finished offsets and table schemas are no longer in state. "
+                            + "Keep the option enabled, or start the job from a fresh state.");
+        }
     }
 
     @Override
@@ -208,6 +233,11 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
                 snapshotSplits.add(split);
             } else {
                 // we don't store the split, but will re-create stream split later
+                if (snapshotSplitAssigner.isSnapshotMetaReleased()) {
+                    throw new IllegalStateException(
+                            "A stream split was handed back after the snapshot split metadata was "
+                                    + "released; it cannot be re-created from dropped metadata.");
+                }
                 isStreamSplitAssigned = false;
             }
         }
@@ -215,6 +245,16 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
             enumeratorMetrics.exitStreamReading();
         }
         snapshotSplitAssigner.addSplits(snapshotSplits);
+    }
+
+    @Override
+    public void releaseSnapshotMetadata() {
+        snapshotSplitAssigner.releaseSnapshotMetadata();
+    }
+
+    @Override
+    public boolean isSnapshotMetaReleased() {
+        return snapshotSplitAssigner.isSnapshotMetaReleased();
     }
 
     @Override
@@ -256,6 +296,12 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
     // --------------------------------------------------------------------------------------------
 
     public StreamSplit createStreamSplit() {
+        // The stream split is built from the snapshot metadata, so it must not be (re-)created
+        // after the metadata was released.
+        if (snapshotSplitAssigner.isSnapshotMetaReleased()) {
+            throw new IllegalStateException(
+                    "Cannot create a stream split after the snapshot split metadata was released.");
+        }
         final List<SchemalessSnapshotSplit> assignedSnapshotSplit =
                 snapshotSplitAssigner.getAssignedSplits().values().stream()
                         .sorted(Comparator.comparing(SourceSplitBase::splitId))
