@@ -328,7 +328,11 @@ class ExistingTableSchemaExpansionE2eITCase extends PipelineTestEnvironment {
                                 + "  id INT NOT NULL,\n"
                                 + "  name STRING,\n"
                                 + "  PRIMARY KEY (id) NOT ENFORCED\n"
-                                + ") WITH ('bucket' = '4');",
+                                // Use Paimon's default dynamic bucket so the pre-created table
+                                // matches what the CDC sink's PaimonHashFunction assumes; a fixed
+                                // bucket here would mismatch the sink's pre-partitioning and drop
+                                // records.
+                                + ") WITH ('bucket' = '-1');",
                         warehouse, database, database);
         executePaimonSql(sql, "pre_create_paimon");
     }
