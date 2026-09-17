@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.pipeline.tests.stage2;
 
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.cdc.common.test.utils.TestUtils;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
@@ -206,8 +207,9 @@ class ExistingTableSchemaExpansionE2eITCase extends PipelineTestEnvironment {
                         MYSQL_TEST_USER, MYSQL_TEST_PASSWORD, database, warehouse, parallelism);
         Path paimonCdcConnector = TestUtils.getResource("paimon-cdc-pipeline-connector.jar");
         Path hadoopJar = TestUtils.getResource("flink-shade-hadoop.jar");
-        submitPipelineJob(pipelineJob, paimonCdcConnector, hadoopJar);
+        JobID jobId = submitPipelineJob(pipelineJob, paimonCdcConnector, hadoopJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
+        waitUntilStreamSplitReady(jobId, parallelism);
         LOG.info("Pipeline job is running");
 
         // `products` existed with (id, name) only, the remaining columns come from the expander.
@@ -372,6 +374,7 @@ class ExistingTableSchemaExpansionE2eITCase extends PipelineTestEnvironment {
                                 + "  (103, 'Three', 'Cecily');",
                         sourceDatabase, sinkDatabase, sourceDatabase, sinkDatabase, sourceDatabase);
         executeFlussSql(sql, "prepare_fluss");
+        waitUntilJobFinished(Duration.ofMinutes(2));
     }
 
     /** Runs a script against the Paimon catalog, whose connector must be passed explicitly. */
@@ -538,10 +541,10 @@ class ExistingTableSchemaExpansionE2eITCase extends PipelineTestEnvironment {
                 "103, Three, Cecily, 4.105, red, {\"key3\": \"value3\"}, null",
                 "104, Four, Derrida, 1.857, white, {\"key4\": \"value4\"}, null",
                 "105, Five, Evelyn, 5.211, red, {\"K\": \"V\", \"k\": \"v\"}, null",
-                "106, Six, Ferris, 9.813, null, null, null",
-                "107, Seven, Grace, 2.117, null, null, null",
-                "108, Eight, Hesse, 6.819, null, null, null",
-                "109, Nine, IINA, 5.223, null, null, null");
+                "106, Six, Ferris, 9.813, red, null, null",
+                "107, Seven, Grace, 2.117, red, null, null",
+                "108, Eight, Hesse, 6.819, red, null, null",
+                "109, Nine, IINA, 5.223, red, null, null");
     }
 
     private static List<String> expectedCustomersRows() {
