@@ -205,7 +205,7 @@ public class PostgresDialect implements JdbcDataSourceDialect {
 
     @Override
     public JdbcConnectionPoolFactory getPooledDataSourceFactory() {
-        return new PostgresConnectionPoolFactory();
+        return new PostgresConnectionPoolFactory(CONNECTION_NAME);
     }
 
     @Override
