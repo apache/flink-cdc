@@ -122,7 +122,10 @@ public class FlussMetaDataApplier implements MetadataApplier, ExistingTableSchem
 
     @Override
     public DataType normalizeToTargetDataType(
-            TableId tableId, String columnName, DataType pipelineDataType) {
+            TableId tableId,
+            String columnName,
+            DataType pipelineDataType,
+            Schema existingTargetSchema) {
         return toCdcType(toFlussType(pipelineDataType));
     }
 

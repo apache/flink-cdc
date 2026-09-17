@@ -155,11 +155,15 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
             try {
                 metadataApplier
                         .getExistingTableSchemaExpansionSupport()
-                        .ifPresent(
+                        .ifPresentOrElse(
                                 support ->
                                         this.existingTableSchemaExpander =
                                                 new ExistingTableSchemaExpander(
-                                                        metadataApplier, support, behavior));
+                                                        metadataApplier, support, behavior),
+                                () ->
+                                        LOG.warn(
+                                                "Existing target table schema expansion is enabled, but MetadataApplier {} does not support it. The sink's original schema handling will be used.",
+                                                metadataApplier.getClass().getName()));
             } catch (Exception e) {
                 LOG.warn(
                         "Failed to initialize existing target table schema expansion. The sink's original schema handling will be used.",
