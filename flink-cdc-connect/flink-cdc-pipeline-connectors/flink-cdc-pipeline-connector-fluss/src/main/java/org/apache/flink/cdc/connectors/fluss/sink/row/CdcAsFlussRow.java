@@ -181,8 +181,7 @@ public class CdcAsFlussRow implements InternalRow {
 
     @Override
     public InternalRow getRow(int i, int numFields) {
-        return new CdcAsFlussRow(
-                cdcRecord.getRow(indexMapping.get(i), numFields), numFields, indexMapping);
+        return CdcAsFlussRow.replace(cdcRecord.getRow(indexMapping.get(i), numFields));
     }
 
     @VisibleForTesting
