@@ -20,19 +20,23 @@ package org.apache.flink.cdc.pipeline.tests;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.cdc.common.data.DateData;
 import org.apache.flink.cdc.common.data.TimeData;
+import org.apache.flink.cdc.common.test.utils.TestUtils;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
 import org.apache.flink.cdc.runtime.operators.transform.PostTransformOperator;
 import org.apache.flink.cdc.runtime.operators.transform.PreTransformOperator;
 
+import org.assertj.core.api.Assumptions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedClass;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -52,8 +56,11 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** E2e tests for the {@link PreTransformOperator} and {@link PostTransformOperator}. */
+@ParameterizedClass(name = "asyncTransform: {0}")
+@ValueSource(booleans = {false, true})
 class TransformE2eITCase extends PipelineTestEnvironment {
     private static final Logger LOG = LoggerFactory.getLogger(TransformE2eITCase.class);
+    private static final Duration ASYNC_RESTORE_TIMEOUT = Duration.ofMinutes(3);
 
     protected final UniqueDatabase transformTestDatabase =
             new UniqueDatabase(MYSQL, "transform_test", MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
@@ -63,6 +70,17 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                 String databaseName = transformTestDatabase.getDatabaseName();
                 return String.format(s, databaseName, databaseName, databaseName);
             };
+
+    private final boolean asyncTransform;
+
+    TransformE2eITCase(boolean asyncTransform) {
+        this.asyncTransform = asyncTransform;
+    }
+
+    private String withAsyncTransform(String pipelineJob) {
+        return pipelineJob
+                + String.format("%n  transform.async-execution.enabled: %s", asyncTransform);
+    }
 
     @BeforeEach
     public void before() throws Exception {
@@ -74,6 +92,107 @@ class TransformE2eITCase extends PipelineTestEnvironment {
     public void after() {
         super.after();
         transformTestDatabase.dropDatabase();
+    }
+
+    @Test
+    void testAsyncTransformRestoreAfterInflightEvents() throws Exception {
+        Assumptions.assumeThat(asyncTransform).isTrue();
+
+        int slowRecordId = 4000;
+        int lastRecordId = 4007;
+        int slowRecordDelaySeconds = 15;
+        String databaseName = transformTestDatabase.getDatabaseName();
+        String pipelineJob =
+                String.format(
+                        "source:\n"
+                                + "  type: mysql\n"
+                                + "  hostname: %s\n"
+                                + "  port: 3306\n"
+                                + "  username: %s\n"
+                                + "  password: %s\n"
+                                + "  scan.startup.mode: initial\n"
+                                + "  tables: %s.TABLEALPHA\n"
+                                + "  server-id: 5400-5404\n"
+                                + "  server-time-zone: UTC\n"
+                                + "\n"
+                                + "sink:\n"
+                                + "  type: values\n"
+                                + "\n"
+                                + "transform:\n"
+                                + "  - source-table: %s.TABLEALPHA\n"
+                                + "    projection: \\*, throttle(ID, %d, %d) AS THROTTLED\n"
+                                + "\n"
+                                + "pipeline:\n"
+                                + "  transform.async-execution.enabled: true\n"
+                                + "  transform.async-execution.timeout: 1m\n"
+                                + "  transform.async-execution.capacity: 16\n"
+                                + "  transform.async-execution.worker-threads: 4\n"
+                                + "  parallelism: 1\n"
+                                + "  user-defined-function:\n"
+                                + "    - name: throttle\n"
+                                + "      classpath: org.apache.flink.cdc.udf.examples.java.SkewedThrottlerFunctionClass\n",
+                        INTER_CONTAINER_MYSQL_ALIAS,
+                        MYSQL_TEST_USER,
+                        MYSQL_TEST_PASSWORD,
+                        databaseName,
+                        databaseName,
+                        slowRecordId,
+                        slowRecordDelaySeconds);
+        Path udfJar = TestUtils.getResource("udf-examples.jar");
+
+        JobID jobId = submitPipelineJob(pipelineJob, udfJar);
+        waitUntilJobRunning(Duration.ofSeconds(30));
+        waitUntilStreamSplitReady(jobId, 1);
+
+        String mysqlJdbcUrl =
+                String.format(
+                        "jdbc:mysql://%s:%s/%s",
+                        MYSQL.getHost(), MYSQL.getDatabasePort(), databaseName);
+        int incrementalOutputOffset = taskManagerConsumer.toUtf8String().length();
+        addRegionColumnToTableAlpha(mysqlJdbcUrl);
+        insertTableAlphaRows(mysqlJdbcUrl, slowRecordId, lastRecordId);
+
+        waitUntilEventAppearsBeforeAnother(
+                incrementalOutputOffset,
+                ASYNC_RESTORE_TIMEOUT,
+                "SkewedThrottlerFunctionClass finished " + lastRecordId,
+                "SkewedThrottlerFunctionClass finished " + slowRecordId);
+
+        String savepointPath = stopJobWithSavepoint(jobId);
+        waitUntilSpecificEventsAfter(
+                incrementalOutputOffset,
+                ASYNC_RESTORE_TIMEOUT,
+                tableAlphaInsertEvent(databaseName, slowRecordId),
+                tableAlphaInsertEvent(databaseName, lastRecordId));
+
+        int restoredOutputOffset = taskManagerConsumer.toUtf8String().length();
+        JobID restoredJobId = submitPipelineJob(pipelineJob, savepointPath, false, udfJar);
+        waitUntilJobRunning(Duration.ofSeconds(30));
+
+        insertTableAlphaRows(mysqlJdbcUrl, 5000, 5001);
+        String restoredCreateTableEvent =
+                String.format(
+                        "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`PRICEALPHA` INT,`AGEALPHA` INT,`NAMEALPHA` VARCHAR(128),`REGION` VARCHAR(17),`THROTTLED` STRING}, primaryKeys=ID, options=()}",
+                        databaseName);
+        waitUntilSpecificEventsAfter(
+                restoredOutputOffset,
+                ASYNC_RESTORE_TIMEOUT,
+                restoredCreateTableEvent,
+                tableAlphaInsertEvent(databaseName, 5000),
+                tableAlphaInsertEvent(databaseName, 5001));
+
+        String restoredOutput =
+                taskManagerConsumer
+                        .toUtf8String()
+                        .substring(
+                                Math.min(
+                                        restoredOutputOffset,
+                                        taskManagerConsumer.toUtf8String().length()));
+        assertThat(restoredOutput).containsOnlyOnce(restoredCreateTableEvent);
+        for (int id = slowRecordId; id <= lastRecordId; id++) {
+            assertThat(restoredOutput).doesNotContain(tableAlphaInsertEvent(databaseName, id));
+        }
+        cancelJob(restoredJobId);
     }
 
     @ParameterizedTest(name = "batchMode: {0}")
@@ -118,7 +237,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                         transformTestDatabase.getDatabaseName(),
                         runtimeMode,
                         parallelism);
-        JobID jobId = submitPipelineJob(pipelineJob);
+        JobID jobId = submitPipelineJob(withAsyncTransform(pipelineJob));
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
 
@@ -202,7 +321,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                         transformTestDatabase.getDatabaseName(),
                         runtimeMode,
                         testParallelism);
-        JobID jobId = submitPipelineJob(pipelineJob);
+        JobID jobId = submitPipelineJob(withAsyncTransform(pipelineJob));
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
 
@@ -293,7 +412,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                         transformTestDatabase.getDatabaseName(),
                         runtimeMode,
                         parallelism);
-        JobID jobId = submitPipelineJob(pipelineJob);
+        JobID jobId = submitPipelineJob(withAsyncTransform(pipelineJob));
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
 
@@ -375,7 +494,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                         transformTestDatabase.getDatabaseName(),
                         runtimeMode,
                         parallelism);
-        JobID jobId = submitPipelineJob(pipelineJob);
+        JobID jobId = submitPipelineJob(withAsyncTransform(pipelineJob));
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
 
@@ -465,7 +584,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                         transformTestDatabase.getDatabaseName(),
                         runtimeMode,
                         testParallelism);
-        JobID jobId = submitPipelineJob(pipelineJob);
+        JobID jobId = submitPipelineJob(withAsyncTransform(pipelineJob));
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
 
@@ -548,7 +667,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                         transformTestDatabase.getDatabaseName(),
                         runtimeMode,
                         parallelism);
-        JobID jobId = submitPipelineJob(pipelineJob);
+        JobID jobId = submitPipelineJob(withAsyncTransform(pipelineJob));
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
 
@@ -634,7 +753,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                         transformTestDatabase.getDatabaseName(),
                         runtimeMode,
                         testParallelism);
-        JobID jobId = submitPipelineJob(pipelineJob);
+        JobID jobId = submitPipelineJob(withAsyncTransform(pipelineJob));
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
 
@@ -715,7 +834,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                         transformTestDatabase.getDatabaseName(),
                         runtimeMode,
                         parallelism);
-        JobID jobId = submitPipelineJob(pipelineJob);
+        JobID jobId = submitPipelineJob(withAsyncTransform(pipelineJob));
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
 
@@ -795,7 +914,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                         transformTestDatabase.getDatabaseName(),
                         runtimeMode,
                         parallelism);
-        JobID jobId = submitPipelineJob(pipelineJob);
+        JobID jobId = submitPipelineJob(withAsyncTransform(pipelineJob));
         waitUntilJobRunning(Duration.ofSeconds(30));
 
         if (batchMode) {
@@ -877,7 +996,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                         transformTestDatabase.getDatabaseName(),
                         runtimeMode,
                         parallelism);
-        JobID jobId = submitPipelineJob(pipelineJob);
+        JobID jobId = submitPipelineJob(withAsyncTransform(pipelineJob));
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
 
@@ -912,7 +1031,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                         transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
                         parallelism);
-        JobID jobId = submitPipelineJob(pipelineJob);
+        JobID jobId = submitPipelineJob(withAsyncTransform(pipelineJob));
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
 
@@ -1007,7 +1126,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                         transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
                         parallelism);
-        JobID jobId = submitPipelineJob(pipelineJob);
+        JobID jobId = submitPipelineJob(withAsyncTransform(pipelineJob));
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
 
@@ -1110,7 +1229,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                         transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
                         parallelism);
-        JobID jobId = submitPipelineJob(pipelineJob);
+        JobID jobId = submitPipelineJob(withAsyncTransform(pipelineJob));
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
 
@@ -1243,7 +1362,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                         transformTestDatabase.getDatabaseName(),
                         projectionExpression,
                         parallelism);
-        JobID jobId = submitPipelineJob(pipelineJob);
+        JobID jobId = submitPipelineJob(withAsyncTransform(pipelineJob));
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
 
@@ -1318,6 +1437,97 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                 "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1st, 3009, 9, 9.0, 90, 18, Keka, ascii test!?, 大五, 测试数据, ひびぴ, 죠주쥬, ÀÆÉ, ÓÔŐÖ, αβγδε, בבקשה, твой, ภาษาไทย, piedzimst brīvi], op=INSERT, meta=()}",
                 "DropColumnEvent{tableId=%s.TABLEALPHA, droppedColumnNames=[CODE_NAME_EX]}",
                 "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[Beginning, 3010, 10, 10, 97, Lemon, ascii test!?, 大五, 测试数据, ひびぴ, 죠주쥬, ÀÆÉ, ÓÔŐÖ, αβγδε, בבקשה, твой, ภาษาไทย, piedzimst brīvi], op=INSERT, meta=()}");
+    }
+
+    private static void addRegionColumnToTableAlpha(String mysqlJdbcUrl) throws SQLException {
+        try (Connection conn =
+                        DriverManager.getConnection(
+                                mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
+                Statement stat = conn.createStatement()) {
+            stat.execute("ALTER TABLE TABLEALPHA ADD COLUMN REGION VARCHAR(17);");
+        }
+    }
+
+    private static void insertTableAlphaRows(
+            String mysqlJdbcUrl, int startInclusive, int endInclusive) throws SQLException {
+        try (Connection conn =
+                        DriverManager.getConnection(
+                                mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
+                Statement stat = conn.createStatement()) {
+            for (int id = startInclusive; id <= endInclusive; id++) {
+                stat.execute(
+                        String.format(
+                                "INSERT INTO TABLEALPHA(ID, VERSION, PRICEALPHA, AGEALPHA, NAMEALPHA) VALUES (%d, '%d', %d, %d, 'Bulk%d')",
+                                id, id, id, id % 100, id));
+            }
+        }
+    }
+
+    private static String tableAlphaInsertEvent(String databaseName, int id) {
+        return String.format(
+                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[%d, %d, %d, %d, Bulk%d, null, throttled_%d], op=INSERT, meta=()}",
+                databaseName, id, id, id, id % 100, id, id);
+    }
+
+    private void waitUntilSpecificEventsAfter(int offset, Duration timeout, String... events)
+            throws Exception {
+        long deadline = System.currentTimeMillis() + timeout.toMillis();
+        while (System.currentTimeMillis() < deadline) {
+            String stdout = taskManagerConsumer.toUtf8String();
+            int searchOffset = Math.min(offset, stdout.length());
+            boolean matched = true;
+            for (String event : events) {
+                int eventOffset = stdout.indexOf(event, searchOffset);
+                if (eventOffset < 0) {
+                    matched = false;
+                    break;
+                }
+                searchOffset = eventOffset + event.length();
+            }
+            if (matched) {
+                return;
+            }
+            Thread.sleep(1000L);
+        }
+        throw new TimeoutException(
+                "Failed to get events after offset "
+                        + offset
+                        + ": "
+                        + Arrays.toString(events)
+                        + " from stdout: "
+                        + taskManagerConsumer.toUtf8String());
+    }
+
+    private void waitUntilEventAppearsBeforeAnother(
+            int offset, Duration timeout, String expectedEvent, String unexpectedEarlierEvent)
+            throws Exception {
+        long deadline = System.currentTimeMillis() + timeout.toMillis();
+        while (System.currentTimeMillis() < deadline) {
+            String stdout = taskManagerConsumer.toUtf8String();
+            String outputAfterOffset = stdout.substring(Math.min(offset, stdout.length()));
+            int expectedOffset = outputAfterOffset.indexOf(expectedEvent);
+            int unexpectedOffset = outputAfterOffset.indexOf(unexpectedEarlierEvent);
+            if (unexpectedOffset >= 0
+                    && (expectedOffset < 0 || unexpectedOffset < expectedOffset)) {
+                throw new AssertionError(
+                        unexpectedEarlierEvent
+                                + " appeared before "
+                                + expectedEvent
+                                + " in stdout: "
+                                + stdout);
+            }
+            if (expectedOffset >= 0) {
+                return;
+            }
+            Thread.sleep(1000L);
+        }
+        throw new TimeoutException(
+                "Failed to get event after offset "
+                        + offset
+                        + ": "
+                        + expectedEvent
+                        + " from stdout: "
+                        + taskManagerConsumer.toUtf8String());
     }
 
     private void validateEventsWithPattern(String... patterns) throws Exception {

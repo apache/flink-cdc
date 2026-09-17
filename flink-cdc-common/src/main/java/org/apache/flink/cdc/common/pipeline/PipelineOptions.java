@@ -175,5 +175,33 @@ public class PipelineOptions {
                                                                     "UP_TO_38: Allows DECIMAL precision up to 38 digits, matching Flink CDC's extended type system.")))
                                             .build());
 
+    public static final ConfigOption<Boolean> PIPELINE_TRANSFORM_ASYNC_EXECUTION_ENABLED =
+            ConfigOptions.key("transform.async-execution.enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Whether to enable ordered async execution for post-transform.");
+
+    public static final ConfigOption<Duration> PIPELINE_TRANSFORM_ASYNC_EXECUTION_TIMEOUT =
+            ConfigOptions.key("transform.async-execution.timeout")
+                    .durationType()
+                    .defaultValue(Duration.ofMinutes(5))
+                    .withDescription(
+                            "The timeout for each post-transform event in ordered async execution.");
+
+    public static final ConfigOption<Integer> PIPELINE_TRANSFORM_ASYNC_EXECUTION_CAPACITY =
+            ConfigOptions.key("transform.async-execution.capacity")
+                    .intType()
+                    .defaultValue(100)
+                    .withDescription(
+                            "The maximum number of in-flight post-transform events in ordered async execution.");
+
+    public static final ConfigOption<Integer> PIPELINE_TRANSFORM_ASYNC_EXECUTION_WORKER_THREADS =
+            ConfigOptions.key("transform.async-execution.worker-threads")
+                    .intType()
+                    .defaultValue(16)
+                    .withDescription(
+                            "The number of worker threads used by each async post-transform task.");
+
     private PipelineOptions() {}
 }
