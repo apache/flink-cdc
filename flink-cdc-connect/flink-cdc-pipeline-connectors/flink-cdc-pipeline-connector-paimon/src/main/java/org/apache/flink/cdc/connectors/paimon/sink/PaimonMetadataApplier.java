@@ -160,7 +160,10 @@ public class PaimonMetadataApplier implements MetadataApplier, ExistingTableSche
 
     @Override
     public DataType normalizeToTargetDataType(
-            TableId tableId, String columnName, DataType pipelineDataType) {
+            TableId tableId,
+            String columnName,
+            DataType pipelineDataType,
+            Schema existingTargetSchema) {
         return TypeUtils.toCDCDataType(TypeUtils.toPaimonDataType(pipelineDataType));
     }
 

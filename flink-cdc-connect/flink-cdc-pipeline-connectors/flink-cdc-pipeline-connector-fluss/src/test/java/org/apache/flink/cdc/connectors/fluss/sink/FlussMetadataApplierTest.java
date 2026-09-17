@@ -28,7 +28,6 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.IntType;
 import org.apache.flink.cdc.runtime.operators.schema.common.ExistingTableSchemaExpander;
-import org.apache.flink.cdc.runtime.operators.schema.common.ExistingTableSchemaExpander.ExpansionResult;
 
 import org.apache.fluss.client.Connection;
 import org.apache.fluss.client.ConnectionFactory;
@@ -265,13 +264,14 @@ public class FlussMetadataApplierTest {
             ExistingTableSchemaExpander expander =
                     new ExistingTableSchemaExpander(applier, applier, SchemaChangeBehavior.LENIENT);
 
-            assertThat(expander.expand(new CreateTableEvent(tableId, desiredSchema)))
-                    .isEqualTo(ExpansionResult.EXPANDED);
+            expander.expand(new CreateTableEvent(tableId, desiredSchema));
             assertThat(applier.getExistingTableSchema(tableId)).contains(expectedSchema);
-            assertThat(expander.expand(new CreateTableEvent(tableId, desiredSchema)))
-                    .isEqualTo(ExpansionResult.NO_ACTION);
+            expander.expand(new CreateTableEvent(tableId, desiredSchema));
+            assertThat(applier.getExistingTableSchema(tableId)).contains(expectedSchema);
 
-            assertThat(applier.normalizeToTargetDataType(tableId, "name", DataTypes.VARCHAR(32)))
+            assertThat(
+                            applier.normalizeToTargetDataType(
+                                    tableId, "name", DataTypes.VARCHAR(32), expectedSchema))
                     .isEqualTo(DataTypes.STRING());
 
             Schema schemaWithDifferentExistingColumnType =
@@ -282,11 +282,7 @@ public class FlussMetadataApplierTest {
                             .primaryKey("id")
                             .build();
 
-            assertThat(
-                            expander.expand(
-                                    new CreateTableEvent(
-                                            tableId, schemaWithDifferentExistingColumnType)))
-                    .isEqualTo(ExpansionResult.DELEGATE_TO_SINK);
+            expander.expand(new CreateTableEvent(tableId, schemaWithDifferentExistingColumnType));
             assertThat(applier.getExistingTableSchema(tableId)).contains(expectedSchema);
         }
     }

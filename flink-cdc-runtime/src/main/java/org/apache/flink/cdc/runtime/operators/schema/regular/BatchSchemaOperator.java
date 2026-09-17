@@ -124,13 +124,17 @@ public class BatchSchemaOperator extends AbstractStreamOperatorAdapter<Event>
             try {
                 metadataApplier
                         .getExistingTableSchemaExpansionSupport()
-                        .ifPresent(
+                        .ifPresentOrElse(
                                 support ->
                                         this.existingTableSchemaExpander =
                                                 new ExistingTableSchemaExpander(
                                                         metadataApplier,
                                                         support,
-                                                        schemaChangeBehavior));
+                                                        schemaChangeBehavior),
+                                () ->
+                                        LOG.warn(
+                                                "Existing target table schema expansion is enabled, but MetadataApplier {} does not support it. The sink's original schema handling will be used.",
+                                                metadataApplier.getClass().getName()));
             } catch (Exception e) {
                 LOG.warn(
                         "Failed to initialize existing target table schema expansion. The sink's original schema handling will be used.",

@@ -76,22 +76,32 @@ public class ExistingTableSchemaExpander {
     }
 
     /** Tries safe expansions without imposing new compatibility failures. */
-    public ExpansionResult expand(CreateTableEvent createTableEvent) {
+    public void expand(CreateTableEvent createTableEvent) {
         try {
-            return expandInternal(createTableEvent);
+            expandInternal(createTableEvent);
         } catch (Exception e) {
             LOG.warn(
                     "Unexpected error while expanding target table {}. Delegating schema handling to the sink.",
                     createTableEvent.tableId(),
                     e);
-            return ExpansionResult.DELEGATE_TO_SINK;
         }
     }
 
-    private ExpansionResult expandInternal(CreateTableEvent createTableEvent) throws Exception {
+    private void expandInternal(CreateTableEvent createTableEvent) throws Exception {
+        if (schemaChangeBehavior == SchemaChangeBehavior.IGNORE
+                || schemaChangeBehavior == SchemaChangeBehavior.EXCEPTION) {
+            return;
+        }
+        boolean supportsAddColumn = supportsSchemaEvolutionType(SchemaChangeEventType.ADD_COLUMN);
+        boolean supportsAlterColumnType =
+                supportsSchemaEvolutionType(SchemaChangeEventType.ALTER_COLUMN_TYPE);
+        if (!supportsAddColumn && !supportsAlterColumnType) {
+            return;
+        }
+
         Optional<Schema> targetSchema = queryTargetSchema(createTableEvent.tableId());
         if (!targetSchema.isPresent()) {
-            return ExpansionResult.NO_ACTION;
+            return;
         }
 
         Schema pipelineSchema = createTableEvent.getSchema();
@@ -108,14 +118,11 @@ public class ExistingTableSchemaExpander {
 
         List<Column> columnsToAdd = new ArrayList<>();
         Map<String, DataType> columnsToWiden = new LinkedHashMap<>();
-        Map<String, DataType> expectedPipelineTypes = new HashMap<>();
-        boolean delegateToSink = false;
 
         for (Column pipelineColumn : pipelineSchema.getColumns()) {
             String columnName = pipelineColumn.getName();
             String comparisonName = normalizeColumnName(columnName, columnNameCaseSensitive);
             if (ambiguousColumnNames.contains(comparisonName)) {
-                delegateToSink = true;
                 LOG.info(
                         "Column name {} in target table {} is ambiguous under the target system's case-sensitivity rule. Delegating this difference to the sink.",
                         columnName,
@@ -128,7 +135,6 @@ public class ExistingTableSchemaExpander {
                 if (pipelineColumn.isPhysical() && !keyColumns.contains(comparisonName)) {
                     columnsToAdd.add(pipelineColumn.copy(pipelineColumn.getType().nullable()));
                 } else {
-                    delegateToSink = true;
                     LOG.info(
                             "Target table {} is missing special column {}. Delegating this difference to the sink.",
                             createTableEvent.tableId(),
@@ -138,16 +144,18 @@ public class ExistingTableSchemaExpander {
             }
 
             Optional<DataType> normalizedPipelineTypeOptional =
-                    normalizeType(createTableEvent.tableId(), columnName, pipelineColumn.getType());
+                    normalizeType(
+                            createTableEvent.tableId(),
+                            columnName,
+                            pipelineColumn.getType(),
+                            currentTargetSchema);
             if (!normalizedPipelineTypeOptional.isPresent()) {
-                delegateToSink = true;
                 continue;
             }
             DataType normalizedPipelineType = normalizedPipelineTypeOptional.get().nullable();
             DataType targetType = targetColumn.getType().nullable();
 
             if (pipelineColumn.getType().isNullable() && !targetColumn.getType().isNullable()) {
-                delegateToSink = true;
                 LOG.info(
                         "Target column {}.{} is NOT NULL while the pipeline column is nullable. Delegating this difference to the sink.",
                         createTableEvent.tableId(),
@@ -158,7 +166,6 @@ public class ExistingTableSchemaExpander {
                 continue;
             }
             if (keyColumns.contains(comparisonName)) {
-                delegateToSink = true;
                 LOG.info(
                         "Target key column {}.{} cannot contain pipeline type {}. Delegating this difference to the sink.",
                         createTableEvent.tableId(),
@@ -169,7 +176,6 @@ public class ExistingTableSchemaExpander {
 
             Optional<DataType> widenedType = getSafeWidenedType(targetType, normalizedPipelineType);
             if (!widenedType.isPresent()) {
-                delegateToSink = true;
                 LOG.info(
                         "Target column {}.{} with type {} cannot safely contain pipeline type {}. Delegating this difference to the sink.",
                         createTableEvent.tableId(),
@@ -180,15 +186,17 @@ public class ExistingTableSchemaExpander {
             }
 
             Optional<DataType> normalizedWidenedTypeOptional =
-                    normalizeType(createTableEvent.tableId(), columnName, widenedType.get());
+                    normalizeType(
+                            createTableEvent.tableId(),
+                            columnName,
+                            widenedType.get(),
+                            currentTargetSchema);
             if (!normalizedWidenedTypeOptional.isPresent()) {
-                delegateToSink = true;
                 continue;
             }
             DataType normalizedWidenedType = normalizedWidenedTypeOptional.get().nullable();
             if (!canContain(normalizedWidenedType, targetType)
                     || !canContain(normalizedWidenedType, normalizedPipelineType)) {
-                delegateToSink = true;
                 LOG.info(
                         "Target system normalizes proposed type {} for {}.{} to {}, which is not a safe widening. Delegating this difference to the sink.",
                         widenedType.get(),
@@ -201,27 +209,18 @@ public class ExistingTableSchemaExpander {
             String targetColumnName = targetColumn.getName();
             columnsToWiden.put(
                     targetColumnName, widenedType.get().copy(targetColumn.getType().isNullable()));
-            expectedPipelineTypes.put(targetColumnName, normalizedPipelineType);
         }
 
-        List<Column> addedColumns = new ArrayList<>();
-        Map<String, DataType> widenedColumns = new LinkedHashMap<>();
-
         if (!columnsToAdd.isEmpty()) {
-            if (supportsSchemaEvolutionType(SchemaChangeEventType.ADD_COLUMN)) {
+            if (supportsAddColumn) {
                 AddColumnEvent addColumnEvent =
                         new AddColumnEvent(
                                 createTableEvent.tableId(),
                                 columnsToAdd.stream()
                                         .map(AddColumnEvent.ColumnWithPosition::new)
                                         .collect(Collectors.toList()));
-                if (applySchemaChange(addColumnEvent, columnsToAdd)) {
-                    addedColumns.addAll(columnsToAdd);
-                } else {
-                    delegateToSink = true;
-                }
+                applySchemaChange(addColumnEvent, columnsToAdd);
             } else {
-                delegateToSink = true;
                 LOG.info(
                         "Target table {} is missing columns {}, but ADD_COLUMN is not enabled or supported. Delegating this difference to the sink.",
                         createTableEvent.tableId(),
@@ -230,7 +229,7 @@ public class ExistingTableSchemaExpander {
         }
 
         if (!columnsToWiden.isEmpty()) {
-            if (supportsSchemaEvolutionType(SchemaChangeEventType.ALTER_COLUMN_TYPE)) {
+            if (supportsAlterColumnType) {
                 AlterColumnTypeEvent alterColumnTypeEvent =
                         new AlterColumnTypeEvent(
                                 createTableEvent.tableId(),
@@ -243,76 +242,14 @@ public class ExistingTableSchemaExpander {
                                                                 targetColumns
                                                                         .get(columnName)
                                                                         .getType())));
-                if (applySchemaChange(alterColumnTypeEvent, columnsToWiden)) {
-                    widenedColumns.putAll(columnsToWiden);
-                } else {
-                    delegateToSink = true;
-                }
+                applySchemaChange(alterColumnTypeEvent, columnsToWiden);
             } else {
-                delegateToSink = true;
                 LOG.info(
                         "Target table {} has narrow columns {}, but ALTER_COLUMN_TYPE is not enabled or supported. Delegating this difference to the sink.",
                         createTableEvent.tableId(),
                         columnsToWiden.keySet());
             }
         }
-
-        if (addedColumns.isEmpty() && widenedColumns.isEmpty()) {
-            return delegateToSink ? ExpansionResult.DELEGATE_TO_SINK : ExpansionResult.NO_ACTION;
-        }
-
-        Optional<Schema> refreshedTargetSchema = queryTargetSchema(createTableEvent.tableId());
-        if (!refreshedTargetSchema.isPresent()) {
-            LOG.warn(
-                    "Target table {} was unavailable after applying expansion. Delegating schema handling to the sink.",
-                    createTableEvent.tableId());
-            return ExpansionResult.DELEGATE_TO_SINK;
-        }
-
-        ColumnIndex refreshedColumns =
-                indexColumns(refreshedTargetSchema.get(), columnNameCaseSensitive);
-        List<String> columnsStillMissing =
-                addedColumns.stream()
-                        .map(Column::getName)
-                        .filter(columnName -> refreshedColumns.get(columnName) == null)
-                        .collect(Collectors.toList());
-        if (!columnsStillMissing.isEmpty()) {
-            delegateToSink = true;
-            LOG.warn(
-                    "Target table {} is still missing columns {} after expansion. Delegating this difference to the sink.",
-                    createTableEvent.tableId(),
-                    columnsStillMissing);
-        }
-
-        List<String> columnsStillNarrow =
-                widenedColumns.keySet().stream()
-                        .filter(
-                                columnName -> {
-                                    Column refreshedColumn = refreshedColumns.get(columnName);
-                                    return refreshedColumn == null
-                                            || !canContain(
-                                                    refreshedColumn.getType().nullable(),
-                                                    expectedPipelineTypes.get(columnName));
-                                })
-                        .collect(Collectors.toList());
-        if (!columnsStillNarrow.isEmpty()) {
-            delegateToSink = true;
-            LOG.warn(
-                    "Target table {} still has narrow columns {} after expansion. Delegating this difference to the sink.",
-                    createTableEvent.tableId(),
-                    columnsStillNarrow);
-        }
-
-        if (delegateToSink) {
-            return ExpansionResult.DELEGATE_TO_SINK;
-        }
-
-        LOG.info(
-                "Expanded existing target table {} by adding columns {} and widening columns {}.",
-                createTableEvent.tableId(),
-                getColumnNames(addedColumns),
-                widenedColumns);
-        return ExpansionResult.EXPANDED;
     }
 
     private Optional<Schema> queryTargetSchema(TableId tableId) throws Exception {
@@ -328,10 +265,14 @@ public class ExistingTableSchemaExpander {
     }
 
     private Optional<DataType> normalizeType(
-            TableId tableId, String columnName, DataType pipelineType) {
+            TableId tableId,
+            String columnName,
+            DataType pipelineType,
+            Schema existingTargetSchema) {
         try {
             DataType normalizedType =
-                    expansionSupport.normalizeToTargetDataType(tableId, columnName, pipelineType);
+                    expansionSupport.normalizeToTargetDataType(
+                            tableId, columnName, pipelineType, existingTargetSchema);
             if (normalizedType == null) {
                 LOG.warn(
                         "Target schema expansion support returned a null normalized type for {}.{}. Delegating this column to the sink.",
@@ -351,30 +292,25 @@ public class ExistingTableSchemaExpander {
         }
     }
 
-    private boolean applySchemaChange(SchemaChangeEvent event, Object changes) {
+    private void applySchemaChange(SchemaChangeEvent event, Object changes) {
         try {
             LOG.info(
-                    "Applying schema change event derived for existing table expansion: {}", event);
+                    "Attempting to apply schema change event derived for existing table expansion: {}",
+                    event);
             metadataApplier.applySchemaChange(event);
             LOG.info(
-                    "Successfully applied schema change event derived for existing table expansion: {}",
+                    "The schema change call for existing table expansion completed without an exception: {}",
                     event);
-            return true;
         } catch (Exception e) {
             LOG.warn(
                     "Failed to apply expansion change {} to target table {}. Delegating schema handling to the sink.",
                     changes,
                     event.tableId(),
                     e);
-            return false;
         }
     }
 
     private boolean supportsSchemaEvolutionType(SchemaChangeEventType eventType) {
-        if (schemaChangeBehavior == SchemaChangeBehavior.IGNORE
-                || schemaChangeBehavior == SchemaChangeBehavior.EXCEPTION) {
-            return false;
-        }
         try {
             return metadataApplier.acceptsSchemaEvolutionType(eventType)
                     && metadataApplier.getSupportedSchemaEvolutionTypes().contains(eventType);
@@ -624,12 +560,5 @@ public class ExistingTableSchemaExpander {
         private Set<String> getAmbiguousColumnNames() {
             return ambiguousColumnNames;
         }
-    }
-
-    /** Outcome of a best-effort expansion attempt. */
-    public enum ExpansionResult {
-        NO_ACTION,
-        EXPANDED,
-        DELEGATE_TO_SINK
     }
 }

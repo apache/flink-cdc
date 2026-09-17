@@ -30,7 +30,6 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.runtime.operators.schema.common.ExistingTableSchemaExpander;
-import org.apache.flink.cdc.runtime.operators.schema.common.ExistingTableSchemaExpander.ExpansionResult;
 
 import org.apache.paimon.CoreOptions;
 import org.apache.paimon.catalog.Catalog;
@@ -307,11 +306,9 @@ class PaimonMetadataApplierTest {
                 new ExistingTableSchemaExpander(
                         metadataApplier, metadataApplier, SchemaChangeBehavior.LENIENT);
 
-        Assertions.assertThat(expander.expand(createTableEvent))
-                .isEqualTo(ExpansionResult.EXPANDED);
+        expander.expand(createTableEvent);
         metadataApplier.applySchemaChange(createTableEvent);
-        Assertions.assertThat(expander.expand(createTableEvent))
-                .isEqualTo(ExpansionResult.NO_ACTION);
+        expander.expand(createTableEvent);
         Assertions.assertThat(metadataApplier.getExistingTableSchema(tableId))
                 .get()
                 .satisfies(
