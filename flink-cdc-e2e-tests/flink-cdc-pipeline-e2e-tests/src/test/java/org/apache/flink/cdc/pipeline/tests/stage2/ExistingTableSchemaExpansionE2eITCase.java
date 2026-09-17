@@ -32,7 +32,6 @@ import org.junit.jupiter.params.ParameterizedClass;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.Container;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.images.builder.Transferable;
@@ -51,31 +50,28 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * End-to-end tests for existing target table schema expansion. Verifies that the {@code
- * existing-table.schema-expansion.enabled} flag reaches the expander through all three execution
- * paths: regular streaming, distributed streaming, and batch.
+ * End-to-end tests verifying that the {@code existing-table.schema-expansion.enabled} sink option
+ * reaches the schema expander through the whole wiring path (YAML option, Composer, schema operator
+ * factory, schema registry or batch schema operator, metadata applier) in all three execution
+ * topologies: regular streaming, batch, and distributed streaming.
+ *
+ * <p>Every case pre-creates the target table with a strict subset of the source columns, so a flag
+ * lost on any wiring hop leaves the missing columns unwritten and fails the assertions.
  */
 @Testcontainers
 @ParameterizedClass
-@ValueSource(ints = {1})
+@ValueSource(ints = {1, 4})
 class ExistingTableSchemaExpansionE2eITCase extends PipelineTestEnvironment {
     private static final Logger LOG =
             LoggerFactory.getLogger(ExistingTableSchemaExpansionE2eITCase.class);
 
-    private static final Duration TIMEOUT = Duration.ofMinutes(3);
-
-    // Paimon warehouse and connector
-    private static final String PAIMON_SQL_CONNECTOR_FORMAT = "paimon-sql-connector-%s.jar";
+    private static final Duration EXPANSION_TESTCASE_TIMEOUT = Duration.ofMinutes(3);
+    private static final String flussImageTag = "apache/fluss:0.9.0-incubating";
+    private static final String zooKeeperImageTag = "zookeeper:3.9.2";
 
     ExistingTableSchemaExpansionE2eITCase(int parallelism) {
         super(parallelism);
     }
-
-    // ------------------------------------------------------------------------------------------
-    // Fluss containers (for distributed streaming test)
-    // ------------------------------------------------------------------------------------------
-    private static final String flussImageTag = "apache/fluss:0.9.0-incubating";
-    private static final String zooKeeperImageTag = "zookeeper:3.9.2";
 
     private static final List<String> flussCoordinatorProperties =
             Arrays.asList(
@@ -102,50 +98,51 @@ class ExistingTableSchemaExpansionE2eITCase extends PipelineTestEnvironment {
                     "security.sasl.plain.jaas.config: org.apache.fluss.security.auth.sasl.plain.PlainLoginModule required user_admin=\"admin-pass\" user_developer=\"developer-pass\";",
                     "super.users: User:admin");
 
-    @Container private static final GenericContainer<?> ZOOKEEPER = containerZookeeper();
+    @Container
+    private static final GenericContainer<?> ZOOKEEPER =
+            new GenericContainer<>(zooKeeperImageTag)
+                    .withNetworkAliases("zookeeper")
+                    .withExposedPorts(2181)
+                    .withNetwork(NETWORK)
+                    .withLogConsumer(new Slf4jLogConsumer(LOG));
 
     @Container
-    private static final GenericContainer<?> FLUSS_COORDINATOR = containerFlussCoordinator();
+    private static final GenericContainer<?> FLUSS_COORDINATOR =
+            new GenericContainer<>(flussImageTag)
+                    .withEnv(
+                            ImmutableMap.of(
+                                    "FLUSS_PROPERTIES",
+                                    String.join("\n", flussCoordinatorProperties)))
+                    .withCommand("coordinatorServer")
+                    .withNetworkAliases("coordinator-server")
+                    .withExposedPorts(9123)
+                    .withNetwork(NETWORK)
+                    .dependsOn(ZOOKEEPER)
+                    .withLogConsumer(new Slf4jLogConsumer(LOG));
 
     @Container
-    private static final GenericContainer<?> FLUSS_TABLET_SERVER = containerFlussTablet();
-
-    private static GenericContainer<?> containerZookeeper() {
-        return new GenericContainer<>(zooKeeperImageTag)
-                .withNetworkAliases("zookeeper")
-                .withExposedPorts(2181)
-                .withNetwork(NETWORK)
-                .withLogConsumer(new Slf4jLogConsumer(LOG));
-    }
-
-    private static GenericContainer<?> containerFlussCoordinator() {
-        return new GenericContainer<>(flussImageTag)
-                .withEnv(
-                        ImmutableMap.of(
-                                "FLUSS_PROPERTIES", String.join("\n", flussCoordinatorProperties)))
-                .withCommand("coordinatorServer")
-                .withNetworkAliases("coordinator-server")
-                .withExposedPorts(9123)
-                .withNetwork(NETWORK)
-                .dependsOn(ZOOKEEPER)
-                .withLogConsumer(new Slf4jLogConsumer(LOG));
-    }
-
-    private static GenericContainer<?> containerFlussTablet() {
-        return new GenericContainer<>(flussImageTag)
-                .withEnv(
-                        ImmutableMap.of(
-                                "FLUSS_PROPERTIES", String.join("\n", flussTabletServerProperties)))
-                .withCommand("tabletServer")
-                .withNetworkAliases("tablet-server")
-                .withExposedPorts(9123)
-                .withNetwork(NETWORK)
-                .dependsOn(ZOOKEEPER, FLUSS_COORDINATOR)
-                .withLogConsumer(new Slf4jLogConsumer(LOG));
-    }
+    private static final GenericContainer<?> FLUSS_TABLET_SERVER =
+            new GenericContainer<>(flussImageTag)
+                    .withEnv(
+                            ImmutableMap.of(
+                                    "FLUSS_PROPERTIES",
+                                    String.join("\n", flussTabletServerProperties)))
+                    .withCommand("tabletServer")
+                    .withNetworkAliases("tablet-server")
+                    .withExposedPorts(9123)
+                    .withNetwork(NETWORK)
+                    .dependsOn(ZOOKEEPER, FLUSS_COORDINATOR)
+                    .withLogConsumer(new Slf4jLogConsumer(LOG));
 
     protected final UniqueDatabase inventoryDatabase =
             new UniqueDatabase(MYSQL, "paimon_inventory", MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
+
+    @Override
+    protected List<String> copyJarToFlinkLib() {
+        // Due to a bug described in https://github.com/apache/fluss/pull/1267, it's not viable to
+        // pass Fluss dependency with `--jar` CLI option.
+        return Collections.singletonList(String.format("fluss-flink-%s.jar", flinkVersion));
+    }
 
     @BeforeAll
     static void initializeContainers() {
@@ -159,12 +156,13 @@ class ExistingTableSchemaExpansionE2eITCase extends PipelineTestEnvironment {
     public void before() throws Exception {
         super.before();
         inventoryDatabase.createAndInitialize();
-        copyPaimonJars();
-    }
-
-    @Override
-    protected List<String> copyJarToFlinkLib() {
-        return Collections.singletonList(String.format("fluss-flink-%s.jar", flinkVersion));
+        jobManager.copyFileToContainer(
+                MountableFile.forHostPath(
+                        TestUtils.getResource(getPaimonSQLConnectorResourceName())),
+                sharedVolume.toString() + "/" + getPaimonSQLConnectorResourceName());
+        jobManager.copyFileToContainer(
+                MountableFile.forHostPath(TestUtils.getResource("flink-shade-hadoop.jar")),
+                sharedVolume.toString() + "/flink-shade-hadoop.jar");
     }
 
     @AfterEach
@@ -173,107 +171,109 @@ class ExistingTableSchemaExpansionE2eITCase extends PipelineTestEnvironment {
         inventoryDatabase.dropDatabase();
     }
 
-    private void copyPaimonJars() throws Exception {
-        jobManager.copyFileToContainer(
-                MountableFile.forHostPath(TestUtils.getResource(getPaimonSQLConnectorName())),
-                sharedVolume.toString() + "/" + getPaimonSQLConnectorName());
-        jobManager.copyFileToContainer(
-                MountableFile.forHostPath(TestUtils.getResource("flink-shade-hadoop.jar")),
-                sharedVolume.toString() + "/flink-shade-hadoop.jar");
-    }
-
-    // ==========================================================================================
-    // Test 1: Regular streaming path (MySQL -> Paimon)
-    // Uses SchemaOperator + regular SchemaCoordinator
-    // ==========================================================================================
+    /**
+     * MySQL reports no parallel metadata, so the Composer wires the regular schema operator backed
+     * by the regular schema coordinator.
+     */
     @Test
-    void testRegularStreaming() throws Exception {
-        String warehouse = sharedVolume.toString() + "/paimon_regular_" + UUID.randomUUID();
+    void testRegularStreamingPath() throws Exception {
+        String warehouse = sharedVolume.toString() + "/" + "paimon_" + UUID.randomUUID();
         String database = inventoryDatabase.getDatabaseName();
-
-        preCreatePaimonTable(warehouse, database, "products", "id INT, name STRING");
-
-        String pipelineJob = buildMysqlToPaimonPipeline(database, warehouse, "", "");
-        Path paimonConnector = TestUtils.getResource("paimon-cdc-pipeline-connector.jar");
-        Path hadoopJar = TestUtils.getResource("flink-shade-hadoop.jar");
-        submitPipelineJob(pipelineJob, paimonConnector, hadoopJar);
-        waitUntilJobRunning(TIMEOUT);
-        LOG.info("Regular streaming pipeline is running");
-
-        validatePaimonResult(warehouse, database, "products", expectedProductsData());
-    }
-
-    // ==========================================================================================
-    // Test 2: Batch path (MySQL -> Paimon)
-    // Uses BatchSchemaOperator
-    // ==========================================================================================
-    @Test
-    void testBatch() throws Exception {
-        String warehouse = sharedVolume.toString() + "/paimon_batch_" + UUID.randomUUID();
-        String database = inventoryDatabase.getDatabaseName();
-
-        preCreatePaimonTable(warehouse, database, "products", "id INT, name STRING");
+        preCreatePaimonProductsTable(warehouse, database);
 
         String pipelineJob =
-                buildMysqlToPaimonPipeline(
-                        database, warehouse, "  execution.runtime-mode: BATCH\n", "");
-        Path paimonConnector = TestUtils.getResource("paimon-cdc-pipeline-connector.jar");
+                String.format(
+                        "source:\n"
+                                + "  type: mysql\n"
+                                + "  hostname: mysql\n"
+                                + "  port: 3306\n"
+                                + "  username: %s\n"
+                                + "  password: %s\n"
+                                + "  tables: %s.\\.*\n"
+                                + "  server-id: 5400-5404\n"
+                                + "  server-time-zone: UTC\n"
+                                + "\n"
+                                + "sink:\n"
+                                + "  type: paimon\n"
+                                + "  catalog.properties.warehouse: %s\n"
+                                + "  catalog.properties.metastore: filesystem\n"
+                                + "  catalog.properties.cache-enabled: false\n"
+                                + "  existing-table.schema-expansion.enabled: true\n"
+                                + "\n"
+                                + "pipeline:\n"
+                                + "  schema.change.behavior: evolve\n"
+                                + "  parallelism: %s",
+                        MYSQL_TEST_USER, MYSQL_TEST_PASSWORD, database, warehouse, parallelism);
+        Path paimonCdcConnector = TestUtils.getResource("paimon-cdc-pipeline-connector.jar");
         Path hadoopJar = TestUtils.getResource("flink-shade-hadoop.jar");
-        submitPipelineJob(pipelineJob, paimonConnector, hadoopJar);
-        waitUntilJobFinished(TIMEOUT);
-        LOG.info("Batch pipeline has finished");
+        submitPipelineJob(pipelineJob, paimonCdcConnector, hadoopJar);
+        waitUntilJobRunning(Duration.ofSeconds(30));
+        LOG.info("Pipeline job is running");
 
-        validatePaimonResult(warehouse, database, "products", expectedProductsData());
+        // `products` existed with (id, name) only, the remaining columns come from the expander.
+        validatePaimonSinkResult(warehouse, database, "products", expectedProductsRows());
+        // `customers` did not exist upfront, so the sink still creates it on its own.
+        validatePaimonSinkResult(warehouse, database, "customers", expectedCustomersRows());
     }
 
-    // ==========================================================================================
-    // Test 3: Distributed streaming path (Fluss -> Fluss)
-    // Fluss source's isParallelMetadataSource() returns true, triggering the distributed
-    // SchemaCoordinator path instead of the regular one.
-    // ==========================================================================================
+    /**
+     * Batch runtime mode makes the Composer wire a batch schema operator instead of the
+     * coordinator-based one. MySQL accepts the {@code snapshot} startup mode only in batch
+     * pipelines, which also bounds the source so that the job reaches a terminal state.
+     */
     @Test
-    void testDistributedStreaming() throws Exception {
-        String sourceDb = "expansion_source";
-        String targetDb = "expansion_target";
+    void testBatchPath() throws Exception {
+        String warehouse = sharedVolume.toString() + "/" + "paimon_" + UUID.randomUUID();
+        String database = inventoryDatabase.getDatabaseName();
+        preCreatePaimonProductsTable(warehouse, database);
 
-        // Pre-create Fluss source table with full schema and insert data.
-        // Also pre-create target table with only id and name (partial schema).
-        String setupSql =
+        String pipelineJob =
                 String.format(
-                        "SET 'execution.runtime-mode' = 'batch';\n"
-                                + "SET 'sql-client.execution.result-mode' = 'tableau';\n"
-                                + "CREATE CATALOG fluss_setup WITH (\n"
-                                + "  'type' = 'fluss',\n"
-                                + "  'bootstrap.servers' = 'coordinator-server:9123',\n"
-                                + "  'client.security.protocol' = 'sasl',\n"
-                                + "  'client.security.sasl.mechanism' = 'PLAIN',\n"
-                                + "  'client.security.sasl.username' = 'developer',\n"
-                                + "  'client.security.sasl.password' = 'developer-pass'\n"
-                                + ");\n"
-                                + "CREATE DATABASE IF NOT EXISTS fluss_setup.%s;\n"
-                                + "CREATE DATABASE IF NOT EXISTS fluss_setup.%s;\n"
-                                + "CREATE TABLE fluss_setup.%s.products (\n"
-                                + "  id INT NOT NULL,\n"
-                                + "  name STRING,\n"
-                                + "  description STRING,\n"
-                                + "  PRIMARY KEY (id) NOT ENFORCED\n"
-                                + ") WITH ('bucket-num' = '4', 'bucket-key' = 'id');\n"
-                                + "CREATE TABLE fluss_setup.%s.products (\n"
-                                + "  id INT NOT NULL,\n"
-                                + "  name STRING,\n"
-                                + "  PRIMARY KEY (id) NOT ENFORCED\n"
-                                + ") WITH ('bucket-num' = '4', 'bucket-key' = 'id');\n"
-                                + "INSERT INTO fluss_setup.%s.products VALUES\n"
-                                + "  (101, 'One', 'Alice'),\n"
-                                + "  (102, 'Two', 'Bob'),\n"
-                                + "  (103, 'Three', 'Cecily');",
-                        sourceDb, targetDb, sourceDb, targetDb, sourceDb);
+                        "source:\n"
+                                + "  type: mysql\n"
+                                + "  hostname: mysql\n"
+                                + "  port: 3306\n"
+                                + "  username: %s\n"
+                                + "  password: %s\n"
+                                + "  tables: %s.\\.*\n"
+                                + "  server-id: 5400-5404\n"
+                                + "  server-time-zone: UTC\n"
+                                + "  scan.startup.mode: snapshot\n"
+                                + "\n"
+                                + "sink:\n"
+                                + "  type: paimon\n"
+                                + "  catalog.properties.warehouse: %s\n"
+                                + "  catalog.properties.metastore: filesystem\n"
+                                + "  catalog.properties.cache-enabled: false\n"
+                                + "  existing-table.schema-expansion.enabled: true\n"
+                                + "\n"
+                                + "pipeline:\n"
+                                + "  schema.change.behavior: evolve\n"
+                                + "  parallelism: %s\n"
+                                + "  execution.runtime-mode: BATCH",
+                        MYSQL_TEST_USER, MYSQL_TEST_PASSWORD, database, warehouse, parallelism);
+        Path paimonCdcConnector = TestUtils.getResource("paimon-cdc-pipeline-connector.jar");
+        Path hadoopJar = TestUtils.getResource("flink-shade-hadoop.jar");
+        submitPipelineJob(pipelineJob, paimonCdcConnector, hadoopJar);
+        waitUntilJobFinished(EXPANSION_TESTCASE_TIMEOUT);
+        LOG.info("Batch pipeline job has finished");
 
-        executeSqlInFlinkSqlClient(setupSql, "setup_fluss");
+        validatePaimonSinkResult(warehouse, database, "products", expectedProductsRows());
+        validatePaimonSinkResult(warehouse, database, "customers", expectedCustomersRows());
+    }
 
-        // Fluss -> Fluss with existing-table.schema-expansion.enabled: true.
-        // Fluss source's isParallelMetadataSource() returns true, so the Composer
-        // uses translateDistributed() which creates a distributed SchemaCoordinator.
+    /**
+     * Fluss reports parallel metadata, so the Composer wires the distributed schema operator backed
+     * by the distributed schema coordinator. That topology only accepts {@code LENIENT}, {@code
+     * IGNORE} and {@code EXCEPTION}, and the expander deliberately stays a no-op for the latter
+     * two.
+     */
+    @Test
+    void testDistributedStreamingPath() throws Exception {
+        String sourceDatabase = "expansion_source_" + parallelism;
+        String sinkDatabase = "expansion_sink_" + parallelism;
+        prepareFlussTables(sourceDatabase, sinkDatabase);
+
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -284,6 +284,7 @@ class ExistingTableSchemaExpansionE2eITCase extends PipelineTestEnvironment {
                                 + "  properties.client.security.sasl.username: developer\n"
                                 + "  properties.client.security.sasl.password: developer-pass\n"
                                 + "  table.discoverer.pattern: %s\\.products\n"
+                                + "  scan.startup.mode: full\n"
                                 + "\n"
                                 + "sink:\n"
                                 + "  type: fluss\n"
@@ -301,191 +302,168 @@ class ExistingTableSchemaExpansionE2eITCase extends PipelineTestEnvironment {
                                 + "pipeline:\n"
                                 + "  schema.change.behavior: lenient\n"
                                 + "  parallelism: %s",
-                        sourceDb, sourceDb, targetDb, parallelism);
+                        sourceDatabase, sourceDatabase, sinkDatabase, parallelism);
+        Path flussCdcConnector = TestUtils.getResource("fluss-cdc-pipeline-connector.jar");
+        submitPipelineJob(pipelineJob, flussCdcConnector);
+        waitUntilJobRunning(Duration.ofSeconds(30));
+        LOG.info("Distributed pipeline job is running");
 
-        Path flussConnector = TestUtils.getResource("fluss-cdc-pipeline-connector.jar");
-        submitPipelineJob(pipelineJob, flussConnector);
-        waitUntilJobRunning(TIMEOUT);
-        LOG.info("Distributed streaming pipeline is running");
-
-        validateFlussResult(
-                targetDb,
+        // The sink table existed with (id, name) only, `description` comes from the expander.
+        validateFlussSinkResult(
+                sinkDatabase,
                 "products",
                 Arrays.asList("101, One, Alice", "102, Two, Bob", "103, Three, Cecily"));
     }
 
-    // ------------------------------------------------------------------------------------------
-    // Helpers
-    // ------------------------------------------------------------------------------------------
-
-    private String buildMysqlToPaimonPipeline(
-            String database, String warehouse, String extraPipelineOpts, String extraSinkOpts) {
-        return String.format(
-                "source:\n"
-                        + "  type: mysql\n"
-                        + "  hostname: mysql\n"
-                        + "  port: 3306\n"
-                        + "  username: %s\n"
-                        + "  password: %s\n"
-                        + "  tables: %s.\\.*\n"
-                        + "  server-id: 5400-5404\n"
-                        + "  server-time-zone: UTC\n"
-                        + "  scan.startup.mode: snapshot\n"
-                        + "\n"
-                        + "sink:\n"
-                        + "  type: paimon\n"
-                        + "  catalog.properties.warehouse: %s\n"
-                        + "  catalog.properties.metastore: filesystem\n"
-                        + "  catalog.properties.cache-enabled: false\n"
-                        + "  existing-table.schema-expansion.enabled: true\n"
-                        + extraSinkOpts
-                        + "\n"
-                        + "pipeline:\n"
-                        + "  schema.change.behavior: lenient\n"
-                        + "  parallelism: %s\n"
-                        + extraPipelineOpts,
-                MYSQL_TEST_USER,
-                MYSQL_TEST_PASSWORD,
-                database,
-                warehouse,
-                parallelism);
-    }
-
-    private void preCreatePaimonTable(
-            String warehouse, String database, String table, String columns) throws Exception {
+    /** Creates the Paimon target table holding a strict subset of the source columns. */
+    private void preCreatePaimonProductsTable(String warehouse, String database) throws Exception {
         String sql =
                 String.format(
-                        "CREATE CATALOG paimon_pre WITH (\n"
+                        "CREATE CATALOG paimon_catalog WITH (\n"
                                 + "  'type' = 'paimon',\n"
                                 + "  'warehouse' = '%s'\n"
                                 + ");\n"
-                                + "CREATE DATABASE IF NOT EXISTS paimon_pre.%s;\n"
-                                + "CREATE TABLE IF NOT EXISTS paimon_pre.%s.%s (\n"
-                                + "  %s\n"
-                                + ") WITH ('bucket' = '4', 'bucket-key' = 'id');",
-                        warehouse, database, database, table, columns);
-        executeSqlInFlinkSqlClient(sql, "pre_create_paimon");
+                                + "CREATE DATABASE IF NOT EXISTS paimon_catalog.%s;\n"
+                                + "CREATE TABLE paimon_catalog.%s.products (\n"
+                                + "  id INT NOT NULL,\n"
+                                + "  name STRING,\n"
+                                + "  PRIMARY KEY (id) NOT ENFORCED\n"
+                                + ") WITH ('bucket' = '4');",
+                        warehouse, database, database);
+        executePaimonSql(sql, "pre_create_paimon");
     }
 
-    private void executeSqlInFlinkSqlClient(String sql, String scriptName) throws Exception {
-        String containerPath = sharedVolume.toString() + "/" + scriptName + ".sql";
-        jobManager.copyFileToContainer(Transferable.of(sql), containerPath);
-        Container.ExecResult result =
+    /**
+     * Creates and populates the Fluss source table with the full schema, plus the routed target
+     * table holding a strict subset of the source columns.
+     */
+    private void prepareFlussTables(String sourceDatabase, String sinkDatabase) throws Exception {
+        String sql =
+                String.format(
+                        "SET 'execution.runtime-mode' = 'batch';\n"
+                                + "CREATE CATALOG fluss_catalog WITH (\n"
+                                + "  'type' = 'fluss',\n"
+                                + "  'bootstrap.servers' = 'coordinator-server:9123',\n"
+                                + "  'client.security.protocol' = 'sasl',\n"
+                                + "  'client.security.sasl.mechanism' = 'PLAIN',\n"
+                                + "  'client.security.sasl.username' = 'developer',\n"
+                                + "  'client.security.sasl.password' = 'developer-pass'\n"
+                                + ");\n"
+                                + "CREATE DATABASE IF NOT EXISTS fluss_catalog.%s;\n"
+                                + "CREATE DATABASE IF NOT EXISTS fluss_catalog.%s;\n"
+                                + "CREATE TABLE fluss_catalog.%s.products (\n"
+                                + "  id INT NOT NULL,\n"
+                                + "  name STRING,\n"
+                                + "  description STRING,\n"
+                                + "  PRIMARY KEY (id) NOT ENFORCED\n"
+                                + ") WITH ('bucket-num' = '4', 'bucket-key' = 'id');\n"
+                                + "CREATE TABLE fluss_catalog.%s.products (\n"
+                                + "  id INT NOT NULL,\n"
+                                + "  name STRING,\n"
+                                + "  PRIMARY KEY (id) NOT ENFORCED\n"
+                                + ") WITH ('bucket-num' = '4', 'bucket-key' = 'id');\n"
+                                + "INSERT INTO fluss_catalog.%s.products VALUES\n"
+                                + "  (101, 'One', 'Alice'),\n"
+                                + "  (102, 'Two', 'Bob'),\n"
+                                + "  (103, 'Three', 'Cecily');",
+                        sourceDatabase, sinkDatabase, sourceDatabase, sinkDatabase, sourceDatabase);
+        executeFlussSql(sql, "prepare_fluss");
+    }
+
+    /** Runs a script against the Paimon catalog, whose connector must be passed explicitly. */
+    private void executePaimonSql(String sql, String scriptName) throws Exception {
+        String containerSqlPath = sharedVolume.toString() + "/" + scriptName + ".sql";
+        jobManager.copyFileToContainer(Transferable.of(sql), containerSqlPath);
+        org.testcontainers.containers.Container.ExecResult result =
                 jobManager.execInContainer(
                         "/opt/flink/bin/sql-client.sh",
                         "--jar",
-                        sharedVolume.toString() + "/" + getPaimonSQLConnectorName(),
+                        sharedVolume.toString() + "/" + getPaimonSQLConnectorResourceName(),
                         "--jar",
                         sharedVolume.toString() + "/flink-shade-hadoop.jar",
                         "-f",
-                        containerPath);
-        Assertions.assertThat(result.getExitCode())
-                .as(
-                        "SQL script %s should succeed. Stdout: %s Stderr: %s",
-                        scriptName, result.getStdout(), result.getStderr())
-                .isEqualTo(0);
+                        containerSqlPath);
+        checkSqlResult(result, scriptName);
     }
 
-    private void validatePaimonResult(
-            String warehouse, String database, String table, List<String> expected)
-            throws Exception {
-        long deadline = System.currentTimeMillis() + TIMEOUT.toMillis();
-        List<String> results = Collections.emptyList();
-        while (System.currentTimeMillis() < deadline) {
-            try {
-                results = fetchPaimonTableRows(warehouse, database, table);
-                Assertions.assertThat(results).containsExactlyInAnyOrderElementsOf(expected);
-                LOG.info("Successfully verified {} Paimon records.", expected.size());
-                return;
-            } catch (AssertionError e) {
-                LOG.warn(
-                        "Paimon results mismatch, expected {} got {}. Retrying...",
-                        expected.size(),
-                        results.size());
-            }
-            Thread.sleep(1000L);
-        }
-        Assertions.assertThat(results).containsExactlyInAnyOrderElementsOf(expected);
+    /** Runs a script against the Fluss catalog, whose connector already sits in Flink's lib. */
+    private void executeFlussSql(String sql, String scriptName) throws Exception {
+        String containerSqlPath = sharedVolume.toString() + "/" + scriptName + ".sql";
+        jobManager.copyFileToContainer(Transferable.of(sql), containerSqlPath);
+        org.testcontainers.containers.Container.ExecResult result =
+                jobManager.execInContainer("/opt/flink/bin/sql-client.sh", "-f", containerSqlPath);
+        checkSqlResult(result, scriptName);
+    }
+
+    private static void checkSqlResult(
+            org.testcontainers.containers.Container.ExecResult result, String scriptName) {
+        Assertions.assertThat(result.getExitCode())
+                .as(
+                        "SQL script %s should succeed. Stdout: %s; Stderr: %s",
+                        scriptName, result.getStdout(), result.getStderr())
+                .isZero();
     }
 
     private List<String> fetchPaimonTableRows(String warehouse, String database, String table)
             throws Exception {
-        String peekTemplate =
+        String template =
                 readLines("docker/peek-paimon.sql").stream()
                         .filter(line -> !line.startsWith("--"))
                         .collect(Collectors.joining("\n"));
-        String sql = String.format(peekTemplate, warehouse, database, table);
-        String containerPath = sharedVolume.toString() + "/peek.sql";
-        jobManager.copyFileToContainer(Transferable.of(sql), containerPath);
-        Container.ExecResult result =
+        String sql = String.format(template, warehouse, database, table);
+        String containerSqlPath = sharedVolume.toString() + "/peek.sql";
+        jobManager.copyFileToContainer(Transferable.of(sql), containerSqlPath);
+
+        org.testcontainers.containers.Container.ExecResult result =
                 jobManager.execInContainer(
                         "/opt/flink/bin/sql-client.sh",
                         "--jar",
-                        sharedVolume.toString() + "/" + getPaimonSQLConnectorName(),
+                        sharedVolume.toString() + "/" + getPaimonSQLConnectorResourceName(),
                         "--jar",
                         sharedVolume.toString() + "/flink-shade-hadoop.jar",
                         "-f",
-                        containerPath);
+                        containerSqlPath);
         if (result.getExitCode() != 0) {
             throw new RuntimeException(
-                    "Failed to query Paimon. Stdout: "
+                    "Failed to execute peek script. Stdout: "
                             + result.getStdout()
                             + "; Stderr: "
                             + result.getStderr());
         }
+
         return Arrays.stream(result.getStdout().split("\n"))
                 .filter(line -> line.startsWith("|"))
                 .skip(1)
                 .map(ExistingTableSchemaExpansionE2eITCase::extractRow)
-                .map(row -> String.join(", ", row))
+                .map(row -> String.format("%s", String.join(", ", row)))
                 .collect(Collectors.toList());
-    }
-
-    private void validateFlussResult(String database, String table, List<String> expected)
-            throws Exception {
-        long deadline = System.currentTimeMillis() + TIMEOUT.toMillis();
-        List<String> results = Collections.emptyList();
-        int rowCount = expected.size();
-        while (System.currentTimeMillis() < deadline) {
-            try {
-                results = fetchFlussTableRows(database, table, rowCount);
-                Assertions.assertThat(results).containsExactlyInAnyOrderElementsOf(expected);
-                LOG.info("Successfully verified {} Fluss records.", expected.size());
-                return;
-            } catch (AssertionError e) {
-                LOG.warn(
-                        "Fluss results mismatch, expected {} got {}. Retrying...",
-                        expected.size(),
-                        results.size());
-            }
-            Thread.sleep(1000L);
-        }
-        Assertions.assertThat(results).containsExactlyInAnyOrderElementsOf(expected);
     }
 
     private List<String> fetchFlussTableRows(String database, String table, int rowCount)
             throws Exception {
-        String peekTemplate =
+        String template =
                 readLines("docker/peek-fluss.sql").stream()
                         .filter(line -> !line.startsWith("--"))
                         .collect(Collectors.joining("\n"));
-        String sql = String.format(peekTemplate, database, table, rowCount);
-        String containerPath = sharedVolume.toString() + "/peek.sql";
-        jobManager.copyFileToContainer(Transferable.of(sql), containerPath);
-        Container.ExecResult result =
-                jobManager.execInContainer("/opt/flink/bin/sql-client.sh", "-f", containerPath);
+        String sql = String.format(template, database, table, rowCount);
+        String containerSqlPath = sharedVolume.toString() + "/peek.sql";
+        jobManager.copyFileToContainer(Transferable.of(sql), containerSqlPath);
+
+        org.testcontainers.containers.Container.ExecResult result =
+                jobManager.execInContainer("/opt/flink/bin/sql-client.sh", "-f", containerSqlPath);
         if (result.getExitCode() != 0) {
             throw new RuntimeException(
-                    "Failed to query Fluss. Stdout: "
+                    "Failed to execute peek script. Stdout: "
                             + result.getStdout()
                             + "; Stderr: "
                             + result.getStderr());
         }
+
         return Arrays.stream(result.getStdout().split("\n"))
                 .filter(line -> line.startsWith("|"))
                 .skip(1)
                 .map(ExistingTableSchemaExpansionE2eITCase::extractRow)
-                .map(row -> String.join(", ", row))
+                .map(row -> String.format("%s", String.join(", ", row)))
                 .collect(Collectors.toList());
     }
 
@@ -497,11 +475,59 @@ class ExistingTableSchemaExpansionE2eITCase extends PipelineTestEnvironment {
                 .toArray(String[]::new);
     }
 
-    private String getPaimonSQLConnectorName() {
-        return String.format(PAIMON_SQL_CONNECTOR_FORMAT, flinkVersion);
+    private void validatePaimonSinkResult(
+            String warehouse, String database, String table, List<String> expected)
+            throws InterruptedException {
+        LOG.info("Verifying Paimon {}::{}::{} results...", warehouse, database, table);
+        long deadline = System.currentTimeMillis() + EXPANSION_TESTCASE_TIMEOUT.toMillis();
+        List<String> results = Collections.emptyList();
+        while (System.currentTimeMillis() < deadline) {
+            try {
+                results = fetchPaimonTableRows(warehouse, database, table);
+                Assertions.assertThat(results).containsExactlyInAnyOrderElementsOf(expected);
+                LOG.info("Successfully verified {} records.", expected.size());
+                return;
+            } catch (Exception e) {
+                LOG.warn("Validate failed, waiting for the next loop...", e);
+            } catch (AssertionError ignored) {
+                // AssertionError contains way too much records and might flood the log output.
+                LOG.warn(
+                        "Results mismatch, expected {} records, but got {} actually. Waiting for the next loop...",
+                        expected.size(),
+                        results.size());
+            }
+            Thread.sleep(1000L);
+        }
+        Assertions.assertThat(results).containsExactlyInAnyOrderElementsOf(expected);
     }
 
-    private List<String> expectedProductsData() {
+    private void validateFlussSinkResult(String database, String table, List<String> expected)
+            throws InterruptedException {
+        LOG.info("Verifying Fluss {}::{} results...", database, table);
+        long deadline = System.currentTimeMillis() + EXPANSION_TESTCASE_TIMEOUT.toMillis();
+        List<String> results = Collections.emptyList();
+        int rowCount = expected.size();
+        while (System.currentTimeMillis() < deadline) {
+            try {
+                results = fetchFlussTableRows(database, table, rowCount);
+                Assertions.assertThat(results).containsExactlyInAnyOrderElementsOf(expected);
+                LOG.info("Successfully verified {} records.", expected.size());
+                return;
+            } catch (Exception e) {
+                LOG.warn("Validate failed, waiting for the next loop...", e);
+            } catch (AssertionError ignored) {
+                // AssertionError contains way too much records and might flood the log output.
+                LOG.warn(
+                        "Results mismatch, expected {} records, but got {} actually. Waiting for the next loop...",
+                        expected.size(),
+                        results.size());
+            }
+            Thread.sleep(1000L);
+        }
+        Assertions.assertThat(results).containsExactlyInAnyOrderElementsOf(expected);
+    }
+
+    private static List<String> expectedProductsRows() {
         return Arrays.asList(
                 "101, One, Alice, 3.202, red, {\"key1\": \"value1\"}, null",
                 "102, Two, Bob, 1.703, white, {\"key2\": \"value2\"}, null",
@@ -512,5 +538,17 @@ class ExistingTableSchemaExpansionE2eITCase extends PipelineTestEnvironment {
                 "107, Seven, Grace, 2.117, null, null, null",
                 "108, Eight, Hesse, 6.819, null, null, null",
                 "109, Nine, IINA, 5.223, null, null, null");
+    }
+
+    private static List<String> expectedCustomersRows() {
+        return Arrays.asList(
+                "101, user_1, Shanghai, 123567891234",
+                "102, user_2, Shanghai, 123567891234",
+                "103, user_3, Shanghai, 123567891234",
+                "104, user_4, Shanghai, 123567891234");
+    }
+
+    protected String getPaimonSQLConnectorResourceName() {
+        return String.format("paimon-sql-connector-%s.jar", flinkVersion);
     }
 }
