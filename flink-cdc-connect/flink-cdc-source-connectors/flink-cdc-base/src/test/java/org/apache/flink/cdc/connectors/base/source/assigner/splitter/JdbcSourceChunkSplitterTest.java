@@ -69,7 +69,7 @@ class JdbcSourceChunkSplitterTest {
 
     /** The splitter must not hold a JDBC connection while idle, before or after splitting. */
     @Test
-    void testConnectionIsAcquiredLazilyAndReleasedWhenTableIsSplit() throws Exception {
+    void testConnectionIsReleasedWhenEvenlySizedTableIsSplit() throws Exception {
         // 100 rows in [1, 100] is evenly distributed and fits in one chunk
         Fixture fixture = new Fixture(new Object[] {1, 100}, 100L);
 
@@ -82,18 +82,14 @@ class JdbcSourceChunkSplitterTest {
         Assertions.assertThat(fixture.splitter.hasNextChunk()).isFalse();
         Mockito.verify(fixture.dialect, Mockito.times(1)).openJdbcConnection(Mockito.any());
         Mockito.verify(fixture.connection, Mockito.times(1)).close();
-
-        fixture.splitter.close();
-        fixture.splitter.close();
-        Mockito.verify(fixture.connection, Mockito.times(1)).close();
     }
 
     /**
-     * An unevenly distributed table is split one chunk per {@code generateSplits} call; the
-     * connection must stay open across those calls and be released only with the last chunk.
+     * An unevenly distributed table is split one chunk per {@code generateSplits} call; each call
+     * must release its connection instead of holding it until the table is fully split.
      */
     @Test
-    void testConnectionIsHeldUntilUnevenlySizedTableIsSplit() throws Exception {
+    void testConnectionIsReleasedAfterEachUnevenlySizedChunk() throws Exception {
         // 10 rows in [1, 1000000] exceeds the upper distribution factor, so chunks are queried
         // one by one: the first query ends at 10, the second finds no more rows
         Fixture fixture = new Fixture(new Object[] {1, 1_000_000}, 10L, 10, null);
@@ -103,30 +99,14 @@ class JdbcSourceChunkSplitterTest {
         Assertions.assertThat(firstSplits).hasSize(1);
         Assertions.assertThat(fixture.splitter.hasNextChunk()).isTrue();
         Mockito.verify(fixture.dialect, Mockito.times(1)).openJdbcConnection(Mockito.any());
-        Mockito.verify(fixture.connection, Mockito.never()).close();
+        Mockito.verify(fixture.connection, Mockito.times(1)).close();
 
         Collection<SnapshotSplit> lastSplits = fixture.splitter.generateSplits(TABLE_ID);
 
         Assertions.assertThat(lastSplits).hasSize(1);
         Assertions.assertThat(fixture.splitter.hasNextChunk()).isFalse();
-        Mockito.verify(fixture.dialect, Mockito.times(1)).openJdbcConnection(Mockito.any());
-        Mockito.verify(fixture.connection, Mockito.times(1)).close();
-    }
-
-    /** Closing the splitter while a table is half split must not let it reopen a connection. */
-    @Test
-    void testConnectionIsNotReacquiredAfterClose() throws Exception {
-        Fixture fixture = new Fixture(new Object[] {1, 1_000_000}, 10L, 10, null);
-
-        fixture.splitter.generateSplits(TABLE_ID);
-        Assertions.assertThat(fixture.splitter.hasNextChunk()).isTrue();
-
-        fixture.splitter.close();
-
-        Assertions.assertThatThrownBy(() -> fixture.splitter.generateSplits(TABLE_ID))
-                .isInstanceOf(IllegalStateException.class);
-        Mockito.verify(fixture.dialect, Mockito.times(1)).openJdbcConnection(Mockito.any());
-        Mockito.verify(fixture.connection, Mockito.times(1)).close();
+        Mockito.verify(fixture.dialect, Mockito.times(2)).openJdbcConnection(Mockito.any());
+        Mockito.verify(fixture.connection, Mockito.times(2)).close();
     }
 
     /** A splitter over a single-column table whose dialect and connection are Mockito mocks. */

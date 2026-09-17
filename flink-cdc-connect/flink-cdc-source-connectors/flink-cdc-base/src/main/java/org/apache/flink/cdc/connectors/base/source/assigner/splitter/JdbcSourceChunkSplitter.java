@@ -67,8 +67,6 @@ public abstract class JdbcSourceChunkSplitter implements ChunkSplitter {
     @Nullable private ChunkSplitterState.ChunkBound nextChunkStart;
     @Nullable private Integer nextChunkId;
 
-    @Nullable private JdbcConnection jdbcConnection;
-    private boolean closed;
     private Table currentSplittingTable;
     private TableChanges.TableChange currentSchema;
     private Column splitColumn;
@@ -102,44 +100,41 @@ public abstract class JdbcSourceChunkSplitter implements ChunkSplitter {
     }
 
     @Override
-    public void open() {
-        // The connection is acquired lazily and released once a table is split, so an assigner
-        // that has nothing to split (e.g. restored after the snapshot phase) holds no connection.
-    }
+    public void open() {}
 
     /** Generates all snapshot splits (chunks) for the give table path. */
     @Override
     public Collection<SnapshotSplit> generateSplits(TableId tableId) throws Exception {
-        try {
-            if (!hasNextChunk()) {
-                // split a new table.
-                analyzeTable(tableId);
-                Optional<List<SnapshotSplit>> evenlySplitChunks =
-                        trySplitAllEvenlySizedChunks(tableId);
-                if (evenlySplitChunks.isPresent()) {
-                    return evenlySplitChunks.get();
-                } else {
-                    synchronized (lock) {
-                        this.currentSplittingTableId = tableId;
-                        this.nextChunkStart = ChunkSplitterState.ChunkBound.START_BOUND;
-                        this.nextChunkId = 0;
-                        return Collections.singletonList(splitOneUnevenlySizedChunk(tableId));
-                    }
-                }
+        try (JdbcConnection jdbc = dialect.openJdbcConnection(sourceConfig)) {
+            return generateSplits(tableId, jdbc);
+        }
+    }
+
+    private Collection<SnapshotSplit> generateSplits(TableId tableId, JdbcConnection jdbc)
+            throws Exception {
+        if (!hasNextChunk()) {
+            // split a new table.
+            analyzeTable(tableId, jdbc);
+            Optional<List<SnapshotSplit>> evenlySplitChunks = trySplitAllEvenlySizedChunks(tableId);
+            if (evenlySplitChunks.isPresent()) {
+                return evenlySplitChunks.get();
             } else {
-                Preconditions.checkState(
-                        currentSplittingTableId.equals(tableId),
-                        "Can not split a new table before the previous table splitting finish.");
-                if (currentSplittingTable == null) {
-                    analyzeTable(currentSplittingTableId);
-                }
                 synchronized (lock) {
-                    return Collections.singletonList(splitOneUnevenlySizedChunk(tableId));
+                    this.currentSplittingTableId = tableId;
+                    this.nextChunkStart = ChunkSplitterState.ChunkBound.START_BOUND;
+                    this.nextChunkId = 0;
+                    return Collections.singletonList(splitOneUnevenlySizedChunk(tableId, jdbc));
                 }
             }
-        } finally {
-            if (!hasNextChunk()) {
-                releaseConnection();
+        } else {
+            Preconditions.checkState(
+                    currentSplittingTableId.equals(tableId),
+                    "Can not split a new table before the previous table splitting finish.");
+            if (currentSplittingTable == null) {
+                analyzeTable(currentSplittingTableId, jdbc);
+            }
+            synchronized (lock) {
+                return Collections.singletonList(splitOneUnevenlySizedChunk(tableId, jdbc));
             }
         }
     }
@@ -163,36 +158,7 @@ public abstract class JdbcSourceChunkSplitter implements ChunkSplitter {
     }
 
     @Override
-    public void close() {
-        synchronized (lock) {
-            closed = true;
-            releaseConnection();
-        }
-    }
-
-    private JdbcConnection getConnection() {
-        synchronized (lock) {
-            Preconditions.checkState(!closed, "The chunk splitter has been closed.");
-            if (jdbcConnection == null) {
-                jdbcConnection = dialect.openJdbcConnection(sourceConfig);
-            }
-            return jdbcConnection;
-        }
-    }
-
-    private void releaseConnection() {
-        synchronized (lock) {
-            if (jdbcConnection != null) {
-                try {
-                    jdbcConnection.close();
-                } catch (Exception e) {
-                    LOG.warn("Failed to close the JDBC connection of the chunk splitter.", e);
-                } finally {
-                    jdbcConnection = null;
-                }
-            }
-        }
-    }
+    public void close() throws Exception {}
 
     /**
      * Query the maximum value of the next chunk, and the next chunk must be greater than or equal
@@ -391,9 +357,8 @@ public abstract class JdbcSourceChunkSplitter implements ChunkSplitter {
     }
 
     /** Analyze the meta information for given table. */
-    private void analyzeTable(TableId tableId) {
+    private void analyzeTable(TableId tableId, JdbcConnection jdbc) {
         try {
-            JdbcConnection jdbc = getConnection();
             currentSchema = dialect.queryTableSchema(jdbc, tableId);
             currentSplittingTable = Objects.requireNonNull(currentSchema).getTable();
             splitColumn = getSplitColumn(currentSplittingTable, sourceConfig.getChunkKeyColumn());
@@ -406,7 +371,8 @@ public abstract class JdbcSourceChunkSplitter implements ChunkSplitter {
     }
 
     /** Generates one snapshot split (chunk) for the give table path. */
-    private SnapshotSplit splitOneUnevenlySizedChunk(TableId tableId) throws SQLException {
+    private SnapshotSplit splitOneUnevenlySizedChunk(TableId tableId, JdbcConnection jdbc)
+            throws SQLException {
         final int chunkSize = sourceConfig.getSplitSize();
         final Object chunkStartVal = nextChunkStart.getValue();
         LOG.info(
@@ -417,7 +383,6 @@ public abstract class JdbcSourceChunkSplitter implements ChunkSplitter {
                         ? "null"
                         : chunkStartVal.toString());
         // we start from [null, min + chunk_size) and avoid [null, min)
-        JdbcConnection jdbc = getConnection();
         Object chunkEnd =
                 nextChunkEnd(
                         jdbc,
