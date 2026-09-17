@@ -284,7 +284,7 @@ class ExistingTableSchemaExpansionE2eITCase extends PipelineTestEnvironment {
                                 + "  properties.client.security.sasl.username: developer\n"
                                 + "  properties.client.security.sasl.password: developer-pass\n"
                                 + "  table.discoverer.pattern: %s\\.products\n"
-                                + "  scan.startup.mode: full\n"
+                                + "  scan.startup.mode: earliest\n"
                                 + "\n"
                                 + "sink:\n"
                                 + "  type: fluss\n"
