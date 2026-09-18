@@ -1568,6 +1568,85 @@ public class IcebergWriterTest {
                 .containsExactlyInAnyOrder("1, c, null, null", "2, d, null, null");
     }
 
+    /**
+     * Verifies the core partition-key-update bug: when an UPDATE changes the value of a partitioned
+     * column, the before-image must be deleted from its original partition, not just the
+     * after-image inserted into the new one. Iceberg's equality deletes are partition-scoped —
+     * deriving the delete purely from the after-image (the pre-fix behavior) routes it to the new
+     * partition and never touches the old one, leaving the stale row behind and producing a
+     * duplicate primary key on read.
+     */
+    @Test
+    public void testUpdateChangingPartitionValueDeletesFromOldPartition() throws Exception {
+        Map<String, String> catalogOptions = new HashMap<>();
+        catalogOptions.put("type", "hadoop");
+        catalogOptions.put(
+                "warehouse",
+                new File(temporaryFolder.toFile(), UUID.randomUUID().toString()).toString());
+        catalogOptions.put("cache-enabled", "false");
+        Catalog catalog =
+                CatalogUtil.buildIcebergCatalog(
+                        "cdc-iceberg-catalog", catalogOptions, new Configuration());
+        IcebergMetadataApplier icebergMetadataApplier = new IcebergMetadataApplier(catalogOptions);
+
+        String jobId = UUID.randomUUID().toString();
+        String operatorId = UUID.randomUUID().toString();
+        IcebergWriter icebergWriter =
+                new IcebergWriter(
+                        catalogOptions,
+                        1,
+                        1,
+                        ZoneId.systemDefault(),
+                        0,
+                        jobId,
+                        operatorId,
+                        new HashMap<>());
+
+        TableId tableId = TableId.parse("test.iceberg_table");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.BIGINT().notNull())
+                        .physicalColumn("region", DataTypes.VARCHAR(100).notNull())
+                        .primaryKey("id")
+                        .partitionKey("region")
+                        .build();
+        CreateTableEvent createTableEvent = new CreateTableEvent(tableId, schema);
+        icebergMetadataApplier.applySchemaChange(createTableEvent);
+        icebergWriter.write(createTableEvent, null);
+
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(schema.getColumnDataTypes().toArray(new DataType[0]));
+        RecordData north =
+                generator.generate(new Object[] {1L, BinaryStringData.fromString("north")});
+        RecordData east =
+                generator.generate(new Object[] {1L, BinaryStringData.fromString("east")});
+
+        // INSERT(id=1, region="north") is committed as its own snapshot, landing in a real,
+        // already-closed data file under the region=north partition.
+        icebergWriter.write(DataChangeEvent.insertEvent(tableId, north), null);
+        Collection<WriteResultWrapper> insertResults = icebergWriter.prepareCommit();
+        IcebergCommitter icebergCommitter = new IcebergCommitter(catalogOptions, new HashMap<>());
+        icebergCommitter.commit(
+                insertResults.stream()
+                        .map(MockCommitRequestImpl::new)
+                        .collect(Collectors.toList()));
+
+        // UPDATE(id=1, region: "north" -> "east") moves the row to a different partition.
+        icebergWriter.write(DataChangeEvent.updateEvent(tableId, north, east), null);
+        Collection<WriteResultWrapper> updateResults = icebergWriter.prepareCommit();
+        icebergCommitter.commit(
+                updateResults.stream()
+                        .map(MockCommitRequestImpl::new)
+                        .collect(Collectors.toList()));
+        icebergCommitter.close();
+
+        // Only "1, east" must survive. Pre-fix, "1, north" also remained: the equality-delete
+        // was derived solely from the after-image and routed to region=east, never touching the
+        // region=north partition holding the original row.
+        List<String> result = fetchTableContent(catalog, tableId, null);
+        Assertions.assertThat(result).containsExactly("1, east");
+    }
+
     private static long countSnapshots(Table table) {
         long count = 0;
         for (Snapshot ignored : table.snapshots()) {
