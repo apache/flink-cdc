@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.fluss.sink;
 
 import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.cdc.common.data.GenericRecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
@@ -75,6 +76,7 @@ import static org.apache.flink.configuration.CoreOptions.ALWAYS_PARENT_FIRST_LOA
 import static org.apache.fluss.config.ConfigOptions.BOOTSTRAP_SERVERS;
 import static org.apache.fluss.flink.source.testutils.FlinkRowAssertionsUtils.assertResultsIgnoreOrder;
 import static org.apache.fluss.server.testutils.FlussClusterExtension.BUILTIN_DATABASE;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** ITCase for Fluss Pipeline. */
@@ -506,6 +508,49 @@ public class FlussSinkPipelineITCase {
         composeAndExecuteInEvolveMode(eventOfSplits);
         checkResult(TABLE_1, Arrays.asList("+I[1, 1]", "+I[2, 2]", "+I[3, 3]"));
         checkResult(TABLE_2, Arrays.asList("+I[1, 1]", "+I[2, 2]", "+I[3, 3]"));
+    }
+
+    @Test
+    void testNestedRowWithReorderedColumns() throws Exception {
+        tBatchEnv
+                .executeSql(
+                        String.format(
+                                "CREATE TABLE %s.%s (id INT, nested ROW<a INT, b INT>,"
+                                        + " PRIMARY KEY (id) NOT ENFORCED)",
+                                TABLE_1.getSchemaName(), TABLE_1.getTableName()))
+                .await();
+
+        RowType nestedType =
+                DataTypes.ROW(
+                        DataTypes.FIELD("a", DataTypes.INT()),
+                        DataTypes.FIELD("b", DataTypes.INT()));
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("nested", nestedType)
+                        .physicalColumn("id", DataTypes.INT().notNull())
+                        .primaryKey("id")
+                        .build();
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(RowType.of(nestedType, DataTypes.INT().notNull()));
+        List<Event> events =
+                Arrays.asList(
+                        new CreateTableEvent(TABLE_1, schema),
+                        DataChangeEvent.insertEvent(
+                                TABLE_1,
+                                generator.generate(new Object[] {GenericRecordData.of(7, 8), 42})));
+
+        composeAndExecuteInEvolveMode(Collections.singletonList(events));
+        List<Row> results = new ArrayList<>();
+        try (CloseableIterator<Row> rows =
+                tBatchEnv
+                        .executeSql(
+                                String.format(
+                                        "SELECT id, nested FROM %s.%s",
+                                        TABLE_1.getSchemaName(), TABLE_1.getTableName()))
+                        .collect()) {
+            rows.forEachRemaining(results::add);
+        }
+        assertThat(results).containsExactly(Row.of(42, Row.of(7, 8)));
     }
 
     @Test
