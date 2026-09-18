@@ -34,6 +34,18 @@ public class ConnectionPoolId implements Serializable {
         this.username = username;
     }
 
+    public String getHost() {
+        return host;
+    }
+
+    public int getPort() {
+        return port;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {
