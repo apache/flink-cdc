@@ -357,6 +357,47 @@ class OracleTableSourceFactoryTest {
     }
 
     @Test
+    void testStartupFromTimestamp() {
+        long startupTimestampMillis = 1700000000000L;
+        Map<String, String> properties = getAllRequiredOptionsWithHost();
+        properties.put("scan.startup.mode", "timestamp");
+        properties.put("scan.startup.timestamp-millis", String.valueOf(startupTimestampMillis));
+
+        DynamicTableSource actualSource = createTableSource(properties);
+        OracleTableSource expectedSource =
+                new OracleTableSource(
+                        SCHEMA,
+                        null,
+                        MY_PORT,
+                        MY_LOCALHOST,
+                        MY_DATABASE,
+                        MY_TABLE,
+                        MY_SCHEMA,
+                        MY_USERNAME,
+                        MY_PASSWORD,
+                        PROPERTIES,
+                        StartupOptions.timestamp(startupTimestampMillis),
+                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED.defaultValue(),
+                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
+                        SourceOptions.CHUNK_META_GROUP_SIZE.defaultValue(),
+                        SourceOptions.SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
+                        JdbcSourceOptions.CONNECT_TIMEOUT.defaultValue(),
+                        JdbcSourceOptions.CONNECT_MAX_RETRIES.defaultValue(),
+                        JdbcSourceOptions.CONNECTION_POOL_SIZE.defaultValue(),
+                        JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND
+                                .defaultValue(),
+                        JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND
+                                .defaultValue(),
+                        null,
+                        SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue(),
+                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
+                        SourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue(),
+                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED
+                                .defaultValue());
+        Assertions.assertThat(actualSource).isEqualTo(expectedSource);
+    }
+
+    @Test
     void testMetadataColumns() {
         Map<String, String> properties = getAllRequiredOptions();
 
@@ -444,7 +485,7 @@ class OracleTableSourceFactoryTest {
                         })
                 .hasStackTraceContaining(
                         "Invalid value for option 'scan.startup.mode'. Supported values are "
-                                + "[initial, snapshot, latest-offset], "
+                                + "[initial, snapshot, latest-offset, timestamp], "
                                 + "but was: abc");
     }
 
