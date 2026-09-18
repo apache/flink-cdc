@@ -162,7 +162,14 @@ public class DorisMetadataApplier implements MetadataApplier {
         Map<String, FieldSchema> fieldSchemaMap = new LinkedHashMap<>();
         List<String> columnNameList = schema.getColumnNames();
         for (String columnName : columnNameList) {
-            Column column = schema.getColumn(columnName).get();
+            Column column =
+                    schema.getColumn(columnName)
+                            .orElseThrow(
+                                    () ->
+                                            new IllegalStateException(
+                                                    "Column '"
+                                                            + columnName
+                                                            + "' not found in schema"));
             String typeString;
             if (column.getType() instanceof LocalZonedTimestampType
                     || column.getType() instanceof TimestampType

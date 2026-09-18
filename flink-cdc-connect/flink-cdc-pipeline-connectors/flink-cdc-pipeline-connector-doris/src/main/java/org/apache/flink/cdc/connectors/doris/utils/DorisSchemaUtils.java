@@ -91,7 +91,15 @@ public class DorisSchemaUtils {
             return null;
         }
 
-        DataType dataType = schema.getColumn(partitionKey).get().getType();
+        DataType dataType =
+                schema.getColumn(partitionKey)
+                        .orElseThrow(
+                                () ->
+                                        new IllegalStateException(
+                                                "Partition key column '"
+                                                        + partitionKey
+                                                        + "' not found in schema"))
+                        .getType();
         return isValidDataType(dataType) ? new Tuple2<>(partitionKey, partitionUnit) : null;
     }
 
