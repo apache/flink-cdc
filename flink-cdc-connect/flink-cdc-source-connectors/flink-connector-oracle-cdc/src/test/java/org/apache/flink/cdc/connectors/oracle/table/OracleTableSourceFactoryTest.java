@@ -277,6 +277,54 @@ class OracleTableSourceFactoryTest {
     }
 
     @Test
+    void testDisableAnalyzeTableForApproximateRowCount() {
+        Map<String, String> options = getAllRequiredOptions();
+        options.put(
+                org.apache.flink.cdc.connectors.oracle.source.config.OracleSourceOptions
+                        .SCAN_INCREMENTAL_SNAPSHOT_ANALYZE_TABLE_ENABLED
+                        .key(),
+                "false");
+
+        DynamicTableSource actualSource = createTableSource(options);
+        Properties dbzProperties = new Properties();
+        dbzProperties.put(
+                org.apache.flink.cdc.connectors.oracle.source.config.OracleSourceConfigFactory
+                        .ANALYZE_TABLE_FOR_APPROXIMATE_ROW_COUNT_ENABLED,
+                "false");
+        OracleTableSource expectedSource =
+                new OracleTableSource(
+                        SCHEMA,
+                        null,
+                        MY_PORT,
+                        MY_LOCALHOST,
+                        MY_DATABASE,
+                        MY_TABLE,
+                        MY_SCHEMA,
+                        MY_USERNAME,
+                        MY_PASSWORD,
+                        dbzProperties,
+                        StartupOptions.initial(),
+                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED.defaultValue(),
+                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
+                        SourceOptions.CHUNK_META_GROUP_SIZE.defaultValue(),
+                        SourceOptions.SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
+                        JdbcSourceOptions.CONNECT_TIMEOUT.defaultValue(),
+                        JdbcSourceOptions.CONNECT_MAX_RETRIES.defaultValue(),
+                        JdbcSourceOptions.CONNECTION_POOL_SIZE.defaultValue(),
+                        JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND
+                                .defaultValue(),
+                        JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND
+                                .defaultValue(),
+                        null,
+                        JdbcSourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue(),
+                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
+                        JdbcSourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue(),
+                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED
+                                .defaultValue());
+        Assertions.assertThat(actualSource).isEqualTo(expectedSource);
+    }
+
+    @Test
     void testStartupFromInitial() {
         Map<String, String> properties = getAllRequiredOptionsWithHost();
         properties.put("scan.startup.mode", "initial");
