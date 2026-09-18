@@ -24,6 +24,8 @@ import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
+import org.apache.flink.cdc.common.pipeline.ExistingTableSchemaExpansionMode;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
@@ -41,6 +43,7 @@ import org.apache.flink.cdc.common.types.TimestampType;
 import org.apache.flink.cdc.common.types.VarBinaryType;
 import org.apache.flink.cdc.common.types.VarCharType;
 import org.apache.flink.cdc.common.types.ZonedTimestampType;
+import org.apache.flink.util.FlinkRuntimeException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,7 +59,10 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/** Performs best-effort safe schema expansion for an existing target table. */
+/**
+ * Handles the initial {@link CreateTableEvent} for an existing target table according to the
+ * configured {@link ExistingTableSchemaExpansionMode}.
+ */
 @Internal
 public class ExistingTableSchemaExpander {
 
@@ -65,49 +71,212 @@ public class ExistingTableSchemaExpander {
     private final MetadataApplier metadataApplier;
     private final ExistingTableSchemaExpansionSupport expansionSupport;
     private final SchemaChangeBehavior schemaChangeBehavior;
+    private final ExistingTableSchemaExpansionMode mode;
 
     public ExistingTableSchemaExpander(
             MetadataApplier metadataApplier,
             ExistingTableSchemaExpansionSupport expansionSupport,
             SchemaChangeBehavior schemaChangeBehavior) {
+        this(
+                metadataApplier,
+                expansionSupport,
+                schemaChangeBehavior,
+                ExistingTableSchemaExpansionMode.TRY_EXPAND);
+    }
+
+    public ExistingTableSchemaExpander(
+            MetadataApplier metadataApplier,
+            ExistingTableSchemaExpansionSupport expansionSupport,
+            SchemaChangeBehavior schemaChangeBehavior,
+            ExistingTableSchemaExpansionMode mode) {
         this.metadataApplier = metadataApplier;
         this.expansionSupport = expansionSupport;
         this.schemaChangeBehavior = schemaChangeBehavior;
+        this.mode = mode;
     }
 
-    /** Tries safe expansions without imposing new compatibility failures. */
-    public void expand(CreateTableEvent createTableEvent) {
+    /**
+     * Handles the initial {@link CreateTableEvent} for an existing target table.
+     *
+     * @return whether the caller should proceed to apply the original {@link CreateTableEvent} to
+     *     the sink. {@code CHECK} mode returns {@code false} after a successful check so that no
+     *     external DDL is issued by the pipeline.
+     */
+    public boolean expand(CreateTableEvent createTableEvent) {
+        if (mode == ExistingTableSchemaExpansionMode.CHECK) {
+            // CHECK guards the initial table state and runs regardless of schema.change.behavior.
+            checkCompatibility(createTableEvent);
+            return false;
+        }
+        if (schemaChangeBehavior == SchemaChangeBehavior.IGNORE
+                || schemaChangeBehavior == SchemaChangeBehavior.EXCEPTION) {
+            // Keep the original rule: TRY_EXPAND/EXPAND skip framework-side handling here.
+            return true;
+        }
+        switch (mode) {
+            case TRY_EXPAND:
+                tryExpand(createTableEvent);
+                return true;
+            case EXPAND:
+                expandStrictly(createTableEvent);
+                return true;
+            case OFF:
+            default:
+                return true;
+        }
+    }
+
+    private void checkCompatibility(CreateTableEvent createTableEvent) {
+        Optional<Schema> targetSchema = queryTargetSchema(createTableEvent.tableId());
+        if (!targetSchema.isPresent()) {
+            throw new SchemaEvolveException(
+                    createTableEvent,
+                    String.format(
+                            "Existing target table %s does not exist. CHECK mode never creates tables; create the target table externally first.",
+                            createTableEvent.tableId()));
+        }
+        ExpansionPlan plan = analyze(createTableEvent, targetSchema.get());
+        // CHECK never issues DDL, so every difference - including missing columns and narrow
+        // column types that EXPAND could repair - makes the target table unable to contain the
+        // upstream schema.
+        if (!plan.incompatibilities.isEmpty()
+                || !plan.columnsToAdd.isEmpty()
+                || !plan.columnsToWiden.isEmpty()) {
+            throw incompatibleException(createTableEvent, plan);
+        }
+        LOG.info(
+                "Existing target table {} passed the schema compatibility check.",
+                createTableEvent.tableId());
+    }
+
+    private void tryExpand(CreateTableEvent createTableEvent) {
         try {
-            expandInternal(createTableEvent);
+            if (!supportsAnyExpansionDdl()) {
+                LOG.info(
+                        "Neither ADD_COLUMN nor ALTER_COLUMN_TYPE is enabled or supported for target table {}. Delegating schema handling to the sink.",
+                        createTableEvent.tableId());
+                return;
+            }
+            Optional<Schema> targetSchema = queryTargetSchema(createTableEvent.tableId());
+            if (!targetSchema.isPresent()) {
+                LOG.info(
+                        "Target table {} does not exist. Delegating table creation to the sink.",
+                        createTableEvent.tableId());
+                return;
+            }
+            ExpansionPlan plan = analyze(createTableEvent, targetSchema.get());
+            for (String incompatibility : plan.incompatibilities) {
+                LOG.warn(
+                        "Target table {} has an unsupported difference: {}. Delegating it to the sink.",
+                        createTableEvent.tableId(),
+                        incompatibility);
+            }
+            applyPlan(createTableEvent, plan);
+            verifyExpansion(createTableEvent, plan, false);
         } catch (Exception e) {
             LOG.warn(
-                    "Unexpected error while expanding target table {}. Delegating schema handling to the sink.",
+                    "Best-effort schema expansion failed for existing target table {}. Delegating schema handling to the sink.",
                     createTableEvent.tableId(),
                     e);
         }
     }
 
-    private void expandInternal(CreateTableEvent createTableEvent) throws Exception {
-        if (schemaChangeBehavior == SchemaChangeBehavior.IGNORE
-                || schemaChangeBehavior == SchemaChangeBehavior.EXCEPTION) {
-            return;
-        }
-        boolean supportsAddColumn = supportsSchemaEvolutionType(SchemaChangeEventType.ADD_COLUMN);
-        boolean supportsAlterColumnType =
-                supportsSchemaEvolutionType(SchemaChangeEventType.ALTER_COLUMN_TYPE);
-        if (!supportsAddColumn && !supportsAlterColumnType) {
-            return;
-        }
-
+    private void expandStrictly(CreateTableEvent createTableEvent) {
         Optional<Schema> targetSchema = queryTargetSchema(createTableEvent.tableId());
         if (!targetSchema.isPresent()) {
+            LOG.info(
+                    "Target table {} does not exist. Delegating table creation to the sink.",
+                    createTableEvent.tableId());
             return;
         }
+        ExpansionPlan plan = analyze(createTableEvent, targetSchema.get());
+        if (!plan.incompatibilities.isEmpty()) {
+            throw incompatibleException(createTableEvent, plan);
+        }
+        // A fully compatible target table needs no DDL, so a missing DDL capability is only an
+        // error when differences actually require repair; applyPlan enforces that per event type.
+        applyPlan(createTableEvent, plan);
+        verifyExpansion(createTableEvent, plan, true);
+    }
 
+    private boolean supportsAnyExpansionDdl() {
+        return supportsSchemaEvolutionType(SchemaChangeEventType.ADD_COLUMN)
+                || supportsSchemaEvolutionType(SchemaChangeEventType.ALTER_COLUMN_TYPE);
+    }
+
+    private SchemaEvolveException incompatibleException(
+            CreateTableEvent createTableEvent, ExpansionPlan plan) {
+        StringBuilder differences = new StringBuilder();
+        for (String incompatibility : plan.incompatibilities) {
+            differences.append("\n - ").append(incompatibility);
+        }
+        for (Column columnToAdd : plan.columnsToAdd) {
+            differences
+                    .append("\n - target table is missing column \"")
+                    .append(columnToAdd.getName())
+                    .append("\"");
+        }
+        for (Map.Entry<String, DataType> columnToWiden : plan.columnsToWiden.entrySet()) {
+            differences
+                    .append("\n - target column \"")
+                    .append(columnToWiden.getKey())
+                    .append("\" is narrower than pipeline type ")
+                    .append(columnToWiden.getValue());
+        }
+        String message =
+                String.format(
+                        "Existing target table %s cannot contain the pipeline schema:%s",
+                        createTableEvent.tableId(), differences);
+        String repairSuggestions = renderRepairSuggestions(createTableEvent, plan);
+        if (!repairSuggestions.isEmpty()) {
+            message +=
+                    String.format(
+                            "\nSuggested repair statements (adjust to the target system's DDL dialect):%s",
+                            repairSuggestions);
+        }
+        return new SchemaEvolveException(createTableEvent, message);
+    }
+
+    /**
+     * Renders lightweight, review-oriented ALTER TABLE suggestions for the safely repairable
+     * differences. Differences that cannot be fixed safely never get a suggested statement.
+     */
+    private String renderRepairSuggestions(CreateTableEvent createTableEvent, ExpansionPlan plan) {
+        StringBuilder suggestions = new StringBuilder();
+        for (Column columnToAdd : plan.columnsToAdd) {
+            suggestions
+                    .append("\n - ALTER TABLE ")
+                    .append(createTableEvent.tableId())
+                    .append(" ADD COLUMN ")
+                    .append(columnToAdd.getName())
+                    .append(" ")
+                    .append(columnToAdd.getType())
+                    .append(";");
+        }
+        for (Map.Entry<String, DataType> columnToWiden : plan.columnsToWiden.entrySet()) {
+            suggestions
+                    .append("\n - ALTER TABLE ")
+                    .append(createTableEvent.tableId())
+                    .append(" ALTER COLUMN ")
+                    .append(columnToWiden.getKey())
+                    .append(" TYPE ")
+                    .append(columnToWiden.getValue())
+                    .append(";");
+        }
+        return suggestions.toString();
+    }
+
+    /**
+     * Analyzes the pipeline schema against the current target schema and derives the safe DDL plan.
+     * Differences that cannot be fixed by safe DDL are collected in {@link
+     * ExpansionPlan#incompatibilities}.
+     */
+    private ExpansionPlan analyze(CreateTableEvent createTableEvent, Schema currentTargetSchema) {
+        ExpansionPlan plan = new ExpansionPlan();
         Schema pipelineSchema = createTableEvent.getSchema();
-        Schema currentTargetSchema = targetSchema.get();
         boolean columnNameCaseSensitive = expansionSupport.isColumnNameCaseSensitive();
         ColumnIndex targetColumns = indexColumns(currentTargetSchema, columnNameCaseSensitive);
+        plan.targetColumns = targetColumns;
         Set<String> ambiguousColumnNames =
                 new HashSet<>(
                         indexColumns(pipelineSchema, columnNameCaseSensitive)
@@ -116,29 +285,26 @@ public class ExistingTableSchemaExpander {
         Set<String> keyColumns =
                 getKeyColumns(pipelineSchema, currentTargetSchema, columnNameCaseSensitive);
 
-        List<Column> columnsToAdd = new ArrayList<>();
-        Map<String, DataType> columnsToWiden = new LinkedHashMap<>();
-
         for (Column pipelineColumn : pipelineSchema.getColumns()) {
             String columnName = pipelineColumn.getName();
             String comparisonName = normalizeColumnName(columnName, columnNameCaseSensitive);
             if (ambiguousColumnNames.contains(comparisonName)) {
-                LOG.info(
-                        "Column name {} in target table {} is ambiguous under the target system's case-sensitivity rule. Delegating this difference to the sink.",
-                        columnName,
-                        createTableEvent.tableId());
+                plan.incompatibilities.add(
+                        String.format(
+                                "column \"%s\" is ambiguous under the target system's case-sensitivity rule",
+                                columnName));
                 continue;
             }
 
             Column targetColumn = targetColumns.get(columnName);
             if (targetColumn == null) {
                 if (pipelineColumn.isPhysical() && !keyColumns.contains(comparisonName)) {
-                    columnsToAdd.add(pipelineColumn.copy(pipelineColumn.getType().nullable()));
+                    plan.columnsToAdd.add(pipelineColumn.copy(pipelineColumn.getType().nullable()));
                 } else {
-                    LOG.info(
-                            "Target table {} is missing special column {}. Delegating this difference to the sink.",
-                            createTableEvent.tableId(),
-                            columnName);
+                    plan.incompatibilities.add(
+                            String.format(
+                                    "target table is missing the non-addable column \"%s\"",
+                                    columnName));
                 }
                 continue;
             }
@@ -150,38 +316,40 @@ public class ExistingTableSchemaExpander {
                             pipelineColumn.getType(),
                             currentTargetSchema);
             if (!normalizedPipelineTypeOptional.isPresent()) {
+                plan.incompatibilities.add(
+                        String.format(
+                                "pipeline type %s of column \"%s\" cannot be normalized to the target type system",
+                                pipelineColumn.getType(), columnName));
                 continue;
             }
             DataType normalizedPipelineType = normalizedPipelineTypeOptional.get().nullable();
             DataType targetType = targetColumn.getType().nullable();
 
             if (pipelineColumn.getType().isNullable() && !targetColumn.getType().isNullable()) {
-                LOG.info(
-                        "Target column {}.{} is NOT NULL while the pipeline column is nullable. Delegating this difference to the sink.",
-                        createTableEvent.tableId(),
-                        columnName);
+                plan.incompatibilities.add(
+                        String.format(
+                                "column \"%s\" is nullable in the pipeline but NOT NULL in the target table",
+                                columnName));
+                continue;
             }
 
             if (canContain(targetType, normalizedPipelineType)) {
                 continue;
             }
             if (keyColumns.contains(comparisonName)) {
-                LOG.info(
-                        "Target key column {}.{} cannot contain pipeline type {}. Delegating this difference to the sink.",
-                        createTableEvent.tableId(),
-                        columnName,
-                        normalizedPipelineType);
+                plan.incompatibilities.add(
+                        String.format(
+                                "key column \"%s\" with target type %s cannot contain pipeline type %s",
+                                columnName, targetType, normalizedPipelineType));
                 continue;
             }
 
             Optional<DataType> widenedType = getSafeWidenedType(targetType, normalizedPipelineType);
             if (!widenedType.isPresent()) {
-                LOG.info(
-                        "Target column {}.{} with type {} cannot safely contain pipeline type {}. Delegating this difference to the sink.",
-                        createTableEvent.tableId(),
-                        columnName,
-                        targetType,
-                        normalizedPipelineType);
+                plan.incompatibilities.add(
+                        String.format(
+                                "column \"%s\" with target type %s cannot safely contain pipeline type %s",
+                                columnName, targetType, normalizedPipelineType));
                 continue;
             }
 
@@ -192,75 +360,107 @@ public class ExistingTableSchemaExpander {
                             widenedType.get(),
                             currentTargetSchema);
             if (!normalizedWidenedTypeOptional.isPresent()) {
+                plan.incompatibilities.add(
+                        String.format(
+                                "proposed widened type %s for column \"%s\" cannot be normalized to the target type system",
+                                widenedType.get(), columnName));
                 continue;
             }
             DataType normalizedWidenedType = normalizedWidenedTypeOptional.get().nullable();
             if (!canContain(normalizedWidenedType, targetType)
                     || !canContain(normalizedWidenedType, normalizedPipelineType)) {
-                LOG.info(
-                        "Target system normalizes proposed type {} for {}.{} to {}, which is not a safe widening. Delegating this difference to the sink.",
-                        widenedType.get(),
-                        createTableEvent.tableId(),
-                        columnName,
-                        normalizedWidenedType);
+                plan.incompatibilities.add(
+                        String.format(
+                                "target system normalizes proposed widened type %s for column \"%s\" to %s, which is not a safe widening",
+                                widenedType.get(), columnName, normalizedWidenedType));
                 continue;
             }
 
-            String targetColumnName = targetColumn.getName();
-            columnsToWiden.put(
-                    targetColumnName, widenedType.get().copy(targetColumn.getType().isNullable()));
+            plan.columnsToWiden.put(
+                    targetColumn.getName(),
+                    widenedType.get().copy(targetColumn.getType().isNullable()));
         }
+        return plan;
+    }
 
-        if (!columnsToAdd.isEmpty()) {
-            if (supportsAddColumn) {
-                AddColumnEvent addColumnEvent =
-                        new AddColumnEvent(
-                                createTableEvent.tableId(),
-                                columnsToAdd.stream()
-                                        .map(AddColumnEvent.ColumnWithPosition::new)
-                                        .collect(Collectors.toList()));
-                applySchemaChange(addColumnEvent, columnsToAdd);
-            } else {
-                LOG.info(
-                        "Target table {} is missing columns {}, but ADD_COLUMN is not enabled or supported. Delegating this difference to the sink.",
-                        createTableEvent.tableId(),
-                        getColumnNames(columnsToAdd));
+    private void applyPlan(CreateTableEvent createTableEvent, ExpansionPlan plan) {
+        if (!plan.columnsToAdd.isEmpty()) {
+            if (!supportsSchemaEvolutionType(SchemaChangeEventType.ADD_COLUMN)) {
+                throw new SchemaEvolveException(
+                        createTableEvent,
+                        String.format(
+                                "Target table %s is missing columns %s, but ADD_COLUMN is not enabled or supported by the sink.",
+                                createTableEvent.tableId(), getColumnNames(plan.columnsToAdd)));
             }
+            AddColumnEvent addColumnEvent =
+                    new AddColumnEvent(
+                            createTableEvent.tableId(),
+                            plan.columnsToAdd.stream()
+                                    .map(AddColumnEvent.ColumnWithPosition::new)
+                                    .collect(Collectors.toList()));
+            applySchemaChange(addColumnEvent, plan.columnsToAdd);
         }
-
-        if (!columnsToWiden.isEmpty()) {
-            if (supportsAlterColumnType) {
-                AlterColumnTypeEvent alterColumnTypeEvent =
-                        new AlterColumnTypeEvent(
-                                createTableEvent.tableId(),
-                                columnsToWiden,
-                                columnsToWiden.keySet().stream()
-                                        .collect(
-                                                Collectors.toMap(
-                                                        columnName -> columnName,
-                                                        columnName ->
-                                                                targetColumns
-                                                                        .get(columnName)
-                                                                        .getType())));
-                applySchemaChange(alterColumnTypeEvent, columnsToWiden);
-            } else {
-                LOG.info(
-                        "Target table {} has narrow columns {}, but ALTER_COLUMN_TYPE is not enabled or supported. Delegating this difference to the sink.",
-                        createTableEvent.tableId(),
-                        columnsToWiden.keySet());
+        if (!plan.columnsToWiden.isEmpty()) {
+            if (!supportsSchemaEvolutionType(SchemaChangeEventType.ALTER_COLUMN_TYPE)) {
+                throw new SchemaEvolveException(
+                        createTableEvent,
+                        String.format(
+                                "Target table %s has narrow columns %s, but ALTER_COLUMN_TYPE is not enabled or supported by the sink.",
+                                createTableEvent.tableId(), plan.columnsToWiden.keySet()));
             }
+            AlterColumnTypeEvent alterColumnTypeEvent =
+                    new AlterColumnTypeEvent(
+                            createTableEvent.tableId(),
+                            plan.columnsToWiden,
+                            plan.columnsToWiden.keySet().stream()
+                                    .collect(
+                                            Collectors.toMap(
+                                                    columnName -> columnName,
+                                                    columnName ->
+                                                            plan.targetColumns
+                                                                    .get(columnName)
+                                                                    .getType())));
+            applySchemaChange(alterColumnTypeEvent, plan.columnsToWiden);
         }
     }
 
-    private Optional<Schema> queryTargetSchema(TableId tableId) throws Exception {
+    /** Re-reads the target schema after applying derived DDL to detect no-op or failed DDL. */
+    private void verifyExpansion(
+            CreateTableEvent createTableEvent, ExpansionPlan plan, boolean strict) {
+        if (plan.columnsToAdd.isEmpty() && plan.columnsToWiden.isEmpty()) {
+            return;
+        }
+        Optional<Schema> updatedTargetSchema = queryTargetSchema(createTableEvent.tableId());
+        if (!updatedTargetSchema.isPresent()) {
+            throw new SchemaEvolveException(
+                    createTableEvent,
+                    String.format(
+                            "Failed to read back target table %s after expansion.",
+                            createTableEvent.tableId()));
+        }
+        ExpansionPlan remaining = analyze(createTableEvent, updatedTargetSchema.get());
+        if (!remaining.incompatibilities.isEmpty()
+                || !remaining.columnsToAdd.isEmpty()
+                || !remaining.columnsToWiden.isEmpty()) {
+            String message =
+                    String.format(
+                            "Target table %s still has unresolved differences after expansion: %s",
+                            createTableEvent.tableId(), remaining.incompatibilities);
+            if (strict) {
+                throw new SchemaEvolveException(createTableEvent, message);
+            }
+            LOG.warn("{}. Sink data may lose those columns.", message);
+        }
+    }
+
+    private Optional<Schema> queryTargetSchema(TableId tableId) {
         try {
             return expansionSupport.getExistingTableSchema(tableId);
         } catch (Exception e) {
-            LOG.warn(
-                    "Failed to query schema of target table {}. Delegating schema handling to the sink.",
-                    tableId,
-                    e);
-            throw e;
+            // Propagate so the job fails over and retries, instead of proceeding to apply the
+            // original CreateTableEvent and silently dropping columns.
+            throw new FlinkRuntimeException(
+                    "Failed to query schema of existing target table " + tableId, e);
         }
     }
 
@@ -293,21 +493,16 @@ public class ExistingTableSchemaExpander {
     }
 
     private void applySchemaChange(SchemaChangeEvent event, Object changes) {
-        try {
-            LOG.info(
-                    "Attempting to apply schema change event derived for existing table expansion: {}",
-                    event);
-            metadataApplier.applySchemaChange(event);
-            LOG.info(
-                    "The schema change call for existing table expansion completed without an exception: {}",
-                    event);
-        } catch (Exception e) {
-            LOG.warn(
-                    "Failed to apply expansion change {} to target table {}. Delegating schema handling to the sink.",
-                    changes,
-                    event.tableId(),
-                    e);
-        }
+        // Failures propagate to the caller: TRY_EXPAND catches and delegates to the sink, while
+        // CHECK/EXPAND fail the job.
+        LOG.info(
+                "Attempting to apply schema change event derived for existing table expansion: {} ({})",
+                event,
+                changes);
+        metadataApplier.applySchemaChange(event);
+        LOG.info(
+                "The schema change call for existing table expansion completed without an exception: {}",
+                event);
     }
 
     private boolean supportsSchemaEvolutionType(SchemaChangeEventType eventType) {
@@ -537,6 +732,14 @@ public class ExistingTableSchemaExpander {
                 || type instanceof TimestampType
                 || type instanceof LocalZonedTimestampType
                 || type instanceof ZonedTimestampType;
+    }
+
+    /** Result of analyzing a pipeline schema against an existing target schema. */
+    private static final class ExpansionPlan {
+        private final List<Column> columnsToAdd = new ArrayList<>();
+        private final Map<String, DataType> columnsToWiden = new LinkedHashMap<>();
+        private final List<String> incompatibilities = new ArrayList<>();
+        private ColumnIndex targetColumns;
     }
 
     private static class ColumnIndex {

@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.runtime.operators.schema.regular;
 
 import org.apache.flink.cdc.common.annotation.Internal;
+import org.apache.flink.cdc.common.pipeline.ExistingTableSchemaExpansionMode;
 import org.apache.flink.cdc.common.pipeline.RouteMode;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.route.RouteRule;
@@ -42,7 +43,7 @@ public class SchemaCoordinatorProvider implements OperatorCoordinator.Provider {
     private final List<RouteRule> routingRules;
     private final RouteMode routeMode;
     private final SchemaChangeBehavior schemaChangeBehavior;
-    private final boolean existingTableSchemaExpansionEnabled;
+    private final ExistingTableSchemaExpansionMode existingTableSchemaExpansionMode;
     private final Duration rpcTimeout;
 
     public SchemaCoordinatorProvider(
@@ -60,7 +61,7 @@ public class SchemaCoordinatorProvider implements OperatorCoordinator.Provider {
                 routingRules,
                 routeMode,
                 schemaChangeBehavior,
-                false,
+                ExistingTableSchemaExpansionMode.OFF,
                 rpcTimeout);
     }
 
@@ -71,7 +72,7 @@ public class SchemaCoordinatorProvider implements OperatorCoordinator.Provider {
             List<RouteRule> routingRules,
             RouteMode routeMode,
             SchemaChangeBehavior schemaChangeBehavior,
-            boolean existingTableSchemaExpansionEnabled,
+            ExistingTableSchemaExpansionMode existingTableSchemaExpansionMode,
             Duration rpcTimeout) {
         this.operatorID = operatorID;
         this.operatorName = operatorName;
@@ -79,7 +80,7 @@ public class SchemaCoordinatorProvider implements OperatorCoordinator.Provider {
         this.routingRules = routingRules;
         this.routeMode = routeMode;
         this.schemaChangeBehavior = schemaChangeBehavior;
-        this.existingTableSchemaExpansionEnabled = existingTableSchemaExpansionEnabled;
+        this.existingTableSchemaExpansionMode = existingTableSchemaExpansionMode;
         this.rpcTimeout = rpcTimeout;
     }
 
@@ -103,7 +104,7 @@ public class SchemaCoordinatorProvider implements OperatorCoordinator.Provider {
                 routingRules,
                 routeMode,
                 schemaChangeBehavior,
-                existingTableSchemaExpansionEnabled,
+                existingTableSchemaExpansionMode,
                 rpcTimeout);
     }
 }

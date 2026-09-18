@@ -20,6 +20,7 @@ package org.apache.flink.cdc.composer.flink.translator;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.pipeline.ExistingTableSchemaExpansionMode;
 import org.apache.flink.cdc.common.pipeline.RouteMode;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.route.RouteRule;
@@ -42,7 +43,7 @@ import java.util.List;
 @Internal
 public class SchemaOperatorTranslator {
     private final SchemaChangeBehavior schemaChangeBehavior;
-    private final boolean existingTableSchemaExpansionEnabled;
+    private final ExistingTableSchemaExpansionMode existingTableSchemaExpansionMode;
     private final String schemaOperatorUid;
     private final Duration rpcTimeOut;
     private final String timezone;
@@ -52,17 +53,22 @@ public class SchemaOperatorTranslator {
             String schemaOperatorUid,
             Duration rpcTimeOut,
             String timezone) {
-        this(schemaChangeBehavior, false, schemaOperatorUid, rpcTimeOut, timezone);
+        this(
+                schemaChangeBehavior,
+                ExistingTableSchemaExpansionMode.OFF,
+                schemaOperatorUid,
+                rpcTimeOut,
+                timezone);
     }
 
     public SchemaOperatorTranslator(
             SchemaChangeBehavior schemaChangeBehavior,
-            boolean existingTableSchemaExpansionEnabled,
+            ExistingTableSchemaExpansionMode existingTableSchemaExpansionMode,
             String schemaOperatorUid,
             Duration rpcTimeOut,
             String timezone) {
         this.schemaChangeBehavior = schemaChangeBehavior;
-        this.existingTableSchemaExpansionEnabled = existingTableSchemaExpansionEnabled;
+        this.existingTableSchemaExpansionMode = existingTableSchemaExpansionMode;
         this.schemaOperatorUid = schemaOperatorUid;
         this.rpcTimeOut = rpcTimeOut;
         this.timezone = timezone;
@@ -157,7 +163,7 @@ public class SchemaOperatorTranslator {
                                 routeMode,
                                 rpcTimeOut,
                                 schemaChangeBehavior,
-                                existingTableSchemaExpansionEnabled,
+                                existingTableSchemaExpansionMode,
                                 timezone));
         stream.uid(schemaOperatorUid).setParallelism(parallelism);
         return stream;
@@ -187,7 +193,7 @@ public class SchemaOperatorTranslator {
                                 routeMode,
                                 metadataApplier,
                                 schemaChangeBehavior,
-                                existingTableSchemaExpansionEnabled,
+                                existingTableSchemaExpansionMode,
                                 timezone));
         stream.uid(schemaOperatorUid).setParallelism(parallelism);
         return stream;
@@ -230,7 +236,7 @@ public class SchemaOperatorTranslator {
                                 routeMode,
                                 rpcTimeOut,
                                 schemaChangeBehavior,
-                                existingTableSchemaExpansionEnabled,
+                                existingTableSchemaExpansionMode,
                                 timezone))
                 .uid(schemaOperatorUid)
                 .setParallelism(parallelism);
