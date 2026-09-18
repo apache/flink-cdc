@@ -48,15 +48,32 @@ public class StreamSplitMetaEvent implements SourceEvent {
 
     private final int totalFinishedSplitSize;
 
+    /**
+     * Generation of the stream-split assignment these meta groups belong to (FLINK-39775). The
+     * reader echoes it back in {@link StreamSplitMetaAssembledEvent} so the coordinator can reject
+     * a stale assembled report from a failed reader attempt.
+     */
+    private final int assignmentGeneration;
+
     public StreamSplitMetaEvent(
             String splitId,
             int metaGroupId,
             @Nullable List<byte[]> metaGroup,
             int totalFinishedSplitSize) {
+        this(splitId, metaGroupId, metaGroup, totalFinishedSplitSize, 0);
+    }
+
+    public StreamSplitMetaEvent(
+            String splitId,
+            int metaGroupId,
+            @Nullable List<byte[]> metaGroup,
+            int totalFinishedSplitSize,
+            int assignmentGeneration) {
         this.splitId = splitId;
         this.metaGroupId = metaGroupId;
         this.metaGroup = metaGroup;
         this.totalFinishedSplitSize = totalFinishedSplitSize;
+        this.assignmentGeneration = assignmentGeneration;
     }
 
     public String getSplitId() {
@@ -73,5 +90,9 @@ public class StreamSplitMetaEvent implements SourceEvent {
 
     public int getTotalFinishedSplitSize() {
         return totalFinishedSplitSize;
+    }
+
+    public int getAssignmentGeneration() {
+        return assignmentGeneration;
     }
 }

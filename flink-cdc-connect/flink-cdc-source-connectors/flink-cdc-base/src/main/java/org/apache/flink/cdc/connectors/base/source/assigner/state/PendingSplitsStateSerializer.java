@@ -53,10 +53,16 @@ import static org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplit
  *
  * <p>The modification of 8th version: add ChunkSplitterState to SnapshotPendingSplitsState, which
  * contains the asynchronously splitting chunk info.
+ *
+ * <p>The modification of 9th version (FLINK-39775): add snapshotMetaReleased(boolean) to
+ * SnapshotPendingSplitsState. Version 9 is written only when
+ * scan.incremental.snapshot.metadata.release.enabled is set, so a job that leaves the option off
+ * keeps writing version 8 and stays restorable by an older connector build.
  */
 public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<PendingSplitsState> {
 
-    private static final int VERSION = 8;
+    private static final int VERSION_WITHOUT_RELEASED_FLAG = 8;
+    private static final int VERSION_WITH_RELEASED_FLAG = 9;
     private static final ThreadLocal<DataOutputSerializer> SERIALIZER_CACHE =
             ThreadLocal.withInitial(() -> new DataOutputSerializer(64));
 
@@ -65,14 +71,23 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
     private static final int HYBRID_PENDING_SPLITS_STATE_FLAG = 3;
 
     private final SourceSplitSerializer splitSerializer;
+    private final boolean releaseSnapshotMetadataEnabled;
 
     public PendingSplitsStateSerializer(SourceSplitSerializer splitSerializer) {
+        this(splitSerializer, false);
+    }
+
+    public PendingSplitsStateSerializer(
+            SourceSplitSerializer splitSerializer, boolean releaseSnapshotMetadataEnabled) {
         this.splitSerializer = splitSerializer;
+        this.releaseSnapshotMetadataEnabled = releaseSnapshotMetadataEnabled;
     }
 
     @Override
     public int getVersion() {
-        return VERSION;
+        return releaseSnapshotMetadataEnabled
+                ? VERSION_WITH_RELEASED_FLAG
+                : VERSION_WITHOUT_RELEASED_FLAG;
     }
 
     @Override
@@ -123,6 +138,7 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
             case 6:
             case 7:
             case 8:
+            case 9:
                 return deserializePendingSplitsState(version, serialized);
             default:
                 throw new IOException("Unknown version: " + version);
@@ -192,6 +208,12 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
                     SerializerUtils.rowToSerializedString(
                             new Object[] {chunkSplitterState.getNextChunkStart().getValue()}));
             out.writeInt(chunkSplitterState.getNextChunkId());
+        }
+
+        // v9 (FLINK-39775): the released flag is written only when metadata release is enabled (see
+        // class javadoc).
+        if (releaseSnapshotMetadataEnabled) {
+            out.writeBoolean(state.isSnapshotMetaReleased());
         }
     }
 
@@ -325,6 +347,12 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
                                 nextChunkId);
             }
         }
+
+        // v9 (FLINK-39775): older versions never released, so the flag defaults to false.
+        boolean snapshotMetaReleased = false;
+        if (version >= 9) {
+            snapshotMetaReleased = in.readBoolean();
+        }
         return new SnapshotPendingSplitsState(
                 alreadyProcessedTables,
                 remainingSchemalessSplits,
@@ -336,7 +364,8 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
                 isTableIdCaseSensitive,
                 true,
                 splitFinishedCheckpointIds,
-                chunkSplitterState);
+                chunkSplitterState,
+                snapshotMetaReleased);
     }
 
     private HybridPendingSplitsState deserializeHybridPendingSplitsState(

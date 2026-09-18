@@ -119,6 +119,7 @@ class SqlServerPipelineRecordEmitterTest {
                 null,
                 false,
                 false,
+                false,
                 false);
     }
 

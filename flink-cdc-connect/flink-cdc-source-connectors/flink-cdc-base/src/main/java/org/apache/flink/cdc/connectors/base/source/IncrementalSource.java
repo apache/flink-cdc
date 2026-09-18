@@ -216,7 +216,10 @@ public class IncrementalSource<T, C extends SourceConfig>
     @Override
     public SimpleVersionedSerializer<PendingSplitsState> getEnumeratorCheckpointSerializer() {
         SourceSplitSerializer sourceSplitSerializer = (SourceSplitSerializer) getSplitSerializer();
-        return new PendingSplitsStateSerializer(sourceSplitSerializer);
+        // Only write the v9 released flag when release is enabled. A default-off job keeps the v8
+        // checkpoint format and stays restorable by an older connector build.
+        return new PendingSplitsStateSerializer(
+                sourceSplitSerializer, configFactory.create(0).isReleaseSnapshotMetadataEnabled());
     }
 
     @Override

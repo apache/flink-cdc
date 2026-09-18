@@ -119,6 +119,18 @@ public interface SplitAssigner extends Closeable {
     void onStreamSplitUpdated();
 
     /**
+     * Releases the bulk snapshot-split metadata once the reader has assembled it and a checkpoint
+     * has covered that assignment. Implementations holding no snapshot metadata keep the default
+     * no-op. Generalizes the MySQL coordinator-memory release (FLINK-39775).
+     */
+    default void releaseSnapshotMetadata() {}
+
+    /** Returns whether {@link #releaseSnapshotMetadata()} has dropped the snapshot metadata. */
+    default boolean isSnapshotMetaReleased() {
+        return false;
+    }
+
+    /**
      * Called to close the assigner, in case it holds on to any resources, like threads or network
      * connections.
      */
