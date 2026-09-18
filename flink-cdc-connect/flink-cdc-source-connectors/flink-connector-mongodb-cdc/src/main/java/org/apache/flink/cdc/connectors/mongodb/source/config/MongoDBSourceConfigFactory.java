@@ -25,6 +25,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.CHUNK_META_GROUP_SIZE;
+import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED;
 import static org.apache.flink.cdc.connectors.base.utils.EnvironmentUtils.checkSupportCheckpointsAfterTasksFinished;
 import static org.apache.flink.cdc.connectors.mongodb.internal.MongoDBEnvelope.MONGODB_SCHEME;
 import static org.apache.flink.cdc.connectors.mongodb.internal.MongoDBEnvelope.MONGODB_SRV_SCHEME;
@@ -63,6 +64,8 @@ public class MongoDBSourceConfigFactory implements Factory<MongoDBSourceConfig> 
     protected boolean skipSnapshotBackfill = false;
     protected boolean scanNewlyAddedTableEnabled = false;
     protected boolean assignUnboundedChunkFirst = false;
+    protected boolean releaseSnapshotMetadataEnabled =
+            SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED.defaultValue();
 
     /** The protocol connected to MongoDB. For example mongodb or mongodb+srv. */
     public MongoDBSourceConfigFactory scheme(String scheme) {
@@ -280,6 +283,16 @@ public class MongoDBSourceConfigFactory implements Factory<MongoDBSourceConfig> 
         return this;
     }
 
+    /**
+     * Whether to release the snapshot split metadata held by the source coordinator once the stream
+     * split is assembled and checkpoint-covered. Defaults to false.
+     */
+    public MongoDBSourceConfigFactory releaseSnapshotMetadataEnabled(
+            boolean releaseSnapshotMetadataEnabled) {
+        this.releaseSnapshotMetadataEnabled = releaseSnapshotMetadataEnabled;
+        return this;
+    }
+
     /** Creates a new {@link MongoDBSourceConfig} for the given subtask {@code subtaskId}. */
     @Override
     public MongoDBSourceConfig create(int subtaskId) {
@@ -306,6 +319,7 @@ public class MongoDBSourceConfigFactory implements Factory<MongoDBSourceConfig> 
                 disableCursorTimeout,
                 skipSnapshotBackfill,
                 scanNewlyAddedTableEnabled,
-                assignUnboundedChunkFirst);
+                assignUnboundedChunkFirst,
+                releaseSnapshotMetadataEnabled);
     }
 }

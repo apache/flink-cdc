@@ -28,6 +28,7 @@ import java.util.Objects;
 
 import static org.apache.flink.cdc.connectors.mongodb.source.utils.MongoUtils.buildConnectionString;
 import static org.apache.flink.util.Preconditions.checkNotNull;
+import static org.apache.flink.util.Preconditions.checkState;
 
 /** A MongoDB Source configuration which is used by {@link MongoDBSource}. */
 public class MongoDBSourceConfig implements SourceConfig {
@@ -56,6 +57,7 @@ public class MongoDBSourceConfig implements SourceConfig {
     private final boolean skipSnapshotBackfill;
     private final boolean isScanNewlyAddedTableEnabled;
     private final boolean assignUnboundedChunkFirst;
+    private final boolean releaseSnapshotMetadataEnabled;
 
     MongoDBSourceConfig(
             String scheme,
@@ -79,7 +81,8 @@ public class MongoDBSourceConfig implements SourceConfig {
             boolean disableCursorTimeout,
             boolean skipSnapshotBackfill,
             boolean isScanNewlyAddedTableEnabled,
-            boolean assignUnboundedChunkFirst) {
+            boolean assignUnboundedChunkFirst,
+            boolean releaseSnapshotMetadataEnabled) {
         this.scheme = checkNotNull(scheme);
         this.hosts = checkNotNull(hosts);
         this.username = username;
@@ -103,6 +106,13 @@ public class MongoDBSourceConfig implements SourceConfig {
         this.skipSnapshotBackfill = skipSnapshotBackfill;
         this.isScanNewlyAddedTableEnabled = isScanNewlyAddedTableEnabled;
         this.assignUnboundedChunkFirst = assignUnboundedChunkFirst;
+        this.releaseSnapshotMetadataEnabled = releaseSnapshotMetadataEnabled;
+        checkState(
+                !(isScanNewlyAddedTableEnabled && releaseSnapshotMetadataEnabled),
+                "scan.incremental.snapshot.metadata.release.enabled and "
+                        + "scan.newly-added-table.enabled cannot both be enabled: releasing the "
+                        + "snapshot split metadata would drop the assigned splits, finished offsets "
+                        + "and table schemas that newly-added-table scanning needs.");
     }
 
     public String getScheme() {
@@ -208,6 +218,11 @@ public class MongoDBSourceConfig implements SourceConfig {
     }
 
     @Override
+    public boolean isReleaseSnapshotMetadataEnabled() {
+        return releaseSnapshotMetadataEnabled;
+    }
+
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
@@ -234,7 +249,8 @@ public class MongoDBSourceConfig implements SourceConfig {
                 && Objects.equals(collectionList, that.collectionList)
                 && Objects.equals(connectionString, that.connectionString)
                 && Objects.equals(skipSnapshotBackfill, that.skipSnapshotBackfill)
-                && Objects.equals(isScanNewlyAddedTableEnabled, that.isScanNewlyAddedTableEnabled);
+                && Objects.equals(isScanNewlyAddedTableEnabled, that.isScanNewlyAddedTableEnabled)
+                && releaseSnapshotMetadataEnabled == that.releaseSnapshotMetadataEnabled;
     }
 
     @Override
@@ -258,6 +274,7 @@ public class MongoDBSourceConfig implements SourceConfig {
                 samplesPerChunk,
                 closeIdleReaders,
                 skipSnapshotBackfill,
-                isScanNewlyAddedTableEnabled);
+                isScanNewlyAddedTableEnabled,
+                releaseSnapshotMetadataEnabled);
     }
 }

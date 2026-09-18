@@ -49,6 +49,7 @@ import java.util.Map;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.CHUNK_META_GROUP_SIZE;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP;
+import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED;
 import static org.apache.flink.cdc.connectors.mongodb.internal.MongoDBEnvelope.MONGODB_SRV_SCHEME;
@@ -125,6 +126,9 @@ class MongoDBTableFactoryTest {
     private static final boolean SCAN_NEWLY_ADDED_TABLE_ENABLED_DEFAULT =
             SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue();
 
+    private static final boolean SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED_DEFAULT =
+            SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED.defaultValue();
+
     @Test
     void testCommonProperties() {
         Map<String, String> properties = getAllOptions();
@@ -159,7 +163,8 @@ class MongoDBTableFactoryTest {
                         SCAN_NO_CURSOR_TIMEOUT_DEFAULT,
                         SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP_DEFAULT,
                         SCAN_NEWLY_ADDED_TABLE_ENABLED_DEFAULT,
-                        SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED.defaultValue());
+                        SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED.defaultValue(),
+                        SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED_DEFAULT);
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
@@ -215,8 +220,56 @@ class MongoDBTableFactoryTest {
                         false,
                         true,
                         true,
+                        true,
+                        SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED_DEFAULT);
+        Assertions.assertThat(actualSource).isEqualTo(expectedSource);
+    }
+
+    @Test
+    void testReleaseSnapshotMetadataOption() {
+        // testOptionalProperties cannot cover this option because it enables
+        // scan.newly-added-table.enabled, which the config rejects in combination with the release.
+        Map<String, String> properties = getAllOptions();
+        properties.put("scan.incremental.snapshot.enabled", "true");
+        properties.put("scan.incremental.snapshot.metadata.release.enabled", "true");
+
+        DynamicTableSource actualSource = createTableSource(SCHEMA, properties);
+        MongoDBTableSource expectedSource =
+                new MongoDBTableSource(
+                        SCHEMA,
+                        SCHEME.defaultValue(),
+                        MY_HOSTS,
+                        USER,
+                        PASSWORD,
+                        MY_DATABASE,
+                        MY_TABLE,
+                        null,
+                        StartupOptions.initial(),
+                        null,
+                        null,
+                        null,
+                        BATCH_SIZE_DEFAULT,
+                        POLL_MAX_BATCH_SIZE_DEFAULT,
+                        POLL_AWAIT_TIME_MILLIS_DEFAULT,
+                        HEARTBEAT_INTERVAL_MILLIS_DEFAULT,
+                        LOCAL_TIME_ZONE,
+                        true,
+                        CHUNK_META_GROUP_SIZE_DEFAULT,
+                        SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE_MB_DEFAULT,
+                        SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SAMPLES_DEFAULT,
+                        SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED_DEFAULT,
+                        FULL_DOCUMENT_PRE_POST_IMAGE_ENABLED_DEFAULT,
+                        SCAN_NO_CURSOR_TIMEOUT_DEFAULT,
+                        SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP_DEFAULT,
+                        SCAN_NEWLY_ADDED_TABLE_ENABLED_DEFAULT,
+                        SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED.defaultValue(),
                         true);
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
+
+        // equals has to carry the field, or a source built without the option would compare equal
+        Map<String, String> withoutRelease = getAllOptions();
+        withoutRelease.put("scan.incremental.snapshot.enabled", "true");
+        Assertions.assertThat(actualSource).isNotEqualTo(createTableSource(SCHEMA, withoutRelease));
     }
 
     @Test
@@ -259,7 +312,8 @@ class MongoDBTableFactoryTest {
                         SCAN_NO_CURSOR_TIMEOUT_DEFAULT,
                         SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP_DEFAULT,
                         SCAN_NEWLY_ADDED_TABLE_ENABLED_DEFAULT,
-                        SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED.defaultValue());
+                        SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED.defaultValue(),
+                        SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED_DEFAULT);
 
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys = Arrays.asList("op_ts", "database_name", "row_kind");
@@ -370,7 +424,8 @@ class MongoDBTableFactoryTest {
                         SCAN_NO_CURSOR_TIMEOUT_DEFAULT,
                         SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP_DEFAULT,
                         SCAN_NEWLY_ADDED_TABLE_ENABLED_DEFAULT,
-                        SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED.defaultValue());
+                        SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED.defaultValue(),
+                        SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED_DEFAULT);
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
