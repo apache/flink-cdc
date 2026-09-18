@@ -90,7 +90,8 @@ MODULES_OCEANBASE_PIPELINE = [
 
 MODULES_DB2 = [
     "flink-cdc-connect/flink-cdc-source-connectors/flink-connector-db2-cdc",
-    "flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-db2-cdc"
+    "flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-db2-cdc",
+    "flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-db2"
 ]
 
 MODULES_VITESS = [
