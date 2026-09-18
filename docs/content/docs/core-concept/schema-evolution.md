@@ -94,7 +94,7 @@ sink:
   existing-table.schema-expansion.mode: "EXPAND"
 ```
 
-> Note: `existing-table.schema-expansion.enabled` is no longer supported. Use `existing-table.schema-expansion.mode` with one of `OFF`, `CHECK`, `TRY_EXPAND`, `EXPAND` instead; the previous `enabled: true` maps to `TRY_EXPAND`. Quote the mode value to avoid the bare `OFF` scalar being parsed as a YAML boolean.
+Quote the mode value (for example `"OFF"`) to avoid the bare `OFF` scalar being parsed as a YAML boolean.
 
 ## Per-Event Type Control
 
