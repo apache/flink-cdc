@@ -19,6 +19,7 @@ package org.apache.flink.cdc.cli.parser;
 
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
+import org.apache.flink.cdc.common.pipeline.ExistingTableSchemaExpansionMode;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.composer.definition.ModelDef;
 import org.apache.flink.cdc.composer.definition.PipelineDef;
@@ -495,6 +496,95 @@ class YamlPipelineDefinitionParserTest {
                                                 .put("schema.change.behavior", behavior)
                                                 .put("parallelism", "1")
                                                 .build())));
+    }
+
+    @Test
+    void testExistingTableSchemaExpansionModeParsing() throws Exception {
+        for (ExistingTableSchemaExpansionMode mode : ExistingTableSchemaExpansionMode.values()) {
+            PipelineDef parsed =
+                    new YamlPipelineDefinitionParser()
+                            .parse(
+                                    "source:\n"
+                                            + "  type: foo\n"
+                                            + "sink:\n"
+                                            + "  type: bar\n"
+                                            + "  existing-table.schema-expansion.mode: "
+                                            + mode.name()
+                                            + "\n",
+                                    new Configuration());
+            assertThat(parsed.getSink().getExistingTableSchemaExpansionMode()).isEqualTo(mode);
+            assertThat(parsed.getSink().getConfig().toMap())
+                    .doesNotContainKey("existing-table.schema-expansion.mode");
+        }
+    }
+
+    @Test
+    void testExistingTableSchemaExpansionModeIsCaseInsensitive() throws Exception {
+        PipelineDef parsed =
+                new YamlPipelineDefinitionParser()
+                        .parse(
+                                "source:\n"
+                                        + "  type: foo\n"
+                                        + "sink:\n"
+                                        + "  type: bar\n"
+                                        + "  existing-table.schema-expansion.mode: \"check\"\n",
+                                new Configuration());
+        assertThat(parsed.getSink().getExistingTableSchemaExpansionMode())
+                .isEqualTo(ExistingTableSchemaExpansionMode.CHECK);
+    }
+
+    @Test
+    void testExistingTableSchemaExpansionModeDefaultsToOff() throws Exception {
+        PipelineDef defaultPipeline =
+                new YamlPipelineDefinitionParser()
+                        .parse("source:\n  type: foo\nsink:\n  type: bar\n", new Configuration());
+        assertThat(defaultPipeline.getSink().getExistingTableSchemaExpansionMode())
+                .isEqualTo(ExistingTableSchemaExpansionMode.OFF);
+    }
+
+    @Test
+    void testBareOffParsesAsExpansionModeOff() throws Exception {
+        // A bare OFF scalar is parsed into a boolean false by Jackson YAML and must be accepted.
+        PipelineDef parsed =
+                new YamlPipelineDefinitionParser()
+                        .parse(
+                                "source:\n"
+                                        + "  type: foo\n"
+                                        + "sink:\n"
+                                        + "  type: bar\n"
+                                        + "  existing-table.schema-expansion.mode: OFF\n",
+                                new Configuration());
+        assertThat(parsed.getSink().getExistingTableSchemaExpansionMode())
+                .isEqualTo(ExistingTableSchemaExpansionMode.OFF);
+    }
+
+    @Test
+    void testRejectsInvalidExpansionMode() {
+        assertThatThrownBy(
+                        () ->
+                                new YamlPipelineDefinitionParser()
+                                        .parse(
+                                                "source:\n"
+                                                        + "  type: foo\n"
+                                                        + "sink:\n"
+                                                        + "  type: bar\n"
+                                                        + "  existing-table.schema-expansion.mode: INVALID\n",
+                                                new Configuration()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("OFF, CHECK, TRY_EXPAND, EXPAND");
+
+        assertThatThrownBy(
+                        () ->
+                                new YamlPipelineDefinitionParser()
+                                        .parse(
+                                                "source:\n"
+                                                        + "  type: foo\n"
+                                                        + "sink:\n"
+                                                        + "  type: bar\n"
+                                                        + "  existing-table.schema-expansion.mode: true\n",
+                                                new Configuration()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("OFF, CHECK, TRY_EXPAND, EXPAND");
     }
 
     @Test

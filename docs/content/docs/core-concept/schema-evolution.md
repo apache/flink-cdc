@@ -73,6 +73,29 @@ This is the default schema evolution behavior.
 In this mode, all schema change events will be silently swallowed by `SchemaOperator` and never attempt to apply them to downstream sink.
 This is useful when your downstream sink is unready for any schema changes, but wants to keep receiving data from unchanged columns.
 
+## Existing Table Schema Expansion
+
+Set the sink option `existing-table.schema-expansion.mode` to control how the framework handles the initial `CreateTableEvent` when the target table already exists. The default is `OFF`. For sinks that implement this capability, the framework may add missing non-key physical columns as nullable columns and safely widen non-key column types. Derived DDL events are logged.
+
+| Mode | Behavior on an existing target table | Behavior when the target table is missing | Failure handling |
+|---|---|---|---|
+| `OFF` | No check or expansion; the sink's original behavior applies | Sink creates the table | N/A |
+| `CHECK` | Validate that every upstream column can be contained by the target table, without issuing any DDL | Fails the job; the table must be created externally | Any incompatibility, read failure, or missing capability fails the job with an aggregated error |
+| `TRY_EXPAND` | Check and best-effort apply safe DDL, then verify the result by reading the target schema back | Sink creates the table | Failures of this mechanism are logged and delegated to the sink's original behavior |
+| `EXPAND` | Check and apply safe DDL, then verify the result by reading the target schema back | Sink creates the table | Any incompatibility, unsupported DDL, execution or verification failure fails the job |
+
+`CHECK` never issues DDL, so it is independent of `include.schema.changes` and of the sink's DDL capabilities. It guards the initial table state and runs **regardless of `schema.change.behavior`** (including `IGNORE` and `EXCEPTION`); `TRY_EXPAND` and `EXPAND` skip the framework-side initial handling when `schema.change.behavior` is `IGNORE` or `EXCEPTION`. Note that `CHECK` only constrains the initial table handling: subsequent source schema changes are still controlled by `schema.change.behavior`, so it is not a job-wide "never issue DDL" switch. When the check fails, the aggregated error lists every difference (table, column, upstream type vs. target type) together with suggested `ALTER TABLE` repair statements that can be reviewed and adjusted to the target system's dialect.
+
+`TRY_EXPAND` swallows failures of this mechanism only; it neither hides errors from the sink's own schema handling nor guarantees that all upstream columns end up in the target table after a failed expansion.
+
+```yaml
+sink:
+  type: paimon
+  existing-table.schema-expansion.mode: "EXPAND"
+```
+
+Quote the mode value (for example `"OFF"`) to avoid the bare `OFF` scalar being parsed as a YAML boolean.
+
 ## Per-Event Type Control
 
 Sometimes, it may not be suitable to synchronize all schema change events to downstream.
@@ -81,9 +104,9 @@ This could be achieved by setting `include.schema.changes` and `exclude.schema.c
 
 ### Options
 
-| Option Key               | meaning                                                                                                   | optional/required |
-|--------------------------|-----------------------------------------------------------------------------------------------------------|-------------------|
-| `include.schema.changes` | Schema change event types to be included. Include all types by default if not specified.                  | optional          |
+| Option Key               | meaning                                                                                                    | optional/required |
+|--------------------------|------------------------------------------------------------------------------------------------------------|-------------------|
+| `include.schema.changes` | Schema change event types to be included. Include all types by default if not specified.                   | optional          |
 | `exclude.schema.changes` | Schema change event types **not** to be included. It has a higher priority than `include.schema.changes`. | optional          |
 
 > In Lenient mode, `TruncateTableEvent` and `DropTableEvent` will be ignored by default. In any other mode, no events will be ignored by default.

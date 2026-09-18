@@ -19,6 +19,7 @@ package org.apache.flink.cdc.runtime.operators.schema.distributed;
 
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.pipeline.ExistingTableSchemaExpansionMode;
 import org.apache.flink.cdc.common.pipeline.RouteMode;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.route.RouteRule;
@@ -44,6 +45,7 @@ public class SchemaOperatorFactory extends SimpleOperatorFactory<Event>
     private final List<RouteRule> routingRules;
     private final RouteMode routeMode;
     private final SchemaChangeBehavior schemaChangeBehavior;
+    private final ExistingTableSchemaExpansionMode existingTableSchemaExpansionMode;
     private final Duration rpcTimeout;
 
     public SchemaOperatorFactory(
@@ -53,6 +55,24 @@ public class SchemaOperatorFactory extends SimpleOperatorFactory<Event>
             Duration rpcTimeout,
             SchemaChangeBehavior schemaChangeBehavior,
             String timezone) {
+        this(
+                metadataApplier,
+                routingRules,
+                routeMode,
+                rpcTimeout,
+                schemaChangeBehavior,
+                ExistingTableSchemaExpansionMode.OFF,
+                timezone);
+    }
+
+    public SchemaOperatorFactory(
+            MetadataApplier metadataApplier,
+            List<RouteRule> routingRules,
+            RouteMode routeMode,
+            Duration rpcTimeout,
+            SchemaChangeBehavior schemaChangeBehavior,
+            ExistingTableSchemaExpansionMode existingTableSchemaExpansionMode,
+            String timezone) {
         super(
                 new SchemaOperator(
                         routingRules, routeMode, rpcTimeout, schemaChangeBehavior, timezone));
@@ -60,6 +80,7 @@ public class SchemaOperatorFactory extends SimpleOperatorFactory<Event>
         this.routingRules = routingRules;
         this.routeMode = routeMode;
         this.schemaChangeBehavior = schemaChangeBehavior;
+        this.existingTableSchemaExpansionMode = existingTableSchemaExpansionMode;
         this.rpcTimeout = rpcTimeout;
     }
 
@@ -73,6 +94,7 @@ public class SchemaOperatorFactory extends SimpleOperatorFactory<Event>
                 routingRules,
                 routeMode,
                 schemaChangeBehavior,
+                existingTableSchemaExpansionMode,
                 rpcTimeout);
     }
 }
