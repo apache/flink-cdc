@@ -70,6 +70,10 @@ public class BatchAppendWriter implements MaxComputeWriter {
 
     private void initOrReloadSession(SessionIdentifier identifier) {
         String partitionSpec = identifier.getPartitionName();
+        PartitionSpec partitionSpecObj =
+                partitionSpec != null && !partitionSpec.isEmpty()
+                        ? new PartitionSpec(partitionSpec)
+                        : null;
         String sessionId = identifier.getSessionId();
 
         try {
@@ -79,7 +83,7 @@ public class BatchAppendWriter implements MaxComputeWriter {
                                 identifier.getProject(),
                                 identifier.getSchema(),
                                 identifier.getTable(),
-                                new PartitionSpec(partitionSpec),
+                                partitionSpecObj,
                                 false);
             } else {
                 this.uploadSession =
@@ -87,7 +91,7 @@ public class BatchAppendWriter implements MaxComputeWriter {
                                 identifier.getProject(),
                                 identifier.getSchema(),
                                 identifier.getTable(),
-                                new PartitionSpec(partitionSpec),
+                                partitionSpecObj,
                                 sessionId);
             }
             this.recordWriter =

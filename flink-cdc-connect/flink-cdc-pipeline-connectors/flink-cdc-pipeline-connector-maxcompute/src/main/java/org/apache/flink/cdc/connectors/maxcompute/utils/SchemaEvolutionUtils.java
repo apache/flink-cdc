@@ -85,7 +85,8 @@ public class SchemaEvolutionUtils {
                         .withHints(unsupportedSchemaHints)
                         .ifNotExists()
                         .debug();
-        if (!CollectionUtil.isNullOrEmpty(schema.primaryKeys())) {
+        if (!CollectionUtil.isNullOrEmpty(schema.primaryKeys())
+                && options.getSinkOperation() == MaxComputeOptions.SinkOperation.UPSERT) {
             tableCreator
                     .transactionTable()
                     .withBucketNum(options.getBucketsNum())
