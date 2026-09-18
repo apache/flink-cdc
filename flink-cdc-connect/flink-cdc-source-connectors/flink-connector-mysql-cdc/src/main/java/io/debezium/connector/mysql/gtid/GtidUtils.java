@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package io.debezium.connector.mysql;
+package io.debezium.connector.mysql.gtid;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -25,7 +25,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Predicate;
 
-/** Utils for handling GTIDs. */
+/**
+ * Utils for handling GTIDs. *
+ *
+ * <p>This is a Flink CDC owned class (not a Debezium fork), placed in the {@code io.debezium}
+ * package for access to package-private Debezium members.
+ */
 public class GtidUtils {
 
     /**
@@ -40,8 +45,10 @@ public class GtidUtils {
      * @param checkpointGtidSet the GTID set restored from checkpoint
      * @return the fixed GTID set for old channels
      */
-    public static GtidSet fixOldChannelsGtidSet(
-            GtidSet availableServerGtidSet, GtidSet purgedServerGtid, GtidSet checkpointGtidSet) {
+    public static MySqlGtidSet fixOldChannelsGtidSet(
+            MySqlGtidSet availableServerGtidSet,
+            MySqlGtidSet purgedServerGtid,
+            MySqlGtidSet checkpointGtidSet) {
         return fixRestoredGtidSet(
                 mergeGtidSetInto(
                         availableServerGtidSet.retainAll(
@@ -63,23 +70,23 @@ public class GtidUtils {
      * @param gtidSourceFilter optional predicate to filter GTID source UUIDs; may be null
      * @return the merged GTID set suitable for binlog subscription
      */
-    public static GtidSet computeLatestModeGtidSet(
-            GtidSet availableServerGtidSet,
-            GtidSet purgedServerGtid,
-            GtidSet checkpointGtidSet,
+    public static MySqlGtidSet computeLatestModeGtidSet(
+            MySqlGtidSet availableServerGtidSet,
+            MySqlGtidSet purgedServerGtid,
+            MySqlGtidSet checkpointGtidSet,
             Predicate<String> gtidSourceFilter) {
-        final GtidSet relevantAvailableServerGtidSet =
+        final MySqlGtidSet relevantAvailableServerGtidSet =
                 (gtidSourceFilter != null)
                         ? availableServerGtidSet.retainAll(gtidSourceFilter)
                         : availableServerGtidSet;
 
         // Step 1: Fix old channels' GTID ranges
-        GtidSet fixedOldChannelsGtid =
+        MySqlGtidSet fixedOldChannelsGtid =
                 fixOldChannelsGtidSet(
                         relevantAvailableServerGtidSet, purgedServerGtid, checkpointGtidSet);
 
         // Step 2: For new channels, use server's full GTID to skip all history
-        GtidSet newChannelsGtid =
+        MySqlGtidSet newChannelsGtid =
                 relevantAvailableServerGtidSet.retainAll(
                         uuid -> checkpointGtidSet.forServerWithId(uuid) == null);
 
@@ -95,21 +102,22 @@ public class GtidUtils {
      * then it will be adjusted according to the server's GTID set; if it does not exist in the
      * server's GTID set, it will be directly added to the new GTID set.
      */
-    public static GtidSet fixRestoredGtidSet(GtidSet serverGtidSet, GtidSet restoredGtidSet) {
-        Map<String, GtidSet.UUIDSet> newSet = new HashMap<>();
+    public static MySqlGtidSet fixRestoredGtidSet(
+            MySqlGtidSet serverGtidSet, MySqlGtidSet restoredGtidSet) {
+        Map<String, MySqlGtidSet.UUIDSet> newSet = new HashMap<>();
         serverGtidSet.getUUIDSets().forEach(uuidSet -> newSet.put(uuidSet.getUUID(), uuidSet));
-        for (GtidSet.UUIDSet restoredUuidSet : restoredGtidSet.getUUIDSets()) {
-            GtidSet.UUIDSet serverUuidSet = newSet.get(restoredUuidSet.getUUID());
+        for (MySqlGtidSet.UUIDSet restoredUuidSet : restoredGtidSet.getUUIDSets()) {
+            MySqlGtidSet.UUIDSet serverUuidSet = newSet.get(restoredUuidSet.getUUID());
             if (serverUuidSet != null) {
-                List<GtidSet.Interval> serverIntervals = serverUuidSet.getIntervals();
-                List<GtidSet.Interval> restoredIntervals = restoredUuidSet.getIntervals();
+                List<MySqlGtidSet.Interval> serverIntervals = serverUuidSet.getIntervals();
+                List<MySqlGtidSet.Interval> restoredIntervals = restoredUuidSet.getIntervals();
 
                 long earliestRestoredTx = getMinIntervalStart(restoredIntervals);
 
                 List<com.github.shyiko.mysql.binlog.GtidSet.Interval> merged = new ArrayList<>();
 
                 // Process each server interval
-                for (GtidSet.Interval serverInterval : serverIntervals) {
+                for (MySqlGtidSet.Interval serverInterval : serverIntervals) {
                     // First, check if any part comes before earliest restored
                     if (serverInterval.getStart() < earliestRestoredTx) {
                         long end = Math.min(serverInterval.getEnd(), earliestRestoredTx - 1);
@@ -119,7 +127,7 @@ public class GtidUtils {
                     }
 
                     // Then check for overlaps with restored intervals
-                    for (GtidSet.Interval restoredInterval : restoredIntervals) {
+                    for (MySqlGtidSet.Interval restoredInterval : restoredIntervals) {
                         if (serverInterval.getStart() <= restoredInterval.getEnd()
                                 && serverInterval.getEnd() >= restoredInterval.getStart()) {
                             // There's an overlap - add the intersection
@@ -138,8 +146,8 @@ public class GtidUtils {
                     }
                 }
 
-                GtidSet.UUIDSet mergedUuidSet =
-                        new GtidSet.UUIDSet(
+                MySqlGtidSet.UUIDSet mergedUuidSet =
+                        new MySqlGtidSet.UUIDSet(
                                 new com.github.shyiko.mysql.binlog.GtidSet.UUIDSet(
                                         restoredUuidSet.getUUID(), merged));
 
@@ -148,11 +156,11 @@ public class GtidUtils {
                 newSet.put(restoredUuidSet.getUUID(), restoredUuidSet);
             }
         }
-        return new GtidSet(newSet);
+        return new MySqlGtidSet(newSet);
     }
 
-    private static long getMinIntervalStart(List<GtidSet.Interval> intervals) {
-        return Collections.min(intervals, Comparator.comparingLong(GtidSet.Interval::getStart))
+    private static long getMinIntervalStart(List<MySqlGtidSet.Interval> intervals) {
+        return Collections.min(intervals, Comparator.comparingLong(MySqlGtidSet.Interval::getStart))
                 .getStart();
     }
 
@@ -160,14 +168,14 @@ public class GtidUtils {
      * This method merges one GTID set (toMerge) into another (base), without overwriting the
      * existing elements in the base GTID set.
      */
-    public static GtidSet mergeGtidSetInto(GtidSet base, GtidSet toMerge) {
-        Map<String, GtidSet.UUIDSet> newSet = new HashMap<>();
+    public static MySqlGtidSet mergeGtidSetInto(MySqlGtidSet base, MySqlGtidSet toMerge) {
+        Map<String, MySqlGtidSet.UUIDSet> newSet = new HashMap<>();
         base.getUUIDSets().forEach(uuidSet -> newSet.put(uuidSet.getUUID(), uuidSet));
-        for (GtidSet.UUIDSet uuidSet : toMerge.getUUIDSets()) {
+        for (MySqlGtidSet.UUIDSet uuidSet : toMerge.getUUIDSets()) {
             if (!newSet.containsKey(uuidSet.getUUID())) {
                 newSet.put(uuidSet.getUUID(), uuidSet);
             }
         }
-        return new GtidSet(newSet);
+        return new MySqlGtidSet(newSet);
     }
 }

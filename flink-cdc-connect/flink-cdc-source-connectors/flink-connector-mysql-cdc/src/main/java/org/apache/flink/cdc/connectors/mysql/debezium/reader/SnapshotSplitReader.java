@@ -44,7 +44,7 @@ import io.debezium.heartbeat.Heartbeat;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.source.spi.ChangeEventSource;
 import io.debezium.pipeline.spi.SnapshotResult;
-import io.debezium.util.SchemaNameAdjuster;
+import io.debezium.schema.SchemaNameAdjuster;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
@@ -144,7 +144,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
                         statefulTaskContext.getDatabaseSchema(),
                         statefulTaskContext.getConnection(),
                         statefulTaskContext.getDispatcher(),
-                        statefulTaskContext.getTopicSelector(),
+                        statefulTaskContext.getTopicNamingStrategy(),
                         statefulTaskContext.getSnapshotReceiver(),
                         StatefulTaskContext.getClock(),
                         currentSnapshotSplit,
@@ -176,7 +176,10 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
         return splitSnapshotReadTask.execute(
                 sourceContext,
                 statefulTaskContext.getMySqlPartition(),
-                statefulTaskContext.getOffsetContext());
+                statefulTaskContext.getOffsetContext(),
+                splitSnapshotReadTask.getSnapshottingTask(
+                        statefulTaskContext.getMySqlPartition(),
+                        statefulTaskContext.getOffsetContext()));
     }
 
     private void backfill(
@@ -262,7 +265,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
         final SignalEventDispatcher signalEventDispatcher =
                 new SignalEventDispatcher(
                         statefulTaskContext.getOffsetContext().getOffset(),
-                        statefulTaskContext.getTopicSelector().getPrimaryTopic(),
+                        statefulTaskContext.getConnectorConfig().getLogicalName(),
                         statefulTaskContext.getDispatcher().getQueue());
         signalEventDispatcher.dispatchWatermarkEvent(
                 backFillBinlogSplit,
@@ -477,5 +480,25 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
         public boolean isRunning() {
             return lowWatermark != null && highWatermark != null;
         }
+
+        // The following methods are only used by Debezium's signal-based blocking snapshot,
+        // which Flink CDC does not use, so they are no-ops here.
+
+        @Override
+        public boolean isPaused() {
+            return false;
+        }
+
+        @Override
+        public void resumeStreaming() throws InterruptedException {}
+
+        @Override
+        public void waitSnapshotCompletion() throws InterruptedException {}
+
+        @Override
+        public void streamingPaused() {}
+
+        @Override
+        public void waitStreamingPaused() throws InterruptedException {}
     }
 }

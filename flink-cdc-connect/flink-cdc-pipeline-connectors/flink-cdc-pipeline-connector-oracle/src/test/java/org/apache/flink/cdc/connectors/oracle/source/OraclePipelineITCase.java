@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.oracle.source;
 
+import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.cdc.common.configuration.Configuration;
@@ -146,7 +147,7 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
         dbzProperties.setProperty("database.connection.adapter", "logminer");
         dbzProperties.setProperty("log.mining.strategy", "online_catalog");
         dbzProperties.setProperty("snapshot.locking.mode", "none");
-        dbzProperties.setProperty("database.history.store.only.captured.tables.ddl", "true");
+        dbzProperties.setProperty("schema.history.internal.store.only.captured.tables.ddl", "true");
         dbzProperties.setProperty("include.schema.changes", "true");
         OracleSourceConfigFactory configFactory = new OracleSourceConfigFactory();
         configFactory.username(CONNECTOR_USER);
@@ -605,7 +606,7 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
         dbzProperties.setProperty("database.connection.adapter", "logminer");
         dbzProperties.setProperty("log.mining.strategy", "online_catalog");
         dbzProperties.setProperty("snapshot.locking.mode", "none");
-        dbzProperties.setProperty("database.history.store.only.captured.tables.ddl", "true");
+        dbzProperties.setProperty("schema.history.internal.store.only.captured.tables.ddl", "true");
         dbzProperties.setProperty("include.schema.changes", "true");
         OracleSourceConfigFactory configFactory = new OracleSourceConfigFactory();
         configFactory.username(CONNECTOR_USER);
@@ -732,7 +733,7 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
         dbzProperties.setProperty("database.connection.adapter", "logminer");
         dbzProperties.setProperty("log.mining.strategy", "online_catalog");
         dbzProperties.setProperty("snapshot.locking.mode", "none");
-        dbzProperties.setProperty("database.history.store.only.captured.tables.ddl", "true");
+        dbzProperties.setProperty("schema.history.internal.store.only.captured.tables.ddl", "true");
         dbzProperties.setProperty("include.schema.changes", "true");
         OracleSourceConfigFactory configFactory = new OracleSourceConfigFactory();
         configFactory
@@ -1272,7 +1273,7 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
         dbzProperties.setProperty("database.connection.adapter", "logminer");
         dbzProperties.setProperty("log.mining.strategy", "online_catalog");
         dbzProperties.setProperty("snapshot.locking.mode", "none");
-        dbzProperties.setProperty("database.history.store.only.captured.tables.ddl", "true");
+        dbzProperties.setProperty("schema.history.internal.store.only.captured.tables.ddl", "true");
         dbzProperties.setProperty("include.schema.changes", "true");
         OracleSourceConfigFactory configFactory = new OracleSourceConfigFactory();
         configFactory.username(CONNECTOR_USER);
@@ -1368,7 +1369,7 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
         dbzProperties.setProperty("database.connection.adapter", "logminer");
         dbzProperties.setProperty("log.mining.strategy", "online_catalog");
         dbzProperties.setProperty("snapshot.locking.mode", "none");
-        dbzProperties.setProperty("database.history.store.only.captured.tables.ddl", "true");
+        dbzProperties.setProperty("schema.history.internal.store.only.captured.tables.ddl", "true");
         dbzProperties.setProperty("include.schema.changes", "true");
 
         configFactory.username(CONNECTOR_USER);
@@ -1432,15 +1433,22 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
             statement.execute(String.format("DELETE FROM %s.PRODUCTS WHERE ID = 111 ", "DEBEZIUM"));
         }
 
-        Thread.sleep(30_000);
+        // A snapshot-only source is BOUNDED, so the job terminates as soon as the snapshot is
+        // done. Sleeping a fixed 30s lets it reach FINISHED first, and stopWithSavepoint can
+        // never succeed on a terminated job. Wait only until the job is RUNNING so the savepoint
+        // is taken while the snapshot is still in flight. Unbounded modes keep running either
+        // way, so they retain the original settle time.
+        if ("snapshot".equals(options.get(SCAN_STARTUP_MODE.key()))) {
+            awaitJobRunning(jobClient);
+        } else {
+            Thread.sleep(30_000);
+        }
 
         // Trigger a savepoint and cancel the job
         LOG.info("Triggering savepoint");
         finishedSavePointPath = triggerSavepointWithRetry(jobClient, savepointDirectory);
         LOG.info("Savepoint created at: {}", finishedSavePointPath);
-        if (!jobClient.getJobStatus().get().name().equals("FINISHED")) {
-            jobClient.cancel().get();
-        }
+        cancelIfRunning(jobClient);
         iterator.close();
 
         // Restore from savepoint
@@ -1505,7 +1513,7 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
             restoreAfterEvents.add(restoredIterator.next());
         }
         restoredIterator.close();
-        restoredJobClient.cancel().get();
+        cancelIfRunning(restoredJobClient);
         // Check if CreateTableEvent for new_products is present
         boolean hasCreateTableEvent =
                 restoreAfterEvents.stream().anyMatch(event -> event instanceof CreateTableEvent);
@@ -1516,6 +1524,39 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
                 restoreAfterEvents.stream().anyMatch(event -> event instanceof DataChangeEvent);
         assertThat(hasProductDataEvent).isTrue();
         env.close();
+    }
+
+    /**
+     * Cancels the job unless it has already reached a terminal state. A snapshot-only source is
+     * bounded, so the job can finish on its own before the test reaches the cancel, and {@code
+     * cancel()} on a finished job throws {@code FlinkJobTerminatedWithoutCancellationException}.
+     */
+    private void cancelIfRunning(JobClient jobClient) throws Exception {
+        if (!jobClient.getJobStatus().get().isTerminalState()) {
+            jobClient.cancel().get();
+        }
+    }
+
+    /**
+     * Waits until the job is RUNNING so that a savepoint can still be taken, failing fast with a
+     * meaningful message if it reaches a terminal state first.
+     */
+    private void awaitJobRunning(JobClient jobClient) throws Exception {
+        final long deadline = System.currentTimeMillis() + 60_000;
+        while (System.currentTimeMillis() < deadline) {
+            JobStatus status = jobClient.getJobStatus().get();
+            if (status == JobStatus.RUNNING) {
+                return;
+            }
+            if (status.isTerminalState()) {
+                throw new IllegalStateException(
+                        "Job reached terminal state "
+                                + status
+                                + " before a savepoint could be taken");
+            }
+            Thread.sleep(100);
+        }
+        throw new IllegalStateException("Job did not reach RUNNING within 60s");
     }
 
     // Helper method to trigger a savepoint with retry mechanism
@@ -1529,6 +1570,13 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
                         .stopWithSavepoint(true, savepointDirectory, SavepointFormatType.DEFAULT)
                         .get();
             } catch (Exception e) {
+                // A terminated job can never accept a savepoint, so retrying just burns the
+                // whole budget and then reports a misleading timeout instead of the real cause.
+                JobStatus status = jobClient.getJobStatus().get();
+                if (status.isTerminalState()) {
+                    throw new IllegalStateException(
+                            "Cannot stop with savepoint: job already reached " + status, e);
+                }
                 retryCount++;
                 LOG.error(
                         "Retry {}/{}: Failed to trigger savepoint: {}",

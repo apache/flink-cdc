@@ -86,9 +86,31 @@ public class SqlServerValidator implements Validator {
         String dbname = properties.getProperty("database.dbname");
         String userName = properties.getProperty("database.user");
         String userpwd = properties.getProperty("database.password");
-        return DriverManager.getConnection(
-                "jdbc:sqlserver://" + hostname + ":" + port + ";" + "databaseName=" + dbname,
-                userName,
-                userpwd);
+        StringBuilder url =
+                new StringBuilder("jdbc:sqlserver://")
+                        .append(hostname)
+                        .append(":")
+                        .append(port)
+                        .append(";databaseName=")
+                        .append(dbname);
+        // This validator opens its own connection rather than reusing Debezium's, so it also
+        // has to carry the connection settings Debezium is given. mssql-jdbc 10.2 -- the
+        // version Debezium 2.0 pulls in, replacing 9.4 -- flipped the "encrypt" default from
+        // false to true, so without these the validator fails the TLS handshake against a
+        // server with a self-signed certificate even though the connector itself connects
+        // fine, and every non-incremental SqlServer source dies in open() before the engine
+        // ever starts.
+        appendIfPresent(url, properties, "database.encrypt", "encrypt");
+        appendIfPresent(
+                url, properties, "database.trustServerCertificate", "trustServerCertificate");
+        return DriverManager.getConnection(url.toString(), userName, userpwd);
+    }
+
+    private static void appendIfPresent(
+            StringBuilder url, Properties properties, String propertyName, String urlName) {
+        String value = properties.getProperty(propertyName);
+        if (value != null && !value.isEmpty()) {
+            url.append(";").append(urlName).append("=").append(value);
+        }
     }
 }

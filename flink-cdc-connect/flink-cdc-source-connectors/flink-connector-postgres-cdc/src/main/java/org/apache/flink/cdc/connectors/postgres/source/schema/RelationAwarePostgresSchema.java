@@ -24,7 +24,7 @@ import io.debezium.connector.postgresql.TypeRegistry;
 import io.debezium.connector.postgresql.connection.PostgresDefaultValueConverter;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
-import io.debezium.schema.TopicSelector;
+import io.debezium.spi.topic.TopicNamingStrategy;
 
 /**
  * Extends PostgresSchema to dispatch Relation messages as schema change events via the event queue
@@ -38,9 +38,11 @@ public class RelationAwarePostgresSchema extends PostgresSchema {
             PostgresConnectorConfig config,
             TypeRegistry typeRegistry,
             PostgresDefaultValueConverter defaultValueConverter,
-            TopicSelector<TableId> topicSelector,
+            TopicNamingStrategy<TableId> topicSelector,
             PostgresValueConverter valueConverter) {
-        super(config, typeRegistry, defaultValueConverter, topicSelector, valueConverter);
+        // Debezium 2.0 dropped the TypeRegistry parameter from the PostgresSchema constructor
+        // (it is now derived internally from the value converter).
+        super(config, defaultValueConverter, topicSelector, valueConverter);
     }
 
     public void setDispatcher(SchemaDispatcher dispatcher) {

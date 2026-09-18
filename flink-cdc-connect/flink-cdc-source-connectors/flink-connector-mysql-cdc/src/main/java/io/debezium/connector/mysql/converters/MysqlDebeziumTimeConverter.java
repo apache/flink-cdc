@@ -50,6 +50,8 @@ import java.util.concurrent.TimeUnit;
  * (for example, yyyy-MM-dd)
  *
  * @see io.debezium.connector.mysql.converters.TinyIntOneToBooleanConverter
+ *     <p>This is a Flink CDC owned class (not a Debezium fork), placed in the {@code io.debezium}
+ *     package for access to package-private Debezium members.
  */
 public class MysqlDebeziumTimeConverter
         implements CustomConverter<SchemaBuilder, RelationalColumn> {

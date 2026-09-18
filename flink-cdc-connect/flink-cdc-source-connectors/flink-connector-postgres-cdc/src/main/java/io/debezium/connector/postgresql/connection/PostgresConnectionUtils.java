@@ -33,6 +33,9 @@ import java.util.Map;
 
 /**
  * A utility class for accessing various Debezium PostgresConnection private-package classes/methods
+ *
+ * <p>This is a Flink CDC owned class (not a Debezium fork), placed in the {@code io.debezium}
+ * package for access to package-private Debezium members.
  */
 public class PostgresConnectionUtils {
     private static final Logger LOGGER = LoggerFactory.getLogger(Utils.class);

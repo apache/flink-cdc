@@ -31,6 +31,7 @@ import org.apache.flink.cdc.connectors.sqlserver.source.offset.LsnOffset;
 import org.apache.flink.cdc.connectors.sqlserver.source.utils.SqlServerUtils;
 import org.apache.flink.table.types.logical.RowType;
 
+import io.debezium.config.CommonConnectorConfig;
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.connector.base.ChangeEventQueue.Builder;
 import io.debezium.connector.sqlserver.SourceInfo;
@@ -42,7 +43,6 @@ import io.debezium.connector.sqlserver.SqlServerOffsetContext;
 import io.debezium.connector.sqlserver.SqlServerOffsetContext.Loader;
 import io.debezium.connector.sqlserver.SqlServerPartition;
 import io.debezium.connector.sqlserver.SqlServerTaskContext;
-import io.debezium.connector.sqlserver.SqlServerTopicSelector;
 import io.debezium.data.Envelope.FieldName;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.ErrorHandler;
@@ -56,10 +56,10 @@ import io.debezium.relational.Column;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables.TableFilter;
-import io.debezium.schema.DataCollectionId;
-import io.debezium.schema.TopicSelector;
+import io.debezium.schema.SchemaNameAdjuster;
+import io.debezium.spi.schema.DataCollectionId;
+import io.debezium.spi.topic.TopicNamingStrategy;
 import io.debezium.util.Collect;
-import io.debezium.util.SchemaNameAdjuster;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
@@ -93,7 +93,7 @@ public class SqlServerSourceFetchTaskContext extends JdbcSourceFetchTaskContext 
     private SqlServerErrorHandler errorHandler;
     private ChangeEventQueue<DataChangeEvent> queue;
     private SqlServerTaskContext taskContext;
-    private TopicSelector<TableId> topicSelector;
+    private TopicNamingStrategy<TableId> topicSelector;
     private EventDispatcher.SnapshotReceiver<SqlServerPartition> snapshotReceiver;
     private SnapshotChangeEventSourceMetrics<SqlServerPartition> snapshotChangeEventSourceMetrics;
     private StreamingChangeEventSourceMetrics<SqlServerPartition> streamingChangeEventSourceMetrics;
@@ -113,7 +113,8 @@ public class SqlServerSourceFetchTaskContext extends JdbcSourceFetchTaskContext 
     public void configure(SourceSplitBase sourceSplitBase) {
         // initial stateful objects
         final SqlServerConnectorConfig connectorConfig = getDbzConnectorConfig();
-        this.topicSelector = SqlServerTopicSelector.defaultSelector(connectorConfig);
+        this.topicSelector =
+                connectorConfig.getTopicNamingStrategy(CommonConnectorConfig.TOPIC_NAMING_STRATEGY);
         EmbeddedFlinkDatabaseHistory.registerHistory(
                 sourceConfig
                         .getDbzConfiguration()
@@ -126,7 +127,7 @@ public class SqlServerSourceFetchTaskContext extends JdbcSourceFetchTaskContext 
 
         String serverName = connectorConfig.getLogicalName();
         String dbName = connectorConfig.getJdbcConfig().getDatabase();
-        this.partition = new SqlServerPartition(serverName, dbName, false);
+        this.partition = new SqlServerPartition(serverName, dbName);
 
         validateAndLoadDatabaseHistory(offsetContext, databaseSchema);
 
@@ -168,7 +169,7 @@ public class SqlServerSourceFetchTaskContext extends JdbcSourceFetchTaskContext 
         this.streamingChangeEventSourceMetrics =
                 changeEventSourceMetricsFactory.getStreamingMetrics(
                         taskContext, queue, metadataProvider);
-        this.errorHandler = new SqlServerErrorHandler(connectorConfig, queue);
+        this.errorHandler = new SqlServerErrorHandler(connectorConfig, queue, null);
     }
 
     /** Loads the connector's persistent offset (if present) via the given loader. */

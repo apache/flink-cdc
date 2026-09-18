@@ -10,9 +10,11 @@ import io.debezium.pipeline.ErrorHandler;
 import io.debezium.pipeline.EventDispatcher;
 import io.debezium.pipeline.source.spi.ChangeTableResultSet;
 import io.debezium.pipeline.source.spi.StreamingChangeEventSource;
+import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
 import io.debezium.schema.DatabaseSchema;
 import io.debezium.schema.SchemaChangeEvent.SchemaChangeEventType;
+import io.debezium.snapshot.SnapshotterService;
 import io.debezium.util.Clock;
 import io.debezium.util.Metronome;
 import org.slf4j.Logger;
@@ -35,27 +37,24 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
- * Copied from Debezium project(1.9.8.final)
+ * Copied from Debezium project(2.7.4.Final)..
  *
- * <p>A {@link StreamingChangeEventSource} based on DB2 change data capture functionality. A main
- * loop polls database DDL change and change data tables and turns them into change events.
+ * <p>Change 1: the effective offset context is initialised at the top of {@code execute} —
+ * Debezium's coordinator calls {@code init(offsetContext)} before {@code execute}, but Flink CDC
+ * drives this source directly and never calls {@code init}.
  *
- * <p>The connector uses CDC functionality of DB2 that is implemented as as a process that monitors
- * source table and write changes from the table into the change table.
+ * <p>Change 2: add the {@code afterHandleLsn} hook, called after each iteration commits its
+ * position, so Flink CDC's bounded stream task can stop at the high watermark.
  *
- * <p>The main loop keeps a pointer to the LSN of changes that were already processed. It queries
- * all change tables and get result set of changes. It always finds the smallest LSN across all
- * tables and the change is converted into the event message and sent downstream. The process
- * repeats until all result sets are empty. The LSN is marked and the procedure repeats.
- *
- * <p>The schema changes detection follows the procedure recommended by DB2 CDC documentation. The
- * database operator should create one more capture process (and table) when a table schema is
- * updated. The code detects presence of two change tables for a single source table. It decides
- * which table is the new one depending on LSNs stored in them. The loop streams changes from the
- * older table till there are events in new table with the LSN larger than in the old one. Then the
- * change table is switched and streaming is executed from the new one.
- *
- * @author Jiri Pechanec, Peter Urbanetz
+ * <p>Change 3: keep the pre-2.7 exclusive upper bound when deciding which capture instances
+ * represent a schema change. Upstream 2.7 widened this to {@code currentMaxLsn.increment()}, making
+ * the window inclusive. Flink CDC reads a change table's {@code startLsn} from a column that tracks
+ * the capture progress rather than a fixed creation LSN, so {@code startLsn} equals {@code
+ * currentMaxLsn} on virtually every poll. With the inclusive bound the same capture instance is
+ * queued as a schema change over and over, and {@code migrateTable} re-reads the live source table
+ * schema each time. After an {@code ALTER TABLE ... ADD COLUMN} that re-read installs the new,
+ * wider schema while the still-open change-table result set only yields the old column count,
+ * producing "Data row is smaller than a column index".
  */
 public class Db2StreamingChangeEventSource
         implements StreamingChangeEventSource<Db2Partition, Db2OffsetContext> {
@@ -86,6 +85,9 @@ public class Db2StreamingChangeEventSource
     private final Db2DatabaseSchema schema;
     private final Duration pollInterval;
     private final Db2ConnectorConfig connectorConfig;
+    private Db2OffsetContext effectiveOffsetContext;
+
+    private final SnapshotterService snapshotterService;
 
     public Db2StreamingChangeEventSource(
             Db2ConnectorConfig connectorConfig,
@@ -94,7 +96,8 @@ public class Db2StreamingChangeEventSource
             EventDispatcher<Db2Partition, TableId> dispatcher,
             ErrorHandler errorHandler,
             Clock clock,
-            Db2DatabaseSchema schema) {
+            Db2DatabaseSchema schema,
+            SnapshotterService snapshotterService) {
         this.connectorConfig = connectorConfig;
         this.dataConnection = dataConnection;
         this.metadataConnection = metadataConnection;
@@ -103,6 +106,15 @@ public class Db2StreamingChangeEventSource
         this.clock = clock;
         this.schema = schema;
         this.pollInterval = connectorConfig.getPollInterval();
+        this.snapshotterService = snapshotterService;
+    }
+
+    public void init(Db2OffsetContext offsetContext) {
+
+        this.effectiveOffsetContext =
+                offsetContext != null
+                        ? offsetContext
+                        : new Db2OffsetContext(connectorConfig, TxLogPosition.NULL, false, false);
     }
 
     @Override
@@ -111,9 +123,11 @@ public class Db2StreamingChangeEventSource
             Db2Partition partition,
             Db2OffsetContext offsetContext)
             throws InterruptedException {
-        if (!connectorConfig.getSnapshotMode().shouldStream()) {
-            LOGGER.info("Streaming is not enabled in current configuration");
-            return;
+        // Debezium's ChangeEventSourceCoordinator calls init(offsetContext) before execute(...) to
+        // set the effective offset context. Flink CDC drives this source directly and never calls
+        // init, so fall back to the offset context it passes in.
+        if (getOffsetContext() == null) {
+            init(offsetContext);
         }
 
         final Metronome metronome = Metronome.sleeper(pollInterval, clock);
@@ -142,7 +156,7 @@ public class Db2StreamingChangeEventSource
                 // situation
                 if (!currentMaxLsn.isAvailable()) {
                     LOGGER.warn(
-                            "No maximum LSN recorded in the database; please ensure that the DB2 Agent is running");
+                            "No maximum LSN in the database; please ensure that the DB2 Agent is running");
                     metronome.pause();
                     continue;
                 }
@@ -338,7 +352,8 @@ public class Db2StreamingChangeEventSource
                                                     operation,
                                                     data,
                                                     dataNext,
-                                                    clock));
+                                                    clock,
+                                                    connectorConfig));
                                     tableWithSmallestLsn.next();
                                 }
                             });
@@ -350,10 +365,22 @@ public class Db2StreamingChangeEventSource
                 } catch (SQLException e) {
                     tablesSlot.set(processErrorFromChangeTableQuery(e, tablesSlot.get()));
                 }
+
+                if (context.isPaused()) {
+                    LOGGER.info("Streaming will now pause");
+                    context.streamingPaused();
+                    context.waitSnapshotCompletion();
+                    LOGGER.info("Streaming resumed");
+                }
             }
         } catch (Exception e) {
             errorHandler.setProducerThrowable(e);
         }
+    }
+
+    @Override
+    public Db2OffsetContext getOffsetContext() {
+        return effectiveOffsetContext;
     }
 
     private void migrateTable(
@@ -363,15 +390,21 @@ public class Db2StreamingChangeEventSource
             throws InterruptedException, SQLException {
         final Db2ChangeTable newTable = schemaChangeCheckpoints.poll();
         LOGGER.info("Migrating schema to {}", newTable);
+        Table tableSchema = metadataConnection.getTableSchemaFromTable(newTable);
+        offsetContext.event(newTable.getSourceTableId(), Instant.now());
         dispatcher.dispatchSchemaChangeEvent(
                 partition,
+                offsetContext,
                 newTable.getSourceTableId(),
                 new Db2SchemaChangeEventEmitter(
                         partition,
                         offsetContext,
                         newTable,
-                        metadataConnection.getTableSchemaFromTable(newTable),
+                        tableSchema,
+                        schema,
                         SchemaChangeEventType.ALTER));
+
+        newTable.setSourceTable(tableSchema);
     }
 
     private Db2ChangeTable[] processErrorFromChangeTableQuery(
@@ -450,12 +483,14 @@ public class Db2StreamingChangeEventSource
                 // obtained from change table
                 dispatcher.dispatchSchemaChangeEvent(
                         partition,
+                        offsetContext,
                         currentTable.getSourceTableId(),
                         new Db2SchemaChangeEventEmitter(
                                 partition,
                                 offsetContext,
                                 currentTable,
                                 dataConnection.getTableSchemaFromTable(currentTable),
+                                schema,
                                 SchemaChangeEventType.CREATE));
             }
             tables.add(currentTable);
@@ -470,13 +505,11 @@ public class Db2StreamingChangeEventSource
      * changes across all tables.<br>
      * This class represents an open database cursor over the change table that is able to move the
      * cursor forward and report the LSN for the change to which the cursor now points.
-     *
-     * @author Jiri Pechanec
      */
     private static class ChangeTablePointer
             extends ChangeTableResultSet<Db2ChangeTable, TxLogPosition> {
 
-        public ChangeTablePointer(Db2ChangeTable changeTable, ResultSet resultSet) {
+        ChangeTablePointer(Db2ChangeTable changeTable, ResultSet resultSet) {
             super(changeTable, resultSet, COL_DATA);
         }
 
@@ -495,7 +528,7 @@ public class Db2StreamingChangeEventSource
         }
     }
 
-    /** expose control to the user to stop the connector. */
+    /** Expose control to the subclass to stop the connector. */
     protected void afterHandleLsn(Db2Partition partition, Lsn toLsn) {
         // do nothing
     }

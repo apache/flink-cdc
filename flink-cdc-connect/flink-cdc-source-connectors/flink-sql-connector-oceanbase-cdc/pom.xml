@@ -61,8 +61,17 @@ limitations under the License.
                                     <include>io.debezium:debezium-api</include>
                                     <include>io.debezium:debezium-embedded</include>
                                     <include>io.debezium:debezium-core</include>
+                                    <!-- Debezium 2.0 moved the Kafka schema history out of
+                                         debezium-core into its own artifact. Building a historized
+                                         connector's ConfigDef eagerly resolves the default value of
+                                         schema.history.internal, so the class must be present even
+                                         though Flink CDC always overrides it with its own history
+                                         implementation. Without it the embedded engine used by the
+                                         legacy DebeziumSourceFunction path dies with a ConfigException. -->
+                                    <include>io.debezium:debezium-storage-kafka</include>
                                     <include>io.debezium:debezium-ddl-parser</include>
                                     <include>io.debezium:debezium-connector-mysql</include>
+                                    <include>io.debezium:debezium-connector-binlog</include>
                                     <include>org.apache.flink:flink-cdc-common</include>
                                     <include>org.apache.flink:flink-connector-debezium</include>
                                     <include>org.apache.flink:flink-connector-mysql-cdc</include>

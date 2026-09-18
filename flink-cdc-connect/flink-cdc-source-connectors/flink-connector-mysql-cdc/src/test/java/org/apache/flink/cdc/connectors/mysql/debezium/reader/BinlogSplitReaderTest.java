@@ -49,10 +49,10 @@ import com.github.shyiko.mysql.binlog.event.Event;
 import com.github.shyiko.mysql.binlog.event.EventHeaderV4;
 import com.github.shyiko.mysql.binlog.event.EventType;
 import com.github.shyiko.mysql.binlog.event.WriteRowsEventData;
-import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
 import io.debezium.connector.mysql.MySqlOffsetContext;
 import io.debezium.connector.mysql.MySqlPartition;
+import io.debezium.connector.mysql.jdbc.MySqlConnection;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.pipeline.spi.OffsetContext;
 import io.debezium.relational.TableId;
@@ -1255,7 +1255,7 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
             Map<TableId, TableChanges.TableChange> tableSchemas =
                     TableDiscoveryUtils.discoverSchemaForCapturedTables(
                             new MySqlPartition(
-                                    sourceConfig.getMySqlConnectorConfig().getLogicalName()),
+                                    sourceConfig.getMySqlConnectorConfig().getLogicalName(), null),
                             sourceConfig,
                             jdbc);
             return MySqlBinlogSplit.fillTableSchemas(

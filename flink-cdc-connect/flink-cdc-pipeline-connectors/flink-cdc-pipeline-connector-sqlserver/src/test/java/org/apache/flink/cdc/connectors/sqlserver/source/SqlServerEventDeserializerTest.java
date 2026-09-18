@@ -213,7 +213,7 @@ class SqlServerEventDeserializerTest {
                 tableChanges.alter(table);
                 break;
             case DROP:
-                tableChanges.drop(table);
+                tableChanges.drop(table.id());
                 break;
             default:
                 throw new IllegalArgumentException("Unsupported type " + type);
@@ -226,7 +226,8 @@ class SqlServerEventDeserializerTest {
                         DBZ_TABLE_ID.catalog(),
                         DBZ_TABLE_ID.schema(),
                         "ddl",
-                        tableChanges);
+                        tableChanges,
+                        java.time.Instant.now());
 
         String historyJson = DOCUMENT_WRITER.write(historyRecord.document());
 

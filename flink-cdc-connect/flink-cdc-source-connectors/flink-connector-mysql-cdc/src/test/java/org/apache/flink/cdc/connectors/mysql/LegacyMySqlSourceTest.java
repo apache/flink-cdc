@@ -839,7 +839,8 @@ public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
                                     "test",
                                     "test",
                                     "CREATE TABLE test(a int)",
-                                    null)
+                                    null,
+                                    java.time.Instant.now())
                             .document();
             historyState.add(writer.write(document));
         }
@@ -1327,6 +1328,16 @@ public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
     }
 
     private static class MockedTable implements Table {
+
+        @Override
+        public io.debezium.relational.Attribute attributeWithName(String name) {
+            return null;
+        }
+
+        @Override
+        public java.util.List<io.debezium.relational.Attribute> attributes() {
+            return java.util.Collections.emptyList();
+        }
 
         private static final Table INSTANCE = new MockedTable();
 

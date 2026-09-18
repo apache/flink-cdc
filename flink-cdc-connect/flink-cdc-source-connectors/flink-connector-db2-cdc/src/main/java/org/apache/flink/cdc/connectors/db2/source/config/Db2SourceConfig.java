@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.db2.source.config;
 
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
+import org.apache.flink.util.TemporaryClassLoaderContext;
 
 import io.debezium.config.Configuration;
 import io.debezium.connector.db2.Db2ConnectorConfig;
@@ -89,6 +90,13 @@ public class Db2SourceConfig extends JdbcSourceConfig {
 
     @Override
     public Db2ConnectorConfig getDbzConnectorConfig() {
-        return new Db2ConnectorConfig(getDbzConfiguration());
+        // Debezium 2.0 resolves classes through the thread context class loader
+        // (io.debezium.config.Instantiator, and the ServiceLoader based SPIs). On a Flink
+        // thread that loader may be a user code class loader from a previous job attempt,
+        // which is already closed. Pin it to the loader that loaded Debezium.
+        try (TemporaryClassLoaderContext ignored =
+                TemporaryClassLoaderContext.of(Db2ConnectorConfig.class.getClassLoader())) {
+            return new Db2ConnectorConfig(getDbzConfiguration());
+        }
     }
 }

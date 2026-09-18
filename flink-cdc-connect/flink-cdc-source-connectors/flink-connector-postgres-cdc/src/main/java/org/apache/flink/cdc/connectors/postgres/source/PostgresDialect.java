@@ -34,12 +34,13 @@ import org.apache.flink.cdc.connectors.postgres.source.fetch.PostgresStreamFetch
 import org.apache.flink.cdc.connectors.postgres.source.utils.CustomPostgresSchema;
 import org.apache.flink.cdc.connectors.postgres.source.utils.TableDiscoveryUtils;
 import org.apache.flink.util.FlinkRuntimeException;
+import org.apache.flink.util.TemporaryClassLoaderContext;
 
+import io.debezium.config.CommonConnectorConfig;
 import io.debezium.connector.postgresql.PostgresConnectorConfig;
 import io.debezium.connector.postgresql.PostgresObjectUtils;
 import io.debezium.connector.postgresql.PostgresSchema;
 import io.debezium.connector.postgresql.PostgresTaskContext;
-import io.debezium.connector.postgresql.PostgresTopicSelector;
 import io.debezium.connector.postgresql.connection.PostgresConnection;
 import io.debezium.connector.postgresql.connection.PostgresConnectionUtils;
 import io.debezium.connector.postgresql.connection.PostgresReplicationConnection;
@@ -47,7 +48,7 @@ import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
 import io.debezium.relational.history.TableChanges.TableChange;
-import io.debezium.schema.TopicSelector;
+import io.debezium.spi.topic.TopicNamingStrategy;
 
 import javax.annotation.Nullable;
 
@@ -105,7 +106,17 @@ public class PostgresDialect implements JdbcDataSourceDialect {
             PostgresConnection jdbcConnection) {
         try {
             PostgresConnectorConfig pgConnectorConfig = sourceConfig.getDbzConnectorConfig();
-            TopicSelector<TableId> topicSelector = PostgresTopicSelector.create(pgConnectorConfig);
+            TopicNamingStrategy<TableId> topicSelector;
+            // Debezium 2.0 resolves classes through the thread context class loader; pin it to the
+            // loader that loaded Debezium so a stale/closed Flink user class loader cannot break
+            // it.
+            try (TemporaryClassLoaderContext ignored =
+                    TemporaryClassLoaderContext.of(CommonConnectorConfig.class.getClassLoader())) {
+                topicSelector =
+                        pgConnectorConfig.getTopicNamingStrategy(
+                                io.debezium.connector.postgresql.PostgresConnectorConfig
+                                        .TOPIC_NAMING_STRATEGY);
+            }
             PostgresConnection.PostgresValueConverterBuilder valueConverterBuilder =
                     newPostgresValueConverterBuilder(pgConnectorConfig);
             PostgresSchema schema =

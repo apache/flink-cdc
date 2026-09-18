@@ -49,6 +49,7 @@ import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.flink.shaded.guava31.com.google.common.util.concurrent.ThreadFactoryBuilder;
 
+import io.debezium.DebeziumException;
 import io.debezium.document.DocumentReader;
 import io.debezium.document.DocumentWriter;
 import io.debezium.embedded.Connect;
@@ -370,6 +371,16 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
     @Override
     public void run(SourceContext<T> sourceContext) throws Exception {
         properties.putIfAbsent("name", "engine");
+        // Debezium 2.x tags the JMX ObjectName of a multi-partition connector's metrics with
+        // "task.id" in addition to the topic prefix. Kafka Connect sets that property; Flink
+        // never has, so Metrics#metricName hands null to Sanitizer.jmxSanitize and the task
+        // fails with a NullPointerException before producing anything. SQL Server is the only
+        // multi-partition connector today, but the property is connector-agnostic, so set it
+        // here for every embedded engine. The subtask index is the natural analogue of a
+        // Connect task id and keeps the name unique within the TaskManager JVM.
+        properties.putIfAbsent(
+                "task.id",
+                String.valueOf(getRuntimeContext().getTaskInfo().getIndexOfThisSubtask()));
         properties.setProperty("offset.storage", FlinkOffsetBackingStore.class.getCanonicalName());
         if (restoredOffsetState != null) {
             // restored from state
@@ -381,6 +392,13 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
         properties.putIfAbsent("offset.flush.interval.ms", String.valueOf(Long.MAX_VALUE));
         // disable tombstones
         properties.setProperty("tombstones.on.delete", "false");
+        // Debezium 2.4 made the embedded engine restart the connector itself on a retriable
+        // error, retrying forever by default ("errors.max.retries" = -1). Debezium 2.3 and older
+        // had no such loop: the error reached the completion callback, the Flink job failed and
+        // Flink's restart strategy recovered it from the last checkpoint. Keep that behavior - an
+        // engine silently retrying forever looks like a source that simply stopped producing.
+        // Users who want the Debezium-side retries can still set "debezium.errors.max.retries".
+        properties.putIfAbsent("errors.max.retries", "0");
         if (engineInstanceName == null) {
             // not restore from recovery
             engineInstanceName = UUID.randomUUID().toString();
@@ -393,7 +411,7 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
         // see
         // https://stackoverflow.com/questions/57147584/debezium-error-schema-isnt-know-to-this-connector
         // and https://debezium.io/blog/2018/03/16/note-on-database-history-topic-configuration/
-        properties.setProperty("database.history", determineDatabase().getCanonicalName());
+        properties.setProperty("schema.history.internal", determineDatabase().getCanonicalName());
 
         // we have to filter out the heartbeat events, otherwise the deserializer will fail
         String dbzHeartbeatPrefix =
@@ -420,7 +438,16 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
                                         // Close the handover and prepare to exit.
                                         handover.close();
                                     } else {
-                                        handover.reportError(error);
+                                        // Debezium may report a failure without a throwable, e.g.
+                                        // when the connector configuration does not validate. In
+                                        // that case the message is the only diagnostic we have.
+                                        handover.reportError(
+                                                error != null
+                                                        ? error
+                                                        : new DebeziumException(
+                                                                message == null
+                                                                        ? "The Debezium engine has stopped unexpectedly."
+                                                                        : message));
                                     }
                                 })
                         .build();

@@ -1,35 +1,47 @@
 /*
- * Copyright Debezium Authors.
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache Software License version 2.0, available at http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package io.debezium.connector.sqlserver;
 
 import io.debezium.connector.SnapshotRecord;
+import io.debezium.pipeline.CommonOffsetContext;
 import io.debezium.pipeline.source.snapshot.incremental.IncrementalSnapshotContext;
 import io.debezium.pipeline.source.snapshot.incremental.SignalBasedIncrementalSnapshotContext;
 import io.debezium.pipeline.spi.OffsetContext;
 import io.debezium.pipeline.txmetadata.TransactionContext;
 import io.debezium.relational.TableId;
-import io.debezium.schema.DataCollectionId;
+import io.debezium.spi.schema.DataCollectionId;
 import io.debezium.util.Collect;
 import org.apache.kafka.connect.data.Schema;
-import org.apache.kafka.connect.data.Struct;
 
 import java.time.Instant;
 import java.util.Map;
 
 /**
- * Copied from Debezium project(1.9.8.final) to modify the
- * io.debezium.connector.sqlserver.SqlServerOffsetContext.Loader#load(java.util.Map) method. The
- * original method is not able to get the eventSerialNo from the offset map which stores as string.
+ * Copied from Debezium project(2.7.4.Final)..
+ *
+ * <p>Change 1: {@code Loader.load} accepts {@code event_serial_no} stored as either a String or a
+ * Long — offsets restored from Flink state carry it as a String.
  */
-public class SqlServerOffsetContext implements OffsetContext {
+public class SqlServerOffsetContext extends CommonOffsetContext<SourceInfo> {
 
     private static final String SNAPSHOT_COMPLETED_KEY = "snapshot_completed";
 
     private final Schema sourceInfoSchema;
-    private final SourceInfo sourceInfo;
     private boolean snapshotCompleted;
     private final TransactionContext transactionContext;
     private final IncrementalSnapshotContext<TableId> incrementalSnapshotContext;
@@ -45,7 +57,7 @@ public class SqlServerOffsetContext implements OffsetContext {
             long eventSerialNo,
             TransactionContext transactionContext,
             IncrementalSnapshotContext<TableId> incrementalSnapshotContext) {
-        sourceInfo = new SourceInfo(connectorConfig);
+        super(new SourceInfo(connectorConfig));
 
         sourceInfo.setCommitLsn(position.getCommitLsn());
         sourceInfo.setChangeLsn(position.getInTxLsn());
@@ -107,11 +119,6 @@ public class SqlServerOffsetContext implements OffsetContext {
         return sourceInfoSchema;
     }
 
-    @Override
-    public Struct getSourceInfo() {
-        return sourceInfo.struct();
-    }
-
     public TxLogPosition getChangePosition() {
         return TxLogPosition.valueOf(sourceInfo.getCommitLsn(), sourceInfo.getChangeLsn());
     }
@@ -151,11 +158,6 @@ public class SqlServerOffsetContext implements OffsetContext {
         snapshotCompleted = true;
     }
 
-    @Override
-    public void postSnapshotCompletion() {
-        sourceInfo.setSnapshot(SnapshotRecord.FALSE);
-    }
-
     public static class Loader implements OffsetContext.Loader<SqlServerOffsetContext> {
 
         private final SqlServerConnectorConfig connectorConfig;
@@ -172,10 +174,10 @@ public class SqlServerOffsetContext implements OffsetContext {
             boolean snapshotCompleted = Boolean.TRUE.equals(offset.get(SNAPSHOT_COMPLETED_KEY));
 
             // only introduced in 0.10.Beta1, so it might be not present when upgrading from earlier
-            // versions
-            // if value is String, convert it to Long
+            // versions.
+            // The eventSerialNo may be stored as a String in the offset map (e.g. when restored
+            // from Flink state); handle both String and Long representations.
             long eventSerialNo;
-
             Object eventSerialNoObj = offset.get(SourceInfo.EVENT_SERIAL_NO_KEY);
             if (eventSerialNoObj != null) {
                 if (eventSerialNoObj instanceof String) {
@@ -213,11 +215,6 @@ public class SqlServerOffsetContext implements OffsetContext {
     }
 
     @Override
-    public void markLastSnapshotRecord() {
-        sourceInfo.setSnapshot(SnapshotRecord.LAST);
-    }
-
-    @Override
     public void event(DataCollectionId tableId, Instant timestamp) {
         sourceInfo.setSourceTime(timestamp);
         sourceInfo.setTableId((TableId) tableId);
@@ -226,11 +223,6 @@ public class SqlServerOffsetContext implements OffsetContext {
     @Override
     public TransactionContext getTransactionContext() {
         return transactionContext;
-    }
-
-    @Override
-    public void incrementalSnapshotEvents() {
-        sourceInfo.setSnapshot(SnapshotRecord.INCREMENTAL);
     }
 
     @Override

@@ -43,8 +43,9 @@ public class Db2SourceConfigFactory extends JdbcSourceConfigFactory {
 
         // set database history impl to flink database history
         props.setProperty(
-                "database.history", EmbeddedFlinkDatabaseHistory.class.getCanonicalName());
-        props.setProperty("database.history.instance.name", UUID.randomUUID() + "_" + subtask);
+                "schema.history.internal", EmbeddedFlinkDatabaseHistory.class.getCanonicalName());
+        props.setProperty(
+                "schema.history.internal.instance.name", UUID.randomUUID() + "_" + subtask);
 
         // hard code server name, because we don't need to distinguish it, docs:
         // Logical name that identifies and provides a namespace for the SQL Server database
@@ -52,12 +53,13 @@ public class Db2SourceConfigFactory extends JdbcSourceConfigFactory {
         // all other connectors, since it is used as a prefix for all Kafka topic names
         // emanating from this connector. Only alphanumeric characters and underscores should be
         // used.
-        props.setProperty("database.server.name", DATABASE_SERVER_NAME);
+        // Debezium 2.0 renamed "database.server.name" to "topic.prefix".
+        props.setProperty("topic.prefix", DATABASE_SERVER_NAME);
         props.setProperty("database.hostname", checkNotNull(hostname));
         props.setProperty("database.user", checkNotNull(username));
         props.setProperty("database.password", checkNotNull(password));
         props.setProperty("database.port", String.valueOf(port));
-        props.setProperty("database.history.skip.unparseable.ddl", String.valueOf(true));
+        props.setProperty("schema.history.internal.skip.unparseable.ddl", String.valueOf(true));
         props.setProperty("database.dbname", checkNotNull(databaseList.get(0)));
 
         if (tableList != null) {

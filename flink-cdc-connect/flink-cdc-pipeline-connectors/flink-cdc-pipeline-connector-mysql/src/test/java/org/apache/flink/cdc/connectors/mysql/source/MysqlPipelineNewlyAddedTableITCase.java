@@ -55,7 +55,7 @@ import org.apache.flink.streaming.util.RestartStrategyUtils;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.util.ExceptionUtils;
 
-import io.debezium.connector.mysql.MySqlConnection;
+import io.debezium.connector.mysql.jdbc.MySqlConnection;
 import io.debezium.jdbc.JdbcConnection;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;

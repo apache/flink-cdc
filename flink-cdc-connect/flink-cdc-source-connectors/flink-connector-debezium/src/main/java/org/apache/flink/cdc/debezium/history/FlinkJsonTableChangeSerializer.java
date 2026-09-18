@@ -58,8 +58,10 @@ public class FlinkJsonTableChangeSerializer implements TableChanges.TableChanges
 
         document.setString("type", tableChange.getType().name());
         document.setString("id", tableChange.getId().toDoubleQuotedString());
-        document.setDocument("table", toDocument(tableChange.getTable()));
-        document.setString("comment", tableChange.getTable().comment());
+        if (tableChange.getTable() != null) {
+            document.setDocument("table", toDocument(tableChange.getTable()));
+            document.setString("comment", tableChange.getTable().comment());
+        }
         return document;
     }
 
@@ -127,7 +129,7 @@ public class FlinkJsonTableChangeSerializer implements TableChanges.TableChanges
             } else if (change.getType() == TableChangeType.ALTER) {
                 tableChanges.alter(change.getTable());
             } else if (change.getType() == TableChangeType.DROP) {
-                tableChanges.drop(change.getTable());
+                tableChanges.drop(change.getId());
             }
         }
 
