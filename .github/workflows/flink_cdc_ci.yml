@@ -68,7 +68,7 @@ jobs:
     uses: ./.github/workflows/flink_cdc_base.yml
     with:
       java-versions: "[11]"
-      flink-versions: "['2.2.0']"
+      flink-versions: "['2.3.0']"
       custom-maven-parameter: "-Pflink2"
       modules: "['core']"
   pipeline-ut:
@@ -82,7 +82,7 @@ jobs:
     uses: ./.github/workflows/flink_cdc_base.yml
     with:
       java-versions: "[11]"
-      flink-versions: "['2.2.0']"
+      flink-versions: "['2.3.0']"
       custom-maven-parameter: "-Pflink2"
       modules: "['doris, elasticsearch, fluss, iceberg, kafka, maxcompute, mysql-pipeline, oceanbase-pipeline, paimon, postgres-pipeline, starrocks, oracle-pipeline']"
   source-ut:
@@ -96,7 +96,7 @@ jobs:
     uses: ./.github/workflows/flink_cdc_base.yml
     with:
       java-versions: "[11]"
-      flink-versions: "['2.2.0']"
+      flink-versions: "['2.3.0']"
       custom-maven-parameter: "-Pflink2"
       modules: "['mysql-source', 'postgres-source, oceanbase-source, tidb, vitess', 'oracle, sqlserver', 'db2, mongodb']"
   pipeline_e2e:
@@ -104,7 +104,7 @@ jobs:
     uses: ./.github/workflows/flink_cdc_base.yml
     with:
       java-versions: "[11]"
-      flink-versions: "['1.20.3']"
+      flink-versions: "['1.20.5']"
       modules: "['pipeline_e2e']"
       e2e-stages: "['stage1', 'stage2', 'stage3']"
   pipeline_e2e_2_x:
@@ -112,7 +112,7 @@ jobs:
     uses: ./.github/workflows/flink_cdc_base.yml
     with:
       java-versions: "[11]"
-      flink-versions: "['2.2.0']"
+      flink-versions: "['2.2.1', '2.3.0']"
       custom-maven-parameter: "-Pflink2"
       modules: "['pipeline_e2e']"
       e2e-stages: "['stage1', 'stage2', 'stage3']"
@@ -121,5 +121,5 @@ jobs:
     uses: ./.github/workflows/flink_cdc_base.yml
     with:
       java-versions: "[11]"
-      flink-versions: "['1.20.3']"
+      flink-versions: "['1.20.5']"
       modules: "['source_e2e']"
