@@ -34,6 +34,7 @@ import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.composer.PipelineComposer;
 import org.apache.flink.cdc.composer.PipelineExecution;
 import org.apache.flink.cdc.composer.definition.PipelineDef;
+import org.apache.flink.cdc.composer.utils.FactoryDiscoveryUtils;
 import org.apache.flink.cdc.composer.flink.coordination.OperatorIDGenerator;
 import org.apache.flink.cdc.composer.flink.translator.DataSinkTranslator;
 import org.apache.flink.cdc.composer.flink.translator.DataSourceTranslator;
@@ -289,10 +290,21 @@ public class FlinkPipelineComposer implements PipelineComposer {
 
     private Optional<URL> getContainingJar(Class<?> clazz) throws Exception {
         URL container = clazz.getProtectionDomain().getCodeSource().getLocation();
-        if (Files.isDirectory(Paths.get(container.toURI()))) {
+        // The code source location is not always a hierarchical file URL: in application mode
+        // Flink builds the user code class loader with relative URLs such as
+        // "file:usrlib/foo.jar", whose URI is opaque and rejected by Paths.get(URI).
+        // See FactoryDiscoveryUtils#resolveLocalPath.
+        java.nio.file.Path containerPath = FactoryDiscoveryUtils.resolveLocalPath(container);
+        if (containerPath == null) {
+            // Already on the classpath of both JobManager and TaskManagers; nothing to add.
             return Optional.empty();
         }
-        return Optional.of(container);
+        if (Files.isDirectory(containerPath)) {
+            return Optional.empty();
+        }
+        // Return the resolved absolute URL: the original location may be relative (see above),
+        // and callers turn it into a URI/File, which fails for a relative URL.
+        return Optional.of(containerPath.toUri().toURL());
     }
 
     private void validatePipelineConfiguration(Configuration pipelineConfig) {
