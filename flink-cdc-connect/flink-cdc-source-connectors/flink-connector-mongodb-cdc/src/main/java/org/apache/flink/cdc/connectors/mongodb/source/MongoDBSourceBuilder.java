@@ -277,6 +277,11 @@ public class MongoDBSourceBuilder<T> {
         return this;
     }
 
+    public MongoDBSourceBuilder<T> recordsPerSecond(double recordsPerSecond) {
+        this.configFactory.recordsPerSecond(recordsPerSecond);
+        return this;
+    }
+
     /**
      * Build the {@link MongoDBSource}.
      *

@@ -208,6 +208,13 @@ public class OracleDataSourceOptions {
                             "List of readable metadata from SourceRecord to be passed to downstream, split by `,`. "
                                     + "Available readable metadata are: op_ts.");
 
+    public static final ConfigOption<Double> RECORDS_PER_SECOND =
+            ConfigOptions.key("records.per.second")
+                    .doubleType()
+                    .defaultValue(-1d)
+                    .withDescription(
+                            "The maximum number of records emitted per second, the default value: -1, means no rate limiting.");
+
     public static Map<String, String> getPropertiesByPrefix(
             Configuration tableOptions, String prefix) {
         final Map<String, String> props = new HashMap<>();

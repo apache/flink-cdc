@@ -89,6 +89,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
     private final boolean skipSnapshotBackfill;
     private final boolean scanNewlyAddedTableEnabled;
     private final boolean assignUnboundedChunkFirst;
+    private final double recordsPerSecond;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -127,7 +128,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
             boolean noCursorTimeout,
             boolean skipSnapshotBackfill,
             boolean scanNewlyAddedTableEnabled,
-            boolean assignUnboundedChunkFirst) {
+            boolean assignUnboundedChunkFirst,
+            double recordsPerSecond) {
         this.physicalSchema = physicalSchema;
         this.scheme = checkNotNull(scheme);
         this.hosts = checkNotNull(hosts);
@@ -157,6 +159,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
         this.skipSnapshotBackfill = skipSnapshotBackfill;
         this.scanNewlyAddedTableEnabled = scanNewlyAddedTableEnabled;
         this.assignUnboundedChunkFirst = assignUnboundedChunkFirst;
+        this.recordsPerSecond = recordsPerSecond;
     }
 
     @Override
@@ -217,7 +220,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                             .scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled)
                             .deserializer(deserializer)
                             .disableCursorTimeout(noCursorTimeout)
-                            .assignUnboundedChunkFirst(assignUnboundedChunkFirst);
+                            .assignUnboundedChunkFirst(assignUnboundedChunkFirst)
+                            .recordsPerSecond(recordsPerSecond);
 
             Optional.ofNullable(databaseList).ifPresent(builder::databaseList);
             Optional.ofNullable(collectionList).ifPresent(builder::collectionList);
@@ -324,7 +328,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                         noCursorTimeout,
                         skipSnapshotBackfill,
                         scanNewlyAddedTableEnabled,
-                        assignUnboundedChunkFirst);
+                        assignUnboundedChunkFirst,
+                        recordsPerSecond);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
@@ -367,7 +372,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                 && Objects.equals(noCursorTimeout, that.noCursorTimeout)
                 && Objects.equals(skipSnapshotBackfill, that.skipSnapshotBackfill)
                 && Objects.equals(scanNewlyAddedTableEnabled, that.scanNewlyAddedTableEnabled)
-                && Objects.equals(assignUnboundedChunkFirst, that.assignUnboundedChunkFirst);
+                && Objects.equals(assignUnboundedChunkFirst, that.assignUnboundedChunkFirst)
+                && Objects.equals(recordsPerSecond, that.recordsPerSecond);
     }
 
     @Override
@@ -401,7 +407,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                 noCursorTimeout,
                 skipSnapshotBackfill,
                 scanNewlyAddedTableEnabled,
-                assignUnboundedChunkFirst);
+                assignUnboundedChunkFirst,
+                recordsPerSecond);
     }
 
     @Override

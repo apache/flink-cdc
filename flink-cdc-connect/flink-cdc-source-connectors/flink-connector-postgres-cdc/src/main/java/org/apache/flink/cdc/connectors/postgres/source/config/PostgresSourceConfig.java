@@ -73,7 +73,8 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
             boolean assignUnboundedChunkFirst,
             boolean includePartitionedTables,
             boolean includeDatabaseInTableId,
-            List<String> logicalMessagePrefixes) {
+            List<String> logicalMessagePrefixes,
+            double recordsPerSecond) {
         super(
                 startupOptions,
                 databaseList,
@@ -100,7 +101,8 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
                 chunkKeyColumn,
                 skipSnapshotBackfill,
                 isScanNewlyAddedTableEnabled,
-                assignUnboundedChunkFirst);
+                assignUnboundedChunkFirst,
+                recordsPerSecond);
         this.subtaskId = subtaskId;
         this.lsnCommitCheckpointsDelay = lsnCommitCheckpointsDelay;
         this.includePartitionedTables = includePartitionedTables;
