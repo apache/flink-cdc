@@ -105,6 +105,8 @@ public abstract class JdbcSourceFetchTaskContext implements FetchTask.Context {
                     Struct after = value.getStruct(Envelope.FieldName.AFTER);
                     Instant fetchTs =
                             Instant.ofEpochMilli((Long) source.get(Envelope.FieldName.TIMESTAMP));
+                    // Preserve headers (e.g. Oracle ROWID) from the original record so that
+                    // MetadataConverters can read them downstream.
                     SourceRecord record =
                             new SourceRecord(
                                     changeRecord.sourcePartition(),
@@ -114,7 +116,9 @@ public abstract class JdbcSourceFetchTaskContext implements FetchTask.Context {
                                     changeRecord.keySchema(),
                                     changeRecord.key(),
                                     changeRecord.valueSchema(),
-                                    envelope.read(after, source, fetchTs));
+                                    envelope.read(after, source, fetchTs),
+                                    changeRecord.timestamp(),
+                                    changeRecord.headers());
                     outputBuffer.put(key, record);
                     break;
                 case DELETE:
@@ -144,6 +148,8 @@ public abstract class JdbcSourceFetchTaskContext implements FetchTask.Context {
                             Instant fetchTs =
                                     Instant.ofEpochMilli(
                                             value.getInt64(Envelope.FieldName.TIMESTAMP));
+                            // Preserve headers (e.g. Oracle ROWID) from the original record so
+                            // that MetadataConverters can read them downstream.
                             SourceRecord sourceRecord =
                                     new SourceRecord(
                                             record.sourcePartition(),
@@ -153,7 +159,9 @@ public abstract class JdbcSourceFetchTaskContext implements FetchTask.Context {
                                             record.keySchema(),
                                             record.key(),
                                             record.valueSchema(),
-                                            envelope.read(updateAfter, source, fetchTs));
+                                            envelope.read(updateAfter, source, fetchTs),
+                                            record.timestamp(),
+                                            record.headers());
                             return sourceRecord;
                         })
                 .collect(Collectors.toList());
