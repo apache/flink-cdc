@@ -158,10 +158,13 @@ public class StarRocksMetadataApplier implements MetadataApplier {
                     new StarRocksColumn.Builder()
                             .setColumnName(column.getName())
                             .setOrdinalPosition(-1)
-                            .setColumnComment(column.getComment())
+                            .setColumnComment(
+                                    StarRocksUtils.escapeSqlStringLiteral(column.getComment()))
                             .setDefaultValue(
-                                    StarRocksUtils.convertInvalidTimestampDefaultValue(
-                                            column.getDefaultValueExpression(), column.getType()));
+                                    StarRocksUtils.escapeSqlStringLiteral(
+                                            StarRocksUtils.convertInvalidTimestampDefaultValue(
+                                                    column.getDefaultValueExpression(),
+                                                    column.getType())));
             toStarRocksDataType(column, false, builder, tableCreateConfig.getUnicodeCharMaxBytes());
             addColumns.add(builder.build());
         }

@@ -506,4 +506,49 @@ class StarRocksUtilsTest {
         BinaryRecordData record = generator.generate(new Object[] {null});
         assertThat(getter.getFieldOrNull(record)).isNull();
     }
+
+    @Test
+    void testEscapeSqlStringLiteralNull() {
+        assertThat(StarRocksUtils.escapeSqlStringLiteral(null)).isNull();
+    }
+
+    @Test
+    void testEscapeSqlStringLiteralNoSpecialChars() {
+        assertThat(StarRocksUtils.escapeSqlStringLiteral("hello world")).isEqualTo("hello world");
+    }
+
+    @Test
+    void testEscapeSqlStringLiteralBackslash() {
+        assertThat(StarRocksUtils.escapeSqlStringLiteral("path\\to\\file"))
+                .isEqualTo("path\\\\to\\\\file");
+    }
+
+    @Test
+    void testEscapeSqlStringLiteralDoubleQuote() {
+        assertThat(StarRocksUtils.escapeSqlStringLiteral("say \"hello\""))
+                .isEqualTo("say \"\"hello\"\"");
+    }
+
+    @Test
+    void testEscapeSqlStringLiteralNewline() {
+        assertThat(StarRocksUtils.escapeSqlStringLiteral("line1\nline2"))
+                .isEqualTo("line1\\nline2");
+    }
+
+    @Test
+    void testEscapeSqlStringLiteralCarriageReturn() {
+        assertThat(StarRocksUtils.escapeSqlStringLiteral("line1\rline2"))
+                .isEqualTo("line1\\rline2");
+    }
+
+    @Test
+    void testEscapeSqlStringLiteralMixed() {
+        assertThat(StarRocksUtils.escapeSqlStringLiteral("a\\b\"c\nd\re"))
+                .isEqualTo("a\\\\b\"\"c\\nd\\re");
+    }
+
+    @Test
+    void testEscapeSqlStringLiteralEmpty() {
+        assertThat(StarRocksUtils.escapeSqlStringLiteral("")).isEqualTo("");
+    }
 }
