@@ -42,3 +42,29 @@ db.createUser(
    ]
  }
 );
+
+// Some legacy sharded tests execute admin commands (e.g. profile on config DB).
+// Ensure superuser exists and always has required privileges.
+if (!db.getUser('superuser')) {
+    db.createUser(
+        {
+            user: 'superuser',
+            pwd: 'superpw',
+            roles: [
+                { role: 'root', db: 'admin' },
+                { role: 'dbAdmin', db: 'config' }
+            ]
+        }
+    );
+} else {
+    db.updateUser(
+        'superuser',
+        {
+            pwd: 'superpw',
+            roles: [
+                { role: 'root', db: 'admin' },
+                { role: 'dbAdmin', db: 'config' }
+            ]
+        }
+    );
+}
