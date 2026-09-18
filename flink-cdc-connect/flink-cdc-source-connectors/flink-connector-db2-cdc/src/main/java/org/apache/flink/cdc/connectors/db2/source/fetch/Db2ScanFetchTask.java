@@ -305,6 +305,12 @@ public class Db2ScanFetchTask extends AbstractScanFetchTask {
                         Strings.duration(clock.currentTimeInMillis() - exportStart));
             } catch (SQLException e) {
                 throw new ConnectException("Snapshotting of table " + table.id() + " failed", e);
+            } finally {
+                try {
+                    jdbcConnection.connection().setAutoCommit(true);
+                } catch (SQLException e) {
+                    LOG.warn("Failed to set autoCommit after snapshot split read", e);
+                }
             }
         }
 
