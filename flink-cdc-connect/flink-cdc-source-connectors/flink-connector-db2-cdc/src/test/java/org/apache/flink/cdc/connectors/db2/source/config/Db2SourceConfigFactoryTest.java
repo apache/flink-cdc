@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.connectors.sqlserver.source.config;
+package org.apache.flink.cdc.connectors.db2.source.config;
 
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 
@@ -25,37 +25,15 @@ import java.util.Properties;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Unit tests for {@link SqlServerSourceConfigFactory}. */
-class SqlServerSourceConfigFactoryTest {
-
-    @Test
-    void testTimestampStartupOption() {
-        long startupTimestampMillis = 1667232000000L;
-
-        SqlServerSourceConfigFactory factory = new SqlServerSourceConfigFactory();
-        factory.hostname("localhost")
-                .port(1433)
-                .databaseList("inventory")
-                .tableList("inventory.dbo.products")
-                .username("flinkuser")
-                .password("flinkpw")
-                .serverTimeZone("UTC");
-        factory.startupOptions(StartupOptions.timestamp(startupTimestampMillis));
-
-        SqlServerSourceConfig sourceConfig = factory.create(0);
-
-        assertThat(sourceConfig.getStartupOptions())
-                .isEqualTo(StartupOptions.timestamp(startupTimestampMillis));
-        assertThat(sourceConfig.getDbzProperties().getProperty("snapshot.mode"))
-                .isEqualTo("schema_only");
-    }
+/** Tests for {@link Db2SourceConfigFactory}. */
+class Db2SourceConfigFactoryTest {
 
     @Test
     void testFetchSizePropagatedToDebeziumProperties() {
-        SqlServerSourceConfigFactory factory = createFactory();
+        Db2SourceConfigFactory factory = createFactory();
         factory.fetchSize(5000);
 
-        SqlServerSourceConfig config = factory.create(0);
+        Db2SourceConfig config = factory.create(0);
 
         assertThat(config.getDbzProperties().getProperty("snapshot.fetch.size")).isEqualTo("5000");
         assertThat(config.getDbzConnectorConfig().getSnapshotFetchSize()).isEqualTo(5000);
@@ -63,9 +41,9 @@ class SqlServerSourceConfigFactoryTest {
 
     @Test
     void testDefaultFetchSizePropagatedToDebeziumProperties() {
-        SqlServerSourceConfigFactory factory = createFactory();
+        Db2SourceConfigFactory factory = createFactory();
 
-        SqlServerSourceConfig config = factory.create(0);
+        Db2SourceConfig config = factory.create(0);
 
         assertThat(config.getDbzProperties().getProperty("snapshot.fetch.size")).isEqualTo("1024");
         assertThat(config.getDbzConnectorConfig().getSnapshotFetchSize()).isEqualTo(1024);
@@ -73,22 +51,22 @@ class SqlServerSourceConfigFactoryTest {
 
     @Test
     void testDebeziumPropertiesCanOverrideFetchSize() {
-        SqlServerSourceConfigFactory factory = createFactory();
+        Db2SourceConfigFactory factory = createFactory();
         factory.fetchSize(5000);
         Properties dbzProps = new Properties();
         dbzProps.setProperty("snapshot.fetch.size", "8000");
         factory.debeziumProperties(dbzProps);
 
-        SqlServerSourceConfig config = factory.create(0);
+        Db2SourceConfig config = factory.create(0);
 
         assertThat(config.getDbzProperties().getProperty("snapshot.fetch.size")).isEqualTo("8000");
         assertThat(config.getDbzConnectorConfig().getSnapshotFetchSize()).isEqualTo(8000);
     }
 
-    private static SqlServerSourceConfigFactory createFactory() {
-        SqlServerSourceConfigFactory factory = new SqlServerSourceConfigFactory();
+    private static Db2SourceConfigFactory createFactory() {
+        Db2SourceConfigFactory factory = new Db2SourceConfigFactory();
         factory.hostname("localhost");
-        factory.port(1433);
+        factory.port(50000);
         factory.databaseList("myDB");
         factory.username("user");
         factory.password("password");
