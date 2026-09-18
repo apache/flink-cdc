@@ -40,6 +40,8 @@ import org.apache.flink.cdc.common.types.TinyIntType;
 import org.apache.flink.cdc.common.types.VarBinaryType;
 import org.apache.flink.cdc.common.types.VarCharType;
 
+import org.apache.flink.cdc.common.utils.Preconditions;
+
 import com.starrocks.connector.flink.catalog.StarRocksColumn;
 import com.starrocks.connector.flink.catalog.StarRocksTable;
 
@@ -165,6 +167,30 @@ public class StarRocksUtils {
     private static final DateTimeFormatter DATETIME_FORMATTER =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
+    private static final DateTimeFormatter[] DATETIME_FORMATTERS = new DateTimeFormatter[10];
+
+    private static DateTimeFormatter datetimeFormatter(int precision) {
+        Preconditions.checkArgument(
+                precision < DATETIME_FORMATTERS.length,
+                "Temporal precision %d exceeds the maximum of %d.",
+                precision,
+                DATETIME_FORMATTERS.length - 1);
+        if (precision <= 0) {
+            return DATETIME_FORMATTER;
+        }
+        DateTimeFormatter formatter = DATETIME_FORMATTERS[precision];
+        if (formatter == null) {
+            formatter =
+                    new DateTimeFormatterBuilder()
+                            .appendPattern("yyyy-MM-dd HH:mm:ss")
+                            .appendFraction(
+                                    ChronoField.NANO_OF_SECOND, precision, precision, true)
+                            .toFormatter();
+            DATETIME_FORMATTERS[precision] = formatter;
+        }
+        return formatter;
+    }
+
     /** Format TIME type data. */
     private static final DateTimeFormatter TIME_FORMATTER =
             new DateTimeFormatterBuilder().appendPattern("HH:mm:ss").toFormatter();
@@ -172,26 +198,25 @@ public class StarRocksUtils {
     private static final DateTimeFormatter[] TIME_FORMATTERS = new DateTimeFormatter[10];
 
     private static DateTimeFormatter timeFormatter(int precision) {
+        Preconditions.checkArgument(
+                precision < TIME_FORMATTERS.length,
+                "Temporal precision %d exceeds the maximum of %d.",
+                precision,
+                TIME_FORMATTERS.length - 1);
         if (precision <= 0) {
             return TIME_FORMATTER;
         }
-        if (precision < TIME_FORMATTERS.length) {
-            DateTimeFormatter formatter = TIME_FORMATTERS[precision];
-            if (formatter == null) {
-                formatter =
-                        new DateTimeFormatterBuilder()
-                                .appendPattern("HH:mm:ss")
-                                .appendFraction(
-                                        ChronoField.NANO_OF_SECOND, precision, precision, true)
-                                .toFormatter();
-                TIME_FORMATTERS[precision] = formatter;
-            }
-            return formatter;
+        DateTimeFormatter formatter = TIME_FORMATTERS[precision];
+        if (formatter == null) {
+            formatter =
+                    new DateTimeFormatterBuilder()
+                            .appendPattern("HH:mm:ss")
+                            .appendFraction(
+                                    ChronoField.NANO_OF_SECOND, precision, precision, true)
+                            .toFormatter();
+            TIME_FORMATTERS[precision] = formatter;
         }
-        return new DateTimeFormatterBuilder()
-                .appendPattern("HH:mm:ss")
-                .appendFraction(ChronoField.NANO_OF_SECOND, precision, precision, true)
-                .toFormatter();
+        return formatter;
     }
 
     /**
@@ -257,22 +282,24 @@ public class StarRocksUtils {
                                         .format(timeFormatter(getPrecision(fieldType)));
                 break;
             case TIMESTAMP_WITHOUT_TIME_ZONE:
+                final int tsPrecision = getPrecision(fieldType);
                 fieldGetter =
                         record ->
-                                record.getTimestamp(fieldPos, getPrecision(fieldType))
+                                record.getTimestamp(fieldPos, tsPrecision)
                                         .toLocalDateTime()
-                                        .format(DATETIME_FORMATTER);
+                                        .format(datetimeFormatter(tsPrecision));
                 break;
             case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
+                final int ltzPrecision = getPrecision(fieldType);
                 fieldGetter =
                         record ->
                                 ZonedDateTime.ofInstant(
                                                 record.getLocalZonedTimestampData(
-                                                                fieldPos, getPrecision(fieldType))
+                                                                fieldPos, ltzPrecision)
                                                         .toInstant(),
                                                 zoneId)
                                         .toLocalDateTime()
-                                        .format(DATETIME_FORMATTER);
+                                        .format(datetimeFormatter(ltzPrecision));
                 break;
             default:
                 throw new UnsupportedOperationException(
