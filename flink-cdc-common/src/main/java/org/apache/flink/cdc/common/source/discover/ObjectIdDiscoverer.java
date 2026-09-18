@@ -30,7 +30,13 @@ public interface ObjectIdDiscoverer<T> extends Serializable, AutoCloseable {
     /** Opens this discoverer and initializes any resources needed for discovery. */
     void open(Context context) throws Exception;
 
-    /** Discovers and returns the set of object identifiers selected by the caller configuration. */
+    /**
+     * Discovers and returns the complete current set of object identifiers selected by the caller
+     * configuration.
+     *
+     * <p>A successful result is authoritative: identifiers absent from it are no longer selected,
+     * and an empty result selects no identifiers. A failed discovery does not describe a new set.
+     */
     Set<T> discover() throws Exception;
 
     /** Closes this discoverer and releases any resources. */

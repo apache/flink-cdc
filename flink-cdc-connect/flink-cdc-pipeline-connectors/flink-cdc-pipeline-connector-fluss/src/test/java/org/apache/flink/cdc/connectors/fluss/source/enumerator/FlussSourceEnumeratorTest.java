@@ -25,8 +25,12 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.source.discover.TableDiscoverer;
 import org.apache.flink.cdc.connectors.fluss.source.discover.FlussDefaultDiscoverer;
 import org.apache.flink.cdc.connectors.fluss.source.discover.FlussSubscriberTableDiscoverer;
+import org.apache.flink.cdc.connectors.fluss.source.event.FinishedKvSnapshotConsumeEvent;
+import org.apache.flink.cdc.connectors.fluss.source.event.TableRemovalAckEvent;
+import org.apache.flink.cdc.connectors.fluss.source.event.TableSubscriptionEvent;
 import org.apache.flink.cdc.connectors.fluss.source.reader.LeaseContext;
 import org.apache.flink.cdc.connectors.fluss.source.split.FlussHybridSnapshotLogSplit;
+import org.apache.flink.cdc.connectors.fluss.source.split.FlussLogSplit;
 import org.apache.flink.cdc.connectors.fluss.source.split.FlussSplitBase;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableEnvironment;
@@ -39,9 +43,12 @@ import org.apache.fluss.client.table.Table;
 import org.apache.fluss.client.table.scanner.batch.BatchScanUtils;
 import org.apache.fluss.client.table.scanner.batch.BatchScanner;
 import org.apache.fluss.config.ConfigOptions;
+import org.apache.fluss.metadata.PartitionSpec;
+import org.apache.fluss.metadata.TableDescriptor;
 import org.apache.fluss.metadata.TablePath;
 import org.apache.fluss.row.InternalRow;
 import org.apache.fluss.server.testutils.FlussClusterExtension;
+import org.apache.fluss.types.DataTypes;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -55,11 +62,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static org.apache.fluss.config.ConfigOptions.BOOTSTRAP_SERVERS;
 import static org.apache.fluss.server.testutils.FlussClusterExtension.BUILTIN_DATABASE;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
@@ -192,13 +201,8 @@ class FlussSourceEnumeratorTest {
         }
     }
 
-    /**
-     * Tests that when a subscribed table is dropped, the enumerator does not emit any new
-     * assignments on the following discovery cycle (current enumerator intentionally does not
-     * revoke already-assigned tables).
-     */
     @Test
-    void testPatternSubscriberIgnoresTableRemoval() throws Throwable {
+    void testPatternSubscriberRemovesDroppedTableAfterReaderAcknowledgements() throws Throwable {
         String tableA = "rm_a";
         String tableB = "rm_b";
         createPkTable(tableA);
@@ -214,21 +218,257 @@ class FlussSourceEnumeratorTest {
                 enumerator.start();
                 registerAllReaders(context, enumerator);
 
-                // First cycle: both tables assigned.
                 runDiscoveryCycle(context);
                 assertThat(assignedTableNames(context)).containsExactlyInAnyOrder(tableA, tableB);
                 int assignmentsAfterFirst = context.getSplitsAssignmentSequence().size();
 
-                // Drop tableB — pattern no longer matches it.
                 tBatchEnv.executeSql(String.format("DROP TABLE %s", tableB)).await();
-
-                // Second cycle: no new assignments should be emitted. The enumerator keeps its
-                // previously-assigned state (no revocation support yet).
                 runDiscoveryCycle(context);
 
+                assertThat(context.getSplitsAssignmentSequence()).hasSize(assignmentsAfterFirst);
+                TablePath removedTablePath = TablePath.of(DATABASE_NAME, tableB);
+                TableSubscriptionEvent removal = latestSubscriptionEvent(context, 0);
+                assertThat(removal.getSubscribedTablePaths())
+                        .containsExactly(TablePath.of(DATABASE_NAME, tableA));
+                assertThat(removal.getPendingRemovalRequests()).containsOnlyKeys(removedTablePath);
+                long requestId = removal.getPendingRemovalRequests().get(removedTablePath);
+                assertThat(enumerator.snapshotState(1L).getPendingRemovalTablePaths())
+                        .containsExactly(removedTablePath);
+
+                acknowledgeRemoval(enumerator, removedTablePath, requestId);
+                assertThat(enumerator.snapshotState(2L).getPendingRemovalTablePaths()).isEmpty();
+                assertThat(latestSubscriptionEvent(context, 0).getSubscribedTablePaths())
+                        .containsExactly(TablePath.of(DATABASE_NAME, tableA));
+            } finally {
+                enumerator.close();
+            }
+        }
+    }
+
+    @Test
+    void testRemovalFenceSurvivesAbortedCheckpointAndRearm() throws Throwable {
+        String tableA = "fence_a";
+        String tableB = "fence_b";
+        createPkTable(tableA);
+        createPkTable(tableB);
+
+        FlussDefaultDiscoverer discoverer = new FlussDefaultDiscoverer();
+        String pattern = fqnRegex(DATABASE_NAME, "fence_.*");
+
+        try (MockSplitEnumeratorContext<FlussSplitBase> context =
+                new MockSplitEnumeratorContext<>(NUM_READERS)) {
+            FlussSourceEnumerator enumerator = newEnumerator(context, discoverer, pattern);
+            try {
+                enumerator.start();
+                registerAllReaders(context, enumerator);
+                runDiscoveryCycle(context);
+
+                TablePath tablePath = TablePath.of(DATABASE_NAME, tableB);
+                tBatchEnv.executeSql(String.format("DROP TABLE %s", tableB)).await();
+                runDiscoveryCycle(context);
+                long firstRequestId =
+                        latestSubscriptionEvent(context, 0)
+                                .getPendingRemovalRequests()
+                                .get(tablePath);
+                acknowledgeRemoval(enumerator, tablePath, firstRequestId);
+                assertThat(latestSubscriptionEvent(context, 0).getFencedTablePaths())
+                        .contains(tablePath);
+                enumerator.snapshotState(1L);
+                enumerator.addReader(0);
+                assertThat(latestSubscriptionEvent(context, 0).getFencedTablePaths())
+                        .contains(tablePath);
+                enumerator.snapshotState(2L);
+                enumerator.notifyCheckpointComplete(2L);
+                enumerator.addReader(0);
+                assertThat(latestSubscriptionEvent(context, 0).getFencedTablePaths())
+                        .doesNotContain(tablePath);
+
+                createPkTable(tableB);
+                runDiscoveryCycle(context);
+                tBatchEnv.executeSql(String.format("DROP TABLE %s", tableB)).await();
+                runDiscoveryCycle(context);
+                long secondRequestId =
+                        latestSubscriptionEvent(context, 0)
+                                .getPendingRemovalRequests()
+                                .get(tablePath);
+                acknowledgeRemoval(enumerator, tablePath, secondRequestId);
+                assertThat(latestSubscriptionEvent(context, 0).getFencedTablePaths())
+                        .contains(tablePath);
+                enumerator.snapshotState(3L);
+
+                createPkTable(tableB);
+                runDiscoveryCycle(context);
+                tBatchEnv.executeSql(String.format("DROP TABLE %s", tableB)).await();
+                runDiscoveryCycle(context);
+                long thirdRequestId =
+                        latestSubscriptionEvent(context, 0)
+                                .getPendingRemovalRequests()
+                                .get(tablePath);
+                acknowledgeRemoval(enumerator, tablePath, thirdRequestId);
+
+                enumerator.notifyCheckpointComplete(3L);
+                enumerator.addReader(0);
+                assertThat(latestSubscriptionEvent(context, 0).getFencedTablePaths())
+                        .contains(tablePath);
+
+                enumerator.snapshotState(4L);
+                enumerator.notifyCheckpointComplete(4L);
+                enumerator.addReader(0);
+                assertThat(latestSubscriptionEvent(context, 0).getFencedTablePaths())
+                        .doesNotContain(tablePath);
+            } finally {
+                enumerator.close();
+            }
+        }
+    }
+
+    @Test
+    void testFencedAddSplitsBackDropsStaleSplitWithoutReassigningOtherBuckets() throws Throwable {
+        String subscriptionTable = "sub_fenced_failed_split";
+        String targetTable = "tgt_fenced_failed_split";
+        createSubscriptionTable(subscriptionTable);
+        createPkTable(targetTable, 2);
+        insertSubscription(subscriptionTable, targetTable);
+
+        FlussSubscriberTableDiscoverer subscriber =
+                new FlussSubscriberTableDiscoverer(DATABASE_NAME + "." + subscriptionTable, 100);
+
+        try (MockSplitEnumeratorContext<FlussSplitBase> context =
+                new MockSplitEnumeratorContext<>(NUM_READERS)) {
+            FlussSourceEnumerator enumerator = newEnumerator(context, subscriber, null);
+            try {
+                enumerator.start();
+                registerAllReaders(context, enumerator);
+                runDiscoveryCycle(context);
+
+                TablePath tablePath = TablePath.of(DATABASE_NAME, targetTable);
+                tBatchEnv
+                        .executeSql(
+                                String.format(
+                                        "DELETE FROM %s WHERE table_name = '%s.%s'",
+                                        subscriptionTable, DATABASE_NAME, targetTable))
+                        .await();
+                runDiscoveryCycle(context);
+                long requestId =
+                        latestSubscriptionEvent(context, 0)
+                                .getPendingRemovalRequests()
+                                .get(tablePath);
+                acknowledgeRemoval(enumerator, tablePath, requestId);
+
+                insertSubscription(subscriptionTable, targetTable);
+                int assignmentsBeforeReadd = context.getSplitsAssignmentSequence().size();
+                runDiscoveryCycle(context);
+                List<FlussSplitBase> freshSplits =
+                        context
+                                .getSplitsAssignmentSequence()
+                                .subList(
+                                        assignmentsBeforeReadd,
+                                        context.getSplitsAssignmentSequence().size())
+                                .stream()
+                                .flatMap(assignment -> assignment.assignment().values().stream())
+                                .flatMap(List::stream)
+                                .collect(Collectors.toList());
+                assertThat(freshSplits).hasSize(2);
+                FlussLogSplit freshB0 =
+                        freshSplits.stream()
+                                .filter(
+                                        split ->
+                                                FlussSourceEnumerator.getSplitOwner(
+                                                                split.getTableBucket(), NUM_READERS)
+                                                        == 0)
+                                .map(FlussSplitBase::asLogSplit)
+                                .findFirst()
+                                .orElseThrow(AssertionError::new);
+                assertThat(
+                                freshSplits.stream()
+                                        .filter(
+                                                split ->
+                                                        FlussSourceEnumerator.getSplitOwner(
+                                                                        split.getTableBucket(),
+                                                                        NUM_READERS)
+                                                                == 1))
+                        .singleElement();
+
+                FlussLogSplit staleB0 =
+                        new FlussLogSplit(
+                                freshB0.getPhysicalTablePath(),
+                                freshB0.getTableBucket(),
+                                freshB0.getStartingOffset() + 1);
+                int assignmentsBeforeFailedReader = context.getSplitsAssignmentSequence().size();
+                enumerator.addSplitsBack(List.of(staleB0, freshB0), 0);
+
                 assertThat(context.getSplitsAssignmentSequence())
-                        .as("Shrinking subscription should not emit new assignments")
-                        .hasSize(assignmentsAfterFirst);
+                        .hasSize(assignmentsBeforeFailedReader + 1);
+                SplitsAssignment<FlussSplitBase> failedReaderAssignment =
+                        context.getSplitsAssignmentSequence()
+                                .get(context.getSplitsAssignmentSequence().size() - 1);
+                assertThat(failedReaderAssignment.assignment()).containsOnlyKeys(0);
+                assertThat(failedReaderAssignment.assignment().get(0)).containsExactly(freshB0);
+
+                int assignmentsBeforeNextDiscovery = context.getSplitsAssignmentSequence().size();
+                runDiscoveryCycle(context);
+                assertThat(context.getSplitsAssignmentSequence())
+                        .hasSize(assignmentsBeforeNextDiscovery);
+            } finally {
+                enumerator.close();
+            }
+        }
+    }
+
+    @Test
+    void testDroppedPartitionDoesNotCreateTableRemovalTombstone() throws Throwable {
+        String tableName = "partition_still_subscribed";
+        tBatchEnv
+                .executeSql(
+                        String.format(
+                                "CREATE TABLE %s (id INT, ds STRING, val STRING, "
+                                        + "PRIMARY KEY (id, ds) NOT ENFORCED) PARTITIONED BY (ds)",
+                                tableName))
+                .await();
+        tBatchEnv
+                .executeSql(
+                        String.format(
+                                "INSERT INTO %s VALUES (1, '20260904', 'first'), (2, '20260905', 'second')",
+                                tableName))
+                .await();
+
+        try (MockSplitEnumeratorContext<FlussSplitBase> context =
+                        new MockSplitEnumeratorContext<>(NUM_READERS);
+                Connection connection =
+                        ConnectionFactory.createConnection(
+                                FLUSS_CLUSTER_EXTENSION.getClientConfig())) {
+            FlussSourceEnumerator enumerator =
+                    newEnumerator(
+                            context,
+                            new FlussDefaultDiscoverer(),
+                            fqnRegex(DATABASE_NAME, tableName));
+            try {
+                enumerator.start();
+                registerAllReaders(context, enumerator);
+                runDiscoveryCycle(context);
+
+                TablePath tablePath = TablePath.of(DATABASE_NAME, tableName);
+                connection
+                        .getAdmin()
+                        .dropPartition(
+                                tablePath,
+                                new PartitionSpec(Collections.singletonMap("ds", "20260904")),
+                                false)
+                        .get();
+                runDiscoveryCycle(context);
+
+                assertThat(enumerator.snapshotState(1L).getPendingRemovalTablePaths()).isEmpty();
+                TableSubscriptionEvent subscription = latestSubscriptionEvent(context, 0);
+                assertThat(subscription.getSubscribedTablePaths()).containsExactly(tablePath);
+                assertThat(subscription.getPendingRemovalRequests()).isEmpty();
+
+                tBatchEnv.executeSql(String.format("DROP TABLE %s", tableName)).await();
+                runDiscoveryCycle(context);
+
+                TableSubscriptionEvent removal = latestSubscriptionEvent(context, 0);
+                assertThat(enumerator.snapshotState(2L).getPendingRemovalTablePaths())
+                        .containsExactly(tablePath);
+                assertThat(removal.getPendingRemovalRequests()).containsKey(tablePath);
             } finally {
                 enumerator.close();
             }
@@ -645,21 +885,13 @@ class FlussSourceEnumeratorTest {
         }
     }
 
-    /**
-     * Tests that removing a row from the subscription table does NOT cause the enumerator to emit
-     * new assignments or revoke any splits on the next discovery cycle — the current enumerator
-     * intentionally does not revoke already-assigned tables.
-     */
     @Test
-    void testFlussTableSubscriberIgnoresSubscriptionShrinkage() throws Throwable {
-        String subscriptionTable = "sub_shrink";
-        String targetA = "tgt_shrink_a";
-        String targetB = "tgt_shrink_b";
+    void testSubscriptionDeletionPersistsTombstoneUntilEveryReaderAcknowledges() throws Throwable {
+        String subscriptionTable = "sub_delete";
+        String targetTable = "tgt_delete";
         createSubscriptionTable(subscriptionTable);
-        createPkTable(targetA);
-        createPkTable(targetB);
-        insertSubscription(subscriptionTable, targetA);
-        insertSubscription(subscriptionTable, targetB);
+        createPkTable(targetTable);
+        insertSubscription(subscriptionTable, targetTable);
 
         FlussSubscriberTableDiscoverer subscriber =
                 new FlussSubscriberTableDiscoverer(DATABASE_NAME + "." + subscriptionTable, 100);
@@ -671,26 +903,474 @@ class FlussSourceEnumeratorTest {
                 enumerator.start();
                 registerAllReaders(context, enumerator);
 
-                // First cycle: both tables assigned.
                 runDiscoveryCycle(context);
-                assertThat(assignedTableNames(context)).containsExactlyInAnyOrder(targetA, targetB);
+                assertThat(assignedTableNames(context)).containsExactly(targetTable);
                 int assignmentsAfterFirst = context.getSplitsAssignmentSequence().size();
+                FlussSplitBase assignedSplit =
+                        context.getSplitsAssignmentSequence().get(0).assignment().values().stream()
+                                .flatMap(List::stream)
+                                .findFirst()
+                                .orElseThrow(AssertionError::new);
 
-                // Shrink the subscription by dropping & recreating the subscription table with
-                // only targetA. (Using DROP+CREATE avoids relying on SQL DELETE support and still
-                // reflects a valid subscription-shrinkage scenario.)
-                tBatchEnv.executeSql(String.format("DROP TABLE %s", subscriptionTable)).await();
-                createSubscriptionTable(subscriptionTable);
-                insertSubscription(subscriptionTable, targetA);
+                tBatchEnv
+                        .executeSql(
+                                String.format(
+                                        "DELETE FROM %s WHERE table_name = '%s.%s'",
+                                        subscriptionTable, DATABASE_NAME, targetTable))
+                        .await();
 
-                // Second cycle: no new assignments should be emitted; previously-assigned state
-                // remains stable (the enumerator does not revoke already-assigned tables).
                 runDiscoveryCycle(context);
 
+                assertThat(context.getSplitsAssignmentSequence()).hasSize(assignmentsAfterFirst);
+                TablePath tablePath = TablePath.of(DATABASE_NAME, targetTable);
+                TableSubscriptionEvent removal = latestSubscriptionEvent(context, 0);
+                assertThat(removal.getSubscribedTablePaths()).isEmpty();
+                assertThat(removal.getPendingRemovalRequests()).containsOnlyKeys(tablePath);
+                long firstRequestId = removal.getPendingRemovalRequests().get(tablePath);
+                assertThat(enumerator.snapshotState(1L).getPendingRemovalTablePaths())
+                        .containsExactly(tablePath);
+
+                enumerator.addSplitsBack(
+                        Collections.singletonList(assignedSplit),
+                        FlussSourceEnumerator.getSplitOwner(
+                                assignedSplit.getTableBucket(), NUM_READERS));
+                assertThat(context.getSplitsAssignmentSequence()).hasSize(assignmentsAfterFirst);
+
+                enumerator.handleSourceEvent(
+                        0,
+                        new TableRemovalAckEvent(
+                                Collections.singletonMap(tablePath, firstRequestId - 1)));
+                assertThat(enumerator.snapshotState(2L).getPendingRemovalTablePaths())
+                        .containsExactly(tablePath);
+
+                enumerator.addReader(0);
+                long restartedRequestId =
+                        latestSubscriptionEvent(context, 0)
+                                .getPendingRemovalRequests()
+                                .get(tablePath);
+                assertThat(restartedRequestId).isNotEqualTo(firstRequestId);
+
+                insertSubscription(subscriptionTable, targetTable);
+                runDiscoveryCycle(context);
+                assertThat(context.getSplitsAssignmentSequence()).hasSize(assignmentsAfterFirst);
+                assertThat(latestSubscriptionEvent(context, 0).getSubscribedTablePaths())
+                        .containsExactly(tablePath);
+                assertThat(latestSubscriptionEvent(context, 0).getPendingRemovalRequests())
+                        .containsOnlyKeys(tablePath);
+
+                acknowledgeRemoval(enumerator, tablePath, firstRequestId);
+                assertThat(enumerator.snapshotState(3L).getPendingRemovalTablePaths())
+                        .containsExactly(tablePath);
+
+                acknowledgeRemoval(enumerator, tablePath, restartedRequestId);
+                assertThat(enumerator.snapshotState(4L).getPendingRemovalTablePaths()).isEmpty();
+                context.runNextOneTimeCallable();
                 assertThat(context.getSplitsAssignmentSequence())
-                        .as("Shrinking subscription should not emit new assignments")
-                        .hasSize(assignmentsAfterFirst);
-                assertThat(assignedTableNames(context)).containsExactlyInAnyOrder(targetA, targetB);
+                        .hasSize(assignmentsAfterFirst + 1);
+                assertThat(latestAssignmentTableNames(context)).containsExactly(targetTable);
+            } finally {
+                enumerator.close();
+            }
+        }
+    }
+
+    @Test
+    void testRemovalWaitsForRegisteredReadersAndDropsLateFailedSplit() throws Throwable {
+        String subscriptionTable = "sub_reader_restart";
+        String targetTable = "tgt_reader_restart";
+        createSubscriptionTable(subscriptionTable);
+        createPkTable(targetTable);
+        insertSubscription(subscriptionTable, targetTable);
+
+        FlussSubscriberTableDiscoverer subscriber =
+                new FlussSubscriberTableDiscoverer(DATABASE_NAME + "." + subscriptionTable, 100);
+
+        try (MockSplitEnumeratorContext<FlussSplitBase> context =
+                new MockSplitEnumeratorContext<>(NUM_READERS)) {
+            FlussSourceEnumerator enumerator = newEnumerator(context, subscriber, null);
+            try {
+                enumerator.start();
+                registerAllReaders(context, enumerator);
+                runDiscoveryCycle(context);
+                FlussSplitBase failedSplit =
+                        context.getSplitsAssignmentSequence().get(0).assignment().values().stream()
+                                .flatMap(List::stream)
+                                .findFirst()
+                                .orElseThrow(AssertionError::new);
+                TablePath tablePath = TablePath.of(DATABASE_NAME, targetTable);
+
+                tBatchEnv
+                        .executeSql(
+                                String.format(
+                                        "DELETE FROM %s WHERE table_name = '%s.%s'",
+                                        subscriptionTable, DATABASE_NAME, targetTable))
+                        .await();
+                runDiscoveryCycle(context);
+                long oldRequestId =
+                        latestSubscriptionEvent(context, 0)
+                                .getPendingRemovalRequests()
+                                .get(tablePath);
+
+                enumerator.handleSourceEvent(
+                        0,
+                        new TableRemovalAckEvent(
+                                Collections.singletonMap(tablePath, oldRequestId)));
+                context.unregisterReader(0);
+                enumerator.handleSourceEvent(
+                        1,
+                        new TableRemovalAckEvent(
+                                Collections.singletonMap(tablePath, oldRequestId)));
+                assertThat(enumerator.snapshotState(1L).getPendingRemovalTablePaths())
+                        .containsExactly(tablePath);
+
+                context.registerReader(new ReaderInfo(0, "restarted_0"));
+                enumerator.addReader(0);
+                long restartedRequestId =
+                        latestSubscriptionEvent(context, 0)
+                                .getPendingRemovalRequests()
+                                .get(tablePath);
+                assertThat(restartedRequestId).isNotEqualTo(oldRequestId);
+
+                acknowledgeRemoval(enumerator, tablePath, oldRequestId);
+                assertThat(enumerator.snapshotState(2L).getPendingRemovalTablePaths())
+                        .containsExactly(tablePath);
+
+                acknowledgeRemoval(enumerator, tablePath, restartedRequestId);
+                assertThat(enumerator.snapshotState(3L).getPendingRemovalTablePaths()).isEmpty();
+
+                int assignmentsBeforeLateSplit = context.getSplitsAssignmentSequence().size();
+                enumerator.addSplitsBack(
+                        Collections.singletonList(failedSplit),
+                        FlussSourceEnumerator.getSplitOwner(
+                                failedSplit.getTableBucket(), NUM_READERS));
+                assertThat(context.getSplitsAssignmentSequence())
+                        .hasSize(assignmentsBeforeLateSplit);
+                FlussSourceEnumState state = enumerator.snapshotState(4L);
+                assertThat(state.getAssignedPhysicalTablePaths())
+                        .noneMatch(path -> path.getTablePath().equals(tablePath));
+                assertThat(state.getRemainingSplits())
+                        .noneMatch(split -> split.getTablePath().equals(tablePath));
+            } finally {
+                enumerator.close();
+            }
+        }
+    }
+
+    @Test
+    void testLateInitializationDoesNotReviveDeletedSubscription() throws Throwable {
+        String subscriptionTable = "sub_late_init";
+        String targetTable = "tgt_late_init";
+        createSubscriptionTable(subscriptionTable);
+        createPkTable(targetTable);
+        insertSubscription(subscriptionTable, targetTable);
+
+        FlussSubscriberTableDiscoverer subscriber =
+                new FlussSubscriberTableDiscoverer(DATABASE_NAME + "." + subscriptionTable, 100);
+
+        try (MockSplitEnumeratorContext<FlussSplitBase> context =
+                new MockSplitEnumeratorContext<>(NUM_READERS)) {
+            FlussSourceEnumerator enumerator = newEnumerator(context, subscriber, null);
+            try {
+                enumerator.start();
+                registerAllReaders(context, enumerator);
+
+                context.runPeriodicCallable(DISCOVERY_CALLABLE_INDEX);
+                tBatchEnv
+                        .executeSql(
+                                String.format(
+                                        "DELETE FROM %s WHERE table_name = '%s.%s'",
+                                        subscriptionTable, DATABASE_NAME, targetTable))
+                        .await();
+                context.runPeriodicCallable(DISCOVERY_CALLABLE_INDEX);
+                context.runNextOneTimeCallable();
+
+                assertThat(context.getSplitsAssignmentSequence()).isEmpty();
+                assertThat(enumerator.snapshotState(1L).getPendingRemovalTablePaths())
+                        .containsExactly(TablePath.of(DATABASE_NAME, targetTable));
+            } finally {
+                enumerator.close();
+            }
+        }
+    }
+
+    @Test
+    void testLateFailedInitializationAfterRemovalAcknowledgementIsIgnored() throws Throwable {
+        String subscriptionTable = "sub_late_failed_init";
+        String targetTable = "tgt_late_failed_init";
+        createSubscriptionTable(subscriptionTable);
+        createPkTable(targetTable);
+        insertSubscription(subscriptionTable, targetTable);
+
+        RuntimeException offsetFailure = new RuntimeException("Injected late offset failure");
+        OffsetsInitializer failingOffsetsInitializer =
+                (partitionName, bucketIds, retriever) -> {
+                    throw offsetFailure;
+                };
+        FlussSubscriberTableDiscoverer subscriber =
+                new FlussSubscriberTableDiscoverer(DATABASE_NAME + "." + subscriptionTable, 100);
+
+        try (MockSplitEnumeratorContext<FlussSplitBase> context =
+                new MockSplitEnumeratorContext<>(NUM_READERS)) {
+            FlussSourceEnumerator enumerator =
+                    newEnumerator(
+                            context,
+                            subscriber,
+                            null,
+                            failingOffsetsInitializer,
+                            DISCOVERY_INTERVAL_MS);
+            try {
+                enumerator.start();
+                registerAllReaders(context, enumerator);
+                context.runPeriodicCallable(DISCOVERY_CALLABLE_INDEX);
+
+                tBatchEnv
+                        .executeSql(
+                                String.format(
+                                        "DELETE FROM %s WHERE table_name = '%s.%s'",
+                                        subscriptionTable, DATABASE_NAME, targetTable))
+                        .await();
+                context.runPeriodicCallable(DISCOVERY_CALLABLE_INDEX);
+
+                TablePath tablePath = TablePath.of(DATABASE_NAME, targetTable);
+                long requestId =
+                        latestSubscriptionEvent(context, 0)
+                                .getPendingRemovalRequests()
+                                .get(tablePath);
+                acknowledgeRemoval(enumerator, tablePath, requestId);
+
+                assertThatCode(context::runNextOneTimeCallable).doesNotThrowAnyException();
+                assertThat(context.getSplitsAssignmentSequence()).isEmpty();
+                assertThat(enumerator.snapshotState(1L).getPendingRemovalTablePaths()).isEmpty();
+            } finally {
+                enumerator.close();
+            }
+        }
+    }
+
+    @Test
+    void testRestoreRegeneratesRemovalRequestIdAndRejectsOldAcknowledgement() throws Throwable {
+        String subscriptionTable = "sub_restore";
+        String targetTable = "tgt_restore";
+        TablePath tablePath = TablePath.of(DATABASE_NAME, targetTable);
+        createSubscriptionTable(subscriptionTable);
+        createPkTable(targetTable);
+        insertSubscription(subscriptionTable, targetTable);
+
+        FlussSubscriberTableDiscoverer subscriber =
+                new FlussSubscriberTableDiscoverer(DATABASE_NAME + "." + subscriptionTable, 100);
+        FlussSourceEnumState restoredState;
+        long oldRequestId;
+        try (MockSplitEnumeratorContext<FlussSplitBase> context =
+                new MockSplitEnumeratorContext<>(NUM_READERS)) {
+            FlussSourceEnumerator enumerator = newEnumerator(context, subscriber, null);
+            try {
+                enumerator.start();
+                registerAllReaders(context, enumerator);
+                runDiscoveryCycle(context);
+
+                tBatchEnv
+                        .executeSql(
+                                String.format(
+                                        "DELETE FROM %s WHERE table_name = '%s.%s'",
+                                        subscriptionTable, DATABASE_NAME, targetTable))
+                        .await();
+                runDiscoveryCycle(context);
+                oldRequestId =
+                        latestSubscriptionEvent(context, 0)
+                                .getPendingRemovalRequests()
+                                .get(tablePath);
+                restoredState = enumerator.snapshotState(1L);
+            } finally {
+                enumerator.close();
+            }
+        }
+
+        insertSubscription(subscriptionTable, targetTable);
+        try (MockSplitEnumeratorContext<FlussSplitBase> context =
+                new MockSplitEnumeratorContext<>(NUM_READERS)) {
+            FlussSourceEnumerator enumerator =
+                    newRestoredEnumerator(
+                            context,
+                            new FlussSubscriberTableDiscoverer(
+                                    DATABASE_NAME + "." + subscriptionTable, 100),
+                            restoredState);
+            try {
+                enumerator.start();
+                runDiscoveryCycle(context);
+                registerAllReaders(context, enumerator);
+
+                long restoredRequestId =
+                        latestSubscriptionEvent(context, 0)
+                                .getPendingRemovalRequests()
+                                .get(tablePath);
+                assertThat(restoredRequestId).isNotEqualTo(oldRequestId);
+                assertThat(enumerator.snapshotState(2L).getPendingRemovalTablePaths())
+                        .containsExactly(tablePath);
+
+                acknowledgeRemoval(enumerator, tablePath, oldRequestId);
+                assertThat(enumerator.snapshotState(3L).getPendingRemovalTablePaths())
+                        .containsExactly(tablePath);
+            } finally {
+                enumerator.close();
+            }
+        }
+    }
+
+    @Test
+    void testRestartedReaderWaitsForFreshDiscoveryBeforeReceivingRemovalSnapshot()
+            throws Throwable {
+        String subscriptionTable = "sub_restore_fresh_discovery";
+        String targetTable = "tgt_restore_fresh_discovery";
+        createSubscriptionTable(subscriptionTable);
+        createPkTable(targetTable);
+        insertSubscription(subscriptionTable, targetTable);
+
+        FlussSubscriberTableDiscoverer subscriber =
+                new FlussSubscriberTableDiscoverer(DATABASE_NAME + "." + subscriptionTable, 100);
+        FlussSourceEnumState restoredState;
+        try (MockSplitEnumeratorContext<FlussSplitBase> context =
+                new MockSplitEnumeratorContext<>(NUM_READERS)) {
+            FlussSourceEnumerator enumerator = newEnumerator(context, subscriber, null);
+            try {
+                enumerator.start();
+                registerAllReaders(context, enumerator);
+                runDiscoveryCycle(context);
+
+                tBatchEnv
+                        .executeSql(
+                                String.format(
+                                        "DELETE FROM %s WHERE table_name = '%s.%s'",
+                                        subscriptionTable, DATABASE_NAME, targetTable))
+                        .await();
+                runDiscoveryCycle(context);
+                restoredState = enumerator.snapshotState(1L);
+            } finally {
+                enumerator.close();
+            }
+        }
+
+        try (MockSplitEnumeratorContext<FlussSplitBase> context =
+                new MockSplitEnumeratorContext<>(NUM_READERS)) {
+            FlussSourceEnumerator enumerator =
+                    newRestoredEnumerator(
+                            context,
+                            new FlussSubscriberTableDiscoverer(
+                                    DATABASE_NAME + "." + subscriptionTable, 100),
+                            restoredState);
+            try {
+                enumerator.start();
+                context.registerReader(new ReaderInfo(0, "loc_0"));
+                enumerator.addReader(0);
+                context.unregisterReader(0);
+                context.registerReader(new ReaderInfo(0, "loc_0_restarted"));
+                enumerator.addReader(0);
+
+                assertThat(context.getSentSourceEvent()).doesNotContainKey(0);
+
+                context.runPeriodicCallable(DISCOVERY_CALLABLE_INDEX);
+
+                assertThat(latestSubscriptionEvent(context, 0).getPendingRemovalRequests())
+                        .containsKey(TablePath.of(DATABASE_NAME, targetTable));
+            } finally {
+                enumerator.close();
+            }
+        }
+    }
+
+    @Test
+    void testMixedInitializationCallbackClearsAcknowledgedRemovalTombstone() throws Throwable {
+        String subscriptionTable = "sub_mixed_init";
+        String removedTable = "tgt_mixed_removed";
+        String retainedTable = "tgt_mixed_retained";
+        createSubscriptionTable(subscriptionTable);
+        createPkTable(removedTable);
+        createPkTable(retainedTable);
+        insertSubscription(subscriptionTable, removedTable);
+        insertSubscription(subscriptionTable, retainedTable);
+
+        FlussSubscriberTableDiscoverer subscriber =
+                new FlussSubscriberTableDiscoverer(DATABASE_NAME + "." + subscriptionTable, 100);
+
+        try (MockSplitEnumeratorContext<FlussSplitBase> context =
+                new MockSplitEnumeratorContext<>(NUM_READERS)) {
+            FlussSourceEnumerator enumerator = newEnumerator(context, subscriber, null);
+            try {
+                enumerator.start();
+                registerAllReaders(context, enumerator);
+
+                context.runPeriodicCallable(DISCOVERY_CALLABLE_INDEX);
+                tBatchEnv
+                        .executeSql(
+                                String.format(
+                                        "DELETE FROM %s WHERE table_name = '%s.%s'",
+                                        subscriptionTable, DATABASE_NAME, removedTable))
+                        .await();
+                context.runPeriodicCallable(DISCOVERY_CALLABLE_INDEX);
+
+                TablePath removedTablePath = TablePath.of(DATABASE_NAME, removedTable);
+                long requestId =
+                        latestSubscriptionEvent(context, 0)
+                                .getPendingRemovalRequests()
+                                .get(removedTablePath);
+                acknowledgeRemoval(enumerator, removedTablePath, requestId);
+                assertThat(enumerator.snapshotState(1L).getPendingRemovalTablePaths())
+                        .containsExactly(removedTablePath);
+
+                context.runNextOneTimeCallable();
+
+                assertThat(latestAssignmentTableNames(context)).containsExactly(retainedTable);
+                assertThat(enumerator.snapshotState(2L).getPendingRemovalTablePaths()).isEmpty();
+            } finally {
+                enumerator.close();
+            }
+        }
+    }
+
+    @Test
+    void testSubscriptionDeletionRemovesPendingKvSnapshotRelease() throws Throwable {
+        String subscriptionTable = "sub_snapshot_release";
+        String targetTable = "tgt_snapshot_release";
+        createSubscriptionTable(subscriptionTable);
+        createPkTable(targetTable);
+        insertSubscription(subscriptionTable, targetTable);
+
+        FlussSubscriberTableDiscoverer subscriber =
+                new FlussSubscriberTableDiscoverer(DATABASE_NAME + "." + subscriptionTable, 100);
+
+        try (MockSplitEnumeratorContext<FlussSplitBase> context =
+                new MockSplitEnumeratorContext<>(NUM_READERS)) {
+            FlussSourceEnumerator enumerator = newEnumerator(context, subscriber, null);
+            try {
+                enumerator.start();
+                registerAllReaders(context, enumerator);
+                runDiscoveryCycle(context);
+
+                FlussSplitBase split =
+                        context.getSplitsAssignmentSequence().get(0).assignment().values().stream()
+                                .flatMap(List::stream)
+                                .findFirst()
+                                .orElseThrow(AssertionError::new);
+                enumerator.handleSourceEvent(
+                        0,
+                        new FinishedKvSnapshotConsumeEvent(
+                                1L, Collections.singleton(split.getTableBucket())));
+                assertThat(enumerator.pendingKvSnapshotBucketsForTesting())
+                        .containsExactly(split.getTableBucket());
+
+                tBatchEnv
+                        .executeSql(
+                                String.format(
+                                        "DELETE FROM %s WHERE table_name = '%s.%s'",
+                                        subscriptionTable, DATABASE_NAME, targetTable))
+                        .await();
+                runDiscoveryCycle(context);
+
+                assertThat(enumerator.pendingKvSnapshotBucketsForTesting()).isEmpty();
+                enumerator.handleSourceEvent(
+                        0,
+                        new FinishedKvSnapshotConsumeEvent(
+                                1L, Collections.singleton(split.getTableBucket())));
+                assertThat(enumerator.pendingKvSnapshotBucketsForTesting()).isEmpty();
             } finally {
                 enumerator.close();
             }
@@ -731,6 +1411,23 @@ class FlussSourceEnumeratorTest {
                 false);
     }
 
+    private FlussSourceEnumerator newRestoredEnumerator(
+            MockSplitEnumeratorContext<FlussSplitBase> context,
+            TableDiscoverer discoverer,
+            FlussSourceEnumState restoredState) {
+        org.apache.fluss.config.Configuration flussConfig =
+                FLUSS_CLUSTER_EXTENSION.getClientConfig();
+        return new FlussSourceEnumerator(
+                context,
+                discoverer,
+                flussConfig,
+                buildSourceConfig(flussConfig, null),
+                OffsetsInitializer.earliest(),
+                DISCOVERY_INTERVAL_MS,
+                restoredState,
+                LeaseContext.fromConf(new org.apache.flink.configuration.Configuration()));
+    }
+
     private static Configuration buildSourceConfig(
             org.apache.fluss.config.Configuration flussConfig, String pattern) {
         Map<String, String> map = new HashMap<>();
@@ -760,6 +1457,15 @@ class FlussSourceEnumeratorTest {
         for (int readerId = 0; readerId < NUM_READERS; readerId++) {
             context.registerReader(new ReaderInfo(readerId, "loc_" + readerId));
             enumerator.addReader(readerId);
+        }
+    }
+
+    private static void acknowledgeRemoval(
+            FlussSourceEnumerator enumerator, TablePath tablePath, long requestId) {
+        for (int readerId = 0; readerId < NUM_READERS; readerId++) {
+            enumerator.handleSourceEvent(
+                    readerId,
+                    new TableRemovalAckEvent(Collections.singletonMap(tablePath, requestId)));
         }
     }
 
@@ -814,6 +1520,15 @@ class FlussSourceEnumeratorTest {
                 .collect(Collectors.toSet());
     }
 
+    private static TableSubscriptionEvent latestSubscriptionEvent(
+            MockSplitEnumeratorContext<FlussSplitBase> context, int readerId) throws Exception {
+        return context.getSentSourceEvent().get(readerId).stream()
+                .filter(TableSubscriptionEvent.class::isInstance)
+                .map(TableSubscriptionEvent.class::cast)
+                .reduce((first, second) -> second)
+                .orElseThrow(AssertionError::new);
+    }
+
     private void createPkTable(String tableName) throws Exception {
         tBatchEnv
                 .executeSql(
@@ -821,6 +1536,28 @@ class FlussSourceEnumeratorTest {
                                 "CREATE TABLE %s (id INT, val STRING, PRIMARY KEY (id) NOT ENFORCED)",
                                 tableName))
                 .await();
+    }
+
+    private void createPkTable(String tableName, int bucketCount) throws Exception {
+        TablePath tablePath = TablePath.of(DATABASE_NAME, tableName);
+        try (Connection connection =
+                ConnectionFactory.createConnection(FLUSS_CLUSTER_EXTENSION.getClientConfig())) {
+            connection
+                    .getAdmin()
+                    .createTable(
+                            tablePath,
+                            TableDescriptor.builder()
+                                    .schema(
+                                            org.apache.fluss.metadata.Schema.newBuilder()
+                                                    .column("id", DataTypes.INT())
+                                                    .column("val", DataTypes.STRING())
+                                                    .primaryKey("id")
+                                                    .build())
+                                    .distributedBy(bucketCount, "id")
+                                    .build(),
+                            false)
+                    .get();
+        }
     }
 
     private void createSubscriptionTable(String tableName) throws Exception {
@@ -842,7 +1579,7 @@ class FlussSourceEnumeratorTest {
     }
 
     private static String fqnRegex(String database, String tablePattern) {
-        return java.util.regex.Pattern.quote(database) + "\\." + tablePattern;
+        return Pattern.quote(database) + "\\." + tablePattern;
     }
 
     private void waitForFlussClusterReady() throws Exception {

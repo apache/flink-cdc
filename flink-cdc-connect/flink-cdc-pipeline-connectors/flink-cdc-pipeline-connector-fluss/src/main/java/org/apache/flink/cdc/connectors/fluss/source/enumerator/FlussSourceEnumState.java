@@ -20,7 +20,9 @@ package org.apache.flink.cdc.connectors.fluss.source.enumerator;
 import org.apache.flink.cdc.connectors.fluss.source.split.FlussSplitBase;
 
 import org.apache.fluss.metadata.PhysicalTablePath;
+import org.apache.fluss.metadata.TablePath;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
@@ -30,14 +32,24 @@ public class FlussSourceEnumState {
     private final Set<PhysicalTablePath> assignedPhysicalTablePaths;
     private final List<FlussSplitBase> remainingSplits;
     private final String leaseId;
+    private final Set<TablePath> pendingRemovalTablePaths;
 
     public FlussSourceEnumState(
             Set<PhysicalTablePath> assignedPhysicalTablePaths,
             List<FlussSplitBase> remainingSplits,
             String leaseId) {
+        this(assignedPhysicalTablePaths, remainingSplits, leaseId, Collections.emptySet());
+    }
+
+    public FlussSourceEnumState(
+            Set<PhysicalTablePath> assignedPhysicalTablePaths,
+            List<FlussSplitBase> remainingSplits,
+            String leaseId,
+            Set<TablePath> pendingRemovalTablePaths) {
         this.assignedPhysicalTablePaths = assignedPhysicalTablePaths;
         this.remainingSplits = remainingSplits;
         this.leaseId = leaseId;
+        this.pendingRemovalTablePaths = pendingRemovalTablePaths;
     }
 
     public Set<PhysicalTablePath> getAssignedPhysicalTablePaths() {
@@ -50,5 +62,9 @@ public class FlussSourceEnumState {
 
     public String getLeaseId() {
         return leaseId;
+    }
+
+    public Set<TablePath> getPendingRemovalTablePaths() {
+        return pendingRemovalTablePaths;
     }
 }

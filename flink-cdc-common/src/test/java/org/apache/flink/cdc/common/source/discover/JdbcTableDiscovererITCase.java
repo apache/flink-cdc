@@ -198,8 +198,21 @@ class JdbcTableDiscovererITCase {
                     "INSERT INTO cdc_subscriptions VALUES "
                             + "('analytics-subscription', 'analytics_db.sessions')");
             try {
-                Set<TableId> updated = discoverer.discover();
-                assertThat(updated)
+                assertThat(discoverer.discover())
+                        .containsExactlyInAnyOrder(
+                                TableId.tableId("analytics_db", "user_events"),
+                                TableId.tableId("analytics_db", "sessions"));
+
+                executeSql(
+                        "DELETE FROM cdc_subscriptions WHERE subscribe_table_name "
+                                + "= 'analytics_db.sessions'");
+                assertThat(discoverer.discover())
+                        .containsExactly(TableId.tableId("analytics_db", "user_events"));
+
+                executeSql(
+                        "INSERT INTO cdc_subscriptions VALUES "
+                                + "('analytics-subscription', 'analytics_db.sessions')");
+                assertThat(discoverer.discover())
                         .containsExactlyInAnyOrder(
                                 TableId.tableId("analytics_db", "user_events"),
                                 TableId.tableId("analytics_db", "sessions"));
