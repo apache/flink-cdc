@@ -79,8 +79,6 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     private static final String EXCLUDE_SCHEMA_EVOLUTION_TYPES = "exclude.schema.changes";
     private static final String EXISTING_TABLE_SCHEMA_EXPANSION_MODE =
             "existing-table.schema-expansion.mode";
-    private static final String EXISTING_TABLE_SCHEMA_EXPANSION_ENABLED =
-            "existing-table.schema-expansion.enabled";
 
     // Route keys
     private static final String ROUTE_SOURCE_TABLE_KEY = "source-table";
@@ -229,13 +227,6 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         List<String> includedSETypes = new ArrayList<>();
         List<String> excludedSETypes = new ArrayList<>();
         boolean excludedFieldNotPresent = sinkNode.get(EXCLUDE_SCHEMA_EVOLUTION_TYPES) == null;
-        if (sinkNode.has(EXISTING_TABLE_SCHEMA_EXPANSION_ENABLED)) {
-            throw new IllegalArgumentException(
-                    String.format(
-                            "Option \"%s\" is no longer supported. Use \"%s\" with one of OFF, CHECK, TRY_EXPAND, EXPAND instead (the previous enabled: true maps to TRY_EXPAND).",
-                            EXISTING_TABLE_SCHEMA_EXPANSION_ENABLED,
-                            EXISTING_TABLE_SCHEMA_EXPANSION_MODE));
-        }
         ExistingTableSchemaExpansionMode existingTableSchemaExpansionMode =
                 parseExpansionMode(sinkNode.get(EXISTING_TABLE_SCHEMA_EXPANSION_MODE));
 

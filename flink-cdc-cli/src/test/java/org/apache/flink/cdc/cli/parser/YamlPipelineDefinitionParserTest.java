@@ -559,23 +559,6 @@ class YamlPipelineDefinitionParserTest {
     }
 
     @Test
-    void testRejectsLegacyExpansionEnabledOption() {
-        assertThatThrownBy(
-                        () ->
-                                new YamlPipelineDefinitionParser()
-                                        .parse(
-                                                "source:\n"
-                                                        + "  type: foo\n"
-                                                        + "sink:\n"
-                                                        + "  type: bar\n"
-                                                        + "  existing-table.schema-expansion.enabled: true\n",
-                                                new Configuration()))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("existing-table.schema-expansion.enabled")
-                .hasMessageContaining("existing-table.schema-expansion.mode");
-    }
-
-    @Test
     void testRejectsInvalidExpansionMode() {
         assertThatThrownBy(
                         () ->

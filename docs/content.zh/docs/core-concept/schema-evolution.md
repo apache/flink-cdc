@@ -96,7 +96,7 @@ sink:
   existing-table.schema-expansion.mode: "EXPAND"
 ```
 
-> 注意：`existing-table.schema-expansion.enabled` 已不再支持。请改用 `existing-table.schema-expansion.mode`，取值为 `OFF`、`CHECK`、`TRY_EXPAND`、`EXPAND`；原 `enabled: true` 等价于 `TRY_EXPAND`。建议给模式值加引号，避免裸写 `OFF` 被 YAML 解析为布尔值。
+建议给模式值加引号（例如 `"OFF"`），避免裸写 `OFF` 被 YAML 解析为布尔值。
 
 ## 按类型配置行为
 
