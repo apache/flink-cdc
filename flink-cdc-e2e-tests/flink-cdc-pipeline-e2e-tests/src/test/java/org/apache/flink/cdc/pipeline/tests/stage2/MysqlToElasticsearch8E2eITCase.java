@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.pipeline.tests;
+package org.apache.flink.cdc.pipeline.tests.stage2;
 
 import org.apache.flink.cdc.common.test.utils.TestUtils;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
@@ -36,6 +36,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedClass;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
@@ -53,6 +55,8 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.stream.Stream;
 
+@ParameterizedClass
+@ValueSource(ints = {1, 4})
 class MysqlToElasticsearch8E2eITCase extends PipelineTestEnvironment {
     private static final Logger LOG = LoggerFactory.getLogger(MysqlToElasticsearch8E2eITCase.class);
 
@@ -69,6 +73,10 @@ class MysqlToElasticsearch8E2eITCase extends PipelineTestEnvironment {
     @Container
     private static final ElasticsearchContainer ELASTICSEARCH_CONTAINER =
             createElasticsearchContainer();
+
+    MysqlToElasticsearch8E2eITCase(int parallelism) {
+        super(parallelism);
+    }
 
     @BeforeAll
     static void initializeContainers() {
