@@ -35,6 +35,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -214,12 +215,12 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
             int splitVersion, DataInputDeserializer in) throws IOException {
         List<TableId> alreadyProcessedTables = readTableIds(2, in);
         List<SnapshotSplit> remainingSplits = readSnapshotSplits(splitVersion, in);
-        Map<String, SnapshotSplit> assignedSnapshotSplits =
+        LinkedHashMap<String, SnapshotSplit> assignedSnapshotSplits =
                 readAssignedSnapshotSplits(splitVersion, in);
 
         final List<SchemalessSnapshotSplit> remainingSchemalessSplits = new ArrayList<>();
-        final Map<String, SchemalessSnapshotSplit> assignedSchemalessSnapshotSplits =
-                new HashMap<>();
+        final LinkedHashMap<String, SchemalessSnapshotSplit> assignedSchemalessSnapshotSplits =
+                new LinkedHashMap<>();
         final Map<TableId, TableChanges.TableChange> tableSchemas = new HashMap<>();
         remainingSplits.forEach(
                 split -> {
@@ -268,7 +269,7 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
             int version, int splitVersion, DataInputDeserializer in) throws IOException {
         List<TableId> alreadyProcessedTables = readTableIds(version, in);
         List<SnapshotSplit> remainingSplits = readSnapshotSplits(splitVersion, in);
-        Map<String, SnapshotSplit> assignedSnapshotSplits =
+        LinkedHashMap<String, SnapshotSplit> assignedSnapshotSplits =
                 readAssignedSnapshotSplits(splitVersion, in);
         Map<String, Offset> finishedOffsets = readFinishedOffsets(splitVersion, in);
         AssignerStatus assignerStatus;
@@ -285,8 +286,8 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
         List<TableId> remainingTableIds = readTableIds(version, in);
         boolean isTableIdCaseSensitive = in.readBoolean();
         final List<SchemalessSnapshotSplit> remainingSchemalessSplits = new ArrayList<>();
-        final Map<String, SchemalessSnapshotSplit> assignedSchemalessSnapshotSplits =
-                new HashMap<>();
+        final LinkedHashMap<String, SchemalessSnapshotSplit> assignedSchemalessSnapshotSplits =
+                new LinkedHashMap<>();
         final Map<TableId, TableChanges.TableChange> tableSchemas = new HashMap<>();
         remainingSplits.forEach(
                 split -> {
@@ -415,9 +416,9 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
         }
     }
 
-    private Map<String, SnapshotSplit> readAssignedSnapshotSplits(
+    private LinkedHashMap<String, SnapshotSplit> readAssignedSnapshotSplits(
             int splitVersion, DataInputDeserializer in) throws IOException {
-        Map<String, SnapshotSplit> assignedSplits = new HashMap<>();
+        LinkedHashMap<String, SnapshotSplit> assignedSplits = new LinkedHashMap<>();
         final int size = in.readInt();
         for (int i = 0; i < size; i++) {
             String splitId = in.readUTF();

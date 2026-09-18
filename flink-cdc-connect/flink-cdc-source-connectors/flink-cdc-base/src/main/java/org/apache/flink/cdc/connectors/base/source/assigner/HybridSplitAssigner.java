@@ -38,12 +38,10 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.connectors.base.source.assigner.AssignerStatus.isInitialAssigningFinished;
 import static org.apache.flink.cdc.connectors.base.source.assigner.AssignerStatus.isNewlyAddedAssigningFinished;
@@ -257,9 +255,7 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
 
     public StreamSplit createStreamSplit() {
         final List<SchemalessSnapshotSplit> assignedSnapshotSplit =
-                snapshotSplitAssigner.getAssignedSplits().values().stream()
-                        .sorted(Comparator.comparing(SourceSplitBase::splitId))
-                        .collect(Collectors.toList());
+                new ArrayList<>(snapshotSplitAssigner.getAssignedSplits().values());
 
         Map<String, Offset> splitFinishedOffsets = snapshotSplitAssigner.getSplitFinishedOffsets();
         final List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos = new ArrayList<>();
