@@ -21,6 +21,7 @@ import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.pipeline.ExistingTableSchemaExpansionMode;
 import org.apache.flink.cdc.common.pipeline.RouteMode;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.route.RouteRule;
@@ -122,7 +123,7 @@ public class SchemaCoordinator extends SchemaRegistry {
                 routingRules,
                 routeMode,
                 schemaChangeBehavior,
-                false,
+                ExistingTableSchemaExpansionMode.OFF,
                 rpcTimeout);
     }
 
@@ -134,7 +135,7 @@ public class SchemaCoordinator extends SchemaRegistry {
             List<RouteRule> routingRules,
             RouteMode routeMode,
             SchemaChangeBehavior schemaChangeBehavior,
-            boolean existingTableSchemaExpansionEnabled,
+            ExistingTableSchemaExpansionMode existingTableSchemaExpansionMode,
             Duration rpcTimeout) {
         super(
                 context,
@@ -144,7 +145,7 @@ public class SchemaCoordinator extends SchemaRegistry {
                 routingRules,
                 routeMode,
                 schemaChangeBehavior,
-                existingTableSchemaExpansionEnabled,
+                existingTableSchemaExpansionMode,
                 rpcTimeout);
         this.schemaChangeThreadPool = Executors.newSingleThreadExecutor();
     }
@@ -504,8 +505,11 @@ public class SchemaCoordinator extends SchemaRegistry {
 
     private boolean applyAndUpdateEvolvedSchemaChange(SchemaChangeEvent schemaChangeEvent) {
         try {
-            expandExistingTableSchemaIfNeeded(schemaChangeEvent);
-            metadataApplier.applySchemaChange(schemaChangeEvent);
+            boolean shouldApplyOriginalCreateTable =
+                    expandExistingTableSchemaIfNeeded(schemaChangeEvent);
+            if (shouldApplyOriginalCreateTable) {
+                metadataApplier.applySchemaChange(schemaChangeEvent);
+            }
             schemaManager.applyEvolvedSchemaChange(schemaChangeEvent);
             LOG.info(
                     "Successfully applied schema change event {} to external system.",

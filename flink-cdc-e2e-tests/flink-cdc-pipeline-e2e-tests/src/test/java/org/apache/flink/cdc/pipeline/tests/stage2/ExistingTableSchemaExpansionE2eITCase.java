@@ -17,7 +17,7 @@
 
 package org.apache.flink.cdc.pipeline.tests.stage2;
 
-import org.apache.flink.api.common.JobID;
+import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.cdc.common.test.utils.TestUtils;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
@@ -46,12 +46,13 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * End-to-end tests verifying that the {@code existing-table.schema-expansion.enabled} sink option
+ * End-to-end tests verifying that the {@code existing-table.schema-expansion.mode} sink option
  * reaches the schema expander through the whole wiring path (YAML option, Composer, schema operator
  * factory, schema registry or batch schema operator, metadata applier) in all three execution
  * topologies: regular streaming, batch, and distributed streaming.
@@ -199,7 +200,7 @@ class ExistingTableSchemaExpansionE2eITCase extends PipelineTestEnvironment {
                                 + "  catalog.properties.warehouse: %s\n"
                                 + "  catalog.properties.metastore: filesystem\n"
                                 + "  catalog.properties.cache-enabled: false\n"
-                                + "  existing-table.schema-expansion.enabled: true\n"
+                                + "  existing-table.schema-expansion.mode: EXPAND\n"
                                 + "\n"
                                 + "pipeline:\n"
                                 + "  schema.change.behavior: evolve\n"
@@ -207,9 +208,8 @@ class ExistingTableSchemaExpansionE2eITCase extends PipelineTestEnvironment {
                         MYSQL_TEST_USER, MYSQL_TEST_PASSWORD, database, warehouse, parallelism);
         Path paimonCdcConnector = TestUtils.getResource("paimon-cdc-pipeline-connector.jar");
         Path hadoopJar = TestUtils.getResource("flink-shade-hadoop.jar");
-        JobID jobId = submitPipelineJob(pipelineJob, paimonCdcConnector, hadoopJar);
+        submitPipelineJob(pipelineJob, paimonCdcConnector, hadoopJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
-        waitUntilStreamSplitReady(jobId, parallelism);
         LOG.info("Pipeline job is running");
 
         // `products` existed with (id, name) only, the remaining columns come from the expander.
@@ -247,7 +247,7 @@ class ExistingTableSchemaExpansionE2eITCase extends PipelineTestEnvironment {
                                 + "  catalog.properties.warehouse: %s\n"
                                 + "  catalog.properties.metastore: filesystem\n"
                                 + "  catalog.properties.cache-enabled: false\n"
-                                + "  existing-table.schema-expansion.enabled: true\n"
+                                + "  existing-table.schema-expansion.mode: EXPAND\n"
                                 + "\n"
                                 + "pipeline:\n"
                                 + "  schema.change.behavior: evolve\n"
@@ -295,7 +295,7 @@ class ExistingTableSchemaExpansionE2eITCase extends PipelineTestEnvironment {
                                 + "  properties.client.security.sasl.mechanism: PLAIN\n"
                                 + "  properties.client.security.sasl.username: developer\n"
                                 + "  properties.client.security.sasl.password: developer-pass\n"
-                                + "  existing-table.schema-expansion.enabled: true\n"
+                                + "  existing-table.schema-expansion.mode: EXPAND\n"
                                 + "\n"
                                 + "route:\n"
                                 + "  - source-table: %s.products\n"
@@ -315,6 +315,183 @@ class ExistingTableSchemaExpansionE2eITCase extends PipelineTestEnvironment {
                 sinkDatabase,
                 "products",
                 Arrays.asList("101, One, Alice", "102, Two, Bob", "103, Three, Cecily"));
+    }
+
+    /**
+     * CHECK mode never issues DDL: a target table missing upstream columns must fail the job, and
+     * the target schema must stay untouched.
+     */
+    @Test
+    void testCheckFailsOnMissingColumn() throws Exception {
+        String warehouse = sharedVolume.toString() + "/" + "paimon_" + UUID.randomUUID();
+        String database = inventoryDatabase.getDatabaseName();
+        preCreatePaimonProductsTable(warehouse, database);
+
+        String pipelineJob =
+                String.format(
+                        "source:\n"
+                                + "  type: mysql\n"
+                                + "  hostname: mysql\n"
+                                + "  port: 3306\n"
+                                + "  username: %s\n"
+                                + "  password: %s\n"
+                                + "  tables: %s.products\n"
+                                + "  server-id: 5400-5404\n"
+                                + "  server-time-zone: UTC\n"
+                                + "\n"
+                                + "sink:\n"
+                                + "  type: paimon\n"
+                                + "  catalog.properties.warehouse: %s\n"
+                                + "  catalog.properties.metastore: filesystem\n"
+                                + "  catalog.properties.cache-enabled: false\n"
+                                + "  existing-table.schema-expansion.mode: CHECK\n"
+                                + "\n"
+                                + "pipeline:\n"
+                                + "  schema.change.behavior: evolve\n"
+                                + "  parallelism: %s",
+                        MYSQL_TEST_USER, MYSQL_TEST_PASSWORD, database, warehouse, parallelism);
+        Path paimonCdcConnector = TestUtils.getResource("paimon-cdc-pipeline-connector.jar");
+        Path hadoopJar = TestUtils.getResource("flink-shade-hadoop.jar");
+        submitPipelineJob(pipelineJob, paimonCdcConnector, hadoopJar);
+
+        // The job must fail because the pre-created table lacks upstream columns, and CHECK never
+        // repairs it: the target schema must stay unchanged.
+        waitUntilJobState(EXPANSION_TESTCASE_TIMEOUT, JobStatus.FAILED);
+        Assertions.assertThat(fetchPaimonTableColumns(warehouse, database, "products"))
+                .containsExactly("id", "name");
+    }
+
+    /**
+     * CHECK mode with a fully compatible target table passes without issuing DDL, and the pipeline
+     * keeps syncing data.
+     */
+    @Test
+    void testCheckPassesWithCompatibleTable() throws Exception {
+        String warehouse = sharedVolume.toString() + "/" + "paimon_" + UUID.randomUUID();
+        String database = inventoryDatabase.getDatabaseName();
+        preCreateCompatiblePaimonProductsTable(warehouse, database);
+
+        String pipelineJob =
+                String.format(
+                        "source:\n"
+                                + "  type: mysql\n"
+                                + "  hostname: mysql\n"
+                                + "  port: 3306\n"
+                                + "  username: %s\n"
+                                + "  password: %s\n"
+                                + "  tables: %s.products\n"
+                                + "  server-id: 5400-5404\n"
+                                + "  server-time-zone: UTC\n"
+                                + "\n"
+                                + "sink:\n"
+                                + "  type: paimon\n"
+                                + "  catalog.properties.warehouse: %s\n"
+                                + "  catalog.properties.metastore: filesystem\n"
+                                + "  catalog.properties.cache-enabled: false\n"
+                                + "  existing-table.schema-expansion.mode: CHECK\n"
+                                + "\n"
+                                + "pipeline:\n"
+                                + "  schema.change.behavior: evolve\n"
+                                + "  parallelism: %s",
+                        MYSQL_TEST_USER, MYSQL_TEST_PASSWORD, database, warehouse, parallelism);
+        Path paimonCdcConnector = TestUtils.getResource("paimon-cdc-pipeline-connector.jar");
+        Path hadoopJar = TestUtils.getResource("flink-shade-hadoop.jar");
+        submitPipelineJob(pipelineJob, paimonCdcConnector, hadoopJar);
+        waitUntilJobRunning(Duration.ofSeconds(30));
+        LOG.info("CHECK-mode pipeline job is running");
+
+        validatePaimonSinkResult(
+                warehouse, database, "products", expectedProductsRowsWithoutDefaultValue());
+    }
+
+    /**
+     * EXPAND mode is strict: a target column that cannot safely contain the pipeline type fails the
+     * job instead of being silently dropped.
+     */
+    @Test
+    void testExpandFailsOnIncompatibleTarget() throws Exception {
+        String warehouse = sharedVolume.toString() + "/" + "paimon_" + UUID.randomUUID();
+        String database = inventoryDatabase.getDatabaseName();
+        preCreateIncompatiblePaimonProductsTable(warehouse, database);
+
+        String pipelineJob =
+                String.format(
+                        "source:\n"
+                                + "  type: mysql\n"
+                                + "  hostname: mysql\n"
+                                + "  port: 3306\n"
+                                + "  username: %s\n"
+                                + "  password: %s\n"
+                                + "  tables: %s.products\n"
+                                + "  server-id: 5400-5404\n"
+                                + "  server-time-zone: UTC\n"
+                                + "\n"
+                                + "sink:\n"
+                                + "  type: paimon\n"
+                                + "  catalog.properties.warehouse: %s\n"
+                                + "  catalog.properties.metastore: filesystem\n"
+                                + "  catalog.properties.cache-enabled: false\n"
+                                + "  existing-table.schema-expansion.mode: EXPAND\n"
+                                + "\n"
+                                + "pipeline:\n"
+                                + "  schema.change.behavior: evolve\n"
+                                + "  parallelism: %s",
+                        MYSQL_TEST_USER, MYSQL_TEST_PASSWORD, database, warehouse, parallelism);
+        Path paimonCdcConnector = TestUtils.getResource("paimon-cdc-pipeline-connector.jar");
+        Path hadoopJar = TestUtils.getResource("flink-shade-hadoop.jar");
+        submitPipelineJob(pipelineJob, paimonCdcConnector, hadoopJar);
+
+        // id STRING cannot safely contain the INT pipeline column, so EXPAND must fail the job.
+        waitUntilJobState(EXPANSION_TESTCASE_TIMEOUT, JobStatus.FAILED);
+    }
+
+    /**
+     * The distributed schema coordinator honors CHECK as well: missing columns in the routed Fluss
+     * target table fail the job without touching the target schema.
+     */
+    @Test
+    void testCheckFailsOnMissingColumnInDistributedTopology() throws Exception {
+        String sourceDatabase = "check_source_" + parallelism;
+        String sinkDatabase = "check_sink_" + parallelism;
+        prepareFlussTables(sourceDatabase, sinkDatabase);
+
+        String pipelineJob =
+                String.format(
+                        "source:\n"
+                                + "  type: fluss\n"
+                                + "  bootstrap.servers: coordinator-server:9123\n"
+                                + "  properties.client.security.protocol: sasl\n"
+                                + "  properties.client.security.sasl.mechanism: PLAIN\n"
+                                + "  properties.client.security.sasl.username: developer\n"
+                                + "  properties.client.security.sasl.password: developer-pass\n"
+                                + "  table.discoverer.pattern: %s\\.products\n"
+                                + "  scan.startup.mode: earliest\n"
+                                + "\n"
+                                + "sink:\n"
+                                + "  type: fluss\n"
+                                + "  bootstrap.servers: coordinator-server:9123\n"
+                                + "  properties.client.security.protocol: sasl\n"
+                                + "  properties.client.security.sasl.mechanism: PLAIN\n"
+                                + "  properties.client.security.sasl.username: developer\n"
+                                + "  properties.client.security.sasl.password: developer-pass\n"
+                                + "  existing-table.schema-expansion.mode: CHECK\n"
+                                + "\n"
+                                + "route:\n"
+                                + "  - source-table: %s.products\n"
+                                + "    sink-table: %s.products\n"
+                                + "\n"
+                                + "pipeline:\n"
+                                + "  schema.change.behavior: lenient\n"
+                                + "  parallelism: %s",
+                        sourceDatabase, sourceDatabase, sinkDatabase, parallelism);
+        Path flussCdcConnector = TestUtils.getResource("fluss-cdc-pipeline-connector.jar");
+        submitPipelineJob(pipelineJob, flussCdcConnector);
+
+        // The distributed schema coordinator must fail the job because the routed target table
+        // lacks the description column, leaving the target schema unchanged.
+        waitUntilJobState(EXPANSION_TESTCASE_TIMEOUT, JobStatus.FAILED);
+        Assertions.assertThat(fetchFlussTableColumns(sinkDatabase, "products"))
+                .containsExactly("id", "name");
     }
 
     /** Creates the Paimon target table holding a strict subset of the source columns. */
@@ -337,6 +514,122 @@ class ExistingTableSchemaExpansionE2eITCase extends PipelineTestEnvironment {
                                 + ") WITH ('bucket' = '-1');",
                         warehouse, database, database);
         executePaimonSql(sql, "pre_create_paimon");
+    }
+
+    /** Creates the Paimon target table with every upstream column and matching types. */
+    private void preCreateCompatiblePaimonProductsTable(String warehouse, String database)
+            throws Exception {
+        String sql =
+                String.format(
+                        "CREATE CATALOG paimon_catalog WITH (\n"
+                                + "  'type' = 'paimon',\n"
+                                + "  'warehouse' = '%s'\n"
+                                + ");\n"
+                                + "CREATE DATABASE IF NOT EXISTS paimon_catalog.%s;\n"
+                                + "CREATE TABLE paimon_catalog.%s.products (\n"
+                                + "  id INT NOT NULL,\n"
+                                + "  name STRING,\n"
+                                + "  description STRING,\n"
+                                + "  weight FLOAT,\n"
+                                + "  enum_c STRING,\n"
+                                + "  json_c STRING,\n"
+                                + "  point_c STRING,\n"
+                                + "  PRIMARY KEY (id) NOT ENFORCED\n"
+                                + ") WITH ('bucket' = '-1');",
+                        warehouse, database, database);
+        executePaimonSql(sql, "pre_create_compatible_paimon");
+    }
+
+    /**
+     * Creates the Paimon target table whose key column type cannot safely contain the pipeline
+     * type.
+     */
+    private void preCreateIncompatiblePaimonProductsTable(String warehouse, String database)
+            throws Exception {
+        String sql =
+                String.format(
+                        "CREATE CATALOG paimon_catalog WITH (\n"
+                                + "  'type' = 'paimon',\n"
+                                + "  'warehouse' = '%s'\n"
+                                + ");\n"
+                                + "CREATE DATABASE IF NOT EXISTS paimon_catalog.%s;\n"
+                                + "CREATE TABLE paimon_catalog.%s.products (\n"
+                                + "  id STRING NOT NULL,\n"
+                                + "  name STRING,\n"
+                                + "  PRIMARY KEY (id) NOT ENFORCED\n"
+                                + ") WITH ('bucket' = '-1');",
+                        warehouse, database, database);
+        executePaimonSql(sql, "pre_create_incompatible_paimon");
+    }
+
+    private List<String> fetchPaimonTableColumns(String warehouse, String database, String table)
+            throws Exception {
+        String sql =
+                String.format(
+                        "CREATE CATALOG paimon_catalog WITH (\n"
+                                + "  'type' = 'paimon',\n"
+                                + "  'warehouse' = '%s'\n"
+                                + ");\n"
+                                + "DESCRIBE paimon_catalog.%s.%s;",
+                        warehouse, database, table);
+        String containerSqlPath = sharedVolume.toString() + "/describe_paimon.sql";
+        jobManager.copyFileToContainer(Transferable.of(sql), containerSqlPath);
+        org.testcontainers.containers.Container.ExecResult result =
+                jobManager.execInContainer(
+                        "/opt/flink/bin/sql-client.sh",
+                        "--jar",
+                        sharedVolume.toString() + "/" + getPaimonSQLConnectorResourceName(),
+                        "--jar",
+                        sharedVolume.toString() + "/flink-shade-hadoop.jar",
+                        "-f",
+                        containerSqlPath);
+        if (result.getExitCode() != 0) {
+            throw new RuntimeException(
+                    "Failed to describe Paimon table. Stdout: "
+                            + result.getStdout()
+                            + "; Stderr: "
+                            + result.getStderr());
+        }
+        return extractDescribeColumns(result.getStdout());
+    }
+
+    private List<String> fetchFlussTableColumns(String database, String table) throws Exception {
+        String sql =
+                String.format(
+                        "CREATE CATALOG fluss_catalog WITH (\n"
+                                + "  'type' = 'fluss',\n"
+                                + "  'bootstrap.servers' = 'coordinator-server:9123',\n"
+                                + "  'client.security.protocol' = 'sasl',\n"
+                                + "  'client.security.sasl.mechanism' = 'PLAIN',\n"
+                                + "  'client.security.sasl.username' = 'developer',\n"
+                                + "  'client.security.sasl.password' = 'developer-pass'\n"
+                                + ");\n"
+                                + "DESCRIBE fluss_catalog.%s.%s;",
+                        database, table);
+        String containerSqlPath = sharedVolume.toString() + "/describe_fluss.sql";
+        jobManager.copyFileToContainer(Transferable.of(sql), containerSqlPath);
+        org.testcontainers.containers.Container.ExecResult result =
+                jobManager.execInContainer("/opt/flink/bin/sql-client.sh", "-f", containerSqlPath);
+        if (result.getExitCode() != 0) {
+            throw new RuntimeException(
+                    "Failed to describe Fluss table. Stdout: "
+                            + result.getStdout()
+                            + "; Stderr: "
+                            + result.getStderr());
+        }
+        return extractDescribeColumns(result.getStdout());
+    }
+
+    /** Extracts column names from the tableau output of a DESCRIBE statement. */
+    private static List<String> extractDescribeColumns(String stdout) {
+        return Arrays.stream(stdout.split("\n"))
+                .filter(line -> line.startsWith("|"))
+                .skip(1)
+                .map(ExistingTableSchemaExpansionE2eITCase::extractRow)
+                .filter(row -> row.length > 0)
+                .map(row -> row[0])
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
     }
 
     /**
@@ -374,7 +667,6 @@ class ExistingTableSchemaExpansionE2eITCase extends PipelineTestEnvironment {
                                 + "  (103, 'Three', 'Cecily');",
                         sourceDatabase, sinkDatabase, sourceDatabase, sinkDatabase, sourceDatabase);
         executeFlussSql(sql, "prepare_fluss");
-        waitUntilJobFinished(Duration.ofMinutes(2));
     }
 
     /** Runs a script against the Paimon catalog, whose connector must be passed explicitly. */
@@ -535,6 +827,8 @@ class ExistingTableSchemaExpansionE2eITCase extends PipelineTestEnvironment {
     }
 
     private static List<String> expectedProductsRows() {
+        // EXPAND adds enum_c via derived DDL, which carries the MySQL DEFAULT 'red' into the
+        // Paimon column definition; the sink then applies it to NULL rows.
         return Arrays.asList(
                 "101, One, Alice, 3.202, red, {\"key1\": \"value1\"}, null",
                 "102, Two, Bob, 1.703, white, {\"key2\": \"value2\"}, null",
@@ -545,6 +839,20 @@ class ExistingTableSchemaExpansionE2eITCase extends PipelineTestEnvironment {
                 "107, Seven, Grace, 2.117, red, null, null",
                 "108, Eight, Hesse, 6.819, red, null, null",
                 "109, Nine, IINA, 5.223, red, null, null");
+    }
+
+    private static List<String> expectedProductsRowsWithoutDefaultValue() {
+        // CHECK pre-creates enum_c without a Paimon column default, so NULL rows stay NULL.
+        return Arrays.asList(
+                "101, One, Alice, 3.202, red, {\"key1\": \"value1\"}, null",
+                "102, Two, Bob, 1.703, white, {\"key2\": \"value2\"}, null",
+                "103, Three, Cecily, 4.105, red, {\"key3\": \"value3\"}, null",
+                "104, Four, Derrida, 1.857, white, {\"key4\": \"value4\"}, null",
+                "105, Five, Evelyn, 5.211, red, {\"K\": \"V\", \"k\": \"v\"}, null",
+                "106, Six, Ferris, 9.813, null, null, null",
+                "107, Seven, Grace, 2.117, null, null, null",
+                "108, Eight, Hesse, 6.819, null, null, null",
+                "109, Nine, IINA, 5.223, null, null, null");
     }
 
     private static List<String> expectedCustomersRows() {

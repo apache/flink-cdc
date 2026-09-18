@@ -23,11 +23,13 @@ import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.pipeline.ExistingTableSchemaExpansionMode;
 import org.apache.flink.cdc.common.pipeline.RouteMode;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.route.TableIdRouter;
 import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.common.sink.ExistingTableSchemaExpansionSupport;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.runtime.operators.AbstractStreamOperatorAdapter;
 import org.apache.flink.cdc.runtime.operators.schema.common.ExistingTableSchemaExpander;
@@ -39,6 +41,7 @@ import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.api.operators.Output;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.tasks.StreamTask;
+import org.apache.flink.util.FlinkRuntimeException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,6 +50,7 @@ import java.io.Serializable;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /** The operator will apply create table event and router mapper in batch mode. */
@@ -62,7 +66,7 @@ public class BatchSchemaOperator extends AbstractStreamOperatorAdapter<Event>
     private final List<RouteRule> routingRules;
     private final RouteMode routeMode;
     private final SchemaChangeBehavior schemaChangeBehavior;
-    private final boolean existingTableSchemaExpansionEnabled;
+    private final ExistingTableSchemaExpansionMode existingTableSchemaExpansionMode;
 
     // Transient fields that are set during open()
     private transient volatile Map<TableId, Schema> originalSchemaMap;
@@ -84,7 +88,7 @@ public class BatchSchemaOperator extends AbstractStreamOperatorAdapter<Event>
                 routeMode,
                 metadataApplier,
                 SchemaChangeBehavior.IGNORE,
-                false,
+                ExistingTableSchemaExpansionMode.OFF,
                 timezone);
     }
 
@@ -93,7 +97,7 @@ public class BatchSchemaOperator extends AbstractStreamOperatorAdapter<Event>
             RouteMode routeMode,
             MetadataApplier metadataApplier,
             SchemaChangeBehavior schemaChangeBehavior,
-            boolean existingTableSchemaExpansionEnabled,
+            ExistingTableSchemaExpansionMode existingTableSchemaExpansionMode,
             String timezone) {
         this.chainingStrategy = ChainingStrategy.ALWAYS;
         this.timezone = timezone;
@@ -101,7 +105,7 @@ public class BatchSchemaOperator extends AbstractStreamOperatorAdapter<Event>
         this.routeMode = routeMode;
         this.metadataApplier = metadataApplier;
         this.schemaChangeBehavior = schemaChangeBehavior;
-        this.existingTableSchemaExpansionEnabled = existingTableSchemaExpansionEnabled;
+        this.existingTableSchemaExpansionMode = existingTableSchemaExpansionMode;
     }
 
     @Override
@@ -120,25 +124,46 @@ public class BatchSchemaOperator extends AbstractStreamOperatorAdapter<Event>
         this.router = new TableIdRouter(routingRules, routeMode);
         this.derivator = new SchemaDerivator();
         this.schemaManager = new SchemaManager(SchemaChangeBehavior.IGNORE);
-        if (existingTableSchemaExpansionEnabled) {
+        // TRY_EXPAND/EXPAND never run under IGNORE/EXCEPTION, so skip their initialization there.
+        // CHECK guards the initial table state and initializes regardless of the behavior.
+        if (existingTableSchemaExpansionMode != ExistingTableSchemaExpansionMode.OFF
+                && (existingTableSchemaExpansionMode == ExistingTableSchemaExpansionMode.CHECK
+                        || (schemaChangeBehavior != SchemaChangeBehavior.IGNORE
+                                && schemaChangeBehavior != SchemaChangeBehavior.EXCEPTION))) {
             try {
-                metadataApplier
-                        .getExistingTableSchemaExpansionSupport()
-                        .ifPresentOrElse(
-                                support ->
-                                        this.existingTableSchemaExpander =
-                                                new ExistingTableSchemaExpander(
-                                                        metadataApplier,
-                                                        support,
-                                                        schemaChangeBehavior),
-                                () ->
-                                        LOG.warn(
-                                                "Existing target table schema expansion is enabled, but MetadataApplier {} does not support it. The sink's original schema handling will be used.",
-                                                metadataApplier.getClass().getName()));
+                Optional<ExistingTableSchemaExpansionSupport> supportOptional =
+                        metadataApplier.getExistingTableSchemaExpansionSupport();
+                if (supportOptional.isPresent()) {
+                    this.existingTableSchemaExpander =
+                            new ExistingTableSchemaExpander(
+                                    metadataApplier,
+                                    supportOptional.get(),
+                                    schemaChangeBehavior,
+                                    existingTableSchemaExpansionMode);
+                } else {
+                    String message =
+                            String.format(
+                                    "Existing target table schema expansion is enabled with mode %s, but MetadataApplier %s does not support it.",
+                                    existingTableSchemaExpansionMode,
+                                    metadataApplier.getClass().getName());
+                    if (existingTableSchemaExpansionMode
+                            == ExistingTableSchemaExpansionMode.TRY_EXPAND) {
+                        LOG.warn("{}. The sink's original schema handling will be used.", message);
+                    } else {
+                        throw new FlinkRuntimeException(message);
+                    }
+                }
             } catch (Exception e) {
-                LOG.warn(
-                        "Failed to initialize existing target table schema expansion. The sink's original schema handling will be used.",
-                        e);
+                String message =
+                        String.format(
+                                "Failed to initialize existing target table schema expansion with mode %s.",
+                                existingTableSchemaExpansionMode);
+                if (existingTableSchemaExpansionMode
+                        == ExistingTableSchemaExpansionMode.TRY_EXPAND) {
+                    LOG.warn("{}. The sink's original schema handling will be used.", message, e);
+                } else {
+                    throw new FlinkRuntimeException(message, e);
+                }
             }
         }
     }
@@ -212,12 +237,15 @@ public class BatchSchemaOperator extends AbstractStreamOperatorAdapter<Event>
     }
 
     private boolean applyAndUpdateEvolvedSchemaChange(SchemaChangeEvent schemaChangeEvent) {
+        boolean shouldApplyOriginalCreateTable = true;
+        if (existingTableSchemaExpander != null && schemaChangeEvent instanceof CreateTableEvent) {
+            shouldApplyOriginalCreateTable =
+                    existingTableSchemaExpander.expand((CreateTableEvent) schemaChangeEvent);
+        }
         try {
-            if (existingTableSchemaExpander != null
-                    && schemaChangeEvent instanceof CreateTableEvent) {
-                existingTableSchemaExpander.expand((CreateTableEvent) schemaChangeEvent);
+            if (shouldApplyOriginalCreateTable) {
+                metadataApplier.applySchemaChange(schemaChangeEvent);
             }
-            metadataApplier.applySchemaChange(schemaChangeEvent);
             schemaManager.applyEvolvedSchemaChange(schemaChangeEvent);
             LOG.info(
                     "Successfully applied schema change event {} to external system.",

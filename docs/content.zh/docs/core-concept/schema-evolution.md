@@ -77,15 +77,26 @@ pipeline:
 
 ## 已有目标表的安全 Schema 扩展
 
-在 Sink 中将 `existing-table.schema-expansion.enabled` 设置为 `true` 后，初始 `CreateTableEvent` 遇到已有目标表时，框架会尝试进行安全 Schema 扩展。对于实现了该能力的 Sink，框架可能将缺失的普通非键物理列按 nullable 补充，并安全拓宽普通非键列类型；派生的 DDL 事件会记录在日志中。
+设置 Sink 选项 `existing-table.schema-expansion.mode` 来控制框架在初始 `CreateTableEvent` 遇到已有目标表时的处理方式，默认值为 `OFF`。对于实现了该能力的 Sink，框架可能将缺失的普通非键物理列按 nullable 补充，并安全拓宽普通非键列类型；派生的 DDL 事件会记录在日志中。
 
-该配置默认值为 `false`。关闭它不会关闭 Sink 自身的 Schema 处理逻辑。框架只会派生 `include.schema.changes` 已启用且 Sink 支持的 DDL 类型；不支持、不安全或执行失败的扩展会继续交给 Sink，框架不会因此引入新的 fail-fast。
+| 模式 | 已有目标表 | 目标表不存在 | 失败处理 |
+|---|---|---|---|
+| `OFF` | 不检查、不扩展，保持 Sink 原行为 | Sink 原生建表 | 不适用 |
+| `CHECK` | 只校验每个上游列能否被目标表容纳，不执行任何 DDL | 作业失败，目标表需由外部创建 | 任何不兼容、读取失败或能力缺失都会以聚合错误使作业失败 |
+| `TRY_EXPAND` | 检查并尽力执行安全 DDL，随后读回目标 schema 验证 | Sink 原生建表 | 本机制的失败仅记录日志并交给 Sink 原行为 |
+| `EXPAND` | 检查并执行安全 DDL，随后读回目标 schema 验证 | Sink 原生建表 | 任何不兼容、DDL 不支持、执行或验证失败都会使作业失败 |
+
+`CHECK` 不执行任何 DDL，因此不受 `include.schema.changes` 和 Sink DDL 能力的影响。它守护初始表状态，**不受 `schema.change.behavior` 控制**（包括 `IGNORE` 和 `EXCEPTION` 也会执行检查）；`TRY_EXPAND` 和 `EXPAND` 在 `schema.change.behavior` 为 `IGNORE` 或 `EXCEPTION` 时跳过框架侧初始处理。注意：`CHECK` 只约束已有目标表的初始处理，后续源端 Schema 变更仍由 `schema.change.behavior` 控制，因此它不是全作业级别的“永不执行 DDL”开关。检查失败时，聚合错误会列出每处差异（表、列、上游类型与目标类型），并附建议的 `ALTER TABLE` 修复语句，可按目标系统方言调整后人工执行。
+
+`TRY_EXPAND` 只吞掉本机制自身的失败：它既不屏蔽 Sink 自身 Schema 处理抛出的错误，也不保证扩展失败后所有上游列都能落入目标表。
 
 ```yaml
 sink:
   type: paimon
-  existing-table.schema-expansion.enabled: true
+  existing-table.schema-expansion.mode: "EXPAND"
 ```
+
+> 注意：`existing-table.schema-expansion.enabled` 已不再支持。请改用 `existing-table.schema-expansion.mode`，取值为 `OFF`、`CHECK`、`TRY_EXPAND`、`EXPAND`；原 `enabled: true` 等价于 `TRY_EXPAND`。建议给模式值加引号，避免裸写 `OFF` 被 YAML 解析为布尔值。
 
 ## 按类型配置行为
 
