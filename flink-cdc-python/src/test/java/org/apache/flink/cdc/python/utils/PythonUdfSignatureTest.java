@@ -21,6 +21,15 @@ import org.apache.flink.cdc.common.types.DataTypes;
 
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import pemja.core.PythonInterpreterConfig;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -31,6 +40,51 @@ class PythonUdfSignatureTest {
     @BeforeAll
     static void requirePemja() {
         PemjaTestSupport.requirePemja();
+    }
+
+    @Test
+    void usesSubInterpreterForSignatureParsing() {
+        assertThat(
+                        PythonUdfSignature.createInterpreterConfig(PemjaTestSupport.PYTHON_EXEC)
+                                .getExecType())
+                .isEqualTo(PythonInterpreterConfig.ExecType.SUB_INTERPRETER);
+    }
+
+    @Test
+    void resolvesLargeSourcesConcurrently() throws Exception {
+        int threadCount = 2;
+        int rounds = 8;
+        String source =
+                "PADDING = '"
+                        + "x".repeat(256 * 1024)
+                        + "'\n"
+                        + "def eval(value: bytes) -> bytes:\n"
+                        + "    return value\n";
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        CyclicBarrier barrier = new CyclicBarrier(threadCount);
+        List<Future<?>> futures = new ArrayList<>();
+        try {
+            for (int thread = 0; thread < threadCount; thread++) {
+                futures.add(
+                        executor.submit(
+                                () -> {
+                                    barrier.await();
+                                    for (int round = 0; round < rounds; round++) {
+                                        assertThat(
+                                                        PythonUdfSignature.parseReturnType(
+                                                                source,
+                                                                PemjaTestSupport.PYTHON_EXEC))
+                                                .isEqualTo(DataTypes.BYTES());
+                                    }
+                                    return null;
+                                }));
+            }
+            for (Future<?> future : futures) {
+                future.get(30, TimeUnit.SECONDS);
+            }
+        } finally {
+            executor.shutdownNow();
+        }
     }
 
     @Test
