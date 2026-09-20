@@ -237,7 +237,7 @@ public class SqlServerSourceBuilder<T> {
 
     /**
      * Whether to release the finished snapshot split metadata from the coordinator after entering
-     * the stream phase, to reduce JobManager memory pressure (FLINK-39775).
+     * the stream phase, to reduce JobManager memory pressure (FLINK-40697).
      */
     public SqlServerSourceBuilder<T> releaseSnapshotMetadataEnabled(
             boolean releaseSnapshotMetadataEnabled) {

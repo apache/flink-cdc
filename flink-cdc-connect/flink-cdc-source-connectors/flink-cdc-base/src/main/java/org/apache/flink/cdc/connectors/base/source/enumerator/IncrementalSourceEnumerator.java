@@ -86,7 +86,7 @@ public class IncrementalSourceEnumerator
     @Nullable protected Integer streamSplitTaskId = null;
     private boolean isStreamSplitUpdateRequestAlreadySent = false;
 
-    // Snapshot-metadata release state (FLINK-39775). The reader reports the metadata assembled; the
+    // Snapshot-metadata release state (FLINK-40697). The reader reports the metadata assembled; the
     // release is armed at the next checkpoint and performed once it completes. The generation is
     // bumped on every stream-reader reset so a stale assembled report cannot arm a premature
     // release.
@@ -259,10 +259,18 @@ public class IncrementalSourceEnumerator
 
     /** Releases the snapshot metadata once the checkpoint that armed it has completed. */
     private void maybeReleaseSnapshotMeta(long checkpointId) {
-        if (releaseCheckpointId != null
-                && checkpointId >= releaseCheckpointId
-                && !splitAssigner.isSnapshotMetaReleased()) {
-            splitAssigner.releaseSnapshotMetadata();
+        if (releaseCheckpointId == null || checkpointId < releaseCheckpointId) {
+            return;
+        }
+        // Fire at most once per arming. Clearing the armed checkpoint also keeps a stream-only
+        // job, whose assigner holds no snapshot metadata to drop, from re-entering this on every
+        // later checkpoint.
+        releaseCheckpointId = null;
+        if (splitAssigner.isSnapshotMetaReleased()) {
+            return;
+        }
+        splitAssigner.releaseSnapshotMetadata();
+        if (splitAssigner.isSnapshotMetaReleased()) {
             // drop the enumerator's own copy of the finished-split metadata; a post-release meta
             // request is ignored in sendStreamMetaRequestEvent.
             finishedSnapshotSplitMeta = null;

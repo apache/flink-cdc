@@ -287,7 +287,7 @@ pipeline:
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>
       <td>Boolean</td>
-      <td>是否在进入 binlog 阶段后，释放 source coordinator 持有的快照分片元数据，以降低 JobManager 内存占用。与 scan.newly-added-table.enabled 不兼容（同时开启两者会导致作业启动失败）；默认关闭。仅在成功完成一次 checkpoint 后才会释放；若未开启 checkpoint 或没有 checkpoint 完成，则会保留该元数据，因此该配置项在未开启 checkpoint 时不生效。</td>
+      <td>是否在进入 binlog 阶段后，释放 source coordinator 持有的快照分片元数据，以降低 JobManager 内存占用。与 scan.newly-added-table.enabled 不兼容（同时开启两者会导致作业启动失败）；默认关闭。仅在成功完成一次 checkpoint 后才会释放；若未开启 checkpoint 或没有 checkpoint 完成，则会保留该元数据，因此该配置项在未开启 checkpoint 时不生效。开启该配置项后生成的 checkpoint 或 savepoint，无法在降级到 Flink CDC 3.6.0 及更早版本后用于恢复作业。</td>
     </tr>
     <tr>
       <td>scan.binlog.newly-added-table.enabled</td>

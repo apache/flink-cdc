@@ -94,7 +94,7 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
     private final Map<String, Long> splitFinishedCheckpointIds;
     private static final long UNDEFINED_CHECKPOINT_ID = -1;
 
-    /** Whether the bulk snapshot split metadata has been released (FLINK-39775). */
+    /** Whether the bulk snapshot split metadata has been released (FLINK-40697). */
     private boolean snapshotMetaReleased = false;
 
     private final Object lock = new Object();

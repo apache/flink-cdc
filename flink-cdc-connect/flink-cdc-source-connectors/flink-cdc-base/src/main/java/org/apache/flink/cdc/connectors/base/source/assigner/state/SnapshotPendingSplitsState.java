@@ -81,9 +81,8 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
     private final ChunkSplitterState chunkSplitterState;
 
     /**
-     * Whether the bulk snapshot split metadata has been released from the coordinator (FLINK-39775
-     * generalized to the incremental source framework). After release the metadata maps are empty
-     * (a "light" state).
+     * Whether the bulk snapshot split metadata has been released from the coordinator (FLINK-40697,
+     * generalizing FLINK-39775). After release the metadata maps are empty (a "light" state).
      */
     private final boolean snapshotMetaReleased;
 

@@ -49,7 +49,7 @@ public class StreamSplitMetaEvent implements SourceEvent {
     private final int totalFinishedSplitSize;
 
     /**
-     * Generation of the stream-split assignment these meta groups belong to (FLINK-39775). The
+     * Generation of the stream-split assignment these meta groups belong to (FLINK-40697). The
      * reader echoes it back in {@link StreamSplitMetaAssembledEvent} so the coordinator can reject
      * a stale assembled report from a failed reader attempt.
      */

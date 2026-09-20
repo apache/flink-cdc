@@ -54,7 +54,7 @@ import static org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplit
  * <p>The modification of 8th version: add ChunkSplitterState to SnapshotPendingSplitsState, which
  * contains the asynchronously splitting chunk info.
  *
- * <p>The modification of 9th version (FLINK-39775): add snapshotMetaReleased(boolean) to
+ * <p>The modification of 9th version (FLINK-40697): add snapshotMetaReleased(boolean) to
  * SnapshotPendingSplitsState. Version 9 is written only when
  * scan.incremental.snapshot.metadata.release.enabled is set, so a job that leaves the option off
  * keeps writing version 8 and stays restorable by an older connector build.
@@ -210,7 +210,7 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
             out.writeInt(chunkSplitterState.getNextChunkId());
         }
 
-        // v9 (FLINK-39775): the released flag is written only when metadata release is enabled (see
+        // v9 (FLINK-40697): the released flag is written only when metadata release is enabled (see
         // class javadoc).
         if (releaseSnapshotMetadataEnabled) {
             out.writeBoolean(state.isSnapshotMetaReleased());
@@ -348,7 +348,7 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
             }
         }
 
-        // v9 (FLINK-39775): older versions never released, so the flag defaults to false.
+        // v9 (FLINK-40697): older versions never released, so the flag defaults to false.
         boolean snapshotMetaReleased = false;
         if (version >= 9) {
             snapshotMetaReleased = in.readBoolean();

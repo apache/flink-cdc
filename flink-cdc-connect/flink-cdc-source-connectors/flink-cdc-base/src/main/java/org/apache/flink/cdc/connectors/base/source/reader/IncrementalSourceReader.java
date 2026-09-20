@@ -99,8 +99,10 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
     /**
      * The stream-split assignment generation served by the coordinator, echoed back in the {@link
      * StreamSplitMetaAssembledEvent} so the coordinator can ignore a stale report from a
-     * failed-over assignment. Defaults to the inline sentinel, which the coordinator always accepts
-     * (an inline split never requests meta groups).
+     * failed-over assignment. Defaults to {@code COMPLETE_WITHOUT_META_GENERATION}, which the
+     * coordinator always accepts. That default still applies when a reader never requests meta
+     * groups, which covers a split restored already assembled and one that carries its metadata
+     * inline.
      */
     private int streamSplitMetaAssignmentGeneration =
             StreamSplitMetaAssembledEvent.COMPLETE_WITHOUT_META_GENERATION;
@@ -322,9 +324,12 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
                             discoverTableSchemasForStreamSplit(
                                     streamSplit, checkNewlyAddedTableSchema);
                     unfinishedSplits.add(streamSplit);
-                    // The stream split arrived already complete (a restored assembled split or an
-                    // inline split). Report it assembled so the coordinator can (re-)arm the
-                    // release. It never requested meta groups, so it carries the inline sentinel.
+                    // The split is complete: it either arrived assembled (restored from a
+                    // checkpoint, or small enough to carry its metadata inline), was handed back
+                    // here after the newly-added-table process, or group fetch just finished
+                    // assembling it. Report it so the coordinator can (re-)arm the release. The
+                    // generation is the one the coordinator served the meta groups under, or
+                    // COMPLETE_WITHOUT_META_GENERATION when this reader never requested any.
                     context.sendSourceEventToCoordinator(
                             new StreamSplitMetaAssembledEvent(
                                     streamSplit.splitId(),
@@ -500,15 +505,8 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
             context.sendSourceEventToCoordinator(splitMetaRequestEvent);
         } else {
             LOG.info("The meta of stream split {} has been collected success", splitId);
+            // addSplits reports the assembled metadata to the coordinator.
             this.addSplits(Collections.singletonList(streamSplit));
-            // Report the stream-split metadata assembled so the coordinator can release what it no
-            // longer needs to serve. Carries the assignment generation so a stale report from a
-            // failed attempt is ignored.
-            context.sendSourceEventToCoordinator(
-                    new StreamSplitMetaAssembledEvent(
-                            splitId,
-                            streamSplit.getTotalFinishedSplitSize(),
-                            streamSplitMetaAssignmentGeneration));
         }
     }
 
