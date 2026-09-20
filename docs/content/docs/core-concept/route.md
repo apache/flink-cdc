@@ -131,3 +131,76 @@ As a result, such table will be routed to downstream table `sink_db_foo.sink_tab
 Standard RegExp capturing could not be used with `replace-symbol` options.
 
 {{< /hint >}}
+
+# Compatibility Notes — Multi-Character Capturing Groups
+
+When a `source-table` rule uses a capturing group that can match more than one character — for
+example `new_db_6.table_([1-9]|1[0-6])`, which captures both single- and two-digit numeric
+suffixes — the routing behavior differs between Flink CDC 3.6.0 and 3.7.0. This section
+illustrates the behavior change and points out which existing pipelines may need to be reviewed
+before upgrading.
+
+## Behavior in Flink CDC 3.6.0
+
+In Flink CDC 3.6.0, a source-table regex with a multi-character capturing group could be
+matched against only a *prefix* of the source table id. The unmatched tail of the source table
+id would then be appended to the sink-table template, producing incorrect sink names.
+
+## Behavior in Flink CDC 3.7.0
+
+Starting with Flink CDC 3.7.0, the source-table regex must consume the entire source table id,
+and every capturing group — including multi-character ones — is captured in full. The table below
+shows side-by-side what the same configuration routes to in 3.6.0 versus 3.7.0.
+
+| Source table id       | source-table                              | sink-table                          | Routed to in 3.6.0                          | Routed to in 3.7.0                  |
+|-----------------------|-------------------------------------------|-------------------------------------|---------------------------------------------|-------------------------------------|
+| `new_db_6.table_1`    | `new_db_6.table_([1-9]|1[0-6])`           | `new_db_6.table_$1_suffix`          | `new_db_6.table_1_suffix`                   | `new_db_6.table_1_suffix`           |
+| `new_db_6.table_13`   | `new_db_6.table_([1-9]|1[0-6])`           | `new_db_6.table_$1_suffix`          | `new_db_6.table_1_suffix3`                  | `new_db_6.table_13_suffix`          |
+| `new_db_6.table_17`   | `new_db_6.table_([1-9]|1[0-6])`           | `new_db_6.table_$1_suffix`          | `new_db_6.table_1_suffix7`                  | `new_db_6.table_17` (no match)      |
+| `new_db_6.table_13`   | `new_db_6.table_([1-9]|1[0-6])`           | `new_db_6.table_merged`             | `new_db_6.table_merged3`                    | `new_db_6.table_merged`             |
+| `new_db_6.table_14`   | `new_db_6.table_([1-9]|1[0-6])`           | `new_db_6.table_merged`             | `new_db_6.table_merged4`                    | `new_db_6.table_merged`             |
+
+Reading the table:
+
+- The first row shows a single-digit source (`table_1`) where the two versions happen to agree,
+  because there is no leftover tail to leak into the sink-table name.
+- The second and third rows show the `$N`-back-reference case: in 3.6.0 the captured value is
+  truncated to the first matched digit (`1`) and the trailing characters are concatenated after
+  the `_suffix` literal; in 3.7.0 the full multi-digit value is captured, and (for `table_17`)
+  the source-table id is not routed at all when the regex does not match the whole id.
+- The fourth and fifth rows show the no-back-reference case: in 3.6.0 each matched source is
+  suffixed by its own unmatched tail (`merged3`, `merged4`, ...), effectively producing one
+  sink-table per source table; in 3.7.0 all matched sources collapse onto the single declared
+  sink-table.
+
+## Compatibility Impact on Existing Pipelines
+
+The change only affects pipelines whose `source-table` rule contains a capturing group that can
+match more than one character (for example `([1-9]|1[0-6])`, `(db_[0-9]+)`, `(\w{2,4})`, etc.).
+Rules that use only single-character capturing groups, literal table names, or the
+`replace-symbol` option are unaffected.
+
+For pipelines that *are* affected, two kinds of behavior change may be observed when upgrading
+from 3.6.0 to 3.7.0:
+
+- **Previously (mis-)routed sources land on a different sink-table id.**
+  - *With a `$N` back-reference:* the captured value becomes the full multi-character substring
+    instead of the truncated one (for example `..._table_13_suffix` instead of the old
+    `..._table_1_suffix3`).
+  - *Without a `$N` back-reference:* every previously-matched source is now routed to the single
+    declared sink-table (for example `new_db_6.table_merged` instead of
+    `new_db_6.table_merged3`).
+
+  Either way, downstream tables that were created under the old (incorrect) name are no longer
+  the target of the pipeline. Reviewers should decide whether to rename the affected downstream
+  tables or to migrate the existing data into the new (correct) sink tables.
+
+- **Source tables that previously matched the rule only partially are no longer routed.** They
+  fall through to the default no-route behavior and keep their original source table id. This
+  is normally the desired behavior, but if any pipeline relied on the 3.6.0 partial-matching
+  misrouting, that pipeline needs to be updated explicitly.
+
+In short, before upgrading, audit your route rules for any `source-table` regex that contains a
+multi-character capturing group, confirm that the rule's matching set is exactly what you
+intend, and — if any pipeline previously depended on the 3.6.0 misrouting — decide whether to
+rename the affected downstream tables or to migrate the data into the new (correct) sink tables.
