@@ -132,7 +132,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                                 + "  transform.async-execution.timeout: 1m\n"
                                 + "  transform.async-execution.capacity: 16\n"
                                 + "  transform.async-execution.worker-threads: 4\n"
-                                + "  parallelism: 1\n"
+                                + "  parallelism: %d\n"
                                 + "  user-defined-function:\n"
                                 + "    - name: throttle\n"
                                 + "      classpath: org.apache.flink.cdc.udf.examples.java.SkewedThrottlerFunctionClass\n",
@@ -142,12 +142,13 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                         databaseName,
                         databaseName,
                         slowRecordId,
-                        slowRecordDelaySeconds);
+                        slowRecordDelaySeconds,
+                        parallelism);
         Path udfJar = TestUtils.getResource("udf-examples.jar");
 
         JobID jobId = submitPipelineJob(pipelineJob, udfJar);
-        waitUntilJobRunning(Duration.ofSeconds(30));
-        waitUntilStreamSplitReady(jobId, 1);
+        waitUntilJobRunning(jobId, Duration.ofSeconds(30));
+        waitUntilStreamSplitReady(jobId, parallelism);
 
         String mysqlJdbcUrl =
                 String.format(
@@ -160,31 +161,48 @@ class TransformE2eITCase extends PipelineTestEnvironment {
         waitUntilEventAppearsBeforeAnother(
                 incrementalOutputOffset,
                 ASYNC_RESTORE_TIMEOUT,
-                "SkewedThrottlerFunctionClass finished " + lastRecordId,
+                "SkewedThrottlerFunctionClass finished " + (slowRecordId + 1),
                 "SkewedThrottlerFunctionClass finished " + slowRecordId);
 
         String savepointPath = stopJobWithSavepoint(jobId);
-        waitUntilSpecificEventsAfter(
-                incrementalOutputOffset,
-                ASYNC_RESTORE_TIMEOUT,
-                tableAlphaInsertEvent(databaseName, slowRecordId),
-                tableAlphaInsertEvent(databaseName, lastRecordId));
+        if (parallelism == 1) {
+            waitUntilSpecificEventsAfter(
+                    incrementalOutputOffset,
+                    ASYNC_RESTORE_TIMEOUT,
+                    tableAlphaInsertEvent(databaseName, slowRecordId),
+                    tableAlphaInsertEvent(databaseName, lastRecordId));
+        } else {
+            waitUntilEventsAfter(
+                    incrementalOutputOffset,
+                    ASYNC_RESTORE_TIMEOUT,
+                    tableAlphaInsertEvent(databaseName, slowRecordId),
+                    tableAlphaInsertEvent(databaseName, lastRecordId));
+        }
 
         int restoredOutputOffset = taskManagerConsumer.toUtf8String().length();
         JobID restoredJobId = submitPipelineJob(pipelineJob, savepointPath, false, udfJar);
-        waitUntilJobRunning(Duration.ofSeconds(30));
+        waitUntilJobRunning(restoredJobId, Duration.ofSeconds(30));
 
         insertTableAlphaRows(mysqlJdbcUrl, 5000, 5001);
         String restoredCreateTableEvent =
                 String.format(
                         "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`PRICEALPHA` INT,`AGEALPHA` INT,`NAMEALPHA` VARCHAR(128),`REGION` VARCHAR(17),`THROTTLED` STRING}, primaryKeys=ID, options=()}",
                         databaseName);
-        waitUntilSpecificEventsAfter(
-                restoredOutputOffset,
-                ASYNC_RESTORE_TIMEOUT,
-                restoredCreateTableEvent,
-                tableAlphaInsertEvent(databaseName, 5000),
-                tableAlphaInsertEvent(databaseName, 5001));
+        if (parallelism == 1) {
+            waitUntilSpecificEventsAfter(
+                    restoredOutputOffset,
+                    ASYNC_RESTORE_TIMEOUT,
+                    restoredCreateTableEvent,
+                    tableAlphaInsertEvent(databaseName, 5000),
+                    tableAlphaInsertEvent(databaseName, 5001));
+        } else {
+            waitUntilEventsAfter(
+                    restoredOutputOffset,
+                    ASYNC_RESTORE_TIMEOUT,
+                    restoredCreateTableEvent,
+                    tableAlphaInsertEvent(databaseName, 5000),
+                    tableAlphaInsertEvent(databaseName, 5001));
+        }
 
         String restoredOutput =
                 taskManagerConsumer
@@ -193,7 +211,11 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                                 Math.min(
                                         restoredOutputOffset,
                                         taskManagerConsumer.toUtf8String().length()));
-        assertThat(restoredOutput).containsOnlyOnce(restoredCreateTableEvent);
+        if (parallelism == 1) {
+            assertThat(restoredOutput).containsOnlyOnce(restoredCreateTableEvent);
+        } else {
+            assertThat(restoredOutput).contains(restoredCreateTableEvent);
+        }
         for (int id = slowRecordId; id <= lastRecordId; id++) {
             assertThat(restoredOutput).doesNotContain(tableAlphaInsertEvent(databaseName, id));
         }
@@ -1488,6 +1510,33 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                     break;
                 }
                 searchOffset = eventOffset + event.length();
+            }
+            if (matched) {
+                return;
+            }
+            Thread.sleep(1000L);
+        }
+        throw new TimeoutException(
+                "Failed to get events after offset "
+                        + offset
+                        + ": "
+                        + Arrays.toString(events)
+                        + " from stdout: "
+                        + taskManagerConsumer.toUtf8String());
+    }
+
+    private void waitUntilEventsAfter(int offset, Duration timeout, String... events)
+            throws Exception {
+        long deadline = System.currentTimeMillis() + timeout.toMillis();
+        while (System.currentTimeMillis() < deadline) {
+            String stdout = taskManagerConsumer.toUtf8String();
+            int searchOffset = Math.min(offset, stdout.length());
+            boolean matched = true;
+            for (String event : events) {
+                if (stdout.indexOf(event, searchOffset) < 0) {
+                    matched = false;
+                    break;
+                }
             }
             if (matched) {
                 return;

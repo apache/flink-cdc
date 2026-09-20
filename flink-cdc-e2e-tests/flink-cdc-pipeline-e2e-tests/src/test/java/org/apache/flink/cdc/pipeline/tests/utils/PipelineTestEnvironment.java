@@ -446,6 +446,10 @@ public abstract class PipelineTestEnvironment extends TestLogger {
         waitUntilJobState(timeout, JobStatus.RUNNING);
     }
 
+    public void waitUntilJobRunning(JobID jobID, Duration timeout) {
+        waitUntilJobState(jobID, timeout, JobStatus.RUNNING);
+    }
+
     public void waitUntilJobFinished(Duration timeout) {
         waitUntilJobState(timeout, JobStatus.FINISHED);
     }
@@ -473,6 +477,38 @@ public abstract class PipelineTestEnvironment extends TestLogger {
                                     message.getJobState()));
                 } else if (jobStatus == expectedStatus) {
                     return;
+                }
+            }
+        }
+    }
+
+    public void waitUntilJobState(JobID jobID, Duration timeout, JobStatus expectedStatus) {
+        RestClusterClient<?> clusterClient = getRestClusterClient();
+        Deadline deadline = Deadline.fromNow(timeout);
+        while (deadline.hasTimeLeft()) {
+            Collection<JobStatusMessage> jobStatusMessages;
+            try {
+                jobStatusMessages = clusterClient.listJobs().get(10, TimeUnit.SECONDS);
+            } catch (Exception e) {
+                LOG.warn("Error when fetching job status.", e);
+                continue;
+            }
+            if (jobStatusMessages != null && !jobStatusMessages.isEmpty()) {
+                for (JobStatusMessage message : jobStatusMessages) {
+                    if (!jobID.equals(message.getJobId())) {
+                        continue;
+                    }
+                    JobStatus jobStatus = message.getJobState();
+                    if (!expectedStatus.isTerminalState() && jobStatus.isTerminalState()) {
+                        throw new ValidationException(
+                                String.format(
+                                        "Job has been terminated! JobName: %s, JobID: %s, Status: %s",
+                                        message.getJobName(),
+                                        message.getJobId(),
+                                        message.getJobState()));
+                    } else if (jobStatus == expectedStatus) {
+                        return;
+                    }
                 }
             }
         }
