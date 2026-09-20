@@ -17,7 +17,6 @@
 
 package org.apache.flink.cdc.pipeline.tests.stage2;
 
-import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.cdc.common.test.utils.TestUtils;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
@@ -209,10 +208,8 @@ class ExistingTableSchemaExpansionE2eITCase extends PipelineTestEnvironment {
                         MYSQL_TEST_USER, MYSQL_TEST_PASSWORD, database, warehouse, parallelism);
         Path paimonCdcConnector = TestUtils.getResource("paimon-cdc-pipeline-connector.jar");
         Path hadoopJar = TestUtils.getResource("flink-shade-hadoop.jar");
-        JobID jobId = submitPipelineJob(pipelineJob, paimonCdcConnector, hadoopJar);
+        submitPipelineJob(pipelineJob, paimonCdcConnector, hadoopJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
-        // Ensure the initial snapshot is complete and committed before querying Paimon.
-        waitUntilStreamSplitReady(jobId, parallelism);
         LOG.info("Pipeline job is running");
 
         // `products` existed with (id, name) only, the remaining columns come from the expander.
@@ -670,19 +667,6 @@ class ExistingTableSchemaExpansionE2eITCase extends PipelineTestEnvironment {
                                 + "  (103, 'Three', 'Cecily');",
                         sourceDatabase, sinkDatabase, sourceDatabase, sinkDatabase, sourceDatabase);
         executeFlussSql(sql, "prepare_fluss");
-        // The batch insert job may finish before Fluss makes the rows visible to new readers.
-        // Poll the source table until the 3 seed rows are actually readable.
-        long deadline = System.currentTimeMillis() + Duration.ofMinutes(2).toMillis();
-        while (System.currentTimeMillis() < deadline) {
-            try {
-                if (fetchFlussTableRows(sourceDatabase, "products", 3).size() == 3) {
-                    return;
-                }
-            } catch (Exception ignored) {
-            }
-            Thread.sleep(1000L);
-        }
-        throw new IllegalStateException("Source Fluss table was not populated within 2 minutes");
     }
 
     /** Runs a script against the Paimon catalog, whose connector must be passed explicitly. */
