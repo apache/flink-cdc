@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.base.source.enumerator;
 
+import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.connector.source.Boundedness;
 import org.apache.flink.api.connector.source.SourceEvent;
 import org.apache.flink.api.connector.source.SplitEnumerator;
@@ -269,6 +270,11 @@ public class IncrementalSourceEnumerator
                     "Released snapshot split metadata from the coordinator at checkpoint {}.",
                     checkpointId);
         }
+    }
+
+    @VisibleForTesting
+    List<List<FinishedSnapshotSplitInfo>> getFinishedSnapshotSplitMeta() {
+        return finishedSnapshotSplitMeta;
     }
 
     // ------------------------------------------------------------------------------------------

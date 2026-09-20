@@ -81,7 +81,7 @@ class IncrementalSourceEnumeratorReleaseTest {
             // and builds its finishedSnapshotSplitMeta cache.
             enumerator.handleSourceEvent(0, new StreamSplitMetaRequestEvent(STREAM_SPLIT_ID, 0, 2));
             assertThat(sentEventsTo(context, 0)).anyMatch(e -> e instanceof StreamSplitMetaEvent);
-            assertThat(finishedSnapshotSplitMeta(enumerator)).isNotNull();
+            assertThat(enumerator.getFinishedSnapshotSplitMeta()).isNotNull();
 
             // 2) The reader reports the metadata fully assembled, but the release must NOT fire yet
             // (no checkpoint has covered the assembled split).
@@ -97,7 +97,7 @@ class IncrementalSourceEnumeratorReleaseTest {
             assertThat(assigner.releaseCalls).isEqualTo(1);
 
             // 4) The enumerator-side metadata cache was cleared too (memory reclaimed).
-            assertThat(finishedSnapshotSplitMeta(enumerator)).isNull();
+            assertThat(enumerator.getFinishedSnapshotSplitMeta()).isNull();
 
             // 5) A stale metadata request after release is ignored gracefully: no exception, and no
             // further metadata is sent to the reader.
@@ -135,7 +135,7 @@ class IncrementalSourceEnumeratorReleaseTest {
             enumerator.notifyCheckpointComplete(100L);
 
             assertThat(assigner.released).isFalse();
-            assertThat(finishedSnapshotSplitMeta(enumerator)).isNotNull();
+            assertThat(enumerator.getFinishedSnapshotSplitMeta()).isNotNull();
         }
     }
 
@@ -249,16 +249,8 @@ class IncrementalSourceEnumeratorReleaseTest {
             enumerator.snapshotState(100L);
             enumerator.notifyCheckpointComplete(100L);
             assertThat(assigner.released).isFalse();
-            assertThat(finishedSnapshotSplitMeta(enumerator)).isNotNull();
+            assertThat(enumerator.getFinishedSnapshotSplitMeta()).isNotNull();
         }
-    }
-
-    private static Object finishedSnapshotSplitMeta(IncrementalSourceEnumerator enumerator)
-            throws Exception {
-        java.lang.reflect.Field field =
-                IncrementalSourceEnumerator.class.getDeclaredField("finishedSnapshotSplitMeta");
-        field.setAccessible(true);
-        return field.get(enumerator);
     }
 
     @SuppressWarnings("unchecked")
