@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.pipeline.tests.stage2;
 
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.cdc.common.test.utils.TestUtils;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
@@ -208,8 +209,10 @@ class ExistingTableSchemaExpansionE2eITCase extends PipelineTestEnvironment {
                         MYSQL_TEST_USER, MYSQL_TEST_PASSWORD, database, warehouse, parallelism);
         Path paimonCdcConnector = TestUtils.getResource("paimon-cdc-pipeline-connector.jar");
         Path hadoopJar = TestUtils.getResource("flink-shade-hadoop.jar");
-        submitPipelineJob(pipelineJob, paimonCdcConnector, hadoopJar);
+        JobID jobId = submitPipelineJob(pipelineJob, paimonCdcConnector, hadoopJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
+        // Ensure the initial snapshot is complete and committed before querying Paimon.
+        waitUntilStreamSplitReady(jobId, parallelism);
         LOG.info("Pipeline job is running");
 
         // `products` existed with (id, name) only, the remaining columns come from the expander.
