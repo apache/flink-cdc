@@ -154,11 +154,14 @@ public class PaimonMetadataApplier implements MetadataApplier {
             Schema schema = event.getSchema();
             org.apache.paimon.schema.Schema.Builder builder =
                     new org.apache.paimon.schema.Schema.Builder();
+            Map<String, String> fullTableOptions = new HashMap<>(tableOptions);
+            fullTableOptions.putAll(schema.options());
+            Map<String, String> effectiveTableOptions = filterBlobOptions(schema, fullTableOptions);
             schema.getColumns()
                     .forEach(
                             (column) -> {
                                 org.apache.paimon.types.DataType dataType =
-                                        convertToBlobIfNeeded(column, tableOptions);
+                                        convertToBlobIfNeeded(column, effectiveTableOptions);
                                 builder.column(column.getName(), dataType, column.getComment());
                             });
             List<String> partitionKeys = new ArrayList<>();
@@ -176,8 +179,7 @@ public class PaimonMetadataApplier implements MetadataApplier {
             builder.partitionKeys(partitionKeys)
                     .primaryKey(primaryKeys)
                     .comment(schema.comment())
-                    .options(tableOptions)
-                    .options(schema.options());
+                    .options(effectiveTableOptions);
             catalog.createTable(tableIdToIdentifier(event), builder.build(), true);
         } catch (Catalog.TableAlreadyExistException
                 | Catalog.DatabaseNotExistException
@@ -402,6 +404,36 @@ public class PaimonMetadataApplier implements MetadataApplier {
         }
 
         return dataType;
+    }
+
+    private Map<String, String> filterBlobOptions(
+            Schema schema, Map<String, String> fullTableOptions) {
+        Map<String, String> effectiveTableOptions = new HashMap<>(fullTableOptions);
+
+        List<String> blobFields = new ArrayList<>(CoreOptions.blobField(fullTableOptions));
+        blobFields.removeIf(
+                field ->
+                        !schema.getColumn(field)
+                                .map(Column::getType)
+                                .map(this::isSupportedTypeForBlob)
+                                .orElse(false));
+        if (blobFields.isEmpty()) {
+            effectiveTableOptions.remove(CoreOptions.BLOB_FIELD.key());
+        } else {
+            effectiveTableOptions.put(CoreOptions.BLOB_FIELD.key(), String.join(",", blobFields));
+        }
+
+        List<String> blobDescriptorFields =
+                new ArrayList<>(CoreOptions.fromMap(fullTableOptions).blobDescriptorField());
+        blobDescriptorFields.retainAll(blobFields);
+        if (blobDescriptorFields.isEmpty()) {
+            effectiveTableOptions.remove(CoreOptions.BLOB_DESCRIPTOR_FIELD.key());
+        } else {
+            effectiveTableOptions.put(
+                    CoreOptions.BLOB_DESCRIPTOR_FIELD.key(),
+                    String.join(",", blobDescriptorFields));
+        }
+        return effectiveTableOptions;
     }
 
     /** Check if DataType can be converted to BLOB (BINARY, VARBINARY, CHAR or VARCHAR). */
