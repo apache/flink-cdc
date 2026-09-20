@@ -670,6 +670,9 @@ class ExistingTableSchemaExpansionE2eITCase extends PipelineTestEnvironment {
                                 + "  (103, 'Three', 'Cecily');",
                         sourceDatabase, sinkDatabase, sourceDatabase, sinkDatabase, sourceDatabase);
         executeFlussSql(sql, "prepare_fluss");
+        // The SQL client submits the batch insert asynchronously, so wait until the source rows
+        // are committed before starting the CDC pipeline.
+        waitUntilJobFinished(Duration.ofMinutes(2));
     }
 
     /** Runs a script against the Paimon catalog, whose connector must be passed explicitly. */
