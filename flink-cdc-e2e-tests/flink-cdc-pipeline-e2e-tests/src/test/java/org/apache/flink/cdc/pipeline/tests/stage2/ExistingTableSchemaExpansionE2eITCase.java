@@ -670,9 +670,19 @@ class ExistingTableSchemaExpansionE2eITCase extends PipelineTestEnvironment {
                                 + "  (103, 'Three', 'Cecily');",
                         sourceDatabase, sinkDatabase, sourceDatabase, sinkDatabase, sourceDatabase);
         executeFlussSql(sql, "prepare_fluss");
-        // The SQL client submits the batch insert asynchronously, so wait until the source rows
-        // are committed before starting the CDC pipeline.
-        waitUntilJobFinished(Duration.ofMinutes(2));
+        // The batch insert job may finish before Fluss makes the rows visible to new readers.
+        // Poll the source table until the 3 seed rows are actually readable.
+        long deadline = System.currentTimeMillis() + Duration.ofMinutes(2).toMillis();
+        while (System.currentTimeMillis() < deadline) {
+            try {
+                if (fetchFlussTableRows(sourceDatabase, "products", 3).size() == 3) {
+                    return;
+                }
+            } catch (Exception ignored) {
+            }
+            Thread.sleep(1000L);
+        }
+        throw new IllegalStateException("Source Fluss table was not populated within 2 minutes");
     }
 
     /** Runs a script against the Paimon catalog, whose connector must be passed explicitly. */
