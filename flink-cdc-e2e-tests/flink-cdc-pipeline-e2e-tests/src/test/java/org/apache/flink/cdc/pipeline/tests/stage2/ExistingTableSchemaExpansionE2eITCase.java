@@ -667,6 +667,26 @@ class ExistingTableSchemaExpansionE2eITCase extends PipelineTestEnvironment {
                                 + "  (103, 'Three', 'Cecily');",
                         sourceDatabase, sinkDatabase, sourceDatabase, sinkDatabase, sourceDatabase);
         executeFlussSql(sql, "prepare_fluss");
+
+        // The SQL client may return before the inserted rows are visible to new Fluss readers.
+        // Verify that the records can actually be read before starting the CDC pipeline.
+        List<String> expectedRows =
+                Arrays.asList("101, One, Alice", "102, Two, Bob", "103, Three, Cecily");
+        long deadline = System.currentTimeMillis() + Duration.ofMinutes(2).toMillis();
+        while (System.currentTimeMillis() < deadline) {
+            try {
+                List<String> actualRows = fetchFlussTableRows(sourceDatabase, "products", 3);
+                if (actualRows.containsAll(expectedRows)
+                        && actualRows.size() == expectedRows.size()) {
+                    return;
+                }
+            } catch (Exception ignored) {
+                // The table may not be readable until the asynchronous insert is committed.
+            }
+            Thread.sleep(1000L);
+        }
+        throw new IllegalStateException(
+                "Source Fluss table was not populated with the expected rows within 2 minutes.");
     }
 
     /** Runs a script against the Paimon catalog, whose connector must be passed explicitly. */
