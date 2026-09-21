@@ -118,7 +118,7 @@ public class AsyncPostTransformFunction extends RichAsyncFunction<Event, Event>
     private static final long EXECUTOR_SHUTDOWN_TIMEOUT_SECONDS = 30L;
     private static final Logger LOG = LoggerFactory.getLogger(AsyncPostTransformFunction.class);
 
-    private static final int TABLE_STATE_VERSION = 2;
+    private static final int TABLE_STATE_VERSION = 1;
 
     private final String timezone;
     private final DecimalPrecisionMode decimalPrecisionMode;
