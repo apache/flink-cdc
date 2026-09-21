@@ -18,11 +18,16 @@
 package org.apache.flink.cdc.connectors.oracle.source.reader.fetch;
 
 import org.apache.flink.cdc.common.annotation.Internal;
+import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.connectors.base.WatermarkDispatcher;
+import org.apache.flink.cdc.connectors.base.source.meta.offset.Offset;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
+import org.apache.flink.cdc.connectors.base.source.meta.wartermark.WatermarkKind;
 import org.apache.flink.cdc.connectors.base.source.reader.external.FetchTask;
+import org.apache.flink.cdc.connectors.oracle.source.meta.offset.RedoLogOffset;
 
+import io.debezium.DebeziumException;
 import io.debezium.config.Configuration;
 import io.debezium.connector.oracle.OracleConnection;
 import io.debezium.connector.oracle.OracleConnectorConfig;
@@ -32,19 +37,30 @@ import io.debezium.connector.oracle.OraclePartition;
 import io.debezium.connector.oracle.OracleStreamingChangeEventSourceMetrics;
 import io.debezium.connector.oracle.logminer.LogMinerStreamingChangeEventSource;
 import io.debezium.connector.oracle.logminer.processor.LogMinerEventProcessor;
+import io.debezium.connector.oracle.xstream.XstreamStreamingChangeEventSource;
 import io.debezium.pipeline.ErrorHandler;
 import io.debezium.pipeline.EventDispatcher;
+import io.debezium.pipeline.source.spi.ChangeEventSource;
+import io.debezium.pipeline.source.spi.StreamingChangeEventSource;
 import io.debezium.relational.TableId;
 import io.debezium.util.Clock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
+
 /** The task to work for fetching data of Oracle table stream split. */
 @Internal
 public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
 
+    private static final Logger LOG = LoggerFactory.getLogger(OracleStreamFetchTask.class);
+    private static final String XSTREAM_COMMIT_PROCESSED_LOW_WATERMARK_ENABLED =
+            "xstream.commit.processed.low.watermark.enabled";
+
     private final StreamSplit split;
     private volatile boolean taskRunning = false;
+    private volatile RunningChangeEventSource runningChangeEventSource;
+    @Nullable private volatile Offset lastCommittedOffset;
 
     public OracleStreamFetchTask(StreamSplit split) {
         this.split = split;
@@ -54,9 +70,27 @@ public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
     public void execute(Context context) throws Exception {
         OracleSourceFetchTaskContext sourceFetchContext = (OracleSourceFetchTaskContext) context;
         taskRunning = true;
+        final OracleConnectorConfig connectorConfig = sourceFetchContext.getDbzConnectorConfig();
+        validateAdapterSupportsSplit(connectorConfig, split);
+
+        if (OracleSourceFetchTaskContext.isLogMinerAdapter(connectorConfig)) {
+            executeLogMinerTask(sourceFetchContext, connectorConfig);
+            return;
+        }
+        if (OracleSourceFetchTaskContext.isXStreamAdapter(connectorConfig)) {
+            executeXStreamTask(sourceFetchContext, connectorConfig);
+            return;
+        }
+
+        executeWithAdapter(sourceFetchContext, connectorConfig);
+    }
+
+    private void executeLogMinerTask(
+            OracleSourceFetchTaskContext sourceFetchContext,
+            OracleConnectorConfig connectorConfig) {
         RedoLogSplitReadTask redoLogSplitReadTask =
                 new RedoLogSplitReadTask(
-                        sourceFetchContext.getDbzConnectorConfig(),
+                        connectorConfig,
                         sourceFetchContext.getConnection(),
                         sourceFetchContext.getEventDispatcher(),
                         sourceFetchContext.getWaterMarkDispatcher(),
@@ -64,13 +98,97 @@ public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
                         sourceFetchContext.getDatabaseSchema(),
                         sourceFetchContext.getSourceConfig().getOriginDbzConnectorConfig(),
                         sourceFetchContext.getStreamingChangeEventSourceMetrics(),
-                        split);
+                        split,
+                        sourceFetchContext.getStartupTimestampMillis());
         StoppableChangeEventSourceContext changeEventSourceContext =
                 new StoppableChangeEventSourceContext();
-        redoLogSplitReadTask.execute(
-                changeEventSourceContext,
-                sourceFetchContext.getPartition(),
-                sourceFetchContext.getOffsetContext());
+        RunningChangeEventSource runningChangeEventSource =
+                registerRunningChangeEventSource(changeEventSourceContext, null);
+        try {
+            redoLogSplitReadTask.execute(
+                    changeEventSourceContext,
+                    sourceFetchContext.getPartition(),
+                    sourceFetchContext.getOffsetContext());
+        } finally {
+            clearRunningChangeEventSource(runningChangeEventSource);
+        }
+    }
+
+    private void executeWithAdapter(
+            OracleSourceFetchTaskContext sourceFetchContext, OracleConnectorConfig connectorConfig)
+            throws InterruptedException {
+        StreamingChangeEventSource<OraclePartition, OracleOffsetContext> streamingSource =
+                connectorConfig
+                        .getAdapter()
+                        .getSource(
+                                sourceFetchContext.getConnection(),
+                                sourceFetchContext.getEventDispatcher(),
+                                sourceFetchContext.getErrorHandler(),
+                                Clock.SYSTEM,
+                                sourceFetchContext.getDatabaseSchema(),
+                                sourceFetchContext.getTaskContext(),
+                                sourceFetchContext.getSourceConfig().getOriginDbzConnectorConfig(),
+                                sourceFetchContext.getStreamingChangeEventSourceMetrics());
+
+        StoppableChangeEventSourceContext changeEventSourceContext =
+                new StoppableChangeEventSourceContext();
+        XstreamStreamingChangeEventSource xstreamStreamingSource =
+                streamingSource instanceof XstreamStreamingChangeEventSource
+                        ? (XstreamStreamingChangeEventSource) streamingSource
+                        : null;
+        RunningChangeEventSource runningChangeEventSource =
+                registerRunningChangeEventSource(
+                        changeEventSourceContext,
+                        xstreamStreamingSource,
+                        isXStreamCommitProcessedLowWatermarkEnabled(sourceFetchContext));
+        try {
+            streamingSource.execute(
+                    changeEventSourceContext,
+                    sourceFetchContext.getPartition(),
+                    sourceFetchContext.getOffsetContext());
+        } finally {
+            clearRunningChangeEventSource(runningChangeEventSource);
+        }
+    }
+
+    private void executeXStreamTask(
+            OracleSourceFetchTaskContext sourceFetchContext, OracleConnectorConfig connectorConfig)
+            throws InterruptedException {
+        StoppableChangeEventSourceContext changeEventSourceContext =
+                new StoppableChangeEventSourceContext();
+        XStreamSplitReadTask xstreamFetchTask =
+                XStreamSplitReadTask.createTask(
+                        connectorConfig,
+                        sourceFetchContext,
+                        split,
+                        sourceFetchContext.getStartupTimestampMillis());
+        RunningChangeEventSource runningChangeEventSource =
+                registerRunningChangeEventSource(
+                        changeEventSourceContext,
+                        xstreamFetchTask,
+                        isXStreamCommitProcessedLowWatermarkEnabled(sourceFetchContext));
+        try {
+            xstreamFetchTask.execute(
+                    changeEventSourceContext,
+                    sourceFetchContext.getPartition(),
+                    sourceFetchContext.getOffsetContext());
+        } finally {
+            clearRunningChangeEventSource(runningChangeEventSource);
+        }
+    }
+
+    static void validateAdapterSupportsSplit(
+            OracleConnectorConfig connectorConfig, StreamSplit streamSplit) {
+        if (RedoLogOffset.NO_STOPPING_OFFSET.equals(streamSplit.getEndingOffset())) {
+            return;
+        }
+        if (OracleSourceFetchTaskContext.isLogMinerAdapter(connectorConfig)) {
+            return;
+        }
+        throw new DebeziumException(
+                String.format(
+                        "Oracle adapter '%s' does not support bounded stream split backfill yet.",
+                        connectorConfig.getAdapter().getType()));
     }
 
     @Override
@@ -86,6 +204,118 @@ public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
     @Override
     public void close() {
         taskRunning = false;
+        RunningChangeEventSource runningChangeEventSource = this.runningChangeEventSource;
+        if (runningChangeEventSource != null) {
+            runningChangeEventSource.stop();
+        }
+    }
+
+    RunningChangeEventSource registerRunningChangeEventSource(
+            StoppableChangeEventSourceContext changeEventSourceContext,
+            XstreamStreamingChangeEventSource xstreamStreamingSource) {
+        return registerRunningChangeEventSource(
+                changeEventSourceContext, xstreamStreamingSource, false);
+    }
+
+    RunningChangeEventSource registerRunningChangeEventSource(
+            StoppableChangeEventSourceContext changeEventSourceContext,
+            XstreamStreamingChangeEventSource xstreamStreamingSource,
+            boolean commitProcessedLowWatermarkEnabled) {
+        RunningChangeEventSource runningChangeEventSource =
+                new ActiveChangeEventSource(
+                        changeEventSourceContext,
+                        xstreamStreamingSource,
+                        commitProcessedLowWatermarkEnabled);
+        this.runningChangeEventSource = runningChangeEventSource;
+        return runningChangeEventSource;
+    }
+
+    void clearRunningChangeEventSource(RunningChangeEventSource runningChangeEventSource) {
+        if (this.runningChangeEventSource == runningChangeEventSource) {
+            this.runningChangeEventSource = null;
+        }
+    }
+
+    public void commitCurrentOffset(@Nullable Offset offsetToCommit) {
+        if (offsetToCommit == null) {
+            return;
+        }
+        if (lastCommittedOffset != null && offsetToCommit.compareTo(lastCommittedOffset) <= 0) {
+            return;
+        }
+
+        RunningChangeEventSource current = this.runningChangeEventSource;
+        if (current != null && current.commitOffset(offsetToCommit)) {
+            lastCommittedOffset = offsetToCommit;
+            LOG.info("Committed Oracle stream offset {} for {}", offsetToCommit, split);
+        }
+    }
+
+    private boolean isXStreamCommitProcessedLowWatermarkEnabled(
+            OracleSourceFetchTaskContext sourceFetchContext) {
+        return Boolean.parseBoolean(
+                sourceFetchContext
+                        .getSourceConfig()
+                        .getOriginDbzConnectorConfig()
+                        .getString(XSTREAM_COMMIT_PROCESSED_LOW_WATERMARK_ENABLED, "false"));
+    }
+
+    @VisibleForTesting
+    void setRunningChangeEventSource(RunningChangeEventSource runningChangeEventSource) {
+        this.runningChangeEventSource = runningChangeEventSource;
+    }
+
+    interface RunningChangeEventSource {
+        void stop();
+
+        default boolean commitOffset(Offset offset) {
+            return false;
+        }
+    }
+
+    private static final class ActiveChangeEventSource implements RunningChangeEventSource {
+
+        private final StoppableChangeEventSourceContext changeEventSourceContext;
+        private final XstreamStreamingChangeEventSource xstreamStreamingSource;
+        private final boolean commitProcessedLowWatermarkEnabled;
+
+        private ActiveChangeEventSource(
+                StoppableChangeEventSourceContext changeEventSourceContext,
+                XstreamStreamingChangeEventSource xstreamStreamingSource,
+                boolean commitProcessedLowWatermarkEnabled) {
+            this.changeEventSourceContext = changeEventSourceContext;
+            this.xstreamStreamingSource = xstreamStreamingSource;
+            this.commitProcessedLowWatermarkEnabled = commitProcessedLowWatermarkEnabled;
+        }
+
+        @Override
+        public void stop() {
+            changeEventSourceContext.stopChangeEventSource();
+            if (xstreamStreamingSource != null) {
+                xstreamStreamingSource.closeXStreamSession();
+            }
+        }
+
+        @Override
+        public boolean commitOffset(Offset offset) {
+            if (xstreamStreamingSource == null) {
+                return false;
+            }
+            if (!commitProcessedLowWatermarkEnabled) {
+                LOG.debug(
+                        "Skip committing Oracle XStream offset because {} is disabled: {}",
+                        XSTREAM_COMMIT_PROCESSED_LOW_WATERMARK_ENABLED,
+                        offset);
+                return false;
+            }
+            String lcrPosition = offset.getOffset().get(RedoLogOffset.LCR_POSITION_KEY);
+            if (lcrPosition == null || "null".equalsIgnoreCase(lcrPosition)) {
+                LOG.debug("Skip committing Oracle XStream offset without LCR position: {}", offset);
+                return false;
+            }
+            xstreamStreamingSource.commitOffset(offset.getOffset());
+            return true;
+        }
     }
 
     /**
@@ -105,6 +335,7 @@ public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
         private final OracleDatabaseSchema schema;
 
         private final OracleStreamingChangeEventSourceMetrics metrics;
+        private final Long startupTimestampMillis;
 
         public RedoLogSplitReadTask(
                 OracleConnectorConfig connectorConfig,
@@ -115,7 +346,8 @@ public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
                 OracleDatabaseSchema schema,
                 Configuration jdbcConfig,
                 OracleStreamingChangeEventSourceMetrics metrics,
-                StreamSplit redoLogSplit) {
+                StreamSplit redoLogSplit,
+                Long startupTimestampMillis) {
             super(
                     connectorConfig,
                     connection,
@@ -133,6 +365,7 @@ public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
             this.connection = connection;
             this.metrics = metrics;
             this.schema = schema;
+            this.startupTimestampMillis = startupTimestampMillis;
         }
 
         @Override
@@ -163,7 +396,100 @@ public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
                     schema,
                     metrics,
                     errorHandler,
-                    redoLogSplit);
+                    redoLogSplit,
+                    startupTimestampMillis);
+        }
+    }
+
+    /** Task to read XStream events and stop when reaching split ending watermark. */
+    public static class XStreamSplitReadTask extends XstreamStreamingChangeEventSource {
+
+        private final WatermarkDispatcher watermarkDispatcher;
+        private final StreamSplit streamSplit;
+        private boolean endWatermarkDispatched;
+
+        public XStreamSplitReadTask(
+                OracleConnectorConfig connectorConfig,
+                OracleConnection connection,
+                EventDispatcher<OraclePartition, TableId> eventDispatcher,
+                ErrorHandler errorHandler,
+                OracleDatabaseSchema schema,
+                OracleStreamingChangeEventSourceMetrics metrics,
+                WatermarkDispatcher watermarkDispatcher,
+                StreamSplit streamSplit,
+                Long startupTimestampMillis) {
+            super(
+                    connectorConfig,
+                    connection,
+                    eventDispatcher,
+                    errorHandler,
+                    Clock.SYSTEM,
+                    schema,
+                    metrics,
+                    startupTimestampMillis);
+            this.watermarkDispatcher = watermarkDispatcher;
+            this.streamSplit = streamSplit;
+        }
+
+        @Override
+        protected void onAfterReceive(
+                ChangeEventSource.ChangeEventSourceContext context,
+                OraclePartition partition,
+                OracleOffsetContext offsetContext)
+                throws InterruptedException {
+            if (reachEndingOffset(context, partition, offsetContext)) {
+                return;
+            }
+            super.onAfterReceive(context, partition, offsetContext);
+        }
+
+        @Override
+        protected int getAttachBusyRetryTimes() {
+            return 0;
+        }
+
+        private boolean reachEndingOffset(
+                ChangeEventSource.ChangeEventSourceContext sourceContext,
+                OraclePartition partition,
+                OracleOffsetContext offsetContext)
+                throws InterruptedException {
+            if (endWatermarkDispatched
+                    || RedoLogOffset.NO_STOPPING_OFFSET.equals(streamSplit.getEndingOffset())) {
+                return false;
+            }
+            if (offsetContext.getScn() == null) {
+                return false;
+            }
+
+            RedoLogOffset currentOffset = new RedoLogOffset(offsetContext.getScn().longValue());
+            if (!currentOffset.isAtOrAfter(streamSplit.getEndingOffset())) {
+                return false;
+            }
+
+            watermarkDispatcher.dispatchWatermarkEvent(
+                    partition.getSourcePartition(), streamSplit, currentOffset, WatermarkKind.END);
+            endWatermarkDispatched = true;
+            if (sourceContext instanceof StoppableChangeEventSourceContext) {
+                ((StoppableChangeEventSourceContext) sourceContext).stopChangeEventSource();
+            }
+            return true;
+        }
+
+        static XStreamSplitReadTask createTask(
+                OracleConnectorConfig connectorConfig,
+                OracleSourceFetchTaskContext sourceFetchContext,
+                StreamSplit streamSplit,
+                Long startupTimestampMillis) {
+            return new XStreamSplitReadTask(
+                    connectorConfig,
+                    sourceFetchContext.getConnection(),
+                    sourceFetchContext.getEventDispatcher(),
+                    sourceFetchContext.getErrorHandler(),
+                    sourceFetchContext.getDatabaseSchema(),
+                    sourceFetchContext.getStreamingChangeEventSourceMetrics(),
+                    sourceFetchContext.getWaterMarkDispatcher(),
+                    streamSplit,
+                    startupTimestampMillis);
         }
     }
 }
