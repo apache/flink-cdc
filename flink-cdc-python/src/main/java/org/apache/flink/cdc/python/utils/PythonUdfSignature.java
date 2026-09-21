@@ -61,12 +61,18 @@ public final class PythonUdfSignature {
     }
 
     private static String parseReturnAnnotation(String source, String pythonExec) {
-        PythonInterpreterConfig pemjaConfig =
-                PythonInterpreterConfig.newBuilder().setPythonExec(pythonExec).build();
-        try (PythonInterpreter parser = new PythonInterpreter(pemjaConfig)) {
+        try (PythonInterpreter parser =
+                new PythonInterpreter(createInterpreterConfig(pythonExec))) {
             parser.exec(loadSignatureScript());
             return (String) parser.invoke("eval_return_type", source);
         }
+    }
+
+    static PythonInterpreterConfig createInterpreterConfig(String pythonExec) {
+        return PythonInterpreterConfig.newBuilder()
+                .setPythonExec(pythonExec)
+                .setExcType(PythonInterpreterConfig.ExecType.SUB_INTERPRETER)
+                .build();
     }
 
     private static String loadSignatureScript() {

@@ -37,6 +37,7 @@ import javax.annotation.Nullable;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -104,6 +105,98 @@ class PythonUdfE2eITCase extends PipelineTestEnvironment {
                 "CreateTableEvent{tableId=%s.USERS, schema=columns={`ID` INT NOT NULL,`EMAIL_NORM` STRING,`DOUBLED` BIGINT}, primaryKeys=ID, options=()}",
                 "DataChangeEvent{tableId=%s.USERS, before=[], after=[3, carol@example.com, 70], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId=%s.USERS, before=[], after=[4, dave@example.org, 84], op=INSERT, meta=()}");
+    }
+
+    @Test
+    void testConcurrentLargeSourceSignatureParsing() throws Exception {
+        submitPipelineJob(buildSignaturePipelineJob());
+        waitUntilJobRunning(Duration.ofMinutes(5));
+
+        String tableId = pythonUdfTestDatabase.getDatabaseName() + ".USERS";
+        waitUntilEventOrTaskManagerStops(
+                "CreateTableEvent{tableId="
+                        + tableId
+                        + ", schema=columns={`ID` INT NOT NULL,`RESULT_ONE` STRING,"
+                        + "`RESULT_TWO` STRING,`RESULT_THREE` STRING}, primaryKeys=ID, options=()}");
+        waitUntilEventOrTaskManagerStops(
+                "DataChangeEvent{tableId="
+                        + tableId
+                        + ", before=[], after=[1, Alice@Example.COM, Alice@Example.COM, "
+                        + "Alice@Example.COM], op=INSERT, meta=()}");
+    }
+
+    private void waitUntilEventOrTaskManagerStops(String event) throws Exception {
+        long deadline = System.currentTimeMillis() + EVENT_WAITING_TIMEOUT.toMillis();
+        while (System.currentTimeMillis() < deadline) {
+            String taskManagerLog = taskManagerConsumer.toUtf8String();
+            if (taskManagerLog.contains(event)) {
+                return;
+            }
+            if (!taskManager.isRunning()) {
+                throw new AssertionError(
+                        "TaskManager exited while waiting for event: "
+                                + event
+                                + "\nTaskManager log:\n"
+                                + taskManagerLog);
+            }
+            Thread.sleep(1000);
+        }
+        throw new TimeoutException("Timed out waiting for event: " + event);
+    }
+
+    private String buildSignaturePipelineJob() {
+        StringBuilder padding = new StringBuilder();
+        for (int i = 0; i < 8192; i++) {
+            padding.append("        None\n");
+        }
+        return String.format(
+                "source:\n"
+                        + "  type: mysql\n"
+                        + "  hostname: %s\n"
+                        + "  port: 3306\n"
+                        + "  username: %s\n"
+                        + "  password: %s\n"
+                        + "  scan.startup.mode: earliest-offset\n"
+                        + "  tables: %s.USERS\n"
+                        + "  server-id: 5600-5610\n"
+                        + "  server-time-zone: UTC\n"
+                        + "\n"
+                        + "sink:\n"
+                        + "  type: values\n"
+                        + "\n"
+                        + "transform:\n"
+                        + "  - source-table: %s.USERS\n"
+                        + "    projection: ID, first_identity(EMAIL) AS RESULT_ONE, "
+                        + "second_identity(EMAIL) AS RESULT_TWO, "
+                        + "third_identity(EMAIL) AS RESULT_THREE\n"
+                        + "    filter: ID = 1\n"
+                        + "\n"
+                        + "pipeline:\n"
+                        + "  parallelism: 4\n"
+                        + "  transform.async-execution.enabled: false\n"
+                        + "  user-defined-function:\n"
+                        + "%s"
+                        + "%s"
+                        + "%s",
+                INTER_CONTAINER_MYSQL_ALIAS,
+                MYSQL_TEST_USER,
+                MYSQL_TEST_PASSWORD,
+                pythonUdfTestDatabase.getDatabaseName(),
+                pythonUdfTestDatabase.getDatabaseName(),
+                signatureUdf("first_identity", padding.toString()),
+                signatureUdf("second_identity", padding.toString()),
+                signatureUdf("third_identity", padding.toString()));
+    }
+
+    private static String signatureUdf(String name, String padding) {
+        return String.format(
+                "    - name: %s\n"
+                        + "      python-code: |\n"
+                        + "%s"
+                        + "        def eval(value: str) -> str:\n"
+                        + "            return value\n"
+                        + "      python-executable: %s\n",
+                name, padding, CONTAINER_PYTHON_EXECUTABLE);
     }
 
     private String buildJobYaml(
