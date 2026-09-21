@@ -46,4 +46,25 @@ class SqlServerSourceConfigFactoryTest {
         Assertions.assertThat(sourceConfig.getDbzProperties().getProperty("snapshot.mode"))
                 .isEqualTo("schema_only");
     }
+
+    @Test
+    void testFailFastWhenReleaseAndNewlyAddedTableBothEnabled() {
+        // Enabling metadata release together with scan.newly-added-table is contradictory: the
+        // release would drop the metadata the newly-added-table flow needs. The config must reject
+        // it at build time rather than silently disabling the release.
+        SqlServerSourceConfigFactory factory = new SqlServerSourceConfigFactory();
+        factory.hostname("localhost")
+                .port(1433)
+                .databaseList("inventory")
+                .tableList("inventory.dbo.products")
+                .username("flinkuser")
+                .password("flinkpw")
+                .serverTimeZone("UTC")
+                .scanNewlyAddedTableEnabled(true)
+                .releaseSnapshotMetadataEnabled(true);
+
+        Assertions.assertThatThrownBy(() -> factory.create(0))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("cannot both be enabled");
+    }
 }

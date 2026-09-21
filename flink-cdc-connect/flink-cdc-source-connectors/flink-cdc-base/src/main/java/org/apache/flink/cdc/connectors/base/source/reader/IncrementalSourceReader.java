@@ -28,6 +28,7 @@ import org.apache.flink.cdc.connectors.base.source.meta.events.FinishedSnapshotS
 import org.apache.flink.cdc.connectors.base.source.meta.events.LatestFinishedSplitsNumberEvent;
 import org.apache.flink.cdc.connectors.base.source.meta.events.LatestFinishedSplitsNumberRequestEvent;
 import org.apache.flink.cdc.connectors.base.source.meta.events.StreamSplitAssignedEvent;
+import org.apache.flink.cdc.connectors.base.source.meta.events.StreamSplitMetaAssembledEvent;
 import org.apache.flink.cdc.connectors.base.source.meta.events.StreamSplitMetaEvent;
 import org.apache.flink.cdc.connectors.base.source.meta.events.StreamSplitMetaRequestEvent;
 import org.apache.flink.cdc.connectors.base.source.meta.events.StreamSplitUpdateAckEvent;
@@ -94,6 +95,17 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
      * addSplit and add back to split reader if snapshot split information is enough.
      */
     protected final Map<String, StreamSplit> uncompletedStreamSplits;
+
+    /**
+     * The stream-split assignment generation served by the coordinator, echoed back in the {@link
+     * StreamSplitMetaAssembledEvent} so the coordinator can ignore a stale report from a
+     * failed-over assignment. Defaults to {@code COMPLETE_WITHOUT_META_GENERATION}, which the
+     * coordinator always accepts. That default still applies when a reader never requests meta
+     * groups, which covers a split restored already assembled and one that carries its metadata
+     * inline.
+     */
+    private int streamSplitMetaAssignmentGeneration =
+            StreamSplitMetaAssembledEvent.COMPLETE_WITHOUT_META_GENERATION;
 
     /**
      * Steam split which is suspended reading in split reader and wait for
@@ -312,6 +324,17 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
                             discoverTableSchemasForStreamSplit(
                                     streamSplit, checkNewlyAddedTableSchema);
                     unfinishedSplits.add(streamSplit);
+                    // The split is complete: it either arrived assembled (restored from a
+                    // checkpoint, or small enough to carry its metadata inline), was handed back
+                    // here after the newly-added-table process, or group fetch just finished
+                    // assembling it. Report it so the coordinator can (re-)arm the release. The
+                    // generation is the one the coordinator served the meta groups under, or
+                    // COMPLETE_WITHOUT_META_GENERATION when this reader never requested any.
+                    context.sendSourceEventToCoordinator(
+                            new StreamSplitMetaAssembledEvent(
+                                    streamSplit.splitId(),
+                                    streamSplit.getTotalFinishedSplitSize(),
+                                    streamSplitMetaAssignmentGeneration));
                 }
 
                 LOG.info(
@@ -422,6 +445,8 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
     private void fillMetaDataForStreamSplit(StreamSplitMetaEvent metadataEvent) {
         StreamSplit streamSplit = uncompletedStreamSplits.get(metadataEvent.getSplitId());
         if (streamSplit != null) {
+            // remember the assignment generation to echo it back when the split is fully assembled
+            this.streamSplitMetaAssignmentGeneration = metadataEvent.getAssignmentGeneration();
             final int receivedMetaGroupId = metadataEvent.getMetaGroupId();
             final int receivedTotalFinishedSplitSize = metadataEvent.getTotalFinishedSplitSize();
             final int expectedMetaGroupId =
@@ -480,6 +505,7 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
             context.sendSourceEventToCoordinator(splitMetaRequestEvent);
         } else {
             LOG.info("The meta of stream split {} has been collected success", splitId);
+            // addSplits reports the assembled metadata to the coordinator.
             this.addSplits(Collections.singletonList(streamSplit));
         }
     }

@@ -94,6 +94,9 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
     private final Map<String, Long> splitFinishedCheckpointIds;
     private static final long UNDEFINED_CHECKPOINT_ID = -1;
 
+    /** Whether the bulk snapshot split metadata has been released (FLINK-40697). */
+    private boolean snapshotMetaReleased = false;
+
     private final Object lock = new Object();
     private ExecutorService splittingExecutorService;
     private volatile Throwable uncaughtSplitterException;
@@ -145,6 +148,7 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
                 offsetFactory,
                 new ConcurrentHashMap<>(),
                 checkpoint.getChunkSplitterState());
+        this.snapshotMetaReleased = checkpoint.isSnapshotMetaReleased();
     }
 
     private SnapshotSplitAssigner(
@@ -530,7 +534,8 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
                         isTableIdCaseSensitive,
                         true,
                         splitFinishedCheckpointIds,
-                        chunkSplitter.snapshotState(checkpointId));
+                        chunkSplitter.snapshotState(checkpointId),
+                        snapshotMetaReleased);
         // we need a complete checkpoint before mark this assigner to be finished, to wait for all
         // records of snapshot splits are completely processed
         if (checkpointIdToFinish == null
@@ -574,6 +579,32 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
                     checkpointId,
                     splitFinishedCheckpointIds.size());
         }
+    }
+
+    /**
+     * Releases the bulk snapshot-split metadata once the reader has assembled it and a checkpoint
+     * has covered that assignment. Clears the metadata maps but keeps {@code
+     * alreadyProcessedTables}, the assigner status and the chunk-splitter state so a restore does
+     * not re-discover tables or rebuild the stream split. Generalizes the MySQL mechanism
+     * (FLINK-39775).
+     */
+    @Override
+    public void releaseSnapshotMetadata() {
+        if (snapshotMetaReleased) {
+            return;
+        }
+        assignedSplits.clear();
+        splitFinishedOffsets.clear();
+        splitFinishedCheckpointIds.clear();
+        tableSchemas.clear();
+        snapshotMetaReleased = true;
+        LOG.info(
+                "Released snapshot split metadata from the coordinator; the assigner state is now light.");
+    }
+
+    @Override
+    public boolean isSnapshotMetaReleased() {
+        return snapshotMetaReleased;
     }
 
     @Override

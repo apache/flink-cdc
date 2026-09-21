@@ -294,7 +294,7 @@ pipeline:
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>
       <td>Boolean</td>
-      <td>Whether to release the snapshot split metadata held by the source coordinator after entering the binlog phase to reduce JobManager memory. Incompatible with scan.newly-added-table.enabled (enabling both fails at startup); disabled by default. Release happens only after a successful checkpoint; if checkpointing is disabled or no checkpoint completes, the metadata is retained, so this option has no effect without checkpointing.</td>
+      <td>Whether to release the snapshot split metadata held by the source coordinator after entering the binlog phase to reduce JobManager memory. Incompatible with scan.newly-added-table.enabled (enabling both fails at startup); disabled by default. Release happens only after a successful checkpoint; if checkpointing is disabled or no checkpoint completes, the metadata is retained, so this option has no effect without checkpointing. A checkpoint or savepoint taken with this option enabled cannot be used to restore the job after downgrading to Flink CDC 3.6.0 or an earlier version.</td>
     </tr>
     <tr>
       <td>scan.binlog.newly-added-table.enabled</td>

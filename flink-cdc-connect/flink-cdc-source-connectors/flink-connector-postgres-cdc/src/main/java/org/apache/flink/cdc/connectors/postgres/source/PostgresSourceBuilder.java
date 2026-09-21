@@ -297,6 +297,16 @@ public class PostgresSourceBuilder<T> {
         return this;
     }
 
+    /**
+     * Whether to release the finished snapshot split metadata from the coordinator after entering
+     * the stream phase, to reduce JobManager memory pressure (FLINK-40697).
+     */
+    public PostgresSourceBuilder<T> releaseSnapshotMetadataEnabled(
+            boolean releaseSnapshotMetadataEnabled) {
+        this.configFactory.releaseSnapshotMetadataEnabled(releaseSnapshotMetadataEnabled);
+        return this;
+    }
+
     /** Set the {@code LSN} checkpoints delay number for Postgres to commit the offsets. */
     public PostgresSourceBuilder<T> lsnCommitCheckpointsDelay(int lsnCommitDelay) {
         this.configFactory.setLsnCommitCheckpointsDelay(lsnCommitDelay);

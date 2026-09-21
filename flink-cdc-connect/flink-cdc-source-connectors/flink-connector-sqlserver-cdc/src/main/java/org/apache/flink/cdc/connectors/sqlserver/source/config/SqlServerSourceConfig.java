@@ -58,7 +58,8 @@ public class SqlServerSourceConfig extends JdbcSourceConfig {
             String chunkKeyColumn,
             boolean skipSnapshotBackfill,
             boolean scanNewlyAddedTableEnabled,
-            boolean assignUnboundedChunkFirst) {
+            boolean assignUnboundedChunkFirst,
+            boolean releaseSnapshotMetadataEnabled) {
         super(
                 startupOptions,
                 databaseList,
@@ -85,7 +86,8 @@ public class SqlServerSourceConfig extends JdbcSourceConfig {
                 chunkKeyColumn,
                 skipSnapshotBackfill,
                 scanNewlyAddedTableEnabled,
-                assignUnboundedChunkFirst);
+                assignUnboundedChunkFirst,
+                releaseSnapshotMetadataEnabled);
     }
 
     @Override
