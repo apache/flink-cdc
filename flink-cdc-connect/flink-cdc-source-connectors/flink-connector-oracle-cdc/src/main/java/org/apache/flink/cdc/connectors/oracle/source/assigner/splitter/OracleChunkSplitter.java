@@ -24,6 +24,7 @@ import org.apache.flink.cdc.connectors.base.source.assigner.splitter.JdbcSourceC
 import org.apache.flink.cdc.connectors.base.source.assigner.state.ChunkSplitterState;
 import org.apache.flink.cdc.connectors.base.source.utils.JdbcChunkUtils;
 import org.apache.flink.cdc.connectors.base.utils.ObjectUtils;
+import org.apache.flink.cdc.connectors.oracle.source.config.OracleSourceConfigFactory;
 import org.apache.flink.cdc.connectors.oracle.source.utils.OracleTypeUtils;
 import org.apache.flink.cdc.connectors.oracle.source.utils.OracleUtils;
 import org.apache.flink.cdc.connectors.oracle.util.ChunkUtils;
@@ -86,7 +87,15 @@ public class OracleChunkSplitter extends JdbcSourceChunkSplitter {
     @Override
     protected Long queryApproximateRowCnt(JdbcConnection jdbc, TableId tableId)
             throws SQLException {
-        return OracleUtils.queryApproximateRowCnt(jdbc, tableId);
+        boolean analyzeTableEnabled =
+                Boolean.parseBoolean(
+                        sourceConfig
+                                .getDbzProperties()
+                                .getProperty(
+                                        OracleSourceConfigFactory
+                                                .ANALYZE_TABLE_FOR_APPROXIMATE_ROW_COUNT_ENABLED,
+                                        "true"));
+        return OracleUtils.queryApproximateRowCnt(jdbc, tableId, analyzeTableEnabled);
     }
 
     @Override
