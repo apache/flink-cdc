@@ -32,7 +32,7 @@ under the License.
 为了描述 Data Pipeline，我们需要定义以下部分：
 - [source]({{< ref "docs/core-concept/data-source" >}})
 - [sink]({{< ref "docs/core-concept/data-sink" >}})
-- [pipeline](#pipeline-configurations)
+- [pipeline](#pipeline-配置)
 
 下面 是 Data Pipeline 的一些可选配置：
 - [route]({{< ref "docs/core-concept/route" >}})
