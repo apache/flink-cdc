@@ -91,10 +91,12 @@ public class StarRocksUtils {
                     new StarRocksColumn.Builder()
                             .setColumnName(column.getName())
                             .setOrdinalPosition(i)
-                            .setColumnComment(column.getComment())
+                            .setColumnComment(escapeSqlStringLiteral(column.getComment()))
                             .setDefaultValue(
-                                    convertInvalidTimestampDefaultValue(
-                                            column.getDefaultValueExpression(), column.getType()));
+                                    escapeSqlStringLiteral(
+                                            convertInvalidTimestampDefaultValue(
+                                                    column.getDefaultValueExpression(),
+                                                    column.getType())));
             toStarRocksDataType(
                     column,
                     i < primaryKeyCount,
@@ -529,5 +531,32 @@ public class StarRocksUtils {
         }
 
         return defaultValue;
+    }
+
+    public static String escapeSqlStringLiteral(String value) {
+        if (value == null) {
+            return null;
+        }
+        StringBuilder sb = new StringBuilder(value.length() + 8);
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            switch (c) {
+                case '\\':
+                    sb.append("\\\\");
+                    break;
+                case '"':
+                    sb.append("\"\"");
+                    break;
+                case '\n':
+                    sb.append("\\n");
+                    break;
+                case '\r':
+                    sb.append("\\r");
+                    break;
+                default:
+                    sb.append(c);
+            }
+        }
+        return sb.toString();
     }
 }

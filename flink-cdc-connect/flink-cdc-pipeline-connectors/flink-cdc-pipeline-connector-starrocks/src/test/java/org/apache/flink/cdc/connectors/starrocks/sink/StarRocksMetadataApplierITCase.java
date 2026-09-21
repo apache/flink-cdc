@@ -617,6 +617,145 @@ class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
         assertEqualsInOrder(expected, actual);
     }
 
+    @Test
+    void testSpecialCharactersInCommentAndDefaultValueInCreateTable() throws Exception {
+        TableId tableId =
+                TableId.tableId(
+                        StarRocksContainer.STARROCKS_DATABASE_NAME,
+                        StarRocksContainer.STARROCKS_TABLE_NAME);
+
+        Schema schema =
+                Schema.newBuilder()
+                        .column(new PhysicalColumn("id", DataTypes.INT().notNull(), null))
+                        .column(
+                                new PhysicalColumn(
+                                        "col_backslash",
+                                        DataTypes.VARCHAR(100),
+                                        "comment with \\ backslash",
+                                        "default\\value"))
+                        .column(
+                                new PhysicalColumn(
+                                        "col_quote",
+                                        DataTypes.VARCHAR(100),
+                                        "comment with \" double quote",
+                                        "default\"value"))
+                        .column(
+                                new PhysicalColumn(
+                                        "col_newline",
+                                        DataTypes.VARCHAR(100),
+                                        "comment with \n newline",
+                                        "default\nvalue"))
+                        .column(
+                                new PhysicalColumn(
+                                        "col_mixed",
+                                        DataTypes.VARCHAR(100),
+                                        "mixed \\ and \" and \n chars",
+                                        "mix\\ed\"val\nue"))
+                        .primaryKey("id")
+                        .build();
+
+        runJobWithEvents(Collections.singletonList(new CreateTableEvent(tableId, schema)));
+
+        List<String> actual = inspectTableSchema(tableId);
+
+        List<String> expected =
+                Arrays.asList(
+                        "id | int | NO | true | null",
+                        "col_backslash | varchar(300) | YES | false | default\\value",
+                        "col_quote | varchar(300) | YES | false | default\"value",
+                        "col_newline | varchar(300) | YES | false | default\nvalue",
+                        "col_mixed | varchar(300) | YES | false | mix\\ed\"val\nue");
+
+        assertEqualsInOrder(expected, actual);
+
+        List<String> comments = inspectColumnComments(tableId);
+        List<String> expectedComments =
+                Arrays.asList(
+                        "id | ",
+                        "col_backslash | comment with \\ backslash",
+                        "col_quote | comment with \" double quote",
+                        "col_newline | comment with \n newline",
+                        "col_mixed | mixed \\ and \" and \n chars");
+
+        assertEqualsInOrder(expectedComments, comments);
+    }
+
+    @Test
+    void testSpecialCharactersInCommentAndDefaultValueInAddColumn() throws Exception {
+        TableId tableId =
+                TableId.tableId(
+                        StarRocksContainer.STARROCKS_DATABASE_NAME,
+                        StarRocksContainer.STARROCKS_TABLE_NAME);
+
+        Schema initialSchema =
+                Schema.newBuilder()
+                        .column(new PhysicalColumn("id", DataTypes.INT().notNull(), null))
+                        .column(new PhysicalColumn("name", DataTypes.VARCHAR(50), null))
+                        .primaryKey("id")
+                        .build();
+
+        List<Event> events = new ArrayList<>();
+        events.add(new CreateTableEvent(tableId, initialSchema));
+
+        events.add(
+                new AddColumnEvent(
+                        tableId,
+                        Collections.singletonList(
+                                new AddColumnEvent.ColumnWithPosition(
+                                        new PhysicalColumn(
+                                                "col_backslash",
+                                                DataTypes.VARCHAR(100),
+                                                "comment with \\ backslash",
+                                                "default\\value")))));
+
+        events.add(
+                new AddColumnEvent(
+                        tableId,
+                        Collections.singletonList(
+                                new AddColumnEvent.ColumnWithPosition(
+                                        new PhysicalColumn(
+                                                "col_quote",
+                                                DataTypes.VARCHAR(100),
+                                                "comment with \" double quote",
+                                                "default\"value")))));
+
+        events.add(
+                new AddColumnEvent(
+                        tableId,
+                        Collections.singletonList(
+                                new AddColumnEvent.ColumnWithPosition(
+                                        new PhysicalColumn(
+                                                "col_newline",
+                                                DataTypes.VARCHAR(100),
+                                                "comment with \n newline",
+                                                "default\nvalue")))));
+
+        runJobWithEvents(events);
+
+        List<String> actual = inspectTableSchema(tableId);
+
+        List<String> expected =
+                Arrays.asList(
+                        "id | int | NO | true | null",
+                        "name | varchar(150) | YES | false | null",
+                        "col_backslash | varchar(300) | YES | false | default\\value",
+                        "col_quote | varchar(300) | YES | false | default\"value",
+                        "col_newline | varchar(300) | YES | false | default\nvalue");
+
+        assertEqualsInOrder(expected, actual);
+
+        List<String> comments = inspectColumnComments(tableId);
+        List<String> expectedComments =
+                Arrays.asList(
+                        "id | ",
+                        "name | ",
+                        "col_backslash | comment with \\ backslash",
+                        "col_quote | comment with \" double quote",
+                        "col_newline | comment with \n newline");
+
+        assertEqualsInOrder(expectedComments, comments);
+    }
+
     /** Microsecond variant: '0000-00-00 00:00:00.000000'. */
     private static final String INVALID_DATETIME_WITH_MICROS = "0000-00-00 00:00:00.000000";
 

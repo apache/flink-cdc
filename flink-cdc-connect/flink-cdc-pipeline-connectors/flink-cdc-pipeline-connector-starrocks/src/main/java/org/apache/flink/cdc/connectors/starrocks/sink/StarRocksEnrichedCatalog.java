@@ -191,11 +191,18 @@ public class StarRocksEnrichedCatalog extends StarRocksCatalog {
         builder.append(" ");
         builder.append(column.isNullable() ? "NULL" : "NOT NULL");
         if (column.getDefaultValue().isPresent()) {
-            builder.append(String.format(" DEFAULT \"%s\"", column.getDefaultValue().get()));
+            builder.append(
+                    String.format(
+                            " DEFAULT \"%s\"",
+                            StarRocksUtils.escapeSqlStringLiteral(column.getDefaultValue().get())));
         }
 
         if (column.getColumnComment().isPresent()) {
-            builder.append(String.format(" COMMENT \"%s\"", column.getColumnComment().get()));
+            builder.append(
+                    String.format(
+                            " COMMENT \"%s\"",
+                            StarRocksUtils.escapeSqlStringLiteral(
+                                    column.getColumnComment().get())));
         }
         return builder.toString();
     }
