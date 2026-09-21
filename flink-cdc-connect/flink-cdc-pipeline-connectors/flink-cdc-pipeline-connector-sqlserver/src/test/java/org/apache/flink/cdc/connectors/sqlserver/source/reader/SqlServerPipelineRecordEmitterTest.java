@@ -120,7 +120,8 @@ class SqlServerPipelineRecordEmitterTest {
                 false,
                 false,
                 false,
-                false);
+                false,
+                -1);
     }
 
     private static Schema schema(java.util.List<Column> columns) {
