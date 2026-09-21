@@ -773,6 +773,33 @@ limitations under the License.
                             </outputDirectory>
                         </artifactItem>
                         <artifactItem>
+                            <groupId>org.apache.hadoop</groupId>
+                            <artifactId>hadoop-client-api</artifactId>
+                            <version>${hadoop.version}</version>
+                            <destFileName>hadoop-client-api.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+                        <artifactItem>
+                            <groupId>org.apache.hadoop</groupId>
+                            <artifactId>hadoop-client-runtime</artifactId>
+                            <version>${hadoop.version}</version>
+                            <destFileName>hadoop-client-runtime.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+                        <artifactItem>
+                            <groupId>commons-logging</groupId>
+                            <artifactId>commons-logging</artifactId>
+                            <version>1.1.3</version>
+                            <destFileName>commons-logging.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+                        <artifactItem>
                             <groupId>org.apache.flink</groupId>
                             <artifactId>flink-shaded-hadoop-2-uber</artifactId>
                             <version>2.8.3-10.0</version>

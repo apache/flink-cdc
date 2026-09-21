@@ -112,8 +112,12 @@ pipeline:
       </tr>
       <tr>
         <td>hadoop</td>
-        <td><a href="https://mvnrepository.com/artifact/org.apache.flink/flink-shaded-hadoop-2-uber/2.8.3-10.0">org.apache.flink:flink-shaded-hadoop-2-uber:2.8.3-10.0</a></td>
-        <td>提供 Hadoop 文件系统相关依赖。</td>
+        <td>
+          <a href="https://mvnrepository.com/artifact/org.apache.hadoop/hadoop-client-api/3.3.4">org.apache.hadoop:hadoop-client-api:3.3.4</a><br/>
+          <a href="https://mvnrepository.com/artifact/org.apache.hadoop/hadoop-client-runtime/3.3.4">org.apache.hadoop:hadoop-client-runtime:3.3.4</a><br/>
+          <a href="https://mvnrepository.com/artifact/commons-logging/commons-logging/1.1.3">commons-logging:commons-logging:1.1.3</a>
+        </td>
+        <td>提供 Hadoop 文件系统相关依赖。运行环境未提供这些依赖时，需要同时添加两个 Hadoop 客户端 JAR 和 Commons Logging。</td>
       </tr>
       <tr>
         <td>glue</td>
@@ -128,6 +132,8 @@ pipeline:
     </tbody>
 </table>
 </div>
+
+Hadoop 3.3.4 是 Iceberg 连接器端到端测试已验证的版本。提交客户端、JobManager 和所有 TaskManager 应使用相同版本的 Hadoop 客户端。不要将 Hadoop 3 客户端 JAR 与 `flink-shaded-hadoop-2-uber` 混用：通过 `HadoopFileIO` 合并 Parquet 数据文件时，需要 Hadoop 2.x 未提供的文件系统 API。
 
 Pipeline 连接器选项
 ----------------

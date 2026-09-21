@@ -112,8 +112,12 @@ Depending on the catalog type, you may need to add extra JARs manually and pass 
       </tr>
       <tr>
         <td>hadoop</td>
-        <td><a href="https://mvnrepository.com/artifact/org.apache.flink/flink-shaded-hadoop-2-uber/2.8.3-10.0">org.apache.flink:flink-shaded-hadoop-2-uber:2.8.3-10.0</a></td>
-        <td>Provides Hadoop filesystem dependencies.</td>
+        <td>
+          <a href="https://mvnrepository.com/artifact/org.apache.hadoop/hadoop-client-api/3.3.4">org.apache.hadoop:hadoop-client-api:3.3.4</a><br/>
+          <a href="https://mvnrepository.com/artifact/org.apache.hadoop/hadoop-client-runtime/3.3.4">org.apache.hadoop:hadoop-client-runtime:3.3.4</a><br/>
+          <a href="https://mvnrepository.com/artifact/commons-logging/commons-logging/1.1.3">commons-logging:commons-logging:1.1.3</a>
+        </td>
+        <td>Provides Hadoop filesystem dependencies. Include both Hadoop client JARs and Commons Logging when they are not already available.</td>
       </tr>
       <tr>
         <td>glue</td>
@@ -128,6 +132,8 @@ Depending on the catalog type, you may need to add extra JARs manually and pass 
     </tbody>
 </table>
 </div>
+
+Hadoop 3.3.4 is the version validated by the Iceberg connector end-to-end tests. Use the same Hadoop client version on the submission client, JobManager, and TaskManagers. Do not combine the Hadoop 3 client JARs with `flink-shaded-hadoop-2-uber`: Hadoop 2.x lacks the filesystem API required by Parquet data-file rewrites using `HadoopFileIO`.
 
 Pipeline Connector Options
 ----------------
