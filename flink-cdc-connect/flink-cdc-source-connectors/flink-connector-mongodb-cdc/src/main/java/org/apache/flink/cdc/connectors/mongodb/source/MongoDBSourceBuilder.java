@@ -278,6 +278,16 @@ public class MongoDBSourceBuilder<T> {
     }
 
     /**
+     * Whether to release the finished snapshot split metadata from the coordinator after entering
+     * the stream phase, to reduce JobManager memory pressure (FLINK-40697).
+     */
+    public MongoDBSourceBuilder<T> releaseSnapshotMetadataEnabled(
+            boolean releaseSnapshotMetadataEnabled) {
+        this.configFactory.releaseSnapshotMetadataEnabled(releaseSnapshotMetadataEnabled);
+        return this;
+    }
+
+    /**
      * Build the {@link MongoDBSource}.
      *
      * @return a MongoDBParallelSource with the settings made for this builder.
