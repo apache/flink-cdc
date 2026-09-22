@@ -31,6 +31,7 @@ import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFact
 import org.apache.flink.cdc.connectors.mysql.source.events.BinlogSplitMetaAssembledEvent;
 import org.apache.flink.cdc.connectors.mysql.source.events.BinlogSplitMetaEvent;
 import org.apache.flink.cdc.connectors.mysql.source.events.FinishedSnapshotSplitsAckEvent;
+import org.apache.flink.cdc.connectors.mysql.source.events.LatestFinishedSplitsNumberRequestEvent;
 import org.apache.flink.cdc.connectors.mysql.source.metrics.MySqlSourceReaderMetrics;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
 import org.apache.flink.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
@@ -120,6 +121,33 @@ class MySqlSourceReaderTest extends MySqlSourceTestBase {
     public void clear() {
         customerDatabase.dropDatabase();
         inventoryDatabase.dropDatabase();
+    }
+
+    @Test
+    void testRestoredSuspendedBinlogSplitRequestsLatestFinishedSplitNumber() throws Exception {
+        MySqlSourceConfig sourceConfig = getConfig(new String[] {"customers"});
+        TestingReaderContext readerContext = new TestingReaderContext();
+        MySqlSourceReader<SourceRecord> reader =
+                createReader(sourceConfig, readerContext, 0, SnapshotPhaseHooks.empty());
+        MySqlBinlogSplit binlogSplit =
+                new MySqlBinlogSplit(
+                        MySqlBinlogSplitAssigner.BINLOG_SPLIT_ID,
+                        BinlogOffset.ofBinlogFilePosition("mysql-bin.000001", 4L),
+                        BinlogOffset.ofNonStopping(),
+                        Collections.emptyList(),
+                        Collections.emptyMap(),
+                        0);
+
+        reader.addSplits(
+                Collections.singletonList(MySqlBinlogSplit.toSuspendedBinlogSplit(binlogSplit)));
+
+        Assertions.assertThat(readerContext.getSentEvents())
+                .anySatisfy(
+                        event ->
+                                Assertions.assertThat(event)
+                                        .isInstanceOf(
+                                                LatestFinishedSplitsNumberRequestEvent.class));
+        reader.close();
     }
 
     @Test
