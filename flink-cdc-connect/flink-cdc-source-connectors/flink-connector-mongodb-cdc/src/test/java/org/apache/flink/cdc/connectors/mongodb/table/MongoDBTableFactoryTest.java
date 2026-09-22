@@ -311,7 +311,8 @@ class MongoDBTableFactoryTest {
                         SSL_KEYSTORE_TYPE_DEFAULT,
                         SSL_TRUSTSTORE_DEFAULT,
                         SSL_TRUSTSTORE_PASSWORD_DEFAULT,
-                        SSL_TRUSTSTORE_TYPE_DEFAULT);
+                        SSL_TRUSTSTORE_TYPE_DEFAULT,
+                        RECORDS_PER_SECOND_DEFAULT);
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
 
         // equals has to carry the field, or a source built without the option would compare equal
