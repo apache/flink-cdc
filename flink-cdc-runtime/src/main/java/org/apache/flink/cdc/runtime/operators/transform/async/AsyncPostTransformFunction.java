@@ -392,7 +392,7 @@ public class AsyncPostTransformFunction extends RichAsyncFunction<Event, Event>
 
         if (transformer.isEmpty()) {
             cachePassthroughSchemaEvent(event);
-            if (event instanceof CreateTableEvent) {
+            if (event instanceof SchemaChangeEvent) {
                 emittedCreateTableEventTables.add(tableId);
             }
             return Optional.of(event);
@@ -407,6 +407,7 @@ public class AsyncPostTransformFunction extends RichAsyncFunction<Event, Event>
         } else if (event instanceof SchemaChangeEvent) {
             Optional<Event> result =
                     processSchemaChangeEvent((SchemaChangeEvent) event, transformer.get());
+            emittedCreateTableEventTables.add(tableId);
             invalidateCache(tableId);
             return result;
         } else if (event instanceof DataChangeEvent) {

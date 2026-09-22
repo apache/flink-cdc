@@ -33,6 +33,7 @@ import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.common.udf.UserDefinedFunction;
 import org.apache.flink.cdc.runtime.serializer.event.EventSerializer;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
+import org.apache.flink.runtime.checkpoint.OperatorSubtaskState;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.tasks.mailbox.Mail;
 import org.apache.flink.streaming.runtime.tasks.mailbox.TaskMailbox;
@@ -143,6 +144,42 @@ class AsyncPostTransformFunctionTest {
                                                             "region", DataTypes.STRING()),
                                                     "blocked"))));
             assertThat(harness.extractOutputValues().get(3)).isInstanceOf(DataChangeEvent.class);
+        }
+    }
+
+    @Test
+    void testSchemaChangeAfterRestoreDoesNotEmitStaleCreateTableEvent() throws Exception {
+        OperatorSubtaskState snapshot;
+        try (OneInputStreamOperatorTestHarness<Event, Event> harness =
+                createHarness(TABLE_ID.identifier(), "*", 10_000L, 1)) {
+            harness.setup(EventSerializer.INSTANCE);
+            harness.open();
+            harness.processElement(new StreamRecord<>(new CreateTableEvent(TABLE_ID, SCHEMA)));
+            waitUntilOutputSize(harness, 1);
+            snapshot = harness.snapshot(1L, 1L);
+        }
+
+        try (OneInputStreamOperatorTestHarness<Event, Event> restoredHarness =
+                createHarness(TABLE_ID.identifier(), "*", 10_000L, 1)) {
+            restoredHarness.setup(EventSerializer.INSTANCE);
+            restoredHarness.initializeState(snapshot);
+            restoredHarness.open();
+            AddColumnEvent addColumnEvent = addRegionColumnEvent();
+            restoredHarness.processElement(new StreamRecord<>(addColumnEvent));
+            restoredHarness.processElement(
+                    new StreamRecord<>(insert(SCHEMA_AFTER_ADD_COLUMN, 2, "Bob", "Berlin")));
+            waitUntilOutputSize(restoredHarness, 2);
+
+            assertThat(restoredHarness.extractOutputValues())
+                    .containsExactly(
+                            new AddColumnEvent(
+                                    TABLE_ID,
+                                    Collections.singletonList(
+                                            AddColumnEvent.after(
+                                                    Column.physicalColumn(
+                                                            "region", DataTypes.STRING()),
+                                                    "name"))),
+                            insert(SCHEMA_AFTER_ADD_COLUMN, 2, "Bob", "Berlin"));
         }
     }
 
