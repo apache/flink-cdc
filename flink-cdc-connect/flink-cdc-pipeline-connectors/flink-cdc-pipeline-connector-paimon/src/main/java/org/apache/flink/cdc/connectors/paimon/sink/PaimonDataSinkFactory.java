@@ -96,7 +96,7 @@ public class PaimonDataSinkFactory implements DataSinkFactory {
                 }
             }
         }
-        PaimonRecordSerializer<Event> serializer = new PaimonRecordEventSerializer(zoneId);
+        PaimonRecordSerializer<Event> serializer = new PaimonRecordEventSerializer(zoneId, options);
         String schemaOperatorUid =
                 context.getPipelineConfiguration()
                         .get(PipelineOptions.PIPELINE_SCHEMA_OPERATOR_UID);
