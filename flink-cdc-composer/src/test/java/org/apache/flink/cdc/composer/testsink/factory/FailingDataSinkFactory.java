@@ -110,17 +110,14 @@ public class FailingDataSinkFactory implements DataSinkFactory {
         }
 
         private static Environment getTaskEnvironment(InitContext context) {
-            // The open-source Sink.InitContext doesn't expose the RuntimeContext. Flink hands over
-            // a
-            // Sink.InitContextWrapper whose wrapped WriterInitContext (InitContextBase) keeps a
-            // StreamingRuntimeContext internally, which gives access to the task Environment needed
-            // to fail the subtask out-of-band.
+            // Sink.InitContext does not expose the task environment needed for an out-of-band
+            // failure.
             try {
-                Object initContext = unwrapInitContext(context);
-                Field runtimeContextField =
+                Class<?> initContextBase =
                         Class.forName(
-                                        "org.apache.flink.streaming.runtime.operators.sink.InitContextBase")
-                                .getDeclaredField("runtimeContext");
+                                "org.apache.flink.streaming.runtime.operators.sink.InitContextBase");
+                Object initContext = unwrapInitContext(context, initContextBase);
+                Field runtimeContextField = initContextBase.getDeclaredField("runtimeContext");
                 runtimeContextField.setAccessible(true);
                 Object runtimeContext = runtimeContextField.get(initContext);
                 if (!(runtimeContext instanceof StreamingRuntimeContext)) {
@@ -140,12 +137,21 @@ public class FailingDataSinkFactory implements DataSinkFactory {
             }
         }
 
-        private static Object unwrapInitContext(InitContext context)
+        private static Object unwrapInitContext(Object context, Class<?> initContextBase)
                 throws ReflectiveOperationException {
             Object current = context;
-            // Sink.InitContextWrapper keeps the real WriterInitContext in its `wrapped` field.
-            while (current.getClass().getName().endsWith("Sink$InitContextWrapper")) {
-                Field wrapped = current.getClass().getDeclaredField("wrapped");
+            while (!initContextBase.isInstance(current)) {
+                String className = current.getClass().getName();
+                String wrappedField;
+                if (className.endsWith("Sink$InitContextWrapper")) {
+                    wrappedField = "wrapped";
+                } else if (className.equals(
+                        "org.apache.flink.api.connector.sink2.InitContextAdapter")) {
+                    wrappedField = "context";
+                } else {
+                    throw new NoSuchFieldException("Cannot unwrap init context " + className);
+                }
+                Field wrapped = current.getClass().getDeclaredField(wrappedField);
                 wrapped.setAccessible(true);
                 current = wrapped.get(current);
             }
