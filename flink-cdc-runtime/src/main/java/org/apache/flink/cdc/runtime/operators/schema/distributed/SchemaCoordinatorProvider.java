@@ -61,7 +61,7 @@ public class SchemaCoordinatorProvider implements OperatorCoordinator.Provider {
                 routingRules,
                 routeMode,
                 schemaChangeBehavior,
-                ExistingTableSchemaExpansionMode.OFF,
+                ExistingTableSchemaExpansionMode.DISABLED,
                 rpcTimeout);
     }
 

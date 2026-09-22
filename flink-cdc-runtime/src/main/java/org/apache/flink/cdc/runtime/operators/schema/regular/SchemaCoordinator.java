@@ -114,7 +114,7 @@ public class SchemaCoordinator extends SchemaRegistry {
                 routes,
                 routeMode,
                 schemaChangeBehavior,
-                ExistingTableSchemaExpansionMode.OFF,
+                ExistingTableSchemaExpansionMode.DISABLED,
                 rpcTimeout);
     }
 

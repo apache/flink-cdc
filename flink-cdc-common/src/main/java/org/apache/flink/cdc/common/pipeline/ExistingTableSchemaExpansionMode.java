@@ -30,7 +30,7 @@ import org.apache.flink.cdc.common.annotation.Experimental;
 @Experimental
 public enum ExistingTableSchemaExpansionMode {
     /** Do not check or expand the existing target table; keep the sink's original behavior. */
-    OFF,
+    DISABLED,
 
     /**
      * Validate that the existing target table can contain every upstream column without executing
@@ -43,6 +43,10 @@ public enum ExistingTableSchemaExpansionMode {
     /**
      * Check and best-effort expand the existing target table with safe DDL. Failures of this
      * mechanism are logged and delegated to the sink's original behavior.
+     *
+     * <p>A connector that does not implement {@link
+     * org.apache.flink.cdc.common.sink.ExistingTableSchemaExpansionSupport} is a configuration
+     * error and fails the job rather than silently degrading.
      */
     TRY_EXPAND,
 

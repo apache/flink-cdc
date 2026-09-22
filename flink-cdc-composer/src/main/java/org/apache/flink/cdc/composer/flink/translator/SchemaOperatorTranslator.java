@@ -35,6 +35,9 @@ import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -42,6 +45,9 @@ import java.util.List;
 /** Translator used to build {@link SchemaOperator} for schema event process. */
 @Internal
 public class SchemaOperatorTranslator {
+
+    private static final Logger LOG = LoggerFactory.getLogger(SchemaOperatorTranslator.class);
+
     private final SchemaChangeBehavior schemaChangeBehavior;
     private final ExistingTableSchemaExpansionMode existingTableSchemaExpansionMode;
     private final String schemaOperatorUid;
@@ -55,7 +61,7 @@ public class SchemaOperatorTranslator {
             String timezone) {
         this(
                 schemaChangeBehavior,
-                ExistingTableSchemaExpansionMode.OFF,
+                ExistingTableSchemaExpansionMode.DISABLED,
                 schemaOperatorUid,
                 rpcTimeOut,
                 timezone);
@@ -176,6 +182,15 @@ public class SchemaOperatorTranslator {
             List<RouteDef> routes,
             RouteMode routeMode,
             String timezone) {
+        // Existing target table schema expansion is only wired into the streaming schema
+        // operators, so a batch pipeline keeps the sink's original schema handling.
+        if (existingTableSchemaExpansionMode != ExistingTableSchemaExpansionMode.DISABLED) {
+            LOG.warn(
+                    "Existing target table schema expansion is not supported in batch mode, but "
+                            + "mode {} was configured. The option is ignored and the sink's "
+                            + "original schema handling applies.",
+                    existingTableSchemaExpansionMode);
+        }
         List<RouteRule> routingRules = new ArrayList<>();
         for (RouteDef route : routes) {
             routingRules.add(
@@ -189,12 +204,7 @@ public class SchemaOperatorTranslator {
                         "SchemaBatchOperator",
                         new EventTypeInfo(),
                         new BatchSchemaOperator(
-                                routingRules,
-                                routeMode,
-                                metadataApplier,
-                                schemaChangeBehavior,
-                                existingTableSchemaExpansionMode,
-                                timezone));
+                                routingRules, routeMode, metadataApplier, timezone));
         stream.uid(schemaOperatorUid).setParallelism(parallelism);
         return stream;
     }

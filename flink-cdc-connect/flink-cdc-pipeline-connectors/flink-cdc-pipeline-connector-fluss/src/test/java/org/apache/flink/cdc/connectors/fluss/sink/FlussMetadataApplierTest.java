@@ -264,9 +264,9 @@ public class FlussMetadataApplierTest {
             ExistingTableSchemaExpander expander =
                     new ExistingTableSchemaExpander(applier, applier, SchemaChangeBehavior.LENIENT);
 
-            expander.expand(new CreateTableEvent(tableId, desiredSchema));
+            expander.handleExistingTableCreation(new CreateTableEvent(tableId, desiredSchema));
             assertThat(applier.getExistingTableSchema(tableId)).contains(expectedSchema);
-            expander.expand(new CreateTableEvent(tableId, desiredSchema));
+            expander.handleExistingTableCreation(new CreateTableEvent(tableId, desiredSchema));
             assertThat(applier.getExistingTableSchema(tableId)).contains(expectedSchema);
 
             assertThat(
@@ -282,7 +282,8 @@ public class FlussMetadataApplierTest {
                             .primaryKey("id")
                             .build();
 
-            expander.expand(new CreateTableEvent(tableId, schemaWithDifferentExistingColumnType));
+            expander.handleExistingTableCreation(
+                    new CreateTableEvent(tableId, schemaWithDifferentExistingColumnType));
             assertThat(applier.getExistingTableSchema(tableId)).contains(expectedSchema);
         }
     }

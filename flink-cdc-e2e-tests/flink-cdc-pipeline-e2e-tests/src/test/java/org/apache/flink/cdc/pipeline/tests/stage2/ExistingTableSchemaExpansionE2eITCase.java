@@ -21,6 +21,7 @@ import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.cdc.common.test.utils.TestUtils;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
+import org.apache.flink.runtime.client.JobStatusMessage;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 
@@ -48,14 +49,15 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
  * End-to-end tests verifying that the {@code existing-table.schema-expansion.mode} sink option
  * reaches the schema expander through the whole wiring path (YAML option, Composer, schema operator
- * factory, schema registry or batch schema operator, metadata applier) in all three execution
- * topologies: regular streaming, batch, and distributed streaming.
+ * factory, schema registry, metadata applier) in the streaming and distributed execution
+ * topologies.
  *
  * <p>Every case pre-creates the target table with a strict subset of the source columns, so a flag
  * lost on any wiring hop leaves the missing columns unwritten and fails the assertions.
@@ -215,52 +217,6 @@ class ExistingTableSchemaExpansionE2eITCase extends PipelineTestEnvironment {
         // `products` existed with (id, name) only, the remaining columns come from the expander.
         validatePaimonSinkResult(warehouse, database, "products", expectedProductsRows());
         // `customers` did not exist upfront, so the sink still creates it on its own.
-        validatePaimonSinkResult(warehouse, database, "customers", expectedCustomersRows());
-    }
-
-    /**
-     * Batch runtime mode makes the Composer wire a batch schema operator instead of the
-     * coordinator-based one. MySQL accepts the {@code snapshot} startup mode only in batch
-     * pipelines, which also bounds the source so that the job reaches a terminal state.
-     */
-    @Test
-    void testBatchPath() throws Exception {
-        String warehouse = sharedVolume.toString() + "/" + "paimon_" + UUID.randomUUID();
-        String database = inventoryDatabase.getDatabaseName();
-        preCreatePaimonProductsTable(warehouse, database);
-
-        String pipelineJob =
-                String.format(
-                        "source:\n"
-                                + "  type: mysql\n"
-                                + "  hostname: mysql\n"
-                                + "  port: 3306\n"
-                                + "  username: %s\n"
-                                + "  password: %s\n"
-                                + "  tables: %s.\\.*\n"
-                                + "  server-id: 5400-5404\n"
-                                + "  server-time-zone: UTC\n"
-                                + "  scan.startup.mode: snapshot\n"
-                                + "\n"
-                                + "sink:\n"
-                                + "  type: paimon\n"
-                                + "  catalog.properties.warehouse: %s\n"
-                                + "  catalog.properties.metastore: filesystem\n"
-                                + "  catalog.properties.cache-enabled: false\n"
-                                + "  existing-table.schema-expansion.mode: EXPAND\n"
-                                + "\n"
-                                + "pipeline:\n"
-                                + "  schema.change.behavior: evolve\n"
-                                + "  parallelism: %s\n"
-                                + "  execution.runtime-mode: BATCH",
-                        MYSQL_TEST_USER, MYSQL_TEST_PASSWORD, database, warehouse, parallelism);
-        Path paimonCdcConnector = TestUtils.getResource("paimon-cdc-pipeline-connector.jar");
-        Path hadoopJar = TestUtils.getResource("flink-shade-hadoop.jar");
-        submitPipelineJob(pipelineJob, paimonCdcConnector, hadoopJar);
-        waitUntilJobFinished(EXPANSION_TESTCASE_TIMEOUT);
-        LOG.info("Batch pipeline job has finished");
-
-        validatePaimonSinkResult(warehouse, database, "products", expectedProductsRows());
         validatePaimonSinkResult(warehouse, database, "customers", expectedCustomersRows());
     }
 
@@ -637,9 +593,21 @@ class ExistingTableSchemaExpansionE2eITCase extends PipelineTestEnvironment {
      * table holding a strict subset of the source columns.
      */
     private void prepareFlussTables(String sourceDatabase, String sinkDatabase) throws Exception {
+        // copyJarToFlinkLib only reaches the JobManager container and the SQL client has no --jar
+        // option, so the TaskManager would lack the Fluss sink classes (such as
+        // FlinkStreamPartitioner) that the insert job needs. Publish the jar on the shared volume
+        // and hand it to the job through pipeline.jars, which ships it to every node. (Pointing
+        // pipeline.jars straight at /opt/flink/lib does not work: that directory is not part of the
+        // TaskManager image, and the jar never reaches the writers.)
+        String flussJar = String.format("fluss-flink-%s.jar", flinkVersion);
+        String containerJar = sharedVolume.toString() + "/" + flussJar;
+        jobManager.copyFileToContainer(
+                MountableFile.forHostPath(TestUtils.getResource(flussJar)), containerJar);
+
         String sql =
                 String.format(
-                        "SET 'execution.runtime-mode' = 'batch';\n"
+                        "SET 'pipeline.jars' = 'file://%s';\n"
+                                + "SET 'execution.runtime-mode' = 'batch';\n"
                                 + "CREATE CATALOG fluss_catalog WITH (\n"
                                 + "  'type' = 'fluss',\n"
                                 + "  'bootstrap.servers' = 'coordinator-server:9123',\n"
@@ -665,15 +633,22 @@ class ExistingTableSchemaExpansionE2eITCase extends PipelineTestEnvironment {
                                 + "  (101, 'One', 'Alice'),\n"
                                 + "  (102, 'Two', 'Bob'),\n"
                                 + "  (103, 'Three', 'Cecily');",
-                        sourceDatabase, sinkDatabase, sourceDatabase, sinkDatabase, sourceDatabase);
+                        containerJar,
+                        sourceDatabase,
+                        sinkDatabase,
+                        sourceDatabase,
+                        sinkDatabase,
+                        sourceDatabase);
         executeFlussSql(sql, "prepare_fluss");
 
-        // The SQL client may return before the inserted rows are visible to new Fluss readers.
-        // Verify that the records can actually be read before starting the CDC pipeline.
+        // The SQL client only submits the batch insert and returns, so the rows may not be visible
+        // to new Fluss readers yet. Verify that they can actually be read before starting the
+        // pipeline, and fail fast if the detached insert job died.
         List<String> expectedRows =
                 Arrays.asList("101, One, Alice", "102, Two, Bob", "103, Three, Cecily");
         long deadline = System.currentTimeMillis() + Duration.ofMinutes(2).toMillis();
         while (System.currentTimeMillis() < deadline) {
+            assertFlussSourceInsertNotFailed();
             try {
                 List<String> actualRows = fetchFlussTableRows(sourceDatabase, "products", 3);
                 if (actualRows.containsAll(expectedRows)
@@ -687,6 +662,23 @@ class ExistingTableSchemaExpansionE2eITCase extends PipelineTestEnvironment {
         }
         throw new IllegalStateException(
                 "Source Fluss table was not populated with the expected rows within 2 minutes.");
+    }
+
+    /**
+     * The SQL client submits batch DML and returns right away, so a job that dies afterwards stays
+     * invisible to {@code execInContainer}'s exit code. Surface it here instead of letting the
+     * read-back loop below time out with a misleading message.
+     */
+    private void assertFlussSourceInsertNotFailed() throws Exception {
+        for (JobStatusMessage job : getRestClusterClient().listJobs().get(10, TimeUnit.SECONDS)) {
+            if (job.getJobState() == JobStatus.FAILED) {
+                throw new IllegalStateException(
+                        String.format(
+                                "Populating the Fluss source table failed: job %s (%s) ended with "
+                                        + "status FAILED.",
+                                job.getJobName(), job.getJobId()));
+            }
+        }
     }
 
     /** Runs a script against the Paimon catalog, whose connector must be passed explicitly. */
@@ -703,6 +695,13 @@ class ExistingTableSchemaExpansionE2eITCase extends PipelineTestEnvironment {
                         "-f",
                         containerSqlPath);
         checkSqlResult(result, scriptName);
+        // The SQL client creates catalog artifacts (databases, tables, schema files) as the
+        // JobManager container's user, while the pipeline's sink and schema operator run in the
+        // TaskManager container and must create or alter files under the same shared volume.
+        // Widen permissions so the TaskManager can write those artifacts atomically; otherwise
+        // applyCreateTable/applyAddColumn fails with "Mkdirs failed" or "Permission denied" and
+        // the job dies without writing any record.
+        runInContainerAsRoot(jobManager, "chmod", "-R", "a+rwX", sharedVolume.toString());
     }
 
     /** Runs a script against the Fluss catalog, whose connector already sits in Flink's lib. */

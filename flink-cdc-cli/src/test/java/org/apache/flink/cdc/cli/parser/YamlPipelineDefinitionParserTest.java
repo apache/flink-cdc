@@ -534,28 +534,12 @@ class YamlPipelineDefinitionParserTest {
     }
 
     @Test
-    void testExistingTableSchemaExpansionModeDefaultsToOff() throws Exception {
+    void testExistingTableSchemaExpansionModeDefaultsToDisabled() throws Exception {
         PipelineDef defaultPipeline =
                 new YamlPipelineDefinitionParser()
                         .parse("source:\n  type: foo\nsink:\n  type: bar\n", new Configuration());
         assertThat(defaultPipeline.getSink().getExistingTableSchemaExpansionMode())
-                .isEqualTo(ExistingTableSchemaExpansionMode.OFF);
-    }
-
-    @Test
-    void testBareOffParsesAsExpansionModeOff() throws Exception {
-        // A bare OFF scalar is parsed into a boolean false by Jackson YAML and must be accepted.
-        PipelineDef parsed =
-                new YamlPipelineDefinitionParser()
-                        .parse(
-                                "source:\n"
-                                        + "  type: foo\n"
-                                        + "sink:\n"
-                                        + "  type: bar\n"
-                                        + "  existing-table.schema-expansion.mode: OFF\n",
-                                new Configuration());
-        assertThat(parsed.getSink().getExistingTableSchemaExpansionMode())
-                .isEqualTo(ExistingTableSchemaExpansionMode.OFF);
+                .isEqualTo(ExistingTableSchemaExpansionMode.DISABLED);
     }
 
     @Test
@@ -571,7 +555,7 @@ class YamlPipelineDefinitionParserTest {
                                                         + "  existing-table.schema-expansion.mode: INVALID\n",
                                                 new Configuration()))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("OFF, CHECK, TRY_EXPAND, EXPAND");
+                .hasMessageContaining("DISABLED, CHECK, TRY_EXPAND, EXPAND");
 
         assertThatThrownBy(
                         () ->
@@ -584,7 +568,20 @@ class YamlPipelineDefinitionParserTest {
                                                         + "  existing-table.schema-expansion.mode: true\n",
                                                 new Configuration()))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("OFF, CHECK, TRY_EXPAND, EXPAND");
+                .hasMessageContaining("DISABLED, CHECK, TRY_EXPAND, EXPAND");
+
+        assertThatThrownBy(
+                        () ->
+                                new YamlPipelineDefinitionParser()
+                                        .parse(
+                                                "source:\n"
+                                                        + "  type: foo\n"
+                                                        + "sink:\n"
+                                                        + "  type: bar\n"
+                                                        + "  existing-table.schema-expansion.mode: false\n",
+                                                new Configuration()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("DISABLED, CHECK, TRY_EXPAND, EXPAND");
     }
 
     @Test

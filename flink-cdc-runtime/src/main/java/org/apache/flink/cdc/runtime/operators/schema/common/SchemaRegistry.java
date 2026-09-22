@@ -156,7 +156,7 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
         this.router = new TableIdRouter(routingRules, routeMode);
         // TRY_EXPAND/EXPAND never run under IGNORE/EXCEPTION, so skip their initialization there.
         // CHECK guards the initial table state and initializes regardless of the behavior.
-        if (existingTableSchemaExpansionMode != ExistingTableSchemaExpansionMode.OFF
+        if (existingTableSchemaExpansionMode != ExistingTableSchemaExpansionMode.DISABLED
                 && (existingTableSchemaExpansionMode == ExistingTableSchemaExpansionMode.CHECK
                         || (behavior != SchemaChangeBehavior.IGNORE
                                 && behavior != SchemaChangeBehavior.EXCEPTION))) {
@@ -184,11 +184,7 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
                 String.format(
                         "Existing target table schema expansion is enabled with mode %s, but MetadataApplier %s does not support it.",
                         existingTableSchemaExpansionMode, metadataApplier.getClass().getName());
-        if (existingTableSchemaExpansionMode == ExistingTableSchemaExpansionMode.TRY_EXPAND) {
-            LOG.warn("{}. The sink's original schema handling will be used.", message);
-        } else {
-            throw new FlinkRuntimeException(message);
-        }
+        throw new FlinkRuntimeException(message);
     }
 
     private void handleExpansionInitFailure(Exception cause) {
@@ -196,11 +192,7 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
                 String.format(
                         "Failed to initialize existing target table schema expansion with mode %s.",
                         existingTableSchemaExpansionMode);
-        if (existingTableSchemaExpansionMode == ExistingTableSchemaExpansionMode.TRY_EXPAND) {
-            LOG.warn("{}. The sink's original schema handling will be used.", message, cause);
-        } else {
-            throw new FlinkRuntimeException(message, cause);
-        }
+        throw new FlinkRuntimeException(message, cause);
     }
 
     /**
@@ -211,7 +203,8 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
      */
     protected boolean expandExistingTableSchemaIfNeeded(SchemaChangeEvent schemaChangeEvent) {
         if (existingTableSchemaExpander != null && schemaChangeEvent instanceof CreateTableEvent) {
-            return existingTableSchemaExpander.expand((CreateTableEvent) schemaChangeEvent);
+            return existingTableSchemaExpander.handleExistingTableCreation(
+                    (CreateTableEvent) schemaChangeEvent);
         }
         return true;
     }

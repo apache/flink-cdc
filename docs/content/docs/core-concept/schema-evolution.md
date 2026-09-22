@@ -75,18 +75,29 @@ This is useful when your downstream sink is unready for any schema changes, but 
 
 ## Existing Table Schema Expansion
 
-Set the sink option `existing-table.schema-expansion.mode` to control how the framework handles the initial `CreateTableEvent` when the target table already exists. The default is `OFF`. For sinks that implement this capability, the framework may add missing non-key physical columns as nullable columns and safely widen non-key column types. Derived DDL events are logged.
+Set the sink option `existing-table.schema-expansion.mode` to control how the framework handles the initial `CreateTableEvent` when the target table already exists. The default is `DISABLED`. For sinks that implement this capability, the framework may add missing non-key physical columns as nullable columns and safely widen non-key column types. Derived DDL events are logged.
+
+This is a framework-level option consumed directly by Flink CDC's `sink` block. It is removed from the sink configuration before the connector is created, so it never reaches the connector's `MetadataApplier` as a configuration property. Unlike `catalog.properties.*`, it cannot be nested under connector-specific properties; placing it under `catalog.properties.existing-table.schema-expansion.mode` has no effect.
+
+| Option | Scope | Passed to connector |
+|---|---|---|
+| `existing-table.schema-expansion.mode` | Flink CDC framework | No |
+| `catalog.properties.*` | Connector-specific catalog options | Yes |
+
+Expansion is only available for sinks whose `MetadataApplier` implements `ExistingTableSchemaExpansionSupport`. The pipeline connectors currently implementing this capability are Paimon and Fluss. Any other explicitly configured non-`DISABLED` mode fails fast because the required expansion capability is unavailable.
+
+Expansion applies to streaming pipelines only. When `execution.runtime-mode` is `BATCH`, the option is ignored, a warning is logged, and the sink's original schema handling applies.
 
 | Mode | Behavior on an existing target table | Behavior when the target table is missing | Failure handling |
 |---|---|---|---|
-| `OFF` | No check or expansion; the sink's original behavior applies | Sink creates the table | N/A |
+| `DISABLED` | No check or expansion; the sink's original behavior applies | Sink creates the table | N/A |
 | `CHECK` | Validate that every upstream column can be contained by the target table, without issuing any DDL | Fails the job; the table must be created externally | Any incompatibility, read failure, or missing capability fails the job with an aggregated error |
-| `TRY_EXPAND` | Check and best-effort apply safe DDL, then verify the result by reading the target schema back | Sink creates the table | Failures of this mechanism are logged and delegated to the sink's original behavior |
+| `TRY_EXPAND` | Check and best-effort apply safe DDL, then verify the result by reading the target schema back | Sink creates the table | A missing expansion capability fails the job; other failures of this mechanism are logged and delegated to the sink's original behavior |
 | `EXPAND` | Check and apply safe DDL, then verify the result by reading the target schema back | Sink creates the table | Any incompatibility, unsupported DDL, execution or verification failure fails the job |
 
-`CHECK` never issues DDL, so it is independent of `include.schema.changes` and of the sink's DDL capabilities. It guards the initial table state and runs **regardless of `schema.change.behavior`** (including `IGNORE` and `EXCEPTION`); `TRY_EXPAND` and `EXPAND` skip the framework-side initial handling when `schema.change.behavior` is `IGNORE` or `EXCEPTION`. Note that `CHECK` only constrains the initial table handling: subsequent source schema changes are still controlled by `schema.change.behavior`, so it is not a job-wide "never issue DDL" switch. When the check fails, the aggregated error lists every difference (table, column, upstream type vs. target type) together with suggested `ALTER TABLE` repair statements that can be reviewed and adjusted to the target system's dialect.
+`CHECK` never issues DDL, so it is independent of `include.schema.changes` and of the sink's DDL capabilities. It guards the initial table state and runs **regardless of `schema.change.behavior`** (including `IGNORE` and `EXCEPTION`); `TRY_EXPAND` and `EXPAND` skip the framework-side initial handling when `schema.change.behavior` is `IGNORE` or `EXCEPTION`. Note that `CHECK` only constrains the initial table handling: subsequent source schema changes are still controlled by `schema.change.behavior`, so it is not a job-wide "never issue DDL" switch. When the check fails, the aggregated error lists every difference (table, column, upstream type vs. target type) together with dialect-independent `ALTER TABLE` repair SQL templates that must be reviewed and adjusted to the target connector's DDL dialect before execution.
 
-`TRY_EXPAND` swallows failures of this mechanism only; it neither hides errors from the sink's own schema handling nor guarantees that all upstream columns end up in the target table after a failed expansion.
+`TRY_EXPAND` swallows expansion-mechanism failures only after the connector is confirmed to support the capability; it neither hides errors from the sink's own schema handling nor guarantees that all upstream columns end up in the target table after a failed expansion.
 
 ```yaml
 sink:
@@ -94,7 +105,7 @@ sink:
   existing-table.schema-expansion.mode: "EXPAND"
 ```
 
-Quote the mode value (for example `"OFF"`) to avoid the bare `OFF` scalar being parsed as a YAML boolean.
+The mode value must be quoted as a string (for example `"DISABLED"` or `"EXPAND"`); boolean values are not accepted.
 
 ## Per-Event Type Control
 

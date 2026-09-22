@@ -61,7 +61,7 @@ public class SchemaOperatorFactory extends SimpleOperatorFactory<Event>
                 routeMode,
                 rpcTimeout,
                 schemaChangeBehavior,
-                ExistingTableSchemaExpansionMode.OFF,
+                ExistingTableSchemaExpansionMode.DISABLED,
                 timezone);
     }
 

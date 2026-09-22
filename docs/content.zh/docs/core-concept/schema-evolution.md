@@ -77,18 +77,29 @@ pipeline:
 
 ## 已有目标表的安全 Schema 扩展
 
-设置 Sink 选项 `existing-table.schema-expansion.mode` 来控制框架在初始 `CreateTableEvent` 遇到已有目标表时的处理方式，默认值为 `OFF`。对于实现了该能力的 Sink，框架可能将缺失的普通非键物理列按 nullable 补充，并安全拓宽普通非键列类型；派生的 DDL 事件会记录在日志中。
+设置 Sink 选项 `existing-table.schema-expansion.mode` 来控制框架在初始 `CreateTableEvent` 遇到已有目标表时的处理方式，默认值为 `DISABLED`。对于实现了该能力的 Sink，框架可能将缺失的普通非键物理列按 nullable 补充，并安全拓宽普通非键列类型；派生的 DDL 事件会记录在日志中。
+
+这是由 Flink CDC 框架直接消费的 `sink` 级选项。连接器创建前，框架会从 Sink 配置中移除该选项，因此它不会作为配置属性传递到连接器的 `MetadataApplier`。与 `catalog.properties.*` 不同，该选项不能嵌套在连接器专属属性下；将其写入 `catalog.properties.existing-table.schema-expansion.mode` 不会生效。
+
+| 选项 | 作用范围 | 是否传递给连接器 |
+|---|---|---|
+| `existing-table.schema-expansion.mode` | Flink CDC 框架 | 否 |
+| `catalog.properties.*` | 连接器专属 Catalog 选项 | 是 |
+
+只有其 `MetadataApplier` 实现了 `ExistingTableSchemaExpansionSupport` 的 Sink 才支持扩展。当前实现该能力的 pipeline connector 是 Paimon 和 Fluss。显式配置任何非 `DISABLED` 模式时，如果当前 connector 缺少扩展能力，作业都会立即失败。
+
+该能力仅对流式作业生效。当 `execution.runtime-mode` 为 `BATCH` 时，该选项会被忽略并打印告警日志，此时沿用 Sink 原生的 Schema 处理。
 
 | 模式 | 已有目标表 | 目标表不存在 | 失败处理 |
 |---|---|---|---|
-| `OFF` | 不检查、不扩展，保持 Sink 原行为 | Sink 原生建表 | 不适用 |
+| `DISABLED` | 不检查、不扩展，保持 Sink 原行为 | Sink 原生建表 | 不适用 |
 | `CHECK` | 只校验每个上游列能否被目标表容纳，不执行任何 DDL | 作业失败，目标表需由外部创建 | 任何不兼容、读取失败或能力缺失都会以聚合错误使作业失败 |
-| `TRY_EXPAND` | 检查并尽力执行安全 DDL，随后读回目标 schema 验证 | Sink 原生建表 | 本机制的失败仅记录日志并交给 Sink 原行为 |
+| `TRY_EXPAND` | 检查并尽力执行安全 DDL，随后读回目标 schema 验证 | Sink 原生建表 | 缺少扩展能力时作业失败；本机制的其他失败仅记录日志并交给 Sink 原行为 |
 | `EXPAND` | 检查并执行安全 DDL，随后读回目标 schema 验证 | Sink 原生建表 | 任何不兼容、DDL 不支持、执行或验证失败都会使作业失败 |
 
-`CHECK` 不执行任何 DDL，因此不受 `include.schema.changes` 和 Sink DDL 能力的影响。它守护初始表状态，**不受 `schema.change.behavior` 控制**（包括 `IGNORE` 和 `EXCEPTION` 也会执行检查）；`TRY_EXPAND` 和 `EXPAND` 在 `schema.change.behavior` 为 `IGNORE` 或 `EXCEPTION` 时跳过框架侧初始处理。注意：`CHECK` 只约束已有目标表的初始处理，后续源端 Schema 变更仍由 `schema.change.behavior` 控制，因此它不是全作业级别的“永不执行 DDL”开关。检查失败时，聚合错误会列出每处差异（表、列、上游类型与目标类型），并附建议的 `ALTER TABLE` 修复语句，可按目标系统方言调整后人工执行。
+`CHECK` 不执行任何 DDL，因此不受 `include.schema.changes` 和 Sink DDL 能力的影响。它守护初始表状态，**不受 `schema.change.behavior` 控制**（包括 `IGNORE` 和 `EXCEPTION` 也会执行检查）；`TRY_EXPAND` 和 `EXPAND` 在 `schema.change.behavior` 为 `IGNORE` 或 `EXCEPTION` 时跳过框架侧初始处理。注意：`CHECK` 只约束已有目标表的初始处理，后续源端 Schema 变更仍由 `schema.change.behavior` 控制，因此它不是全作业级别的“永不执行 DDL”开关。检查失败时，聚合错误会列出每处差异（表、列、上游类型与目标类型），并附方言无关的 `ALTER TABLE` 修复 SQL 模板，需按目标连接器方言调整并人工确认后执行。
 
-`TRY_EXPAND` 只吞掉本机制自身的失败：它既不屏蔽 Sink 自身 Schema 处理抛出的错误，也不保证扩展失败后所有上游列都能落入目标表。
+`TRY_EXPAND` 仅在确认 connector 支持该能力后吞掉本机制自身的失败：它既不屏蔽 Sink 自身 Schema 处理抛出的错误，也不保证扩展失败后所有上游列都能落入目标表。
 
 ```yaml
 sink:
@@ -96,7 +107,7 @@ sink:
   existing-table.schema-expansion.mode: "EXPAND"
 ```
 
-建议给模式值加引号（例如 `"OFF"`），避免裸写 `OFF` 被 YAML 解析为布尔值。
+模式值必须使用字符串（例如 `"DISABLED"` 或 `"EXPAND"`）；布尔值将不被接受。
 
 ## 按类型配置行为
 
