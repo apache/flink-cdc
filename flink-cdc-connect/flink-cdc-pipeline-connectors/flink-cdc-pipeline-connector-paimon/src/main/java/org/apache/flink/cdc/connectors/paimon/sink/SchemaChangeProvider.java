@@ -164,11 +164,12 @@ public class SchemaChangeProvider {
         return TypeUtils.toPaimonDataType(column.getType());
     }
 
-    /** Check if DataType can be converted to BLOB (BINARY, VARBINARY, or VARCHAR). */
+    /** Check if DataType can be converted to BLOB (BINARY, VARBINARY, CHAR or VARCHAR). */
     private static boolean isSupportedTypeForBlob(DataType dataType) {
         DataTypeRoot typeRoot = dataType.getTypeRoot();
         return typeRoot == DataTypeRoot.BINARY
                 || typeRoot == DataTypeRoot.VARBINARY
+                || typeRoot == DataTypeRoot.CHAR
                 || typeRoot == DataTypeRoot.VARCHAR;
     }
 

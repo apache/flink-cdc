@@ -992,7 +992,7 @@ class PaimonMetadataApplierTest {
                     SchemaEvolveException {
         initialize(metastore);
         Map<String, String> tableOptions = new HashMap<>();
-        tableOptions.put(CoreOptions.BLOB_FIELD.key(), "new_blob_col");
+        tableOptions.put(CoreOptions.BLOB_FIELD.key(), "new_blob_col,char_blob_col");
         tableOptions.put(CoreOptions.ROW_TRACKING_ENABLED.key(), "true");
         tableOptions.put(CoreOptions.DATA_EVOLUTION_ENABLED.key(), "true");
         MetadataApplier metadataApplier =
@@ -1009,13 +1009,18 @@ class PaimonMetadataApplierTest {
                                 .build());
         metadataApplier.applySchemaChange(createTableEvent);
 
-        // Add VARBINARY column that should be converted to BLOB
+        // Add VARBINARY and CHAR columns that should be converted to BLOB
         List<AddColumnEvent.ColumnWithPosition> addedColumns = new ArrayList<>();
         addedColumns.add(
                 new AddColumnEvent.ColumnWithPosition(
                         Column.physicalColumn(
                                 "new_blob_col",
                                 org.apache.flink.cdc.common.types.DataTypes.VARBINARY(100))));
+        addedColumns.add(
+                new AddColumnEvent.ColumnWithPosition(
+                        Column.physicalColumn(
+                                "char_blob_col",
+                                org.apache.flink.cdc.common.types.DataTypes.CHAR(100))));
         AddColumnEvent addColumnEvent =
                 new AddColumnEvent(TableId.parse("test.add_blob_column_table"), addedColumns);
         metadataApplier.applySchemaChange(addColumnEvent);
@@ -1025,6 +1030,8 @@ class PaimonMetadataApplierTest {
 
         // Verify the added column is BLOB type
         assertThat(rowType.getField("new_blob_col").type().getTypeRoot())
+                .isEqualTo(org.apache.paimon.types.DataTypeRoot.BLOB);
+        assertThat(rowType.getField("char_blob_col").type().getTypeRoot())
                 .isEqualTo(org.apache.paimon.types.DataTypeRoot.BLOB);
     }
 
