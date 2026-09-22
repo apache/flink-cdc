@@ -297,23 +297,12 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
 
     private static ExistingTableSchemaExpansionMode parseExpansionMode(JsonNode optionValue) {
         if (optionValue == null) {
-            return ExistingTableSchemaExpansionMode.OFF;
-        }
-        // A bare `OFF` YAML scalar is parsed by Jackson YAML into a boolean `false`; accept it as
-        // OFF for ergonomics. Any other boolean is ambiguous and rejected.
-        if (optionValue.isBoolean()) {
-            if (!optionValue.booleanValue()) {
-                return ExistingTableSchemaExpansionMode.OFF;
-            }
-            throw new IllegalArgumentException(
-                    String.format(
-                            "Option \"%s\" must be one of OFF, CHECK, TRY_EXPAND, EXPAND, but was \"%s\".",
-                            EXISTING_TABLE_SCHEMA_EXPANSION_MODE, optionValue));
+            return ExistingTableSchemaExpansionMode.DISABLED;
         }
         if (!optionValue.isTextual()) {
             throw new IllegalArgumentException(
                     String.format(
-                            "Option \"%s\" must be one of OFF, CHECK, TRY_EXPAND, EXPAND, but was \"%s\".",
+                            "Option \"%s\" must be one of DISABLED, CHECK, TRY_EXPAND, EXPAND, but was \"%s\".",
                             EXISTING_TABLE_SCHEMA_EXPANSION_MODE, optionValue));
         }
         String value = optionValue.asText();
@@ -324,7 +313,7 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         }
         throw new IllegalArgumentException(
                 String.format(
-                        "Option \"%s\" must be one of OFF, CHECK, TRY_EXPAND, EXPAND, but was \"%s\".",
+                        "Option \"%s\" must be one of DISABLED, CHECK, TRY_EXPAND, EXPAND, but was \"%s\".",
                         EXISTING_TABLE_SCHEMA_EXPANSION_MODE, value));
     }
 

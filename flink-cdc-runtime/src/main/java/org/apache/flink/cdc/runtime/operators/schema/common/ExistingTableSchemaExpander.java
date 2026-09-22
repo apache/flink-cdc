@@ -98,11 +98,17 @@ public class ExistingTableSchemaExpander {
     /**
      * Handles the initial {@link CreateTableEvent} for an existing target table.
      *
-     * @return whether the caller should proceed to apply the original {@link CreateTableEvent} to
-     *     the sink. {@code CHECK} mode returns {@code false} after a successful check so that no
-     *     external DDL is issued by the pipeline.
+     * <p>This is a two-phase contract: the expander first tries to check/expand the existing target
+     * table, then signals whether the sink should still apply the original {@link
+     * CreateTableEvent}.
+     *
+     * @return {@code true} if the caller should proceed to apply the original {@link
+     *     CreateTableEvent} to the sink; {@code false} means the framework has fully handled this
+     *     event and the original {@link CreateTableEvent} must not be applied. {@code CHECK} mode
+     *     returns {@code false} after a successful check so that no external DDL is issued by the
+     *     pipeline.
      */
-    public boolean expand(CreateTableEvent createTableEvent) {
+    public boolean handleExistingTableCreation(CreateTableEvent createTableEvent) {
         if (mode == ExistingTableSchemaExpansionMode.CHECK) {
             // CHECK guards the initial table state and runs regardless of schema.change.behavior.
             checkCompatibility(createTableEvent);
@@ -120,7 +126,7 @@ public class ExistingTableSchemaExpander {
             case EXPAND:
                 expandStrictly(createTableEvent);
                 return true;
-            case OFF:
+            case DISABLED:
             default:
                 return true;
         }
@@ -150,35 +156,70 @@ public class ExistingTableSchemaExpander {
     }
 
     private void tryExpand(CreateTableEvent createTableEvent) {
+        // Phase 1 - probe the target table. Failures here are "cannot expand safely" cases: the
+        // connector lacks DDL capability, or the target table does not exist yet. Delegating to the
+        // sink's original behavior is safe because no derived DDL has been issued.
+        if (!supportsAnyExpansionDdl()) {
+            LOG.info(
+                    "Neither ADD_COLUMN nor ALTER_COLUMN_TYPE is enabled or supported for target table {}. Delegating schema handling to the sink.",
+                    createTableEvent.tableId());
+            return;
+        }
+        Optional<Schema> targetSchema;
         try {
-            if (!supportsAnyExpansionDdl()) {
-                LOG.info(
-                        "Neither ADD_COLUMN nor ALTER_COLUMN_TYPE is enabled or supported for target table {}. Delegating schema handling to the sink.",
-                        createTableEvent.tableId());
-                return;
-            }
-            Optional<Schema> targetSchema = queryTargetSchema(createTableEvent.tableId());
-            if (!targetSchema.isPresent()) {
-                LOG.info(
-                        "Target table {} does not exist. Delegating table creation to the sink.",
-                        createTableEvent.tableId());
-                return;
-            }
-            ExpansionPlan plan = analyze(createTableEvent, targetSchema.get());
-            for (String incompatibility : plan.incompatibilities) {
-                LOG.warn(
-                        "Target table {} has an unsupported difference: {}. Delegating it to the sink.",
-                        createTableEvent.tableId(),
-                        incompatibility);
-            }
-            applyPlan(createTableEvent, plan);
-            verifyExpansion(createTableEvent, plan, false);
+            targetSchema = queryTargetSchema(createTableEvent.tableId());
         } catch (Exception e) {
             LOG.warn(
-                    "Best-effort schema expansion failed for existing target table {}. Delegating schema handling to the sink.",
+                    "Failed to read the existing target table {} before expansion. Delegating schema handling to the sink.",
                     createTableEvent.tableId(),
                     e);
+            return;
         }
+        if (!targetSchema.isPresent()) {
+            LOG.info(
+                    "Target table {} does not exist. Delegating table creation to the sink.",
+                    createTableEvent.tableId());
+            return;
+        }
+
+        ExpansionPlan plan = analyze(createTableEvent, targetSchema.get());
+        for (String incompatibility : plan.incompatibilities) {
+            LOG.warn(
+                    "Target table {} has an unsupported difference: {}. Delegating it to the sink.",
+                    createTableEvent.tableId(),
+                    incompatibility);
+        }
+
+        // The plan needs repair DDL, but the sink cannot perform the specific required event type.
+        // This is a capability gap, not a transient failure, so delegate to the sink instead of
+        // failing the job (mirrors applyPlan's capability checks, which throw for EXPAND mode).
+        if (!plan.columnsToAdd.isEmpty()
+                && !supportsSchemaEvolutionType(SchemaChangeEventType.ADD_COLUMN)) {
+            LOG.warn(
+                    "Target table {} is missing columns {}, but ADD_COLUMN is not enabled or supported by the sink. Delegating schema handling to the sink.",
+                    createTableEvent.tableId(),
+                    getColumnNames(plan.columnsToAdd));
+            return;
+        }
+        if (!plan.columnsToWiden.isEmpty()
+                && !supportsSchemaEvolutionType(SchemaChangeEventType.ALTER_COLUMN_TYPE)) {
+            LOG.warn(
+                    "Target table {} has narrow columns {}, but ALTER_COLUMN_TYPE is not enabled or supported by the sink. Delegating schema handling to the sink.",
+                    createTableEvent.tableId(),
+                    plan.columnsToWiden.keySet());
+            return;
+        }
+
+        // Phase 2 - apply and verify. At this point the expander has identified supportable
+        // differences and is about to issue derived DDL. A failure here (transient network/catalog
+        // error, DDL execution failure, or read-back verification failure) must propagate so the
+        // job fails over and the idempotent expander retries; otherwise the original
+        // CreateTableEvent
+        // would be applied to an existing table (typically a no-op) and the missing columns would
+        // be
+        // silently dropped forever.
+        applyPlan(createTableEvent, plan);
+        verifyExpansion(createTableEvent, plan, false);
     }
 
     private void expandStrictly(CreateTableEvent createTableEvent) {
@@ -231,7 +272,7 @@ public class ExistingTableSchemaExpander {
         if (!repairSuggestions.isEmpty()) {
             message +=
                     String.format(
-                            "\nSuggested repair statements (adjust to the target system's DDL dialect):%s",
+                            "\nSuggested repair SQL templates (review and adjust to the target connector's DDL dialect before execution):%s",
                             repairSuggestions);
         }
         return new SchemaEvolveException(createTableEvent, message);

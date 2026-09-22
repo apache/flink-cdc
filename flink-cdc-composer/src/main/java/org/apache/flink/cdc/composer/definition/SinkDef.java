@@ -55,7 +55,7 @@ public class SinkDef {
         this.config = config;
         this.includedSchemaEvolutionTypes =
                 Arrays.stream(SchemaChangeEventTypeFamily.ALL).collect(Collectors.toSet());
-        this.existingTableSchemaExpansionMode = ExistingTableSchemaExpansionMode.OFF;
+        this.existingTableSchemaExpansionMode = ExistingTableSchemaExpansionMode.DISABLED;
     }
 
     public SinkDef(
@@ -68,7 +68,7 @@ public class SinkDef {
                 name,
                 config,
                 includedSchemaEvolutionTypes,
-                ExistingTableSchemaExpansionMode.OFF);
+                ExistingTableSchemaExpansionMode.DISABLED);
     }
 
     public SinkDef(

@@ -131,9 +131,7 @@ public class PaimonMetadataApplier implements MetadataApplier, ExistingTableSche
 
     @Override
     public Optional<Schema> getExistingTableSchema(TableId tableId) {
-        if (catalog == null) {
-            catalog = FlinkCatalogFactory.createPaimonCatalog(catalogOptions);
-        }
+        Catalog catalog = getCatalog();
         try {
             Table table =
                     catalog.getTable(
@@ -169,18 +167,14 @@ public class PaimonMetadataApplier implements MetadataApplier, ExistingTableSche
 
     @Override
     public boolean isColumnNameCaseSensitive() {
-        if (catalog == null) {
-            catalog = FlinkCatalogFactory.createPaimonCatalog(catalogOptions);
-        }
-        return catalog.caseSensitive();
+        return getCatalog().caseSensitive();
     }
 
     @Override
     public void applySchemaChange(SchemaChangeEvent schemaChangeEvent)
             throws SchemaEvolveException {
-        if (catalog == null) {
-            catalog = FlinkCatalogFactory.createPaimonCatalog(catalogOptions);
-        }
+        // Eagerly initialize the catalog: the visitor methods below use the cached field directly.
+        getCatalog();
         SchemaChangeEventVisitor.voidVisit(
                 schemaChangeEvent,
                 this::applyAddColumn,
@@ -197,7 +191,21 @@ public class PaimonMetadataApplier implements MetadataApplier, ExistingTableSche
     public void close() throws Exception {
         if (catalog != null) {
             catalog.close();
+            catalog = null;
         }
+    }
+
+    /**
+     * Lazily creates and caches the Paimon {@link Catalog}. All catalog access must go through this
+     * method so the lifecycle stays centralized: the catalog is created once on first use and
+     * released by {@link #close()}, which also resets the cached instance so the applier stays
+     * reusable after close.
+     */
+    private Catalog getCatalog() {
+        if (catalog == null) {
+            catalog = FlinkCatalogFactory.createPaimonCatalog(catalogOptions);
+        }
+        return catalog;
     }
 
     private void applyCreateTable(CreateTableEvent event) throws SchemaEvolveException {

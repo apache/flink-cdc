@@ -69,7 +69,7 @@ class ExistingTableSchemaExpanderTest {
                 new TestingExistingTableSchemaExpansionSupport(null);
 
         new ExistingTableSchemaExpander(applier, applier, SchemaChangeBehavior.LENIENT)
-                .expand(eventWithMissingColumn());
+                .handleExistingTableCreation(eventWithMissingColumn());
         assertThat(applier.queryCalls).isOne();
         assertThat(applier.appliedEvents).isEmpty();
     }
@@ -86,8 +86,8 @@ class ExistingTableSchemaExpanderTest {
                         Column.physicalColumn("id", DataTypes.INT()),
                         Column.physicalColumn("name", DataTypes.STRING().notNull()));
 
-        expander.expand(event);
-        expander.expand(event);
+        expander.handleExistingTableCreation(event);
+        expander.handleExistingTableCreation(event);
 
         assertThat(applier.appliedEvents).hasSize(1);
         AddColumnEvent addColumnEvent = (AddColumnEvent) applier.appliedEvents.get(0);
@@ -111,7 +111,7 @@ class ExistingTableSchemaExpanderTest {
                         .build();
 
         new ExistingTableSchemaExpander(applier, applier, SchemaChangeBehavior.LENIENT)
-                .expand(new CreateTableEvent(TABLE_ID, pipelineSchema));
+                .handleExistingTableCreation(new CreateTableEvent(TABLE_ID, pipelineSchema));
         assertThat(applier.appliedEvents).isEmpty();
     }
 
@@ -122,7 +122,8 @@ class ExistingTableSchemaExpanderTest {
                         schema(Column.physicalColumn("value", DataTypes.BIGINT())));
 
         new ExistingTableSchemaExpander(applier, applier, SchemaChangeBehavior.LENIENT)
-                .expand(createTableEvent(Column.physicalColumn("value", DataTypes.INT())));
+                .handleExistingTableCreation(
+                        createTableEvent(Column.physicalColumn("value", DataTypes.INT())));
         assertThat(applier.appliedEvents).isEmpty();
     }
 
@@ -136,8 +137,8 @@ class ExistingTableSchemaExpanderTest {
         CreateTableEvent event =
                 createTableEvent(Column.physicalColumn("value", DataTypes.BIGINT()));
 
-        expander.expand(event);
-        expander.expand(event);
+        expander.handleExistingTableCreation(event);
+        expander.handleExistingTableCreation(event);
 
         assertThat(applier.appliedEvents).singleElement().isInstanceOf(AlterColumnTypeEvent.class);
         AlterColumnTypeEvent alterColumnTypeEvent =
@@ -164,7 +165,7 @@ class ExistingTableSchemaExpanderTest {
                 new TestingExistingTableSchemaExpansionSupport(targetSchema);
 
         new ExistingTableSchemaExpander(applier, applier, SchemaChangeBehavior.LENIENT)
-                .expand(new CreateTableEvent(TABLE_ID, pipelineSchema));
+                .handleExistingTableCreation(new CreateTableEvent(TABLE_ID, pipelineSchema));
         assertThat(applier.appliedEvents).isEmpty();
     }
 
@@ -175,7 +176,7 @@ class ExistingTableSchemaExpanderTest {
                         schema(Column.physicalColumn("amount", DataTypes.DECIMAL(12, 2))));
 
         new ExistingTableSchemaExpander(applier, applier, SchemaChangeBehavior.LENIENT)
-                .expand(
+                .handleExistingTableCreation(
                         createTableEvent(
                                 Column.physicalColumn("amount", DataTypes.DECIMAL(12, 4))));
 
@@ -193,7 +194,8 @@ class ExistingTableSchemaExpanderTest {
                         schema(Column.physicalColumn("value", targetType)));
 
         new ExistingTableSchemaExpander(applier, applier, SchemaChangeBehavior.LENIENT)
-                .expand(createTableEvent(Column.physicalColumn("value", pipelineType)));
+                .handleExistingTableCreation(
+                        createTableEvent(Column.physicalColumn("value", pipelineType)));
 
         AlterColumnTypeEvent event = (AlterColumnTypeEvent) applier.appliedEvents.get(0);
         assertThat(event.getTypeMapping()).containsExactly(Map.entry("value", expectedWidenedType));
@@ -207,7 +209,8 @@ class ExistingTableSchemaExpanderTest {
                         schema(Column.physicalColumn("value", targetType)));
 
         new ExistingTableSchemaExpander(applier, applier, SchemaChangeBehavior.LENIENT)
-                .expand(createTableEvent(Column.physicalColumn("value", pipelineType)));
+                .handleExistingTableCreation(
+                        createTableEvent(Column.physicalColumn("value", pipelineType)));
         assertThat(applier.appliedEvents).isEmpty();
     }
 
@@ -218,7 +221,8 @@ class ExistingTableSchemaExpanderTest {
                         schema(Column.physicalColumn("value", DataTypes.BOOLEAN())));
 
         new ExistingTableSchemaExpander(applier, applier, SchemaChangeBehavior.LENIENT)
-                .expand(createTableEvent(Column.physicalColumn("value", DataTypes.TIMESTAMP())));
+                .handleExistingTableCreation(
+                        createTableEvent(Column.physicalColumn("value", DataTypes.TIMESTAMP())));
         assertThat(applier.appliedEvents).isEmpty();
     }
 
@@ -238,7 +242,7 @@ class ExistingTableSchemaExpanderTest {
                 };
 
         new ExistingTableSchemaExpander(applier, applier, SchemaChangeBehavior.LENIENT)
-                .expand(
+                .handleExistingTableCreation(
                         createTableEvent(
                                 Column.physicalColumn("event_time", DataTypes.TIMESTAMP(9))));
         assertThat(applier.appliedEvents).isEmpty();
@@ -261,7 +265,8 @@ class ExistingTableSchemaExpanderTest {
                                 : type;
 
         new ExistingTableSchemaExpander(applier, applier, SchemaChangeBehavior.LENIENT)
-                .expand(createTableEvent(Column.physicalColumn("id", DataTypes.BIGINT())));
+                .handleExistingTableCreation(
+                        createTableEvent(Column.physicalColumn("id", DataTypes.BIGINT())));
 
         assertThat(applier.appliedEvents).isEmpty();
         assertThat(applier.queryCalls).isOne();
@@ -277,7 +282,7 @@ class ExistingTableSchemaExpanderTest {
         applier.normalizationFailureColumns.add("broken");
 
         new ExistingTableSchemaExpander(applier, applier, SchemaChangeBehavior.LENIENT)
-                .expand(
+                .handleExistingTableCreation(
                         createTableEvent(
                                 Column.physicalColumn("broken", DataTypes.BIGINT()),
                                 Column.physicalColumn("id", DataTypes.BIGINT()),
@@ -300,7 +305,8 @@ class ExistingTableSchemaExpanderTest {
         applier.columnNameCaseSensitive = false;
 
         new ExistingTableSchemaExpander(applier, applier, SchemaChangeBehavior.LENIENT)
-                .expand(createTableEvent(Column.physicalColumn("value", DataTypes.BIGINT())));
+                .handleExistingTableCreation(
+                        createTableEvent(Column.physicalColumn("value", DataTypes.BIGINT())));
 
         AlterColumnTypeEvent alterColumnTypeEvent =
                 (AlterColumnTypeEvent) applier.appliedEvents.get(0);
@@ -315,7 +321,8 @@ class ExistingTableSchemaExpanderTest {
                         schema(Column.physicalColumn("VALUE", DataTypes.INT())));
 
         new ExistingTableSchemaExpander(applier, applier, SchemaChangeBehavior.LENIENT)
-                .expand(createTableEvent(Column.physicalColumn("value", DataTypes.BIGINT())));
+                .handleExistingTableCreation(
+                        createTableEvent(Column.physicalColumn("value", DataTypes.BIGINT())));
         assertThat(applier.appliedEvents).singleElement().isInstanceOf(AddColumnEvent.class);
     }
 
@@ -329,7 +336,8 @@ class ExistingTableSchemaExpanderTest {
         applier.columnNameCaseSensitive = false;
 
         new ExistingTableSchemaExpander(applier, applier, SchemaChangeBehavior.LENIENT)
-                .expand(createTableEvent(Column.physicalColumn("value", DataTypes.BIGINT())));
+                .handleExistingTableCreation(
+                        createTableEvent(Column.physicalColumn("value", DataTypes.BIGINT())));
         assertThat(applier.appliedEvents).isEmpty();
     }
 
@@ -340,7 +348,8 @@ class ExistingTableSchemaExpanderTest {
                         schema(Column.physicalColumn("value", DataTypes.BIGINT().notNull())));
 
         new ExistingTableSchemaExpander(applier, applier, SchemaChangeBehavior.LENIENT)
-                .expand(createTableEvent(Column.physicalColumn("value", DataTypes.BIGINT())));
+                .handleExistingTableCreation(
+                        createTableEvent(Column.physicalColumn("value", DataTypes.BIGINT())));
         assertThat(applier.appliedEvents).isEmpty();
     }
 
@@ -354,7 +363,7 @@ class ExistingTableSchemaExpanderTest {
 
         new ExistingTableSchemaExpander(
                         addUnavailableApplier, addUnavailableApplier, SchemaChangeBehavior.LENIENT)
-                .expand(eventWithMissingColumn());
+                .handleExistingTableCreation(eventWithMissingColumn());
         assertThat(addUnavailableApplier.appliedEvents).isEmpty();
         assertThat(addUnavailableApplier.queryCalls).isZero();
 
@@ -368,7 +377,8 @@ class ExistingTableSchemaExpanderTest {
                         alterUnavailableApplier,
                         alterUnavailableApplier,
                         SchemaChangeBehavior.LENIENT)
-                .expand(createTableEvent(Column.physicalColumn("id", DataTypes.BIGINT())));
+                .handleExistingTableCreation(
+                        createTableEvent(Column.physicalColumn("id", DataTypes.BIGINT())));
         assertThat(alterUnavailableApplier.appliedEvents).isEmpty();
         assertThat(alterUnavailableApplier.queryCalls).isOne();
     }
@@ -381,7 +391,7 @@ class ExistingTableSchemaExpanderTest {
         applier.supportedEventTypes = Collections.singleton(SchemaChangeEventType.CREATE_TABLE);
 
         new ExistingTableSchemaExpander(applier, applier, SchemaChangeBehavior.LENIENT)
-                .expand(eventWithMissingColumn());
+                .handleExistingTableCreation(eventWithMissingColumn());
 
         assertThat(applier.queryCalls).isZero();
         assertThat(applier.appliedEvents).isEmpty();
@@ -401,7 +411,8 @@ class ExistingTableSchemaExpanderTest {
                         Column.physicalColumn("id", DataTypes.BIGINT()),
                         Column.physicalColumn("name", DataTypes.STRING()));
 
-        new ExistingTableSchemaExpander(applier, applier, schemaChangeBehavior).expand(event);
+        new ExistingTableSchemaExpander(applier, applier, schemaChangeBehavior)
+                .handleExistingTableCreation(event);
         assertThat(applier.appliedEvents).isEmpty();
         assertThat(applier.queryCalls).isZero();
     }
@@ -421,7 +432,7 @@ class ExistingTableSchemaExpanderTest {
                                                 normalizationFailureApplier,
                                                 normalizationFailureApplier,
                                                 SchemaChangeBehavior.LENIENT)
-                                        .expand(
+                                        .handleExistingTableCreation(
                                                 createTableEvent(
                                                         Column.physicalColumn(
                                                                 "id", DataTypes.BIGINT()))))
@@ -441,7 +452,10 @@ class ExistingTableSchemaExpanderTest {
                         queryFailureApplier,
                         SchemaChangeBehavior.LENIENT,
                         ExistingTableSchemaExpansionMode.EXPAND);
-        assertThatThrownBy(() -> queryFailureExpander.expand(eventWithMissingColumn()))
+        assertThatThrownBy(
+                        () ->
+                                queryFailureExpander.handleExistingTableCreation(
+                                        eventWithMissingColumn()))
                 .isInstanceOf(FlinkRuntimeException.class);
         assertThat(queryFailureApplier.appliedEvents).isEmpty();
     }
@@ -459,26 +473,69 @@ class ExistingTableSchemaExpanderTest {
                                                 ddlFailureApplier,
                                                 SchemaChangeBehavior.LENIENT,
                                                 ExistingTableSchemaExpansionMode.EXPAND)
-                                        .expand(eventWithMissingColumn()))
+                                        .handleExistingTableCreation(eventWithMissingColumn()))
                 .isInstanceOf(FlinkRuntimeException.class);
         assertThat(ddlFailureApplier.queryCalls).isOne();
     }
 
     @Test
-    void testDelegatesToSinkOnUnsupportedDdlFailure() {
+    void testTryExpandFailsFastOnUnsupportedDdlFailure() {
         TestingExistingTableSchemaExpansionSupport unsupportedApplier =
                 new TestingExistingTableSchemaExpansionSupport(
                         schema(Column.physicalColumn("id", DataTypes.INT())));
         unsupportedApplier.unsupportedEventTypes.add(SchemaChangeEventType.ADD_COLUMN);
-        assertThatCode(
+        assertThatThrownBy(
                         () ->
                                 new ExistingTableSchemaExpander(
                                                 unsupportedApplier,
                                                 unsupportedApplier,
                                                 SchemaChangeBehavior.LENIENT)
-                                        .expand(eventWithMissingColumn()))
-                .doesNotThrowAnyException();
+                                        .handleExistingTableCreation(eventWithMissingColumn()))
+                .isInstanceOf(UnsupportedSchemaChangeEventException.class);
         assertThat(unsupportedApplier.appliedEvents).isEmpty();
+    }
+
+    @Test
+    void testTryExpandFailsFastOnTransientDdlFailure() {
+        // After supportable differences are identified, a transient DDL failure must propagate so
+        // the job fails over and retries, instead of silently delegating to the sink and dropping
+        // the missing columns forever.
+        TestingExistingTableSchemaExpansionSupport ddlFailureApplier =
+                new TestingExistingTableSchemaExpansionSupport(
+                        schema(Column.physicalColumn("id", DataTypes.INT())));
+        ddlFailureApplier.failedEventTypes.add(SchemaChangeEventType.ADD_COLUMN);
+
+        assertThatThrownBy(
+                        () ->
+                                new ExistingTableSchemaExpander(
+                                                ddlFailureApplier,
+                                                ddlFailureApplier,
+                                                SchemaChangeBehavior.LENIENT,
+                                                ExistingTableSchemaExpansionMode.TRY_EXPAND)
+                                        .handleExistingTableCreation(eventWithMissingColumn()))
+                .isInstanceOf(SchemaEvolveException.class);
+        assertThat(ddlFailureApplier.appliedEvents).isEmpty();
+    }
+
+    @Test
+    void testTryExpandFailsFastOnReadBackQueryFailure() {
+        // The initial read succeeds and derived DDL is issued, but the read-back verification query
+        // fails transiently. This must propagate for failover instead of being swallowed.
+        TestingExistingTableSchemaExpansionSupport readBackFailureApplier =
+                new TestingExistingTableSchemaExpansionSupport(
+                        schema(Column.physicalColumn("id", DataTypes.INT())));
+        readBackFailureApplier.queryFailureAfterCalls = 1;
+
+        assertThatThrownBy(
+                        () ->
+                                new ExistingTableSchemaExpander(
+                                                readBackFailureApplier,
+                                                readBackFailureApplier,
+                                                SchemaChangeBehavior.LENIENT,
+                                                ExistingTableSchemaExpansionMode.TRY_EXPAND)
+                                        .handleExistingTableCreation(eventWithMissingColumn()))
+                .isInstanceOf(FlinkRuntimeException.class);
+        assertThat(readBackFailureApplier.appliedEvents).hasSize(1);
     }
 
     @Test
@@ -492,7 +549,7 @@ class ExistingTableSchemaExpanderTest {
                         unchangedTargetApplier,
                         unchangedTargetApplier,
                         SchemaChangeBehavior.LENIENT)
-                .expand(eventWithMissingColumn());
+                .handleExistingTableCreation(eventWithMissingColumn());
         assertThat(unchangedTargetApplier.appliedEvents)
                 .singleElement()
                 .isInstanceOf(AddColumnEvent.class);
@@ -508,7 +565,8 @@ class ExistingTableSchemaExpanderTest {
                         unchangedTargetTypeApplier,
                         unchangedTargetTypeApplier,
                         SchemaChangeBehavior.LENIENT)
-                .expand(createTableEvent(Column.physicalColumn("id", DataTypes.BIGINT())));
+                .handleExistingTableCreation(
+                        createTableEvent(Column.physicalColumn("id", DataTypes.BIGINT())));
         assertThat(unchangedTargetTypeApplier.appliedEvents)
                 .singleElement()
                 .isInstanceOf(AlterColumnTypeEvent.class);
@@ -534,7 +592,9 @@ class ExistingTableSchemaExpanderTest {
                         applier,
                         SchemaChangeBehavior.LENIENT,
                         ExistingTableSchemaExpansionMode.CHECK);
-        assertThat(expander.expand(createTableEvent(Column.physicalColumn("id", DataTypes.INT()))))
+        assertThat(
+                        expander.handleExistingTableCreation(
+                                createTableEvent(Column.physicalColumn("id", DataTypes.INT()))))
                 .isFalse();
         assertThat(applier.appliedEvents).isEmpty();
         assertThat(applier.queryCalls).isOne();
@@ -552,7 +612,10 @@ class ExistingTableSchemaExpanderTest {
                         missingColumnApplier,
                         SchemaChangeBehavior.LENIENT,
                         ExistingTableSchemaExpansionMode.CHECK);
-        assertThatThrownBy(() -> missingColumnExpander.expand(eventWithMissingColumn()))
+        assertThatThrownBy(
+                        () ->
+                                missingColumnExpander.handleExistingTableCreation(
+                                        eventWithMissingColumn()))
                 .isInstanceOfSatisfying(
                         SchemaEvolveException.class,
                         e ->
@@ -574,7 +637,7 @@ class ExistingTableSchemaExpanderTest {
                         ExistingTableSchemaExpansionMode.CHECK);
         assertThatThrownBy(
                         () ->
-                                narrowColumnExpander.expand(
+                                narrowColumnExpander.handleExistingTableCreation(
                                         createTableEvent(
                                                 Column.physicalColumn("id", DataTypes.INT()))))
                 .isInstanceOfSatisfying(
@@ -599,7 +662,7 @@ class ExistingTableSchemaExpanderTest {
                         applier,
                         SchemaChangeBehavior.LENIENT,
                         ExistingTableSchemaExpansionMode.EXPAND);
-        assertThatThrownBy(() -> expander.expand(eventWithMissingColumn()))
+        assertThatThrownBy(() -> expander.handleExistingTableCreation(eventWithMissingColumn()))
                 .isInstanceOfSatisfying(
                         SchemaEvolveException.class,
                         e -> assertThat(e.getExceptionMessage()).contains("ADD_COLUMN"));
@@ -618,7 +681,9 @@ class ExistingTableSchemaExpanderTest {
                         applier,
                         SchemaChangeBehavior.LENIENT,
                         ExistingTableSchemaExpansionMode.EXPAND);
-        assertThat(expander.expand(createTableEvent(Column.physicalColumn("id", DataTypes.INT()))))
+        assertThat(
+                        expander.handleExistingTableCreation(
+                                createTableEvent(Column.physicalColumn("id", DataTypes.INT()))))
                 .isTrue();
         assertThat(applier.appliedEvents).isEmpty();
         assertThat(applier.queryCalls).isOne();
@@ -637,7 +702,7 @@ class ExistingTableSchemaExpanderTest {
                             applier, applier, behavior, ExistingTableSchemaExpansionMode.CHECK);
             assertThatThrownBy(
                             () ->
-                                    expander.expand(
+                                    expander.handleExistingTableCreation(
                                             createTableEvent(
                                                     Column.physicalColumn("id", DataTypes.INT()))))
                     .isInstanceOf(SchemaEvolveException.class);
@@ -654,7 +719,7 @@ class ExistingTableSchemaExpanderTest {
                         applier,
                         SchemaChangeBehavior.LENIENT,
                         ExistingTableSchemaExpansionMode.CHECK);
-        assertThatThrownBy(() -> expander.expand(eventWithMissingColumn()))
+        assertThatThrownBy(() -> expander.handleExistingTableCreation(eventWithMissingColumn()))
                 .isInstanceOfSatisfying(
                         SchemaEvolveException.class,
                         e ->
@@ -679,7 +744,7 @@ class ExistingTableSchemaExpanderTest {
                         ExistingTableSchemaExpansionMode.CHECK);
         assertThatThrownBy(
                         () ->
-                                expander.expand(
+                                expander.handleExistingTableCreation(
                                         createTableEvent(
                                                 Column.physicalColumn("id", DataTypes.INT()),
                                                 Column.physicalColumn(
@@ -705,7 +770,7 @@ class ExistingTableSchemaExpanderTest {
                         applier,
                         SchemaChangeBehavior.LENIENT,
                         ExistingTableSchemaExpansionMode.EXPAND);
-        assertThatThrownBy(() -> expander.expand(eventWithMissingColumn()))
+        assertThatThrownBy(() -> expander.handleExistingTableCreation(eventWithMissingColumn()))
                 .isInstanceOfSatisfying(
                         SchemaEvolveException.class,
                         e ->
@@ -728,7 +793,7 @@ class ExistingTableSchemaExpanderTest {
                         applier,
                         SchemaChangeBehavior.LENIENT,
                         ExistingTableSchemaExpansionMode.EXPAND);
-        assertThatThrownBy(() -> expander.expand(eventWithMissingColumn()))
+        assertThatThrownBy(() -> expander.handleExistingTableCreation(eventWithMissingColumn()))
                 .isInstanceOfSatisfying(
                         SchemaEvolveException.class,
                         e -> assertThat(e.getExceptionMessage()).contains("after expansion"));
@@ -745,8 +810,8 @@ class ExistingTableSchemaExpanderTest {
                         applier,
                         applier,
                         SchemaChangeBehavior.LENIENT,
-                        ExistingTableSchemaExpansionMode.OFF);
-        assertThat(expander.expand(eventWithMissingColumn())).isTrue();
+                        ExistingTableSchemaExpansionMode.DISABLED);
+        assertThat(expander.handleExistingTableCreation(eventWithMissingColumn())).isTrue();
         assertThat(applier.queryCalls).isZero();
         assertThat(applier.appliedEvents).isEmpty();
     }
@@ -758,7 +823,7 @@ class ExistingTableSchemaExpanderTest {
                         schema(Column.physicalColumn("id", DataTypes.INT())));
 
         new ExistingTableSchemaExpander(applier, applier, SchemaChangeBehavior.LENIENT)
-                .expand(
+                .handleExistingTableCreation(
                         createTableEvent(
                                 Column.physicalColumn("id", DataTypes.BIGINT()),
                                 Column.physicalColumn(

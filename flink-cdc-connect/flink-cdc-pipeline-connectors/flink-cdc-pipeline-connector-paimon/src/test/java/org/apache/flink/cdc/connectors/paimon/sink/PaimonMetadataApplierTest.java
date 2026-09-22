@@ -306,9 +306,9 @@ class PaimonMetadataApplierTest {
                 new ExistingTableSchemaExpander(
                         metadataApplier, metadataApplier, SchemaChangeBehavior.LENIENT);
 
-        expander.expand(createTableEvent);
+        expander.handleExistingTableCreation(createTableEvent);
         metadataApplier.applySchemaChange(createTableEvent);
-        expander.expand(createTableEvent);
+        expander.handleExistingTableCreation(createTableEvent);
         Assertions.assertThat(metadataApplier.getExistingTableSchema(tableId))
                 .get()
                 .satisfies(
@@ -1262,5 +1262,40 @@ class PaimonMetadataApplierTest {
                 .isEqualTo(org.apache.paimon.types.DataTypeRoot.BLOB);
         assertThat(rowType.getField("id").type().getTypeRoot())
                 .isEqualTo(org.apache.paimon.types.DataTypeRoot.INTEGER);
+    }
+
+    @Test
+    void testCloseIsIdempotentAndRecreatesCatalogOnReuse()
+            throws Catalog.DatabaseNotEmptyException, Catalog.DatabaseNotExistException, Exception {
+        initialize("filesystem");
+        PaimonMetadataApplier metadataApplier = new PaimonMetadataApplier(catalogOptions);
+
+        // Trigger lazy catalog creation.
+        metadataApplier.applySchemaChange(
+                new CreateTableEvent(
+                        TableId.parse("test.close_idempotent"),
+                        Schema.newBuilder()
+                                .physicalColumn(
+                                        "id", org.apache.flink.cdc.common.types.DataTypes.INT())
+                                .primaryKey("id")
+                                .build()));
+
+        // close() must be idempotent and must not fail when called repeatedly.
+        metadataApplier.close();
+        metadataApplier.close();
+
+        // After close the cached catalog is reset; the applier stays reusable and recreates it.
+        metadataApplier.applySchemaChange(
+                new CreateTableEvent(
+                        TableId.parse("test.close_reuse"),
+                        Schema.newBuilder()
+                                .physicalColumn(
+                                        "id", org.apache.flink.cdc.common.types.DataTypes.INT())
+                                .primaryKey("id")
+                                .build()));
+
+        Assertions.assertThat(catalog.getTable(Identifier.fromString("test.close_reuse")))
+                .isNotNull();
+        metadataApplier.close();
     }
 }

@@ -37,6 +37,7 @@ import org.apache.flink.cdc.runtime.operators.schema.regular.event.SchemaChangeR
 import org.apache.flink.cdc.runtime.testutils.operators.MockedOperatorCoordinatorContext;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
+import org.apache.flink.util.FlinkRuntimeException;
 
 import org.junit.jupiter.api.Test;
 
@@ -162,6 +163,38 @@ class SchemaCoordinatorTest {
         } finally {
             coordinator.close();
         }
+    }
+
+    @Test
+    void tryExpandModeFailsWhenConnectorLacksExpansionSupport() {
+        UnsupportedExpansionMetadataApplier metadataApplier =
+                new UnsupportedExpansionMetadataApplier();
+
+        SchemaCoordinator coordinator =
+                new SchemaCoordinator(
+                        "regular-schema-coordinator",
+                        new MockedOperatorCoordinatorContext(
+                                new OperatorID(), Thread.currentThread().getContextClassLoader()),
+                        Executors.newSingleThreadExecutor(),
+                        metadataApplier,
+                        Collections.emptyList(),
+                        RouteMode.ALL_MATCH,
+                        SchemaChangeBehavior.LENIENT,
+                        ExistingTableSchemaExpansionMode.TRY_EXPAND,
+                        Duration.ofSeconds(10));
+
+        assertThatThrownBy(coordinator::start)
+                .isInstanceOf(FlinkRuntimeException.class)
+                .hasCauseInstanceOf(FlinkRuntimeException.class)
+                .hasRootCauseMessage(
+                        "Existing target table schema expansion is enabled with mode TRY_EXPAND, but MetadataApplier "
+                                + UnsupportedExpansionMetadataApplier.class.getName()
+                                + " does not support it.");
+    }
+
+    private static final class UnsupportedExpansionMetadataApplier implements MetadataApplier {
+        @Override
+        public void applySchemaChange(SchemaChangeEvent schemaChangeEvent) {}
     }
 
     private static final class ExpandingMetadataApplier
