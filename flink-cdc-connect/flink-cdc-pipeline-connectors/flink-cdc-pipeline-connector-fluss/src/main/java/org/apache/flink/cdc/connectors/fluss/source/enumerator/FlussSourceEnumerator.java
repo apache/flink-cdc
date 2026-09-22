@@ -78,8 +78,9 @@ import java.util.stream.Collectors;
  * <ol>
  *   <li>{@link #getSubscribedTableBuckets()} — discovers subscribed tables and enumerates all
  *       table-buckets including partitions (async).
- *   <li>{@link #checkTableBucketChanges} — compares discovered table-buckets with already-assigned
- *       ones and triggers split creation for new table-buckets (callback).
+ *   <li>{@link #checkTableBucketChanges} — compares discovered table-buckets against assigned,
+ *       pending, and initializing ones and triggers split creation for new table-buckets
+ *       (callback).
  *   <li>{@link #initPendingBucketSplits} — resolves starting offsets and creates splits for new
  *       table-buckets (async).
  *   <li>{@link #handleTableBucketChanges} — marks physical table paths as assigned and distributes
@@ -106,6 +107,7 @@ public class FlussSourceEnumerator
     private final LeaseContext leaseContext;
 
     private final Set<PhysicalTablePath> assignedPhysicalTablePaths;
+    private final Set<PhysicalTablePath> initializingPhysicalTablePaths;
     private final Map<Integer, Set<FlussSplitBase>> pendingPartitionSplitAssignment;
     private final TreeMap<Long, Set<TableBucket>> consumedKvSnapshotMap;
 
@@ -133,6 +135,7 @@ public class FlussSourceEnumerator
         this.scanDiscoveryIntervalMs = scanDiscoveryIntervalMs;
         this.leaseContext = leaseContext;
         this.assignedPhysicalTablePaths = assignedPhysicalTablePaths;
+        this.initializingPhysicalTablePaths = new HashSet<>();
         this.pendingPartitionSplitAssignment = new HashMap<>();
         this.consumedKvSnapshotMap = new TreeMap<>();
         this.checkpointCompletedBefore = checkpointCompletedBefore;
@@ -247,24 +250,24 @@ public class FlussSourceEnumerator
     // -------------------------------------------------------------------------
 
     /**
-     * Compares the discovered table-buckets against assigned and pending {@link PhysicalTablePath}s
-     * and triggers split creation for newly discovered table-buckets.
+     * Compares the discovered table-buckets against assigned, pending, and initializing {@link
+     * PhysicalTablePath}s, and triggers split creation for newly discovered table-buckets.
      */
     private void checkTableBucketChanges(List<TableBucketInfo> allBuckets, Throwable error) {
         if (error != null) {
             throw new FlinkRuntimeException("Failed to discover subscribed table-buckets.", error);
         }
 
-        Set<PhysicalTablePath> assignedOrPendingPhysicalTablePaths =
-                new HashSet<>(assignedPhysicalTablePaths);
+        Set<PhysicalTablePath> knownPhysicalTablePaths = new HashSet<>(assignedPhysicalTablePaths);
+        knownPhysicalTablePaths.addAll(initializingPhysicalTablePaths);
         pendingPartitionSplitAssignment.values().stream()
                 .flatMap(Set::stream)
                 .map(FlussSplitBase::getPhysicalTablePath)
-                .forEach(assignedOrPendingPhysicalTablePaths::add);
+                .forEach(knownPhysicalTablePaths::add);
 
         List<TableBucketInfo> newBuckets = new ArrayList<>();
         for (TableBucketInfo info : allBuckets) {
-            if (!assignedOrPendingPhysicalTablePaths.contains(info.physicalTablePath)) {
+            if (!knownPhysicalTablePaths.contains(info.physicalTablePath)) {
                 newBuckets.add(info);
             }
         }
@@ -274,9 +277,22 @@ public class FlussSourceEnumerator
             return;
         }
 
+        Set<PhysicalTablePath> requestPhysicalTablePaths =
+                newBuckets.stream()
+                        .map(info -> info.physicalTablePath)
+                        .collect(Collectors.toCollection(HashSet::new));
+        initializingPhysicalTablePaths.addAll(requestPhysicalTablePaths);
+
         LOG.info("Discovered {} new table-bucket(s) to initialize.", newBuckets.size());
         context.callAsync(
-                () -> initPendingBucketSplits(newBuckets), this::handleTableBucketChanges);
+                () -> initPendingBucketSplits(newBuckets),
+                (splits, initializationError) -> {
+                    try {
+                        handleTableBucketChanges(splits, initializationError);
+                    } finally {
+                        initializingPhysicalTablePaths.removeAll(requestPhysicalTablePaths);
+                    }
+                });
     }
 
     // -------------------------------------------------------------------------

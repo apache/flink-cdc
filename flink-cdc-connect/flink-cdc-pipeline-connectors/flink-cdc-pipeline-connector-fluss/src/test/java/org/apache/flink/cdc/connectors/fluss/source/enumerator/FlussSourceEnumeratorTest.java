@@ -48,6 +48,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -235,6 +236,168 @@ class FlussSourceEnumeratorTest {
         }
     }
 
+    /**
+     * Tests that running several periodic discovery rounds before the async split initialization
+     * triggered by the first round completes does not queue duplicate initializations for the same
+     * table-bucket.
+     */
+    @Test
+    void testMultiplePeriodicDiscoveryRoundsBeforeInitDoNotDuplicateSplits() throws Throwable {
+        String tableName = "multi_bucket_dup";
+        createPkTable(tableName, 3);
+
+        FlussDefaultDiscoverer discoverer = new FlussDefaultDiscoverer();
+        String pattern = fqnRegex(DATABASE_NAME, tableName);
+
+        AtomicInteger offsetInitializationCount = new AtomicInteger();
+        OffsetsInitializer earliestOffsetsInitializer = OffsetsInitializer.earliest();
+        OffsetsInitializer countingOffsetsInitializer =
+                (partitionName, bucketIds, retriever) -> {
+                    offsetInitializationCount.incrementAndGet();
+                    return earliestOffsetsInitializer.getBucketOffsets(
+                            partitionName, bucketIds, retriever);
+                };
+
+        try (MockSplitEnumeratorContext<FlussSplitBase> context =
+                new MockSplitEnumeratorContext<>(NUM_READERS)) {
+            FlussSourceEnumerator enumerator =
+                    newEnumerator(
+                            context,
+                            discoverer,
+                            pattern,
+                            countingOffsetsInitializer,
+                            DISCOVERY_INTERVAL_MS);
+            try {
+                enumerator.start();
+                registerAllReaders(context, enumerator);
+
+                // Simulates a slow/backed-up async initialization: several discovery rounds run
+                // before any of the resulting one-time (init) callables are drained.
+                context.runPeriodicCallable(DISCOVERY_CALLABLE_INDEX);
+                context.runPeriodicCallable(DISCOVERY_CALLABLE_INDEX);
+                context.runPeriodicCallable(DISCOVERY_CALLABLE_INDEX);
+
+                int queuedInitCount = context.getOneTimeCallables().size();
+
+                while (!context.getOneTimeCallables().isEmpty()) {
+                    context.runNextOneTimeCallable();
+                }
+
+                assertThat(assignedBucketIds(context, tableName))
+                        .containsExactlyInAnyOrder(0, 1, 2);
+                assertThat(queuedInitCount)
+                        .as(
+                                "Each already-discovered table-bucket must only be queued for "
+                                        + "initialization once, even across repeated discovery "
+                                        + "rounds")
+                        .isEqualTo(1);
+                assertThat(offsetInitializationCount.get())
+                        .as("The offsets initializer must only be invoked once for the table")
+                        .isEqualTo(1);
+
+                context.runPeriodicCallable(DISCOVERY_CALLABLE_INDEX);
+                assertThat(context.getOneTimeCallables())
+                        .as("Nothing new to discover once every bucket is already assigned")
+                        .isEmpty();
+            } finally {
+                enumerator.close();
+            }
+        }
+    }
+
+    /**
+     * Tests that when no readers are registered yet, a completed table-bucket initialization lands
+     * in the pending assignment map instead of being lost or re-queued, and that once readers
+     * register, all pending splits are assigned exactly once.
+     */
+    @Test
+    void testPendingAssignmentSurvivesDiscoveryUntilReadersRegister() throws Throwable {
+        String tableName = "pending_no_reader";
+        createPkTable(tableName, 3);
+
+        FlussDefaultDiscoverer discoverer = new FlussDefaultDiscoverer();
+        String pattern = fqnRegex(DATABASE_NAME, tableName);
+
+        try (MockSplitEnumeratorContext<FlussSplitBase> context =
+                new MockSplitEnumeratorContext<>(NUM_READERS)) {
+            FlussSourceEnumerator enumerator = newEnumerator(context, discoverer, pattern);
+            try {
+                enumerator.start();
+
+                // No readers registered yet: initialization completes into the pending
+                // assignment map instead of being assigned.
+                runDiscoveryCycle(context);
+                assertThat(context.getSplitsAssignmentSequence()).isEmpty();
+
+                // A subsequent discovery round must not re-discover or re-queue the same
+                // table-buckets while they are only pending (not yet assigned).
+                context.runPeriodicCallable(DISCOVERY_CALLABLE_INDEX);
+                assertThat(context.getOneTimeCallables()).isEmpty();
+
+                registerAllReaders(context, enumerator);
+
+                assertThat(assignedBucketIds(context, tableName))
+                        .containsExactlyInAnyOrder(0, 1, 2);
+            } finally {
+                enumerator.close();
+            }
+        }
+    }
+
+    /**
+     * Tests that once one partition's initialization completes, a subsequent discovery round does
+     * not re-queue initialization for another partition whose initialization is still in flight.
+     */
+    @Test
+    void testDiscoveryDoesNotDropStillInitializingPartitionAfterAnotherCompletes()
+            throws Throwable {
+        String tableName = "two_partition_inflight";
+        createPartitionedPkTable(tableName, 3);
+        insertPartitionRow(tableName, 1, "p1", "a");
+
+        FlussDefaultDiscoverer discoverer = new FlussDefaultDiscoverer();
+        String pattern = fqnRegex(DATABASE_NAME, tableName);
+
+        try (MockSplitEnumeratorContext<FlussSplitBase> context =
+                new MockSplitEnumeratorContext<>(NUM_READERS)) {
+            FlussSourceEnumerator enumerator = newEnumerator(context, discoverer, pattern);
+            try {
+                enumerator.start();
+                registerAllReaders(context, enumerator);
+
+                // Round 1: discovers partition p1 and queues its initialization, without
+                // draining it.
+                context.runPeriodicCallable(DISCOVERY_CALLABLE_INDEX);
+                assertThat(context.getOneTimeCallables()).hasSize(1);
+
+                // Partition p2 appears before p1's initialization has completed.
+                insertPartitionRow(tableName, 2, "p2", "b");
+
+                // Round 2: discovers p2 and queues its initialization; p1 is still in flight.
+                context.runPeriodicCallable(DISCOVERY_CALLABLE_INDEX);
+                assertThat(context.getOneTimeCallables()).hasSize(2);
+
+                context.runNextOneTimeCallable();
+                assertThat(assignedSplitIds(context, tableName))
+                        .containsExactlyInAnyOrder(expectedSplitIds(tableName, "p1"));
+                assertThat(context.getOneTimeCallables()).hasSize(1);
+
+                // Round 3: p1 is now assigned, p2 is still in flight (its callable has not been
+                // drained yet). This round must not re-queue p2's initialization.
+                context.runPeriodicCallable(DISCOVERY_CALLABLE_INDEX);
+                assertThat(context.getOneTimeCallables())
+                        .as("A still in-flight partition must not be re-queued for initialization")
+                        .hasSize(1);
+
+                context.runNextOneTimeCallable();
+                assertThat(assignedSplitIds(context, tableName))
+                        .containsExactlyInAnyOrder(expectedSplitIds(tableName, "p1", "p2"));
+            } finally {
+                enumerator.close();
+            }
+        }
+    }
+
     @Test
     void testDiscoveryFailsWhenTableDiscoveryFails() throws Throwable {
         RuntimeException discoveryFailure =
@@ -308,6 +471,89 @@ class FlussSourceEnumeratorTest {
                 assertThat(context.getSplitsAssignmentSequence()).isEmpty();
             } finally {
                 enumerator.close();
+            }
+        }
+    }
+
+    /**
+     * Tests that after an offset-initialization failure, restarting the enumerator from a
+     * checkpoint taken at that point fully rediscovers and initializes every table-bucket exactly
+     * once. The failed instance is discarded rather than retried in place: {@link
+     * MockSplitEnumeratorContext}'s stored worker error is not cleared once thrown, so it cannot be
+     * reused to observe a same-instance retry.
+     */
+    @Test
+    void testDiscoveryFullyRediscoversAfterOffsetInitializationFailureOnRestart() throws Throwable {
+        String tableName = "offset_failure_restart";
+        createPkTable(tableName, 3);
+
+        RuntimeException offsetFailure =
+                new RuntimeException("Injected offset initialization failure");
+        OffsetsInitializer failingOffsetsInitializer =
+                (partitionName, bucketIds, retriever) -> {
+                    throw offsetFailure;
+                };
+
+        FlussSourceEnumState checkpoint;
+        try (MockSplitEnumeratorContext<FlussSplitBase> context =
+                new MockSplitEnumeratorContext<>(NUM_READERS)) {
+            FlussSourceEnumerator enumerator =
+                    newEnumerator(
+                            context,
+                            new FlussDefaultDiscoverer(),
+                            fqnRegex(DATABASE_NAME, tableName),
+                            failingOffsetsInitializer,
+                            DISCOVERY_INTERVAL_MS);
+            try {
+                enumerator.start();
+                registerAllReaders(context, enumerator);
+
+                context.runPeriodicCallable(DISCOVERY_CALLABLE_INDEX);
+                assertThatThrownBy(context::runNextOneTimeCallable)
+                        .isInstanceOf(FlinkRuntimeException.class)
+                        .hasMessage("Failed to initialize splits for new table-buckets.")
+                        .hasRootCauseMessage("Injected offset initialization failure");
+                assertThat(context.getSplitsAssignmentSequence()).isEmpty();
+
+                checkpoint = enumerator.snapshotState(1L);
+                assertThat(checkpoint.getAssignedPhysicalTablePaths()).isEmpty();
+                assertThat(checkpoint.getRemainingSplits()).isEmpty();
+            } finally {
+                enumerator.close();
+            }
+        }
+
+        FlussSourceEnumStateSerializer serializer = new FlussSourceEnumStateSerializer();
+        FlussSourceEnumState restoredCheckpoint =
+                serializer.deserialize(serializer.getVersion(), serializer.serialize(checkpoint));
+
+        try (MockSplitEnumeratorContext<FlussSplitBase> restoredContext =
+                new MockSplitEnumeratorContext<>(NUM_READERS)) {
+            org.apache.fluss.config.Configuration flussConfig =
+                    FLUSS_CLUSTER_EXTENSION.getClientConfig();
+            FlussSourceEnumerator restoredEnumerator =
+                    new FlussSourceEnumerator(
+                            restoredContext,
+                            new FlussDefaultDiscoverer(),
+                            flussConfig,
+                            buildSourceConfig(flussConfig, fqnRegex(DATABASE_NAME, tableName)),
+                            OffsetsInitializer.earliest(),
+                            DISCOVERY_INTERVAL_MS,
+                            restoredCheckpoint,
+                            LeaseContext.fromConf(
+                                    new org.apache.flink.configuration.Configuration()));
+            try {
+                restoredEnumerator.start();
+                registerAllReaders(restoredContext, restoredEnumerator);
+
+                runDiscoveryCycle(restoredContext);
+                assertThat(assignedBucketIds(restoredContext, tableName))
+                        .containsExactlyInAnyOrder(0, 1, 2);
+
+                restoredContext.runPeriodicCallable(DISCOVERY_CALLABLE_INDEX);
+                assertThat(restoredContext.getOneTimeCallables()).isEmpty();
+            } finally {
+                restoredEnumerator.close();
             }
         }
     }
@@ -565,6 +811,74 @@ class FlussSourceEnumeratorTest {
         }
     }
 
+    /**
+     * Tests that a table-bucket whose initialization is still in flight at snapshot time (i.e. not
+     * yet reflected in {@link FlussSourceEnumState}) is fully re-discovered and initialized exactly
+     * once after restoring from that snapshot.
+     */
+    @Test
+    void testSnapshotDuringInFlightInitializationAllowsFullRediscoveryAfterRestore()
+            throws Throwable {
+        String tableName = "inflight_snapshot_restore";
+        createPkTable(tableName, 3);
+
+        FlussSourceEnumState checkpoint;
+        try (MockSplitEnumeratorContext<FlussSplitBase> context =
+                new MockSplitEnumeratorContext<>(NUM_READERS)) {
+            FlussSourceEnumerator enumerator =
+                    newEnumerator(
+                            context,
+                            new FlussDefaultDiscoverer(),
+                            fqnRegex(DATABASE_NAME, tableName));
+            try {
+                enumerator.start();
+                registerAllReaders(context, enumerator);
+
+                // Discovered but not drained: tracked as in-flight, not yet pending or assigned.
+                context.runPeriodicCallable(DISCOVERY_CALLABLE_INDEX);
+                assertThat(context.getOneTimeCallables()).hasSize(1);
+
+                checkpoint = enumerator.snapshotState(1L);
+                assertThat(checkpoint.getAssignedPhysicalTablePaths()).isEmpty();
+                assertThat(checkpoint.getRemainingSplits()).isEmpty();
+            } finally {
+                enumerator.close();
+            }
+        }
+
+        FlussSourceEnumStateSerializer serializer = new FlussSourceEnumStateSerializer();
+        FlussSourceEnumState restoredCheckpoint =
+                serializer.deserialize(serializer.getVersion(), serializer.serialize(checkpoint));
+
+        try (MockSplitEnumeratorContext<FlussSplitBase> restoredContext =
+                new MockSplitEnumeratorContext<>(NUM_READERS)) {
+            org.apache.fluss.config.Configuration flussConfig =
+                    FLUSS_CLUSTER_EXTENSION.getClientConfig();
+            FlussSourceEnumerator restoredEnumerator =
+                    new FlussSourceEnumerator(
+                            restoredContext,
+                            new FlussDefaultDiscoverer(),
+                            flussConfig,
+                            buildSourceConfig(flussConfig, fqnRegex(DATABASE_NAME, tableName)),
+                            OffsetsInitializer.earliest(),
+                            DISCOVERY_INTERVAL_MS,
+                            restoredCheckpoint,
+                            LeaseContext.fromConf(
+                                    new org.apache.flink.configuration.Configuration()));
+            try {
+                restoredEnumerator.start();
+                registerAllReaders(restoredContext, restoredEnumerator);
+
+                runDiscoveryCycle(restoredContext);
+
+                assertThat(assignedBucketIds(restoredContext, tableName))
+                        .containsExactlyInAnyOrder(0, 1, 2);
+            } finally {
+                restoredEnumerator.close();
+            }
+        }
+    }
+
     // =====================================================================
     //  FlussTableSubscriber tests — subscription-table driven add/remove
     // =====================================================================
@@ -800,6 +1114,46 @@ class FlussSourceEnumeratorTest {
                 .collect(Collectors.toSet());
     }
 
+    /** Returns the bucket ids assigned so far for the given table, across all assignments. */
+    private static List<Integer> assignedBucketIds(
+            MockSplitEnumeratorContext<FlussSplitBase> context, String tableName) {
+        return context.getSplitsAssignmentSequence().stream()
+                .flatMap(assignment -> assignment.assignment().values().stream())
+                .flatMap(List::stream)
+                .filter(split -> split.getPhysicalTablePath().getTableName().equals(tableName))
+                .map(split -> split.getTableBucket().getBucket())
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Returns the full split id of every split assigned so far for the given table, across all
+     * assignments. A {@link List} (not a {@link Set}) is returned so duplicate splits are not
+     * silently hidden.
+     */
+    private static List<String> assignedSplitIds(
+            MockSplitEnumeratorContext<FlussSplitBase> context, String tableName) {
+        return context.getSplitsAssignmentSequence().stream()
+                .flatMap(assignment -> assignment.assignment().values().stream())
+                .flatMap(List::stream)
+                .filter(split -> split.getPhysicalTablePath().getTableName().equals(tableName))
+                .map(FlussSplitBase::splitId)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Builds the expected {@link FlussSplitBase#splitId()} values for buckets 0..2 of the given
+     * table and partitions.
+     */
+    private static String[] expectedSplitIds(String tableName, String... partitionNames) {
+        List<String> ids = new ArrayList<>();
+        for (String partitionName : partitionNames) {
+            for (int bucket = 0; bucket < 3; bucket++) {
+                ids.add(DATABASE_NAME + "." + tableName + "." + partitionName + "." + bucket);
+            }
+        }
+        return ids.toArray(new String[0]);
+    }
+
     /** Returns the set of table names in the most recent assignment only. */
     private static Set<String> latestAssignmentTableNames(
             MockSplitEnumeratorContext<FlussSplitBase> context) {
@@ -820,6 +1174,37 @@ class FlussSourceEnumeratorTest {
                         String.format(
                                 "CREATE TABLE %s (id INT, val STRING, PRIMARY KEY (id) NOT ENFORCED)",
                                 tableName))
+                .await();
+    }
+
+    private void createPkTable(String tableName, int numBuckets) throws Exception {
+        tBatchEnv
+                .executeSql(
+                        String.format(
+                                "CREATE TABLE %s (id INT, val STRING, PRIMARY KEY (id) NOT ENFORCED) "
+                                        + "WITH ('bucket.num' = '%d')",
+                                tableName, numBuckets))
+                .await();
+    }
+
+    private void createPartitionedPkTable(String tableName, int numBuckets) throws Exception {
+        tBatchEnv
+                .executeSql(
+                        String.format(
+                                "CREATE TABLE %s (id INT, ds STRING, val STRING, "
+                                        + "PRIMARY KEY (id, ds) NOT ENFORCED) PARTITIONED BY (ds) "
+                                        + "WITH ('bucket.num' = '%d')",
+                                tableName, numBuckets))
+                .await();
+    }
+
+    private void insertPartitionRow(String tableName, int id, String partitionValue, String val)
+            throws Exception {
+        tBatchEnv
+                .executeSql(
+                        String.format(
+                                "INSERT INTO %s VALUES (%d, '%s', '%s')",
+                                tableName, id, partitionValue, val))
                 .await();
     }
 
