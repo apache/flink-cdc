@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.pipeline.tests.stage2;
 
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.cdc.common.test.utils.TestUtils;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
@@ -262,8 +263,8 @@ class ExistingTableSchemaExpansionE2eITCase extends PipelineTestEnvironment {
                                 + "  parallelism: %s",
                         sourceDatabase, sourceDatabase, sinkDatabase, parallelism);
         Path flussCdcConnector = TestUtils.getResource("fluss-cdc-pipeline-connector.jar");
-        submitPipelineJob(pipelineJob, flussCdcConnector);
-        waitUntilJobRunning(Duration.ofSeconds(30));
+        JobID jobId = submitPipelineJob(pipelineJob, flussCdcConnector);
+        waitUntilPipelineJobState(jobId, JobStatus.RUNNING, Duration.ofSeconds(30));
         LOG.info("Distributed pipeline job is running");
 
         // The sink table existed with (id, name) only, `description` comes from the expander.
@@ -441,11 +442,11 @@ class ExistingTableSchemaExpansionE2eITCase extends PipelineTestEnvironment {
                                 + "  parallelism: %s",
                         sourceDatabase, sourceDatabase, sinkDatabase, parallelism);
         Path flussCdcConnector = TestUtils.getResource("fluss-cdc-pipeline-connector.jar");
-        submitPipelineJob(pipelineJob, flussCdcConnector);
+        JobID jobId = submitPipelineJob(pipelineJob, flussCdcConnector);
 
         // The distributed schema coordinator must fail the job because the routed target table
         // lacks the description column, leaving the target schema unchanged.
-        waitUntilJobState(EXPANSION_TESTCASE_TIMEOUT, JobStatus.FAILED);
+        waitUntilPipelineJobState(jobId, JobStatus.FAILED, EXPANSION_TESTCASE_TIMEOUT);
         Assertions.assertThat(fetchFlussTableColumns(sinkDatabase, "products"))
                 .containsExactly("id", "name");
     }
@@ -662,6 +663,45 @@ class ExistingTableSchemaExpansionE2eITCase extends PipelineTestEnvironment {
         }
         throw new IllegalStateException(
                 "Source Fluss table was not populated with the expected rows within 2 minutes.");
+    }
+
+    /**
+     * Waits until {@code jobId} reaches {@code expectedStatus}. The inherited helpers inspect the
+     * first job the cluster reports, which is ambiguous in the Fluss cases because {@link
+     * #prepareFlussTables} leaves finished batch jobs behind on the same session cluster.
+     */
+    private void waitUntilPipelineJobState(JobID jobId, JobStatus expectedStatus, Duration timeout)
+            throws Exception {
+        if (jobId == null) {
+            throw new IllegalStateException(
+                    "Could not determine the job id of the submitted pipeline job.");
+        }
+        long deadline = System.currentTimeMillis() + timeout.toMillis();
+        JobStatus status = null;
+        while (System.currentTimeMillis() < deadline) {
+            try {
+                status = getRestClusterClient().getJobStatus(jobId).get(10, TimeUnit.SECONDS);
+            } catch (Exception e) {
+                // The freshly submitted job may not be visible through REST yet.
+                status = null;
+            }
+            if (status != null) {
+                if (status == expectedStatus) {
+                    return;
+                }
+                if (status.isTerminalState()) {
+                    throw new IllegalStateException(
+                            String.format(
+                                    "Pipeline job %s reached terminal state %s while waiting for %s.",
+                                    jobId, status, expectedStatus));
+                }
+            }
+            Thread.sleep(1000L);
+        }
+        throw new IllegalStateException(
+                String.format(
+                        "Pipeline job %s did not reach %s within %s; last observed status: %s.",
+                        jobId, expectedStatus, timeout, status));
     }
 
     /**
