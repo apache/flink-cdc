@@ -140,7 +140,11 @@ class StarRocksMetadataApplierTest {
                                 new AddColumnEvent.ColumnWithPosition(
                                         Column.physicalColumn("col2", new DecimalType(20, 5))),
                                 new AddColumnEvent.ColumnWithPosition(
-                                        Column.physicalColumn("col3", new SmallIntType()))));
+                                        Column.physicalColumn(
+                                                "col3",
+                                                new SmallIntType(),
+                                                "comment \"quoted\" \\ path",
+                                                "default \"quoted\" \\ path"))));
         metadataApplier.applySchemaChange(addColumnEvent);
 
         StarRocksTable actualTable =
@@ -170,6 +174,8 @@ class StarRocksMetadataApplierTest {
                         .setOrdinalPosition(2)
                         .setDataType("smallint")
                         .setNullable(true)
+                        .setColumnComment("comment \\\"quoted\\\" \\\\ path")
+                        .setDefaultValue("default \\\"quoted\\\" \\\\ path")
                         .build());
         StarRocksTable expectTable =
                 new StarRocksTable.Builder()

@@ -47,6 +47,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.apache.flink.cdc.connectors.starrocks.sink.StarRocksUtils.toStarRocksDataType;
+import static org.apache.flink.cdc.connectors.starrocks.sink.utils.StarRocksEscapingUtils.escape;
 
 /** A {@code MetadataApplier} that applies metadata changes to StarRocks. */
 public class StarRocksMetadataApplier implements MetadataApplier {
@@ -158,10 +159,12 @@ public class StarRocksMetadataApplier implements MetadataApplier {
                     new StarRocksColumn.Builder()
                             .setColumnName(column.getName())
                             .setOrdinalPosition(-1)
-                            .setColumnComment(column.getComment())
+                            .setColumnComment(escape(column.getComment()))
                             .setDefaultValue(
-                                    StarRocksUtils.convertInvalidTimestampDefaultValue(
-                                            column.getDefaultValueExpression(), column.getType()));
+                                    escape(
+                                            StarRocksUtils.convertInvalidTimestampDefaultValue(
+                                                    column.getDefaultValueExpression(),
+                                                    column.getType())));
             toStarRocksDataType(column, false, builder);
             addColumns.add(builder.build());
         }
