@@ -53,6 +53,7 @@ import java.util.List;
 
 import static org.apache.flink.cdc.common.types.DataTypeChecks.getPrecision;
 import static org.apache.flink.cdc.common.types.DataTypeChecks.getScale;
+import static org.apache.flink.cdc.connectors.starrocks.sink.utils.StarRocksEscapingUtils.escape;
 
 /** Utilities for conversion from source table to StarRocks table. */
 public class StarRocksUtils {
@@ -91,10 +92,12 @@ public class StarRocksUtils {
                     new StarRocksColumn.Builder()
                             .setColumnName(column.getName())
                             .setOrdinalPosition(i)
-                            .setColumnComment(column.getComment())
+                            .setColumnComment(escape(column.getComment()))
                             .setDefaultValue(
-                                    convertInvalidTimestampDefaultValue(
-                                            column.getDefaultValueExpression(), column.getType()));
+                                    escape(
+                                            convertInvalidTimestampDefaultValue(
+                                                    column.getDefaultValueExpression(),
+                                                    column.getType())));
             toStarRocksDataType(
                     column,
                     i < primaryKeyCount,

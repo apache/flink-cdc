@@ -240,6 +240,30 @@ class StarRocksUtilsTest {
         assertThat(table.getComment()).hasValue("test table comment");
     }
 
+    @Test
+    void testToStarRocksTableEscapesColumnDefaultValueAndComment() {
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.BIGINT().notNull())
+                        .physicalColumn(
+                                "escaped",
+                                DataTypes.VARCHAR(100),
+                                "comment \"quoted\" \\ path",
+                                "default \"quoted\" \\ path")
+                        .primaryKey("id")
+                        .build();
+
+        StarRocksTable table =
+                StarRocksUtils.toStarRocksTable(
+                        TableId.tableId("db", "table"),
+                        schema,
+                        new TableCreateConfig(null, Collections.emptyMap()));
+
+        StarRocksColumn column = table.getColumn("escaped");
+        assertThat(column.getColumnComment()).hasValue("comment \\\"quoted\\\" \\\\ path");
+        assertThat(column.getDefaultValue()).hasValue("default \\\"quoted\\\" \\\\ path");
+    }
+
     // --------------------------------------------------------------------------------------------
     // Tests for convertInvalidTimestampDefaultValue
     // --------------------------------------------------------------------------------------------
