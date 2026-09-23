@@ -379,12 +379,70 @@ Connector Options
         For example updating an already updated value in snapshot, or deleting an already deleted entry in snapshot. These replayed change log events should be handled specially.
       </td>
     </tr>
+    <tr>
+      <td>mongodb.ssl.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>Whether the connector will use SSL to connect to MongoDB instances.</td>
+    </tr>
+    <tr>
+      <td>mongodb.ssl.invalid.hostname.allowed</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>When SSL is enabled, this setting controls whether strict hostname checking is disabled during the connection phase. If <code>true</code>, the connection will not prevent man-in-the-middle attacks.</td>
+    </tr>
+    <tr>
+      <td>mongodb.ssl.keystore</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>The location of the key store file. This is optional and can be used for two-way authentication between the client and the MongoDB server.</td>
+    </tr>
+    <tr>
+      <td>mongodb.ssl.keystore.password</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>The password for the key store file. This is optional and only needed if <code>mongodb.ssl.keystore</code> is configured.</td>
+    </tr>
+    <tr>
+      <td>mongodb.ssl.keystore.type</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">PKCS12</td>
+      <td>String</td>
+      <td>The type of key store file. This is optional and only needed if <code>mongodb.ssl.keystore</code> is configured. Defaults to PKCS12.</td>
+    </tr>
+    <tr>
+      <td>mongodb.ssl.truststore</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>The location of the trust store file for the server certificate verification.</td>
+    </tr>
+    <tr>
+      <td>mongodb.ssl.truststore.password</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>The password for the trust store file. Used to check the integrity of the truststore, and unlock the truststore.</td>
+    </tr>
+    <tr>
+      <td>mongodb.ssl.truststore.type</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">PKCS12</td>
+      <td>String</td>
+      <td>The type of trust store file. This is optional and only needed if <code>mongodb.ssl.truststore</code> is configured. Defaults to PKCS12.</td>
+    </tr>
     </tbody>
 </table>
 </div>
 
 Note: `heartbeat.interval.ms` is highly recommended setting a proper value larger than 0 **if the collection changes slowly**.
 The heartbeat event can push the `resumeToken` forward to avoid `resumeToken` being expired when we recover the Flink job from a checkpoint or savepoint.
+
+Note: The `mongodb.ssl.*` options only take effect when the incremental snapshot is enabled (`scan.incremental.snapshot.enabled` = `true`). They are ignored by the non-incremental source.
 
 Available Metadata
 ----------------
