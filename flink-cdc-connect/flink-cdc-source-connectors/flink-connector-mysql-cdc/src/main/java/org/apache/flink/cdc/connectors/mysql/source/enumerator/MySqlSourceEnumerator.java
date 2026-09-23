@@ -60,6 +60,7 @@ import java.util.Optional;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 
+import static org.apache.flink.cdc.connectors.mysql.source.assigners.AssignerStatus.isNewlyAddedAssigningFinished;
 import static org.apache.flink.cdc.connectors.mysql.source.assigners.AssignerStatus.isNewlyAddedAssigningSnapshotFinished;
 
 /**
@@ -146,9 +147,17 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
 
     @Override
     public void addReader(int subtaskId) {
-        // send BinlogSplitUpdateRequestEvent to source reader after newly added table
-        // snapshot splits finished.
-        if (isNewlyAddedAssigningSnapshotFinished(splitAssigner.getAssignerStatus())) {
+        // Reconcile the binlog split after newly added table snapshot splits finished. The
+        // NEWLY_ADDED_ASSIGNING_FINISHED branch is needed for region failover: the enumerator
+        // remains alive with the latest finished split metadata, while the restarted reader may
+        // restore an older binlog split from the last completed checkpoint.
+        if (isNewlyAddedAssigningSnapshotFinished(splitAssigner.getAssignerStatus())
+                || isNewlyAddedAssigningFinished(splitAssigner.getAssignerStatus())) {
+            LOG.info(
+                    "The enumerator sends BinlogSplitUpdateRequestEvent to subtask {} when adding "
+                            + "reader under assigner status {}.",
+                    subtaskId,
+                    splitAssigner.getAssignerStatus());
             context.sendEventToSourceReader(subtaskId, new BinlogSplitUpdateRequestEvent());
         }
     }
@@ -181,7 +190,15 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
             LOG.info(
                     "The enumerator receives event that the binlog split has been updated from subtask {}. ",
                     subtaskId);
-            splitAssigner.onBinlogSplitUpdated();
+            if (isNewlyAddedAssigningFinished(splitAssigner.getAssignerStatus())) {
+                LOG.info(
+                        "Ignore the duplicated binlog split update acknowledgement from subtask {} "
+                                + "under assigner status {}.",
+                        subtaskId,
+                        splitAssigner.getAssignerStatus());
+            } else {
+                splitAssigner.onBinlogSplitUpdated();
+            }
         } else if (sourceEvent instanceof LatestFinishedSplitsNumberRequestEvent) {
             LOG.info(
                     "The enumerator receives request from subtask {} for the latest finished splits number after added newly tables. ",
