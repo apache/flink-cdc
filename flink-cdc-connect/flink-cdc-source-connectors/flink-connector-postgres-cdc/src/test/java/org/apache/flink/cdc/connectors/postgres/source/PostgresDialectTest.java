@@ -111,7 +111,7 @@ class PostgresDialectTest extends PostgresTestBase {
                     resultSet -> {
                         Assertions.assertThat(resultSet.next()).isTrue();
                         Assertions.assertThat(resultSet.getString(1))
-                                .isEqualTo("postgres-cdc-connector");
+                                .isEqualTo(PostgresDialect.CONNECTION_NAME);
                     });
         }
     }

@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.postgres.source;
 
+import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
 import org.apache.flink.cdc.connectors.base.dialect.JdbcDataSourceDialect;
 import org.apache.flink.cdc.connectors.base.relational.connection.JdbcConnectionFactory;
@@ -64,7 +65,7 @@ import static io.debezium.connector.postgresql.Utils.currentOffset;
 /** The dialect for Postgres. */
 public class PostgresDialect implements JdbcDataSourceDialect {
     private static final long serialVersionUID = 1L;
-    private static final String CONNECTION_NAME = "postgres-cdc-connector";
+    @VisibleForTesting static final String CONNECTION_NAME = "postgres-cdc-connector";
 
     private final PostgresSourceConfig sourceConfig;
     private transient Tables.TableFilter filters;
