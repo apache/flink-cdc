@@ -284,6 +284,18 @@ pipeline:
       </td>
     </tr>
     <tr>
+      <td>scan.newly-added-table.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        是否扫描新增的表。默认值为 false。
+        该选项仅在从 savepoint 或 checkpoint 恢复时生效，
+        会启用 SnapshotSplitAssigner#captureNewlyAddedTables() 代码路径，
+        以发现在 savepoint 时刻未被捕获但匹配 source <code>tables</code> 模式的新表。
+      </td>
+    </tr>
+    <tr>
       <td>schema-change.enabled</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>
