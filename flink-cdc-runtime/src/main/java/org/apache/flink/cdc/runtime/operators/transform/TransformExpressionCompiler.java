@@ -91,6 +91,9 @@ public class TransformExpressionCompiler {
                         try {
                             // Compile
                             expressionEvaluator.cook(key.getFullExpression());
+                            // Initialize Janino's lazily populated Method cache before publishing
+                            // the evaluator to concurrent cache readers.
+                            expressionEvaluator.getMethod();
                         } catch (CompileException e) {
                             throw new InvalidProgramException(
                                     String.format(
