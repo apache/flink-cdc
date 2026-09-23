@@ -192,19 +192,40 @@ public class FlinkPipelineComposer implements PipelineComposer {
                         dataSource.supportedMetadataColumns());
 
         // PreTransform ---> PostTransform
-        stream =
-                transformTranslator.translatePostTransform(
-                        stream,
-                        pipelineDef.getTransforms(),
-                        pipelineDef.getConfig().get(PipelineOptions.PIPELINE_LOCAL_TIME_ZONE),
-                        pipelineDef
-                                .getConfig()
-                                .get(PipelineOptions.PIPELINE_TRANSFORM_DECIMAL_PRECISION_MODE),
-                        pipelineDef.getUdfs(),
-                        pipelineDef.getModels(),
-                        dataSource.supportedMetadataColumns(),
-                        operatorUidGenerator,
-                        env);
+        if (pipelineDefConfig.get(PipelineOptions.PIPELINE_TRANSFORM_ASYNC_EXECUTION_ENABLED)) {
+            stream =
+                    transformTranslator.translateAsyncPostTransform(
+                            stream,
+                            pipelineDef.getTransforms(),
+                            pipelineDefConfig.get(PipelineOptions.PIPELINE_LOCAL_TIME_ZONE),
+                            pipelineDefConfig.get(
+                                    PipelineOptions.PIPELINE_TRANSFORM_DECIMAL_PRECISION_MODE),
+                            pipelineDef.getUdfs(),
+                            pipelineDef.getModels(),
+                            dataSource.supportedMetadataColumns(),
+                            operatorUidGenerator,
+                            pipelineDefConfig.get(
+                                    PipelineOptions.PIPELINE_TRANSFORM_ASYNC_EXECUTION_TIMEOUT),
+                            pipelineDefConfig.get(
+                                    PipelineOptions.PIPELINE_TRANSFORM_ASYNC_EXECUTION_CAPACITY),
+                            pipelineDefConfig.get(
+                                    PipelineOptions
+                                            .PIPELINE_TRANSFORM_ASYNC_EXECUTION_WORKER_THREADS),
+                            env);
+        } else {
+            stream =
+                    transformTranslator.translatePostTransform(
+                            stream,
+                            pipelineDef.getTransforms(),
+                            pipelineDefConfig.get(PipelineOptions.PIPELINE_LOCAL_TIME_ZONE),
+                            pipelineDefConfig.get(
+                                    PipelineOptions.PIPELINE_TRANSFORM_DECIMAL_PRECISION_MODE),
+                            pipelineDef.getUdfs(),
+                            pipelineDef.getModels(),
+                            dataSource.supportedMetadataColumns(),
+                            operatorUidGenerator,
+                            env);
+        }
 
         if (isParallelMetadataSource) {
             // Translate a distributed topology for sources with distributed tables
