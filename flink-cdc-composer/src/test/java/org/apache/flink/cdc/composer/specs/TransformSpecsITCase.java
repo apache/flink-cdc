@@ -32,6 +32,7 @@ import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.pipeline.DecimalPrecisionMode;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.Schema;
@@ -56,9 +57,11 @@ import org.assertj.core.api.Assumptions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedClass;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import javax.annotation.Nullable;
 
@@ -117,6 +120,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Fail.fail;
 
 /** Spec based transform module IT cases. */
+@ParameterizedClass
+@ValueSource(booleans = {false, true})
 class TransformSpecsITCase {
 
     private static final TableId testTableId = TableId.tableId("foo", "bar", "baz");
@@ -342,7 +347,6 @@ class TransformSpecsITCase {
 
     private static final ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
 
-    @SuppressWarnings("unchecked")
     private static Stream<TestSpec> loadTestSpec(Path specPath) {
         List<TestSpec> specs = new ArrayList<>();
         try {
@@ -355,6 +359,11 @@ class TransformSpecsITCase {
                 spec.ignore = asTextOrNull(specNode.get("ignore"));
                 if (specNode.has("time-zone")) {
                     spec.timeZone = asTextOrNull(specNode.get("time-zone"));
+                }
+                if (specNode.has("decimal-precision-mode")) {
+                    spec.decimalPrecisionMode =
+                            DecimalPrecisionMode.valueOf(
+                                    specNode.get("decimal-precision-mode").asText().toUpperCase());
                 }
                 if (specNode.has("projection")) {
                     spec.projectionRules =
@@ -399,6 +408,7 @@ class TransformSpecsITCase {
         public String name;
         public String ignore;
         public String timeZone = "UTC";
+        public DecimalPrecisionMode decimalPrecisionMode = DecimalPrecisionMode.UP_TO_19;
         public List<String> projectionRules = new ArrayList<>();
         public @Nullable String filterRule;
         public @Nullable String primaryKey;
@@ -412,6 +422,11 @@ class TransformSpecsITCase {
 
     private final PrintStream standardOut = System.out;
     private final ByteArrayOutputStream outCaptor = new ByteArrayOutputStream();
+    private final boolean asyncTransform;
+
+    TransformSpecsITCase(boolean asyncTransform) {
+        this.asyncTransform = asyncTransform;
+    }
 
     @BeforeEach
     void takeOverStdOut() {
@@ -444,6 +459,12 @@ class TransformSpecsITCase {
                 .as("Test case %s is ignored until we close %s", spec.name, spec.ignore)
                 .isNull();
         FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+        if (asyncTransform) {
+            // Keep the value source in a separate task. Otherwise, a transform failure in the
+            // chained async task may trigger irrelevant exceptions that hide the original
+            // exception.
+            composer.getEnv().disableOperatorChaining();
+        }
 
         Configuration sourceConfig = new Configuration();
         sourceConfig.set(EVENT_SET_ID, CUSTOM_SOURCE_EVENTS);
@@ -474,6 +495,11 @@ class TransformSpecsITCase {
         pipelineConfig.set(PipelineOptions.PIPELINE_LOCAL_TIME_ZONE, spec.timeZone);
         pipelineConfig.set(
                 PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
+        pipelineConfig.set(
+                PipelineOptions.PIPELINE_TRANSFORM_DECIMAL_PRECISION_MODE,
+                spec.decimalPrecisionMode);
+        pipelineConfig.set(
+                PipelineOptions.PIPELINE_TRANSFORM_ASYNC_EXECUTION_ENABLED, asyncTransform);
         PipelineDef pipelineDef =
                 new PipelineDef(
                         sourceDef,
@@ -511,6 +537,7 @@ class TransformSpecsITCase {
         "specs/logical.yaml",
         "specs/meta.yaml",
         "specs/nested.yaml",
+        "specs/regression.yaml",
         "specs/string.yaml",
         "specs/temporal.yaml"
     };

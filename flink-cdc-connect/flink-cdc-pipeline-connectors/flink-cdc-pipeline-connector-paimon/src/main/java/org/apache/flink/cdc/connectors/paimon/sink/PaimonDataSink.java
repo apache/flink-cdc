@@ -85,6 +85,6 @@ public class PaimonDataSink implements DataSink, Serializable {
     @Override
     public HashFunctionProvider<DataChangeEvent> getDataChangeEventHashFunctionProvider(
             int parallelism) {
-        return new PaimonHashFunctionProvider(options, zoneId, parallelism);
+        return new PaimonHashFunctionProvider(zoneId, parallelism);
     }
 }

@@ -30,19 +30,24 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.event.visitor.SchemaChangeEventVisitor;
 import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
+import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
+import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.connectors.paimon.sink.utils.TypeUtils;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.Sets;
 
+import org.apache.paimon.CoreOptions;
 import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.catalog.Identifier;
 import org.apache.paimon.flink.FlinkCatalogFactory;
 import org.apache.paimon.options.Options;
 import org.apache.paimon.schema.SchemaChange;
+import org.apache.paimon.table.FileStoreTable;
 import org.apache.paimon.table.Table;
 import org.apache.paimon.table.sink.BatchTableCommit;
+import org.apache.paimon.types.DataTypes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,6 +57,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import static org.apache.flink.cdc.common.types.DataTypeFamily.BINARY_STRING;
+import static org.apache.flink.cdc.common.types.DataTypeFamily.CHARACTER_STRING;
 import static org.apache.flink.cdc.common.utils.Preconditions.checkArgument;
 import static org.apache.flink.cdc.common.utils.Preconditions.checkNotNull;
 
@@ -147,13 +154,16 @@ public class PaimonMetadataApplier implements MetadataApplier {
             Schema schema = event.getSchema();
             org.apache.paimon.schema.Schema.Builder builder =
                     new org.apache.paimon.schema.Schema.Builder();
+            Map<String, String> fullTableOptions = new HashMap<>(tableOptions);
+            fullTableOptions.putAll(schema.options());
+            Map<String, String> effectiveTableOptions = filterBlobOptions(schema, fullTableOptions);
             schema.getColumns()
                     .forEach(
-                            (column) ->
-                                    builder.column(
-                                            column.getName(),
-                                            TypeUtils.toPaimonDataType(column.getType()),
-                                            column.getComment()));
+                            (column) -> {
+                                org.apache.paimon.types.DataType dataType =
+                                        convertToBlobIfNeeded(column, effectiveTableOptions);
+                                builder.column(column.getName(), dataType, column.getComment());
+                            });
             List<String> partitionKeys = new ArrayList<>();
             List<String> primaryKeys = schema.primaryKeys();
             if (partitionMaps.containsKey(event.tableId())) {
@@ -169,8 +179,7 @@ public class PaimonMetadataApplier implements MetadataApplier {
             builder.partitionKeys(partitionKeys)
                     .primaryKey(primaryKeys)
                     .comment(schema.comment())
-                    .options(tableOptions)
-                    .options(schema.options());
+                    .options(effectiveTableOptions);
             catalog.createTable(tableIdToIdentifier(event), builder.build(), true);
         } catch (Catalog.TableAlreadyExistException
                 | Catalog.DatabaseNotExistException
@@ -205,10 +214,12 @@ public class PaimonMetadataApplier implements MetadataApplier {
                                 SchemaChangeProvider.add(
                                         columnWithPosition,
                                         SchemaChange.Move.first(
-                                                columnWithPosition.getAddColumn().getName())));
+                                                columnWithPosition.getAddColumn().getName()),
+                                        tableOptions));
                         break;
                     case LAST:
-                        tableChangeList.addAll(SchemaChangeProvider.add(columnWithPosition));
+                        tableChangeList.addAll(
+                                SchemaChangeProvider.add(columnWithPosition, tableOptions));
                         break;
                     case BEFORE:
                         tableChangeList.addAll(
@@ -225,7 +236,8 @@ public class PaimonMetadataApplier implements MetadataApplier {
                                 SchemaChange.Move.after(
                                         columnWithPosition.getAddColumn().getName(),
                                         columnWithPosition.getExistedColumnName());
-                        tableChangeList.addAll(SchemaChangeProvider.add(columnWithPosition, after));
+                        tableChangeList.addAll(
+                                SchemaChangeProvider.add(columnWithPosition, after, tableOptions));
                         break;
                     default:
                         throw new SchemaEvolveException(
@@ -253,7 +265,8 @@ public class PaimonMetadataApplier implements MetadataApplier {
                 columnWithPosition,
                 (index == 0)
                         ? SchemaChange.Move.first(columnName)
-                        : SchemaChange.Move.after(columnName, columnNames.get(index - 1)));
+                        : SchemaChange.Move.after(columnName, columnNames.get(index - 1)),
+                tableOptions);
     }
 
     private int checkColumnPosition(String existedColumnName, List<String> columnNames) {
@@ -303,13 +316,22 @@ public class PaimonMetadataApplier implements MetadataApplier {
 
     private void applyAlterColumnType(AlterColumnTypeEvent event) throws SchemaEvolveException {
         try {
+            FileStoreTable table =
+                    (FileStoreTable)
+                            catalog.getTable(
+                                    new Identifier(
+                                            event.tableId().getSchemaName(),
+                                            event.tableId().getTableName()));
             List<SchemaChange> tableChangeList = new ArrayList<>();
             event.getTypeMapping()
                     .forEach(
-                            (oldName, newType) ->
-                                    tableChangeList.add(
-                                            SchemaChangeProvider.updateColumnType(
-                                                    oldName, newType)));
+                            (columnName, newType) -> {
+                                // Modifying the primary key data type may lead to exceptions in
+                                // read/write/merge operations.
+                                SchemaChangeProvider.updateColumnType(
+                                                table.schema(), columnName, newType, tableOptions)
+                                        .ifPresent(tableChangeList::add);
+                            });
             event.getComments()
                     .forEach(
                             (name, comment) -> {
@@ -358,5 +380,64 @@ public class PaimonMetadataApplier implements MetadataApplier {
 
     private static Identifier tableIdToIdentifier(SchemaChangeEvent event) {
         return new Identifier(event.tableId().getSchemaName(), event.tableId().getTableName());
+    }
+
+    /**
+     * Convert CDC VARBINARY/BINARY/CHAR/VARCHAR/STRING type to Paimon BLOB type if configured.
+     *
+     * @param column The CDC column definition.
+     * @param tableOptions The table options containing blob-field configuration.
+     * @return The Paimon DataType (BLOB if configured, otherwise original converted type).
+     */
+    private org.apache.paimon.types.DataType convertToBlobIfNeeded(
+            Column column, Map<String, String> tableOptions) {
+        org.apache.paimon.types.DataType dataType = TypeUtils.toPaimonDataType(column.getType());
+
+        // Check if this field should be converted to BLOB type using Paimon's CoreOptions
+        List<String> blobFields = CoreOptions.blobField(tableOptions);
+        if (!blobFields.isEmpty() && isSupportedTypeForBlob(column.getType())) {
+            if (blobFields.contains(column.getName())) {
+                // Convert VARBINARY/BINARY/VARCHAR/STRING to BLOB type
+                // BLOB type is always nullable in Paimon
+                return DataTypes.BLOB();
+            }
+        }
+
+        return dataType;
+    }
+
+    private Map<String, String> filterBlobOptions(
+            Schema schema, Map<String, String> fullTableOptions) {
+        Map<String, String> effectiveTableOptions = new HashMap<>(fullTableOptions);
+
+        List<String> blobFields = new ArrayList<>(CoreOptions.blobField(fullTableOptions));
+        blobFields.removeIf(
+                field ->
+                        !schema.getColumn(field)
+                                .map(Column::getType)
+                                .map(this::isSupportedTypeForBlob)
+                                .orElse(false));
+        if (blobFields.isEmpty()) {
+            effectiveTableOptions.remove(CoreOptions.BLOB_FIELD.key());
+        } else {
+            effectiveTableOptions.put(CoreOptions.BLOB_FIELD.key(), String.join(",", blobFields));
+        }
+
+        List<String> blobDescriptorFields =
+                new ArrayList<>(CoreOptions.fromMap(fullTableOptions).blobDescriptorField());
+        blobDescriptorFields.retainAll(blobFields);
+        if (blobDescriptorFields.isEmpty()) {
+            effectiveTableOptions.remove(CoreOptions.BLOB_DESCRIPTOR_FIELD.key());
+        } else {
+            effectiveTableOptions.put(
+                    CoreOptions.BLOB_DESCRIPTOR_FIELD.key(),
+                    String.join(",", blobDescriptorFields));
+        }
+        return effectiveTableOptions;
+    }
+
+    /** Check if DataType can be converted to BLOB (BINARY, VARBINARY, CHAR or VARCHAR). */
+    private boolean isSupportedTypeForBlob(DataType dataType) {
+        return dataType.isAnyOf(BINARY_STRING, CHARACTER_STRING);
     }
 }

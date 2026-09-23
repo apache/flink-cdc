@@ -219,10 +219,10 @@ Connector Options
           <td>Boolean</td>
           <td>Incremental snapshot is a new mechanism to read snapshot of a table. Compared to the old snapshot mechanism,
               the incremental snapshot has many advantages, including:
-                (1) source can be parallel during snapshot reading,
-                (2) source can perform checkpoints in the chunk granularity during snapshot reading,
-                (3) source doesn't need to acquire global read lock (FLUSH TABLES WITH READ LOCK) before snapshot reading.
-              Please see <a href="#incremental-snapshot-reading ">Incremental Snapshot Reading</a>section for more detailed information.
+                <br/>(1) source can be parallel during snapshot reading,
+                <br/>(2) source can perform checkpoints in the chunk granularity during snapshot reading,
+                <br/>(3) source doesn't need to acquire global read lock (FLUSH TABLES WITH READ LOCK) before snapshot reading.
+              <br/>Please see <a href="#incremental-snapshot-reading-experimental">Incremental Snapshot Reading</a> section for more detailed information.
           </td>
     </tr>
     <tr>
@@ -235,6 +235,13 @@ Connector Options
           If the flink version is greater than or equal to 1.15, the default value of 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' has been changed to true,
           so it does not need to be explicitly configured 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' = 'true'
       </td>
+    </tr>
+    <tr>
+      <td>scan.incremental.snapshot.metadata.release.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>是否在 source 进入增量阶段后，释放 source coordinator 持有的快照分片元数据（已分配的分片、已完成分片的位点以及表结构），以降低快照分片数量非常大的作业的 JobManager 内存占用。默认关闭。与 scan.newly-added-table.enabled 不兼容：同时开启两者会导致作业启动失败，且已释放元数据的作业无法再开启动态加表功能。仅在成功完成一次 checkpoint 后才会释放；若未开启 checkpoint 或没有 checkpoint 完成，则会保留该元数据，因此该配置项在未开启 checkpoint 时不生效。开启该配置项后生成的 checkpoint 或 savepoint，无法在降级到 Flink CDC 3.6.0 及更早版本后用于恢复作业。</td>
     </tr>
     <tr>
       <td>scan.lsn-commit.checkpoints-num-delay</td>
@@ -573,7 +580,7 @@ $ ./bin/flink run \
       --from-savepoint /tmp/flink-savepoints/savepoint-cca7bc-bb1e257f0dab \
       ./FlinkCDCExample.jar
 ```
-**注意:** 请参考文档 [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.17/docs/deployment/cli/#command-line-interface) 了解更多详细信息。
+**注意:** 请参考文档 [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.20/docs/deployment/cli/#command-line-interface) 了解更多详细信息。
 
 ### DataStream Source
 

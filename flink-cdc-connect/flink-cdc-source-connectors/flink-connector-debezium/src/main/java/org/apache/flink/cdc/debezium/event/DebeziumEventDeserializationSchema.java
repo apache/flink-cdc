@@ -141,7 +141,8 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
         return new EventTypeInfo();
     }
 
-    private RecordData extractBeforeDataRecord(Struct value, Schema valueSchema) throws Exception {
+    protected RecordData extractBeforeDataRecord(Struct value, Schema valueSchema)
+            throws Exception {
         Schema beforeSchema = fieldSchema(valueSchema, Envelope.FieldName.BEFORE);
         Struct beforeValue = fieldStruct(value, Envelope.FieldName.BEFORE);
         return extractDataRecord(beforeValue, beforeSchema);

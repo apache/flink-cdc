@@ -42,6 +42,15 @@ public interface SourceConfig extends Serializable {
 
     boolean isAssignUnboundedChunkFirst();
 
+    /**
+     * Whether releasing the snapshot split metadata held by the source coordinator once the stream
+     * split is assembled and checkpoint-covered is enabled. Default {@code false} so existing jobs
+     * and configs that do not set the option are unaffected.
+     */
+    default boolean isReleaseSnapshotMetadataEnabled() {
+        return false;
+    }
+
     /** Factory for the {@code SourceConfig}. */
     @FunctionalInterface
     interface Factory<C extends SourceConfig> extends Serializable {

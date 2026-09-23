@@ -297,6 +297,16 @@ public class PostgresSourceBuilder<T> {
         return this;
     }
 
+    /**
+     * Whether to release the finished snapshot split metadata from the coordinator after entering
+     * the stream phase, to reduce JobManager memory pressure (FLINK-40697).
+     */
+    public PostgresSourceBuilder<T> releaseSnapshotMetadataEnabled(
+            boolean releaseSnapshotMetadataEnabled) {
+        this.configFactory.releaseSnapshotMetadataEnabled(releaseSnapshotMetadataEnabled);
+        return this;
+    }
+
     /** Set the {@code LSN} checkpoints delay number for Postgres to commit the offsets. */
     public PostgresSourceBuilder<T> lsnCommitCheckpointsDelay(int lsnCommitDelay) {
         this.configFactory.setLsnCommitCheckpointsDelay(lsnCommitDelay);
@@ -312,6 +322,40 @@ public class PostgresSourceBuilder<T> {
     /** Whether to include database in the generated Table ID. */
     public PostgresSourceBuilder<T> includeDatabaseInTableId(boolean includeDatabaseInTableId) {
         this.configFactory.setIncludeDatabaseInTableId(includeDatabaseInTableId);
+        return this;
+    }
+
+    /**
+     * Enable emitting Postgres logical decoding messages (records produced by {@code
+     * pg_logical_emit_message}) to the deserializer.
+     *
+     * <p>Unlike normal table changes, logical messages are <b>not bound to any table</b> and are
+     * <b>not filtered by PUBLICATION</b>. They are written as standalone {@code LOGICAL MESSAGE}
+     * records in the WAL and streamed to all replication slots created with the {@code pgoutput}
+     * plugin. Both transactional ({@code pg_logical_emit_message(true, ...)}) and non-transactional
+     * ({@code pg_logical_emit_message(false, ...)}) messages are delivered.
+     *
+     * <p>Once enabled, this connector performs <b>client-side prefix filtering</b>: only messages
+     * whose {@code prefix} starts with one of the given {@code prefixes} are forwarded to the
+     * deserializer; messages with non-matching prefixes are silently dropped.
+     *
+     * <p>Requirements:
+     *
+     * <ol>
+     *   <li>PostgreSQL 14+ with {@code wal_level=logical} configured in {@code postgresql.conf}
+     *       (the {@code pgoutput} plugin started supporting the {@code messages} streaming option
+     *       since PG 14).
+     *   <li>The decoding plugin must be {@code pgoutput} (configured via {@link
+     *       #decodingPluginName}).
+     *   <li>{@code prefixes} must be non-null and non-empty; otherwise no logical message will be
+     *       emitted.
+     * </ol>
+     *
+     * @param prefixes the list of message prefixes to be included; messages whose prefix matches
+     *     any of these will be emitted, all others are dropped
+     */
+    public PostgresSourceBuilder<T> includeLogicalMessages(List<String> prefixes) {
+        this.configFactory.includeLogicalMessages(prefixes);
         return this;
     }
 
@@ -462,7 +506,8 @@ public class PostgresSourceBuilder<T> {
                     deserializationSchema,
                     sourceReaderMetrics,
                     sourceConfig.isIncludeSchemaChanges(),
-                    offsetFactory);
+                    offsetFactory,
+                    (PostgresSourceConfig) sourceConfig);
         }
 
         public static <T> PostgresSourceBuilder<T> builder() {

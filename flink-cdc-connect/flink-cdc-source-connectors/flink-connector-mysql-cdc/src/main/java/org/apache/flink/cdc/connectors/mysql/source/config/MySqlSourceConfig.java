@@ -24,6 +24,7 @@ import org.apache.flink.table.catalog.ObjectPath;
 
 import io.debezium.config.Configuration;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
+import io.debezium.relational.CachedTableFilter;
 import io.debezium.relational.RelationalTableFilters;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
@@ -72,6 +73,7 @@ public class MySqlSourceConfig implements Serializable {
     private final boolean parseOnLineSchemaChanges;
     public static boolean useLegacyJsonFormat = true;
     private final boolean assignUnboundedChunkFirst;
+    private final boolean releaseSnapshotMetadataEnabled;
 
     // --------------------------------------------------------------------------------------------
     // Debezium Configurations
@@ -112,7 +114,8 @@ public class MySqlSourceConfig implements Serializable {
             boolean parseOnLineSchemaChanges,
             boolean treatTinyInt1AsBoolean,
             boolean useLegacyJsonFormat,
-            boolean assignUnboundedChunkFirst) {
+            boolean assignUnboundedChunkFirst,
+            boolean releaseSnapshotMetadataEnabled) {
         this.hostname = checkNotNull(hostname);
         this.port = port;
         this.username = checkNotNull(username);
@@ -143,14 +146,16 @@ public class MySqlSourceConfig implements Serializable {
                 (excludeTableList == null
                         ? null
                         : new Selectors.SelectorsBuilder().includeTables(excludeTableList).build());
-        Tables.TableFilter tableFilter = dbzMySqlConfig.getTableFilters().dataCollectionFilter();
-        dbzMySqlConfig
-                .getTableFilters()
-                .setDataCollectionFilters(
-                        (TableId tableId) ->
-                                tableFilter.isIncluded(tableId)
-                                        && (excludeTableFilter == null
-                                                || !excludeTableFilter.isMatch(tableId)));
+        if (excludeTableFilter != null) {
+            Tables.TableFilter tableFilter =
+                    dbzMySqlConfig.getTableFilters().dataCollectionFilter();
+            dbzMySqlConfig
+                    .getTableFilters()
+                    .setDataCollectionFilters(
+                            CachedTableFilter.from(tableFilter)
+                                    .withAdditionalFilter(
+                                            tableId -> !excludeTableFilter.isMatch(tableId)));
+        }
         this.jdbcProperties = jdbcProperties;
         this.chunkKeyColumns = chunkKeyColumns;
         this.skipSnapshotBackfill = skipSnapshotBackfill;
@@ -158,6 +163,7 @@ public class MySqlSourceConfig implements Serializable {
         this.treatTinyInt1AsBoolean = treatTinyInt1AsBoolean;
         this.useLegacyJsonFormat = useLegacyJsonFormat;
         this.assignUnboundedChunkFirst = assignUnboundedChunkFirst;
+        this.releaseSnapshotMetadataEnabled = releaseSnapshotMetadataEnabled;
     }
 
     public String getHostname() {
@@ -243,6 +249,10 @@ public class MySqlSourceConfig implements Serializable {
 
     public boolean isScanNewlyAddedTableEnabled() {
         return scanNewlyAddedTableEnabled;
+    }
+
+    public boolean isReleaseSnapshotMetadataEnabled() {
+        return releaseSnapshotMetadataEnabled;
     }
 
     public boolean isCloseIdleReaders() {

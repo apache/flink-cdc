@@ -238,7 +238,7 @@ MongoDB 的更改事件记录在消息之前没有更新。因此，我们只能
         <td>String</td>
         <td> MongoDB CDC 消费者可选的启动模式，
          合法的模式为 "initial"，"latest-offset" 和 "timestamp"。
-           请查阅 <a href="#a-name-id-002-a">启动模式</a> 章节了解更多详细信息。</td>
+           请查阅 <a href="#启动模式">启动模式</a> 章节了解更多详细信息。</td>
     </tr>
     <tr>
         <td>scan.startup.timestamp-millis</td>
@@ -326,6 +326,13 @@ MongoDB 的更改事件记录在消息之前没有更新。因此，我们只能
       <td>是否在快照结束后关闭空闲的 Reader。 此特性需要 flink 版本大于等于 1.14 并且 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' 需要设置为 true。</td>
     </tr>
     <tr>
+      <td>scan.incremental.snapshot.metadata.release.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>是否在 source 进入增量阶段后，释放 source coordinator 持有的快照分片元数据（已分配的分片、已完成分片的位点以及表结构），以降低快照分片数量非常大的作业的 JobManager 内存占用。默认关闭。与 scan.newly-added-table.enabled 不兼容：同时开启两者会导致作业启动失败，且已释放元数据的作业无法再开启动态加表功能。仅在成功完成一次 checkpoint 后才会释放；若未开启 checkpoint 或没有 checkpoint 完成，则会保留该元数据，因此该配置项在未开启 checkpoint 时不生效。开启该配置项后生成的 checkpoint 或 savepoint，无法在降级到 Flink CDC 3.6.0 及更早版本后用于恢复作业。</td>
+    </tr>
+    <tr>
       <td>scan.incremental.snapshot.unbounded-chunk-first.enabled</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">true</td>
@@ -347,12 +354,70 @@ MongoDB 的更改事件记录在消息之前没有更新。因此，我们只能
         For example updating an already updated value in snapshot, or deleting an already deleted entry in snapshot. These replayed change log events should be handled specially.
       </td>
     </tr>
+    <tr>
+      <td>mongodb.ssl.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>连接器是否使用 SSL 连接 MongoDB 实例。</td>
+    </tr>
+    <tr>
+      <td>mongodb.ssl.invalid.hostname.allowed</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>启用 SSL 时，该配置控制是否在连接阶段禁用严格的主机名校验。若设为 <code>true</code>，连接将无法防范中间人攻击。</td>
+    </tr>
+    <tr>
+      <td>mongodb.ssl.keystore</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>密钥库（keystore）文件的位置。该项为可选，可用于客户端与 MongoDB 服务端之间的双向认证。</td>
+    </tr>
+    <tr>
+      <td>mongodb.ssl.keystore.password</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>密钥库文件的密码。该项为可选，仅在配置了 <code>mongodb.ssl.keystore</code> 时才需要。</td>
+    </tr>
+    <tr>
+      <td>mongodb.ssl.keystore.type</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">PKCS12</td>
+      <td>String</td>
+      <td>密钥库文件的类型。该项为可选，仅在配置了 <code>mongodb.ssl.keystore</code> 时才需要。默认为 PKCS12。</td>
+    </tr>
+    <tr>
+      <td>mongodb.ssl.truststore</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>用于校验服务端证书的信任库（truststore）文件的位置。</td>
+    </tr>
+    <tr>
+      <td>mongodb.ssl.truststore.password</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>信任库文件的密码。用于校验信任库的完整性并解锁信任库。</td>
+    </tr>
+    <tr>
+      <td>mongodb.ssl.truststore.type</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">PKCS12</td>
+      <td>String</td>
+      <td>信任库文件的类型。该项为可选，仅在配置了 <code>mongodb.ssl.truststore</code> 时才需要。默认为 PKCS12。</td>
+    </tr>
     </tbody>
 </table>
 </div>
 
 注意: `heartbeat.interval.ms` 强烈建议设置一个大于 0 的适当值 **如果集合更改缓慢**.
 当我们从检查点或保存点恢复 Flink 作业时，心跳事件可以向前推送 `resumeToken`，以避免 `resumeToken` 过期。
+
+注意: `mongodb.ssl.*` 相关配置仅在开启增量快照（`scan.incremental.snapshot.enabled` = `true`）时才会生效，非增量快照的数据源会忽略这些配置。
 
 可用元数据
 ----------------
@@ -423,7 +488,7 @@ CREATE TABLE products (
 
 MongoDB CDC 连接器是一个 Flink Source 连接器，它将首先读取数据库快照，然后在处理**甚至失败时继续读取带有**的更改流事件。
 
-### 启动模式<a name="启动模式" id="002" ></a>
+### 启动模式
 
 配置选项```scan.startup.mode```指定 MongoDB CDC 消费者的启动模式。有效枚举包括：
 
@@ -544,7 +609,7 @@ $ ./bin/flink run \
       --from-savepoint /tmp/flink-savepoints/savepoint-cca7bc-bb1e257f0dab \
       ./FlinkCDCExample.jar
 ```
-**注意:** 请参考文档 [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.17/docs/deployment/cli/#command-line-interface) 了解更多详细信息。
+**注意:** 请参考文档 [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.20/docs/deployment/cli/#command-line-interface) 了解更多详细信息。
 
 ### DataStream Source
 
@@ -694,7 +759,7 @@ CREATE TABLE mongodb_source (...) WITH (
 ----------------
 [BSON](https://docs.mongodb.com/manual/reference/bson-types/) **二进制 JSON**的缩写是一种类似 JSON 格式的二进制编码序列，用于在 MongoDB 中存储文档和进行远程过程调用。
 
-[Flink SQL Data Type](https://nightlies.apache.org/flink/flink-docs-release-1.16/docs/dev/table/types/) 类似于 SQL 标准的数据类型术语，该术语描述了表生态系统中值的逻辑类型。它可以用于声明操作的输入和/或输出类型。
+[Flink SQL Data Type](https://nightlies.apache.org/flink/flink-docs-release-1.20/docs/dev/table/types/) 类似于 SQL 标准的数据类型术语，该术语描述了表生态系统中值的逻辑类型。它可以用于声明操作的输入和/或输出类型。
 
 为了使 Flink SQL 能够处理来自异构数据源的数据，异构数据源的数据类型需要统一转换为 Flink SQL 数据类型。
 
@@ -812,6 +877,6 @@ CREATE TABLE mongodb_source (...) WITH (
 - [Replica set protocol](https://docs.mongodb.com/manual/reference/replica-configuration/#mongodb-rsconf-rsconf.protocolVersion)
 - [Connection String Options](https://docs.mongodb.com/manual/reference/connection-string/#std-label-connections-connection-options)
 - [BSON Types](https://docs.mongodb.com/manual/reference/bson-types/)
-- [Flink DataTypes](https://nightlies.apache.org/flink/flink-docs-release-1.16/docs/dev/table/types/)
+- [Flink DataTypes](https://nightlies.apache.org/flink/flink-docs-release-1.20/docs/dev/table/types/)
 
 {{< top >}}

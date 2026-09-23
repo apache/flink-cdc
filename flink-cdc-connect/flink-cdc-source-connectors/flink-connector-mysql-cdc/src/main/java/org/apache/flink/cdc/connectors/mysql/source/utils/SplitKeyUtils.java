@@ -25,6 +25,7 @@ import org.apache.kafka.connect.data.Struct;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.util.Arrays;
 import java.util.List;
 
 /** Utility class to deal split keys and split key ranges. */
@@ -42,6 +43,8 @@ public class SplitKeyUtils {
             return ((Comparable) o1).compareTo(o2);
         } else if (isNumericObject(o1) && isNumericObject(o2)) {
             return toBigDecimal(o1).compareTo(toBigDecimal(o2));
+        } else if (o1 instanceof byte[] && o2 instanceof byte[]) {
+            return Arrays.compareUnsigned((byte[]) o1, (byte[]) o2);
         } else {
             return o1.toString().compareTo(o2.toString());
         }

@@ -29,6 +29,7 @@ import org.apache.flink.configuration.StateRecoveryOptions;
 import org.apache.flink.core.execution.JobClient;
 import org.apache.flink.core.execution.SavepointFormatType;
 import org.apache.flink.runtime.checkpoint.CheckpointException;
+import org.apache.flink.runtime.messages.FlinkJobNotFoundException;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -81,6 +82,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.lang.String.format;
+import static org.apache.flink.api.common.JobStatus.RUNNING;
 import static org.apache.flink.util.Preconditions.checkState;
 
 /** IT tests to cover various newly added tables during capture process. */
@@ -636,6 +638,10 @@ class NewlyAddedTableITCase extends MySqlSourceTestBase {
 
             // trigger failover after some snapshot data read finished
             if (failoverPhase == FailoverPhase.SNAPSHOT) {
+                // Wait until the job is RUNNING before triggering snapshot-phase failover.
+                // On JM failover, revoking leadership before the JobMaster leader election
+                // is established can tear down the HA services under startup.
+                waitUntilJobRunning(tableResult);
                 triggerFailover(
                         failoverType,
                         jobClient.getJobID(),
@@ -720,6 +726,7 @@ class NewlyAddedTableITCase extends MySqlSourceTestBase {
                         jobClient.getJobID(),
                         miniClusterResource.get().getMiniCluster(),
                         () -> sleepMs(100));
+                waitUntilJobRunning(tableResult);
             }
 
             fetchedDataList.addAll(expectedBinlogDataThisRound);
@@ -773,6 +780,7 @@ class NewlyAddedTableITCase extends MySqlSourceTestBase {
                             .subList(0, round + 1)
                             .toArray(new String[0]);
             String newlyAddedTable = captureAddressTables[round];
+            int previousUpsertSize = fetchedDataList.size();
             if (makeBinlogBeforeCapture) {
                 makeBinlogBeforeCaptureForAddressTable(getConnection(), newlyAddedTable);
             }
@@ -830,6 +838,11 @@ class NewlyAddedTableITCase extends MySqlSourceTestBase {
 
             // trigger failover after some snapshot data read finished
             if (failoverPhase == FailoverPhase.SNAPSHOT) {
+                waitForUpsertSinkSize("sink", previousUpsertSize + 1);
+                // Wait until the job is RUNNING before triggering snapshot-phase failover.
+                // On JM failover, revoking leadership before the JobMaster leader election
+                // is established can tear down the HA services under startup.
+                waitUntilJobRunning(tableResult);
                 triggerFailover(
                         failoverType,
                         jobClient.getJobID(),
@@ -851,6 +864,7 @@ class NewlyAddedTableITCase extends MySqlSourceTestBase {
                         jobClient.getJobID(),
                         miniClusterResource.get().getMiniCluster(),
                         () -> sleepMs(100));
+                waitUntilJobRunning(tableResult);
             }
             makeSecondPartBinlogForAddressTable(getConnection(), newlyAddedTable);
 
@@ -879,10 +893,10 @@ class NewlyAddedTableITCase extends MySqlSourceTestBase {
             // step 5: assert fetched binlog data in this round
             fetchedDataList.addAll(expectedBinlogUpsertDataThisRound);
 
-            waitForUpsertSinkSize("sink", fetchedDataList.size());
-            // the result size of sink may arrive fetchedDataList.size() with old data, wait one
-            // checkpoint to wait retract old record and send new record
-            Thread.sleep(1000);
+            // The sink size can reach fetchedDataList.size() while the retracted row still holds
+            // its old value, because the in-place upsert keeps the row count unchanged. Poll until
+            // the sink content converges instead of relying on a fixed sleep after the size wait.
+            waitForUpsertSinkContent("sink", fetchedDataList);
             assertEqualsInAnyOrder(
                     fetchedDataList, TestValuesTableFactory.getResultsAsStrings("sink"));
 
@@ -949,8 +963,18 @@ class NewlyAddedTableITCase extends MySqlSourceTestBase {
                 StreamExecutionEnvironment.getExecutionEnvironment(configuration);
         env.setParallelism(parallelism);
         env.enableCheckpointing(200L);
-        RestartStrategyUtils.configureFixedDelayRestartStrategy(env, 3, 100L);
+        // A single failover can surface multiple racing task failures while the cluster
+        // reconnects, so allow enough retries that one induced failover never exhausts the
+        // restart strategy by itself.
+        RestartStrategyUtils.configureFixedDelayRestartStrategy(env, 10, 100L);
         return env;
+    }
+
+    private void waitUntilJobRunning(TableResult tableResult)
+            throws InterruptedException, ExecutionException {
+        do {
+            Thread.sleep(5000L);
+        } while (tableResult.getJobClient().get().getJobStatus().get() != RUNNING);
     }
 
     private String triggerSavepointWithRetry(JobClient jobClient, String savepointDirectory)
@@ -963,10 +987,16 @@ class NewlyAddedTableITCase extends MySqlSourceTestBase {
                         .triggerSavepoint(savepointDirectory, SavepointFormatType.DEFAULT)
                         .get();
             } catch (Exception e) {
-                Optional<CheckpointException> exception =
+                Optional<CheckpointException> checkpointException =
                         ExceptionUtils.findThrowable(e, CheckpointException.class);
-                if (exception.isPresent()
-                        && exception.get().getMessage().contains("Checkpoint triggering task")) {
+                Optional<FlinkJobNotFoundException> jobNotFoundException =
+                        ExceptionUtils.findThrowable(e, FlinkJobNotFoundException.class);
+                if ((checkpointException.isPresent()
+                                && checkpointException
+                                        .get()
+                                        .getMessage()
+                                        .contains("Checkpoint triggering task"))
+                        || jobNotFoundException.isPresent()) {
                     Thread.sleep(100);
                     retryTimes++;
                 } else {
@@ -1122,6 +1152,36 @@ class NewlyAddedTableITCase extends MySqlSourceTestBase {
         }
     }
 
+    /**
+     * Waits until the upsert sink content matches {@code expected} in any order. Unlike a
+     * size-based wait, this also detects in-place upserts that replace a row's value without
+     * changing the row count, so the assertion does not race the retract/insert convergence.
+     */
+    private static void waitForUpsertSinkContent(String sinkName, List<String> expected)
+            throws InterruptedException {
+        long deadline = System.currentTimeMillis() + TimeUnit.MINUTES.toMillis(2);
+        List<String> sortedExpected = expected.stream().sorted().collect(Collectors.toList());
+        while (System.currentTimeMillis() < deadline) {
+            List<String> actual;
+            synchronized (TestValuesTableFactory.class) {
+                try {
+                    actual = TestValuesTableFactory.getResultsAsStrings(sinkName);
+                } catch (IllegalArgumentException e) {
+                    // job is not started yet
+                    actual = new ArrayList<>();
+                }
+            }
+            if (actual.size() == sortedExpected.size()
+                    && actual.stream()
+                            .sorted()
+                            .collect(Collectors.toList())
+                            .equals(sortedExpected)) {
+                return;
+            }
+            Thread.sleep(100);
+        }
+    }
+
     private static int sinkSize(String sinkName) {
         synchronized (TestValuesTableFactory.class) {
             try {
@@ -1218,10 +1278,10 @@ class NewlyAddedTableITCase extends MySqlSourceTestBase {
                                     newlyAddedTable, cityName, cityName));
             // step 5: assert fetched binlog data in this round
             fetchedDataList.addAll(expectedBinlogUpsertDataThisRound);
-            waitForUpsertSinkSize("sink", fetchedDataList.size());
-            // the result size of sink may arrive fetchedDataList.size() with old data, wait one
-            // checkpoint to wait retract old record and send new record
-            Thread.sleep(1000);
+            // The sink size can reach fetchedDataList.size() while the retracted row still holds
+            // its old value, because the in-place upsert keeps the row count unchanged. Poll until
+            // the sink content converges instead of relying on a fixed sleep after the size wait.
+            waitForUpsertSinkContent("sink", fetchedDataList);
             assertEqualsInAnyOrder(
                     fetchedDataList, TestValuesTableFactory.getResultsAsStrings("sink"));
             // step 6: trigger savepoint

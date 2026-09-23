@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.mysql.source.utils;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.util.Arrays;
 
 /** Utilities for operation on {@link Object}. */
 public class ObjectUtils {
@@ -82,6 +83,9 @@ public class ObjectUtils {
      */
     @SuppressWarnings("unchecked")
     public static int compare(Object obj1, Object obj2) {
+        if (obj1 instanceof byte[] && obj2 instanceof byte[]) {
+            return Arrays.compareUnsigned((byte[]) obj1, (byte[]) obj2);
+        }
         if (obj1 instanceof Comparable && obj1.getClass().equals(obj2.getClass())) {
             return ((Comparable) obj1).compareTo(obj2);
         } else {

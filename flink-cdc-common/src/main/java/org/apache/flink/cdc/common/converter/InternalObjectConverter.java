@@ -87,7 +87,7 @@ public class InternalObjectConverter {
 
         @Override
         public Function<Object, DecimalData> visit(DecimalType decimalType) {
-            return CommonConverter::convertToDecimalData;
+            return obj -> CommonConverter.convertToDecimalData(obj, decimalType);
         }
 
         @Override

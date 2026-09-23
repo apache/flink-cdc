@@ -276,6 +276,19 @@ pipeline:
       </td>
     </tr>
     <tr>
+      <td>scan.newly-added-table.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        Whether to scan the newly added tables or not. Defaults to false.
+        This option only takes effect when restoring from a savepoint or checkpoint,
+        and enables the existing SnapshotSplitAssigner#captureNewlyAddedTables() code path
+        to discover tables that match the source <code>tables</code> pattern but were not part of
+        the captured set at savepoint time.
+      </td>
+    </tr>
+    <tr>
       <td>schema-change.enabled</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>

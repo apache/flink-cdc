@@ -216,10 +216,10 @@ SELECT * FROM shipments;
           <td>Boolean</td>
           <td>Incremental snapshot is a new mechanism to read snapshot of a table. Compared to the old snapshot mechanism,
               the incremental snapshot has many advantages, including:
-                (1) source can be parallel during snapshot reading,
-                (2) source can perform checkpoints in the chunk granularity during snapshot reading,
-                (3) source doesn't need to acquire global read lock (FLUSH TABLES WITH READ LOCK) before snapshot reading.
-              Please see <a href="#incremental-snapshot-reading ">Incremental Snapshot Reading</a>section for more detailed information.
+                <br/>(1) source can be parallel during snapshot reading,
+                <br/>(2) source can perform checkpoints in the chunk granularity during snapshot reading,
+                <br/>(3) source doesn't need to acquire global read lock (FLUSH TABLES WITH READ LOCK) before snapshot reading.
+              <br/>Please see <a href="#incremental-snapshot-reading-experimental">Incremental Snapshot Reading</a> section for more detailed information.
           </td>
     </tr>
     <tr>
@@ -232,6 +232,13 @@ SELECT * FROM shipments;
           If the flink version is greater than or equal to 1.15, the default value of 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' has been changed to true,
           so it does not need to be explicitly configured 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' = 'true'
       </td>
+    </tr>
+    <tr>
+      <td>scan.incremental.snapshot.metadata.release.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>Whether to release the snapshot split metadata (assigned splits, finished offsets and table schemas) held by the source coordinator once the source has entered the stream phase, to reduce JobManager memory on jobs with a very large number of snapshot splits. Disabled by default. Incompatible with scan.newly-added-table.enabled: enabling both fails at startup, and a job that has released the metadata cannot later enable newly-added-table scanning. Release happens only after a successful checkpoint; if checkpointing is disabled or no checkpoint completes, the metadata is retained, so this option has no effect without checkpointing. A checkpoint or savepoint taken with this option enabled cannot be used to restore the job after downgrading to Flink CDC 3.6.0 or an earlier version.</td>
     </tr>
     <tr>
       <td>scan.lsn-commit.checkpoints-num-delay</td>
@@ -574,7 +581,7 @@ $ ./bin/flink run \
       --from-savepoint /tmp/flink-savepoints/savepoint-cca7bc-bb1e257f0dab \
       ./FlinkCDCExample.jar
 ```
-**Note:** Please refer to the doc [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.17/docs/deployment/cli/#command-line-interface) for more details.
+**Note:** Please refer to the doc [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.20/docs/deployment/cli/#command-line-interface) for more details.
 
 ### DataStream Source
 

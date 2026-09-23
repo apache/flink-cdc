@@ -32,6 +32,7 @@ import org.apache.flink.cdc.connectors.postgres.source.offset.PostgresOffsetUtil
 import org.apache.flink.cdc.connectors.postgres.source.schema.PostgresSchemaRecord;
 import org.apache.flink.cdc.connectors.postgres.source.schema.RelationAwarePostgresSchema;
 import org.apache.flink.cdc.connectors.postgres.source.utils.ChunkUtils;
+import org.apache.flink.cdc.connectors.postgres.source.utils.PostgresSourceRecordUtils;
 import org.apache.flink.table.types.logical.RowType;
 
 import io.debezium.DebeziumException;
@@ -332,6 +333,12 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
         String schemaName = source.getString(SCHEMA_NAME_KEY);
         String tableName = source.getString(TABLE_NAME_KEY);
         return new TableId(null, schemaName, tableName);
+    }
+
+    @Override
+    public boolean isDataChangeRecord(SourceRecord record) {
+        // logical message (which op is 'm') is not a data change record.
+        return PostgresSourceRecordUtils.isDataChangeRecord(record);
     }
 
     @Override

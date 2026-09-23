@@ -156,6 +156,23 @@ class FlussConversionsTest {
                 .hasMessageContaining("Unsupported data type in fluss");
     }
 
+    @Test
+    void testToCdcSchemaWithPartitionKeys() {
+        org.apache.fluss.metadata.Schema flussSchema =
+                FlussConversions.toFlussSchema(
+                        Schema.newBuilder()
+                                .physicalColumn("id", DataTypes.INT().notNull())
+                                .physicalColumn("dt", DataTypes.STRING().notNull())
+                                .primaryKey("id", "dt")
+                                .build());
+
+        Schema cdcSchema =
+                FlussConversions.toCdcSchema(flussSchema, Collections.singletonList("dt"));
+
+        assertThat(cdcSchema.primaryKeys()).containsExactly("id", "dt");
+        assertThat(cdcSchema.partitionKeys()).containsExactly("dt");
+    }
+
     // --------------------------------------------------------------------------------------------
     // Tests for toFlussTable
     // --------------------------------------------------------------------------------------------

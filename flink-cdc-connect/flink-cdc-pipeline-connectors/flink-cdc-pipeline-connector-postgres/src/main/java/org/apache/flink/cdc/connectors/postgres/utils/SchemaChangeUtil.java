@@ -25,12 +25,10 @@ import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.types.DataType;
-import org.apache.flink.cdc.connectors.postgres.source.PostgresDialect;
 import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfig;
 
 import io.debezium.connector.postgresql.PostgresConnectorConfig;
 import io.debezium.connector.postgresql.TypeRegistry;
-import io.debezium.connector.postgresql.connection.PostgresConnection;
 import io.debezium.relational.Column;
 import io.debezium.relational.Table;
 
@@ -83,10 +81,11 @@ public class SchemaChangeUtil {
             @Nullable Table tableBefore,
             Table tableAfter,
             PostgresSourceConfig sourceConfig,
-            PostgresDialect dialect) {
+            TypeRegistry typeRegistry) {
 
         if (tableBefore == null) {
-            return Collections.singletonList(toCreateTableEvent(tableAfter, sourceConfig, dialect));
+            return Collections.singletonList(
+                    toCreateTableEvent(tableAfter, sourceConfig, typeRegistry));
         }
 
         TableId cdcTableId =
@@ -95,23 +94,8 @@ public class SchemaChangeUtil {
                         sourceConfig.getDatabaseList().get(0),
                         sourceConfig.isIncludeDatabaseInTableId());
         PostgresConnectorConfig dbzConfig = sourceConfig.getDbzConnectorConfig();
-
-        try (PostgresConnection connection = dialect.openJdbcConnection()) {
-            TypeRegistry typeRegistry = connection.getTypeRegistry();
-            return inferMinimalSchemaChanges(
-                    cdcTableId,
-                    tableBefore.columns(),
-                    tableAfter.columns(),
-                    dbzConfig,
-                    typeRegistry);
-        }
-    }
-
-    public static CreateTableEvent toCreateTableEvent(
-            Table table, PostgresSourceConfig sourceConfig, PostgresDialect dialect) {
-        try (PostgresConnection connection = dialect.openJdbcConnection()) {
-            return toCreateTableEvent(table, sourceConfig, connection.getTypeRegistry());
-        }
+        return inferMinimalSchemaChanges(
+                cdcTableId, tableBefore.columns(), tableAfter.columns(), dbzConfig, typeRegistry);
     }
 
     private static CreateTableEvent toCreateTableEvent(

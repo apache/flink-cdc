@@ -18,8 +18,19 @@
 package org.apache.flink.cdc.composer.flink;
 
 import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.cdc.common.data.binary.BinaryStringData;
+import org.apache.flink.cdc.common.event.AddColumnEvent;
+import org.apache.flink.cdc.common.event.CreateTableEvent;
+import org.apache.flink.cdc.common.event.DataChangeEvent;
+import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
+import org.apache.flink.cdc.common.schema.Column;
+import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.common.types.DataType;
+import org.apache.flink.cdc.common.udf.UserDefinedFunction;
+import org.apache.flink.cdc.common.udf.UserDefinedFunctionContext;
 import org.apache.flink.cdc.composer.PipelineExecution;
 import org.apache.flink.cdc.composer.definition.ModelDef;
 import org.apache.flink.cdc.composer.definition.PipelineDef;
@@ -33,6 +44,7 @@ import org.apache.flink.cdc.connectors.values.sink.ValuesDataSink;
 import org.apache.flink.cdc.connectors.values.sink.ValuesDataSinkOptions;
 import org.apache.flink.cdc.connectors.values.source.ValuesDataSourceHelper;
 import org.apache.flink.cdc.connectors.values.source.ValuesDataSourceOptions;
+import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
 import org.apache.flink.test.junit5.MiniClusterExtension;
 
@@ -41,6 +53,7 @@ import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -48,19 +61,41 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
+import static org.apache.flink.cdc.common.types.DataTypes.BIGINT;
+import static org.apache.flink.cdc.common.types.DataTypes.INT;
+import static org.apache.flink.cdc.common.types.DataTypes.STRING;
 import static org.apache.flink.configuration.CoreOptions.ALWAYS_PARENT_FIRST_LOADER_PATTERNS_ADDITIONAL;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 /** Integration test for UDFs. */
 class FlinkPipelineUdfITCase {
     private static final int MAX_PARALLELISM = 4;
+    private static final TableId ASYNC_TRANSFORM_TABLE_ID =
+            TableId.tableId("foo", "bar", "async_transform");
+    private static final Schema ASYNC_TRANSFORM_SCHEMA =
+            Schema.newBuilder()
+                    .physicalColumn("id_", BIGINT().notNull())
+                    .physicalColumn("name_", STRING())
+                    .build();
+    private static final Schema ASYNC_TRANSFORM_SCHEMA_WITH_REGION =
+            Schema.newBuilder()
+                    .physicalColumn("id_", BIGINT().notNull())
+                    .physicalColumn("name_", STRING())
+                    .physicalColumn("region_", STRING())
+                    .build();
 
     // Always use parent-first classloader for CDC classes.
     // The reason is that ValuesDatabase uses static field for holding data, we need to make sure
@@ -106,6 +141,113 @@ class FlinkPipelineUdfITCase {
     // ----------------------
     // CDC pipeline UDF tests
     // ----------------------
+    @Test
+    void testAsyncTransformExecutesDataConcurrentlyInOrderWithSchemaBarrier() throws Exception {
+        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+
+        Configuration sourceConfig = new Configuration();
+        sourceConfig.set(
+                ValuesDataSourceOptions.EVENT_SET_ID,
+                ValuesDataSourceHelper.EventSetId.CUSTOM_SOURCE_EVENTS);
+        SourceDef sourceDef =
+                new SourceDef(ValuesDataFactory.IDENTIFIER, "Value Source", sourceConfig);
+
+        Configuration sinkConfig = new Configuration();
+        sinkConfig.set(ValuesDataSinkOptions.PRINT_ENABLED, true);
+        SinkDef sinkDef = new SinkDef(ValuesDataFactory.IDENTIFIER, "Value Sink", sinkConfig);
+
+        ValuesDataSourceHelper.setSourceEvents(
+                Collections.singletonList(createAsyncTransformEvents()));
+
+        TransformDef transformDef =
+                new TransformDef(
+                        ASYNC_TRANSFORM_TABLE_ID.toString(),
+                        "*, completion_order(id_) AS completion_order_",
+                        null,
+                        null,
+                        null,
+                        null,
+                        "async transform ordering",
+                        null);
+        UdfDef udfDef = new UdfDef("completion_order", CompletionOrderUdf.class.getName());
+
+        Configuration pipelineConfig = new Configuration();
+        pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
+        pipelineConfig.set(
+                PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
+        pipelineConfig.set(PipelineOptions.PIPELINE_TRANSFORM_ASYNC_EXECUTION_ENABLED, true);
+        pipelineConfig.set(PipelineOptions.PIPELINE_TRANSFORM_ASYNC_EXECUTION_WORKER_THREADS, 2);
+        PipelineDef pipelineDef =
+                new PipelineDef(
+                        sourceDef,
+                        sinkDef,
+                        Collections.emptyList(),
+                        Collections.singletonList(transformDef),
+                        Collections.singletonList(udfDef),
+                        pipelineConfig);
+
+        PipelineExecution execution = composer.compose(pipelineDef);
+        execution.execute();
+
+        assertThat(outCaptor.toString().trim().split("\n"))
+                .containsExactly(
+                        "CreateTableEvent{tableId=foo.bar.async_transform, schema=columns={`id_` BIGINT NOT NULL,`name_` STRING,`completion_order_` INT}, primaryKeys=, options=()}",
+                        "DataChangeEvent{tableId=foo.bar.async_transform, before=[], after=[1, name-1, 2], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=foo.bar.async_transform, before=[], after=[2, name-2, 1], op=INSERT, meta=()}",
+                        "AddColumnEvent{tableId=foo.bar.async_transform, addedColumns=[ColumnWithPosition{column=`region_` STRING, position=AFTER, existedColumnName=name_}]}",
+                        "DataChangeEvent{tableId=foo.bar.async_transform, before=[], after=[3, name-3, region-3, 3], op=INSERT, meta=()}");
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("asyncTransformFailureCases")
+    void testAsyncTransformPropagatesFailures(
+            String testName, String udfClassName, Duration timeout, String expectedMessage) {
+        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+
+        Configuration sourceConfig = new Configuration();
+        sourceConfig.set(
+                ValuesDataSourceOptions.EVENT_SET_ID,
+                ValuesDataSourceHelper.EventSetId.CUSTOM_SOURCE_EVENTS);
+        SourceDef sourceDef =
+                new SourceDef(ValuesDataFactory.IDENTIFIER, "Value Source", sourceConfig);
+
+        Configuration sinkConfig = new Configuration();
+        SinkDef sinkDef = new SinkDef(ValuesDataFactory.IDENTIFIER, "Value Sink", sinkConfig);
+
+        ValuesDataSourceHelper.setSourceEvents(
+                Collections.singletonList(createSingleAsyncTransformRecord()));
+
+        TransformDef transformDef =
+                new TransformDef(
+                        ASYNC_TRANSFORM_TABLE_ID.toString(),
+                        "*, test_failure(name_) AS result_",
+                        null,
+                        null,
+                        null,
+                        null,
+                        testName,
+                        null);
+        UdfDef udfDef = new UdfDef("test_failure", udfClassName);
+
+        Configuration pipelineConfig = new Configuration();
+        pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
+        pipelineConfig.set(
+                PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
+        pipelineConfig.set(PipelineOptions.PIPELINE_TRANSFORM_ASYNC_EXECUTION_ENABLED, true);
+        pipelineConfig.set(PipelineOptions.PIPELINE_TRANSFORM_ASYNC_EXECUTION_TIMEOUT, timeout);
+        PipelineDef pipelineDef =
+                new PipelineDef(
+                        sourceDef,
+                        sinkDef,
+                        Collections.emptyList(),
+                        Collections.singletonList(transformDef),
+                        Collections.singletonList(udfDef),
+                        pipelineConfig);
+
+        assertThatThrownBy(() -> composer.compose(pipelineDef).execute())
+                .hasStackTraceContaining(expectedMessage);
+    }
+
     @ParameterizedTest
     @MethodSource("testParams")
     void testTransformWithUdf(ValuesDataSink.SinkApi sinkApi, String language) throws Exception {
@@ -1094,5 +1236,149 @@ class FlinkPipelineUdfITCase {
                 arguments(ValuesDataSink.SinkApi.SINK_V2, "java"),
                 arguments(ValuesDataSink.SinkApi.SINK_FUNCTION, "scala"),
                 arguments(ValuesDataSink.SinkApi.SINK_V2, "scala"));
+    }
+
+    private static List<Event> createAsyncTransformEvents() {
+        BinaryRecordDataGenerator initialSchemaGenerator =
+                new BinaryRecordDataGenerator(
+                        ASYNC_TRANSFORM_SCHEMA.getColumnDataTypes().toArray(new DataType[0]));
+        BinaryRecordDataGenerator schemaWithRegionGenerator =
+                new BinaryRecordDataGenerator(
+                        ASYNC_TRANSFORM_SCHEMA_WITH_REGION
+                                .getColumnDataTypes()
+                                .toArray(new DataType[0]));
+        List<Event> events = new ArrayList<>();
+        events.add(new CreateTableEvent(ASYNC_TRANSFORM_TABLE_ID, ASYNC_TRANSFORM_SCHEMA));
+        events.add(
+                DataChangeEvent.insertEvent(
+                        ASYNC_TRANSFORM_TABLE_ID,
+                        initialSchemaGenerator.generate(
+                                new Object[] {1L, BinaryStringData.fromString("name-1")})));
+        events.add(
+                DataChangeEvent.insertEvent(
+                        ASYNC_TRANSFORM_TABLE_ID,
+                        initialSchemaGenerator.generate(
+                                new Object[] {2L, BinaryStringData.fromString("name-2")})));
+        events.add(
+                new AddColumnEvent(
+                        ASYNC_TRANSFORM_TABLE_ID,
+                        Collections.singletonList(
+                                AddColumnEvent.last(Column.physicalColumn("region_", STRING())))));
+        events.add(
+                DataChangeEvent.insertEvent(
+                        ASYNC_TRANSFORM_TABLE_ID,
+                        schemaWithRegionGenerator.generate(
+                                new Object[] {
+                                    3L,
+                                    BinaryStringData.fromString("name-3"),
+                                    BinaryStringData.fromString("region-3")
+                                })));
+        return events;
+    }
+
+    private static List<Event> createSingleAsyncTransformRecord() {
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(
+                        ASYNC_TRANSFORM_SCHEMA.getColumnDataTypes().toArray(new DataType[0]));
+        return Arrays.asList(
+                new CreateTableEvent(ASYNC_TRANSFORM_TABLE_ID, ASYNC_TRANSFORM_SCHEMA),
+                DataChangeEvent.insertEvent(
+                        ASYNC_TRANSFORM_TABLE_ID,
+                        generator.generate(
+                                new Object[] {1L, BinaryStringData.fromString("name-1")})));
+    }
+
+    private static Stream<Arguments> asyncTransformFailureCases() {
+        return Stream.of(
+                arguments(
+                        "UDF exception",
+                        FailingUdf.class.getName(),
+                        Duration.ofSeconds(30),
+                        "expected async transform failure"),
+                arguments(
+                        "timeout",
+                        TimeoutUdf.class.getName(),
+                        Duration.ofMillis(100),
+                        "Async post-transform timed out for event"));
+    }
+
+    public static class CompletionOrderUdf implements UserDefinedFunction {
+
+        private transient CountDownLatch secondRecordCompleted;
+        private transient CountDownLatch firstRecordCompleted;
+        private transient AtomicInteger completionOrder;
+
+        @Override
+        public DataType getReturnType(UserDefinedFunctionContext context) {
+            return INT();
+        }
+
+        @Override
+        public void open(UserDefinedFunctionContext context) {
+            secondRecordCompleted = new CountDownLatch(1);
+            firstRecordCompleted = new CountDownLatch(1);
+            completionOrder = new AtomicInteger();
+        }
+
+        public Integer eval(Long value) {
+            if (value == 1L) {
+                await(secondRecordCompleted);
+                int order = completionOrder.incrementAndGet();
+                firstRecordCompleted.countDown();
+                return order;
+            }
+            if (value == 2L) {
+                int order = completionOrder.incrementAndGet();
+                secondRecordCompleted.countDown();
+                return order;
+            }
+            if (firstRecordCompleted.getCount() != 0) {
+                throw new IllegalStateException(
+                        "Data after the schema change ran before preceding data completed.");
+            }
+            return completionOrder.incrementAndGet();
+        }
+
+        private void await(CountDownLatch latch) {
+            try {
+                if (!latch.await(10, TimeUnit.SECONDS)) {
+                    throw new IllegalStateException(
+                            "Later data was not executed concurrently with earlier data.");
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException("Interrupted while waiting for concurrent data.", e);
+            }
+        }
+    }
+
+    public static class FailingUdf implements UserDefinedFunction {
+
+        @Override
+        public DataType getReturnType(UserDefinedFunctionContext context) {
+            return STRING();
+        }
+
+        public String eval(String value) {
+            throw new IllegalStateException("expected async transform failure");
+        }
+    }
+
+    public static class TimeoutUdf implements UserDefinedFunction {
+
+        @Override
+        public DataType getReturnType(UserDefinedFunctionContext context) {
+            return STRING();
+        }
+
+        public String eval(String value) {
+            try {
+                Thread.sleep(Duration.ofSeconds(30).toMillis());
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException("Interrupted while waiting for timeout.", e);
+            }
+            return value;
+        }
     }
 }

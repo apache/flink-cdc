@@ -220,6 +220,126 @@
     DataChangeEvent{tableId=foo.bar.baz, before=[-1, null, 0.00000, 1.00000, 2.22000, 333.00000, 44.44000, 5555555.00000, null], after=[], op=DELETE, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, 0.00000, 1.00000, 2.22000, 333.00000, 44.44000, 5555555.00000, null], op=INSERT, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[0, null, 0.00000, 1.00000, 2.22000, 333.00000, 44.44000, 5555555.00000, null], after=[], op=DELETE, meta=()}
+- do: Cast To Decimal(38, 0) (Decimal-19 mode)
+  decimal-precision-mode: up_to_19
+  projection: |-
+    id_
+    CAST(null AS DECIMAL(38, 0)) AS comp_0
+    CAST(0 AS DECIMAL(38, 0)) AS comp_1
+    CAST(1 AS DECIMAL(38, 0)) AS comp_2
+    CAST('2.22' AS DECIMAL(38, 0)) AS comp_3
+    CAST('333' AS DECIMAL(38, 0)) AS comp_4
+    CAST('44.44' AS DECIMAL(38, 0)) AS comp_5
+    CAST('5555555' AS DECIMAL(38, 0)) AS comp_6
+    CAST('FOOBAR' AS DECIMAL(38, 0)) AS comp_7
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_0` DECIMAL(19, 0),`comp_1` DECIMAL(19, 0),`comp_2` DECIMAL(19, 0),`comp_3` DECIMAL(19, 0),`comp_4` DECIMAL(19, 0),`comp_5` DECIMAL(19, 0),`comp_6` DECIMAL(19, 0),`comp_7` DECIMAL(19, 0)}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, null, 0, 1, 2, 333, 44, 5555555, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, null, 0, 1, 2, 333, 44, 5555555, null], after=[-1, null, 0, 1, 2, 333, 44, 5555555, null], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, null, 0, 1, 2, 333, 44, 5555555, null], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, 0, 1, 2, 333, 44, 5555555, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, 0, 1, 2, 333, 44, 5555555, null], after=[], op=DELETE, meta=()}
+- do: Cast To Decimal(38, 0) (Decimal-38 mode)
+  decimal-precision-mode: up_to_38
+  projection: |-
+    id_
+    CAST(null AS DECIMAL(38, 0)) AS comp_0
+    CAST(0 AS DECIMAL(38, 0)) AS comp_1
+    CAST(1 AS DECIMAL(38, 0)) AS comp_2
+    CAST('2.22' AS DECIMAL(38, 0)) AS comp_3
+    CAST('333' AS DECIMAL(38, 0)) AS comp_4
+    CAST('44.44' AS DECIMAL(38, 0)) AS comp_5
+    CAST('5555555' AS DECIMAL(38, 0)) AS comp_6
+    CAST('FOOBAR' AS DECIMAL(38, 0)) AS comp_7
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_0` DECIMAL(38, 0),`comp_1` DECIMAL(38, 0),`comp_2` DECIMAL(38, 0),`comp_3` DECIMAL(38, 0),`comp_4` DECIMAL(38, 0),`comp_5` DECIMAL(38, 0),`comp_6` DECIMAL(38, 0),`comp_7` DECIMAL(38, 0)}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, null, 0, 1, 2, 333, 44, 5555555, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, null, 0, 1, 2, 333, 44, 5555555, null], after=[-1, null, 0, 1, 2, 333, 44, 5555555, null], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, null, 0, 1, 2, 333, 44, 5555555, null], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, 0, 1, 2, 333, 44, 5555555, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, 0, 1, 2, 333, 44, 5555555, null], after=[], op=DELETE, meta=()}
+- do: Cast To Decimal(38, 10) (Decimal-19 mode)
+  decimal-precision-mode: up_to_19
+  projection: |-
+    id_
+    CAST(null AS DECIMAL(38, 10)) AS comp_0
+    CAST(0 AS DECIMAL(38, 10)) AS comp_1
+    CAST(1 AS DECIMAL(38, 10)) AS comp_2
+    CAST('2.22' AS DECIMAL(38, 10)) AS comp_3
+    CAST('333' AS DECIMAL(38, 10)) AS comp_4
+    CAST('44.44' AS DECIMAL(38, 10)) AS comp_5
+    CAST('5555555' AS DECIMAL(38, 10)) AS comp_6
+    CAST('FOOBAR' AS DECIMAL(38, 10)) AS comp_7
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_0` DECIMAL(19, 10),`comp_1` DECIMAL(19, 10),`comp_2` DECIMAL(19, 10),`comp_3` DECIMAL(19, 10),`comp_4` DECIMAL(19, 10),`comp_5` DECIMAL(19, 10),`comp_6` DECIMAL(19, 10),`comp_7` DECIMAL(19, 10)}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, null, 0.0000000000, 1.0000000000, 2.2200000000, 333.0000000000, 44.4400000000, 5555555.0000000000, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, null, 0.0000000000, 1.0000000000, 2.2200000000, 333.0000000000, 44.4400000000, 5555555.0000000000, null], after=[-1, null, 0.0000000000, 1.0000000000, 2.2200000000, 333.0000000000, 44.4400000000, 5555555.0000000000, null], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, null, 0.0000000000, 1.0000000000, 2.2200000000, 333.0000000000, 44.4400000000, 5555555.0000000000, null], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, 0.0000000000, 1.0000000000, 2.2200000000, 333.0000000000, 44.4400000000, 5555555.0000000000, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, 0.0000000000, 1.0000000000, 2.2200000000, 333.0000000000, 44.4400000000, 5555555.0000000000, null], after=[], op=DELETE, meta=()}
+- do: Cast To Decimal(38, 10) (Decimal-38 mode)
+  decimal-precision-mode: up_to_38
+  projection: |-
+    id_
+    CAST(null AS DECIMAL(38, 10)) AS comp_0
+    CAST(0 AS DECIMAL(38, 10)) AS comp_1
+    CAST(1 AS DECIMAL(38, 10)) AS comp_2
+    CAST('2.22' AS DECIMAL(38, 10)) AS comp_3
+    CAST('333' AS DECIMAL(38, 10)) AS comp_4
+    CAST('44.44' AS DECIMAL(38, 10)) AS comp_5
+    CAST('5555555' AS DECIMAL(38, 10)) AS comp_6
+    CAST('FOOBAR' AS DECIMAL(38, 10)) AS comp_7
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_0` DECIMAL(38, 10),`comp_1` DECIMAL(38, 10),`comp_2` DECIMAL(38, 10),`comp_3` DECIMAL(38, 10),`comp_4` DECIMAL(38, 10),`comp_5` DECIMAL(38, 10),`comp_6` DECIMAL(38, 10),`comp_7` DECIMAL(38, 10)}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, null, 0.0000000000, 1.0000000000, 2.2200000000, 333.0000000000, 44.4400000000, 5555555.0000000000, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, null, 0.0000000000, 1.0000000000, 2.2200000000, 333.0000000000, 44.4400000000, 5555555.0000000000, null], after=[-1, null, 0.0000000000, 1.0000000000, 2.2200000000, 333.0000000000, 44.4400000000, 5555555.0000000000, null], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, null, 0.0000000000, 1.0000000000, 2.2200000000, 333.0000000000, 44.4400000000, 5555555.0000000000, null], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, 0.0000000000, 1.0000000000, 2.2200000000, 333.0000000000, 44.4400000000, 5555555.0000000000, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, 0.0000000000, 1.0000000000, 2.2200000000, 333.0000000000, 44.4400000000, 5555555.0000000000, null], after=[], op=DELETE, meta=()}
+- do: Cast To Decimal(38, 18) (Decimal-19 mode)
+  decimal-precision-mode: up_to_19
+  projection: |-
+    id_
+    CAST(null AS DECIMAL(38, 18)) AS comp_0
+    CAST(0 AS DECIMAL(38, 18)) AS comp_1
+    CAST(1 AS DECIMAL(38, 18)) AS comp_2
+    CAST('2.22' AS DECIMAL(38, 18)) AS comp_3
+    CAST('333' AS DECIMAL(38, 18)) AS comp_4
+    CAST('44.44' AS DECIMAL(38, 18)) AS comp_5
+    CAST('5555555' AS DECIMAL(38, 18)) AS comp_6
+    CAST('FOOBAR' AS DECIMAL(38, 18)) AS comp_7
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_0` DECIMAL(19, 18),`comp_1` DECIMAL(19, 18),`comp_2` DECIMAL(19, 18),`comp_3` DECIMAL(19, 18),`comp_4` DECIMAL(19, 18),`comp_5` DECIMAL(19, 18),`comp_6` DECIMAL(19, 18),`comp_7` DECIMAL(19, 18)}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, null, 0.000000000000000000, 1.000000000000000000, 2.220000000000000000, null, null, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, null, 0.000000000000000000, 1.000000000000000000, 2.220000000000000000, null, null, null, null], after=[-1, null, 0.000000000000000000, 1.000000000000000000, 2.220000000000000000, null, null, null, null], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, null, 0.000000000000000000, 1.000000000000000000, 2.220000000000000000, null, null, null, null], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, 0.000000000000000000, 1.000000000000000000, 2.220000000000000000, null, null, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, 0.000000000000000000, 1.000000000000000000, 2.220000000000000000, null, null, null, null], after=[], op=DELETE, meta=()}
+- do: Cast To Decimal(38, 18) (Decimal-38 mode)
+  decimal-precision-mode: up_to_38
+  projection: |-
+    id_
+    CAST(null AS DECIMAL(38, 18)) AS comp_0
+    CAST(0 AS DECIMAL(38, 18)) AS comp_1
+    CAST(1 AS DECIMAL(38, 18)) AS comp_2
+    CAST('2.22' AS DECIMAL(38, 18)) AS comp_3
+    CAST('333' AS DECIMAL(38, 18)) AS comp_4
+    CAST('44.44' AS DECIMAL(38, 18)) AS comp_5
+    CAST('5555555' AS DECIMAL(38, 18)) AS comp_6
+    CAST('FOOBAR' AS DECIMAL(38, 18)) AS comp_7
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_0` DECIMAL(38, 18),`comp_1` DECIMAL(38, 18),`comp_2` DECIMAL(38, 18),`comp_3` DECIMAL(38, 18),`comp_4` DECIMAL(38, 18),`comp_5` DECIMAL(38, 18),`comp_6` DECIMAL(38, 18),`comp_7` DECIMAL(38, 18)}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, null, 0.000000000000000000, 1.000000000000000000, 2.220000000000000000, 333.000000000000000000, 44.440000000000000000, 5555555.000000000000000000, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, null, 0.000000000000000000, 1.000000000000000000, 2.220000000000000000, 333.000000000000000000, 44.440000000000000000, 5555555.000000000000000000, null], after=[-1, null, 0.000000000000000000, 1.000000000000000000, 2.220000000000000000, 333.000000000000000000, 44.440000000000000000, 5555555.000000000000000000, null], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, null, 0.000000000000000000, 1.000000000000000000, 2.220000000000000000, 333.000000000000000000, 44.440000000000000000, 5555555.000000000000000000, null], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, 0.000000000000000000, 1.000000000000000000, 2.220000000000000000, 333.000000000000000000, 44.440000000000000000, 5555555.000000000000000000, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, 0.000000000000000000, 1.000000000000000000, 2.220000000000000000, 333.000000000000000000, 44.440000000000000000, 5555555.000000000000000000, null], after=[], op=DELETE, meta=()}
 - do: Cast To Timestamp (UTC)
   projection: |-
     id_
@@ -263,6 +383,22 @@
     DataChangeEvent{tableId=foo.bar.baz, before=[-1, 1970-01-09T08:57:36.789723456, 1970-01-10T15:49:27.891834561, 1970-01-11T22:41:18.912945612, 1970-01-09T08:57:36.789723456, 1970-01-10T22:49:27.891834561, 1970-01-12T10:41:18.912945612, 1970-01-09T16:57:36.789723456, 1970-01-10T23:49:27.891834561, 1970-01-12T06:41:18.912945612, 2019-12-31T21:48:25], after=[], op=DELETE, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null, null, null, null, null, null, null, null, 2019-12-31T21:48:25], op=INSERT, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null, null, null, null, null, null, null, null, 2019-12-31T21:48:25], after=[], op=DELETE, meta=()}
+- do: Try Cast
+  projection: |-
+    id_
+    TRY_CAST('123' AS INTEGER) AS valid_int
+    TRY_CAST('FOOBAR' AS INTEGER) AS invalid_int
+    TRY_CAST('2019-12-31T21:48:25' AS TIMESTAMP(6)) AS valid_timestamp
+    TRY_CAST('FOOBAR' AS TIMESTAMP(6)) AS invalid_timestamp
+    IFNULL(TRY_CAST('FOOBAR' AS INTEGER), 17) AS int_fallback
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`valid_int` INT,`invalid_int` INT,`valid_timestamp` TIMESTAMP(3),`invalid_timestamp` TIMESTAMP(3),`int_fallback` INT NOT NULL}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, 123, null, 2019-12-31T21:48:25, null, 17], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, 123, null, 2019-12-31T21:48:25, null, 17], after=[-1, 123, null, 2019-12-31T21:48:25, null, 17], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, 123, null, 2019-12-31T21:48:25, null, 17], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, 123, null, 2019-12-31T21:48:25, null, 17], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, 123, null, 2019-12-31T21:48:25, null, 17], after=[], op=DELETE, meta=()}
 - do: Cast To Timestamp Failure
   projection: |-
     id_

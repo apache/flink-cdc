@@ -25,6 +25,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.CHUNK_META_GROUP_SIZE;
+import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED;
 import static org.apache.flink.cdc.connectors.base.utils.EnvironmentUtils.checkSupportCheckpointsAfterTasksFinished;
 import static org.apache.flink.cdc.connectors.mongodb.internal.MongoDBEnvelope.MONGODB_SCHEME;
 import static org.apache.flink.cdc.connectors.mongodb.internal.MongoDBEnvelope.MONGODB_SRV_SCHEME;
@@ -63,6 +64,19 @@ public class MongoDBSourceConfigFactory implements Factory<MongoDBSourceConfig> 
     protected boolean skipSnapshotBackfill = false;
     protected boolean scanNewlyAddedTableEnabled = false;
     protected boolean assignUnboundedChunkFirst = false;
+    protected boolean releaseSnapshotMetadataEnabled =
+            SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED.defaultValue();
+
+    private boolean sslEnabled = MongoDBSourceOptions.SSL_ENABLED.defaultValue();
+    private boolean sslInvalidHostnameAllowed =
+            MongoDBSourceOptions.SSL_INVALID_HOSTNAME_ALLOWED.defaultValue();
+    private String sslKeyStore = MongoDBSourceOptions.SSL_KEYSTORE.defaultValue();
+    private String sslKeyStorePassword = MongoDBSourceOptions.SSL_KEYSTORE_PASSWORD.defaultValue();
+    private String sslKeyStoreType = MongoDBSourceOptions.SSL_KEYSTORE_TYPE.defaultValue();
+    private String sslTrustStore = MongoDBSourceOptions.SSL_TRUSTSTORE.defaultValue();
+    private String sslTrustStorePassword =
+            MongoDBSourceOptions.SSL_TRUSTSTORE_PASSWORD.defaultValue();
+    private String sslTrustStoreType = MongoDBSourceOptions.SSL_TRUSTSTORE_TYPE.defaultValue();
 
     /** The protocol connected to MongoDB. For example mongodb or mongodb+srv. */
     public MongoDBSourceConfigFactory scheme(String scheme) {
@@ -280,6 +294,64 @@ public class MongoDBSourceConfigFactory implements Factory<MongoDBSourceConfig> 
         return this;
     }
 
+    /**
+     * Whether to release the snapshot split metadata held by the source coordinator once the stream
+     * split is assembled and checkpoint-covered. Defaults to false.
+     */
+    public MongoDBSourceConfigFactory releaseSnapshotMetadataEnabled(
+            boolean releaseSnapshotMetadataEnabled) {
+        this.releaseSnapshotMetadataEnabled = releaseSnapshotMetadataEnabled;
+        return this;
+    }
+
+    /** Whether the connector will use SSL to connect to MongoDB instances. */
+    public MongoDBSourceConfigFactory sslEnabled(boolean sslEnabled) {
+        this.sslEnabled = sslEnabled;
+        return this;
+    }
+
+    /** When SSL is enabled, controls whether strict hostname checking is disabled. */
+    public MongoDBSourceConfigFactory sslInvalidHostnameAllowed(boolean sslInvalidHostnameAllowed) {
+        this.sslInvalidHostnameAllowed = sslInvalidHostnameAllowed;
+        return this;
+    }
+
+    /** The location of the key store file for two-way authentication. */
+    public MongoDBSourceConfigFactory sslKeyStore(String sslKeyStore) {
+        this.sslKeyStore = sslKeyStore;
+        return this;
+    }
+
+    /** The password for the key store file. */
+    public MongoDBSourceConfigFactory sslKeyStorePassword(String sslKeyStorePassword) {
+        this.sslKeyStorePassword = sslKeyStorePassword;
+        return this;
+    }
+
+    /** The type of key store file. */
+    public MongoDBSourceConfigFactory sslKeyStoreType(String sslKeyStoreType) {
+        this.sslKeyStoreType = sslKeyStoreType;
+        return this;
+    }
+
+    /** The location of the trust store file for the server certificate verification. */
+    public MongoDBSourceConfigFactory sslTrustStore(String sslTrustStore) {
+        this.sslTrustStore = sslTrustStore;
+        return this;
+    }
+
+    /** The password for the trust store file. */
+    public MongoDBSourceConfigFactory sslTrustStorePassword(String sslTrustStorePassword) {
+        this.sslTrustStorePassword = sslTrustStorePassword;
+        return this;
+    }
+
+    /** The type of trust store file. */
+    public MongoDBSourceConfigFactory sslTrustStoreType(String sslTrustStoreType) {
+        this.sslTrustStoreType = sslTrustStoreType;
+        return this;
+    }
+
     /** Creates a new {@link MongoDBSourceConfig} for the given subtask {@code subtaskId}. */
     @Override
     public MongoDBSourceConfig create(int subtaskId) {
@@ -306,6 +378,15 @@ public class MongoDBSourceConfigFactory implements Factory<MongoDBSourceConfig> 
                 disableCursorTimeout,
                 skipSnapshotBackfill,
                 scanNewlyAddedTableEnabled,
-                assignUnboundedChunkFirst);
+                assignUnboundedChunkFirst,
+                releaseSnapshotMetadataEnabled,
+                sslEnabled,
+                sslInvalidHostnameAllowed,
+                sslKeyStore,
+                sslKeyStorePassword,
+                sslKeyStoreType,
+                sslTrustStore,
+                sslTrustStorePassword,
+                sslTrustStoreType);
     }
 }

@@ -652,6 +652,24 @@ public class MySqlStreamingChangeEventSource
             LOGGER.warn(
                     "Rollback statements cannot be handled without binlog buffering, the connector will fail. Please check '{}' to see how to enable buffering",
                     MySqlConnectorConfig.BUFFER_SIZE_FOR_BINLOG_READER.name());
+        } else {
+            // ROLLBACK is not a DDL event and already has a dedicated warning above.
+            EventHeader header = event.getHeader();
+            if (header instanceof EventHeaderV4) {
+                EventHeaderV4 eventHeader = (EventHeaderV4) header;
+                LOGGER.info(
+                        "Received MySQL DDL event at {} [{}-{}], database={}, ddl={}",
+                        offsetContext.getSource().binlogFilename(),
+                        eventHeader.getPosition(),
+                        eventHeader.getNextPosition(),
+                        command.getDatabase(),
+                        sql);
+            } else {
+                LOGGER.info(
+                        "Received MySQL DDL event, database={}, ddl={}",
+                        command.getDatabase(),
+                        sql);
+            }
         }
 
         final List<SchemaChangeEvent> schemaChangeEvents =

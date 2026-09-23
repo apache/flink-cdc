@@ -32,16 +32,23 @@ limitations under the License.
         <flink-major-1.20>1.20</flink-major-1.20>
         <mysql.driver.version>8.0.27</mysql.driver.version>
         <starrocks.connector.version>1.2.14_flink-${flink-major-1.20}</starrocks.connector.version>
-        <paimon.version>1.3.1</paimon.version>
+        <paimon.version>2.0.0</paimon.version>
         <flink.release.download.skip>false</flink.release.download.skip>
         <flink.release.name>flink-${flink.version}-bin-scala_${scala.binary.version}.tgz</flink.release.name>
         <flink.release.mirror>https://dlcdn.apache.org/flink/flink-${flink.version}</flink.release.mirror>
+        <flink.hadoop.compatibility.artifact-id>flink-hadoop-compatibility_2.12</flink.hadoop.compatibility.artifact-id>
         <maven.plugin.download.version>1.6.8</maven.plugin.download.version>
         <iceberg.version>1.10.1</iceberg.version>
         <hive.version>2.3.9</hive.version>
-        <fluss.version>0.9.0-incubating</fluss.version>
+        <fluss.version>1.0.0</fluss.version>
         <jmh.version>1.37</jmh.version>
         <hudi.version>1.1.0</hudi.version>
+        <!-- E2E stage filtering: CI overrides via -De2eIncludePattern=**/stageN/**/*ITCase.java
+             and -DskipYarnTest=true for stages where the YARN test should not run. The defaults
+             here preserve the original `mvn verify` behavior for local developers. -->
+        <e2eIncludePattern>**/*ITCase.java</e2eIncludePattern>
+        <e2eExcludePattern>**/MysqlE2eWithYarnApplicationITCase.java</e2eExcludePattern>
+        <skipYarnTest>false</skipYarnTest>
     </properties>
 
     <dependencies>
@@ -169,7 +176,7 @@ limitations under the License.
         </dependency>
         <dependency>
             <groupId>org.apache.paimon</groupId>
-            <artifactId>paimon-flink-${flink.major.version}</artifactId>
+            <artifactId>paimon-flink-${paimon.flink.major.version}</artifactId>
             <version>${paimon.version}</version>
             <scope>test</scope>
         </dependency>
@@ -200,6 +207,12 @@ limitations under the License.
         </dependency>
         <dependency>
             <groupId>org.apache.flink</groupId>
+            <artifactId>flink-cdc-pipeline-connector-elasticsearch</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.flink</groupId>
             <artifactId>flink-connector-postgres-cdc</artifactId>
             <version>${project.version}</version>
             <type>test-jar</type>
@@ -210,6 +223,21 @@ limitations under the License.
                     <artifactId>protobuf-java</artifactId>
                 </exclusion>
             </exclusions>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-cdc-pipeline-connector-sqlserver</artifactId>
+            <version>${project.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-connector-sqlserver-cdc</artifactId>
+            <version>${project.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.iceberg</groupId>
@@ -249,6 +277,12 @@ limitations under the License.
             <version>${testcontainers.version}</version>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>elasticsearch</artifactId>
+            <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
 
         <!-- benchmark -->
         <dependency>
@@ -269,6 +303,12 @@ limitations under the License.
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>postgresql</artifactId>
+            <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>mssqlserver</artifactId>
             <version>${testcontainers.version}</version>
             <scope>test</scope>
         </dependency>
@@ -436,10 +476,10 @@ limitations under the License.
                         </goals>
                         <configuration>
                             <includes>
-                                <include>**/*.*</include>
+                                <include>${e2eIncludePattern}</include>
                             </includes>
                             <excludes>
-                                <exclude>**/MysqlE2eWithYarnApplicationITCase.java</exclude>
+                                <exclude>${e2eExcludePattern}</exclude>
                             </excludes>
                             <forkCount>1</forkCount>
                             <systemPropertyVariables>
@@ -454,6 +494,7 @@ limitations under the License.
                             <goal>test</goal>
                         </goals>
                         <configuration>
+                            <skip>${skipYarnTest}</skip>
                             <includes>
                                 <include>**/MysqlE2eWithYarnApplicationITCase.java</include>
                             </includes>
@@ -545,6 +586,16 @@ limitations under the License.
 
                         <artifactItem>
                             <groupId>org.apache.flink</groupId>
+                            <artifactId>flink-cdc-pipeline-model-dummy</artifactId>
+                            <version>${project.version}</version>
+                            <destFileName>dummy-model.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+
+                        <artifactItem>
+                            <groupId>org.apache.flink</groupId>
                             <artifactId>flink-cdc-pipeline-connector-mysql</artifactId>
                             <version>${project.version}</version>
                             <destFileName>mysql-cdc-pipeline-connector.jar</destFileName>
@@ -558,6 +609,16 @@ limitations under the License.
                             <artifactId>flink-cdc-pipeline-connector-postgres</artifactId>
                             <version>${project.version}</version>
                             <destFileName>postgres-cdc-pipeline-connector.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+
+                        <artifactItem>
+                            <groupId>org.apache.flink</groupId>
+                            <artifactId>flink-cdc-pipeline-connector-sqlserver</artifactId>
+                            <version>${project.version}</version>
+                            <destFileName>sqlserver-cdc-pipeline-connector.jar</destFileName>
                             <type>jar</type>
                             <outputDirectory>${project.build.directory}/dependencies
                             </outputDirectory>
@@ -716,6 +777,15 @@ limitations under the License.
                         </artifactItem>
                         <artifactItem>
                             <groupId>org.apache.flink</groupId>
+                            <artifactId>flink-cdc-pipeline-connector-elasticsearch</artifactId>
+                            <version>${project.version}</version>
+                            <destFileName>elasticsearch-cdc-pipeline-connector.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+                        <artifactItem>
+                            <groupId>org.apache.flink</groupId>
                             <artifactId>flink-parquet</artifactId>
                             <version>${flink.version}</version>
                             <destFileName>flink-parquet.jar</destFileName>
@@ -734,7 +804,7 @@ limitations under the License.
                         </artifactItem>
                         <artifactItem>
                             <groupId>org.apache.flink</groupId>
-                            <artifactId>flink-hadoop-compatibility_2.12</artifactId>
+                            <artifactId>${flink.hadoop.compatibility.artifact-id}</artifactId>
                             <version>${flink.version}</version>
                             <destFileName>flink-hadoop-compatibility.jar</destFileName>
                             <type>jar</type>
@@ -802,4 +872,14 @@ limitations under the License.
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>flink2</id>
+            <properties>
+                <flink.version>${flink.2.x.version}</flink.version>
+                <flink.hadoop.compatibility.artifact-id>flink-hadoop-compatibility</flink.hadoop.compatibility.artifact-id>
+            </properties>
+        </profile>
+    </profiles>
 </project>

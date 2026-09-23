@@ -29,7 +29,8 @@ import java.io.IOException;
 
 /** Serializer for {@link WriteResultWrapper}. */
 class WriteResultWrapperSerializer implements SimpleVersionedSerializer<WriteResultWrapper> {
-    private static final int VERSION = 1;
+    // v2 added the batchIndex field. v1 payloads still read back: the missing field defaults to 0.
+    private static final int VERSION = 2;
 
     @Override
     public int getVersion() {
@@ -47,7 +48,8 @@ class WriteResultWrapperSerializer implements SimpleVersionedSerializer<WriteRes
 
     @Override
     public WriteResultWrapper deserialize(int version, byte[] serialized) throws IOException {
-        if (version == 1) {
+        // v1 and v2 share the same byte layout, so both deserialize the same way.
+        if (version == 1 || version == 2) {
             DataInputDeserializer view = new DataInputDeserializer(serialized);
             byte[] resultBuf = new byte[serialized.length];
             view.read(resultBuf);

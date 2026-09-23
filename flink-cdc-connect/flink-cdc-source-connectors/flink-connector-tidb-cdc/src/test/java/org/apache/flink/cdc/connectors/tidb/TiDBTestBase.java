@@ -151,7 +151,23 @@ public class TiDBTestBase extends AbstractTestBase {
     }
 
     protected Connection getJdbcConnection(String databaseName) throws SQLException {
-        return DriverManager.getConnection(getJdbcUrl(databaseName), TIDB_USER, TIDB_PASSWORD);
+        long deadline = System.nanoTime() + Duration.ofSeconds(120).toNanos();
+        SQLException lastException = null;
+        while (System.nanoTime() < deadline) {
+            try {
+                return DriverManager.getConnection(
+                        getJdbcUrl(databaseName), TIDB_USER, TIDB_PASSWORD);
+            } catch (SQLException e) {
+                lastException = e;
+                try {
+                    Thread.sleep(1000L);
+                } catch (InterruptedException interruptedException) {
+                    Thread.currentThread().interrupt();
+                    throw new SQLException(interruptedException);
+                }
+            }
+        }
+        throw lastException;
     }
 
     private static void dropTestDatabase(Connection connection, String databaseName)

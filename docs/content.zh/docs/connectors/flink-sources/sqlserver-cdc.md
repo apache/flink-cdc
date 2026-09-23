@@ -231,6 +231,13 @@ Connector Options
       </td>
     </tr>
     <tr>
+      <td>scan.incremental.snapshot.metadata.release.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>是否在 source 进入增量阶段后，释放 source coordinator 持有的快照分片元数据（已分配的分片、已完成分片的位点以及表结构），以降低快照分片数量非常大的作业的 JobManager 内存占用。默认关闭。与 scan.newly-added-table.enabled 不兼容：同时开启两者会导致作业启动失败，且已释放元数据的作业无法再开启动态加表功能。仅在成功完成一次 checkpoint 后才会释放；若未开启 checkpoint 或没有 checkpoint 完成，则会保留该元数据，因此该配置项在未开启 checkpoint 时不生效。开启该配置项后生成的 checkpoint 或 savepoint，无法在降级到 Flink CDC 3.6.0 及更早版本后用于恢复作业。</td>
+    </tr>
+    <tr>
           <td>scan.incremental.snapshot.chunk.key-column</td>
           <td>optional</td>
           <td style="word-wrap: break-word;">(none)</td>
@@ -308,6 +315,9 @@ Limitation
 --------
 
 ### Can't perform checkpoint during scanning snapshot of tables
+
+*注意：此限制仅在未启用增量快照框架（即 `scan.incremental.snapshot.enabled` 设置为 `false`）时适用。*
+
 During scanning snapshot of database tables, since there is no recoverable position, we can't perform checkpoints. In order to not perform checkpoints, SqlServer CDC source will keep the checkpoint waiting to timeout. The timeout checkpoint will be recognized as failed checkpoint, by default, this will trigger a failover for the Flink job. So if the database table is large, it is recommended to add following Flink configurations to avoid failover because of the timeout checkpoints:
 
 ```
@@ -530,8 +540,8 @@ Data Type Mapping
       <td>DECIMAL(p, s)</td>
     </tr>
     <tr>
-      <td>numeric</td>
-      <td>NUMERIC</td>
+      <td>numeric(p, s)</td>
+      <td>DECIMAL(p, s)</td>
     </tr>
     <tr>
       <td>

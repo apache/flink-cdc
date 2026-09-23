@@ -182,6 +182,7 @@ public class StarRocksDataSinkFactory implements DataSinkFactory {
         optionalOptions.add(StarRocksDataSinkOptions.SINK_METRIC_HISTOGRAM_WINDOW_SIZE);
         optionalOptions.add(StarRocksDataSinkOptions.TABLE_CREATE_NUM_BUCKETS);
         optionalOptions.add(StarRocksDataSinkOptions.TABLE_SCHEMA_CHANGE_TIMEOUT);
+        optionalOptions.add(StarRocksDataSinkOptions.UNICODE_CHAR_MAX_BYTES);
         return optionalOptions;
     }
 }

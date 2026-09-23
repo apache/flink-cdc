@@ -1,0 +1,275 @@
+################################################################################
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#      http://www.apache.org/licenses/LICENSE-2.0
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+################################################################################
+
+- do: FLINK-39682 (Invoke TO_DATE with TIMESTAMP)
+  time-zone: Asia/Tokyo
+  projection: |-
+    id_
+    timestamp_0_
+    TO_DATE(timestamp_0_) AS comp_1
+    TIMESTAMPADD(HOUR, 18, timestamp_0_) AS comp_2
+    TO_DATE(TIMESTAMPADD(HOUR, 18, timestamp_0_)) AS comp_3
+    timestamp_6_
+    TO_DATE(timestamp_6_) AS comp_4
+    TIMESTAMPADD(HOUR, 18, timestamp_6_) AS comp_5
+    TO_DATE(TIMESTAMPADD(HOUR, 18, timestamp_6_)) AS comp_6
+    timestamp_9_
+    TO_DATE(timestamp_9_) AS comp_7
+    TIMESTAMPADD(HOUR, 18, timestamp_9_) AS comp_8
+    TO_DATE(TIMESTAMPADD(HOUR, 18, timestamp_9_)) AS comp_9
+  filter: id_ > 0
+  primary-key: id_
+  # timestamp_0_ is: 1970-01-02 10:17:36, TO_DATE should yield 1970-01-02
+  # after +18 hours: 1970-01-03 04:17:36, TO_DATE should yield 1970-01-03
+  #
+  # timestamp_6_ is: 1970-01-03 17:09:27, TO_DATE should yield 1970-01-03
+  # after +18 hours: 1970-01-04 11:09:27, TO_DATE should yield 1970-01-04
+  #
+  # timestamp_9_ is: 1970-01-05 00:01:18, TO_DATE should yield 1970-01-05
+  # after +18 hours: 1970-01-05 18:01:18, TO_DATE should yield 1970-01-05
+  #
+  # None of them are affected by pipeline time-zone config.
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`timestamp_0_` TIMESTAMP(0),`comp_1` DATE,`comp_2` TIMESTAMP(0),`comp_3` DATE,`timestamp_6_` TIMESTAMP(6),`comp_4` DATE,`comp_5` TIMESTAMP(3),`comp_6` DATE,`timestamp_9_` TIMESTAMP(9),`comp_7` DATE,`comp_8` TIMESTAMP(3),`comp_9` DATE}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, 1970-01-02T10:17:36.789123456, 1970-01-02, 1970-01-03T04:17:36.789, 1970-01-03, 1970-01-03T17:09:27.891234561, 1970-01-03, 1970-01-04T11:09:27.891, 1970-01-04, 1970-01-05T00:01:18.912345612, 1970-01-05, 1970-01-05T18:01:18.912, 1970-01-05], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, 1970-01-02T10:17:36.789123456, 1970-01-02, 1970-01-03T04:17:36.789, 1970-01-03, 1970-01-03T17:09:27.891234561, 1970-01-03, 1970-01-04T11:09:27.891, 1970-01-04, 1970-01-05T00:01:18.912345612, 1970-01-05, 1970-01-05T18:01:18.912, 1970-01-05], after=[], op=DELETE, meta=()}
+
+- do: FLINK-39682 (Invoke TO_DATE with TIMESTAMP_TZ)
+  time-zone: America/Los_Angeles
+  projection: |-
+    id_
+    timestamp_tz_0_
+    TO_DATE(timestamp_tz_0_) AS comp_1
+    timestamp_tz_6_
+    TO_DATE(timestamp_tz_6_) AS comp_2
+    timestamp_tz_9_
+    TO_DATE(timestamp_tz_9_) AS comp_3
+  filter: id_ > 0
+  non-null: 'true'
+  primary-key: id_
+  # timestamp_tz_0_ is: 1970-01-02 10:17:36.789123456 (Asia/Shanghai, UTC+8),       TO_DATE should yield 1970-01-02
+  # timestamp_tz_6_ is: 1970-01-03 17:09:27.891234561 (Europe/Berlin, UTC+1),       TO_DATE should yield 1970-01-03
+  # timestamp_tz_9_ is: 1970-01-05 00:01:18.912345612 (America/Puerto_Rico, UTC-4), TO_DATE should yield 1970-01-05
+  # None of them are affected by pipeline time-zone config.
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`timestamp_tz_0_` TIMESTAMP(0) WITH TIME ZONE,`comp_1` DATE,`timestamp_tz_6_` TIMESTAMP(6) WITH TIME ZONE,`comp_2` DATE,`timestamp_tz_9_` TIMESTAMP(9) WITH TIME ZONE,`comp_3` DATE}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, 1970-01-02T10:17:36.789123456+08:00, 1970-01-02, 1970-01-03T17:09:27.891234561+01:00, 1970-01-03, 1970-01-05T00:01:18.912345612-04:00, 1970-01-05], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, 1970-01-02T10:17:36.789123456+08:00, 1970-01-02, 1970-01-03T17:09:27.891234561+01:00, 1970-01-03, 1970-01-05T00:01:18.912345612-04:00, 1970-01-05], after=[], op=DELETE, meta=()}
+
+- do: FLINK-39682 (Invoke TO_DATE with TIMESTAMP_LTZ)
+  time-zone: Australia/Sydney
+  projection: |-
+    id_
+    timestamp_ltz_0_
+    TO_DATE(timestamp_ltz_0_) AS comp_1
+    TIMESTAMPADD(HOUR, 18, timestamp_ltz_0_) AS comp_2
+    TO_DATE(TIMESTAMPADD(HOUR, 18, timestamp_ltz_0_)) AS comp_3
+    timestamp_ltz_6_
+    TO_DATE(timestamp_ltz_6_) AS comp_4
+    TIMESTAMPADD(HOUR, 18, timestamp_ltz_6_) AS comp_5
+    TO_DATE(TIMESTAMPADD(HOUR, 18, timestamp_ltz_6_)) AS comp_6
+    timestamp_ltz_9_
+    TO_DATE(timestamp_ltz_9_) AS comp_7
+    TIMESTAMPADD(HOUR, 18, timestamp_ltz_9_) AS comp_8
+    TO_DATE(TIMESTAMPADD(HOUR, 18, timestamp_ltz_9_)) AS comp_9
+  filter: id_ > 0
+  primary-key: id_
+  # timestamp_0_ is: 1970-01-02 10:17:36 (UTC), TO_DATE should yield 1970-01-02
+  # after +18 hours: 1970-01-03 04:17:36 (UTC), TO_DATE should yield 1970-01-03
+  #
+  # timestamp_6_ is: 1970-01-03 17:09:27 (UTC), TO_DATE should yield 1970-01-03
+  # after +18 hours: 1970-01-04 11:09:27 (UTC), TO_DATE should yield 1970-01-04
+  #
+  # timestamp_9_ is: 1970-01-05 00:01:18 (UTC), TO_DATE should yield 1970-01-05
+  # after +18 hours: 1970-01-05 18:01:18 (UTC), TO_DATE should yield 1970-01-05
+  #
+  # None of them are affected by pipeline time-zone config.
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`timestamp_ltz_0_` TIMESTAMP_LTZ(0),`comp_1` DATE,`comp_2` TIMESTAMP_LTZ(0),`comp_3` DATE,`timestamp_ltz_6_` TIMESTAMP_LTZ(6),`comp_4` DATE,`comp_5` TIMESTAMP_LTZ(3),`comp_6` DATE,`timestamp_ltz_9_` TIMESTAMP_LTZ(9),`comp_7` DATE,`comp_8` TIMESTAMP_LTZ(3),`comp_9` DATE}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, 1970-01-02T10:17:36.789123456, 1970-01-02, 1970-01-03T04:17:36.789, 1970-01-03, 1970-01-03T17:09:27.891234561, 1970-01-03, 1970-01-04T11:09:27.891, 1970-01-04, 1970-01-05T00:01:18.912345612, 1970-01-05, 1970-01-05T18:01:18.912, 1970-01-05], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, 1970-01-02T10:17:36.789123456, 1970-01-02, 1970-01-03T04:17:36.789, 1970-01-03, 1970-01-03T17:09:27.891234561, 1970-01-03, 1970-01-04T11:09:27.891, 1970-01-04, 1970-01-05T00:01:18.912345612, 1970-01-05, 1970-01-05T18:01:18.912, 1970-01-05], after=[], op=DELETE, meta=()}
+
+- do: FLINK-39682 (Invoke TO_DATE with TIMESTAMP_LTZ, 24 hour offsets)
+  time-zone: Pacific/Tarawa
+  projection: |-
+    id_
+    timestamp_ltz_9_
+    TO_DATE(timestamp_ltz_9_) AS date_orig
+    TIMESTAMPADD(HOUR, -12, timestamp_ltz_9_) AS shift_m12
+    TO_DATE(TIMESTAMPADD(HOUR, -12, timestamp_ltz_9_)) AS date_m12
+    TIMESTAMPADD(HOUR, -11, timestamp_ltz_9_) AS shift_m11
+    TO_DATE(TIMESTAMPADD(HOUR, -11, timestamp_ltz_9_)) AS date_m11
+    TIMESTAMPADD(HOUR, -10, timestamp_ltz_9_) AS shift_m10
+    TO_DATE(TIMESTAMPADD(HOUR, -10, timestamp_ltz_9_)) AS date_m10
+    TIMESTAMPADD(HOUR, -9, timestamp_ltz_9_) AS shift_m9
+    TO_DATE(TIMESTAMPADD(HOUR, -9, timestamp_ltz_9_)) AS date_m9
+    TIMESTAMPADD(HOUR, -8, timestamp_ltz_9_) AS shift_m8
+    TO_DATE(TIMESTAMPADD(HOUR, -8, timestamp_ltz_9_)) AS date_m8
+    TIMESTAMPADD(HOUR, -7, timestamp_ltz_9_) AS shift_m7
+    TO_DATE(TIMESTAMPADD(HOUR, -7, timestamp_ltz_9_)) AS date_m7
+    TIMESTAMPADD(HOUR, -6, timestamp_ltz_9_) AS shift_m6
+    TO_DATE(TIMESTAMPADD(HOUR, -6, timestamp_ltz_9_)) AS date_m6
+    TIMESTAMPADD(HOUR, -5, timestamp_ltz_9_) AS shift_m5
+    TO_DATE(TIMESTAMPADD(HOUR, -5, timestamp_ltz_9_)) AS date_m5
+    TIMESTAMPADD(HOUR, -4, timestamp_ltz_9_) AS shift_m4
+    TO_DATE(TIMESTAMPADD(HOUR, -4, timestamp_ltz_9_)) AS date_m4
+    TIMESTAMPADD(HOUR, -3, timestamp_ltz_9_) AS shift_m3
+    TO_DATE(TIMESTAMPADD(HOUR, -3, timestamp_ltz_9_)) AS date_m3
+    TIMESTAMPADD(HOUR, -2, timestamp_ltz_9_) AS shift_m2
+    TO_DATE(TIMESTAMPADD(HOUR, -2, timestamp_ltz_9_)) AS date_m2
+    TIMESTAMPADD(HOUR, -1, timestamp_ltz_9_) AS shift_m1
+    TO_DATE(TIMESTAMPADD(HOUR, -1, timestamp_ltz_9_)) AS date_m1
+    TIMESTAMPADD(HOUR, 0, timestamp_ltz_9_) AS shift_p0
+    TO_DATE(TIMESTAMPADD(HOUR, 0, timestamp_ltz_9_)) AS date_p0
+    TIMESTAMPADD(HOUR, 1, timestamp_ltz_9_) AS shift_p1
+    TO_DATE(TIMESTAMPADD(HOUR, 1, timestamp_ltz_9_)) AS date_p1
+    TIMESTAMPADD(HOUR, 2, timestamp_ltz_9_) AS shift_p2
+    TO_DATE(TIMESTAMPADD(HOUR, 2, timestamp_ltz_9_)) AS date_p2
+    TIMESTAMPADD(HOUR, 3, timestamp_ltz_9_) AS shift_p3
+    TO_DATE(TIMESTAMPADD(HOUR, 3, timestamp_ltz_9_)) AS date_p3
+    TIMESTAMPADD(HOUR, 4, timestamp_ltz_9_) AS shift_p4
+    TO_DATE(TIMESTAMPADD(HOUR, 4, timestamp_ltz_9_)) AS date_p4
+    TIMESTAMPADD(HOUR, 5, timestamp_ltz_9_) AS shift_p5
+    TO_DATE(TIMESTAMPADD(HOUR, 5, timestamp_ltz_9_)) AS date_p5
+    TIMESTAMPADD(HOUR, 6, timestamp_ltz_9_) AS shift_p6
+    TO_DATE(TIMESTAMPADD(HOUR, 6, timestamp_ltz_9_)) AS date_p6
+    TIMESTAMPADD(HOUR, 7, timestamp_ltz_9_) AS shift_p7
+    TO_DATE(TIMESTAMPADD(HOUR, 7, timestamp_ltz_9_)) AS date_p7
+    TIMESTAMPADD(HOUR, 8, timestamp_ltz_9_) AS shift_p8
+    TO_DATE(TIMESTAMPADD(HOUR, 8, timestamp_ltz_9_)) AS date_p8
+    TIMESTAMPADD(HOUR, 9, timestamp_ltz_9_) AS shift_p9
+    TO_DATE(TIMESTAMPADD(HOUR, 9, timestamp_ltz_9_)) AS date_p9
+    TIMESTAMPADD(HOUR, 10, timestamp_ltz_9_) AS shift_p10
+    TO_DATE(TIMESTAMPADD(HOUR, 10, timestamp_ltz_9_)) AS date_p10
+    TIMESTAMPADD(HOUR, 11, timestamp_ltz_9_) AS shift_p11
+    TO_DATE(TIMESTAMPADD(HOUR, 11, timestamp_ltz_9_)) AS date_p11
+  filter: id_ > 0
+  primary-key: id_
+  # timestamp_ltz_9_ is: 1970-01-05T00:01:18.912345612 (UTC), epoch=345678912ms
+  # pipeline time-zone is Pacific/Tarawa (UTC+12).
+  #
+  # TIMESTAMPADD(HOUR, N, ...) always operates in UTC, producing 24 time points
+  # spanning all 24 UTC hours, straddling the midnight boundary:
+  #
+  #   N=-12 → 1970-01-04T12:01:18.912 UTC  (UTC+12 local: 1970-01-05T00:01:18) → TO_DATE = 1970-01-04
+  #   N=-11 → 1970-01-04T13:01:18.912 UTC  (UTC+12 local: 1970-01-05T01:01:18) → TO_DATE = 1970-01-04
+  #   N=-10 → 1970-01-04T14:01:18.912 UTC  (UTC+12 local: 1970-01-05T02:01:18) → TO_DATE = 1970-01-04
+  #     ...
+  #   N= -1 → 1970-01-04T23:01:18.912 UTC  (UTC+12 local: 1970-01-05T11:01:18) → TO_DATE = 1970-01-04
+  #   N=  0 → 1970-01-05T00:01:18.912 UTC  (UTC+12 local: 1970-01-05T12:01:18) → TO_DATE = 1970-01-05
+  #     ...
+  #   N= 11 → 1970-01-05T11:01:18.912 UTC  (UTC+12 local: 1970-01-05T23:01:18) → TO_DATE = 1970-01-05
+  #
+  # TO_DATE always uses UTC, so N=-12..-1 → 1970-01-04, N=0..+11 → 1970-01-05.
+  # A buggy implementation using pipeline time-zone (UTC+12) would return 1970-01-05 for all 24 entries.
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`timestamp_ltz_9_` TIMESTAMP_LTZ(9),`date_orig` DATE,`shift_m12` TIMESTAMP_LTZ(3),`date_m12` DATE,`shift_m11` TIMESTAMP_LTZ(3),`date_m11` DATE,`shift_m10` TIMESTAMP_LTZ(3),`date_m10` DATE,`shift_m9` TIMESTAMP_LTZ(3),`date_m9` DATE,`shift_m8` TIMESTAMP_LTZ(3),`date_m8` DATE,`shift_m7` TIMESTAMP_LTZ(3),`date_m7` DATE,`shift_m6` TIMESTAMP_LTZ(3),`date_m6` DATE,`shift_m5` TIMESTAMP_LTZ(3),`date_m5` DATE,`shift_m4` TIMESTAMP_LTZ(3),`date_m4` DATE,`shift_m3` TIMESTAMP_LTZ(3),`date_m3` DATE,`shift_m2` TIMESTAMP_LTZ(3),`date_m2` DATE,`shift_m1` TIMESTAMP_LTZ(3),`date_m1` DATE,`shift_p0` TIMESTAMP_LTZ(3),`date_p0` DATE,`shift_p1` TIMESTAMP_LTZ(3),`date_p1` DATE,`shift_p2` TIMESTAMP_LTZ(3),`date_p2` DATE,`shift_p3` TIMESTAMP_LTZ(3),`date_p3` DATE,`shift_p4` TIMESTAMP_LTZ(3),`date_p4` DATE,`shift_p5` TIMESTAMP_LTZ(3),`date_p5` DATE,`shift_p6` TIMESTAMP_LTZ(3),`date_p6` DATE,`shift_p7` TIMESTAMP_LTZ(3),`date_p7` DATE,`shift_p8` TIMESTAMP_LTZ(3),`date_p8` DATE,`shift_p9` TIMESTAMP_LTZ(3),`date_p9` DATE,`shift_p10` TIMESTAMP_LTZ(3),`date_p10` DATE,`shift_p11` TIMESTAMP_LTZ(3),`date_p11` DATE}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, 1970-01-05T00:01:18.912345612, 1970-01-05, 1970-01-04T12:01:18.912, 1970-01-04, 1970-01-04T13:01:18.912, 1970-01-04, 1970-01-04T14:01:18.912, 1970-01-04, 1970-01-04T15:01:18.912, 1970-01-04, 1970-01-04T16:01:18.912, 1970-01-04, 1970-01-04T17:01:18.912, 1970-01-04, 1970-01-04T18:01:18.912, 1970-01-04, 1970-01-04T19:01:18.912, 1970-01-04, 1970-01-04T20:01:18.912, 1970-01-04, 1970-01-04T21:01:18.912, 1970-01-04, 1970-01-04T22:01:18.912, 1970-01-04, 1970-01-04T23:01:18.912, 1970-01-04, 1970-01-05T00:01:18.912, 1970-01-05, 1970-01-05T01:01:18.912, 1970-01-05, 1970-01-05T02:01:18.912, 1970-01-05, 1970-01-05T03:01:18.912, 1970-01-05, 1970-01-05T04:01:18.912, 1970-01-05, 1970-01-05T05:01:18.912, 1970-01-05, 1970-01-05T06:01:18.912, 1970-01-05, 1970-01-05T07:01:18.912, 1970-01-05, 1970-01-05T08:01:18.912, 1970-01-05, 1970-01-05T09:01:18.912, 1970-01-05, 1970-01-05T10:01:18.912, 1970-01-05, 1970-01-05T11:01:18.912, 1970-01-05], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, 1970-01-05T00:01:18.912345612, 1970-01-05, 1970-01-04T12:01:18.912, 1970-01-04, 1970-01-04T13:01:18.912, 1970-01-04, 1970-01-04T14:01:18.912, 1970-01-04, 1970-01-04T15:01:18.912, 1970-01-04, 1970-01-04T16:01:18.912, 1970-01-04, 1970-01-04T17:01:18.912, 1970-01-04, 1970-01-04T18:01:18.912, 1970-01-04, 1970-01-04T19:01:18.912, 1970-01-04, 1970-01-04T20:01:18.912, 1970-01-04, 1970-01-04T21:01:18.912, 1970-01-04, 1970-01-04T22:01:18.912, 1970-01-04, 1970-01-04T23:01:18.912, 1970-01-04, 1970-01-05T00:01:18.912, 1970-01-05, 1970-01-05T01:01:18.912, 1970-01-05, 1970-01-05T02:01:18.912, 1970-01-05, 1970-01-05T03:01:18.912, 1970-01-05, 1970-01-05T04:01:18.912, 1970-01-05, 1970-01-05T05:01:18.912, 1970-01-05, 1970-01-05T06:01:18.912, 1970-01-05, 1970-01-05T07:01:18.912, 1970-01-05, 1970-01-05T08:01:18.912, 1970-01-05, 1970-01-05T09:01:18.912, 1970-01-05, 1970-01-05T10:01:18.912, 1970-01-05, 1970-01-05T11:01:18.912, 1970-01-05], after=[], op=DELETE, meta=()}
+
+- do: TO_DATE chained with FROM_UNIXTIME (common CDC pattern)
+  projection: |-
+    id_
+    TO_DATE(FROM_UNIXTIME(bigint_)) AS comp_1
+    TO_DATE(FROM_UNIXTIME(bigint_, 'yyyy-MM-dd')) AS comp_2
+  primary-key: id_
+  # bigint_ = 5 for record1 => FROM_UNIXTIME(5) = "1970-01-01 00:00:05"
+  #   TO_DATE("1970-01-01 00:00:05") = null (format mismatch: contains time, TO_DATE expects 'yyyy-MM-dd')
+  #   FROM_UNIXTIME(5, 'yyyy-MM-dd') = "1970-01-01", TO_DATE("1970-01-01") = 1970-01-01
+  # bigint_ = -5 for record2 => FROM_UNIXTIME(-5) = "1969-12-31 23:59:55"
+  #   TO_DATE("1969-12-31 23:59:55") = null (same reason)
+  #   FROM_UNIXTIME(-5, 'yyyy-MM-dd') = "1969-12-31", TO_DATE("1969-12-31") = 1969-12-31
+  # NOTE: Customers should always use FROM_UNIXTIME(x, 'yyyy-MM-dd') when chaining with TO_DATE
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_1` DATE,`comp_2` DATE}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, null, 1970-01-01], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, null, 1970-01-01], after=[-1, null, 1969-12-31], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, null, 1969-12-31], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null], after=[], op=DELETE, meta=()}
+
+- do: TO_DATE chained with DATE_FORMAT (extract date from timestamp)
+  projection: |-
+    id_
+    TO_DATE(DATE_FORMAT(timestamp_0_, 'yyyy-MM-dd')) AS comp_1
+    TO_DATE(DATE_FORMAT(timestamp_0_, 'yyyy-MM-01')) AS comp_2
+  primary-key: id_
+  # timestamp_0_ record1 = 1970-01-02T10:17:36
+  #   DATE_FORMAT(..., 'yyyy-MM-dd') = "1970-01-02", TO_DATE = 1970-01-02
+  #   DATE_FORMAT(..., 'yyyy-MM-01') = "1970-01-01", TO_DATE = 1970-01-01
+  # timestamp_0_ record2 = 1970-01-09T08:57:36
+  #   DATE_FORMAT(..., 'yyyy-MM-dd') = "1970-01-09", TO_DATE = 1970-01-09
+  #   DATE_FORMAT(..., 'yyyy-MM-01') = "1970-01-01", TO_DATE = 1970-01-01
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_1` DATE,`comp_2` DATE}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, 1970-01-02, 1970-01-01], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, 1970-01-02, 1970-01-01], after=[-1, 1970-01-09, 1970-01-01], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, 1970-01-09, 1970-01-01], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null], after=[], op=DELETE, meta=()}
+
+- do: TO_DATE with CASE WHEN null-guard pattern (common CDC pattern)
+  projection: |-
+    id_
+    CASE WHEN timestamp_0_ IS NULL THEN TO_DATE('2000-01-01') ELSE TO_DATE(timestamp_0_) END AS comp_1
+    CASE WHEN bigint_ IS NULL THEN TO_DATE('2000-01-01') ELSE TO_DATE(FROM_UNIXTIME(bigint_, 'yyyy-MM-dd')) END AS comp_2
+  primary-key: id_
+  # record1: timestamp_0_ not null => TO_DATE(1970-01-02T10:17:36) = 1970-01-02
+  #           bigint_=5, not null => TO_DATE(FROM_UNIXTIME(5,'yyyy-MM-dd')) = TO_DATE("1970-01-01") = 1970-01-01
+  # record2: timestamp_0_ not null => TO_DATE(1970-01-09T08:57:36) = 1970-01-09
+  #           bigint_=-5, not null => TO_DATE(FROM_UNIXTIME(-5,'yyyy-MM-dd')) = TO_DATE("1969-12-31") = 1969-12-31
+  # record3: both null => TO_DATE('2000-01-01') = 2000-01-01
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_1` DATE,`comp_2` DATE}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, 1970-01-02, 1970-01-01], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, 1970-01-02, 1970-01-01], after=[-1, 1970-01-09, 1969-12-31], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, 1970-01-09, 1969-12-31], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, 2000-01-01, 2000-01-01], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, 2000-01-01, 2000-01-01], after=[], op=DELETE, meta=()}
+
+- do: TO_DATE with TO_TIMESTAMP_LTZ (convert epoch to date)
+  projection: |-
+    id_
+    TO_DATE(TO_TIMESTAMP_LTZ(bigint_, 0)) AS comp_1
+  primary-key: id_
+  # bigint_ = 5 for record1 => TO_TIMESTAMP_LTZ(5, 0) = epoch second 5 = 1970-01-01T00:00:05 UTC
+  #   TO_DATE => 1970-01-01
+  # bigint_ = -5 for record2 => TO_TIMESTAMP_LTZ(-5, 0) = 1969-12-31T23:59:55 UTC
+  #   TO_DATE => 1969-12-31
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_1` DATE}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, 1970-01-01], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, 1970-01-01], after=[-1, 1969-12-31], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, 1969-12-31], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null], after=[], op=DELETE, meta=()}
+
+- do: TO_DATE with DATE_FORMAT yyyyMMdd pattern (CDC partition key)
+  projection: |-
+    id_
+    DATE_FORMAT(timestamp_0_, 'yyyyMMdd') AS comp_1
+    TO_DATE(DATE_FORMAT(timestamp_6_, 'yyyyMMdd'), 'yyyyMMdd') AS comp_2
+  primary-key: id_
+  # timestamp_0_ record1 = 1970-01-02T10:17:36 => DATE_FORMAT = "19700102"
+  # timestamp_6_ record1 = 1970-01-03T17:09:27 => DATE_FORMAT = "19700103", TO_DATE("19700103","yyyyMMdd") = 1970-01-03
+  # timestamp_0_ record2 = 1970-01-09T08:57:36 => DATE_FORMAT = "19700109"
+  # timestamp_6_ record2 = 1970-01-10T15:49:27 => DATE_FORMAT = "19700110", TO_DATE("19700110","yyyyMMdd") = 1970-01-10
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_1` STRING,`comp_2` DATE}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, 19700102, 1970-01-03], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, 19700102, 1970-01-03], after=[-1, 19700109, 1970-01-10], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, 19700109, 1970-01-10], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null], after=[], op=DELETE, meta=()}

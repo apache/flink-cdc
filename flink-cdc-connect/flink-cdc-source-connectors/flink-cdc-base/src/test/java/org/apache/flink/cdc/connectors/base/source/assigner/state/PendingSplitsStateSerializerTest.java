@@ -35,6 +35,7 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -105,6 +106,74 @@ class PendingSplitsStateSerializerTest {
 
         assertThat(serializer.deserialize(serializer.getVersion(), serializer.serialize(state)))
                 .isEqualTo(state);
+    }
+
+    @Test
+    void testReleaseEnabledRoundTripsV9WithFlag() throws Exception {
+        PendingSplitsStateSerializer serializer =
+                new PendingSplitsStateSerializer(constructSourceSplitSerializer(), true);
+        assertThat(serializer.getVersion()).isEqualTo(9);
+        SnapshotPendingSplitsState released = buildSnapshotState(true);
+        PendingSplitsState restored =
+                serializer.deserialize(serializer.getVersion(), serializer.serialize(released));
+        assertThat(restored).isEqualTo(released);
+        assertThat(((SnapshotPendingSplitsState) restored).isSnapshotMetaReleased()).isTrue();
+    }
+
+    @Test
+    void testReleaseDisabledJobKeepsWritingV8Format() throws Exception {
+        PendingSplitsStateSerializer v8 =
+                new PendingSplitsStateSerializer(constructSourceSplitSerializer(), false);
+        PendingSplitsStateSerializer v9 =
+                new PendingSplitsStateSerializer(constructSourceSplitSerializer(), true);
+        assertThat(v8.getVersion()).isEqualTo(8);
+        assertThat(v9.getVersion()).isEqualTo(9);
+
+        SnapshotPendingSplitsState state = buildSnapshotState(false);
+        byte[] v9Bytes = v9.serialize(state);
+        // clear the lazily cached serialized form so the v8 serializer re-serializes the state
+        state.serializedFormCache = null;
+        byte[] v8Bytes = v8.serialize(state);
+
+        // For a snapshot-only state the released flag is the final byte, so the v8 bytes are the
+        // v9 bytes without that trailing byte, the format an older connector wrote.
+        assertThat(v8Bytes).isEqualTo(Arrays.copyOf(v9Bytes, v9Bytes.length - 1));
+
+        PendingSplitsState restored = v8.deserialize(8, v8Bytes);
+        assertThat(restored).isEqualTo(state);
+        assertThat(((SnapshotPendingSplitsState) restored).isSnapshotMetaReleased()).isFalse();
+    }
+
+    @Test
+    void testHybridStateRoundTripAtV8LeavesFlagFalse() throws Exception {
+        PendingSplitsStateSerializer v8 =
+                new PendingSplitsStateSerializer(constructSourceSplitSerializer(), false);
+        HybridPendingSplitsState hybrid =
+                new HybridPendingSplitsState(buildSnapshotState(false), true);
+        PendingSplitsState restored = v8.deserialize(v8.getVersion(), v8.serialize(hybrid));
+        assertThat(restored).isEqualTo(hybrid);
+        assertThat(
+                        ((HybridPendingSplitsState) restored)
+                                .getSnapshotPendingSplits()
+                                .isSnapshotMetaReleased())
+                .isFalse();
+    }
+
+    private SnapshotPendingSplitsState buildSnapshotState(boolean snapshotMetaReleased) {
+        return new SnapshotPendingSplitsState(
+                Collections.emptyList(),
+                Collections.emptyList(),
+                Collections.emptyMap(),
+                constructTableSchema(),
+                Collections.emptyMap(),
+                AssignerStatus.INITIAL_ASSIGNING,
+                Collections.emptyList(),
+                false,
+                true,
+                Collections.emptyMap(),
+                new ChunkSplitterState(
+                        constructTableId(), ChunkSplitterState.ChunkBound.middleOf(1), 2),
+                snapshotMetaReleased);
     }
 
     private SourceSplitSerializer constructSourceSplitSerializer() {

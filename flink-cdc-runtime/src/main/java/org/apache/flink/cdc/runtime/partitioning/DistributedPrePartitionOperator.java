@@ -23,12 +23,14 @@ import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.function.HashFunction;
+import org.apache.flink.cdc.common.function.HashFunction.HashContext;
 import org.apache.flink.cdc.common.function.HashFunctionProvider;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.runtime.operators.AbstractStreamOperatorAdapter;
 import org.apache.flink.cdc.runtime.operators.schema.regular.SchemaOperator;
 import org.apache.flink.cdc.runtime.serializer.event.EventSerializer;
+import org.apache.flink.cdc.source.RuntimeContextAdapter;
 import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
@@ -52,7 +54,7 @@ public class DistributedPrePartitionOperator
     private transient Map<TableId, Schema> schemaMap;
     private transient Map<TableId, HashFunction<DataChangeEvent>> hashFunctionMap;
 
-    private transient int subTaskId;
+    private transient HashContext hashContext;
 
     public DistributedPrePartitionOperator(
             int downstreamParallelism, HashFunctionProvider<DataChangeEvent> hashFunctionProvider) {
@@ -64,7 +66,10 @@ public class DistributedPrePartitionOperator
     @Override
     public void open() throws Exception {
         super.open();
-        subTaskId = getRuntimeContext().getTaskInfo().getIndexOfThisSubtask();
+        hashContext =
+                HashFunction.createContext(
+                        RuntimeContextAdapter.getIndexOfThisSubtask(getRuntimeContext()),
+                        downstreamParallelism);
         schemaMap = new HashMap<>();
         hashFunctionMap = new HashMap<>();
     }
@@ -92,7 +97,9 @@ public class DistributedPrePartitionOperator
             partitionBy((DataChangeEvent) event);
         } else {
             throw new IllegalStateException(
-                    subTaskId + "> PrePartition operator received an unexpected event: " + event);
+                    hashContext.getSourceSubtaskIndex()
+                            + "> PrePartition operator received an unexpected event: "
+                            + event);
         }
     }
 
@@ -101,10 +108,10 @@ public class DistributedPrePartitionOperator
                 new StreamRecord<>(
                         PartitioningEvent.ofDistributed(
                                 dataChangeEvent,
-                                subTaskId,
+                                hashContext.getSourceSubtaskIndex(),
                                 hashFunctionMap
                                                 .get(dataChangeEvent.tableId())
-                                                .hashcode(dataChangeEvent)
+                                                .hashcode(hashContext, dataChangeEvent)
                                         % downstreamParallelism)));
     }
 
@@ -114,7 +121,9 @@ public class DistributedPrePartitionOperator
             // JVM
             Event copiedEvent = EventSerializer.INSTANCE.copy(toBroadcast);
             output.collect(
-                    new StreamRecord<>(PartitioningEvent.ofDistributed(copiedEvent, subTaskId, i)));
+                    new StreamRecord<>(
+                            PartitioningEvent.ofDistributed(
+                                    copiedEvent, hashContext.getSourceSubtaskIndex(), i)));
         }
     }
 

@@ -22,7 +22,9 @@ import org.apache.flink.cdc.common.function.HashFunctionProvider;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.common.sink.EventSinkProvider;
 import org.apache.flink.cdc.common.sink.FlinkSinkProvider;
+import org.apache.flink.cdc.common.sink.ForwardHashFunctionProvider;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
+import org.apache.flink.cdc.connectors.fluss.sink.FlussDataSinkOptions.SinkPartitioningStrategy;
 import org.apache.flink.cdc.connectors.fluss.sink.v2.FlussSink;
 
 import org.apache.fluss.config.Configuration;
@@ -37,16 +39,19 @@ public class FlussDataSink implements DataSink {
     private final Map<String, String> tableProperties;
     private final Map<String, List<String>> bucketKeysMap;
     private final Map<String, Integer> bucketNumMap;
+    private final SinkPartitioningStrategy sinkPartitioningStrategy;
 
     public FlussDataSink(
             Configuration flussClientConfig,
             Map<String, String> tableProperties,
             Map<String, List<String>> bucketKeysMap,
-            Map<String, Integer> bucketNumMap) {
+            Map<String, Integer> bucketNumMap,
+            SinkPartitioningStrategy sinkPartitioningStrategy) {
         this.flussClientConfig = flussClientConfig;
         this.tableProperties = tableProperties;
         this.bucketKeysMap = bucketKeysMap;
         this.bucketNumMap = bucketNumMap;
+        this.sinkPartitioningStrategy = sinkPartitioningStrategy;
     }
 
     @Override
@@ -63,6 +68,13 @@ public class FlussDataSink implements DataSink {
 
     @Override
     public HashFunctionProvider<DataChangeEvent> getDataChangeEventHashFunctionProvider() {
-        return new FlussHashFunctionProvider();
+        switch (sinkPartitioningStrategy) {
+            case DEFAULT:
+                return new FlussHashFunctionProvider();
+            case FORWARD:
+                return new ForwardHashFunctionProvider();
+        }
+        throw new IllegalArgumentException(
+                "Unsupported sink partitioning strategy: " + sinkPartitioningStrategy);
     }
 }

@@ -43,6 +43,7 @@ limitations under the License.
         <module>flink-cdc-runtime</module>
         <module>flink-cdc-e2e-tests</module>
         <module>flink-cdc-pipeline-udf-examples</module>
+        <module>flink-cdc-python</module>
         <module>flink-cdc-pipeline-model</module>
     </modules>
 
@@ -116,6 +117,7 @@ limitations under the License.
         <maven.compiler.target>${target.java.version}</maven.compiler.target>
         <flink.kafka.connector.version>3.3.0-1.20</flink.kafka.connector.version>
         <paimon.flink.major.version>1.20</paimon.flink.major.version>
+        <fluss.flink.major.version>1.20</fluss.flink.major.version>
     </properties>
 
     <dependencyManagement>
@@ -468,6 +470,12 @@ limitations under the License.
                         <exclude>
                             flink-cdc-connect/flink-cdc-source-connectors/flink-connector-db2-cdc/src/test/resources/db2_server/Dockerfile
                         </exclude>
+                        <!-- Certificate files -->
+                        <exclude>**/ssl/*.crt</exclude>
+                        <exclude>**/ssl/*.csr</exclude>
+                        <exclude>**/ssl/*.ext</exclude>
+                        <exclude>**/ssl/*.key</exclude>
+                        <exclude>**/ssl/*.srl</exclude>
                     </excludes>
                 </configuration>
             </plugin>
@@ -857,6 +865,7 @@ limitations under the License.
                 <flink.kafka.connector.version>4.0.1-2.0</flink.kafka.connector.version>
                 <paimon.flink.major.version>2.1</paimon.flink.major.version>
                 <iceberg.flink.major.version>2.0</iceberg.flink.major.version>
+                <fluss.flink.major.version>2.2</fluss.flink.major.version>
             </properties>
             <build>
                 <pluginManagement>

@@ -36,44 +36,57 @@ public class MySqlTypeUtils {
     private static final String BOOL = "BOOL";
     private static final String TINYINT = "TINYINT";
     private static final String TINYINT_UNSIGNED = "TINYINT UNSIGNED";
+    private static final String TINYINT_ZEROFILL = "TINYINT ZEROFILL";
     private static final String TINYINT_UNSIGNED_ZEROFILL = "TINYINT UNSIGNED ZEROFILL";
     private static final String SMALLINT = "SMALLINT";
     private static final String SMALLINT_UNSIGNED = "SMALLINT UNSIGNED";
+    private static final String SMALLINT_ZEROFILL = "SMALLINT ZEROFILL";
     private static final String SMALLINT_UNSIGNED_ZEROFILL = "SMALLINT UNSIGNED ZEROFILL";
     private static final String MEDIUMINT = "MEDIUMINT";
     private static final String MEDIUMINT_UNSIGNED = "MEDIUMINT UNSIGNED";
+    private static final String MEDIUMINT_ZEROFILL = "MEDIUMINT ZEROFILL";
     private static final String MEDIUMINT_UNSIGNED_ZEROFILL = "MEDIUMINT UNSIGNED ZEROFILL";
     private static final String INT = "INT";
     private static final String INT_UNSIGNED = "INT UNSIGNED";
+    private static final String INT_ZEROFILL = "INT ZEROFILL";
     private static final String INT_UNSIGNED_ZEROFILL = "INT UNSIGNED ZEROFILL";
     private static final String INTEGER = "INTEGER";
     private static final String INTEGER_UNSIGNED = "INTEGER UNSIGNED";
+    private static final String INTEGER_ZEROFILL = "INTEGER ZEROFILL";
     private static final String INTEGER_UNSIGNED_ZEROFILL = "INTEGER UNSIGNED ZEROFILL";
     private static final String BIGINT = "BIGINT";
     private static final String SERIAL = "SERIAL";
     private static final String BIGINT_UNSIGNED = "BIGINT UNSIGNED";
+    private static final String BIGINT_ZEROFILL = "BIGINT ZEROFILL";
     private static final String BIGINT_UNSIGNED_ZEROFILL = "BIGINT UNSIGNED ZEROFILL";
     private static final String REAL = "REAL";
     private static final String REAL_UNSIGNED = "REAL UNSIGNED";
+    private static final String REAL_ZEROFILL = "REAL ZEROFILL";
     private static final String REAL_UNSIGNED_ZEROFILL = "REAL UNSIGNED ZEROFILL";
     private static final String FLOAT = "FLOAT";
     private static final String FLOAT_UNSIGNED = "FLOAT UNSIGNED";
+    private static final String FLOAT_ZEROFILL = "FLOAT ZEROFILL";
     private static final String FLOAT_UNSIGNED_ZEROFILL = "FLOAT UNSIGNED ZEROFILL";
     private static final String DOUBLE = "DOUBLE";
     private static final String DOUBLE_UNSIGNED = "DOUBLE UNSIGNED";
+    private static final String DOUBLE_ZEROFILL = "DOUBLE ZEROFILL";
     private static final String DOUBLE_UNSIGNED_ZEROFILL = "DOUBLE UNSIGNED ZEROFILL";
     private static final String DOUBLE_PRECISION = "DOUBLE PRECISION";
     private static final String DOUBLE_PRECISION_UNSIGNED = "DOUBLE PRECISION UNSIGNED";
+    private static final String DOUBLE_PRECISION_ZEROFILL = "DOUBLE PRECISION ZEROFILL";
     private static final String DOUBLE_PRECISION_UNSIGNED_ZEROFILL =
             "DOUBLE PRECISION UNSIGNED ZEROFILL";
     private static final String NUMERIC = "NUMERIC";
     private static final String NUMERIC_UNSIGNED = "NUMERIC UNSIGNED";
+    private static final String NUMERIC_ZEROFILL = "NUMERIC ZEROFILL";
     private static final String NUMERIC_UNSIGNED_ZEROFILL = "NUMERIC UNSIGNED ZEROFILL";
     private static final String FIXED = "FIXED";
     private static final String FIXED_UNSIGNED = "FIXED UNSIGNED";
+    private static final String FIXED_ZEROFILL = "FIXED ZEROFILL";
     private static final String FIXED_UNSIGNED_ZEROFILL = "FIXED UNSIGNED ZEROFILL";
     private static final String DECIMAL = "DECIMAL";
     private static final String DECIMAL_UNSIGNED = "DECIMAL UNSIGNED";
+    private static final String DECIMAL_ZEROFILL = "DECIMAL ZEROFILL";
     private static final String DECIMAL_UNSIGNED_ZEROFILL = "DECIMAL UNSIGNED ZEROFILL";
     private static final String CHAR = "CHAR";
     private static final String VARCHAR = "VARCHAR";
@@ -139,10 +152,12 @@ public class MySqlTypeUtils {
                         ? DataTypes.BOOLEAN()
                         : DataTypes.TINYINT();
             case TINYINT_UNSIGNED:
+            case TINYINT_ZEROFILL:
             case TINYINT_UNSIGNED_ZEROFILL:
             case SMALLINT:
                 return DataTypes.SMALLINT();
             case SMALLINT_UNSIGNED:
+            case SMALLINT_ZEROFILL:
             case SMALLINT_UNSIGNED_ZEROFILL:
             case INT:
             case INTEGER:
@@ -151,38 +166,49 @@ public class MySqlTypeUtils {
                 return DataTypes.INT();
             case INT_UNSIGNED:
             case INT_UNSIGNED_ZEROFILL:
+            case INT_ZEROFILL:
             case INTEGER_UNSIGNED:
+            case INTEGER_ZEROFILL:
             case INTEGER_UNSIGNED_ZEROFILL:
             case MEDIUMINT_UNSIGNED:
+            case MEDIUMINT_ZEROFILL:
             case MEDIUMINT_UNSIGNED_ZEROFILL:
             case BIGINT:
                 return DataTypes.BIGINT();
             case BIGINT_UNSIGNED:
+            case BIGINT_ZEROFILL:
             case BIGINT_UNSIGNED_ZEROFILL:
             case SERIAL:
                 return DataTypes.DECIMAL(20, 0);
             case FLOAT:
             case FLOAT_UNSIGNED:
+            case FLOAT_ZEROFILL:
             case FLOAT_UNSIGNED_ZEROFILL:
                 return DataTypes.FLOAT();
             case REAL:
             case REAL_UNSIGNED:
+            case REAL_ZEROFILL:
             case REAL_UNSIGNED_ZEROFILL:
             case DOUBLE:
             case DOUBLE_UNSIGNED:
+            case DOUBLE_ZEROFILL:
             case DOUBLE_UNSIGNED_ZEROFILL:
             case DOUBLE_PRECISION:
             case DOUBLE_PRECISION_UNSIGNED:
+            case DOUBLE_PRECISION_ZEROFILL:
             case DOUBLE_PRECISION_UNSIGNED_ZEROFILL:
                 return DataTypes.DOUBLE();
             case NUMERIC:
             case NUMERIC_UNSIGNED:
+            case NUMERIC_ZEROFILL:
             case NUMERIC_UNSIGNED_ZEROFILL:
             case FIXED:
             case FIXED_UNSIGNED:
+            case FIXED_ZEROFILL:
             case FIXED_UNSIGNED_ZEROFILL:
             case DECIMAL:
             case DECIMAL_UNSIGNED:
+            case DECIMAL_ZEROFILL:
             case DECIMAL_UNSIGNED_ZEROFILL:
                 return column.length() <= 38
                         ? DataTypes.DECIMAL(column.length(), column.scale().orElse(0))

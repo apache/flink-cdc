@@ -344,6 +344,13 @@ Connector Options
       </td>
     </tr>
     <tr>
+      <td>scan.incremental.snapshot.metadata.release.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>Whether to release the snapshot split metadata (assigned splits, finished offsets and table schemas) held by the source coordinator once the source has entered the stream phase, to reduce JobManager memory on jobs with a very large number of snapshot splits. Disabled by default. Incompatible with scan.newly-added-table.enabled: enabling both fails at startup, and a job that has released the metadata cannot later enable newly-added-table scanning. Release happens only after a successful checkpoint; if checkpointing is disabled or no checkpoint completes, the metadata is retained, so this option has no effect without checkpointing. A checkpoint or savepoint taken with this option enabled cannot be used to restore the job after downgrading to Flink CDC 3.6.0 or an earlier version.</td>
+    </tr>
+    <tr>
       <td>scan.cursor.no-timeout</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">true</td>
@@ -372,12 +379,70 @@ Connector Options
         For example updating an already updated value in snapshot, or deleting an already deleted entry in snapshot. These replayed change log events should be handled specially.
       </td>
     </tr>
+    <tr>
+      <td>mongodb.ssl.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>Whether the connector will use SSL to connect to MongoDB instances.</td>
+    </tr>
+    <tr>
+      <td>mongodb.ssl.invalid.hostname.allowed</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>When SSL is enabled, this setting controls whether strict hostname checking is disabled during the connection phase. If <code>true</code>, the connection will not prevent man-in-the-middle attacks.</td>
+    </tr>
+    <tr>
+      <td>mongodb.ssl.keystore</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>The location of the key store file. This is optional and can be used for two-way authentication between the client and the MongoDB server.</td>
+    </tr>
+    <tr>
+      <td>mongodb.ssl.keystore.password</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>The password for the key store file. This is optional and only needed if <code>mongodb.ssl.keystore</code> is configured.</td>
+    </tr>
+    <tr>
+      <td>mongodb.ssl.keystore.type</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">PKCS12</td>
+      <td>String</td>
+      <td>The type of key store file. This is optional and only needed if <code>mongodb.ssl.keystore</code> is configured. Defaults to PKCS12.</td>
+    </tr>
+    <tr>
+      <td>mongodb.ssl.truststore</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>The location of the trust store file for the server certificate verification.</td>
+    </tr>
+    <tr>
+      <td>mongodb.ssl.truststore.password</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>The password for the trust store file. Used to check the integrity of the truststore, and unlock the truststore.</td>
+    </tr>
+    <tr>
+      <td>mongodb.ssl.truststore.type</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">PKCS12</td>
+      <td>String</td>
+      <td>The type of trust store file. This is optional and only needed if <code>mongodb.ssl.truststore</code> is configured. Defaults to PKCS12.</td>
+    </tr>
     </tbody>
 </table>
 </div>
 
 Note: `heartbeat.interval.ms` is highly recommended setting a proper value larger than 0 **if the collection changes slowly**.
 The heartbeat event can push the `resumeToken` forward to avoid `resumeToken` being expired when we recover the Flink job from a checkpoint or savepoint.
+
+Note: The `mongodb.ssl.*` options only take effect when the incremental snapshot is enabled (`scan.incremental.snapshot.enabled` = `true`). They are ignored by the non-incremental source.
 
 Available Metadata
 ----------------
@@ -567,7 +632,7 @@ $ ./bin/flink run \
       --from-savepoint /tmp/flink-savepoints/savepoint-cca7bc-bb1e257f0dab \
       ./FlinkCDCExample.jar
 ```
-**Note:** Please refer the doc [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.17/docs/deployment/cli/#command-line-interface) for more details.
+**Note:** Please refer the doc [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.20/docs/deployment/cli/#command-line-interface) for more details.
 
 ### DataStream Source
 
@@ -714,7 +779,7 @@ Data Type Mapping
 ----------------
 [BSON](https://docs.mongodb.com/manual/reference/bson-types/) short for **Binary JSON** is a binary-encoded serialization of JSON-like format used to store documents and make remote procedure calls in MongoDB.
 
-[Flink SQL Data Type](https://nightlies.apache.org/flink/flink-docs-release-1.17/docs/dev/table/types/) is similar to the SQL standard’s data type terminology which describes the logical type of a value in the table ecosystem. It can be used to declare input and/or output types of operations.
+[Flink SQL Data Type](https://nightlies.apache.org/flink/flink-docs-release-1.20/docs/dev/table/types/) is similar to the SQL standard’s data type terminology which describes the logical type of a value in the table ecosystem. It can be used to declare input and/or output types of operations.
 
 In order to enable Flink SQL to process data from heterogeneous data sources, the data types of heterogeneous data sources need to be uniformly converted to Flink SQL data types.
 
@@ -835,6 +900,6 @@ Reference
 - [Connection String Options](https://docs.mongodb.com/manual/reference/connection-string/#std-label-connections-connection-options)
 - [Document Pre- and Post-Images](https://www.mongodb.com/docs/v6.0/changeStreams/#change-streams-with-document-pre--and-post-images)
 - [BSON Types](https://docs.mongodb.com/manual/reference/bson-types/)
-- [Flink DataTypes](https://nightlies.apache.org/flink/flink-docs-release-1.17/docs/dev/table/types/)
+- [Flink DataTypes](https://nightlies.apache.org/flink/flink-docs-release-1.20/docs/dev/table/types/)
 
 {{< top >}}

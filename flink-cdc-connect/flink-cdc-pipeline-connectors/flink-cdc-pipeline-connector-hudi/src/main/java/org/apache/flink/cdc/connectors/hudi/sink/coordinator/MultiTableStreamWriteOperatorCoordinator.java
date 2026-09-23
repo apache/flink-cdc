@@ -45,21 +45,28 @@ import org.apache.hudi.common.util.Option;
 import org.apache.hudi.common.util.SerializationUtils;
 import org.apache.hudi.common.util.collection.Pair;
 import org.apache.hudi.configuration.FlinkOptions;
+import org.apache.hudi.configuration.HadoopConfigurations;
 import org.apache.hudi.configuration.OptionsResolver;
 import org.apache.hudi.exception.HoodieException;
+import org.apache.hudi.hadoop.fs.HadoopFSUtils;
+import org.apache.hudi.hive.HiveSyncTool;
 import org.apache.hudi.sink.StreamWriteOperatorCoordinator;
 import org.apache.hudi.sink.event.Correspondent;
 import org.apache.hudi.sink.event.WriteMetadataEvent;
 import org.apache.hudi.sink.utils.CoordinationResponseSerDe;
 import org.apache.hudi.sink.utils.EventBuffers;
 import org.apache.hudi.sink.utils.ExplicitClassloaderThreadFactory;
+import org.apache.hudi.sink.utils.HiveSyncContext;
 import org.apache.hudi.sink.utils.NonThrownExecutor;
+import org.apache.hudi.storage.StorageConfiguration;
 import org.apache.hudi.util.ClusteringUtil;
 import org.apache.hudi.util.CompactionUtil;
 import org.apache.hudi.util.FlinkWriteClients;
 import org.apache.hudi.util.StreamerUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.annotation.Nullable;
 
 import java.io.IOException;
 import java.io.Serializable;
@@ -107,16 +114,19 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
         final EventBuffers eventBuffers;
         final TableState tableState;
         final String tablePath;
+        @Nullable final transient HiveSyncContext hiveSyncContext;
 
         TableContext(
                 HoodieFlinkWriteClient<?> writeClient,
                 EventBuffers eventBuffers,
                 TableState tableState,
-                String tablePath) {
+                String tablePath,
+                @Nullable HiveSyncContext hiveSyncContext) {
             this.writeClient = writeClient;
             this.eventBuffers = eventBuffers;
             this.tableState = tableState;
             this.tablePath = tablePath;
+            this.hiveSyncContext = hiveSyncContext;
         }
 
         void close() {
@@ -139,6 +149,7 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
         final boolean scheduleCompaction;
         final boolean scheduleClustering;
         final boolean isDeltaTimeCompaction;
+        final boolean syncHive;
 
         // Event-driven compaction tracking - tracks actual write activity
         long commitsSinceLastCompaction = 0;
@@ -159,6 +170,7 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
             this.scheduleClustering = OptionsResolver.needsScheduleClustering(conf);
             this.isDeltaTimeCompaction = OptionsResolver.isDeltaTimeCompaction(conf);
             this.commitsThreshold = conf.get(COMPACTION_DELTA_COMMITS);
+            this.syncHive = conf.get(FlinkOptions.HIVE_SYNC_ENABLED);
         }
 
         /**
@@ -252,6 +264,9 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
     /** A single-thread executor to handle instant time requests, mimicking the parent behavior. */
     private transient NonThrownExecutor instantRequestExecutor;
 
+    /** A single-thread executor to handle asynchronous hive sync. */
+    @Nullable private transient NonThrownExecutor hiveSyncExecutor;
+
     public MultiTableStreamWriteOperatorCoordinator(Configuration conf, Context context) {
         super(conf, context);
         this.baseConfig = conf;
@@ -296,6 +311,19 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
         // Initialize the gateways array to avoid NullPointerException when subtasks are ready.
         this.gateways = new SubtaskGateway[context.currentParallelism()];
 
+        // Initialize the hive sync executor if hive sync is enabled.
+        if (baseConfig.get(FlinkOptions.HIVE_SYNC_ENABLED)) {
+            this.hiveSyncExecutor =
+                    NonThrownExecutor.builder(LOG)
+                            .threadFactory(
+                                    new ExplicitClassloaderThreadFactory(
+                                            "multi-table-hive-sync",
+                                            context.getUserCodeClassloader()))
+                            .waitForTasksFinish(true)
+                            .build();
+            LOG.info("Hive sync executor initialized.");
+        }
+
         // Re-initialize transient fields after deserialization from a Flink checkpoint.
         // When the coordinator is restored, the `tableContexts` map is deserialized, but all
         // `writeClient` fields within it will be null because they are transient.
@@ -312,13 +340,16 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
 
                 // Replace the old context (with a null client) with a new one containing the live
                 // client.
+                HiveSyncContext hiveSyncCtx =
+                        createHiveSyncContextIfNeeded(tableConfig, oldContext.tableState);
                 tableContexts.put(
                         tableId,
                         new TableContext(
                                 writeClient,
                                 oldContext.eventBuffers,
                                 oldContext.tableState,
-                                oldContext.tablePath));
+                                oldContext.tablePath,
+                                hiveSyncCtx));
                 LOG.info(
                         "Successfully re-initialized write client for recovered table: {}",
                         tableId);
@@ -477,13 +508,19 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
                                         FlinkWriteClients.createWriteClient(tableConfig);
                                 TableState tableState = new TableState(tableConfig);
                                 EventBuffers eventBuffers = EventBuffers.getInstance(tableConfig);
+                                HiveSyncContext hiveSyncCtx =
+                                        createHiveSyncContextIfNeeded(tableConfig, tableState);
 
                                 LOG.info(
                                         "Successfully initialized resources for table: {} at path: {}",
                                         tId,
                                         tablePath);
                                 return new TableContext(
-                                        writeClient, eventBuffers, tableState, tablePath);
+                                        writeClient,
+                                        eventBuffers,
+                                        tableState,
+                                        tablePath,
+                                        hiveSyncCtx);
                             } catch (Exception e) {
                                 LOG.error(
                                         "Failed to initialize Hudi table resources for: {}",
@@ -552,12 +589,15 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
 
             // Update the table context with the new write client
             // Keep the same eventBuffers, tableState, and tablePath
+            HiveSyncContext hiveSyncCtx =
+                    createHiveSyncContextIfNeeded(tableConfig, oldContext.tableState);
             TableContext newContext =
                     new TableContext(
                             newWriteClient,
                             oldContext.eventBuffers,
                             oldContext.tableState,
-                            oldContext.tablePath);
+                            oldContext.tablePath,
+                            hiveSyncCtx);
             tableContexts.put(tableId, newContext);
 
             LOG.info("Successfully updated write client for table {} after schema change", tableId);
@@ -694,7 +734,7 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
                                     EventBuffers eventBuffers =
                                             EventBuffers.getInstance(tableConfig);
                                     return new TableContext(
-                                            null, eventBuffers, tableState, tablePath);
+                                            null, eventBuffers, tableState, tablePath, null);
                                 });
                         TableContext tableContext = tableContexts.get(tableId);
                         tableContext.eventBuffers.addEventsToBuffer(completedEvents);
@@ -842,6 +882,8 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
                         "Skipping table services scheduling for table [{}] - empty commit",
                         tableId);
             }
+
+            syncHiveAsyncIfNeeded(tableId, tableContext);
         } else {
             LOG.error("Failed to commit instant [{}] for table [{}]", instant, tableId);
             MultiTableStreamWriteOperatorCoordinator.this.context.failJob(
@@ -909,10 +951,40 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
         }
     }
 
+    private void syncHiveAsyncIfNeeded(TableId tableId, TableContext tableContext) {
+        if (tableContext.tableState.syncHive
+                && tableContext.hiveSyncContext != null
+                && hiveSyncExecutor != null) {
+            hiveSyncExecutor.execute(
+                    () -> {
+                        try (HiveSyncTool syncTool = tableContext.hiveSyncContext.hiveSyncTool()) {
+                            syncTool.syncHoodieTable();
+                            LOG.info("Successfully synced Hive metadata for table [{}]", tableId);
+                        }
+                    },
+                    "sync hive metadata for table %s",
+                    tableId);
+        }
+    }
+
+    @Nullable
+    private HiveSyncContext createHiveSyncContextIfNeeded(
+            Configuration tableConfig, TableState tableState) {
+        if (!tableState.syncHive) {
+            return null;
+        }
+        StorageConfiguration<org.apache.hadoop.conf.Configuration> storageConf =
+                HadoopFSUtils.getStorageConfWithCopy(HadoopConfigurations.getHiveConf(tableConfig));
+        return HiveSyncContext.create(tableConfig, storageConf);
+    }
+
     @Override
     public void close() throws Exception {
         if (instantRequestExecutor != null) {
             instantRequestExecutor.close();
+        }
+        if (hiveSyncExecutor != null) {
+            hiveSyncExecutor.close();
         }
         tableContexts.values().forEach(TableContext::close);
         tableContexts.clear();
@@ -956,7 +1028,18 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
         Schema cdcSchema =
                 Preconditions.checkNotNull(
                         tableSchemas.get(tableId), "Schema for " + tableId + "should not be null.");
-        return ConfigUtils.createTableConfig(baseConfig, cdcSchema, tableId);
+        Configuration tableConfig = ConfigUtils.createTableConfig(baseConfig, cdcSchema, tableId);
+        applyHiveSyncTableDefaults(tableConfig, tableId);
+        return tableConfig;
+    }
+
+    static void applyHiveSyncTableDefaults(Configuration tableConfig, TableId tableId) {
+        if (!tableConfig.contains(FlinkOptions.HIVE_SYNC_DB)) {
+            tableConfig.set(FlinkOptions.HIVE_SYNC_DB, tableId.getSchemaName());
+        }
+        if (!tableConfig.contains(FlinkOptions.HIVE_SYNC_TABLE)) {
+            tableConfig.set(FlinkOptions.HIVE_SYNC_TABLE, tableId.getTableName());
+        }
     }
 
     /** Provider for {@link MultiTableStreamWriteOperatorCoordinator}. */

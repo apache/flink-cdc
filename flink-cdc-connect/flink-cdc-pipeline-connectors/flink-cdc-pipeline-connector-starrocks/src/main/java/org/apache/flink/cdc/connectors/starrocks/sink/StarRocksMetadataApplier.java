@@ -165,7 +165,7 @@ public class StarRocksMetadataApplier implements MetadataApplier {
                                             StarRocksUtils.convertInvalidTimestampDefaultValue(
                                                     column.getDefaultValueExpression(),
                                                     column.getType())));
-            toStarRocksDataType(column, false, builder);
+            toStarRocksDataType(column, false, builder, tableCreateConfig.getUnicodeCharMaxBytes());
             addColumns.add(builder.build());
         }
 
@@ -324,7 +324,11 @@ public class StarRocksMetadataApplier implements MetadataApplier {
             for (Map.Entry<String, DataType> entry : typeMapping.entrySet()) {
                 StarRocksColumn.Builder builder =
                         new StarRocksColumn.Builder().setColumnName(entry.getKey());
-                toStarRocksDataType(entry.getValue(), false, builder);
+                toStarRocksDataType(
+                        entry.getValue(),
+                        false,
+                        builder,
+                        tableCreateConfig.getUnicodeCharMaxBytes());
                 catalog.alterColumnType(
                         tableId.getSchemaName(), tableId.getTableName(), builder.build());
             }
