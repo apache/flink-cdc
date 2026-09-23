@@ -63,4 +63,15 @@ public class TableSubscriptionEvent implements SourceEvent {
     public Set<TablePath> getFencedTablePaths() {
         return fencedTablePaths;
     }
+
+    @Override
+    public String toString() {
+        return "TableSubscriptionEvent{subscribedTablePaths="
+                + subscribedTablePaths
+                + ", pendingRemovalRequests="
+                + pendingRemovalRequests
+                + ", fencedTablePaths="
+                + fencedTablePaths
+                + '}';
+    }
 }

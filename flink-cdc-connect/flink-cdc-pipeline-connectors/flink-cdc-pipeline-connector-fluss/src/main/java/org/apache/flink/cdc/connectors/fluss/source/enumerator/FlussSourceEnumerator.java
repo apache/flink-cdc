@@ -100,8 +100,8 @@ public class FlussSourceEnumerator
         implements SplitEnumerator<FlussSplitBase, FlussSourceEnumState> {
 
     private static final Logger LOG = LoggerFactory.getLogger(FlussSourceEnumerator.class);
-    // Keep request IDs unique across restored enumerator instances so stale acknowledgements cannot
-    // complete a later removal.
+    // Keep request IDs unique across enumerator instances in the same JVM so stale acknowledgements
+    // cannot complete a later removal.
     private static final AtomicLong NEXT_REMOVAL_REQUEST_ID = new AtomicLong();
 
     private final SplitEnumeratorContext<FlussSplitBase> context;
@@ -295,6 +295,7 @@ public class FlussSourceEnumerator
             throw new FlinkRuntimeException("Failed to discover subscribed table-buckets.", error);
         }
 
+        // Removal cleanup needs the previous discovery's buckets, absent from the new result.
         boolean subscriptionChanged = updateSubscriptions(discoveryResult.subscribedTablePaths);
         lastDiscoveredTableBuckets = discoveryResult.tableBuckets;
         if (!sentSubscriptionSnapshot || subscriptionChanged) {
@@ -644,6 +645,10 @@ public class FlussSourceEnumerator
                                                     && !pendingRemovalTablePaths.contains(
                                                             tablePath));
             if (!hasActiveInitializingPath) {
+                LOG.warn(
+                        "Ignoring initialization failure for unsubscribed tables {}.",
+                        initializingPaths,
+                        error);
                 maybeClearRemovalTombstones();
                 return;
             }

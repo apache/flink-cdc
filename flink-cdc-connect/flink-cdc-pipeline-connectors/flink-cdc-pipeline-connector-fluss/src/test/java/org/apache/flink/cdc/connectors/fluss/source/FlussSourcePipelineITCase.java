@@ -47,6 +47,8 @@ import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableEnvironment;
 import org.apache.flink.table.api.config.ExecutionConfigOptions;
 import org.apache.flink.test.junit5.MiniClusterExtension;
+import org.apache.flink.testutils.junit.SharedObjectsExtension;
+import org.apache.flink.testutils.junit.SharedReference;
 import org.apache.flink.util.CloseableIterator;
 
 import org.apache.fluss.client.Connection;
@@ -103,6 +105,8 @@ public class FlussSourcePipelineITCase {
                     .setClusterConf(initConfig())
                     .setNumOfTabletServers(3)
                     .build();
+
+    @RegisterExtension final SharedObjectsExtension sharedObjects = SharedObjectsExtension.create();
 
     protected TableEnvironment tBatchEnv;
 
@@ -850,10 +854,10 @@ public class FlussSourcePipelineITCase {
         JobClient jobClient =
                 startSubscriptionSource(
                         DATABASE_NAME + "." + subscriptionTable,
-                        "SubscriptionSavepointRemovalPhase1");
+                        "SubscriptionSavepointRemovalPhase1",
+                        tableA,
+                        tableB);
         try {
-            // A1 and B1 must be consumed and checkpointed before the subscription changes.
-            Thread.sleep(Duration.ofSeconds(10).toMillis());
             String savepointPath =
                     jobClient
                             .stopWithSavepoint(
@@ -909,10 +913,10 @@ public class FlussSourcePipelineITCase {
         JobClient jobClient =
                 startSubscriptionSource(
                         DATABASE_NAME + "." + subscriptionTable,
-                        "SubscriptionSavepointReaddPhase1");
+                        "SubscriptionSavepointReaddPhase1",
+                        tableA,
+                        tableB);
         try {
-            // B1 must be consumed and checkpointed before removal distinguishes a new lifecycle.
-            Thread.sleep(Duration.ofSeconds(10).toMillis());
             tBatchEnv
                     .executeSql(
                             String.format(
@@ -987,10 +991,9 @@ public class FlussSourcePipelineITCase {
         JobClient jobClient =
                 startSubscriptionSource(
                         DATABASE_NAME + "." + subscriptionTable,
-                        "SubscriptionSavepointRollbackPhase1");
+                        "SubscriptionSavepointRollbackPhase1",
+                        tableB);
         try {
-            // B1 must be consumed and checkpointed in N before the same-window changes.
-            Thread.sleep(Duration.ofSeconds(10).toMillis());
             String savepointPath =
                     jobClient
                             .stopWithSavepoint(
@@ -1178,8 +1181,10 @@ public class FlussSourcePipelineITCase {
 
     // ======================== Helper methods ========================
 
-    private JobClient startSubscriptionSource(String subscriptionTableFqn, String jobName)
-            throws Exception {
+    private JobClient startSubscriptionSource(
+            String subscriptionTableFqn, String jobName, String... tableNames) throws Exception {
+        SharedReference<List<Event>> events =
+                sharedObjects.add(Collections.synchronizedList(new ArrayList<>()));
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.setParallelism(1);
         env.enableCheckpointing(200);
@@ -1190,9 +1195,32 @@ public class FlussSourcePipelineITCase {
                         "FlussSource",
                         new EventTypeInfo())
                 .uid("fluss-source")
+                .map(
+                        event -> {
+                            events.get().add(event);
+                            return event;
+                        })
+                .returns(new EventTypeInfo())
                 .sinkTo(new DiscardingSink<>())
                 .uid("discard-sink");
-        return env.executeAsync(jobName);
+        JobClient jobClient = env.executeAsync(jobName);
+        try {
+            for (String tableName : tableNames) {
+                awaitEvents(
+                        events.get(),
+                        collected ->
+                                convertToStringList(
+                                                eventsForTable(collected, tableName),
+                                                DataTypes.INT(),
+                                                DataTypes.STRING())
+                                        .contains("+I[1, " + tableName + "1]"),
+                        COLLECT_TIMEOUT);
+            }
+            return jobClient;
+        } catch (Exception | AssertionError e) {
+            jobClient.cancel().get();
+            throw e;
+        }
     }
 
     private RestoredSubscription startRestoredSubscription(

@@ -34,12 +34,16 @@ import org.apache.fluss.metadata.TableBucket;
 import org.apache.fluss.metadata.TablePath;
 import org.apache.fluss.types.RowType;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
+import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Proxy;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
@@ -73,8 +77,10 @@ class FlussSplitReaderTest {
                 new FlussHybridSnapshotLogSplit(PHYSICAL_TABLE_PATH, TABLE_BUCKET, 10L, 100L));
     }
 
-    @Test
-    void testRemoveTablesFinishesLogAndSnapshotSplitsAndClearsTableResources() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void testRemoveTablesFinishesLogAndSnapshotSplitsAndClearsTableResources(boolean closeFails)
+            throws Exception {
         TableBucket logBucket = new TableBucket(TABLE_ID, 0);
         TableBucket currentSnapshotBucket = new TableBucket(TABLE_ID, 1);
         TableBucket queuedSnapshotBucket = new TableBucket(TABLE_ID, 2);
@@ -95,6 +101,9 @@ class FlussSplitReaderTest {
                         (proxy, method, arguments) -> {
                             if (method.getName().equals("close")) {
                                 tableClosed.set(true);
+                                if (closeFails) {
+                                    throw new IOException("Test table close failure");
+                                }
                             }
                             return null;
                         });
@@ -120,6 +129,19 @@ class FlussSplitReaderTest {
                         });
 
         tableResources(reader).put(TABLE_PATH, table);
+        TablePath otherTablePath = TablePath.of("test_db", "other_table");
+        AtomicBoolean otherTableClosed = new AtomicBoolean();
+        tableResources(reader)
+                .put(
+                        otherTablePath,
+                        proxy(
+                                Table.class,
+                                (proxy, method, arguments) -> {
+                                    if (method.getName().equals("close")) {
+                                        otherTableClosed.set(true);
+                                    }
+                                    return null;
+                                }));
         tableRowTypes(reader).put(TABLE_PATH, new RowType(Collections.emptyList()));
         tablePrimaryKeyNames(reader).put(TABLE_PATH, Collections.singletonList("id"));
         tablePartitionKeyNames(reader).put(TABLE_PATH, Collections.singletonList("part"));
@@ -131,7 +153,10 @@ class FlussSplitReaderTest {
         setField(reader, "currentBatchScanner", batchScanner);
         setField(reader, "currentLogScanner", logScanner);
 
-        reader.removeTables(Collections.singleton(TABLE_PATH));
+        Set<TablePath> removedTables = new LinkedHashSet<>();
+        removedTables.add(TABLE_PATH);
+        removedTables.add(otherTablePath);
+        reader.removeTables(removedTables);
 
         RecordsWithSplitIds<FlussSourceRecord> records = reader.fetch();
         assertThat(records.finishedSplits())
@@ -152,6 +177,28 @@ class FlussSplitReaderTest {
         assertThatCode(reader::fetch).doesNotThrowAnyException();
         assertThat(batchScannerClosed).isTrue();
         assertThat(tableClosed).isTrue();
+        assertThat(otherTableClosed).isTrue();
+    }
+
+    @Test
+    void testUnsubscriptionFailurePropagates() throws Exception {
+        FlussSplitReader reader = new FlussSplitReader(new Configuration(), null, null);
+        bucketToSplit(reader)
+                .put(TABLE_BUCKET, new FlussLogSplit(PHYSICAL_TABLE_PATH, TABLE_BUCKET, 10L));
+        IllegalStateException failure = new IllegalStateException("Test unsubscribe failure");
+        setField(
+                reader,
+                "currentLogScanner",
+                proxy(
+                        MultiTableLogScanner.class,
+                        (proxy, method, arguments) -> {
+                            if (method.getName().equals("unsubscribe")) {
+                                throw failure;
+                            }
+                            return null;
+                        }));
+        assertThatThrownBy(() -> reader.removeTables(Collections.singleton(TABLE_PATH)))
+                .isSameAs(failure);
     }
 
     @Test

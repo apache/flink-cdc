@@ -40,4 +40,9 @@ public class TableRemovalAckEvent implements SourceEvent {
     public Map<TablePath, Long> getCompletedRemovalRequests() {
         return completedRemovalRequests;
     }
+
+    @Override
+    public String toString() {
+        return "TableRemovalAckEvent{completedRemovalRequests=" + completedRemovalRequests + '}';
+    }
 }

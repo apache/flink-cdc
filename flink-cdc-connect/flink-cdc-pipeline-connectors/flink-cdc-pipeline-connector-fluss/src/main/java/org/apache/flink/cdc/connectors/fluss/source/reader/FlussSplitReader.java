@@ -450,7 +450,7 @@ public class FlussSplitReader implements SplitReader<FlussSourceRecord, FlussSpl
                 try {
                     table.close();
                 } catch (Exception e) {
-                    throw new IOException("Failed to close table " + tablePath, e);
+                    LOG.warn("Failed to close removed table {}.", tablePath, e);
                 }
             }
             tableRowTypes.remove(tablePath);
