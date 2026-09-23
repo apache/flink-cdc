@@ -37,18 +37,19 @@ import org.apache.flink.cdc.connectors.postgres.testutils.UniqueDatabase;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.configuration.StateRecoveryOptions;
 import org.apache.flink.core.execution.JobClient;
-import org.apache.flink.runtime.checkpoint.CheckpointException;
+import org.apache.flink.core.execution.SavepointFormatType;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.operators.collect.AbstractCollectResultBuffer;
 import org.apache.flink.streaming.api.operators.collect.CheckpointedCollectResultBuffer;
 import org.apache.flink.streaming.api.operators.collect.CollectResultIterator;
+import org.apache.flink.streaming.api.operators.collect.CollectResultIteratorAdapter;
 import org.apache.flink.streaming.api.operators.collect.CollectSinkOperator;
 import org.apache.flink.streaming.api.operators.collect.CollectSinkOperatorFactory;
 import org.apache.flink.streaming.api.operators.collect.CollectStreamSink;
 import org.apache.flink.streaming.util.RestartStrategyUtils;
-import org.apache.flink.util.ExceptionUtils;
 
 import io.debezium.connector.postgresql.connection.PostgresConnection;
 import org.junit.jupiter.api.AfterEach;
@@ -64,9 +65,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
 import static java.lang.String.format;
@@ -138,7 +137,9 @@ class PostgresPipelineNewlyAddedTableITCase extends PostgresTestBase {
                         new EventTypeInfo());
 
         TypeSerializer<Event> serializer =
-                source.getTransformation().getOutputType().createSerializer(env.getConfig());
+                source.getTransformation()
+                        .getOutputType()
+                        .createSerializer(env.getConfig().getSerializerConfig());
         CheckpointedCollectResultBuffer<Event> resultBuffer =
                 new CheckpointedCollectResultBuffer<>(serializer);
         String accumulatorName = "dataStreamCollect_" + UUID.randomUUID();
@@ -263,25 +264,23 @@ class PostgresPipelineNewlyAddedTableITCase extends PostgresTestBase {
     }
 
     private String triggerSavepointWithRetry(JobClient jobClient, String savepointDirectory)
-            throws ExecutionException, InterruptedException {
-        int retryTimes = 0;
-        // retry 600 times, it takes 100 milliseconds per time, at most retry 1 minute
-        while (retryTimes < 600) {
+            throws Exception {
+        int retryCount = 0;
+        final int maxRetries = 600;
+        while (retryCount < maxRetries) {
             try {
-                return jobClient.triggerSavepoint(savepointDirectory).get();
+                return jobClient
+                        .triggerSavepoint(savepointDirectory, SavepointFormatType.DEFAULT)
+                        .get();
             } catch (Exception e) {
-                Optional<CheckpointException> exception =
-                        ExceptionUtils.findThrowable(e, CheckpointException.class);
-                if (exception.isPresent()
-                        && exception.get().getMessage().contains("Checkpoint triggering task")) {
-                    Thread.sleep(100);
-                    retryTimes++;
-                } else {
+                retryCount++;
+                if (retryCount >= maxRetries) {
                     throw e;
                 }
+                Thread.sleep(100);
             }
         }
-        return null;
+        throw new Exception("Failed to trigger savepoint after " + maxRetries + " retries");
     }
 
     private void initialAddressTables(PostgresConnection connection, List<String> addressTables)
@@ -360,13 +359,14 @@ class PostgresPipelineNewlyAddedTableITCase extends PostgresTestBase {
             String accumulatorName) {
         CollectSinkOperatorFactory<T> sinkFactory =
                 new CollectSinkOperatorFactory<>(serializer, accumulatorName);
-        CollectSinkOperator<T> operator = (CollectSinkOperator<T>) sinkFactory.getOperator();
-        CollectResultIterator<T> iterator =
-                new CollectResultIterator<>(
-                        buffer, operator.getOperatorIdFuture(), accumulatorName, 0);
         CollectStreamSink<T> sink = new CollectStreamSink<>(source, sinkFactory);
-        sink.name("Data stream collect sink");
+        String operatorUid = "Data stream collect sink";
+        sink.name(operatorUid).uid(operatorUid);
+        CollectSinkOperator<T> operator = (CollectSinkOperator<T>) sinkFactory.getOperator();
         env.addOperator(sink.getTransformation());
+        CollectResultIterator<T> iterator =
+                new CollectResultIteratorAdapter<>(
+                        buffer, operatorUid, operator, accumulatorName, 0);
         env.registerCollectIterator(iterator);
         return iterator;
     }
@@ -375,7 +375,7 @@ class PostgresPipelineNewlyAddedTableITCase extends PostgresTestBase {
             String finishedSavePointPath, int parallelism) {
         Configuration configuration = new Configuration();
         if (finishedSavePointPath != null) {
-            configuration.setString("execution.savepoint.path", finishedSavePointPath);
+            configuration.set(StateRecoveryOptions.SAVEPOINT_PATH, finishedSavePointPath);
         }
         StreamExecutionEnvironment env =
                 StreamExecutionEnvironment.getExecutionEnvironment(configuration);
