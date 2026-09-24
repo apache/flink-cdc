@@ -105,6 +105,7 @@ public class Db2SourceConfigFactory extends JdbcSourceConfigFactory {
                 chunkKeyColumn,
                 skipSnapshotBackfill,
                 assignUnboundedChunkFirst,
-                releaseSnapshotMetadataEnabled);
+                releaseSnapshotMetadataEnabled,
+                recordsPerSecond);
     }
 }

@@ -59,7 +59,8 @@ public class SqlServerSourceConfig extends JdbcSourceConfig {
             boolean skipSnapshotBackfill,
             boolean scanNewlyAddedTableEnabled,
             boolean assignUnboundedChunkFirst,
-            boolean releaseSnapshotMetadataEnabled) {
+            boolean releaseSnapshotMetadataEnabled,
+            double recordsPerSecond) {
         super(
                 startupOptions,
                 databaseList,
@@ -87,7 +88,8 @@ public class SqlServerSourceConfig extends JdbcSourceConfig {
                 skipSnapshotBackfill,
                 scanNewlyAddedTableEnabled,
                 assignUnboundedChunkFirst,
-                releaseSnapshotMetadataEnabled);
+                releaseSnapshotMetadataEnabled,
+                recordsPerSecond);
     }
 
     @Override

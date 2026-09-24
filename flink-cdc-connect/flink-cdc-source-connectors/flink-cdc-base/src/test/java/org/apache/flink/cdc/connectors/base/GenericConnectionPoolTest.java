@@ -126,7 +126,8 @@ class GenericConnectionPoolTest {
                 Duration.ofSeconds(10),
                 2,
                 3,
-                false);
+                false,
+                -1);
     }
 
     private static class MockConnectionPoolFactory extends JdbcConnectionPoolFactory {
