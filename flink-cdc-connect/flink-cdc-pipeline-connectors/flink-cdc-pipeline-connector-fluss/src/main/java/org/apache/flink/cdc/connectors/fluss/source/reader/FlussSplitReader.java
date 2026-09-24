@@ -57,9 +57,13 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.Set;
 
 /**
  * A {@link SplitReader} implementation for Fluss. It reads change log records from Fluss log
@@ -86,10 +90,11 @@ public class FlussSplitReader implements SplitReader<FlussSourceRecord, FlussSpl
 
     // Bounded (snapshot) split reading
     private final Queue<FlussSplitBase> boundedSplits;
+    private final Set<String> removedSplitIds;
     @Nullable private FlussSplitBase currentBoundedSplit;
     @Nullable private BatchScanner currentBatchScanner;
     @Nullable private Integer currentBatchSchemaId;
-    @Nullable private MultiTableLogScanner currentLogScanner;
+    @Nullable private volatile MultiTableLogScanner currentLogScanner;
     private long snapshotRecordsToSkip;
     private long currentReadRecordsCount;
 
@@ -106,11 +111,18 @@ public class FlussSplitReader implements SplitReader<FlussSourceRecord, FlussSpl
         this.tablePartitionKeyNames = new HashMap<>();
         this.bucketToSplit = new HashMap<>();
         this.boundedSplits = new ArrayDeque<>();
+        this.removedSplitIds = new LinkedHashSet<>();
     }
 
     @Override
     public RecordsWithSplitIds<FlussSourceRecord> fetch() throws IOException {
         RecordsBySplits.Builder<FlussSourceRecord> builder = new RecordsBySplits.Builder<>();
+
+        if (!removedSplitIds.isEmpty()) {
+            removedSplitIds.forEach(builder::addFinishedSplit);
+            removedSplitIds.clear();
+            return builder.build();
+        }
 
         // Priority: read bounded (snapshot) splits first, then log
         checkSnapshotSplitOrStartNext();
@@ -395,8 +407,67 @@ public class FlussSplitReader implements SplitReader<FlussSourceRecord, FlussSpl
         return new RowType(fields);
     }
 
+    /** Removes all reader-side resources for the specified logical tables. */
+    void removeTables(Set<TablePath> tablePaths) throws IOException {
+        Set<TableBucket> removedBuckets = new HashSet<>();
+        for (Iterator<Map.Entry<TableBucket, FlussSplitBase>> iterator =
+                        bucketToSplit.entrySet().iterator();
+                iterator.hasNext(); ) {
+            Map.Entry<TableBucket, FlussSplitBase> entry = iterator.next();
+            FlussSplitBase split = entry.getValue();
+            if (!tablePaths.contains(split.getTablePath())) {
+                continue;
+            }
+            removedBuckets.add(entry.getKey());
+            removedSplitIds.add(split.splitId());
+            iterator.remove();
+            if (currentLogScanner != null) {
+                if (entry.getKey().getPartitionId() == null) {
+                    currentLogScanner.unsubscribe(split.getTablePath(), entry.getKey().getBucket());
+                } else {
+                    currentLogScanner.unsubscribe(
+                            split.getTablePath(),
+                            entry.getKey().getPartitionId(),
+                            entry.getKey().getBucket());
+                }
+            }
+        }
+        for (Iterator<FlussSplitBase> iterator = boundedSplits.iterator(); iterator.hasNext(); ) {
+            FlussSplitBase split = iterator.next();
+            if (tablePaths.contains(split.getTablePath())) {
+                removedSplitIds.add(split.splitId());
+                iterator.remove();
+            }
+        }
+        if (currentBoundedSplit != null
+                && tablePaths.contains(currentBoundedSplit.getTablePath())) {
+            removedSplitIds.add(currentBoundedSplit.splitId());
+            closeCurrentBoundedSplit();
+        }
+        for (TablePath tablePath : tablePaths) {
+            Table table = tables.remove(tablePath);
+            if (table != null) {
+                try {
+                    table.close();
+                } catch (Exception e) {
+                    LOG.warn("Failed to close removed table {}.", tablePath, e);
+                }
+            }
+            tableRowTypes.remove(tablePath);
+            tablePrimaryKeyNames.remove(tablePath);
+            tablePartitionKeyNames.remove(tablePath);
+        }
+        if (!removedBuckets.isEmpty()) {
+            LOG.info("Removed Fluss source table buckets {}.", removedBuckets);
+        }
+    }
+
     @Override
-    public void wakeUp() {}
+    public void wakeUp() {
+        if (currentLogScanner != null) {
+            currentLogScanner.wakeup();
+        }
+    }
 
     @Override
     public void close() throws Exception {

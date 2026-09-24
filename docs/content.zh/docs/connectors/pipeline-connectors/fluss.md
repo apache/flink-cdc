@@ -25,12 +25,32 @@ under the License.
 -->
 
 # Fluss Pipeline 连接器
-Fluss Pipeline 连接器可用作 Pipeline 的 *Data Sink*，将数据写入 [Fluss](https://fluss.apache.org)。本文档介绍如何配置 Fluss Pipeline 连接器。
+Fluss Pipeline 连接器可用作 Pipeline 的 *Data Source* 或 *Data Sink*，从 [Fluss](https://fluss.apache.org)
+读取或向其写入数据。本文档介绍这两种用法的配置。
 
 ## What can the connector do?
 * 自动创建不存在的表 
 * 数据同步
 * Schema 变更同步（lenient 模式）
+* 动态 Source 表订阅
+
+## Fluss Source
+
+以下是动态发现 Fluss 表并读取的最小配置：
+
+```yaml
+source:
+  type: fluss
+  bootstrap.servers: localhost:9123
+  table.discoverer.type: fluss-default
+  table.discoverer.pattern: 'inventory\..*'
+  scan.discovery.interval: 10 s
+  scan.startup.mode: earliest
+```
+
+`table.discoverer.type` 用于选择 Source 的表发现器。`fluss-default` 通过
+`table.discoverer.pattern` 匹配全限定表名；选择其他发现器时，需配置其必需的
+`table.discoverer.*` 参数。
 
 How to create Pipeline
 ----------------
@@ -143,6 +163,20 @@ Pipeline Connector Options
 ## 使用说明
 
 * 支持 Fluss 主键表和日志表。
+
+### 动态 Source 订阅
+
+当 Fluss 作为带表发现器的 Source 使用时，每次成功发现的结果都是当前订阅表的完整权威集合。配置正数
+`scan.discovery.interval` 才会周期性更新订阅。空结果会退订全部已发现的表；发现失败不会修改当前订阅，并会使作业失败。
+
+退订表只会停止并清理 Source 侧 reader，不会删除 Fluss 表，也不会改变 Sink 行为。恢复后的 reader 会先等待新的订阅快照，
+再打开 checkpoint 中恢复的 split，因此当前仍处于退订状态的表不会通过恢复的 split 输出记录。表再次被订阅时会作为新表处理，
+并使用配置的 `scan.startup.mode`。
+
+移除与 checkpoint 状态协同：故障恢复时会从最近一次成功 checkpoint 恢复 Source split 和待移除 tombstone；订阅由发现流程刷新。如果退订和重新订阅都发生在
+相邻两次已完成的 checkpoint 之间，故障回滚时可以表现为从未退订过；若人为恢复到移除 tombstone 之前的 checkpoint，
+而该表当前已重新订阅，则不承诺重新开始一个全新的表生命周期。对于主键表，移除时不会提前释放快照 lease，仍由现有的
+过期和关闭逻辑处理。
 
 * 关于自动建表
   * 没有分区键
