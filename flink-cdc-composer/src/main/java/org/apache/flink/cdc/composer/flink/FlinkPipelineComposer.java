@@ -70,6 +70,30 @@ public class FlinkPipelineComposer implements PipelineComposer {
     public static FlinkPipelineComposer ofRemoteCluster(
             org.apache.flink.configuration.Configuration flinkConfig, List<Path> additionalJars) {
         StreamExecutionEnvironment env = new StreamExecutionEnvironment(flinkConfig);
+        addAdditionalJars(env, additionalJars);
+        return new FlinkPipelineComposer(env, false);
+    }
+
+    public static FlinkPipelineComposer ofApplicationCluster(StreamExecutionEnvironment env) {
+        return new FlinkPipelineComposer(env, false);
+    }
+
+    @VisibleForTesting
+    public static FlinkPipelineComposer ofMiniCluster() {
+        return new FlinkPipelineComposer(
+                StreamExecutionEnvironment.getExecutionEnvironment(), true);
+    }
+
+    public static FlinkPipelineComposer ofMiniCluster(
+            org.apache.flink.configuration.Configuration flinkConfig, List<Path> additionalJars) {
+        StreamExecutionEnvironment env =
+                StreamExecutionEnvironment.getExecutionEnvironment(flinkConfig);
+        addAdditionalJars(env, additionalJars);
+        return new FlinkPipelineComposer(env, true);
+    }
+
+    private static void addAdditionalJars(
+            StreamExecutionEnvironment env, List<Path> additionalJars) {
         additionalJars.forEach(
                 jarPath -> {
                     try {
@@ -84,16 +108,6 @@ public class FlinkPipelineComposer implements PipelineComposer {
                                 e);
                     }
                 });
-        return new FlinkPipelineComposer(env, false);
-    }
-
-    public static FlinkPipelineComposer ofApplicationCluster(StreamExecutionEnvironment env) {
-        return new FlinkPipelineComposer(env, false);
-    }
-
-    public static FlinkPipelineComposer ofMiniCluster() {
-        return new FlinkPipelineComposer(
-                StreamExecutionEnvironment.getExecutionEnvironment(), true);
     }
 
     private FlinkPipelineComposer(StreamExecutionEnvironment env, boolean isBlocking) {
