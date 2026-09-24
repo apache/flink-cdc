@@ -125,7 +125,8 @@ public abstract class PostgresTestBase extends AbstractTestBase {
                         PostgresConnectionPoolFactory.JDBC_URL_PATTERN,
                         container.getHost(),
                         container.getMappedPort(PostgreSQLContainer.POSTGRESQL_PORT),
-                        databaseName);
+                        databaseName,
+                        "test-driver");
         return DriverManager.getConnection(
                 jdbcUrl, container.getUsername(), container.getPassword());
     }

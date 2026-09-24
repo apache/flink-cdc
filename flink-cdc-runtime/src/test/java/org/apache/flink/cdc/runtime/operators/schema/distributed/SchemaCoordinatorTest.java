@@ -35,10 +35,13 @@ import org.apache.flink.cdc.runtime.operators.schema.common.event.GetEvolvedSche
 import org.apache.flink.cdc.runtime.operators.schema.distributed.event.SchemaChangeRequest;
 import org.apache.flink.cdc.runtime.operators.schema.distributed.event.SchemaChangeResponse;
 import org.apache.flink.cdc.runtime.testutils.operators.MockedOperatorCoordinatorContext;
+import org.apache.flink.cdc.runtime.testutils.schema.CollectingMetadataApplier;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
+import org.apache.flink.runtime.operators.coordination.MockOperatorCoordinatorContext;
 import org.apache.flink.runtime.operators.coordination.OperatorCoordinator;
 
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -61,6 +64,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BooleanSupplier;
 
 import static org.apache.flink.cdc.runtime.operators.schema.common.CoordinationResponseUtils.unwrap;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -284,6 +288,196 @@ class SchemaCoordinatorTest {
         }
     }
 
+    @Test
+    void testIgnoreSubtaskResetWithoutOngoingSchemaEvolution() throws Exception {
+        MockedOperatorCoordinatorContext context = createContext();
+        SchemaCoordinator coordinator = createCoordinator(context);
+        coordinator.start();
+
+        try {
+            coordinator.executionAttemptFailed(
+                    0, 0, new RuntimeException("failure outside schema evolution"));
+            coordinator.subtaskReset(0, 123L);
+
+            Assertions.assertThat(context.isJobFailed()).isFalse();
+        } finally {
+            coordinator.close();
+        }
+    }
+
+    @Test
+    void testDoNotEscalateSubtaskResetWhenFailureReasonIsMissing() throws Exception {
+        MockedOperatorCoordinatorContext context = createContext();
+        SchemaCoordinator coordinator = createCoordinator(context);
+        coordinator.start();
+
+        try {
+            CompletableFuture<CoordinationResponse> requestFuture =
+                    coordinator.handleCoordinationRequest(createSchemaChangeRequest());
+            waitUntil(coordinator::isSchemaEvolutionInProgress);
+
+            coordinator.subtaskReset(0, 123L);
+            coordinator.subtaskReset(0, 124L);
+
+            Assertions.assertThat(context.isJobFailed()).isFalse();
+            Assertions.assertThat(requestFuture).isNotDone();
+        } finally {
+            coordinator.close();
+        }
+    }
+
+    @Test
+    void testPreserveFailureFromAnotherSubtaskWithoutEscalatingReset() throws Exception {
+        MockOperatorCoordinatorContext context =
+                new MockOperatorCoordinatorContext(
+                        new OperatorID(), 2, Thread.currentThread().getContextClassLoader());
+        SchemaCoordinator coordinator = createCoordinator(context);
+        coordinator.start();
+
+        try {
+            CompletableFuture<CoordinationResponse> requestFromSubtaskZero =
+                    coordinator.handleCoordinationRequest(createSchemaChangeRequest(0));
+            coordinator.handleCoordinationRequest(createSchemaChangeRequest(1));
+            waitUntil(coordinator::isSchemaEvolutionInProgress);
+
+            RuntimeException originalFailure = new RuntimeException("other subtask failure");
+            coordinator.executionAttemptFailed(1, 0, originalFailure);
+            coordinator.subtaskReset(1, 123L);
+
+            Assertions.assertThat(context.isJobFailed()).isFalse();
+            coordinator.executionAttemptReady(1, 1, null);
+            CompletableFuture<CoordinationResponse> retriedRequest =
+                    coordinator.handleCoordinationRequest(createSchemaChangeRequest(0));
+
+            waitUntil(context::isJobFailed);
+            Assertions.assertThat(context.getJobFailureReason()).isSameAs(originalFailure);
+            Assertions.assertThatThrownBy(() -> retriedRequest.get(5, TimeUnit.SECONDS))
+                    .hasCause(originalFailure);
+            assertUnexpectedEvolvingStatusSuppressed(originalFailure);
+            Assertions.assertThat(requestFromSubtaskZero).isNotDone();
+        } finally {
+            coordinator.close();
+        }
+    }
+
+    @Test
+    void testPreserveOriginalFailureDuringPartialFailover() throws Exception {
+        MockedOperatorCoordinatorContext context = createContext();
+        SchemaCoordinator coordinator = createCoordinator(context);
+        coordinator.start();
+
+        try {
+            SchemaChangeRequest request = createSchemaChangeRequest();
+
+            CompletableFuture<CoordinationResponse> firstRequest =
+                    coordinator.handleCoordinationRequest(request);
+            waitUntil(coordinator::isSchemaEvolutionInProgress);
+
+            RuntimeException originalFailure = new RuntimeException("original task failure");
+            coordinator.executionAttemptFailed(0, 0, originalFailure);
+            coordinator.subtaskReset(0, 123L);
+
+            Assertions.assertThat(context.isJobFailed()).isFalse();
+            coordinator.executionAttemptReady(0, 1, null);
+            CompletableFuture<CoordinationResponse> retriedRequest =
+                    coordinator.handleCoordinationRequest(request);
+
+            waitUntil(context::isJobFailed);
+            Assertions.assertThat(context.getFailureCause()).isSameAs(originalFailure);
+            Assertions.assertThatThrownBy(() -> retriedRequest.get(5, TimeUnit.SECONDS))
+                    .hasCause(originalFailure);
+            assertUnexpectedEvolvingStatusSuppressed(originalFailure);
+            Assertions.assertThat(firstRequest).isNotDone();
+        } finally {
+            coordinator.close();
+        }
+    }
+
+    @Test
+    void testPreserveFirstFailureAcrossMultipleAttempts() throws Exception {
+        MockedOperatorCoordinatorContext context = createContext();
+        SchemaCoordinator coordinator = createCoordinator(context);
+        coordinator.start();
+
+        try {
+            SchemaChangeRequest request = createSchemaChangeRequest();
+
+            CompletableFuture<CoordinationResponse> firstRequest =
+                    coordinator.handleCoordinationRequest(request);
+            waitUntil(coordinator::isSchemaEvolutionInProgress);
+
+            RuntimeException firstFailure = new RuntimeException("first attempt failure");
+            coordinator.executionAttemptFailed(0, 0, firstFailure);
+            coordinator.subtaskReset(0, 123L);
+
+            RuntimeException secondFailure = new RuntimeException("second attempt failure");
+            coordinator.executionAttemptFailed(0, 1, secondFailure);
+            coordinator.subtaskReset(0, 124L);
+
+            coordinator.executionAttemptReady(0, 2, null);
+            CompletableFuture<CoordinationResponse> retriedRequest =
+                    coordinator.handleCoordinationRequest(request);
+
+            waitUntil(context::isJobFailed);
+            Assertions.assertThat(context.getFailureCause()).isSameAs(firstFailure);
+            Assertions.assertThatThrownBy(() -> retriedRequest.get(5, TimeUnit.SECONDS))
+                    .hasCause(firstFailure);
+            assertUnexpectedEvolvingStatusSuppressed(firstFailure);
+            Assertions.assertThat(firstRequest).isNotDone();
+        } finally {
+            coordinator.close();
+        }
+    }
+
+    @Test
+    void testRetainStateErrorWhenOriginalFailureIsMissing() throws Exception {
+        MockedOperatorCoordinatorContext context = createContext();
+        SchemaCoordinator coordinator = createCoordinator(context);
+        coordinator.start();
+
+        try {
+            SchemaChangeRequest request = createSchemaChangeRequest();
+            coordinator.handleCoordinationRequest(request);
+            waitUntil(coordinator::isSchemaEvolutionInProgress);
+
+            coordinator.handleCoordinationRequest(request);
+
+            waitUntil(context::isJobFailed);
+            Assertions.assertThat(context.getFailureCause())
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("Unexpected evolving status: EVOLVING");
+        } finally {
+            coordinator.close();
+        }
+    }
+
+    @Test
+    void testClearStaleFailureWhenStartingNewSchemaEvolution() throws Exception {
+        MockedOperatorCoordinatorContext context = createContext();
+        SchemaCoordinator coordinator = createCoordinator(context);
+        coordinator.start();
+
+        try {
+            RuntimeException staleFailure = new RuntimeException("stale task failure");
+            coordinator.executionAttemptFailed(0, 0, staleFailure);
+
+            SchemaChangeRequest request = createSchemaChangeRequest();
+            coordinator.handleCoordinationRequest(request);
+            waitUntil(coordinator::isSchemaEvolutionInProgress);
+
+            coordinator.handleCoordinationRequest(request);
+
+            waitUntil(context::isJobFailed);
+            Assertions.assertThat(context.getFailureCause())
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("Unexpected evolving status: EVOLVING")
+                    .isNotSameAs(staleFailure);
+            Assertions.assertThat(staleFailure.getSuppressed()).isEmpty();
+        } finally {
+            coordinator.close();
+        }
+    }
+
     private static SchemaCoordinator createCoordinator(
             FailOnceMetadataApplier metadataApplier, Duration rpcTimeout) {
         return createCoordinator(
@@ -325,6 +519,54 @@ class SchemaCoordinatorTest {
                 coordinator.handleCoordinationRequest(new SchemaChangeRequest(0, 0, event));
         coordinator.handleEventFromOperator(0, 0, new FlushSuccessEvent(0, 0));
         return response;
+    }
+
+    private static MockedOperatorCoordinatorContext createContext() {
+        return new MockedOperatorCoordinatorContext(
+                new OperatorID(), Thread.currentThread().getContextClassLoader());
+    }
+
+    private static SchemaCoordinator createCoordinator(OperatorCoordinator.Context context) {
+        return new SchemaCoordinator(
+                "SchemaCoordinator",
+                context,
+                Executors.newSingleThreadExecutor(),
+                new CollectingMetadataApplier(Duration.ZERO),
+                Collections.emptyList(),
+                RouteMode.ALL_MATCH,
+                SchemaChangeBehavior.LENIENT,
+                Duration.ofMinutes(1));
+    }
+
+    private static SchemaChangeRequest createSchemaChangeRequest() {
+        return createSchemaChangeRequest(0);
+    }
+
+    private static SchemaChangeRequest createSchemaChangeRequest(int sinkSubTaskId) {
+        TableId tableId = TableId.tableId("inventory", "products");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT().notNull())
+                        .primaryKey("id")
+                        .build();
+        return new SchemaChangeRequest(0, sinkSubTaskId, new CreateTableEvent(tableId, schema));
+    }
+
+    private static void assertUnexpectedEvolvingStatusSuppressed(Throwable originalFailure) {
+        Assertions.assertThat(originalFailure.getSuppressed()).hasSize(1);
+        Assertions.assertThat(originalFailure.getSuppressed()[0])
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Unexpected evolving status: EVOLVING");
+    }
+
+    private static void waitUntil(BooleanSupplier condition) throws Exception {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (!condition.getAsBoolean()) {
+            if (System.nanoTime() > deadline) {
+                throw new AssertionError("Condition was not met within the timeout.");
+            }
+            Thread.sleep(10);
+        }
     }
 
     private static final class FailOnceMetadataApplier implements MetadataApplier {

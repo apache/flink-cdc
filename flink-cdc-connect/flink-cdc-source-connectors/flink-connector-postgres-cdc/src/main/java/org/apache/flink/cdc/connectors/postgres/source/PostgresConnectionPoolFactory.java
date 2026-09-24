@@ -26,7 +26,12 @@ import io.debezium.jdbc.JdbcConfiguration;
 
 /** A connection pool factory to create pooled Postgres {@link HikariDataSource}. */
 public class PostgresConnectionPoolFactory extends JdbcConnectionPoolFactory {
-    public static final String JDBC_URL_PATTERN = "jdbc:postgresql://%s:%s/%s";
+    public static final String JDBC_URL_PATTERN = "jdbc:postgresql://%s:%s/%s?ApplicationName=%s";
+    private final String applicationName;
+
+    public PostgresConnectionPoolFactory(String applicationName) {
+        this.applicationName = applicationName;
+    }
 
     @Override
     public String getJdbcUrl(JdbcSourceConfig sourceConfig) {
@@ -34,7 +39,7 @@ public class PostgresConnectionPoolFactory extends JdbcConnectionPoolFactory {
         String hostName = sourceConfig.getHostname();
         int port = sourceConfig.getPort();
         String database = sourceConfig.getDatabaseList().get(0);
-        return String.format(JDBC_URL_PATTERN, hostName, port, database);
+        return String.format(JDBC_URL_PATTERN, hostName, port, database, applicationName);
     }
 
     /**

@@ -57,9 +57,11 @@ import org.assertj.core.api.Assumptions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedClass;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import javax.annotation.Nullable;
 
@@ -118,6 +120,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Fail.fail;
 
 /** Spec based transform module IT cases. */
+@ParameterizedClass
+@ValueSource(booleans = {false, true})
 class TransformSpecsITCase {
 
     private static final TableId testTableId = TableId.tableId("foo", "bar", "baz");
@@ -418,6 +422,11 @@ class TransformSpecsITCase {
 
     private final PrintStream standardOut = System.out;
     private final ByteArrayOutputStream outCaptor = new ByteArrayOutputStream();
+    private final boolean asyncTransform;
+
+    TransformSpecsITCase(boolean asyncTransform) {
+        this.asyncTransform = asyncTransform;
+    }
 
     @BeforeEach
     void takeOverStdOut() {
@@ -450,6 +459,12 @@ class TransformSpecsITCase {
                 .as("Test case %s is ignored until we close %s", spec.name, spec.ignore)
                 .isNull();
         FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+        if (asyncTransform) {
+            // Keep the value source in a separate task. Otherwise, a transform failure in the
+            // chained async task may trigger irrelevant exceptions that hide the original
+            // exception.
+            composer.getEnv().disableOperatorChaining();
+        }
 
         Configuration sourceConfig = new Configuration();
         sourceConfig.set(EVENT_SET_ID, CUSTOM_SOURCE_EVENTS);
@@ -483,6 +498,8 @@ class TransformSpecsITCase {
         pipelineConfig.set(
                 PipelineOptions.PIPELINE_TRANSFORM_DECIMAL_PRECISION_MODE,
                 spec.decimalPrecisionMode);
+        pipelineConfig.set(
+                PipelineOptions.PIPELINE_TRANSFORM_ASYNC_EXECUTION_ENABLED, asyncTransform);
         PipelineDef pipelineDef =
                 new PipelineDef(
                         sourceDef,

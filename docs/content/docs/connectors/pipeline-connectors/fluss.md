@@ -26,12 +26,33 @@ under the License.
 
 # Fluss Pipeline Connector
 
-The Fluss Pipeline connector can be used as the *Data Sink* of the pipeline, and write data to [Fluss](https://fluss.apache.org). This document describes how to set up the Fluss Pipeline connector.
+The Fluss Pipeline connector can be used as a *Data Source* or *Data Sink* of the pipeline. It
+reads from or writes data to [Fluss](https://fluss.apache.org). This document describes how to set
+up both roles.
 
 ## What can the connector do?
 * Create table automatically if not exist
 * Data synchronization
 * Schema change synchronization (lenient mode)
+* Dynamic source table subscriptions
+
+## Fluss Source
+
+The following is the minimal configuration for reading dynamically discovered Fluss tables:
+
+```yaml
+source:
+  type: fluss
+  bootstrap.servers: localhost:9123
+  table.discoverer.type: fluss-default
+  table.discoverer.pattern: 'inventory\..*'
+  scan.discovery.interval: 10 s
+  scan.startup.mode: earliest
+```
+
+`table.discoverer.type` selects the source table discoverer. `fluss-default` matches fully
+qualified table names with `table.discoverer.pattern`; configure another discoverer's required
+`table.discoverer.*` options when selecting it instead.
 
 How to create Pipeline
 ----------------
@@ -145,6 +166,27 @@ Pipeline Connector Options
 ## Usage Notes
 
 * Support Fluss primary key table and log table.
+
+### Dynamic source subscriptions
+
+When Fluss is used as a source with a table discoverer, each successful discovery result is the
+authoritative complete subscription set. Set a positive `scan.discovery.interval` to enable
+periodic updates. An empty result unsubscribes every discovered table; a discovery failure does not
+change the current subscription and fails the job.
+
+Unsubscribing a table only stops and cleans up its source-side readers. It does not delete the Fluss
+table or change sink behavior. A restored reader waits for a fresh subscription snapshot before it
+opens restored splits, so a table that remains unsubscribed cannot emit from restored splits after recovery.
+If a table is subscribed again, it is treated as a new table and uses the configured
+`scan.startup.mode`.
+
+Removal is coordinated with checkpoint state: a failure restores source splits and pending removal
+tombstones from the latest completed checkpoint; subscription is refreshed by discovery. A removal
+and re-addition that both occur between the same two completed checkpoints may be rolled back as
+though the removal had not occurred. Restoring a checkpoint from before a removal tombstone while
+the table is currently re-subscribed does not promise a fresh table lifecycle. For primary key
+tables, snapshot leases are not released early during removal;
+their existing expiry and close handling remain in effect.
 
 * For creating table automatically
   * There is no partition key

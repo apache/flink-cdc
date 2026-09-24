@@ -354,12 +354,70 @@ MongoDB 的更改事件记录在消息之前没有更新。因此，我们只能
         For example updating an already updated value in snapshot, or deleting an already deleted entry in snapshot. These replayed change log events should be handled specially.
       </td>
     </tr>
+    <tr>
+      <td>mongodb.ssl.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>连接器是否使用 SSL 连接 MongoDB 实例。</td>
+    </tr>
+    <tr>
+      <td>mongodb.ssl.invalid.hostname.allowed</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>启用 SSL 时，该配置控制是否在连接阶段禁用严格的主机名校验。若设为 <code>true</code>，连接将无法防范中间人攻击。</td>
+    </tr>
+    <tr>
+      <td>mongodb.ssl.keystore</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>密钥库（keystore）文件的位置。该项为可选，可用于客户端与 MongoDB 服务端之间的双向认证。</td>
+    </tr>
+    <tr>
+      <td>mongodb.ssl.keystore.password</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>密钥库文件的密码。该项为可选，仅在配置了 <code>mongodb.ssl.keystore</code> 时才需要。</td>
+    </tr>
+    <tr>
+      <td>mongodb.ssl.keystore.type</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">PKCS12</td>
+      <td>String</td>
+      <td>密钥库文件的类型。该项为可选，仅在配置了 <code>mongodb.ssl.keystore</code> 时才需要。默认为 PKCS12。</td>
+    </tr>
+    <tr>
+      <td>mongodb.ssl.truststore</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>用于校验服务端证书的信任库（truststore）文件的位置。</td>
+    </tr>
+    <tr>
+      <td>mongodb.ssl.truststore.password</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>信任库文件的密码。用于校验信任库的完整性并解锁信任库。</td>
+    </tr>
+    <tr>
+      <td>mongodb.ssl.truststore.type</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">PKCS12</td>
+      <td>String</td>
+      <td>信任库文件的类型。该项为可选，仅在配置了 <code>mongodb.ssl.truststore</code> 时才需要。默认为 PKCS12。</td>
+    </tr>
     </tbody>
 </table>
 </div>
 
 注意: `heartbeat.interval.ms` 强烈建议设置一个大于 0 的适当值 **如果集合更改缓慢**.
 当我们从检查点或保存点恢复 Flink 作业时，心跳事件可以向前推送 `resumeToken`，以避免 `resumeToken` 过期。
+
+注意: `mongodb.ssl.*` 相关配置仅在开启增量快照（`scan.incremental.snapshot.enabled` = `true`）时才会生效，非增量快照的数据源会忽略这些配置。
 
 可用元数据
 ----------------

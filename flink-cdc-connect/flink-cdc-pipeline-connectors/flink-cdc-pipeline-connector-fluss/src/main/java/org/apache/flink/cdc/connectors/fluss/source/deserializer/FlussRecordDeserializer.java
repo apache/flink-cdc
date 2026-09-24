@@ -244,6 +244,16 @@ public class FlussRecordDeserializer implements FlussDeserializer<Event> {
         return Collections.emptyList();
     }
 
+    @Override
+    public void removeState(TablePath tablePath) {
+        ensureCacheInitialized();
+        latestSchemaIdCache.remove(tablePath);
+        latestRowTypeCache.remove(tablePath);
+        latestRecordDataGeneratorCache.remove(tablePath);
+        latestFieldConverterCache.remove(tablePath);
+        restoredCreateTableRowTypeCache.remove(tablePath);
+    }
+
     // -------------------------------------------------------------------------
     //  Schema change inference
     // -------------------------------------------------------------------------

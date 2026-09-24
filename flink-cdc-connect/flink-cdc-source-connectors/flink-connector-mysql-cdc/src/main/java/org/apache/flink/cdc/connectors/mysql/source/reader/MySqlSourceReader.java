@@ -287,6 +287,12 @@ public class MySqlSourceReader<T>
                 // the binlog split is suspended
                 if (binlogSplit.isSuspended()) {
                     suspendedBinlogSplit = binlogSplit;
+                    // A suspended split can be restored directly from a checkpoint after region
+                    // failover. In that case there is no running binlog reader to finish and send
+                    // this request from onSplitFinished(), so request the latest finished split
+                    // count here to resume the update protocol.
+                    context.sendSourceEventToCoordinator(
+                            new LatestFinishedSplitsNumberRequestEvent());
                 } else if (!binlogSplit.isCompletedSplit()) {
                     uncompletedBinlogSplits.put(binlogSplit.splitId(), binlogSplit);
                     requestBinlogSplitMetaIfNeeded(binlogSplit);

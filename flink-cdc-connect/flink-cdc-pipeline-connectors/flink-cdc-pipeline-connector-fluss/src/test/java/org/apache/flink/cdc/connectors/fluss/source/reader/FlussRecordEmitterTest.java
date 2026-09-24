@@ -200,6 +200,34 @@ class FlussRecordEmitterTest {
     }
 
     @Test
+    void testRemovedTableDoesNotEmitOrAdvanceStateUntilItIsReadded() throws Exception {
+        RowType rowType =
+                rowType(field("id", new IntType(false), 1), field("name", new StringType(true), 2));
+        FlussLogSplit split = logSplitWithSchema(1, rowType);
+        FlussLogSplitState splitState = new FlussLogSplitState(split);
+        emitter.applySplit(split);
+        emitter.removeTable(TABLE_PATH);
+
+        emitter.emitRecord(
+                logRecord(1, rowType, GenericRow.of(1, BinaryString.fromString("late")), 100L),
+                output,
+                splitState);
+
+        assertThat(output.getCollectedEvents()).isEmpty();
+        assertThat(splitState.toFlussSplit().getStartingOffset()).isEqualTo(100L);
+
+        emitter.applySplit(split);
+        emitter.emitRecord(
+                logRecord(1, rowType, GenericRow.of(2, BinaryString.fromString("readded")), 100L),
+                output,
+                splitState);
+        assertThat(output.getCollectedEvents())
+                .extracting(Event::getClass)
+                .containsExactly(CreateTableEvent.class, DataChangeEvent.class);
+        assertThat(splitState.toFlussSplit().getStartingOffset()).isEqualTo(101L);
+    }
+
+    @Test
     void testCreateTableEventContainsPrimaryKey() throws Exception {
         RowType rt =
                 rowType(
