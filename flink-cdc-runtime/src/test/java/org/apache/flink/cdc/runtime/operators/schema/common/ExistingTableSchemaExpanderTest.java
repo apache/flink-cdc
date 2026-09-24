@@ -1075,6 +1075,111 @@ class ExistingTableSchemaExpanderTest {
                                         .doesNotContain("after expansion: []"));
     }
 
+    @Test
+    void testPartitionColumnsInsideTargetPrimaryKeyStayCompatible() {
+        // Paimon appends partition columns to the stored primary key, so this is the primary key a
+        // partitioned table created by the pipeline itself reads back with. Expansion must still
+        // run instead of treating the table as key-incompatible.
+        TestingExistingTableSchemaExpansionSupport applier =
+                new TestingExistingTableSchemaExpansionSupport(
+                        Schema.newBuilder()
+                                .physicalColumn("col1", DataTypes.INT())
+                                .physicalColumn("dt", DataTypes.STRING())
+                                .primaryKey("col1", "dt")
+                                .partitionKey("dt")
+                                .build());
+        Schema pipelineSchema =
+                Schema.newBuilder()
+                        .physicalColumn("col1", DataTypes.INT())
+                        .physicalColumn("dt", DataTypes.STRING())
+                        .physicalColumn("note", DataTypes.STRING())
+                        .primaryKey("col1")
+                        .partitionKey("dt")
+                        .build();
+        ExistingTableSchemaExpander expander =
+                new ExistingTableSchemaExpander(
+                        applier,
+                        applier,
+                        SchemaChangeBehavior.LENIENT,
+                        ExistingTableSchemaExpansionMode.TRY_EXPAND);
+
+        expander.handleExistingTableCreation(new CreateTableEvent(TABLE_ID, pipelineSchema));
+        assertThat(applier.appliedEvents).singleElement().isInstanceOf(AddColumnEvent.class);
+    }
+
+    @Test
+    void testSinkSidePartitionKeysDoNotBreakPrimaryKeyComparison() {
+        // Partitioning may also come from the sink's own `partition.key` option, in which case the
+        // pipeline schema carries no partition key at all while the stored primary key still got
+        // the partition column appended.
+        TestingExistingTableSchemaExpansionSupport applier =
+                new TestingExistingTableSchemaExpansionSupport(
+                        Schema.newBuilder()
+                                .physicalColumn("col1", DataTypes.INT())
+                                .physicalColumn("dt", DataTypes.STRING())
+                                .primaryKey("col1", "dt")
+                                .partitionKey("dt")
+                                .build());
+        Schema pipelineSchema =
+                Schema.newBuilder()
+                        .physicalColumn("col1", DataTypes.INT())
+                        .physicalColumn("dt", DataTypes.STRING())
+                        .primaryKey("col1")
+                        .build();
+        ExistingTableSchemaExpander expander =
+                new ExistingTableSchemaExpander(
+                        applier,
+                        applier,
+                        SchemaChangeBehavior.LENIENT,
+                        ExistingTableSchemaExpansionMode.CHECK);
+
+        assertThatCode(
+                        () ->
+                                expander.handleExistingTableCreation(
+                                        new CreateTableEvent(TABLE_ID, pipelineSchema)))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void testCheckFailsOnExtraNonPartitionPrimaryKeyColumn() {
+        // Guards the normalization from becoming "ignore the key": only partition columns are
+        // dropped from the comparison.
+        TestingExistingTableSchemaExpansionSupport applier =
+                new TestingExistingTableSchemaExpansionSupport(
+                        Schema.newBuilder()
+                                .physicalColumn("col1", DataTypes.INT())
+                                .physicalColumn("name", DataTypes.STRING())
+                                .physicalColumn("dt", DataTypes.STRING())
+                                .primaryKey("col1", "name")
+                                .partitionKey("dt")
+                                .build());
+        Schema pipelineSchema =
+                Schema.newBuilder()
+                        .physicalColumn("col1", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .physicalColumn("dt", DataTypes.STRING())
+                        .primaryKey("col1")
+                        .partitionKey("dt")
+                        .build();
+        ExistingTableSchemaExpander expander =
+                new ExistingTableSchemaExpander(
+                        applier,
+                        applier,
+                        SchemaChangeBehavior.LENIENT,
+                        ExistingTableSchemaExpansionMode.CHECK);
+
+        assertThatThrownBy(
+                        () ->
+                                expander.handleExistingTableCreation(
+                                        new CreateTableEvent(TABLE_ID, pipelineSchema)))
+                .isInstanceOfSatisfying(
+                        SchemaEvolveException.class,
+                        e ->
+                                assertThat(e.getExceptionMessage())
+                                        .contains("primary key")
+                                        .contains("partition columns are not counted"));
+    }
+
     private static CreateTableEvent eventWithMissingColumn() {
         return createTableEvent(
                 Column.physicalColumn("id", DataTypes.INT()),

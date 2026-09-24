@@ -639,11 +639,13 @@ public class ExistingTableSchemaExpander {
      * Records primary key and partition key differences between the pipeline schema and the
      * existing target table, and flags the plan as unexpandable when any is found.
      *
-     * <p>Primary keys are always compared because they define how records are merged. Partition
-     * keys are only compared when the pipeline declares them: most sources do not report
-     * partitioning at all, so a two-sided comparison would make externally partitioned target
-     * tables look incompatible. Key names are compared as case-normalized sets, matching what the
-     * connectors do in their own checks, so that an ordering-only difference is not reported.
+     * <p>Primary keys are always compared because they define how records are merged, after
+     * dropping partition columns from both sides so that sinks which store partition columns inside
+     * the primary key are not reported as incompatible. Partition keys are only compared when the
+     * pipeline declares them: most sources do not report partitioning at all, so a two-sided
+     * comparison would make externally partitioned target tables look incompatible. Key names are
+     * compared as case-normalized sets, matching what the connectors do in their own checks, so
+     * that an ordering-only difference is not reported.
      */
     private void validateTableKeys(
             TableId tableId,
@@ -651,15 +653,13 @@ public class ExistingTableSchemaExpander {
             Schema targetSchema,
             boolean caseSensitive,
             ExpansionPlan plan) {
-        Set<String> pipelinePrimaryKeys =
-                normalizeKeyNames(pipelineSchema.primaryKeys(), caseSensitive);
-        Set<String> targetPrimaryKeys =
-                normalizeKeyNames(targetSchema.primaryKeys(), caseSensitive);
-        if (!pipelinePrimaryKeys.equals(targetPrimaryKeys)) {
+        Set<String> pipelineIdentityKeys = identityKeys(pipelineSchema, caseSensitive);
+        Set<String> targetIdentityKeys = identityKeys(targetSchema, caseSensitive);
+        if (!pipelineIdentityKeys.equals(targetIdentityKeys)) {
             plan.keysIncompatible = true;
             plan.incompatibilities.add(
                     String.format(
-                            "existing target table %s has primary key %s but the pipeline schema has primary key %s",
+                            "existing target table %s has primary key %s but the pipeline schema has primary key %s (partition columns are not counted when comparing keys)",
                             tableId, targetSchema.primaryKeys(), pipelineSchema.primaryKeys()));
         }
 
@@ -674,6 +674,23 @@ public class ExistingTableSchemaExpander {
                             "existing target table %s has partition key %s but the pipeline schema has partition key %s",
                             tableId, targetSchema.partitionKeys(), pipelineSchema.partitionKeys()));
         }
+    }
+
+    /**
+     * Returns the identity part of a schema's primary key, that is the primary key without its
+     * partition columns.
+     *
+     * <p>Some sinks fold partition columns into the stored primary key. Paimon appends every
+     * partition column to the primary key when creating a table, so a partitioned table that this
+     * very pipeline created reads back with a strictly larger primary key than the pipeline
+     * declared. Comparing only the remaining identity columns keeps such tables compatible while
+     * still catching a genuinely different key.
+     */
+    private static Set<String> identityKeys(Schema schema, boolean caseSensitive) {
+        Set<String> partitionColumns = normalizeKeyNames(schema.partitionKeys(), caseSensitive);
+        return normalizeKeyNames(schema.primaryKeys(), caseSensitive).stream()
+                .filter(columnName -> !partitionColumns.contains(columnName))
+                .collect(Collectors.toSet());
     }
 
     private static Set<String> normalizeKeyNames(List<String> keyNames, boolean caseSensitive) {

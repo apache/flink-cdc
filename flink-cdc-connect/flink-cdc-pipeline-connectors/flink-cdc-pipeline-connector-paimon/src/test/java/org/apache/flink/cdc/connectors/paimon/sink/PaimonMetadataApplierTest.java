@@ -24,6 +24,7 @@ import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
+import org.apache.flink.cdc.common.pipeline.ExistingTableSchemaExpansionMode;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
@@ -331,6 +332,85 @@ class PaimonMetadataApplierTest {
                             Assertions.assertThat(schema.primaryKeys()).containsExactly("id");
                             Assertions.assertThat(schema.partitionKeys()).isEmpty();
                         });
+    }
+
+    @Test
+    void testExistingTableSchemaExpansionOnPartitionedTable()
+            throws Catalog.DatabaseNotEmptyException,
+                    Catalog.DatabaseNotExistException,
+                    SchemaEvolveException {
+        initialize("filesystem");
+        PaimonMetadataApplier metadataApplier = new PaimonMetadataApplier(catalogOptions);
+        TableId tableId = TableId.parse("test.expand_partitioned_table");
+        metadataApplier.applySchemaChange(
+                new CreateTableEvent(
+                        tableId,
+                        Schema.newBuilder()
+                                .physicalColumn(
+                                        "col1",
+                                        org.apache.flink.cdc.common.types.DataTypes.STRING()
+                                                .notNull())
+                                .physicalColumn(
+                                        "col2", org.apache.flink.cdc.common.types.DataTypes.INT())
+                                .physicalColumn(
+                                        "dt",
+                                        org.apache.flink.cdc.common.types.DataTypes.INT().notNull())
+                                .primaryKey("col1")
+                                .partitionKey("dt")
+                                .build()));
+
+        // Paimon appends partition columns to the stored primary key, so the table reads back with
+        // a strictly larger key than the pipeline declared. Expansion must not mistake that for a
+        // key mismatch.
+        Schema storedSchema = metadataApplier.getExistingTableSchema(tableId).get();
+        assertThat(storedSchema.primaryKeys()).containsExactly("col1", "dt");
+        assertThat(storedSchema.partitionKeys()).containsExactly("dt");
+
+        // A pipeline that declares the same partition key.
+        Schema pipelineSchema =
+                Schema.newBuilder()
+                        .physicalColumn(
+                                "col1",
+                                org.apache.flink.cdc.common.types.DataTypes.STRING().notNull())
+                        .physicalColumn("col2", org.apache.flink.cdc.common.types.DataTypes.INT())
+                        .physicalColumn(
+                                "dt", org.apache.flink.cdc.common.types.DataTypes.INT().notNull())
+                        .physicalColumn("amount", org.apache.flink.cdc.common.types.DataTypes.INT())
+                        .primaryKey("col1")
+                        .partitionKey("dt")
+                        .build();
+        new ExistingTableSchemaExpander(
+                        metadataApplier,
+                        metadataApplier,
+                        SchemaChangeBehavior.LENIENT,
+                        ExistingTableSchemaExpansionMode.EXPAND)
+                .handleExistingTableCreation(new CreateTableEvent(tableId, pipelineSchema));
+        assertThat(metadataApplier.getExistingTableSchema(tableId).get().getColumn("amount"))
+                .isPresent();
+
+        // Partitioning may also come from the sink's own partition configuration, in which case the
+        // pipeline schema carries no partition key at all.
+        Schema pipelineSchemaWithoutPartitionKey =
+                Schema.newBuilder()
+                        .physicalColumn(
+                                "col1",
+                                org.apache.flink.cdc.common.types.DataTypes.STRING().notNull())
+                        .physicalColumn("col2", org.apache.flink.cdc.common.types.DataTypes.INT())
+                        .physicalColumn(
+                                "dt", org.apache.flink.cdc.common.types.DataTypes.INT().notNull())
+                        .physicalColumn(
+                                "note", org.apache.flink.cdc.common.types.DataTypes.STRING())
+                        .primaryKey("col1")
+                        .build();
+        new ExistingTableSchemaExpander(
+                        metadataApplier,
+                        metadataApplier,
+                        SchemaChangeBehavior.LENIENT,
+                        ExistingTableSchemaExpansionMode.EXPAND)
+                .handleExistingTableCreation(
+                        new CreateTableEvent(tableId, pipelineSchemaWithoutPartitionKey));
+        assertThat(metadataApplier.getExistingTableSchema(tableId).get().getColumn("note"))
+                .isPresent();
     }
 
     @ParameterizedTest

@@ -99,7 +99,7 @@ pipeline:
 
 `CHECK` 不执行任何 DDL，因此不受 `include.schema.changes` 和 Sink DDL 能力的影响。它守护初始表状态，**不受 `schema.change.behavior` 控制**（包括 `IGNORE` 和 `EXCEPTION` 也会执行检查）；`TRY_EXPAND` 和 `EXPAND` 在 `schema.change.behavior` 为 `IGNORE` 或 `EXCEPTION` 时跳过框架侧初始处理。注意：`CHECK` 只约束已有目标表的初始处理，后续源端 Schema 变更仍由 `schema.change.behavior` 控制，因此它不是全作业级别的“永不执行 DDL”开关。检查失败时，聚合错误会列出每处差异（表、列、上游类型与目标类型），并附方言无关的 `ALTER TABLE` 修复 SQL 模板，需按目标连接器方言调整并人工确认后执行。
 
-扩展不会重新对齐表键。框架会将 pipeline 的主键与已有目标表的主键进行比较，不一致会作为不兼容项上报：`CHECK` 与 `EXPAND` 会直接使作业失败；`TRY_EXPAND` 则完全跳过扩展（不会对一张主键永远无法匹配的表执行 DDL），并把 `CreateTableEvent` 交由 Sink 处理，因此只打印告警，最终由连接器自身的键校验决定。若希望主键不一致时作业必须失败，请使用 `CHECK` 或 `EXPAND`。分区键只在 pipeline 自身声明时才比较（例如通过 `PARTITION BY` 转换，或源端会上报分区信息）：多数源并不声明，因此外部自行分区的目标表不会被判为不兼容。
+扩展不会重新对齐表键。框架会将 pipeline 的主键与已有目标表的主键进行比较（比较时忽略两侧的分区列，因为 Paimon 等连接器会把分区列存入主键），不一致会作为不兼容项上报：`CHECK` 与 `EXPAND` 会直接使作业失败；`TRY_EXPAND` 则完全跳过扩展（不会对一张主键永远无法匹配的表执行 DDL），并把 `CreateTableEvent` 交由 Sink 处理，因此只打印告警，最终由连接器自身的键校验决定。若希望主键不一致时作业必须失败，请使用 `CHECK` 或 `EXPAND`。分区键只在 pipeline 自身声明时才比较（例如通过 `PARTITION BY` 转换，或源端会上报分区信息）：多数源并不声明，因此外部自行分区的目标表不会被判为不兼容。
 
 `TRY_EXPAND` 仅在确认 connector 支持该能力后吞掉本机制自身的失败：它既不屏蔽 Sink 自身 Schema 处理抛出的错误，也不保证扩展失败后所有上游列都能落入目标表。
 
