@@ -66,6 +66,7 @@ public class Db2Connection extends JdbcConnection {
                     + "WHEN IBMSNAP_OPERATION = 'I' AND (LAG(cdc.IBMSNAP_OPERATION,1,'X') OVER (PARTITION BY cdc.IBMSNAP_COMMITSEQ ORDER BY cdc.IBMSNAP_INTENTSEQ)) ='D' THEN 4 "
                     + "WHEN IBMSNAP_OPERATION = 'D' THEN 1 "
                     + "WHEN IBMSNAP_OPERATION = 'I' THEN 2 "
+                    + "WHEN IBMSNAP_OPERATION = 'U' THEN 5 "
                     + "END "
                     + "OPCODE,"
                     + "cdc.* "
@@ -77,14 +78,13 @@ public class Db2Connection extends JdbcConnection {
                     + CDC_SCHEMA
                     + ".IBMSNAP_REGISTER r left JOIN SYSCAT.TABLES t ON r.SOURCE_OWNER  = t.TABSCHEMA AND r.SOURCE_TABLE = t.TABNAME  WHERE r.SOURCE_OWNER <> ''";
 
-    // No new Tabels 1=0
     private static final String GET_LIST_OF_NEW_CDC_ENABLED_TABLES =
             "select CAST((t.TBSPACEID * 65536 +  t.TABLEID )AS INTEGER ) AS OBJECTID, "
                     + "       CD_OWNER CONCAT '.' CONCAT CD_TABLE, "
                     + "       CD_NEW_SYNCHPOINT, "
                     + "       CD_OLD_SYNCHPOINT "
                     + "from ASNCDC.IBMSNAP_REGISTER  r left JOIN SYSCAT.TABLES t ON r.SOURCE_OWNER  = t.TABSCHEMA AND r.SOURCE_TABLE = t.TABNAME "
-                    + "WHERE r.SOURCE_OWNER <> '' AND 1=0 AND CD_NEW_SYNCHPOINT > ? AND CD_OLD_SYNCHPOINT < ? ";
+                    + "WHERE r.SOURCE_OWNER <> '' AND CD_NEW_SYNCHPOINT > ? AND CD_OLD_SYNCHPOINT < ? ";
 
     private static final String GET_LIST_OF_KEY_COLUMNS =
             "SELECT "
@@ -161,8 +161,7 @@ public class Db2Connection extends JdbcConnection {
     public void getChangesForTable(
             TableId tableId, Lsn fromLsn, Lsn toLsn, ResultSetConsumer consumer)
             throws SQLException {
-        final String query =
-                GET_ALL_CHANGES_FOR_TABLE.replace(STATEMENTS_PLACEHOLDER, cdcNameForTable(tableId));
+        final String query = getAllChangesForTableQuery(cdcNameForTable(tableId));
         prepareQuery(
                 query,
                 statement -> {
@@ -192,9 +191,7 @@ public class Db2Connection extends JdbcConnection {
 
         int idx = 0;
         for (Db2ChangeTable changeTable : changeTables) {
-            final String query =
-                    GET_ALL_CHANGES_FOR_TABLE.replace(
-                            STATEMENTS_PLACEHOLDER, changeTable.getCaptureInstance());
+            final String query = getAllChangesForTableQuery(changeTable.getCaptureInstance());
             queries[idx] = query;
             // If the table was added in the middle of queried buffer we need
             // to adjust from to the first LSN available
@@ -212,6 +209,10 @@ public class Db2Connection extends JdbcConnection {
             idx++;
         }
         prepareQuery(queries, preparers, consumer);
+    }
+
+    static String getAllChangesForTableQuery(String captureInstance) {
+        return GET_ALL_CHANGES_FOR_TABLE.replace(STATEMENTS_PLACEHOLDER, captureInstance);
     }
 
     /**
