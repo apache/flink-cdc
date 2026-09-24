@@ -1126,28 +1126,28 @@ public class MySqlStreamingChangeEventSource
                     (event) -> handleRowsQuery(effectiveOffsetContext, event));
         }
 
-        BinaryLogClient.EventListener eventListener;
+        BinaryLogClient.EventListener listener;
         if (connectorConfig.bufferSizeForStreamingChangeEventSource() == 0) {
-            eventListener = (event) -> handleEvent(partition, effectiveOffsetContext, event);
+            listener = (event) -> handleEvent(partition, effectiveOffsetContext, event);
         } else {
             EventBuffer buffer =
                     new EventBuffer(
                             connectorConfig.bufferSizeForStreamingChangeEventSource(),
                             this,
                             context);
-            eventListener = (event) -> buffer.add(partition, effectiveOffsetContext, event);
+            listener = (event) -> buffer.add(partition, effectiveOffsetContext, event);
         }
 
         ReaderThreadLifecycleListener lifecycleListener =
                 new ReaderThreadLifecycleListener(effectiveOffsetContext);
-        BinaryLogClient.EventListener metricsEventListener =
+        BinaryLogClient.EventListener onEventListener =
                 (event) -> onEvent(effectiveOffsetContext, event);
         BinaryLogClient.EventListener logEventListener =
                 LOGGER.isDebugEnabled() ? (event) -> logEvent(effectiveOffsetContext, event) : null;
 
-        client.registerEventListener(eventListener);
+        client.registerEventListener(listener);
         client.registerLifecycleListener(lifecycleListener);
-        client.registerEventListener(metricsEventListener);
+        client.registerEventListener(onEventListener);
         if (logEventListener != null) {
             client.registerEventListener(logEventListener);
         }
@@ -1285,19 +1285,19 @@ public class MySqlStreamingChangeEventSource
             while (context.isRunning()) {
                 Thread.sleep(100);
             }
-
+        } finally {
             // Unregister listeners to avoid client reuse interference (FLINK-39315)
-            client.unregisterEventListener(eventListener);
-            client.unregisterEventListener(metricsEventListener);
-            client.unregisterLifecycleListener(lifecycleListener);
+            client.unregisterEventListener(listener);
+            client.unregisterEventListener(onEventListener);
             if (logEventListener != null) {
                 client.unregisterEventListener(logEventListener);
             }
-        } finally {
             try {
                 client.disconnect();
             } catch (Exception e) {
                 LOGGER.info("Exception while stopping binary log client", e);
+            } finally {
+                client.unregisterLifecycleListener(lifecycleListener);
             }
         }
     }
