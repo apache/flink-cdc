@@ -370,3 +370,32 @@
     DataChangeEvent{tableId=foo.bar.baz, before=[-1, true, true, true, true, true, true, true, true, true, true, true], after=[], op=DELETE, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, true, true, true, true, true, true, true, true, true, true, true], op=INSERT, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[0, true, true, true, true, true, true, true, true, true, true, true], after=[], op=DELETE, meta=()}
+- do: Flink SQL Predicate Semantics
+  expression-semantics: FLINK_SQL
+  projection: |-
+    id_
+    int_ = 4 AS equals_
+    int_ <> 4 AS not_equals_
+    int_ BETWEEN 3 AND 5 AS between_
+    int_ NOT BETWEEN 3 AND 5 AS not_between_
+    int_ IN (4, CAST(NULL AS INT)) AS in_
+    int_ NOT IN (-4, CAST(NULL AS INT)) AS not_in_
+    string_ LIKE 'From % Lie' AS like_
+    string_ NOT LIKE '%Alice%' AS not_like_
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`equals_` BOOLEAN,`not_equals_` BOOLEAN,`between_` BOOLEAN,`not_between_` BOOLEAN,`in_` BOOLEAN,`not_in_` BOOLEAN,`like_` BOOLEAN,`not_like_` BOOLEAN}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, true, false, true, false, true, null, true, true], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, true, false, true, false, true, null, true, true], after=[-1, false, true, false, true, null, false, false, true], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, false, true, false, true, null, false, false, true], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null, null, null, null, null, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null, null, null, null, null, null, null], after=[], op=DELETE, meta=()}
+- do: Flink SQL Unknown Filter Semantics
+  expression-semantics: FLINK_SQL
+  projection: id_, int_
+  filter: int_ IN (4, CAST(NULL AS INT))
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`int_` INT}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, 4], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, 4], after=[], op=DELETE, meta=()}

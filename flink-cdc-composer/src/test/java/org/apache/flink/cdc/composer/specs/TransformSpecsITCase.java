@@ -35,6 +35,7 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.DecimalPrecisionMode;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
+import org.apache.flink.cdc.common.pipeline.TransformExpressionSemantics;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.variant.Variant;
@@ -365,6 +366,11 @@ class TransformSpecsITCase {
                             DecimalPrecisionMode.valueOf(
                                     specNode.get("decimal-precision-mode").asText().toUpperCase());
                 }
+                if (specNode.has("expression-semantics")) {
+                    spec.expressionSemantics =
+                            TransformExpressionSemantics.valueOf(
+                                    specNode.get("expression-semantics").asText().toUpperCase());
+                }
                 if (specNode.has("projection")) {
                     spec.projectionRules =
                             List.of(
@@ -409,6 +415,8 @@ class TransformSpecsITCase {
         public String ignore;
         public String timeZone = "UTC";
         public DecimalPrecisionMode decimalPrecisionMode = DecimalPrecisionMode.UP_TO_19;
+        public TransformExpressionSemantics expressionSemantics =
+                TransformExpressionSemantics.DEFAULT;
         public List<String> projectionRules = new ArrayList<>();
         public @Nullable String filterRule;
         public @Nullable String primaryKey;
@@ -493,6 +501,8 @@ class TransformSpecsITCase {
         Configuration pipelineConfig = new Configuration();
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
         pipelineConfig.set(PipelineOptions.PIPELINE_LOCAL_TIME_ZONE, spec.timeZone);
+        pipelineConfig.set(
+                PipelineOptions.PIPELINE_TRANSFORM_EXPRESSION_SEMANTICS, spec.expressionSemantics);
         pipelineConfig.set(
                 PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
         pipelineConfig.set(

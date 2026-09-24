@@ -203,5 +203,13 @@ public class PipelineOptions {
                     .withDescription(
                             "The number of worker threads used by each async post-transform task.");
 
+    public static final ConfigOption<TransformExpressionSemantics>
+            PIPELINE_TRANSFORM_EXPRESSION_SEMANTICS =
+                    ConfigOptions.key("transform.expression.semantics")
+                            .enumType(TransformExpressionSemantics.class)
+                            .defaultValue(TransformExpressionSemantics.DEFAULT)
+                            .withDescription(
+                                    "Semantics used to evaluate transform expressions. DEFAULT preserves current behavior, while FLINK_SQL enables Flink SQL-compatible semantics for supported predicates.");
+
     private PipelineOptions() {}
 }

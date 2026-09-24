@@ -19,6 +19,7 @@ package org.apache.flink.cdc.runtime.parser;
 
 import org.apache.flink.api.common.io.ParseException;
 import org.apache.flink.cdc.common.pipeline.DecimalPrecisionMode;
+import org.apache.flink.cdc.common.pipeline.TransformExpressionSemantics;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.common.types.DataType;
@@ -406,7 +407,8 @@ public class TransformParser {
                 columns,
                 udfDescriptors,
                 supportedMetadataColumns,
-                DecimalPrecisionMode.UP_TO_19);
+                DecimalPrecisionMode.UP_TO_19,
+                TransformExpressionSemantics.DEFAULT);
     }
 
     public static List<ProjectionColumn> generateProjectionColumns(
@@ -415,6 +417,37 @@ public class TransformParser {
             List<UserDefinedFunctionDescriptor> udfDescriptors,
             SupportedMetadataColumn[] supportedMetadataColumns,
             DecimalPrecisionMode decimalPrecisionMode) {
+        return generateProjectionColumns(
+                projectionExpression,
+                columns,
+                udfDescriptors,
+                supportedMetadataColumns,
+                decimalPrecisionMode,
+                TransformExpressionSemantics.DEFAULT);
+    }
+
+    public static List<ProjectionColumn> generateProjectionColumns(
+            String projectionExpression,
+            List<Column> columns,
+            List<UserDefinedFunctionDescriptor> udfDescriptors,
+            SupportedMetadataColumn[] supportedMetadataColumns,
+            TransformExpressionSemantics expressionSemantics) {
+        return generateProjectionColumns(
+                projectionExpression,
+                columns,
+                udfDescriptors,
+                supportedMetadataColumns,
+                DecimalPrecisionMode.UP_TO_19,
+                expressionSemantics);
+    }
+
+    public static List<ProjectionColumn> generateProjectionColumns(
+            String projectionExpression,
+            List<Column> columns,
+            List<UserDefinedFunctionDescriptor> udfDescriptors,
+            SupportedMetadataColumn[] supportedMetadataColumns,
+            DecimalPrecisionMode decimalPrecisionMode,
+            TransformExpressionSemantics expressionSemantics) {
         if (isNullOrWhitespaceOnly(projectionExpression)) {
             return new ArrayList<>();
         }
@@ -504,7 +537,8 @@ public class TransformParser {
                                                     columnNameMap,
                                                     udfDescriptors,
                                                     supportedMetadataColumns,
-                                                    decimalPrecisionMode),
+                                                    decimalPrecisionMode,
+                                                    expressionSemantics),
                                             exprNode),
                                     originalColumnNames,
                                     columnNameMap);
@@ -743,7 +777,8 @@ public class TransformParser {
                 udfDescriptors,
                 supportedMetadataColumns,
                 columnNameMap,
-                DecimalPrecisionMode.UP_TO_19);
+                DecimalPrecisionMode.UP_TO_19,
+                TransformExpressionSemantics.DEFAULT);
     }
 
     public static String translateFilterExpressionToJaninoExpression(
@@ -753,6 +788,41 @@ public class TransformParser {
             SupportedMetadataColumn[] supportedMetadataColumns,
             Map<String, String> columnNameMap,
             DecimalPrecisionMode decimalPrecisionMode) {
+        return translateFilterExpressionToJaninoExpression(
+                filterExpression,
+                columns,
+                udfDescriptors,
+                supportedMetadataColumns,
+                columnNameMap,
+                decimalPrecisionMode,
+                TransformExpressionSemantics.DEFAULT);
+    }
+
+    public static String translateFilterExpressionToJaninoExpression(
+            String filterExpression,
+            List<Column> columns,
+            List<UserDefinedFunctionDescriptor> udfDescriptors,
+            SupportedMetadataColumn[] supportedMetadataColumns,
+            Map<String, String> columnNameMap,
+            TransformExpressionSemantics expressionSemantics) {
+        return translateFilterExpressionToJaninoExpression(
+                filterExpression,
+                columns,
+                udfDescriptors,
+                supportedMetadataColumns,
+                columnNameMap,
+                DecimalPrecisionMode.UP_TO_19,
+                expressionSemantics);
+    }
+
+    public static String translateFilterExpressionToJaninoExpression(
+            String filterExpression,
+            List<Column> columns,
+            List<UserDefinedFunctionDescriptor> udfDescriptors,
+            SupportedMetadataColumn[] supportedMetadataColumns,
+            Map<String, String> columnNameMap,
+            DecimalPrecisionMode decimalPrecisionMode,
+            TransformExpressionSemantics expressionSemantics) {
         if (isNullOrWhitespaceOnly(filterExpression)) {
             return "";
         }
@@ -767,7 +837,8 @@ public class TransformParser {
                         columnNameMap,
                         udfDescriptors,
                         supportedMetadataColumns,
-                        decimalPrecisionMode),
+                        decimalPrecisionMode,
+                        expressionSemantics),
                 where);
     }
 
