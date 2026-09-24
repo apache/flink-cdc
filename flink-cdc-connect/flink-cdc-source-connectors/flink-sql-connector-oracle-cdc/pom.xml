@@ -73,6 +73,14 @@ limitations under the License.
                             </artifactSet>
                             <filters>
                                 <filter>
+                                    <artifact>io.debezium:debezium-connector-oracle</artifact>
+                                    <excludes>
+                                        <exclude>
+                                            io/debezium/connector/oracle/logminer/UnistrHelper.class
+                                        </exclude>
+                                    </excludes>
+                                </filter>
+                                <filter>
                                     <artifact>org.apache.kafka:*</artifact>
                                     <excludes>
                                         <exclude>kafka/kafka-version.properties</exclude>
