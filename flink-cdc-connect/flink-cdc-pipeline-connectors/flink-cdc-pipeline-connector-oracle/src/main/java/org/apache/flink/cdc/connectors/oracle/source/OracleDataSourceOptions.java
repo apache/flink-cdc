@@ -130,7 +130,15 @@ public class OracleDataSourceOptions {
                     .defaultValue("initial")
                     .withDescription(
                             "Optional startup mode for oracle CDC consumer, valid enumerations are "
-                                    + "\"initial\", \"latest-offset\", \"snapshot\"");
+                                    + "\"initial\", \"latest-offset\", \"snapshot\", \"specific-offset\"");
+
+    public static final ConfigOption<Long> SCAN_STARTUP_SPECIFIC_OFFSET_SCN =
+            ConfigOptions.key("scan.startup.specific-offset.scn")
+                    .longType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "The specific SCN to start reading redo log from, "
+                                    + "required when 'scan.startup.mode' is 'specific-offset'.");
 
     @Experimental
     public static final ConfigOption<Integer> CHUNK_META_GROUP_SIZE =
