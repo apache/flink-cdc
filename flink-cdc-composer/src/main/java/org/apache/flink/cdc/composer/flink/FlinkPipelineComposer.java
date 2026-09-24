@@ -29,6 +29,7 @@ import org.apache.flink.cdc.common.pipeline.RuntimeExecutionMode;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.common.sink.DefaultDataChangeEventHashFunctionProvider;
+import org.apache.flink.cdc.common.sink.SupportsStreamGraphPostProcessing;
 import org.apache.flink.cdc.common.sink.TableIdHashFunctionProvider;
 import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.composer.PipelineComposer;
@@ -40,6 +41,7 @@ import org.apache.flink.cdc.composer.flink.translator.DataSourceTranslator;
 import org.apache.flink.cdc.composer.flink.translator.OperatorUidGenerator;
 import org.apache.flink.cdc.composer.flink.translator.PartitioningTranslator;
 import org.apache.flink.cdc.composer.flink.translator.SchemaOperatorTranslator;
+import org.apache.flink.cdc.composer.flink.translator.TargetTableDiscovery;
 import org.apache.flink.cdc.composer.flink.translator.TransformTranslator;
 import org.apache.flink.cdc.runtime.partitioning.PartitioningEvent;
 import org.apache.flink.cdc.runtime.serializer.event.EventSerializer;
@@ -108,16 +110,21 @@ public class FlinkPipelineComposer implements PipelineComposer {
         int parallelism = pipelineDefConfig.get(PipelineOptions.PIPELINE_PARALLELISM);
         env.getConfig().setParallelism(parallelism);
 
-        translate(env, pipelineDef);
+        DataSink dataSink = translate(env, pipelineDef);
 
         // Add framework JARs
         addFrameworkJars();
 
         return new FlinkPipelineExecution(
-                env, pipelineDefConfig.get(PipelineOptions.PIPELINE_NAME), isBlocking);
+                env,
+                pipelineDefConfig.get(PipelineOptions.PIPELINE_NAME),
+                isBlocking,
+                dataSink instanceof SupportsStreamGraphPostProcessing
+                        ? (SupportsStreamGraphPostProcessing) dataSink
+                        : null);
     }
 
-    private void translate(StreamExecutionEnvironment env, PipelineDef pipelineDef) {
+    private DataSink translate(StreamExecutionEnvironment env, PipelineDef pipelineDef) {
         Configuration pipelineDefConfig = pipelineDef.getConfig();
         int parallelism = pipelineDefConfig.get(PipelineOptions.PIPELINE_PARALLELISM);
         SchemaChangeBehavior schemaChangeBehavior =
@@ -164,6 +171,7 @@ public class FlinkPipelineComposer implements PipelineComposer {
                 sourceTranslator.createDataSource(pipelineDef.getSource(), pipelineDefConfig, env);
         DataSink dataSink =
                 sinkTranslator.createDataSink(pipelineDef.getSink(), pipelineDefConfig, env);
+        TargetTableDiscovery.initialize(pipelineDef, dataSource, dataSink);
         HashFunctionProvider<DataChangeEvent> sinkDefinedHashFunctionProvider =
                 dataSink.getDataChangeEventHashFunctionProvider(parallelism);
         validatePartitioningStrategyCompatibility(pipelineDef, sinkDefinedHashFunctionProvider);
@@ -283,6 +291,7 @@ public class FlinkPipelineComposer implements PipelineComposer {
                 isBatchMode,
                 schemaOperatorIDGenerator.generate(),
                 operatorUidGenerator);
+        return dataSink;
     }
 
     private void addFrameworkJars() {

@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.pipeline.tests.stage2;
 
 import org.apache.flink.api.common.JobID;
+import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.cdc.common.test.utils.TestUtils;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
@@ -25,11 +26,13 @@ import org.apache.flink.cdc.pipeline.tests.utils.TarballFetcher;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.iceberg.CatalogUtil;
+import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.data.IcebergGenerics;
 import org.apache.iceberg.data.Record;
+import org.apache.iceberg.hadoop.HadoopCatalog;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.types.Types;
 import org.assertj.core.api.Assertions;
@@ -37,6 +40,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedClass;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -50,6 +54,7 @@ import org.testcontainers.lifecycle.Startables;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileAttribute;
+import java.nio.file.attribute.FileTime;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.sql.Connection;
@@ -57,6 +62,7 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -66,8 +72,12 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 
 /** End-to-end tests for mysql cdc to Iceberg pipeline job. */
 @ParameterizedClass
@@ -173,13 +183,7 @@ public class MySqlToIcebergE2eITCase extends PipelineTestEnvironment {
                                 + "  schema.change.behavior: evolve\n"
                                 + "  parallelism: %s",
                         MYSQL_TEST_USER, MYSQL_TEST_PASSWORD, database, warehouse, parallelism);
-        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
-        Path icebergCdcConnector = TestUtils.getResource("iceberg-cdc-pipeline-connector.jar");
-        Path hadoopJar = TestUtils.getResource("flink-shade-hadoop.jar");
-        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
-        JobID jobId =
-                submitPipelineJob(
-                        pipelineJob, mysqlCdcJar, icebergCdcConnector, mysqlDriverJar, hadoopJar);
+        JobID jobId = submitIcebergPipelineJob(pipelineJob);
         waitUntilJobRunning(Duration.ofSeconds(60));
         LOG.info("Pipeline job is running");
         validateSinkResult(
@@ -286,6 +290,208 @@ public class MySqlToIcebergE2eITCase extends PipelineTestEnvironment {
         recordsInSnapshotPhase =
                 recordsInSnapshotPhase.stream().sorted().collect(Collectors.toList());
         validateSinkResult(warehouse, database, "products", recordsInSnapshotPhase);
+    }
+
+    @Test
+    @Timeout(600)
+    void testMaintainsAutomaticallyDiscoveredAndRoutedTables() throws Exception {
+        String database = inventoryDatabase.getDatabaseName();
+        String jdbcUrl =
+                String.format(
+                        "jdbc:mysql://%s:%s/%s",
+                        MYSQL.getHost(), MYSQL.getDatabasePort(), database);
+        TableIdentifier target = TableIdentifier.of("maintenance", "orders");
+        try (Connection connection =
+                        DriverManager.getConnection(jdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
+                Statement statement = connection.createStatement();
+                HadoopCatalog catalog = new HadoopCatalog(new Configuration(), warehouse)) {
+            statement.execute(
+                    "CREATE TABLE maintenance_orders (id INT PRIMARY KEY, name VARCHAR(100))");
+            statement.execute("CREATE TABLE maintenance_ignored LIKE maintenance_orders");
+            statement.execute("INSERT INTO maintenance_orders VALUES (1, 'row-1')");
+            statement.execute("INSERT INTO maintenance_ignored VALUES (999, 'ignored')");
+            assertThat(catalog.tableExists(target)).isFalse();
+
+            String pipelineJob =
+                    String.format(
+                            "source:\n"
+                                    + "  type: mysql\n"
+                                    + "  hostname: mysql\n"
+                                    + "  port: 3306\n"
+                                    + "  username: %s\n"
+                                    + "  password: %s\n"
+                                    + "  tables: %s.maintenance_\\.*\n"
+                                    + "  tables.exclude: %s.maintenance_ignored\n"
+                                    + "  server-id: 5400-5404\n"
+                                    + "  server-time-zone: UTC\n"
+                                    + "\n"
+                                    + "sink:\n"
+                                    + "  type: iceberg\n"
+                                    + "  catalog.properties.type: hadoop\n"
+                                    + "  catalog.properties.warehouse: %s\n"
+                                    + "  sink.maintenance.enabled: true\n"
+                                    + "  sink.maintenance.parallelism: 1\n"
+                                    + "  sink.maintenance.rate-limit: 1 s\n"
+                                    + "  sink.maintenance.lock-check-delay: 1 s\n"
+                                    + "  sink.maintenance.lock.jdbc.uri: 'jdbc:mysql://mysql:3306/%s?useSSL=false&allowPublicKeyRetrieval=true'\n"
+                                    + "  sink.maintenance.lock.jdbc.properties.user: %s\n"
+                                    + "  sink.maintenance.lock.jdbc.properties.password: %s\n"
+                                    + "  sink.maintenance.lock.jdbc.init-lock-tables: true\n"
+                                    + "  sink.maintenance.rewrite-data-files.enabled: true\n"
+                                    + "  sink.maintenance.rewrite-data-files.interval: 2 s\n"
+                                    + "  sink.maintenance.rewrite-data-files.min-input-files: 2\n"
+                                    + "  sink.maintenance.rewrite-data-files.delete-file-threshold: 1\n"
+                                    + "  sink.maintenance.expire-snapshots.enabled: true\n"
+                                    + "  sink.maintenance.expire-snapshots.interval: 2 s\n"
+                                    + "  sink.maintenance.expire-snapshots.max-age: 30 s\n"
+                                    + "  sink.maintenance.expire-snapshots.retain-last: 2\n"
+                                    + "  sink.maintenance.delete-orphan-files.enabled: true\n"
+                                    + "  sink.maintenance.delete-orphan-files.interval: 2 s\n"
+                                    + "  sink.maintenance.delete-orphan-files.min-age: 3 d\n"
+                                    + "\n"
+                                    + "route:\n"
+                                    + "  - source-table: %s.maintenance_orders\n"
+                                    + "    sink-table: maintenance.orders\n"
+                                    + "\n"
+                                    + "pipeline:\n"
+                                    + "  parallelism: %s\n",
+                            MYSQL_TEST_USER,
+                            MYSQL_TEST_PASSWORD,
+                            database,
+                            database,
+                            warehouse,
+                            database,
+                            MYSQL_TEST_USER,
+                            MYSQL_TEST_PASSWORD,
+                            database,
+                            parallelism);
+            JobID jobId = submitIcebergPipelineJob(pipelineJob);
+            assertThat(jobId).isNotNull();
+            waitUntilJobRunning(STARTUP_WAITING_TIMEOUT);
+            await().atMost(EVENT_WAITING_TIMEOUT)
+                    .untilAsserted(
+                            () -> {
+                                assertMaintenanceJobRunning(jobId);
+                                assertThat(catalog.tableExists(target)).isTrue();
+                            });
+            Table table = catalog.loadTable(target);
+            List<String> expected = new ArrayList<>();
+            expected.add("1:row-1");
+            awaitMaintenanceRows(jobId, table, expected);
+            long firstSnapshot = table.currentSnapshot().snapshotId();
+
+            // Wait for each commit so CDC produces multiple files for maintenance to combine.
+            for (int id = 2; id <= 6; id++) {
+                statement.execute(
+                        String.format(
+                                "INSERT INTO maintenance_orders VALUES (%s, 'row-%s')", id, id));
+                expected.add(id + ":row-" + id);
+                awaitMaintenanceRows(jobId, table, expected);
+            }
+
+            runInContainerAsRoot(jobManager, "chmod", "0777", "-R", warehouse);
+            Path oldOrphan =
+                    Path.of(warehouse, "maintenance", "orders", "data", "old-orphan.parquet");
+            Path newOrphan = oldOrphan.resolveSibling("new-orphan.parquet");
+            Files.write(oldOrphan, new byte[] {1});
+            Files.write(newOrphan, new byte[] {2});
+            Files.setLastModifiedTime(
+                    oldOrphan, FileTime.from(Instant.now().minus(Duration.ofDays(10))));
+
+            await().atMost(EVENT_WAITING_TIMEOUT)
+                    .pollInterval(Duration.ofSeconds(1))
+                    .untilAsserted(
+                            () -> {
+                                assertMaintenanceJobRunning(jobId);
+                                table.refresh();
+                                assertThat(table.currentSnapshot().operation())
+                                        .isEqualTo("replace");
+                                assertThat(table.snapshot(firstSnapshot)).isNull();
+                                assertThat(table.snapshots()).hasSize(2);
+                                try (CloseableIterable<FileScanTask> files =
+                                        table.newScan().planFiles()) {
+                                    assertThat(files).hasSize(1);
+                                }
+                                assertThat(oldOrphan).doesNotExist();
+                                assertThat(newOrphan).exists();
+                                assertMaintenanceRows(table, expected);
+                            });
+            long compactedSnapshot = table.currentSnapshot().snapshotId();
+
+            statement.execute("UPDATE maintenance_orders SET name = 'updated' WHERE id = 1");
+            statement.execute("DELETE FROM maintenance_orders WHERE id = 2");
+            statement.execute("INSERT INTO maintenance_orders VALUES (7, 'later')");
+            expected.remove("1:row-1");
+            expected.remove("2:row-2");
+            expected.add("1:updated");
+            expected.add("7:later");
+            awaitMaintenanceRows(jobId, table, expected);
+            await().atMost(EVENT_WAITING_TIMEOUT)
+                    .pollInterval(Duration.ofSeconds(1))
+                    .untilAsserted(
+                            () -> {
+                                assertMaintenanceJobRunning(jobId);
+                                table.refresh();
+                                assertThat(table.currentSnapshot().snapshotId())
+                                        .isNotEqualTo(compactedSnapshot);
+                                assertThat(table.currentSnapshot().operation())
+                                        .isEqualTo("replace");
+                                assertMaintenanceRows(table, expected);
+                                assertThat(newOrphan).exists();
+                            });
+            assertThat(catalog.tableExists(TableIdentifier.of(database, "maintenance_orders")))
+                    .isFalse();
+            assertThat(catalog.tableExists(TableIdentifier.of(database, "maintenance_ignored")))
+                    .isFalse();
+            triggerCheckpointWithRetry(jobId);
+            assertMaintenanceJobRunning(jobId);
+        }
+    }
+
+    private JobID submitIcebergPipelineJob(String pipelineJob) throws Exception {
+        return submitPipelineJob(
+                pipelineJob,
+                TestUtils.getResource("mysql-cdc-pipeline-connector.jar"),
+                TestUtils.getResource("iceberg-cdc-pipeline-connector.jar"),
+                TestUtils.getResource("hadoop-client-api.jar"),
+                TestUtils.getResource("hadoop-client-runtime.jar"),
+                TestUtils.getResource("commons-logging.jar"));
+    }
+
+    private void awaitMaintenanceRows(JobID jobId, Table table, List<String> expected) {
+        await().atMost(EVENT_WAITING_TIMEOUT)
+                .pollInterval(Duration.ofSeconds(1))
+                .untilAsserted(
+                        () -> {
+                            assertMaintenanceJobRunning(jobId);
+                            table.refresh();
+                            assertMaintenanceRows(table, expected);
+                        });
+    }
+
+    private void assertMaintenanceJobRunning(JobID jobId) throws Exception {
+        JobStatus status = getRestClusterClient().getJobStatus(jobId).get(10, TimeUnit.SECONDS);
+        if (status.isGloballyTerminalState()) {
+            throw new IllegalStateException(
+                    "Maintenance pipeline terminated: " + status,
+                    getRestClusterClient()
+                            .requestJobResult(jobId)
+                            .get(10, TimeUnit.SECONDS)
+                            .getSerializedThrowable()
+                            .map(error -> error.deserializeError(getClass().getClassLoader()))
+                            .orElse(null));
+        }
+        assertThat(status).isEqualTo(JobStatus.RUNNING);
+    }
+
+    private static void assertMaintenanceRows(Table table, List<String> expected) throws Exception {
+        List<String> actual = new ArrayList<>();
+        try (CloseableIterable<Record> records = IcebergGenerics.read(table).build()) {
+            for (Record record : records) {
+                actual.add(record.getField("id") + ":" + record.getField("name"));
+            }
+        }
+        assertThat(actual).containsExactlyInAnyOrderElementsOf(expected);
     }
 
     /**
