@@ -411,8 +411,6 @@ Flink SQL> SELECT * FROM orders;
       <td>
         是否尝试解析由 <a href="https://github.com/github/gh-ost">gh-ost</a> 或 <a href="https://docs.percona.com/percona-toolkit/pt-online-schema-change.html">pt-osc</a> 工具生成的表结构变更事件。
         这些工具会在变更表结构时，将变更语句应用到“影子表”之上，并稍后将其与主表进行交换，以达到表结构变更的目的。
-        <br>
-        这是一项实验性功能。
       </td>
     </tr>
     <tr>
