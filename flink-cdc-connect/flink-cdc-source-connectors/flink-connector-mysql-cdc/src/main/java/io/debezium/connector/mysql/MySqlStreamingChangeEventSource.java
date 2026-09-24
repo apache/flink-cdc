@@ -87,18 +87,20 @@ import static io.debezium.util.Strings.isNullOrEmpty;
  * Copied from Debezium project(1.9.8.Final) to fix
  * https://github.com/ververica/flink-cdc-connectors/issues/1944.
  *
- * <p>Line 1432-1443 : Adjust GTID merging logic to support recovering from job which previously
+ * <p>Line 1467-1479 : Adjust GTID merging logic to support recovering from job which previously
  * specifying starting offset on start. Uses {@link GtidUtils#fixOldChannelsGtidSet} for shared
  * EARLIEST/LATEST logic.
  *
- * <p>Line 1444-1452 : Fix LATEST mode GTID merging to avoid replaying pre-checkpoint transactions
+ * <p>Line 1481-1487 : Fix LATEST mode GTID merging to avoid replaying pre-checkpoint transactions
  * when checkpoint GTID has non-contiguous ranges. Delegates to {@link
  * GtidUtils#computeLatestModeGtidSet}. See FLINK-39149.
  *
- * <p>Line 1490 : Add more error details for some exceptions.
+ * <p>Line 1539 : Add more error details for some exceptions.
  *
- * <p>Line 951-963 : Use iterator instead of index-based loop to avoid O(n²) complexity when
+ * <p>Line 972-984 : Use iterator instead of index-based loop to avoid O(n²) complexity when
  * processing LinkedList rows in handleChange method. See FLINK-38846.
+ *
+ * <p>Line 1289-1300 : Unregister listeners to avoid client reuse interference. See FLINK-39315.
  */
 public class MySqlStreamingChangeEventSource
         implements StreamingChangeEventSource<MySqlPartition, MySqlOffsetContext> {
@@ -1135,12 +1137,19 @@ public class MySqlStreamingChangeEventSource
                             context);
             listener = (event) -> buffer.add(partition, effectiveOffsetContext, event);
         }
-        client.registerEventListener(listener);
 
-        client.registerLifecycleListener(new ReaderThreadLifecycleListener(effectiveOffsetContext));
-        client.registerEventListener((event) -> onEvent(effectiveOffsetContext, event));
-        if (LOGGER.isDebugEnabled()) {
-            client.registerEventListener((event) -> logEvent(effectiveOffsetContext, event));
+        ReaderThreadLifecycleListener lifecycleListener =
+                new ReaderThreadLifecycleListener(effectiveOffsetContext);
+        BinaryLogClient.EventListener onEventListener =
+                (event) -> onEvent(effectiveOffsetContext, event);
+        BinaryLogClient.EventListener logEventListener =
+                LOGGER.isDebugEnabled() ? (event) -> logEvent(effectiveOffsetContext, event) : null;
+
+        client.registerEventListener(listener);
+        client.registerLifecycleListener(lifecycleListener);
+        client.registerEventListener(onEventListener);
+        if (logEventListener != null) {
+            client.registerEventListener(logEventListener);
         }
 
         final boolean isGtidModeEnabled = connection.isGtidModeEnabled();
@@ -1277,10 +1286,18 @@ public class MySqlStreamingChangeEventSource
                 Thread.sleep(100);
             }
         } finally {
+            // Unregister listeners to avoid client reuse interference (FLINK-39315)
+            client.unregisterEventListener(listener);
+            client.unregisterEventListener(onEventListener);
+            if (logEventListener != null) {
+                client.unregisterEventListener(logEventListener);
+            }
             try {
                 client.disconnect();
             } catch (Exception e) {
                 LOGGER.info("Exception while stopping binary log client", e);
+            } finally {
+                client.unregisterLifecycleListener(lifecycleListener);
             }
         }
     }
