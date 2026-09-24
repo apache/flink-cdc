@@ -19,6 +19,7 @@ package org.apache.flink.cdc.common.utils;
 
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
+import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.TableId;
@@ -517,5 +518,41 @@ class SchemaUtilsTest {
                                                 .option("Key2", "Value2")
                                                 .build()))
                 .isExactlyInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void testIsSchemaChangeEventRedundantOnCreateTableEvent() {
+        TableId tableId = TableId.parse("default.default.table1");
+        Schema schemaV1 =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT().notNull())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .physicalColumn("age", DataTypes.INT())
+                        .primaryKey("id")
+                        .build();
+        Schema schemaV2 =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT().notNull())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+
+        // Not applied yet when no schema has been recorded
+        Assertions.assertThat(
+                        SchemaUtils.isSchemaChangeEventRedundant(
+                                null, new CreateTableEvent(tableId, schemaV1)))
+                .isFalse();
+
+        // Redundant only when the recorded schema is identical
+        Assertions.assertThat(
+                        SchemaUtils.isSchemaChangeEventRedundant(
+                                schemaV1, new CreateTableEvent(tableId, schemaV1)))
+                .isTrue();
+
+        // A re-snapshot carrying a drifted schema must not be treated as redundant
+        Assertions.assertThat(
+                        SchemaUtils.isSchemaChangeEventRedundant(
+                                schemaV1, new CreateTableEvent(tableId, schemaV2)))
+                .isFalse();
     }
 }
