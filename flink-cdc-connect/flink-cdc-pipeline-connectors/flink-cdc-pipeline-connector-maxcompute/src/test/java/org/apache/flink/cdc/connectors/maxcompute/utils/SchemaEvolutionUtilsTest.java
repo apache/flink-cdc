@@ -128,4 +128,25 @@ class SchemaEvolutionUtilsTest extends EmulatorTestBase {
             fail(e.getMessage());
         }
     }
+
+    @Test
+    void testCreateTableInAppendMode() {
+        try {
+            String appendTable = "SCHEMA_EVOLUTION_APPEND_TABLE";
+            SchemaEvolutionUtils.createTable(
+                    appendOptions,
+                    TableId.tableId(appendTable),
+                    Schema.newBuilder()
+                            .physicalColumn("PK", DataTypes.BIGINT())
+                            .physicalColumn("ID1", DataTypes.BIGINT())
+                            .primaryKey("PK")
+                            .build());
+            // In APPEND mode the table should NOT be created as a transactional table,
+            // so primary key metadata should be absent even though the schema defines one.
+            assertThat(odpsInstance.tables().get(appendTable).getPrimaryKey()).isEmpty();
+            odpsInstance.tables().delete(appendTable, true);
+        } catch (Exception e) {
+            fail(e.getMessage());
+        }
+    }
 }

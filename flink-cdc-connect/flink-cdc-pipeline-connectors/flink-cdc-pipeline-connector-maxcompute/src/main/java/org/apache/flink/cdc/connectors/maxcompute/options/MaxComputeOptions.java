@@ -36,6 +36,7 @@ public class MaxComputeOptions implements Serializable {
     private final String stsToken;
     private final int bucketsNum;
     private final String schemaOperatorUid;
+    private final SinkOperation sinkOperation;
 
     private MaxComputeOptions(Builder builder) {
         this.accessId = builder.accessId;
@@ -48,6 +49,7 @@ public class MaxComputeOptions implements Serializable {
         this.bucketsNum = builder.bucketsNum;
         this.supportSchema = MaxComputeUtils.supportSchema(this);
         this.schemaOperatorUid = builder.schemaOperatorUid;
+        this.sinkOperation = builder.sinkOperation;
     }
 
     public static Builder builder(
@@ -95,6 +97,10 @@ public class MaxComputeOptions implements Serializable {
         return schemaOperatorUid;
     }
 
+    public SinkOperation getSinkOperation() {
+        return sinkOperation;
+    }
+
     /** builder for maxcompute options. */
     public static class Builder {
 
@@ -107,6 +113,7 @@ public class MaxComputeOptions implements Serializable {
         private String stsToken;
         private String schemaOperatorUid;
         private int bucketsNum = 16;
+        private SinkOperation sinkOperation = SinkOperation.UPSERT;
 
         public Builder(String accessId, String accessKey, String endpoint, String project) {
             this.accessId = accessId;
@@ -140,8 +147,46 @@ public class MaxComputeOptions implements Serializable {
             return this;
         }
 
+        public Builder withSinkOperation(SinkOperation sinkOperation) {
+            this.sinkOperation = sinkOperation;
+            return this;
+        }
+
         public MaxComputeOptions build() {
             return new MaxComputeOptions(this);
+        }
+    }
+
+    /** Sink operation mode for MaxCompute: APPEND or UPSERT. */
+    public enum SinkOperation {
+        APPEND("append"),
+        UPSERT("upsert");
+
+        private final String value;
+
+        SinkOperation(String value) {
+            this.value = value;
+        }
+
+        public String getValue() {
+            return value;
+        }
+
+        @Override
+        public String toString() {
+            return value;
+        }
+
+        public static SinkOperation fromValue(String value) {
+            for (SinkOperation op : values()) {
+                if (op.value.equalsIgnoreCase(value)) {
+                    return op;
+                }
+            }
+            throw new IllegalArgumentException(
+                    "Unknown sink operation: '"
+                            + value
+                            + "'. Valid values are: 'upsert', 'append'.");
         }
     }
 }
