@@ -27,6 +27,7 @@ import org.apache.flink.shaded.guava31.com.google.common.util.concurrent.ThreadF
 
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.pipeline.DataChangeEvent;
+import io.debezium.relational.TableId;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
@@ -260,13 +261,23 @@ public class IncrementalSourceScanFetcher implements Fetcher<SourceRecords, Sour
                         lowWatermark));
     }
 
-    private boolean isChangeRecordInChunkRange(SourceRecord record) {
-        if (taskContext.isDataChangeRecord(record)) {
-            return taskContext.isRecordBetween(
-                    record,
-                    currentSnapshotSplit.getSplitStart(),
-                    currentSnapshotSplit.getSplitEnd());
+    @VisibleForTesting
+    boolean isChangeRecordInChunkRange(SourceRecord record) {
+        if (!taskContext.isDataChangeRecord(record)) {
+            return false;
         }
-        return false;
+        // Skip records of other captured tables; their schema may not be loaded yet
+        // and their PKs do not align with this chunk's bounds.
+        TableId recordTableId = taskContext.getTableId(record);
+        if (recordTableId == null || !recordTableId.equals(currentSnapshotSplit.getTableId())) {
+            return false;
+        }
+        return taskContext.isRecordBetween(
+                record, currentSnapshotSplit.getSplitStart(), currentSnapshotSplit.getSplitEnd());
+    }
+
+    @VisibleForTesting
+    void setCurrentSnapshotSplit(SnapshotSplit currentSnapshotSplit) {
+        this.currentSnapshotSplit = currentSnapshotSplit;
     }
 }
