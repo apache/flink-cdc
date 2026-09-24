@@ -190,6 +190,16 @@ public class ExistingTableSchemaExpander {
                     incompatibility);
         }
 
+        // Keys are not repairable by expansion, so issuing the remaining column-level DDL would
+        // mutate a target table that can never serve the pipeline. Delegate the whole event to the
+        // sink instead, which also lets the connector's own key validation have the last word.
+        if (plan.keysIncompatible) {
+            LOG.warn(
+                    "Target table {} has keys differing from the pipeline schema, which expansion cannot realign. Skipping expansion and delegating schema handling to the sink.",
+                    createTableEvent.tableId());
+            return;
+        }
+
         // The plan needs repair DDL, but the sink cannot perform the specific required event type.
         // This is a capability gap, not a transient failure, so delegate to the sink instead of
         // failing the job (mirrors applyPlan's capability checks, which throw for EXPAND mode).
@@ -245,8 +255,8 @@ public class ExistingTableSchemaExpander {
                 || supportsSchemaEvolutionType(SchemaChangeEventType.ALTER_COLUMN_TYPE);
     }
 
-    private SchemaEvolveException incompatibleException(
-            CreateTableEvent createTableEvent, ExpansionPlan plan) {
+    /** Renders every unresolved difference of a plan as a bullet list. */
+    private static String describeDifferences(ExpansionPlan plan) {
         StringBuilder differences = new StringBuilder();
         for (String incompatibility : plan.incompatibilities) {
             differences.append("\n - ").append(incompatibility);
@@ -264,10 +274,15 @@ public class ExistingTableSchemaExpander {
                     .append("\" is narrower than pipeline type ")
                     .append(columnToWiden.getValue());
         }
+        return differences.toString();
+    }
+
+    private SchemaEvolveException incompatibleException(
+            CreateTableEvent createTableEvent, ExpansionPlan plan) {
         String message =
                 String.format(
                         "Existing target table %s cannot contain the pipeline schema:%s",
-                        createTableEvent.tableId(), differences);
+                        createTableEvent.tableId(), describeDifferences(plan));
         String repairSuggestions = renderRepairSuggestions(createTableEvent, plan);
         if (!repairSuggestions.isEmpty()) {
             message +=
@@ -325,6 +340,15 @@ public class ExistingTableSchemaExpander {
         ambiguousColumnNames.addAll(targetColumns.getAmbiguousColumnNames());
         Set<String> keyColumns =
                 getKeyColumns(pipelineSchema, currentTargetSchema, columnNameCaseSensitive);
+        // Table keys are never realignable by ADD_COLUMN or ALTER_COLUMN_TYPE, and a target table
+        // that identifies rows differently silently merges or splits upstream records, so a
+        // mismatch has to be reported instead of looking like "nothing to expand".
+        validateTableKeys(
+                createTableEvent.tableId(),
+                pipelineSchema,
+                currentTargetSchema,
+                columnNameCaseSensitive,
+                plan);
 
         for (Column pipelineColumn : pipelineSchema.getColumns()) {
             String columnName = pipelineColumn.getName();
@@ -339,13 +363,31 @@ public class ExistingTableSchemaExpander {
 
             Column targetColumn = targetColumns.get(columnName);
             if (targetColumn == null) {
-                if (pipelineColumn.isPhysical() && !keyColumns.contains(comparisonName)) {
-                    plan.columnsToAdd.add(pipelineColumn.copy(pipelineColumn.getType().nullable()));
-                } else {
+                if (!pipelineColumn.isPhysical() || keyColumns.contains(comparisonName)) {
                     plan.incompatibilities.add(
                             String.format(
                                     "target table is missing the non-addable column \"%s\"",
                                     columnName));
+                } else {
+                    // A brand new column is never compared against an existing target column, so
+                    // its type still has to be expressible by the target system. Without this
+                    // check the incompatibility would only surface once the derived DDL runs in
+                    // the apply phase, failing the job instead of being handled up front.
+                    Optional<DataType> normalizedNewType =
+                            normalizeType(
+                                    createTableEvent.tableId(),
+                                    columnName,
+                                    pipelineColumn.getType(),
+                                    currentTargetSchema);
+                    if (!normalizedNewType.isPresent()) {
+                        plan.incompatibilities.add(
+                                String.format(
+                                        "pipeline type %s of missing column \"%s\" cannot be normalized to the target type system",
+                                        pipelineColumn.getType(), columnName));
+                    } else {
+                        plan.columnsToAdd.add(
+                                pipelineColumn.copy(pipelineColumn.getType().nullable()));
+                    }
                 }
                 continue;
             }
@@ -485,8 +527,8 @@ public class ExistingTableSchemaExpander {
                 || !remaining.columnsToWiden.isEmpty()) {
             String message =
                     String.format(
-                            "Target table %s still has unresolved differences after expansion: %s",
-                            createTableEvent.tableId(), remaining.incompatibilities);
+                            "Target table %s still has unresolved differences after expansion:%s",
+                            createTableEvent.tableId(), describeDifferences(remaining));
             if (strict) {
                 throw new SchemaEvolveException(createTableEvent, message);
             }
@@ -591,6 +633,53 @@ public class ExistingTableSchemaExpander {
                 .map(columnName -> normalizeColumnName(columnName, caseSensitive))
                 .forEach(keyColumns::add);
         return keyColumns;
+    }
+
+    /**
+     * Records primary key and partition key differences between the pipeline schema and the
+     * existing target table, and flags the plan as unexpandable when any is found.
+     *
+     * <p>Primary keys are always compared because they define how records are merged. Partition
+     * keys are only compared when the pipeline declares them: most sources do not report
+     * partitioning at all, so a two-sided comparison would make externally partitioned target
+     * tables look incompatible. Key names are compared as case-normalized sets, matching what the
+     * connectors do in their own checks, so that an ordering-only difference is not reported.
+     */
+    private void validateTableKeys(
+            TableId tableId,
+            Schema pipelineSchema,
+            Schema targetSchema,
+            boolean caseSensitive,
+            ExpansionPlan plan) {
+        Set<String> pipelinePrimaryKeys =
+                normalizeKeyNames(pipelineSchema.primaryKeys(), caseSensitive);
+        Set<String> targetPrimaryKeys =
+                normalizeKeyNames(targetSchema.primaryKeys(), caseSensitive);
+        if (!pipelinePrimaryKeys.equals(targetPrimaryKeys)) {
+            plan.keysIncompatible = true;
+            plan.incompatibilities.add(
+                    String.format(
+                            "existing target table %s has primary key %s but the pipeline schema has primary key %s",
+                            tableId, targetSchema.primaryKeys(), pipelineSchema.primaryKeys()));
+        }
+
+        Set<String> pipelinePartitionKeys =
+                normalizeKeyNames(pipelineSchema.partitionKeys(), caseSensitive);
+        if (!pipelinePartitionKeys.isEmpty()
+                && !pipelinePartitionKeys.equals(
+                        normalizeKeyNames(targetSchema.partitionKeys(), caseSensitive))) {
+            plan.keysIncompatible = true;
+            plan.incompatibilities.add(
+                    String.format(
+                            "existing target table %s has partition key %s but the pipeline schema has partition key %s",
+                            tableId, targetSchema.partitionKeys(), pipelineSchema.partitionKeys()));
+        }
+    }
+
+    private static Set<String> normalizeKeyNames(List<String> keyNames, boolean caseSensitive) {
+        return keyNames.stream()
+                .map(keyName -> normalizeColumnName(keyName, caseSensitive))
+                .collect(Collectors.toSet());
     }
 
     private static String normalizeColumnName(String columnName, boolean caseSensitive) {
@@ -780,6 +869,7 @@ public class ExistingTableSchemaExpander {
         private final List<Column> columnsToAdd = new ArrayList<>();
         private final Map<String, DataType> columnsToWiden = new LinkedHashMap<>();
         private final List<String> incompatibilities = new ArrayList<>();
+        private boolean keysIncompatible;
         private ColumnIndex targetColumns;
     }
 

@@ -834,6 +834,247 @@ class ExistingTableSchemaExpanderTest {
                         SchemaChangeEventType.ADD_COLUMN, SchemaChangeEventType.ALTER_COLUMN_TYPE);
     }
 
+    @Test
+    void testCheckFailsWhenTargetPrimaryKeysDiffer() {
+        // Same columns and types on both sides; only the primary key differs, which no amount of
+        // ADD_COLUMN / ALTER_COLUMN_TYPE can realign.
+        TestingExistingTableSchemaExpansionSupport applier =
+                new TestingExistingTableSchemaExpansionSupport(
+                        Schema.newBuilder()
+                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("name", DataTypes.STRING())
+                                .primaryKey("name")
+                                .build());
+        Schema pipelineSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+        ExistingTableSchemaExpander expander =
+                new ExistingTableSchemaExpander(
+                        applier,
+                        applier,
+                        SchemaChangeBehavior.LENIENT,
+                        ExistingTableSchemaExpansionMode.CHECK);
+
+        assertThatThrownBy(
+                        () ->
+                                expander.handleExistingTableCreation(
+                                        new CreateTableEvent(TABLE_ID, pipelineSchema)))
+                .isInstanceOfSatisfying(
+                        SchemaEvolveException.class,
+                        e ->
+                                assertThat(e.getExceptionMessage())
+                                        .contains("primary key")
+                                        .contains("[name]")
+                                        .contains("[id]"));
+        assertThat(applier.appliedEvents).isEmpty();
+    }
+
+    @Test
+    void testCheckFailsWhenTargetTableHasNoPrimaryKey() {
+        TestingExistingTableSchemaExpansionSupport applier =
+                new TestingExistingTableSchemaExpansionSupport(
+                        schema(
+                                Column.physicalColumn("id", DataTypes.INT()),
+                                Column.physicalColumn("name", DataTypes.STRING())));
+        Schema pipelineSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+        ExistingTableSchemaExpander expander =
+                new ExistingTableSchemaExpander(
+                        applier,
+                        applier,
+                        SchemaChangeBehavior.LENIENT,
+                        ExistingTableSchemaExpansionMode.CHECK);
+
+        assertThatThrownBy(
+                        () ->
+                                expander.handleExistingTableCreation(
+                                        new CreateTableEvent(TABLE_ID, pipelineSchema)))
+                .isInstanceOfSatisfying(
+                        SchemaEvolveException.class,
+                        e -> assertThat(e.getExceptionMessage()).contains("primary key"));
+        assertThat(applier.appliedEvents).isEmpty();
+    }
+
+    @Test
+    void testUndeclaredPipelinePartitionKeysDoNotMakeTargetIncompatible() {
+        // Most sources never report partitioning, so an externally partitioned target table must
+        // stay compatible as long as the pipeline does not declare its own partition keys.
+        TestingExistingTableSchemaExpansionSupport applier =
+                new TestingExistingTableSchemaExpansionSupport(
+                        Schema.newBuilder()
+                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("region", DataTypes.STRING())
+                                .primaryKey("id")
+                                .partitionKey("region")
+                                .build());
+        Schema pipelineSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("region", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+        ExistingTableSchemaExpander expander =
+                new ExistingTableSchemaExpander(
+                        applier,
+                        applier,
+                        SchemaChangeBehavior.LENIENT,
+                        ExistingTableSchemaExpansionMode.CHECK);
+
+        assertThatCode(
+                        () ->
+                                expander.handleExistingTableCreation(
+                                        new CreateTableEvent(TABLE_ID, pipelineSchema)))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void testCheckFailsWhenDeclaredPartitionKeysDiffer() {
+        TestingExistingTableSchemaExpansionSupport applier =
+                new TestingExistingTableSchemaExpansionSupport(
+                        Schema.newBuilder()
+                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("region", DataTypes.STRING())
+                                .primaryKey("id")
+                                .build());
+        Schema pipelineSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("region", DataTypes.STRING())
+                        .primaryKey("id")
+                        .partitionKey("region")
+                        .build();
+        ExistingTableSchemaExpander expander =
+                new ExistingTableSchemaExpander(
+                        applier,
+                        applier,
+                        SchemaChangeBehavior.LENIENT,
+                        ExistingTableSchemaExpansionMode.CHECK);
+
+        assertThatThrownBy(
+                        () ->
+                                expander.handleExistingTableCreation(
+                                        new CreateTableEvent(TABLE_ID, pipelineSchema)))
+                .isInstanceOfSatisfying(
+                        SchemaEvolveException.class,
+                        e -> assertThat(e.getExceptionMessage()).contains("partition key"));
+    }
+
+    @Test
+    void testTryExpandSkipsDdlWhenKeysAreIncompatible() {
+        // Expanding a table whose keys can never match the pipeline would mutate a target that
+        // cannot serve it, so the whole event is delegated to the sink instead.
+        TestingExistingTableSchemaExpansionSupport applier =
+                new TestingExistingTableSchemaExpansionSupport(
+                        Schema.newBuilder()
+                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("name", DataTypes.STRING())
+                                .primaryKey("name")
+                                .build());
+        Schema pipelineSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .physicalColumn("note", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+        ExistingTableSchemaExpander expander =
+                new ExistingTableSchemaExpander(
+                        applier,
+                        applier,
+                        SchemaChangeBehavior.LENIENT,
+                        ExistingTableSchemaExpansionMode.TRY_EXPAND);
+
+        assertThat(
+                        expander.handleExistingTableCreation(
+                                new CreateTableEvent(TABLE_ID, pipelineSchema)))
+                .isTrue();
+        assertThat(applier.appliedEvents).isEmpty();
+    }
+
+    @Test
+    void testTryExpandDelegatesWhenMissingColumnTypeCannotBeNormalized() {
+        TestingExistingTableSchemaExpansionSupport applier =
+                new TestingExistingTableSchemaExpansionSupport(
+                        schema(Column.physicalColumn("id", DataTypes.INT())));
+        applier.normalizationFailureColumns.add("note");
+        ExistingTableSchemaExpander expander =
+                new ExistingTableSchemaExpander(
+                        applier,
+                        applier,
+                        SchemaChangeBehavior.LENIENT,
+                        ExistingTableSchemaExpansionMode.TRY_EXPAND);
+
+        assertThatCode(
+                        () ->
+                                expander.handleExistingTableCreation(
+                                        createTableEvent(
+                                                Column.physicalColumn("id", DataTypes.INT()),
+                                                Column.physicalColumn("note", DataTypes.STRING()))))
+                .doesNotThrowAnyException();
+        // The unsupported type is caught while probing, so no doomed DDL is ever issued.
+        assertThat(applier.appliedEvents).isEmpty();
+    }
+
+    @Test
+    void testExpandFailsWhenMissingColumnTypeCannotBeNormalized() {
+        TestingExistingTableSchemaExpansionSupport applier =
+                new TestingExistingTableSchemaExpansionSupport(
+                        schema(Column.physicalColumn("id", DataTypes.INT())));
+        applier.normalizationFailureColumns.add("note");
+        ExistingTableSchemaExpander expander =
+                new ExistingTableSchemaExpander(
+                        applier,
+                        applier,
+                        SchemaChangeBehavior.LENIENT,
+                        ExistingTableSchemaExpansionMode.EXPAND);
+
+        assertThatThrownBy(
+                        () ->
+                                expander.handleExistingTableCreation(
+                                        createTableEvent(
+                                                Column.physicalColumn("id", DataTypes.INT()),
+                                                Column.physicalColumn("note", DataTypes.STRING()))))
+                .isInstanceOfSatisfying(
+                        SchemaEvolveException.class,
+                        e ->
+                                assertThat(e.getExceptionMessage())
+                                        .contains("missing column")
+                                        .contains("cannot be normalized"));
+        assertThat(applier.appliedEvents).isEmpty();
+    }
+
+    @Test
+    void testUnresolvedDifferencesAfterExpansionAreListed() {
+        TestingExistingTableSchemaExpansionSupport applier =
+                new TestingExistingTableSchemaExpansionSupport(
+                        schema(Column.physicalColumn("id", DataTypes.INT())));
+        // The sink accepts the DDL but the table never actually changes, so verification has to
+        // report which columns are still missing rather than an empty difference list.
+        applier.updateTargetSchema = false;
+        ExistingTableSchemaExpander expander =
+                new ExistingTableSchemaExpander(
+                        applier,
+                        applier,
+                        SchemaChangeBehavior.LENIENT,
+                        ExistingTableSchemaExpansionMode.EXPAND);
+
+        assertThatThrownBy(() -> expander.handleExistingTableCreation(eventWithMissingColumn()))
+                .isInstanceOfSatisfying(
+                        SchemaEvolveException.class,
+                        e ->
+                                assertThat(e.getExceptionMessage())
+                                        .contains("still has unresolved differences")
+                                        .contains("target table is missing column \"name\"")
+                                        .doesNotContain("after expansion: []"));
+    }
+
     private static CreateTableEvent eventWithMissingColumn() {
         return createTableEvent(
                 Column.physicalColumn("id", DataTypes.INT()),
