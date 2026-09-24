@@ -363,8 +363,12 @@ public class SchemaUtils {
                             return true;
                         },
                         createTableEvent -> {
-                            // It has been applied if such table already exists
-                            return latestSchema.isPresent();
+                            // It has been applied only if an identical schema is recorded. A
+                            // re-snapshot after upstream schema drift (e.g. the table was removed
+                            // from the pipeline and added back) carries a different schema, and
+                            // must not be skipped against the stale recorded one.
+                            return latestSchema.isPresent()
+                                    && latestSchema.get().equals(createTableEvent.getSchema());
                         },
                         dropColumnEvent -> {
                             // It has not been applied if schema does not even exist

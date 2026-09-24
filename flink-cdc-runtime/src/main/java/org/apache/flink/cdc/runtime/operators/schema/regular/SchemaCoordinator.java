@@ -57,6 +57,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -276,12 +277,13 @@ public class SchemaCoordinator extends SchemaRegistry {
                 });
     }
 
-    private List<SchemaChangeEvent> deduceEvolvedSchemaChanges(SchemaChangeEvent event) {
+    private DeducedSchemaChanges deduceEvolvedSchemaChanges(SchemaChangeEvent event) {
         LOG.info("Step 1 - Start deducing evolved schema change for {}", event);
 
         TableId originalTableId = event.tableId();
         List<SchemaChangeEvent> deducedSchemaChangeEvents = new ArrayList<>();
         Set<TableId> originalTables = schemaManager.getAllOriginalTables();
+        boolean recreatedWithAlignment = false;
 
         // First, grab all affected evolved tables.
         Set<TableId> affectedEvolvedTables =
@@ -311,10 +313,30 @@ public class SchemaCoordinator extends SchemaRegistry {
             if (upstreamDependencies.size() == 1) {
                 // If it's a one-by-one routing rule, we can simply forward it to downstream sink.
                 SchemaChangeEvent rawEvent = event.copy(evolvedTableId);
-                rawSchemaChangeEvents.add(rawEvent);
-                LOG.info(
-                        "Step 3.3 - It's an one-by-one routing and could be forwarded as {}.",
-                        rawEvent);
+                if (rawEvent instanceof CreateTableEvent && currentEvolvedSchema != null) {
+                    // The upstream table is being re-snapshotted (e.g. it was removed from the
+                    // pipeline and added back) with a schema that drifted from the recorded one.
+                    // The downstream table might even have been dropped externally, so we
+                    // re-create it if absent, then align it with the target schema.
+                    Schema targetSchema =
+                            deduceRecreatedSchema(
+                                    currentEvolvedSchema,
+                                    ((CreateTableEvent) rawEvent).getSchema());
+                    rawSchemaChangeEvents.add(new CreateTableEvent(evolvedTableId, targetSchema));
+                    rawSchemaChangeEvents.addAll(
+                            SchemaMergingUtils.getSchemaDifference(
+                                    evolvedTableId, currentEvolvedSchema, targetSchema));
+                    recreatedWithAlignment = true;
+                    LOG.info(
+                            "Step 3.3 - It's an one-by-one routing and the table is re-created "
+                                    + "with alignment events {}.",
+                            rawSchemaChangeEvents);
+                } else {
+                    rawSchemaChangeEvents.add(rawEvent);
+                    LOG.info(
+                            "Step 3.3 - It's an one-by-one routing and could be forwarded as {}.",
+                            rawEvent);
+                }
             } else {
                 Set<Schema> toBeMergedSchemas =
                         SchemaDerivator.reverseLookupDependingUpstreamSchemas(
@@ -355,7 +377,50 @@ public class SchemaCoordinator extends SchemaRegistry {
             deducedSchemaChangeEvents.addAll(normalizedEvents);
         }
 
-        return deducedSchemaChangeEvents;
+        if (recreatedWithAlignment) {
+            // Downstream operators only need the resulting CreateTableEvents to refresh their
+            // schema views. The alignment events are applied to the external system only.
+            List<SchemaChangeEvent> eventsToPropagate =
+                    deducedSchemaChangeEvents.stream()
+                            .filter(evt -> evt instanceof CreateTableEvent)
+                            .collect(Collectors.toList());
+            return new DeducedSchemaChanges(deducedSchemaChangeEvents, eventsToPropagate);
+        }
+        return new DeducedSchemaChanges(deducedSchemaChangeEvents, deducedSchemaChangeEvents);
+    }
+
+    /**
+     * Deduces the target evolved schema when an upstream table is re-created with a drifted schema.
+     * Behaviors that never narrow or freeze the downstream schema keep the recorded columns instead
+     * of jumping to the incoming schema.
+     */
+    private Schema deduceRecreatedSchema(Schema currentEvolvedSchema, Schema incomingSchema) {
+        switch (behavior) {
+            case LENIENT:
+                return SchemaMergingUtils.getLeastCommonSchema(
+                        currentEvolvedSchema, incomingSchema);
+            case IGNORE:
+                return currentEvolvedSchema;
+            case EVOLVE:
+            case TRY_EVOLVE:
+            case EXCEPTION:
+            default:
+                return incomingSchema;
+        }
+    }
+
+    /** Schema change events deduced from one upstream schema change event. */
+    private static class DeducedSchemaChanges {
+        // Events to be applied to the external system and the local schema state.
+        private final List<SchemaChangeEvent> toApply;
+        // Events to be propagated back to SchemaOperators and emitted downstream.
+        private final List<SchemaChangeEvent> toPropagate;
+
+        private DeducedSchemaChanges(
+                List<SchemaChangeEvent> toApply, List<SchemaChangeEvent> toPropagate) {
+            this.toApply = toApply;
+            this.toPropagate = toPropagate;
+        }
     }
 
     /** Applies the schema change to the external system. */
@@ -385,13 +450,14 @@ public class SchemaCoordinator extends SchemaRegistry {
         Schema currentUpstreamSchema =
                 schemaManager.getLatestOriginalSchema(originalTableId).orElse(null);
 
-        List<SchemaChangeEvent> deducedSchemaChangeEvents = new ArrayList<>();
+        DeducedSchemaChanges deducedSchemaChanges =
+                new DeducedSchemaChanges(Collections.emptyList(), Collections.emptyList());
 
         // For redundant schema change events (possibly coming from duplicate emitted
         // CreateTableEvents in snapshot stage), we just skip them.
         if (!SchemaUtils.isSchemaChangeEventRedundant(currentUpstreamSchema, originalEvent)) {
             schemaManager.applyOriginalSchemaChange(originalEvent);
-            deducedSchemaChangeEvents.addAll(deduceEvolvedSchemaChanges(originalEvent));
+            deducedSchemaChanges = deduceEvolvedSchemaChanges(originalEvent);
         } else {
             LOG.info(
                     "Schema change event {} is redundant for current schema {}, just skip it.",
@@ -403,15 +469,15 @@ public class SchemaCoordinator extends SchemaRegistry {
                 "All sink subtask have flushed for table {}. Start to apply schema change request: \n\t{}\nthat extracts to:\n\t{}",
                 request.getTableId().toString(),
                 request,
-                deducedSchemaChangeEvents.stream()
+                deducedSchemaChanges.toApply.stream()
                         .map(SchemaChangeEvent::toString)
                         .collect(Collectors.joining("\n\t")));
 
         if (SchemaChangeBehavior.EXCEPTION.equals(behavior)) {
-            if (deducedSchemaChangeEvents.stream()
+            if (deducedSchemaChanges.toApply.stream()
                     .anyMatch(evt -> !(evt instanceof CreateTableEvent))) {
                 SchemaChangeEvent unacceptableSchemaChangeEvent =
-                        deducedSchemaChangeEvents.stream()
+                        deducedSchemaChanges.toApply.stream()
                                 .filter(evt -> !(evt instanceof CreateTableEvent))
                                 .findAny()
                                 .get();
@@ -422,12 +488,17 @@ public class SchemaCoordinator extends SchemaRegistry {
         }
 
         // Tries to apply it to external system
-        List<SchemaChangeEvent> appliedSchemaChangeEvents = new ArrayList<>();
-        for (SchemaChangeEvent event : deducedSchemaChangeEvents) {
+        Set<SchemaChangeEvent> successfullyAppliedEvents =
+                Collections.newSetFromMap(new IdentityHashMap<>());
+        for (SchemaChangeEvent event : deducedSchemaChanges.toApply) {
             if (applyAndUpdateEvolvedSchemaChange(event)) {
-                appliedSchemaChangeEvents.add(event);
+                successfullyAppliedEvents.add(event);
             }
         }
+        List<SchemaChangeEvent> appliedSchemaChangeEvents =
+                deducedSchemaChanges.toPropagate.stream()
+                        .filter(successfullyAppliedEvents::contains)
+                        .collect(Collectors.toList());
 
         Map<TableId, Schema> refreshedEvolvedSchemas = new HashMap<>();
 
@@ -456,7 +527,14 @@ public class SchemaCoordinator extends SchemaRegistry {
     private boolean applyAndUpdateEvolvedSchemaChange(SchemaChangeEvent schemaChangeEvent) {
         try {
             metadataApplier.applySchemaChange(schemaChangeEvent);
-            schemaManager.applyEvolvedSchemaChange(schemaChangeEvent);
+            // Alignment events following a re-created table might already be reflected in the
+            // evolved schema state (the CreateTableEvent emplaces it as a whole). Applying them
+            // again would corrupt the state, so only non-redundant events get recorded.
+            Schema latestEvolvedSchema =
+                    schemaManager.getLatestEvolvedSchema(schemaChangeEvent.tableId()).orElse(null);
+            if (!SchemaUtils.isSchemaChangeEventRedundant(latestEvolvedSchema, schemaChangeEvent)) {
+                schemaManager.applyEvolvedSchemaChange(schemaChangeEvent);
+            }
             LOG.info(
                     "Successfully applied schema change event {} to external system.",
                     schemaChangeEvent);
