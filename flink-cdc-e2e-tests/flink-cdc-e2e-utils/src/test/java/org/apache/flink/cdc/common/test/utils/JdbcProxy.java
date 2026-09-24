@@ -65,9 +65,10 @@ public class JdbcProxy {
                 results.add(StringUtils.join(result, ","));
             }
             Collections.sort(results);
-            Collections.sort(expectedResult);
+            List<String> sortedExpectedResult = new ArrayList<>(expectedResult);
+            Collections.sort(sortedExpectedResult);
             // make it easier to check the result
-            Assertions.assertThat(expectedResult.toArray()).isEqualTo(results.toArray());
+            Assertions.assertThat(results).containsExactlyElementsOf(sortedExpectedResult);
         }
     }
 

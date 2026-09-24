@@ -17,7 +17,6 @@
 
 package org.apache.flink.cdc.connectors.tidb.metrics;
 
-import org.apache.flink.cdc.connectors.tidb.TiKVRichParallelSourceFunction;
 import org.apache.flink.metrics.Gauge;
 import org.apache.flink.metrics.MetricGroup;
 

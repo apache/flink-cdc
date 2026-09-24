@@ -26,12 +26,10 @@ under the License.
 
 # TiDB CDC Connector
 
-The TiDB CDC connector allows for reading snapshot data and incremental data from TiDB database. This document describes how to setup the TiDB CDC connector to run SQL queries against TiDB databases.
+The TiDB CDC connector reads a consistent snapshot of a TiDB table and then continuously reads row-level changes from TiKV CDC. It supports the Flink SQL/Table API and the unified DataStream Source API.
 
 Dependencies
 ------------
-
-In order to setup the TiDB CDC connector, the following table provides dependency information for both projects using a build automation tool (such as Maven or SBT) and SQL Client with SQL JAR bundles.
 
 ### Maven dependency
 
@@ -39,465 +37,201 @@ In order to setup the TiDB CDC connector, the following table provides dependenc
 
 ### SQL Client JAR
 
-```Download link is available only for stable releases.```
+Download [flink-sql-connector-tidb-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-tidb-cdc) and place the JAR in `<FLINK_HOME>/lib/`.
 
-Download [flink-sql-connector-tidb-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-tidb-cdc) and put it under `<FLINK_HOME>/lib/`.
+The download link is available only for released versions. Use a connector artifact built for the Flink major version running the job.
 
-**Note:** Refer to [flink-sql-connector-tidb-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-tidb-cdc), more released versions will be available in the Maven central warehouse.
+Create a TiDB CDC table
+-----------------------
 
-How to create a TiDB CDC table
-----------------
+The connector uses two endpoints:
 
-The TiDB CDC table can be defined as following:
+- `hostname` and `port` connect to the TiDB SQL endpoint for schema discovery and snapshot reads.
+- `pd-addresses` connects to PD and TiKV for incremental change reads.
+
+All addresses advertised by PD and TiKV must be reachable from every TaskManager. Use `host-mapping` when the cluster advertises internal host names or addresses that Flink cannot resolve directly.
 
 ```sql
--- checkpoint every 3000 milliseconds                       
-Flink SQL> SET 'execution.checkpointing.interval' = '3s';   
+-- Checkpoint periodically so source progress can be recovered after a failure.
+SET 'execution.checkpointing.interval' = '3s';
 
--- register a TiDB table 'orders' in Flink SQL
-Flink SQL> CREATE TABLE orders (
-     order_id INT,
-     order_date TIMESTAMP(3),
-     customer_name STRING,
-     price DECIMAL(10, 5),
-     product_id INT,
-     order_status BOOLEAN,
-     PRIMARY KEY(order_id) NOT ENFORCED
-     ) WITH (
-     'connector' = 'tidb-cdc',
-     'tikv.grpc.timeout_in_ms' = '20000', 
-     'pd-addresses' = 'localhost:2379',
-     'database-name' = 'mydb',
-     'table-name' = 'orders'
-);
-  
--- read snapshot and binlogs from orders table
-Flink SQL> SELECT * FROM orders;
-```
-
-Connector Options
-----------------
-
-<div class="highlight">
-<table class="colwidths-auto docutils">
-    <thead>
-      <tr>
-        <th class="text-left" style="width: 10%">Option</th>
-        <th class="text-left" style="width: 8%">Required</th>
-        <th class="text-left" style="width: 7%">Default</th>
-        <th class="text-left" style="width: 10%">Type</th>
-        <th class="text-left" style="width: 65%">Description</th>
-      </tr>
-    </thead>
-    <tbody>
-    <tr>
-      <td>connector</td>
-      <td>required</td>
-      <td style="word-wrap: break-word;">(none)</td>
-      <td>String</td>
-      <td>Specify what connector to use, here should be <code>'tidb-cdc'</code>.</td>
-    </tr>
-    <tr>
-      <td>database-name</td>
-      <td>required</td>
-      <td style="word-wrap: break-word;">(none)</td>
-      <td>String</td>
-      <td>Database name of the TiDB server to monitor.</td>
-    </tr> 
-    <tr>
-      <td>table-name</td>
-      <td>required</td>
-      <td style="word-wrap: break-word;">(none)</td>
-      <td>String</td>
-      <td>Table name of the TiDB database to monitor.</td>
-    </tr>
-    <tr>
-      <td>scan.startup.mode</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">initial</td>
-      <td>String</td>
-      <td>Optional startup mode for TiDB CDC consumer, valid enumerations are "initial" and "latest-offset".</td>
-    </tr>
-    <tr>
-      <td>pd-addresses</td>
-      <td>required</td>
-      <td style="word-wrap: break-word;">(none)</td>
-      <td>String</td>
-      <td>TiKV cluster's PD address.</td>
-    </tr>
-    <tr>
-      <td>host-mapping</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">(none)</td>
-      <td>String</td>
-      <td>TiKV cluster's host-mapping used to configure public IP and intranet IP mapping. When the TiKV cluster is running on the intranet, you can map a set of intranet IPs to public IPs for an outside Flink cluster to access. The format is {Intranet IP1}:{Public IP1};{Intranet IP2}:{Public IP2}, e.g. 192.168.0.2:8.8.8.8;192.168.0.3:9.9.9.9.</td>
-    </tr>
-    <tr>
-      <td>tikv.grpc.timeout_in_ms</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">(none)</td>
-      <td>Long</td>
-      <td>TiKV GRPC timeout in ms.</td>
-    </tr>
-    <tr>
-      <td>tikv.grpc.scan_timeout_in_ms</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">(none)</td>
-      <td>Long</td>
-      <td>TiKV GRPC scan timeout in ms.</td>
-    </tr>
-    <tr>
-      <td>tikv.batch_get_concurrency</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">20</td>
-      <td>Integer</td>
-      <td>TiKV GRPC batch get concurrency.</td>
-    </tr>
-    <tr>
-      <td>tikv.*</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">(none)</td>
-      <td>String</td>
-      <td>Pass-through TiDB client's properties.</td> 
-    </tr>
-    </tbody>
-</table>
-</div>
-
-Available Metadata
-----------------
-
-The following format metadata can be exposed as read-only (VIRTUAL) columns in a table definition.
-
-<table class="colwidths-auto docutils">
-  <thead>
-     <tr>
-       <th class="text-left" style="width: 15%">Key</th>
-       <th class="text-left" style="width: 30%">DataType</th>
-       <th class="text-left" style="width: 55%">Description</th>
-     </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>table_name</td>
-      <td>STRING NOT NULL</td>
-      <td>Name of the table that contain the row.</td>
-    </tr>
-    <tr>
-      <td>database_name</td>
-      <td>STRING NOT NULL</td>
-      <td>Name of the database that contain the row.</td>
-    </tr>
-    <tr>
-      <td>op_ts</td>
-      <td>TIMESTAMP_LTZ(3) NOT NULL</td>
-      <td>It indicates the time that the change was made in the database. <br>If the record is read from snapshot of the table instead of the binlog, the value is always 0.</td>
-    </tr>
-  </tbody>
-</table>
-
-The extended CREATE TABLE example demonstrates the syntax for exposing these metadata fields:
-```sql
-CREATE TABLE products (
-    db_name STRING METADATA FROM 'database_name' VIRTUAL,
-    table_name STRING METADATA  FROM 'table_name' VIRTUAL,
-    operation_ts TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
+CREATE TABLE orders (
     order_id INT,
-    order_date TIMESTAMP(0),
+    order_date TIMESTAMP(3),
     customer_name STRING,
     price DECIMAL(10, 5),
     product_id INT,
     order_status BOOLEAN,
-    PRIMARY KEY(order_id) NOT ENFORCED
+    PRIMARY KEY (order_id) NOT ENFORCED
 ) WITH (
     'connector' = 'tidb-cdc',
-    'tikv.grpc.timeout_in_ms' = '20000',
-    'pd-addresses' = 'localhost:2379',
+    'hostname' = 'tidb.example.com',
+    'port' = '4000',
+    'username' = 'root',
+    'password' = '',
+    'pd-addresses' = 'pd-0.example.com:2379,pd-1.example.com:2379',
     'database-name' = 'mydb',
-    'table-name' = 'orders'
+    'table-name' = 'orders',
+    'scan.startup.mode' = 'initial'
+);
+
+SELECT * FROM orders;
+```
+
+{{< hint info >}}
+Define a primary key in the Flink table whenever the TiDB table has one. The key lets downstream operators and sinks interpret updates and deletes correctly. The connector currently creates one stream reader for one captured table, so use one SQL source table per TiDB table.
+{{< /hint >}}
+
+Connector options
+-----------------
+
+| Option | Required | Default | Type | Description |
+| --- | --- | --- | --- | --- |
+| `connector` | Yes | (none) | String | Must be `tidb-cdc`. |
+| `hostname` | Yes | (none) | String | Host name or IP address of the TiDB SQL endpoint. |
+| `port` | Yes | `4000` | Integer | Port of the TiDB SQL endpoint. Although a default exists in the configuration object, the table factory requires this option. |
+| `username` | Yes | (none) | String | User name used for the TiDB JDBC connection. |
+| `password` | Yes | (none) | String | Password used for the TiDB JDBC connection. Specify an empty string when the account has no password. |
+| `pd-addresses` | Yes | (none) | String | Comma-separated PD endpoints used by the TiKV client. |
+| `database-name` | Yes | (none) | String | Database containing the captured table. |
+| `table-name` | Yes | (none) | String | Name of the single table to capture. |
+| `scan.startup.mode` | No | `initial` | String | Startup mode: `initial`, `snapshot`, `latest-offset`, or `timestamp`. |
+| `scan.startup.timestamp-millis` | Conditional | (none) | Long | Start timestamp in epoch milliseconds. Required when `scan.startup.mode` is `timestamp`. |
+| `server-time-zone` | No | `UTC` | String | TiDB session time zone used when converting temporal values. |
+| `connect.timeout` | No | `30s` | Duration | Maximum time to wait when opening a TiDB JDBC connection. |
+| `connect.max-retries` | No | `3` | Integer | Maximum number of retries when opening a TiDB JDBC connection. |
+| `connection.pool.size` | No | `20` | Integer | JDBC connection pool size. |
+| `jdbc.driver` | No | `com.mysql.cj.jdbc.Driver` | String | JDBC driver class used to connect to TiDB. |
+| `scan.incremental.snapshot.enabled` | No | `true` | Boolean | Accepted by the factory. The current SQL runtime always builds the incremental source and does not branch on this value. |
+| `scan.incremental.snapshot.chunk.size` | No | `8096` | Integer | Approximate number of rows in each snapshot chunk. |
+| `scan.snapshot.fetch.size` | No | `1024` | Integer | Maximum number of rows fetched by one snapshot poll. |
+| `chunk-meta.group.size` | No | `1000` | Integer | Number of chunk metadata entries in each metadata group. |
+| `scan.incremental.snapshot.chunk.key-column` | No | first primary-key column | String | Column used to split snapshot chunks. Use a comparable, evenly distributed column when possible. |
+| `chunk-key.even-distribution.factor.upper-bound` | No | `1000.0` | Double | Upper bound used to decide whether the chunk key is evenly distributed. |
+| `chunk-key.even-distribution.factor.lower-bound` | No | `0.05` | Double | Lower bound used to decide whether the chunk key is evenly distributed. |
+| `host-mapping` | No | (none) | String | Maps advertised TiKV hosts to addresses reachable by Flink. Format: `internalHost:externalHost;internalHost2:externalHost2`. The port is preserved. |
+| `heartbeat.interval.ms` | No | `30s` | Duration | Configured heartbeat interval. The current TiDB SQL runtime stores this value but does not attach a heartbeat setting to the source builder. |
+| `table-list` | No | (none) | String | Accepted by the factory, but the current SQL runtime builds the capture list from `database-name` and `table-name`; do not use it as a replacement for those options. |
+
+Options prefixed with `jdbc.properties.`, `debezium.`, and `tikv.` are accepted during table validation. In the current SQL runtime, arbitrary `tikv.*` keys are not copied into `TiConfiguration` and therefore have no runtime effect.
+
+Startup modes
+-------------
+
+- `initial` (default): reads the table snapshot and then continues from the corresponding change position.
+- `snapshot`: reads the snapshot only and stops before streaming changes.
+- `latest-offset`: skips existing rows and reads changes produced after the source starts.
+- `timestamp`: starts the change stream at `scan.startup.timestamp-millis`.
+
+The source offset is stored in Flink checkpoint state. Enable checkpointing in production so the source can resume from a completed checkpoint after recovery.
+
+Changelog semantics
+-------------------
+
+The table source declares the full Flink changelog mode:
+
+| Row kind | Meaning |
+| --- | --- |
+| `+I` | Insert or snapshot row |
+| `-U` | Value before an update |
+| `+U` | Value after an update |
+| `-D` | Deleted value |
+
+TiKV must provide the old row value for updates and deletes. Downstream sinks that have a primary key can use these events to maintain the latest table state.
+
+Available metadata
+------------------
+
+Metadata columns are read-only and must be declared with `METADATA ... VIRTUAL`.
+
+| Key | Data type | Description |
+| --- | --- | --- |
+| `table_name` | `STRING NOT NULL` | Name of the source table. |
+| `database_name` | `STRING NOT NULL` | Name of the source database. |
+| `op_ts` | `TIMESTAMP_LTZ(3) NOT NULL` | Database change timestamp. Snapshot records use timestamp `0`. |
+| `row_kind` | `STRING NOT NULL` | Flink row kind: `+I`, `-U`, `+U`, or `-D`. |
+
+```sql
+CREATE TABLE products (
+    db_name STRING METADATA FROM 'database_name' VIRTUAL,
+    source_table STRING METADATA FROM 'table_name' VIRTUAL,
+    operation_ts TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
+    change_kind STRING METADATA FROM 'row_kind' VIRTUAL,
+    id BIGINT,
+    name STRING,
+    weight DECIMAL(10, 3),
+    PRIMARY KEY (id) NOT ENFORCED
+) WITH (
+    'connector' = 'tidb-cdc',
+    'hostname' = 'tidb.example.com',
+    'port' = '4000',
+    'username' = 'root',
+    'password' = '',
+    'pd-addresses' = 'pd.example.com:2379',
+    'database-name' = 'inventory',
+    'table-name' = 'products'
 );
 ```
 
-Features
---------
-### Exactly-Once Processing
+DataStream Source
+-----------------
 
-The TiDB CDC connector is a Flink Source connector which will read database snapshot first and then continues to read change events with **exactly-once processing** even failures happen.
-
-### Startup Reading Position
-
-The config option `scan.startup.mode` specifies the startup mode for TiDB CDC consumer. The valid enumerations are:
-
-- `initial` (default): Takes a snapshot of structure and data of captured tables; useful if you want fetch a complete representation of the data from the captured tables.
-- `latest-offset`: Takes a snapshot of the structure of captured tables only; useful if only changes happening from now onwards should be fetched.
-
-### Multi Thread Reading
-
-The TiDB CDC source can work in parallel reading, because there is multiple tasks can receive change events.
-
-### DataStream Source
-
-The TiDB CDC connector can also be a DataStream source. You can create a SourceFunction as the following shows:
-
-### DataStream Source
+Use `TiDBSourceBuilder.TiDBIncrementalSource` with `StreamExecutionEnvironment#fromSource`. The legacy `SourceFunction`-based `TiDBSource` API shown in older documentation is not part of the current connector.
 
 ```java
-import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
-import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.common.eventtime.WatermarkStrategy;
+import org.apache.flink.cdc.connectors.base.source.jdbc.JdbcIncrementalSource;
+import org.apache.flink.cdc.connectors.tidb.source.TiDBSourceBuilder;
+import org.apache.flink.cdc.debezium.JsonDebeziumDeserializationSchema;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.api.functions.source.SourceFunction;
-import org.apache.flink.util.Collector;
 
-import org.apache.flink.cdc.connectors.tidb.TDBSourceOptions;
-import org.apache.flink.cdc.connectors.tidb.TiDBSource;
-import org.apache.flink.cdc.connectors.tidb.TiKVChangeEventDeserializationSchema;
-import org.apache.flink.cdc.connectors.tidb.TiKVSnapshotEventDeserializationSchema;
-import org.tikv.kvproto.Cdcpb;
-import org.tikv.kvproto.Kvrpcpb;
-
-import java.util.HashMap;
-
-public class TiDBSourceExample {
-
-    public static void main(String[] args) throws Exception {
-
-        SourceFunction<String> tidbSource =
-            TiDBSource.<String>builder()
-                .database("mydb") // set captured database
-                .tableName("products") // set captured table
-                .tiConf(
-                    TDBSourceOptions.getTiConfiguration(
-                        "localhost:2399", new HashMap<>()))
-                .snapshotEventDeserializer(
-                    new TiKVSnapshotEventDeserializationSchema<String>() {
-                        @Override
-                        public void deserialize(
-                            Kvrpcpb.KvPair record, Collector<String> out)
-                            throws Exception {
-                            out.collect(record.toString());
-                        }
-
-                        @Override
-                        public TypeInformation<String> getProducedType() {
-                            return BasicTypeInfo.STRING_TYPE_INFO;
-                        }
-                    })
-                .changeEventDeserializer(
-                    new TiKVChangeEventDeserializationSchema<String>() {
-                        @Override
-                        public void deserialize(
-                            Cdcpb.Event.Row record, Collector<String> out)
-                            throws Exception {
-                            out.collect(record.toString());
-                        }
-
-                        @Override
-                        public TypeInformation<String> getProducedType() {
-                            return BasicTypeInfo.STRING_TYPE_INFO;
-                        }
-                    })
+JdbcIncrementalSource<String> source =
+        TiDBSourceBuilder.TiDBIncrementalSource.<String>builder()
+                .hostname("tidb.example.com")
+                .port(4000)
+                .username("root")
+                .password("")
+                .pdAddresses("pd.example.com:2379")
+                .databaseList("inventory")
+                .tableList("inventory.products")
+                .deserializer(new JsonDebeziumDeserializationSchema())
                 .build();
 
-        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-
-        // enable checkpoint
-        env.enableCheckpointing(3000);
-        env.addSource(tidbSource).print().setParallelism(1);
-
-        env.execute("Print TiDB Snapshot + Binlog");
-    }
-}
+StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+env.enableCheckpointing(3000L);
+env.fromSource(source, WatermarkStrategy.noWatermarks(), "TiDB CDC")
+        .print();
+env.execute("TiDB CDC example");
 ```
 
-Data Type Mapping
-----------------
+Data type mapping
+-----------------
 
-<div class="wy-table-responsive">
-<table class="colwidths-auto docutils">
-    <thead>
-      <tr>
-        <th class="text-left">TiDB type<a href="https://dev.tidb.com/doc/man/8.0/en/data-types.html"></a></th>
-        <th class="text-left">Flink SQL type<a href="{% link dev/table/types.md %}"></a></th>
-        <th class="text-left">NOTE</th>
-      </tr>
-    </thead>
-    <tbody>
-    <tr>
-      <td>TINYINT</td>
-      <td>TINYINT</td>
-      <td></td>
-    </tr>
-    <tr>
-      <td>
-        SMALLINT<br>
-        TINYINT UNSIGNED</td>
-      <td>SMALLINT</td>
-      <td></td>
-    </tr>
-    <tr>
-      <td>
-        INT<br>
-        MEDIUMINT<br>
-        SMALLINT UNSIGNED</td>
-      <td>INT</td>
-      <td></td>
-    </tr>
-    <tr>
-      <td>
-        BIGINT<br>
-        INT UNSIGNED</td>
-      <td>BIGINT</td>
-      <td></td>
-    </tr>
-   <tr>
-      <td>BIGINT UNSIGNED</td>
-      <td>DECIMAL(20, 0)</td>
-      <td></td>
-    </tr>
-    <tr>
-      <td>
-        FLOAT<br>
-        </td>
-      <td>FLOAT</td>
-      <td></td>
-    </tr>
-    <tr>
-      <td>
-        REAL<br>
-        DOUBLE
-      </td>
-      <td>DOUBLE</td>
-      <td></td>
-    </tr>
-    <tr>
-      <td>
-        NUMERIC(p, s)<br>
-        DECIMAL(p, s)<br>
-        where p <= 38<br>
-      </td>
-      <td>DECIMAL(p, s)</td>
-      <td></td>
-    </tr>
-    <tr>
-      <td>
-        NUMERIC(p, s)<br>
-        DECIMAL(p, s)<br>
-        where 38 < p <= 65<br>
-      </td>
-      <td>STRING</td>
-      <td>The precision for DECIMAL data type is up to 65 in TiDB, but the precision for DECIMAL is limited to 38 in Flink.
-  So if you define a decimal column whose precision is greater than 38, you should map it to STRING to avoid precision loss.</td>
-    </tr>
-    <tr>
-      <td>
-        BOOLEAN<br>
-        TINYINT(1)<br>
-        BIT(1)
-        </td>
-      <td>BOOLEAN</td>
-      <td></td>
-    </tr>
-    <tr>
-      <td>DATE</td>
-      <td>DATE</td>
-      <td></td>
-    </tr>
-    <tr>
-      <td>TIME [(p)]</td>
-      <td>TIME [(p)]</td>
-      <td></td>
-    </tr>
-    <tr>
-      <td>TIMESTAMP [(p)]</td>
-      <td>TIMESTAMP_LTZ [(p)]</td>
-      <td></td>
-    </tr>
-    <tr>
-      <td>DATETIME [(p)]</td>
-      <td>TIMESTAMP [(p)]
-      </td>
-      <td></td>
-    </tr>
-    <tr>
-      <td>
-        CHAR(n)
-      </td>
-      <td>CHAR(n)</td>
-      <td></td>
-    </tr>
-    <tr>
-      <td>
-        VARCHAR(n)
-      </td>
-      <td>VARCHAR(n)</td>
-      <td></td>
-    </tr>
-    <tr>
-      <td>
-        BIT(n)
-      </td>
-      <td>BINARY(⌈n/8⌉)</td>
-      <td></td>
-    </tr>
-    <tr>
-      <td>
-        BINARY(n)
-      </td>
-      <td>BINARY(n)</td>
-      <td></td>
-    </tr>
-    <tr>
-      <td>
-        TINYTEXT<br>
-        TEXT<br>
-        MEDIUMTEXT<br>
-        LONGTEXT<br>
-      </td>
-      <td>STRING</td>
-      <td></td>
-    </tr>
-    <tr>
-      <td>
-        TINYBLOB<br>
-        BLOB<br>
-        MEDIUMBLOB<br>
-        LONGBLOB<br>
-      </td>
-      <td>BYTES</td>
-      <td>Currently, for BLOB data type in TiDB, only the blob whose length isn't greater than 2,147,483,647(2 ** 31 - 1) is supported. </td>
-    </tr>
-    <tr>
-      <td>
-        YEAR
-      </td>
-      <td>INT</td>
-      <td></td>
-    </tr>
-    <tr>
-      <td>
-        ENUM
-      </td>
-      <td>STRING</td>
-      <td></td>
-    </tr>
-    <tr>
-      <td>
-        JSON
-      </td>
-      <td>STRING</td>
-      <td>The JSON data type  will be converted into STRING with JSON format in Flink.</td>
-    </tr>
-    <tr>
-      <td>
-        SET
-      </td>
-      <td>ARRAY&lt;STRING&gt;</td>
-      <td>As the SET data type in TiDB is a string object that can have zero or more values, 
-          it should always be mapped to an array of string
-      </td>
-    </tr>
-    </tbody>
-</table>
-</div>
+| TiDB type | Flink SQL type | Notes |
+| --- | --- | --- |
+| `TINYINT` | `TINYINT` | |
+| `TINYINT UNSIGNED`, `SMALLINT` | `SMALLINT` | |
+| `SMALLINT UNSIGNED`, `MEDIUMINT`, `MEDIUMINT UNSIGNED`, `INT` | `INT` | |
+| `INT UNSIGNED`, `BIGINT` | `BIGINT` | |
+| `BIGINT UNSIGNED` | `DECIMAL(20, 0)` | |
+| `FLOAT` | `FLOAT` | |
+| `REAL`, `DOUBLE` | `DOUBLE` | |
+| `NUMERIC(p,s)`, `DECIMAL(p,s)`, `p <= 38` | `DECIMAL(p,s)` | |
+| `NUMERIC(p,s)`, `DECIMAL(p,s)`, `38 < p <= 65` | `STRING` | Flink decimals support at most 38 digits; use `STRING` to avoid precision loss. |
+| `BOOLEAN`, `TINYINT(1)`, `BIT(1)` | `BOOLEAN` | |
+| `DATE` | `DATE` | |
+| `TIME(p)` | `TIME(p)` | |
+| `TIMESTAMP(p)` | `TIMESTAMP_LTZ(p)` | Interpreted using `server-time-zone`. |
+| `DATETIME(p)` | `TIMESTAMP(p)` | |
+| `CHAR(n)` | `CHAR(n)` | |
+| `VARCHAR(n)` | `VARCHAR(n)` | |
+| `BIT(n)` | `BINARY(ceil(n / 8))` | |
+| `BINARY(n)` | `BINARY(n)` | |
+| `TINYTEXT`, `TEXT`, `MEDIUMTEXT`, `LONGTEXT` | `STRING` | |
+| `TINYBLOB`, `BLOB`, `MEDIUMBLOB`, `LONGBLOB` | `BYTES` | Values larger than the maximum Java array size are not supported. |
+| `YEAR` | `INT` | |
+| `ENUM` | `STRING` | |
+| `SET` | `ARRAY<STRING>` | Values are split into string elements. |
+| `JSON` | `STRING` | Serialized as JSON text. |
 
 {{< top >}}
