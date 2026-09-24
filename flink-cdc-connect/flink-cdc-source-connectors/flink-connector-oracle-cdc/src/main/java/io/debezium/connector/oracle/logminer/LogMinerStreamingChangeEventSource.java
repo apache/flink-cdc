@@ -797,10 +797,10 @@ public class LogMinerStreamingChangeEventSource
                                 Scn.valueOf(
                                         connectorConfig.getLogMiningScnGapDetectionGapSizeMin()))
                         > 0) {
-                    Optional<OffsetDateTime> prevEndScnTimestamp =
+                    Optional<Instant> prevEndScnTimestamp =
                             connection.getScnToTimestamp(prevEndScn);
                     if (prevEndScnTimestamp.isPresent()) {
-                        Optional<OffsetDateTime> currentScnTimestamp =
+                        Optional<Instant> currentScnTimestamp =
                                 connection.getScnToTimestamp(currentScn);
                         if (currentScnTimestamp.isPresent()) {
                             long timeDeltaMs =
