@@ -174,3 +174,7 @@ iceberg-pipeline-connector:
 postgres-pipeline-connector:
   - changed-files:
       - any-glob-to-any-file: 'flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-postgres/**/*'
+
+db2-pipeline-connector:
+  - changed-files:
+      - any-glob-to-any-file: 'flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-db2/**/*'
