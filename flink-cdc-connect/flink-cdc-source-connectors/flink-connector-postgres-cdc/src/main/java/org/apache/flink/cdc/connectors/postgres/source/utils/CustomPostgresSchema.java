@@ -39,7 +39,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
 /** A CustomPostgresSchema similar to PostgresSchema with customization. */
 public class CustomPostgresSchema {
@@ -82,7 +81,7 @@ public class CustomPostgresSchema {
 
         if (!unMatchTableIds.isEmpty()) {
             try {
-                readTableSchema(tableIds);
+                readTableSchema(unMatchTableIds);
             } catch (SQLException e) {
                 throw new FlinkRuntimeException("Failed to read table schema", e);
             }
@@ -119,26 +118,37 @@ public class CustomPostgresSchema {
             throw new FlinkRuntimeException("Failed to read schema", e);
         }
 
-        for (TableId tableId : tableIds) {
-            Table table = Objects.requireNonNull(tables.forTable(tableId));
-            // set the events to populate proper sourceInfo into offsetContext
-            offsetContext.event(tableId, Instant.now());
-
-            // TODO: check whether we always set isFromSnapshot = true
+        // Cache all tables discovered by readSchema to avoid redundant full scans on future calls.
+        for (TableId discoveredId : tables.tableIds()) {
+            if (this.schemasByTableId.containsKey(discoveredId)) {
+                continue;
+            }
+            Table table = tables.forTable(discoveredId);
+            if (table == null) {
+                continue;
+            }
+            offsetContext.event(discoveredId, Instant.now());
             SchemaChangeEvent schemaChangeEvent =
                     SchemaChangeEvent.ofCreate(
                             partition,
                             offsetContext,
                             dbzConfig.databaseName(),
-                            tableId.schema(),
+                            discoveredId.schema(),
                             null,
                             table,
                             true);
-
             for (TableChanges.TableChange tableChange : schemaChangeEvent.getTableChanges()) {
-                this.schemasByTableId.put(tableId, tableChange);
+                this.schemasByTableId.put(discoveredId, tableChange);
             }
-            tableChanges.add(this.schemasByTableId.get(tableId));
+        }
+
+        for (TableId tableId : tableIds) {
+            TableChange cached = this.schemasByTableId.get(tableId);
+            if (cached == null) {
+                throw new FlinkRuntimeException(
+                        String.format("Failed to read table schema of table %s", tableId));
+            }
+            tableChanges.add(cached);
         }
         return tableChanges;
     }
