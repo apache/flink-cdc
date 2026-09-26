@@ -22,15 +22,20 @@ import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.connector.source.ReaderOutput;
 import org.apache.flink.api.connector.source.SourceOutput;
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
+import org.apache.flink.cdc.connectors.base.source.meta.events.StreamSplitUpdateRequestEvent;
+import org.apache.flink.cdc.connectors.base.source.meta.offset.Offset;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
+import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitState;
 import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
+import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplitState;
 import org.apache.flink.cdc.connectors.postgres.PostgresTestBase;
 import org.apache.flink.cdc.connectors.postgres.source.MockPostgresDialect;
 import org.apache.flink.cdc.connectors.postgres.source.PostgresDialect;
 import org.apache.flink.cdc.connectors.postgres.source.PostgresSourceBuilder;
 import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfig;
 import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfigFactory;
+import org.apache.flink.cdc.connectors.postgres.source.offset.PostgresOffset;
 import org.apache.flink.cdc.connectors.postgres.source.offset.PostgresOffsetFactory;
 import org.apache.flink.cdc.connectors.postgres.testutils.RecordsFormatter;
 import org.apache.flink.cdc.connectors.postgres.testutils.UniqueDatabase;
@@ -58,6 +63,7 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -187,6 +193,95 @@ public class PostgresSourceReaderTest extends PostgresTestBase {
         assertThat(completedCheckpointIds).isEmpty();
         reader.notifyCheckpointComplete(104L);
         assertThat(completedCheckpointIds).containsExactly(101L);
+    }
+
+    /**
+     * A snapshot-only stream split that reached its ending offset must release the replication slot
+     * even though its starting offset is behind that ending offset.
+     *
+     * <p>That combination is the normal case rather than an edge case: {@code
+     * HybridSplitAssigner#createStreamSplit} seeds the two offsets with the lowest and highest high
+     * watermark of the finished snapshot splits, so they differ as soon as there is more than one
+     * split or any concurrent write, and only emitted data-change or heartbeat records move the
+     * starting offset afterwards.
+     */
+    @Test
+    void testSnapshotOnlyRemovesSlotWhenStartingOffsetIsBehindEndingOffset() throws Exception {
+        final PostgresSourceReader reader = createSnapshotOnlyReader();
+        createSlot();
+        assertThat(customDatabase.checkSlot(slotName)).isEqualTo(slotName);
+
+        reader.onSplitFinished(finishedStreamSplit());
+
+        // checkSlot returns a human-readable "does not exist" sentence that itself embeds the slot
+        // name, so compare for equality rather than containment.
+        assertThat(customDatabase.checkSlot(slotName)).isNotEqualTo(slotName);
+    }
+
+    /**
+     * A suspended stream split is the other reason {@code onSplitFinished} fires — the enumerator
+     * paused streaming so newly added tables can be snapshotted, and the split will resume. The
+     * slot has to survive that, otherwise resuming loses its position.
+     */
+    @Test
+    void testSnapshotOnlyKeepsSlotWhenStreamSplitIsMerelySuspended() throws Exception {
+        final PostgresSourceReader reader = createSnapshotOnlyReader();
+        createSlot();
+        // StreamSplitUpdateRequestEvent is what the enumerator sends to pause streaming; note the
+        // reader context flag is the authority here, not StreamSplit#isSuspended.
+        reader.handleSourceEvents(new StreamSplitUpdateRequestEvent());
+
+        reader.onSplitFinished(finishedStreamSplit());
+
+        assertThat(customDatabase.checkSlot(slotName)).isEqualTo(slotName);
+    }
+
+    private Map<String, SourceSplitState> finishedStreamSplit() {
+        // Deliberately startingOffset < endingOffset: that is what the assigner produces for a
+        // multi-split snapshot, and what the previous guard treated as "not finished".
+        final Offset startingOffset = lsnOffset(1000L);
+        final Offset endingOffset = lsnOffset(2000L);
+        final StreamSplit split =
+                new StreamSplit(
+                        StreamSplit.STREAM_SPLIT_ID,
+                        startingOffset,
+                        endingOffset,
+                        new ArrayList<>(),
+                        new HashMap<>(),
+                        0,
+                        false,
+                        true);
+        final Map<String, SourceSplitState> finished = new HashMap<>();
+        finished.put(split.splitId(), new StreamSplitState(split));
+        return finished;
+    }
+
+    private static Offset lsnOffset(long lsn) {
+        final Map<String, String> offset = new HashMap<>();
+        offset.put("lsn", Long.toString(lsn));
+        return PostgresOffset.of(offset);
+    }
+
+    private void createSlot() throws Exception {
+        try (Connection connection =
+                        getJdbcConnection(POSTGRES_CONTAINER, customDatabase.getDatabaseName());
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    String.format(
+                            "SELECT pg_create_logical_replication_slot('%s', 'pgoutput')",
+                            slotName));
+        }
+    }
+
+    private PostgresSourceReader createSnapshotOnlyReader() throws Exception {
+        final PostgresOffsetFactory offsetFactory = new PostgresOffsetFactory();
+        final PostgresSourceConfigFactory configFactory = createConfigFactory();
+        configFactory.startupOptions(StartupOptions.snapshot());
+        PostgresDialect dialect = new PostgresDialect(configFactory.create(0));
+        final PostgresSourceBuilder.PostgresIncrementalSource<?> source =
+                new PostgresSourceBuilder.PostgresIncrementalSource<>(
+                        configFactory, new ForwardDeserializeSchema(), offsetFactory, dialect);
+        return source.createReader(new TestingReaderContext());
     }
 
     @ParameterizedTest
