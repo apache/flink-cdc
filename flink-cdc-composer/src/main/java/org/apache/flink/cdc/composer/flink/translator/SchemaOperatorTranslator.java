@@ -20,6 +20,7 @@ package org.apache.flink.cdc.composer.flink.translator;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.pipeline.ExistingTableSchemaExpansionMode;
 import org.apache.flink.cdc.common.pipeline.RouteMode;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.route.RouteRule;
@@ -34,6 +35,9 @@ import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -41,7 +45,11 @@ import java.util.List;
 /** Translator used to build {@link SchemaOperator} for schema event process. */
 @Internal
 public class SchemaOperatorTranslator {
+
+    private static final Logger LOG = LoggerFactory.getLogger(SchemaOperatorTranslator.class);
+
     private final SchemaChangeBehavior schemaChangeBehavior;
+    private final ExistingTableSchemaExpansionMode existingTableSchemaExpansionMode;
     private final String schemaOperatorUid;
     private final Duration rpcTimeOut;
     private final String timezone;
@@ -51,7 +59,22 @@ public class SchemaOperatorTranslator {
             String schemaOperatorUid,
             Duration rpcTimeOut,
             String timezone) {
+        this(
+                schemaChangeBehavior,
+                ExistingTableSchemaExpansionMode.DISABLED,
+                schemaOperatorUid,
+                rpcTimeOut,
+                timezone);
+    }
+
+    public SchemaOperatorTranslator(
+            SchemaChangeBehavior schemaChangeBehavior,
+            ExistingTableSchemaExpansionMode existingTableSchemaExpansionMode,
+            String schemaOperatorUid,
+            Duration rpcTimeOut,
+            String timezone) {
         this.schemaChangeBehavior = schemaChangeBehavior;
+        this.existingTableSchemaExpansionMode = existingTableSchemaExpansionMode;
         this.schemaOperatorUid = schemaOperatorUid;
         this.rpcTimeOut = rpcTimeOut;
         this.timezone = timezone;
@@ -146,6 +169,7 @@ public class SchemaOperatorTranslator {
                                 routeMode,
                                 rpcTimeOut,
                                 schemaChangeBehavior,
+                                existingTableSchemaExpansionMode,
                                 timezone));
         stream.uid(schemaOperatorUid).setParallelism(parallelism);
         return stream;
@@ -158,6 +182,15 @@ public class SchemaOperatorTranslator {
             List<RouteDef> routes,
             RouteMode routeMode,
             String timezone) {
+        // Existing target table schema expansion is only wired into the streaming schema
+        // operators, so a batch pipeline keeps the sink's original schema handling.
+        if (existingTableSchemaExpansionMode != ExistingTableSchemaExpansionMode.DISABLED) {
+            LOG.warn(
+                    "Existing target table schema expansion is not supported in batch mode, but "
+                            + "mode {} was configured. The option is ignored and the sink's "
+                            + "original schema handling applies.",
+                    existingTableSchemaExpansionMode);
+        }
         List<RouteRule> routingRules = new ArrayList<>();
         for (RouteDef route : routes) {
             routingRules.add(
@@ -213,6 +246,7 @@ public class SchemaOperatorTranslator {
                                 routeMode,
                                 rpcTimeOut,
                                 schemaChangeBehavior,
+                                existingTableSchemaExpansionMode,
                                 timezone))
                 .uid(schemaOperatorUid)
                 .setParallelism(parallelism);

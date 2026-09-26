@@ -20,11 +20,14 @@ package org.apache.flink.cdc.connectors.fluss.sink;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropTableEvent;
+import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.IntType;
+import org.apache.flink.cdc.runtime.operators.schema.common.ExistingTableSchemaExpander;
 
 import org.apache.fluss.client.Connection;
 import org.apache.fluss.client.ConnectionFactory;
@@ -218,6 +221,70 @@ public class FlussMetadataApplierTest {
                                                     org.apache.fluss.types.DataTypes.INT(),
                                                     flussRowType.getFieldCount() + 1))))
                     .isTrue();
+        }
+    }
+
+    @Test
+    void testExistingTableSchemaExpansion() throws Exception {
+        TableId tableId = TableId.tableId("default_namespace", DATABASE_NAME, "table1");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT().notNull())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+        try (FlussMetaDataApplier applier =
+                new FlussMetaDataApplier(
+                        FLUSS_CLUSTER_EXTENSION.getClientConfig(),
+                        Collections.emptyMap(),
+                        Collections.emptyMap(),
+                        Collections.emptyMap())) {
+            assertThat(applier.getExistingTableSchema(tableId)).isEmpty();
+
+            applier.applySchemaChange(new CreateTableEvent(tableId, schema));
+
+            assertThat(applier.getExistingTableSchema(tableId)).contains(schema);
+
+            Schema desiredSchema =
+                    Schema.newBuilder()
+                            .physicalColumn("id", DataTypes.INT().notNull())
+                            .physicalColumn("name", DataTypes.STRING())
+                            .physicalColumn("description", DataTypes.STRING())
+                            .primaryKey("id")
+                            .build();
+            Schema expectedSchema =
+                    Schema.newBuilder()
+                            .physicalColumn("id", DataTypes.INT().notNull())
+                            .physicalColumn("name", DataTypes.STRING())
+                            .physicalColumn("description", DataTypes.STRING())
+                            .primaryKey("id")
+                            .build();
+            applier.setAcceptedSchemaEvolutionTypes(
+                    Collections.singleton(SchemaChangeEventType.ADD_COLUMN));
+            ExistingTableSchemaExpander expander =
+                    new ExistingTableSchemaExpander(applier, applier, SchemaChangeBehavior.LENIENT);
+
+            expander.handleExistingTableCreation(new CreateTableEvent(tableId, desiredSchema));
+            assertThat(applier.getExistingTableSchema(tableId)).contains(expectedSchema);
+            expander.handleExistingTableCreation(new CreateTableEvent(tableId, desiredSchema));
+            assertThat(applier.getExistingTableSchema(tableId)).contains(expectedSchema);
+
+            assertThat(
+                            applier.normalizeToTargetDataType(
+                                    tableId, "name", DataTypes.VARCHAR(32), expectedSchema))
+                    .isEqualTo(DataTypes.STRING());
+
+            Schema schemaWithDifferentExistingColumnType =
+                    Schema.newBuilder()
+                            .physicalColumn("id", DataTypes.BIGINT().notNull())
+                            .physicalColumn("name", DataTypes.STRING())
+                            .physicalColumn("description", DataTypes.STRING())
+                            .primaryKey("id")
+                            .build();
+
+            expander.handleExistingTableCreation(
+                    new CreateTableEvent(tableId, schemaWithDifferentExistingColumnType));
+            assertThat(applier.getExistingTableSchema(tableId)).contains(expectedSchema);
         }
     }
 

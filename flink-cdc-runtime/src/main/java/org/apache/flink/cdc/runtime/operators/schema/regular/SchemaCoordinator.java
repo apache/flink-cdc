@@ -23,6 +23,7 @@ import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
 import org.apache.flink.cdc.common.exceptions.UnsupportedSchemaChangeEventException;
+import org.apache.flink.cdc.common.pipeline.ExistingTableSchemaExpansionMode;
 import org.apache.flink.cdc.common.pipeline.RouteMode;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.route.RouteRule;
@@ -105,6 +106,28 @@ public class SchemaCoordinator extends SchemaRegistry {
             RouteMode routeMode,
             SchemaChangeBehavior schemaChangeBehavior,
             Duration rpcTimeout) {
+        this(
+                operatorName,
+                context,
+                coordinatorExecutor,
+                metadataApplier,
+                routes,
+                routeMode,
+                schemaChangeBehavior,
+                ExistingTableSchemaExpansionMode.DISABLED,
+                rpcTimeout);
+    }
+
+    public SchemaCoordinator(
+            String operatorName,
+            OperatorCoordinator.Context context,
+            ExecutorService coordinatorExecutor,
+            MetadataApplier metadataApplier,
+            List<RouteRule> routes,
+            RouteMode routeMode,
+            SchemaChangeBehavior schemaChangeBehavior,
+            ExistingTableSchemaExpansionMode existingTableSchemaExpansionMode,
+            Duration rpcTimeout) {
         super(
                 context,
                 operatorName,
@@ -113,6 +136,7 @@ public class SchemaCoordinator extends SchemaRegistry {
                 routes,
                 routeMode,
                 schemaChangeBehavior,
+                existingTableSchemaExpansionMode,
                 rpcTimeout);
         this.schemaChangeThreadPool = Executors.newSingleThreadExecutor();
     }
@@ -454,8 +478,15 @@ public class SchemaCoordinator extends SchemaRegistry {
     }
 
     private boolean applyAndUpdateEvolvedSchemaChange(SchemaChangeEvent schemaChangeEvent) {
+        // The initial existing-table handling runs outside the tolerant try-catch: CHECK/EXPAND
+        // failures must fail the job even under TRY_EVOLVE, while TRY_EXPAND swallows its own
+        // failures internally.
+        boolean shouldApplyOriginalCreateTable =
+                expandExistingTableSchemaIfNeeded(schemaChangeEvent);
         try {
-            metadataApplier.applySchemaChange(schemaChangeEvent);
+            if (shouldApplyOriginalCreateTable) {
+                metadataApplier.applySchemaChange(schemaChangeEvent);
+            }
             schemaManager.applyEvolvedSchemaChange(schemaChangeEvent);
             LOG.info(
                     "Successfully applied schema change event {} to external system.",

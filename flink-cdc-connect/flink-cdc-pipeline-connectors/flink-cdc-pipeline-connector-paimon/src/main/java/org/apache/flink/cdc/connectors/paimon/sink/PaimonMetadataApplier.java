@@ -32,6 +32,7 @@ import org.apache.flink.cdc.common.event.visitor.SchemaChangeEventVisitor;
 import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.common.sink.ExistingTableSchemaExpansionSupport;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.connectors.paimon.sink.utils.TypeUtils;
@@ -55,7 +56,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.common.types.DataTypeFamily.BINARY_STRING;
 import static org.apache.flink.cdc.common.types.DataTypeFamily.CHARACTER_STRING;
@@ -66,7 +69,7 @@ import static org.apache.flink.cdc.common.utils.Preconditions.checkNotNull;
  * A {@code MetadataApplier} that applies metadata changes to Paimon. Support primary key table
  * only.
  */
-public class PaimonMetadataApplier implements MetadataApplier {
+public class PaimonMetadataApplier implements MetadataApplier, ExistingTableSchemaExpansionSupport {
 
     private static final Logger LOG = LoggerFactory.getLogger(PaimonMetadataApplier.class);
 
@@ -122,11 +125,56 @@ public class PaimonMetadataApplier implements MetadataApplier {
     }
 
     @Override
+    public Optional<ExistingTableSchemaExpansionSupport> getExistingTableSchemaExpansionSupport() {
+        return Optional.of(this);
+    }
+
+    @Override
+    public Optional<Schema> getExistingTableSchema(TableId tableId) {
+        Catalog catalog = getCatalog();
+        try {
+            Table table =
+                    catalog.getTable(
+                            new Identifier(tableId.getSchemaName(), tableId.getTableName()));
+            Schema.Builder builder = Schema.newBuilder();
+            builder.setColumns(
+                    table.rowType().getFields().stream()
+                            .map(
+                                    field ->
+                                            Column.physicalColumn(
+                                                    field.name(),
+                                                    TypeUtils.toCDCDataType(field.type()),
+                                                    field.description()))
+                            .collect(Collectors.toList()));
+            builder.primaryKey(table.primaryKeys());
+            builder.partitionKey(table.partitionKeys());
+            table.comment().ifPresent(builder::comment);
+            builder.options(table.options());
+            return Optional.of(builder.build());
+        } catch (Catalog.TableNotExistException e) {
+            return Optional.empty();
+        }
+    }
+
+    @Override
+    public DataType normalizeToTargetDataType(
+            TableId tableId,
+            String columnName,
+            DataType pipelineDataType,
+            Schema existingTargetSchema) {
+        return TypeUtils.toCDCDataType(TypeUtils.toPaimonDataType(pipelineDataType));
+    }
+
+    @Override
+    public boolean isColumnNameCaseSensitive() {
+        return getCatalog().caseSensitive();
+    }
+
+    @Override
     public void applySchemaChange(SchemaChangeEvent schemaChangeEvent)
             throws SchemaEvolveException {
-        if (catalog == null) {
-            catalog = FlinkCatalogFactory.createPaimonCatalog(catalogOptions);
-        }
+        // Eagerly initialize the catalog: the visitor methods below use the cached field directly.
+        getCatalog();
         SchemaChangeEventVisitor.voidVisit(
                 schemaChangeEvent,
                 this::applyAddColumn,
@@ -143,7 +191,21 @@ public class PaimonMetadataApplier implements MetadataApplier {
     public void close() throws Exception {
         if (catalog != null) {
             catalog.close();
+            catalog = null;
         }
+    }
+
+    /**
+     * Lazily creates and caches the Paimon {@link Catalog}. All catalog access must go through this
+     * method so the lifecycle stays centralized: the catalog is created once on first use and
+     * released by {@link #close()}, which also resets the cached instance so the applier stays
+     * reusable after close.
+     */
+    private Catalog getCatalog() {
+        if (catalog == null) {
+            catalog = FlinkCatalogFactory.createPaimonCatalog(catalogOptions);
+        }
+        return catalog;
     }
 
     private void applyCreateTable(CreateTableEvent event) throws SchemaEvolveException {

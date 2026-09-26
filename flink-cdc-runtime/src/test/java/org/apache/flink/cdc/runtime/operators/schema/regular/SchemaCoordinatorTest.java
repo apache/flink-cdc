@@ -22,11 +22,14 @@ import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
+import org.apache.flink.cdc.common.pipeline.ExistingTableSchemaExpansionMode;
 import org.apache.flink.cdc.common.pipeline.RouteMode;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.common.sink.ExistingTableSchemaExpansionSupport;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
+import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.runtime.operators.schema.common.event.FlushSuccessEvent;
 import org.apache.flink.cdc.runtime.operators.schema.regular.event.SchemaChangeRequest;
@@ -34,11 +37,13 @@ import org.apache.flink.cdc.runtime.operators.schema.regular.event.SchemaChangeR
 import org.apache.flink.cdc.runtime.testutils.operators.MockedOperatorCoordinatorContext;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
+import org.apache.flink.util.FlinkRuntimeException;
 
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 import java.util.Collections;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -99,6 +104,140 @@ class SchemaCoordinatorTest {
             assertThat(response.getAppliedSchemaChangeEvents()).containsExactly(ADD_EXTRA_V2);
         } finally {
             coordinator.close();
+        }
+    }
+
+    @Test
+    void checkModeSkipsExternalCreateTableButRegistersSchema() throws Exception {
+        ExpandingMetadataApplier metadataApplier =
+                new ExpandingMetadataApplier(INITIAL_SCHEMA, true);
+        SchemaCoordinator coordinator =
+                new SchemaCoordinator(
+                        "regular-schema-coordinator",
+                        new MockedOperatorCoordinatorContext(
+                                new OperatorID(), Thread.currentThread().getContextClassLoader()),
+                        Executors.newSingleThreadExecutor(),
+                        metadataApplier,
+                        Collections.emptyList(),
+                        RouteMode.ALL_MATCH,
+                        SchemaChangeBehavior.TRY_EVOLVE,
+                        ExistingTableSchemaExpansionMode.CHECK,
+                        Duration.ofSeconds(10));
+        coordinator.start();
+        try {
+            CreateTableEvent createTableEvent = new CreateTableEvent(TABLE_ID, INITIAL_SCHEMA);
+            SchemaChangeResponse response = requestSchemaChange(coordinator, createTableEvent);
+            // CHECK passes: the event is still registered and reported, but no external DDL runs.
+            assertThat(response.getAppliedSchemaChangeEvents()).containsExactly(createTableEvent);
+            assertThat(metadataApplier.appliedEvents).isEmpty();
+        } finally {
+            coordinator.close();
+        }
+    }
+
+    @Test
+    void expandModeFailureIsNotSwallowedUnderTryEvolve() throws Exception {
+        // Target column type cannot safely contain the pipeline type.
+        Schema incompatibleTarget =
+                Schema.newBuilder().physicalColumn("id", DataTypes.STRING()).build();
+        ExpandingMetadataApplier metadataApplier =
+                new ExpandingMetadataApplier(incompatibleTarget, false);
+        SchemaCoordinator coordinator =
+                new SchemaCoordinator(
+                        "regular-schema-coordinator",
+                        new MockedOperatorCoordinatorContext(
+                                new OperatorID(), Thread.currentThread().getContextClassLoader()),
+                        Executors.newSingleThreadExecutor(),
+                        metadataApplier,
+                        Collections.emptyList(),
+                        RouteMode.ALL_MATCH,
+                        SchemaChangeBehavior.TRY_EVOLVE,
+                        ExistingTableSchemaExpansionMode.EXPAND,
+                        Duration.ofSeconds(10));
+        coordinator.start();
+        try {
+            CompletableFuture<CoordinationResponse> response =
+                    submitSchemaChange(coordinator, new CreateTableEvent(TABLE_ID, INITIAL_SCHEMA));
+            assertThatThrownBy(() -> response.get(10, TimeUnit.SECONDS))
+                    .isInstanceOf(ExecutionException.class);
+        } finally {
+            coordinator.close();
+        }
+    }
+
+    @Test
+    void tryExpandModeFailsWhenConnectorLacksExpansionSupport() {
+        UnsupportedExpansionMetadataApplier metadataApplier =
+                new UnsupportedExpansionMetadataApplier();
+
+        SchemaCoordinator coordinator =
+                new SchemaCoordinator(
+                        "regular-schema-coordinator",
+                        new MockedOperatorCoordinatorContext(
+                                new OperatorID(), Thread.currentThread().getContextClassLoader()),
+                        Executors.newSingleThreadExecutor(),
+                        metadataApplier,
+                        Collections.emptyList(),
+                        RouteMode.ALL_MATCH,
+                        SchemaChangeBehavior.LENIENT,
+                        ExistingTableSchemaExpansionMode.TRY_EXPAND,
+                        Duration.ofSeconds(10));
+
+        assertThatThrownBy(coordinator::start)
+                .isInstanceOf(FlinkRuntimeException.class)
+                .hasCauseInstanceOf(FlinkRuntimeException.class)
+                .hasRootCauseMessage(
+                        "Existing target table schema expansion is enabled with mode TRY_EXPAND, but MetadataApplier "
+                                + UnsupportedExpansionMetadataApplier.class.getName()
+                                + " does not support it.");
+    }
+
+    private static final class UnsupportedExpansionMetadataApplier implements MetadataApplier {
+        @Override
+        public void applySchemaChange(SchemaChangeEvent schemaChangeEvent) {}
+    }
+
+    private static final class ExpandingMetadataApplier
+            implements MetadataApplier, ExistingTableSchemaExpansionSupport {
+        private final Schema targetSchema;
+        private final boolean recordAppliedEvents;
+        private final java.util.List<SchemaChangeEvent> appliedEvents = new java.util.ArrayList<>();
+
+        private ExpandingMetadataApplier(Schema targetSchema, boolean recordAppliedEvents) {
+            this.targetSchema = targetSchema;
+            this.recordAppliedEvents = recordAppliedEvents;
+        }
+
+        @Override
+        public void applySchemaChange(SchemaChangeEvent schemaChangeEvent) {
+            if (recordAppliedEvents) {
+                appliedEvents.add(schemaChangeEvent);
+            }
+        }
+
+        @Override
+        public Optional<ExistingTableSchemaExpansionSupport>
+                getExistingTableSchemaExpansionSupport() {
+            return Optional.of(this);
+        }
+
+        @Override
+        public Optional<Schema> getExistingTableSchema(TableId tableId) {
+            return Optional.ofNullable(targetSchema);
+        }
+
+        @Override
+        public DataType normalizeToTargetDataType(
+                TableId tableId,
+                String columnName,
+                DataType pipelineDataType,
+                Schema existingTargetSchema) {
+            return pipelineDataType;
+        }
+
+        @Override
+        public boolean isColumnNameCaseSensitive() {
+            return true;
         }
     }
 

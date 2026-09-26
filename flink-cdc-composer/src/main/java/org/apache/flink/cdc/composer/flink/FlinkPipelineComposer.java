@@ -153,6 +153,7 @@ public class FlinkPipelineComposer implements PipelineComposer {
         SchemaOperatorTranslator schemaOperatorTranslator =
                 new SchemaOperatorTranslator(
                         schemaChangeBehavior,
+                        pipelineDef.getSink().getExistingTableSchemaExpansionMode(),
                         schemaOperatorUid,
                         pipelineDefConfig.get(PipelineOptions.PIPELINE_SCHEMA_OPERATOR_RPC_TIMEOUT),
                         pipelineDefConfig.get(PipelineOptions.PIPELINE_LOCAL_TIME_ZONE));
