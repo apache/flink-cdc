@@ -296,6 +296,19 @@ pipeline:
       </td>
     </tr>
     <tr>
+      <td>scan.pre-epoch-timestamp.wall-clock-conversion.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        是否对 1970-01-01（epoch）之前的 PostgreSQL "timestamp without time zone" 列值，按照数据库中存储的日期时间（wall clock）进行转换。<br>
+        开启后，该值不会受运行任务的 JVM 时区影响，这在存在历史时区偏移的时区下很重要：当 JVM 时区为 Asia/Shanghai 时，
+        数据库中存储的 "1900-01-01 00:00:00.123" 否则会被读取为 "1900-01-01 00:05:43.123"。<br>
+        关闭（默认值）时保持原有的转换行为。1970-01-01 及之后的值无论是否开启该选项都会被同样地转换，
+        且该选项不会改变列的数据类型。
+      </td>
+    </tr>
+    <tr>
       <td>schema-change.enabled</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>

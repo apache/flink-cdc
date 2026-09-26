@@ -49,6 +49,7 @@ import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSource
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.PASSWORD;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.PG_PORT;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED;
+import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.SCAN_PRE_EPOCH_TIMESTAMP_WALL_CLOCK_CONVERSION_ENABLED;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.SLOT_NAME;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.TABLES;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.TABLES_EXCLUDE;
@@ -260,6 +261,38 @@ public class PostgresDataSourceFactoryTest extends PostgresTestBase {
         PostgresDataSource dataSource = (PostgresDataSource) factory.createDataSource(context);
         assertThat(dataSource.getPostgresSourceConfig().getPort())
                 .isEqualTo(POSTGRES_CONTAINER.getMappedPort(POSTGRESQL_PORT));
+    }
+
+    @Test
+    public void testWallClockConversionOption() {
+        Map<String, String> options = new HashMap<>();
+        options.put(HOSTNAME.key(), POSTGRES_CONTAINER.getHost());
+        options.put(
+                PG_PORT.key(), String.valueOf(POSTGRES_CONTAINER.getMappedPort(POSTGRESQL_PORT)));
+        options.put(USERNAME.key(), TEST_USER);
+        options.put(PASSWORD.key(), TEST_PASSWORD);
+        options.put(TABLES.key(), POSTGRES_CONTAINER.getDatabaseName() + ".inventory.prod\\.*");
+        options.put(SLOT_NAME.key(), slotName);
+        options.put(SCAN_PRE_EPOCH_TIMESTAMP_WALL_CLOCK_CONVERSION_ENABLED.key(), "true");
+
+        Factory.Context context = new MockContext(Configuration.fromMap(options));
+        PostgresDataSourceFactory factory = new PostgresDataSourceFactory();
+        assertThat(factory.optionalOptions())
+                .contains(SCAN_PRE_EPOCH_TIMESTAMP_WALL_CLOCK_CONVERSION_ENABLED);
+
+        PostgresDataSource dataSource = (PostgresDataSource) factory.createDataSource(context);
+        // the option is forwarded to the Debezium configuration which reads it by the value
+        // converter
+        assertThat(
+                        dataSource
+                                .getPostgresSourceConfig()
+                                .getDbzConnectorConfig()
+                                .getConfig()
+                                .getBoolean(
+                                        SCAN_PRE_EPOCH_TIMESTAMP_WALL_CLOCK_CONVERSION_ENABLED
+                                                .key(),
+                                        false))
+                .isTrue();
     }
 
     @Test
