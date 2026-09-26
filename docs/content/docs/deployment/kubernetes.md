@@ -244,9 +244,8 @@ spec:
   imagePullPolicy: Always
   job:
     args:
-      - '--use-mini-cluster'
       - /opt/flink/flink-cdc-{{< param Version >}}/conf/mysql-to-doris.yaml
-    entryClass: org.apache.flink.cdc.cli.CliFrontend
+    entryClass: org.apache.flink.cdc.cli.CliExecutor
     jarURI: 'local:///opt/flink/lib/flink-cdc-dist-{{< param Version >}}.jar'
     parallelism: 1
     state: running
@@ -279,7 +278,7 @@ spec:
 ```
 {{< hint info >}}  
 1. Due to Flink's class loader, the parameter of `classloader.resolve-order` must be `parent-first`.
-2. Flink CDC submits a job to a remote Flink cluster by default, you should start a Standalone Flink cluster in the pod by `--use-mini-cluster` in Operator mode.  
+2. The `entryClass` must be `org.apache.flink.cdc.cli.CliExecutor`, which is the entrypoint of Flink **native application mode**. The pipeline definition file path is passed through `args`; the JobManager reads it, builds the job graph, and the job is executed on dedicated TaskManagers.  
 {{< /hint >}}
 
 ### Submit a Flink CDC Job
@@ -293,7 +292,3 @@ After successful submission, the return information is as follows：
 flinkdeployment.flink.apache.org/flink-cdc-pipeline-job created
 ```
 If you want to trace the logs or expose the Flink Web UI, please refer to: [Flink Kubernetes Operator documentation](https://nightlies.apache.org/flink/flink-kubernetes-operator-docs-main/docs/concepts/overview/)。
-
-{{< hint info >}}  
-Please note that submitting with **native application mode** is not supported for now.  
-{{< /hint >}}
