@@ -82,6 +82,7 @@ public class StatefulTaskContext implements AutoCloseable {
     private final MySqlEventMetadataProvider metadataProvider;
     private final SchemaNameAdjuster schemaNameAdjuster;
     private final MySqlConnection connection;
+    private final MySqlConnection snapshotConnection;
     private final BinaryLogClient binaryLogClient;
 
     private MySqlDatabaseSchema databaseSchema;
@@ -97,16 +98,37 @@ public class StatefulTaskContext implements AutoCloseable {
     private ChangeEventQueue<DataChangeEvent> queue;
     private ErrorHandler errorHandler;
 
+    /**
+     * Creates a StatefulTaskContext with separate primary and replica connections.
+     *
+     * @param sourceConfig The MySQL source configuration
+     * @param binaryLogClient The binary log client for binlog streaming
+     * @param primaryConnection Connection to the primary writer instance
+     * @param snapshotConnection Connection to the snapshot instance for snapshot queries
+     */
     public StatefulTaskContext(
             MySqlSourceConfig sourceConfig,
             BinaryLogClient binaryLogClient,
-            MySqlConnection connection) {
+            MySqlConnection primaryConnection,
+            MySqlConnection snapshotConnection) {
         this.sourceConfig = sourceConfig;
         this.connectorConfig = sourceConfig.getMySqlConnectorConfig();
         this.schemaNameAdjuster = SchemaNameAdjuster.create();
         this.metadataProvider = new MySqlEventMetadataProvider();
         this.binaryLogClient = binaryLogClient;
-        this.connection = connection;
+        this.connection = primaryConnection;
+        this.snapshotConnection = snapshotConnection;
+    }
+
+    /**
+     * Legacy constructor for backward compatibility. Uses same connection for both primary and
+     * snapshot operations.
+     */
+    public StatefulTaskContext(
+            MySqlSourceConfig sourceConfig,
+            BinaryLogClient binaryLogClient,
+            MySqlConnection connection) {
+        this(sourceConfig, binaryLogClient, connection, connection);
     }
 
     public void configure(MySqlSplit mySqlSplit) {
@@ -310,6 +332,10 @@ public class StatefulTaskContext implements AutoCloseable {
         if (connection != null) {
             connection.close();
         }
+        // Close snapshot connection only if it's a distinct object from the primary connection
+        if (snapshotConnection != null && snapshotConnection != connection) {
+            snapshotConnection.close();
+        }
         if (binaryLogClient != null) {
             binaryLogClient.disconnect();
         }
@@ -386,6 +412,15 @@ public class StatefulTaskContext implements AutoCloseable {
 
     public MySqlConnection getConnection() {
         return connection;
+    }
+
+    /**
+     * Returns the snapshot connection for snapshot queries. If a snapshot hostname is configured,
+     * this connection points to the snapshot instance; otherwise, it's the same as the primary
+     * connection.
+     */
+    public MySqlConnection getSnapshotConnection() {
+        return snapshotConnection;
     }
 
     public BinaryLogClient getBinaryLogClient() {

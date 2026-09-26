@@ -31,6 +31,10 @@ import java.util.Properties;
 
 /** Tests for {@link org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils}. */
 class DebeziumUtilsTest {
+
+    private static final String PRIMARY_HOSTNAME = "writer-host";
+    private static final String SNAPSHOT_HOSTNAME = "reader-host";
+
     @Test
     void testCreateMySqlConnection() {
         // test without set useSSL
@@ -39,7 +43,7 @@ class DebeziumUtilsTest {
         MySqlSourceConfig configWithoutUseSSL = getConfig(jdbcProps);
         MySqlConnection connection0 = DebeziumUtils.createMySqlConnection(configWithoutUseSSL);
         assertJdbcUrl(
-                "jdbc:mysql://localhost:3306/?useSSL=false&connectTimeout=20000&useInformationSchema=true"
+                "jdbc:mysql://writer-host:3306/?useSSL=false&connectTimeout=20000&useInformationSchema=true"
                         + "&nullCatalogMeansCurrent=false&characterSetResults=UTF-8&onlyTest=test"
                         + "&zeroDateTimeBehavior=CONVERT_TO_NULL&characterEncoding=UTF-8&useUnicode=true",
                 connection0.connectionString());
@@ -49,7 +53,7 @@ class DebeziumUtilsTest {
         MySqlSourceConfig configNotUseSSL = getConfig(jdbcProps);
         MySqlConnection connection1 = DebeziumUtils.createMySqlConnection(configNotUseSSL);
         assertJdbcUrl(
-                "jdbc:mysql://localhost:3306/?connectTimeout=20000&useInformationSchema=true"
+                "jdbc:mysql://writer-host:3306/?connectTimeout=20000&useInformationSchema=true"
                         + "&nullCatalogMeansCurrent=false&characterSetResults=UTF-8&useSSL=false&onlyTest=test"
                         + "&zeroDateTimeBehavior=CONVERT_TO_NULL&characterEncoding=UTF-8&useUnicode=true",
                 connection1.connectionString());
@@ -59,10 +63,60 @@ class DebeziumUtilsTest {
         MySqlSourceConfig configUseSSL = getConfig(jdbcProps);
         MySqlConnection connection2 = DebeziumUtils.createMySqlConnection(configUseSSL);
         assertJdbcUrl(
-                "jdbc:mysql://localhost:3306/?connectTimeout=20000&useInformationSchema=true"
+                "jdbc:mysql://writer-host:3306/?connectTimeout=20000&useInformationSchema=true"
                         + "&nullCatalogMeansCurrent=false&characterSetResults=UTF-8&useSSL=true&onlyTest=test"
                         + "&zeroDateTimeBehavior=CONVERT_TO_NULL&characterEncoding=UTF-8&useUnicode=true",
                 connection2.connectionString());
+    }
+
+    @Test
+    void testCreateSnapshotMySqlConnectionWithSnapshotHostname() {
+        Properties jdbcProps = new Properties();
+        MySqlSourceConfig config = getConfigWithSnapshotHostname(jdbcProps, SNAPSHOT_HOSTNAME);
+
+        // Create reader connection - should use reader hostname
+        MySqlConnection readerConnection = DebeziumUtils.createSnapshotMySqlConnection(config);
+
+        // Create primary connection - should use primary hostname
+        MySqlConnection primaryConnection = DebeziumUtils.createMySqlConnection(config);
+
+        // Reader connection should point to reader hostname
+        Assertions.assertThat(readerConnection.connectionString()).contains(SNAPSHOT_HOSTNAME);
+        Assertions.assertThat(readerConnection.connectionString()).doesNotContain(PRIMARY_HOSTNAME);
+
+        // Primary connection should point to primary hostname
+        Assertions.assertThat(primaryConnection.connectionString()).contains(PRIMARY_HOSTNAME);
+        Assertions.assertThat(primaryConnection.connectionString())
+                .doesNotContain(SNAPSHOT_HOSTNAME);
+    }
+
+    @Test
+    void testCreateSnapshotMySqlConnectionFallbackToPrimary() {
+        Properties jdbcProps = new Properties();
+        MySqlSourceConfig config = getConfig(jdbcProps);
+
+        // When no reader hostname is configured, should fall back to primary
+        MySqlConnection readerConnection = DebeziumUtils.createSnapshotMySqlConnection(config);
+        MySqlConnection primaryConnection = DebeziumUtils.createMySqlConnection(config);
+
+        // Both should point to the primary hostname
+        Assertions.assertThat(readerConnection.connectionString()).contains(PRIMARY_HOSTNAME);
+        Assertions.assertThat(primaryConnection.connectionString()).contains(PRIMARY_HOSTNAME);
+    }
+
+    @Test
+    void testSnapshotHostnameConfigurationProperty() {
+        Properties jdbcProps = new Properties();
+
+        // Config without reader hostname
+        MySqlSourceConfig configWithoutReader = getConfig(jdbcProps);
+        Assertions.assertThat(configWithoutReader.getSnapshotHostname()).isNull();
+
+        // Config with reader hostname
+        MySqlSourceConfig configWithReader =
+                getConfigWithSnapshotHostname(jdbcProps, SNAPSHOT_HOSTNAME);
+        Assertions.assertThat(configWithReader.getSnapshotHostname()).isEqualTo(SNAPSHOT_HOSTNAME);
+        Assertions.assertThat(configWithReader.getHostname()).isEqualTo(PRIMARY_HOSTNAME);
     }
 
     private MySqlSourceConfig getConfig(Properties jdbcProperties) {
@@ -71,7 +125,27 @@ class DebeziumUtilsTest {
                 .databaseList("fakeDb")
                 .tableList("fakeDb.fakeTable")
                 .includeSchemaChanges(false)
-                .hostname("localhost")
+                .hostname(PRIMARY_HOSTNAME)
+                .port(3306)
+                .splitSize(10)
+                .fetchSize(2)
+                .connectTimeout(Duration.ofSeconds(20))
+                .username("fakeUser")
+                .password("fakePw")
+                .serverTimeZone(ZoneId.of("UTC").toString())
+                .jdbcProperties(jdbcProperties)
+                .createConfig(0);
+    }
+
+    private MySqlSourceConfig getConfigWithSnapshotHostname(
+            Properties jdbcProperties, String snapshotHostname) {
+        return new MySqlSourceConfigFactory()
+                .startupOptions(StartupOptions.initial())
+                .databaseList("fakeDb")
+                .tableList("fakeDb.fakeTable")
+                .includeSchemaChanges(false)
+                .hostname(PRIMARY_HOSTNAME)
+                .snapshotHostname(snapshotHostname)
                 .port(3306)
                 .splitSize(10)
                 .fetchSize(2)
