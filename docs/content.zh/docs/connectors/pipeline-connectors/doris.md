@@ -116,14 +116,14 @@ pipeline:
       <td>auto-redirect</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>
-      <td>String</td>
+      <td>Boolean</td>
       <td> 是否通过FE重定向写入，直连BE写入 </td>
     </tr>
     <tr>
       <td>charset-encoding</td>
       <td>optional</td>
-      <td style="word-wrap: break-word;">false</td>
-      <td>Boolean</td>
+      <td style="word-wrap: break-word;">UTF-8</td>
+      <td>String</td>
       <td> Doris Http客户端字符集编码，默认UTF-8 </td>
     </tr>
     <tr>
@@ -183,6 +183,48 @@ pipeline:
        <td>Boolean</td>
        <td>在CDC场景中，当上游的主键与下游的主键不一致时，需要将 update-before 数据作为已删除数据传递给下游，否则数据将无法被删除。默认设置为忽略，即执行 upsert 语义 </td>
      </tr>
+    <tr>
+      <td>sink.enable-2pc</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>是否在导入数据时启用两阶段提交（2PC）</td>
+    </tr>
+    <tr>
+      <td>sink.check-interval</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">10000</td>
+      <td>Integer</td>
+      <td>导入过程中检查异常的间隔（毫秒）</td>
+    </tr>
+    <tr>
+      <td>sink.buffer-size</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">1048576(1MB)</td>
+      <td>Integer</td>
+      <td>Stream Load 缓存数据的缓冲区大小（字节）</td>
+    </tr>
+    <tr>
+      <td>sink.buffer-count</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">3</td>
+      <td>Integer</td>
+      <td>Stream Load 缓存数据的缓冲区数量</td>
+    </tr>
+    <tr>
+      <td>sink.label-prefix</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>Stream Load 的唯一 label 前缀</td>
+    </tr>
+    <tr>
+      <td>sink.use-cache</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>是否为断点续传使用缓冲区缓存</td>
+    </tr>
     <tr>
       <td>sink.properties.</td>
       <td>optional</td>
