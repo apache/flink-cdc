@@ -56,6 +56,8 @@ public class MaxComputeDataSinkFactory implements DataSinkFactory {
         String quotaName = factoryConfiguration.get(MaxComputeDataSinkOptions.QUOTA_NAME);
         String stsToken = factoryConfiguration.get(MaxComputeDataSinkOptions.STS_TOKEN);
         int bucketsNum = factoryConfiguration.get(MaxComputeDataSinkOptions.BUCKETS_NUM);
+        MaxComputeOptions.SinkOperation sinkOperation =
+                factoryConfiguration.get(MaxComputeDataSinkOptions.SINK_OPERATION);
 
         String schemaOperatorUid =
                 pipelineConfiguration.get(PipelineOptions.PIPELINE_SCHEMA_OPERATOR_UID);
@@ -65,6 +67,7 @@ public class MaxComputeDataSinkFactory implements DataSinkFactory {
                 .withStsToken(stsToken)
                 .withBucketsNum(bucketsNum)
                 .withSchemaOperatorUid(schemaOperatorUid)
+                .withSinkOperation(sinkOperation)
                 .build();
     }
 
@@ -124,6 +127,7 @@ public class MaxComputeDataSinkFactory implements DataSinkFactory {
         optionalOptions.add(MaxComputeDataSinkOptions.FLUSH_CONCURRENT_NUM);
         optionalOptions.add(MaxComputeDataSinkOptions.TOTAL_BUFFER_SIZE);
         optionalOptions.add(MaxComputeDataSinkOptions.BUCKET_BUFFER_SIZE);
+        optionalOptions.add(MaxComputeDataSinkOptions.SINK_OPERATION);
 
         return optionalOptions;
     }
