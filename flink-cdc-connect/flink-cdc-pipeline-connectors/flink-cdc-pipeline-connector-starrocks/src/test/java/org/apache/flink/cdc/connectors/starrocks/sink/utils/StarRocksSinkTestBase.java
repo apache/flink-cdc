@@ -40,6 +40,7 @@ import org.testcontainers.containers.wait.strategy.LogMessageWaitStrategy;
 import org.testcontainers.lifecycle.Startables;
 
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
@@ -205,6 +206,23 @@ public class StarRocksSinkTestBase extends TestLogger {
             results.add(String.join(" | ", columns));
         }
         return results;
+    }
+
+    public String inspectTableComment(TableId tableId) throws SQLException {
+        String sql =
+                "SELECT TABLE_COMMENT FROM information_schema.TABLES "
+                        + "WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?";
+        try (Connection connection = STARROCKS_CONTAINER.createConnection("");
+                PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, tableId.getSchemaName());
+            statement.setString(2, tableId.getTableName());
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (resultSet.next()) {
+                    return resultSet.getString(1);
+                }
+            }
+        }
+        return null;
     }
 
     public List<String> fetchTableContent(TableId tableId, int columnCount) throws SQLException {

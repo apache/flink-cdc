@@ -19,9 +19,12 @@ package org.apache.flink.cdc.connectors.starrocks.sink;
 
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
+import org.apache.flink.cdc.common.event.AlterTableCommentEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
+import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.exceptions.UnsupportedSchemaChangeEventException;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.BooleanType;
@@ -67,6 +70,12 @@ class StarRocksMetadataApplierTest {
         this.catalog = new MockStarRocksCatalog();
         this.metadataApplier =
                 new StarRocksMetadataApplier(catalog, tableCreateConfig, schemaChangeConfig);
+    }
+
+    @Test
+    void testSupportedSchemaEvolutionTypes() {
+        Assertions.assertThat(metadataApplier.getSupportedSchemaEvolutionTypes())
+                .contains(SchemaChangeEventType.ALTER_TABLE_COMMENT);
     }
 
     @Test
@@ -120,6 +129,85 @@ class StarRocksMetadataApplierTest {
                         .setTableProperties(Collections.singletonMap("replication_num", "5"))
                         .build();
         Assertions.assertThat(actualTable).isEqualTo(expectTable);
+    }
+
+    @Test
+    void testAlterTableComment() throws Exception {
+        TableId tableId = TableId.parse("test.tbl_comment");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("col1", new IntType())
+                        .primaryKey("col1")
+                        .comment("old table comment")
+                        .build();
+        metadataApplier.applySchemaChange(new CreateTableEvent(tableId, schema));
+
+        metadataApplier.applySchemaChange(new AlterTableCommentEvent(tableId, "new table comment"));
+
+        StarRocksTable actualTable =
+                catalog.getTable(tableId.getSchemaName(), tableId.getTableName()).orElse(null);
+        Assertions.assertThat(actualTable).isNotNull();
+        Assertions.assertThat(actualTable.getComment()).hasValue("new table comment");
+    }
+
+    @Test
+    void testAlterTableCommentWithUnsupportedVersion() throws Exception {
+        TableId tableId = TableId.parse("test.tbl_comment_unsupported_version");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("col1", new IntType())
+                        .primaryKey("col1")
+                        .build();
+        metadataApplier.applySchemaChange(new CreateTableEvent(tableId, schema));
+
+        catalog.setSupportsAlterTableComment(false);
+
+        Assertions.assertThatThrownBy(
+                        () ->
+                                metadataApplier.applySchemaChange(
+                                        new AlterTableCommentEvent(tableId, "new table comment")))
+                .isExactlyInstanceOf(UnsupportedSchemaChangeEventException.class)
+                .extracting(e -> ((UnsupportedSchemaChangeEventException) e).getExceptionMessage())
+                .asString()
+                .contains("StarRocks 3.1 or later");
+    }
+
+    @Test
+    void testAlterTableCommentSupportedVersion() {
+        Assertions.assertThat(StarRocksEnrichedCatalog.isAlterTableCommentSupportedVersion("3.1.0"))
+                .isTrue();
+        Assertions.assertThat(
+                        StarRocksEnrichedCatalog.isAlterTableCommentSupportedVersion("3.5.10"))
+                .isTrue();
+        Assertions.assertThat(
+                        StarRocksEnrichedCatalog.isAlterTableCommentSupportedVersion(
+                                "StarRocks-3.5.10"))
+                .isTrue();
+        Assertions.assertThat(
+                        StarRocksEnrichedCatalog.isAlterTableCommentSupportedVersion(
+                                "StarRocks version 3.1.0"))
+                .isTrue();
+        Assertions.assertThat(StarRocksEnrichedCatalog.isAlterTableCommentSupportedVersion("4.0.0"))
+                .isTrue();
+        Assertions.assertThat(StarRocksEnrichedCatalog.isAlterTableCommentSupportedVersion("3.0.9"))
+                .isFalse();
+        Assertions.assertThat(
+                        StarRocksEnrichedCatalog.isAlterTableCommentSupportedVersion(
+                                "StarRocks version 2.1.2"))
+                .isFalse();
+        Assertions.assertThat(StarRocksEnrichedCatalog.isAlterTableCommentSupportedVersion("2.5.0"))
+                .isFalse();
+        Assertions.assertThat(
+                        StarRocksEnrichedCatalog.isAlterTableCommentSupportedVersion("unknown"))
+                .isFalse();
+    }
+
+    @Test
+    void testEscapeSqlStringLiteral() {
+        Assertions.assertThat(
+                        StarRocksEnrichedCatalog.escapeSqlStringLiteral(
+                                "comment with \"quote\", backslash \\, newline\nand carriage\r"))
+                .isEqualTo("comment with \\\"quote\\\", backslash \\\\, newline\\nand carriage\\r");
     }
 
     @Test
