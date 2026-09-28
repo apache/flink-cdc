@@ -52,6 +52,7 @@ public class ValuesDataSourceHelper {
     public enum EventSetId {
         SINGLE_SPLIT_SINGLE_TABLE,
         SINGLE_SPLIT_SINGLE_TABLE_WITH_DEFAULT_VALUE,
+        SINGLE_SPLIT_SINGLE_PARTITION_TABLE,
         SINGLE_SPLIT_MULTI_TABLES,
         MULTI_SPLITS_SINGLE_TABLE,
         CUSTOM_SOURCE_EVENTS,
@@ -120,6 +121,11 @@ public class ValuesDataSourceHelper {
             case SINGLE_SPLIT_SINGLE_TABLE_WITH_DEFAULT_VALUE:
                 {
                     sourceEvents = singleSplitSingleTableWithDefaultValue();
+                    break;
+                }
+            case SINGLE_SPLIT_SINGLE_PARTITION_TABLE:
+                {
+                    sourceEvents = singleSplitSinglePartitionTable();
                     break;
                 }
             case SINGLE_SPLIT_MULTI_TABLES:
@@ -339,6 +345,63 @@ public class ValuesDataSourceHelper {
         // rename column with default value
         eventOfSplits.get(0).add(renameColumnWithDefaultValue(TABLE_1));
 
+        return eventOfSplits;
+    }
+
+    /**
+     * A single split with a single partitioned table. The partition column is intentionally placed
+     * before data columns to verify partition handling when partition key is not at the end of the
+     * schema.
+     */
+    public static List<List<Event>> singleSplitSinglePartitionTable() {
+        List<List<Event>> eventOfSplits = new ArrayList<>();
+        List<Event> split1 = new ArrayList<>();
+
+        // create table with partition column before data columns
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("pt", DataTypes.STRING())
+                        .physicalColumn("col1", DataTypes.STRING())
+                        .physicalColumn("col2", DataTypes.STRING())
+                        .partitionKey("pt")
+                        .primaryKey("col1")
+                        .build();
+        split1.add(new CreateTableEvent(TABLE_1, schema));
+
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(
+                        RowType.of(DataTypes.STRING(), DataTypes.STRING(), DataTypes.STRING()));
+
+        // insert into different partitions
+        split1.add(
+                DataChangeEvent.insertEvent(
+                        TABLE_1,
+                        generator.generate(
+                                new Object[] {
+                                    BinaryStringData.fromString("2024-01"),
+                                    BinaryStringData.fromString("1"),
+                                    BinaryStringData.fromString("a")
+                                })));
+        split1.add(
+                DataChangeEvent.insertEvent(
+                        TABLE_1,
+                        generator.generate(
+                                new Object[] {
+                                    BinaryStringData.fromString("2024-01"),
+                                    BinaryStringData.fromString("2"),
+                                    BinaryStringData.fromString("b")
+                                })));
+        split1.add(
+                DataChangeEvent.insertEvent(
+                        TABLE_1,
+                        generator.generate(
+                                new Object[] {
+                                    BinaryStringData.fromString("2024-02"),
+                                    BinaryStringData.fromString("3"),
+                                    BinaryStringData.fromString("c")
+                                })));
+
+        eventOfSplits.add(split1);
         return eventOfSplits;
     }
 
