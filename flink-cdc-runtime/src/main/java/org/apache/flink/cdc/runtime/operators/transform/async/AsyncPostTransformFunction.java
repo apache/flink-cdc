@@ -34,6 +34,7 @@ import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.model.AiModelClient;
 import org.apache.flink.cdc.common.pipeline.DecimalPrecisionMode;
+import org.apache.flink.cdc.common.pipeline.TransformExpressionSemantics;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.udf.UserDefinedFunctionContext;
@@ -122,6 +123,7 @@ public class AsyncPostTransformFunction extends RichAsyncFunction<Event, Event>
 
     private final String timezone;
     private final DecimalPrecisionMode decimalPrecisionMode;
+    private final TransformExpressionSemantics expressionSemantics;
     private final List<TransformRule> transformRules;
     private final Map<TableId, PostTransformTableInfo> tableInfoMap;
 
@@ -160,6 +162,7 @@ public class AsyncPostTransformFunction extends RichAsyncFunction<Event, Event>
             List<TransformRule> transformRules,
             String timezone,
             DecimalPrecisionMode decimalPrecisionMode,
+            TransformExpressionSemantics expressionSemantics,
             List<Tuple3<String, String, Map<String, String>>> udfFunctions,
             Map<String, AiModelClient> modelClients,
             int asyncWorkerThreads) {
@@ -167,6 +170,7 @@ public class AsyncPostTransformFunction extends RichAsyncFunction<Event, Event>
                 asyncWorkerThreads > 0, "Async worker threads must be greater than 0.");
         this.timezone = timezone;
         this.decimalPrecisionMode = decimalPrecisionMode;
+        this.expressionSemantics = expressionSemantics;
         this.transformRules = transformRules;
         this.tableInfoMap = new ConcurrentHashMap<>();
         this.udfFunctions = udfFunctions;
@@ -689,7 +693,8 @@ public class AsyncPostTransformFunction extends RichAsyncFunction<Event, Event>
                         preSchema.getColumns(),
                         udfDescriptors,
                         transformer.getSupportedMetadataColumns(),
-                        decimalPrecisionMode);
+                        decimalPrecisionMode,
+                        expressionSemantics);
         return preSchema.copy(
                 projectionColumns.stream()
                         .map(ProjectionColumn::getColumn)
@@ -760,7 +765,8 @@ public class AsyncPostTransformFunction extends RichAsyncFunction<Event, Event>
                             udfDescriptors,
                             udfFunctionInstances,
                             postTransformer.getSupportedMetadataColumns(),
-                            modelClients));
+                            modelClients,
+                            expressionSemantics));
         }
         return processors.get(tableId, postTransformer);
     }
@@ -789,7 +795,8 @@ public class AsyncPostTransformFunction extends RichAsyncFunction<Event, Event>
                                 udfDescriptors,
                                 udfFunctionInstances,
                                 postTransformer.getSupportedMetadataColumns(),
-                                modelClients));
+                                modelClients,
+                                expressionSemantics));
             }
         }
         return processors.get(tableId, postTransformer);

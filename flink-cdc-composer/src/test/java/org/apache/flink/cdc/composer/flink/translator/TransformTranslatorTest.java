@@ -21,6 +21,7 @@ import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.DecimalPrecisionMode;
+import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.common.types.DataTypes;
@@ -60,6 +61,8 @@ class TransformTranslatorTest {
                                 Collections.singletonList(transform),
                                 "UTC",
                                 DecimalPrecisionMode.UP_TO_19,
+                                PipelineOptions.PIPELINE_TRANSFORM_EXPRESSION_SEMANTICS
+                                        .defaultValue(),
                                 Collections.emptyList(),
                                 Collections.emptyList(),
                                 new SupportedMetadataColumn[0],

@@ -25,6 +25,7 @@ import org.apache.flink.cdc.common.model.AiModelClient;
 import org.apache.flink.cdc.common.model.AiModelClientFactory;
 import org.apache.flink.cdc.common.model.ModelContext;
 import org.apache.flink.cdc.common.pipeline.DecimalPrecisionMode;
+import org.apache.flink.cdc.common.pipeline.TransformExpressionSemantics;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.composer.definition.ModelDef;
 import org.apache.flink.cdc.composer.definition.TransformDef;
@@ -115,6 +116,7 @@ public class TransformTranslator {
             List<TransformDef> transforms,
             String timezone,
             DecimalPrecisionMode decimalPrecisionMode,
+            TransformExpressionSemantics expressionSemantics,
             List<UdfDef> udfFunctions,
             List<ModelDef> models,
             SupportedMetadataColumn[] supportedMetadataColumns,
@@ -140,6 +142,7 @@ public class TransformTranslator {
         }
         postTransformFunctionBuilder.addTimezone(timezone);
         postTransformFunctionBuilder.addDecimalPrecisionMode(decimalPrecisionMode);
+        postTransformFunctionBuilder.addExpressionSemantics(expressionSemantics);
         postTransformFunctionBuilder.addUdfFunctions(
                 udfFunctions.stream().map(this::udfDefToUDFTuple).collect(Collectors.toList()));
         postTransformFunctionBuilder.addUdfFunctions(
@@ -159,6 +162,7 @@ public class TransformTranslator {
             List<TransformDef> transforms,
             String timezone,
             DecimalPrecisionMode decimalPrecisionMode,
+            TransformExpressionSemantics expressionSemantics,
             List<UdfDef> udfFunctions,
             List<ModelDef> models,
             SupportedMetadataColumn[] supportedMetadataColumns,
@@ -195,6 +199,7 @@ public class TransformTranslator {
         }
         asyncPostTransformFunctionBuilder.addTimezone(timezone);
         asyncPostTransformFunctionBuilder.addDecimalPrecisionMode(decimalPrecisionMode);
+        asyncPostTransformFunctionBuilder.addExpressionSemantics(expressionSemantics);
         asyncPostTransformFunctionBuilder.addUdfFunctions(
                 udfFunctions.stream().map(this::udfDefToUDFTuple).collect(Collectors.toList()));
         asyncPostTransformFunctionBuilder.addUdfFunctions(
