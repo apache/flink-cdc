@@ -167,6 +167,20 @@ pipeline:
       <td>表快照的块大小（行数），读取表的快照时，捕获的表被拆分为多个块。</td>
     </tr>
     <tr>
+      <td>scan.incremental.snapshot.chunk.key-column</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>用于将表快照拆分为多个分片的分片键列。
+        默认情况下，分片键是主键的第一列。
+        对于<b>无主键表</b>，此选项为<b>必填项</b>，且指定列必须为 <code>NOT NULL</code>。
+        可以使用非主键列作为分片键，但这可能会导致查询性能下降。
+        <br>
+        可使用 <code>&lt;table-pattern&gt;:&lt;column&gt;</code> 格式为多张表分别指定分片键，多个配置之间用分号（<code>;</code>）分隔。
+        例如：<code>db1.table_[0-9]+:col1;db2.orders:col2</code>。
+      </td>
+    </tr>
+    <tr>
       <td>scan.snapshot.fetch.size</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">1024</td>
