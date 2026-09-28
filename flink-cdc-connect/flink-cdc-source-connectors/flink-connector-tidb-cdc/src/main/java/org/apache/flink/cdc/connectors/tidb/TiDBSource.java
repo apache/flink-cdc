@@ -17,16 +17,120 @@
 
 package org.apache.flink.cdc.connectors.tidb;
 
+import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.connector.source.Boundedness;
+import org.apache.flink.api.connector.source.Source;
+import org.apache.flink.api.connector.source.SourceReader;
+import org.apache.flink.api.connector.source.SourceReaderContext;
+import org.apache.flink.api.connector.source.SplitEnumerator;
+import org.apache.flink.api.connector.source.SplitEnumeratorContext;
+import org.apache.flink.api.java.typeutils.ResultTypeQueryable;
+import org.apache.flink.cdc.common.annotation.PublicEvolving;
+import org.apache.flink.cdc.connectors.tidb.source.enumerator.TiKVEnumeratorState;
+import org.apache.flink.cdc.connectors.tidb.source.enumerator.TiKVEnumeratorStateSerializer;
+import org.apache.flink.cdc.connectors.tidb.source.enumerator.TiKVSourceEnumerator;
+import org.apache.flink.cdc.connectors.tidb.source.reader.TiKVSourceReader;
+import org.apache.flink.cdc.connectors.tidb.source.split.TiKVKeyRangeSplit;
+import org.apache.flink.cdc.connectors.tidb.source.split.TiKVKeyRangeSplitSerializer;
+import org.apache.flink.cdc.connectors.tidb.table.StartupMode;
 import org.apache.flink.cdc.connectors.tidb.table.StartupOptions;
-import org.apache.flink.streaming.api.functions.source.RichParallelSourceFunction;
+import org.apache.flink.core.io.SimpleVersionedSerializer;
 
 import org.tikv.common.TiConfiguration;
 
-/** A builder to build a SourceFunction which can read snapshot and continue to read CDC events. */
-public class TiDBSource {
+/**
+ * The TiDB CDC {@link Source} based on FLIP-27.
+ *
+ * <p>The enumerator splits the captured table by TiKV regions once and assigns a contiguous
+ * key-range to each reader. Restore reuses checkpointed splits and does not re-query PD for region
+ * topology.
+ *
+ * <pre>{@code
+ * Source<String, ?, ?> source =
+ *     TiDBSource.<String>builder()
+ *         .database("mydb")
+ *         .tableName("products")
+ *         .tiConf(tiConf)
+ *         .snapshotEventDeserializer(...)
+ *         .changeEventDeserializer(...)
+ *         .build();
+ * env.fromSource(source, WatermarkStrategy.noWatermarks(), "TiDB Source");
+ * }</pre>
+ *
+ * @param <T> the output type of the source.
+ */
+@PublicEvolving
+public class TiDBSource<T>
+        implements Source<T, TiKVKeyRangeSplit, TiKVEnumeratorState>, ResultTypeQueryable<T> {
+
+    private static final long serialVersionUID = 1L;
+
+    private final TiKVSnapshotEventDeserializationSchema<T> snapshotEventDeserializationSchema;
+    private final TiKVChangeEventDeserializationSchema<T> changeEventDeserializationSchema;
+    private final TiConfiguration tiConf;
+    private final StartupMode startupMode;
+    private final String database;
+    private final String tableName;
+
+    TiDBSource(
+            TiKVSnapshotEventDeserializationSchema<T> snapshotEventDeserializationSchema,
+            TiKVChangeEventDeserializationSchema<T> changeEventDeserializationSchema,
+            TiConfiguration tiConf,
+            StartupMode startupMode,
+            String database,
+            String tableName) {
+        this.snapshotEventDeserializationSchema = snapshotEventDeserializationSchema;
+        this.changeEventDeserializationSchema = changeEventDeserializationSchema;
+        this.tiConf = tiConf;
+        this.startupMode = startupMode;
+        this.database = database;
+        this.tableName = tableName;
+    }
 
     public static <T> Builder<T> builder() {
         return new Builder<>();
+    }
+
+    @Override
+    public Boundedness getBoundedness() {
+        return Boundedness.CONTINUOUS_UNBOUNDED;
+    }
+
+    @Override
+    public SourceReader<T, TiKVKeyRangeSplit> createReader(SourceReaderContext readerContext) {
+        return new TiKVSourceReader<>(
+                readerContext,
+                snapshotEventDeserializationSchema,
+                changeEventDeserializationSchema,
+                tiConf,
+                startupMode);
+    }
+
+    @Override
+    public SplitEnumerator<TiKVKeyRangeSplit, TiKVEnumeratorState> createEnumerator(
+            SplitEnumeratorContext<TiKVKeyRangeSplit> enumContext) {
+        return new TiKVSourceEnumerator(enumContext, tiConf, database, tableName);
+    }
+
+    @Override
+    public SplitEnumerator<TiKVKeyRangeSplit, TiKVEnumeratorState> restoreEnumerator(
+            SplitEnumeratorContext<TiKVKeyRangeSplit> enumContext, TiKVEnumeratorState checkpoint) {
+        return new TiKVSourceEnumerator(enumContext, tiConf, database, tableName, checkpoint);
+    }
+
+    @Override
+    public SimpleVersionedSerializer<TiKVKeyRangeSplit> getSplitSerializer() {
+        return TiKVKeyRangeSplitSerializer.INSTANCE;
+    }
+
+    @Override
+    public SimpleVersionedSerializer<TiKVEnumeratorState> getEnumeratorCheckpointSerializer() {
+        return TiKVEnumeratorStateSerializer.INSTANCE;
+    }
+
+    @Override
+    public TypeInformation<T> getProducedType() {
+        return snapshotEventDeserializationSchema.getProducedType();
     }
 
     /** Builder class of {@link TiDBSource}. */
@@ -35,7 +139,6 @@ public class TiDBSource {
         private String tableName;
         private StartupOptions startupOptions = StartupOptions.initial();
         private TiConfiguration tiConf;
-
         private TiKVSnapshotEventDeserializationSchema<T> snapshotEventDeserializationSchema;
         private TiKVChangeEventDeserializationSchema<T> changeEventDeserializationSchema;
 
@@ -77,9 +180,8 @@ public class TiDBSource {
             return this;
         }
 
-        public RichParallelSourceFunction<T> build() {
-
-            return new TiKVRichParallelSourceFunction<>(
+        public TiDBSource<T> build() {
+            return new TiDBSource<>(
                     snapshotEventDeserializationSchema,
                     changeEventDeserializationSchema,
                     tiConf,

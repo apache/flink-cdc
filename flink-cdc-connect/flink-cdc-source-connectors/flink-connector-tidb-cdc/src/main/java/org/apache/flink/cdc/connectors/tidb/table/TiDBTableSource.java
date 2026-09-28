@@ -24,7 +24,7 @@ import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.connector.source.ScanTableSource;
-import org.apache.flink.table.connector.source.SourceFunctionProvider;
+import org.apache.flink.table.connector.source.SourceProvider;
 import org.apache.flink.table.connector.source.abilities.SupportsReadingMetadata;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.DataType;
@@ -131,7 +131,7 @@ public class TiDBTableSource implements ScanTableSource, SupportsReadingMetadata
                         .tiConf(tiConf)
                         .snapshotEventDeserializer(snapshotEventDeserializationSchema)
                         .changeEventDeserializer(changeEventDeserializationSchema);
-        return SourceFunctionProvider.of(builder.build(), false);
+        return SourceProvider.of(builder.build());
     }
 
     @Override

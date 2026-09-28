@@ -63,9 +63,14 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
 /**
- * The source implementation for TiKV that read snapshot events first and then read the change
- * event.
+ * Deprecated SourceFunction implementation. Use {@link
+ * org.apache.flink.cdc.connectors.tidb.TiDBSource} which splits the table once on the enumerator.
+ *
+ * @deprecated Use {@link org.apache.flink.cdc.connectors.tidb.TiDBSource} with {@code
+ *     env.fromSource(...)}. Per-subtask region discovery can assign overlapping or gapped key
+ *     ranges when tasks start at different times.
  */
+@Deprecated
 public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunction<T>
         implements CheckpointListener, CheckpointedFunction, ResultTypeQueryable<T> {
 
