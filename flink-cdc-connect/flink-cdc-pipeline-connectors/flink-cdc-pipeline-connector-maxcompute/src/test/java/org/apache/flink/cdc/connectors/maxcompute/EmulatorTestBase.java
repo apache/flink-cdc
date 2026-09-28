@@ -47,23 +47,23 @@ public class EmulatorTestBase {
             DockerImageName.parse("maxcompute/maxcompute-emulator:v0.0.7");
 
     // a fresh container per test class: a stopped GenericContainer instance cannot be restarted
-    public static GenericContainer<?> MAXCOMPUTE_CONTAINER;
+    public static GenericContainer<?> maxcomputeContainer;
 
     @BeforeAll
     static void createContainer() {
-        MAXCOMPUTE_CONTAINER =
+        maxcomputeContainer =
                 new GenericContainer<>(MAXCOMPUTE_IMAGE)
                         .withExposedPorts(8080)
                         .waitingFor(
                                 Wait.forLogMessage(
                                         ".*Started MaxcomputeEmulatorApplication.*\\n", 1))
                         .withLogConsumer(new Slf4jLogConsumer(LOG));
-        Startables.deepStart(MAXCOMPUTE_CONTAINER).join();
+        Startables.deepStart(maxcomputeContainer).join();
     }
 
     @AfterAll
     static void destroyContainer() {
-        MAXCOMPUTE_CONTAINER.stop();
+        maxcomputeContainer.stop();
     }
 
     public final MaxComputeOptions testOptions =
@@ -75,16 +75,16 @@ public class EmulatorTestBase {
 
     private String getEndpoint() {
         String ip;
-        if (MAXCOMPUTE_CONTAINER.getHost().equals("localhost")) {
+        if (maxcomputeContainer.getHost().equals("localhost")) {
             try {
                 ip = InetAddress.getLocalHost().getHostAddress();
             } catch (UnknownHostException e) {
                 ip = "127.0.0.1";
             }
         } else {
-            ip = MAXCOMPUTE_CONTAINER.getHost();
+            ip = maxcomputeContainer.getHost();
         }
-        String endpoint = "http://" + ip + ":" + MAXCOMPUTE_CONTAINER.getFirstMappedPort();
+        String endpoint = "http://" + ip + ":" + maxcomputeContainer.getFirstMappedPort();
         sendPOST(endpoint + "/init", endpoint);
         return endpoint;
     }
