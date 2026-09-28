@@ -28,8 +28,12 @@ import io.debezium.relational.history.TableChanges;
 import io.debezium.relational.history.TableChanges.TableChange;
 
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 /** A component used to get schema by table path. */
@@ -44,38 +48,73 @@ public class SqlServerSchema {
     public TableChange getTableSchema(
             JdbcConnection jdbc, TableId tableId, Tables.TableFilter tableFilters) {
         // read schema from cache first
-        TableChange schema = schemasByTableId.get(tableId);
-        if (schema == null) {
-            schema = readTableSchema(jdbc, tableId, tableFilters);
-            schemasByTableId.put(tableId, schema);
+        if (!schemasByTableId.containsKey(tableId)) {
+            readTableSchema(jdbc, Collections.singletonList(tableId), tableFilters);
         }
-        return schema;
+        return schemasByTableId.get(tableId);
     }
 
-    private TableChange readTableSchema(
-            JdbcConnection jdbc, TableId tableId, Tables.TableFilter tableFilters) {
+    public Map<TableId, TableChange> getTableSchema(
+            JdbcConnection jdbc, List<TableId> tableIds, Tables.TableFilter tableFilters) {
+        // read schema from cache first
+        Map<TableId, TableChange> tableChanges = new HashMap<>();
+
+        List<TableId> unMatchTableIds = new ArrayList<>();
+        for (TableId tableId : tableIds) {
+            if (schemasByTableId.containsKey(tableId)) {
+                tableChanges.put(tableId, schemasByTableId.get(tableId));
+            } else {
+                unMatchTableIds.add(tableId);
+            }
+        }
+
+        if (!unMatchTableIds.isEmpty()) {
+            readTableSchema(jdbc, tableIds, tableFilters);
+            for (TableId tableId : unMatchTableIds) {
+                if (schemasByTableId.containsKey(tableId)) {
+                    tableChanges.put(tableId, schemasByTableId.get(tableId));
+                } else {
+                    throw new FlinkRuntimeException(
+                            String.format("Failed to read table schema of table %s", tableId));
+                }
+            }
+        }
+        return tableChanges;
+    }
+
+    private List<TableChange> readTableSchema(
+            JdbcConnection jdbc, List<TableId> tableIds, Tables.TableFilter tableFilters) {
         SqlServerConnection sqlServerConnection = (SqlServerConnection) jdbc;
 
-        final Map<TableId, TableChange> tableChangeMap = new HashMap<>();
         Tables tables = new Tables();
-        tables.overwriteTable(tables.editOrCreateTable(tableId).create());
+        for (TableId tableId : tableIds) {
+            tables.overwriteTable(tables.editOrCreateTable(tableId).create());
+        }
 
         try {
+            // leave the schema pattern open so all requested tables are read in one scan, even
+            // when they span multiple SQL Server schemas
             sqlServerConnection.readSchema(
-                    tables, tableId.catalog(), tableId.schema(), tableFilters, null, false);
-            Table table = tables.forTable(tableId);
-            TableChange tableChange = new TableChange(TableChanges.TableChangeType.CREATE, table);
-            tableChangeMap.put(tableId, tableChange);
+                    tables, tableIds.get(0).catalog(), null, tableFilters, null, false);
         } catch (SQLException e) {
-            throw new FlinkRuntimeException(
-                    String.format("Failed to read schema for table %s ", tableId), e);
+            throw new FlinkRuntimeException("Failed to read schema", e);
         }
 
-        if (!tableChangeMap.containsKey(tableId)) {
-            throw new FlinkRuntimeException(
-                    String.format("Can't obtain schema for table %s ", tableId));
+        // tableFilters matches every captured table, so this single scan already fetched all of
+        // them; cache everything it found instead of just the tables that were asked for, so
+        // later single-table lookups (e.g. from chunk splitting) hit the cache too
+        for (TableId tableId : tables.tableIds()) {
+            Table table = tables.forTable(tableId);
+            if (table != null) {
+                schemasByTableId.put(
+                        tableId, new TableChange(TableChanges.TableChangeType.CREATE, table));
+            }
         }
 
-        return tableChangeMap.get(tableId);
+        List<TableChange> tableChanges = new ArrayList<>();
+        for (TableId tableId : tableIds) {
+            tableChanges.add(Objects.requireNonNull(schemasByTableId.get(tableId)));
+        }
+        return tableChanges;
     }
 }
