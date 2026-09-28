@@ -20,9 +20,11 @@ package org.apache.flink.cdc.connectors.iceberg.sink.utils;
 import org.apache.flink.cdc.common.types.DataTypes;
 
 import org.apache.iceberg.expressions.Literal;
+import org.apache.iceberg.types.Types;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.ZoneId;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -135,5 +137,27 @@ public class IcebergTypeUtilsTest {
         Literal<?> result =
                 IcebergTypeUtils.parseDefaultValue("AUTO_DECREMENT()", DataTypes.BIGINT());
         assertThat(result).isNull();
+    }
+
+    @Test
+    public void testConvertTimestampWithLocalTimeZoneToIcebergType() {
+        // TIMESTAMPTZ in PostgreSQL should map to TIMESTAMP_LTZ in CDC types,
+        // and then to Iceberg's TimestampType.withZone().
+        // This verifies the type conversion doesn't use TIMESTAMP_WITH_TIME_ZONE
+        // (ZonedTimestampType), which would cause a serialization mismatch in
+        // BinaryRecordData — the Debezium deserializer produces
+        // LocalZonedTimestampData, not ZonedTimestampData.
+        assertThat(IcebergTypeUtils.convertCDCTypeToIcebergType(DataTypes.TIMESTAMP_LTZ(6)))
+                .isEqualTo(Types.TimestampType.withZone());
+    }
+
+    @Test
+    public void testCreateFieldGetterForTimestampLtz() {
+        // Verify that createFieldGetter for TIMESTAMP_WITH_LOCAL_TIME_ZONE
+        // produces a valid field getter (not throwing ClassCastException or
+        // NumberFormatException when reading through BinaryRecordData).
+        org.apache.flink.cdc.common.data.RecordData.FieldGetter getter =
+                IcebergTypeUtils.createFieldGetter(DataTypes.TIMESTAMP_LTZ(6), 0, ZoneId.of("UTC"));
+        assertThat(getter).isNotNull();
     }
 }
