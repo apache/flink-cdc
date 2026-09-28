@@ -89,6 +89,18 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
     public void exitCopyCreateTable(MySqlParser.CopyCreateTableContext ctx) {
         TableId tableId = parser.parseQualifiedTableId(ctx.tableName(0).fullId());
         TableId originalTableId = parser.parseQualifiedTableId(ctx.tableName(1).fullId());
+
+        // MySQL logs CREATE TABLE IF NOT EXISTS even when the target already exists. In that case
+        // the statement is a no-op and must not replace the schema restored from history.
+        if (ctx.ifNotExists() != null && parser.databaseTables().forTable(tableId) != null) {
+            LOG.debug(
+                    "Ignoring no-op CREATE TABLE IF NOT EXISTS {} LIKE {} because the target table already exists",
+                    tableId,
+                    originalTableId);
+            super.exitCopyCreateTable(ctx);
+            return;
+        }
+
         Table original = parser.databaseTables().forTable(originalTableId);
         if (original != null) {
             parser.databaseTables()
