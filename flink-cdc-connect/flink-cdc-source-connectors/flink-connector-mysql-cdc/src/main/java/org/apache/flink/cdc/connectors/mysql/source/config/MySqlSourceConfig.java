@@ -45,6 +45,7 @@ public class MySqlSourceConfig implements Serializable {
     private static final long serialVersionUID = 1L;
 
     private final String hostname;
+    @Nullable private final String snapshotHostname;
     private final int port;
     private final String username;
     private final String password;
@@ -85,6 +86,7 @@ public class MySqlSourceConfig implements Serializable {
 
     MySqlSourceConfig(
             String hostname,
+            @Nullable String snapshotHostname,
             int port,
             String username,
             String password,
@@ -117,6 +119,7 @@ public class MySqlSourceConfig implements Serializable {
             boolean assignUnboundedChunkFirst,
             boolean releaseSnapshotMetadataEnabled) {
         this.hostname = checkNotNull(hostname);
+        this.snapshotHostname = snapshotHostname;
         this.port = port;
         this.username = checkNotNull(username);
         this.password = password;
@@ -168,6 +171,11 @@ public class MySqlSourceConfig implements Serializable {
 
     public String getHostname() {
         return hostname;
+    }
+
+    @Nullable
+    public String getSnapshotHostname() {
+        return snapshotHostname;
     }
 
     public int getPort() {
