@@ -18,9 +18,12 @@
 package org.apache.flink.cdc.connectors.mysql.source;
 
 import org.apache.flink.cdc.common.annotation.Internal;
+import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
+import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.connectors.mysql.source.parser.CustomMySqlAntlrDdlParser;
 import org.apache.flink.cdc.connectors.mysql.table.MySqlReadableMetadata;
 import org.apache.flink.cdc.debezium.event.DebeziumEventDeserializationSchema;
@@ -38,6 +41,8 @@ import io.debezium.relational.history.HistoryRecord;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -45,8 +50,11 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 import static io.debezium.connector.AbstractSourceInfo.DATABASE_NAME_KEY;
 import static io.debezium.connector.AbstractSourceInfo.TABLE_NAME_KEY;
@@ -57,6 +65,8 @@ import static org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils.get
 public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
 
     private static final long serialVersionUID = 1L;
+
+    private static final Logger LOG = LoggerFactory.getLogger(MySqlEventDeserializer.class);
 
     public static final String SCHEMA_CHANGE_EVENT_KEY_NAME =
             "io.debezium.connector.mysql.SchemaChangeKey";
@@ -72,6 +82,7 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
 
     private final List<MySqlReadableMetadata> readableMetadataList;
     private final boolean isTableIdCaseInsensitive;
+    private transient ConcurrentMap<TableId, DataType> dataTypeCache;
 
     public MySqlEventDeserializer(
             DebeziumChangelogMode changelogMode,
@@ -103,6 +114,36 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
     }
 
     @Override
+    public List<DataChangeEvent> deserializeDataChangeRecord(SourceRecord record) throws Exception {
+        Envelope.Operation op = Envelope.operationFor(record);
+        TableId tableId = getTableId(record);
+
+        Struct value = (Struct) record.value();
+        Schema valueSchema = record.valueSchema();
+        Map<String, String> meta = getMetadata(record);
+
+        if (op == Envelope.Operation.CREATE || op == Envelope.Operation.READ) {
+            RecordData after = extractAfterDataRecord(tableId, value, valueSchema);
+            return Collections.singletonList(DataChangeEvent.insertEvent(tableId, after, meta));
+        } else if (op == Envelope.Operation.DELETE) {
+            RecordData before = extractBeforeDataRecord(tableId, value, valueSchema);
+            return Collections.singletonList(DataChangeEvent.deleteEvent(tableId, before, meta));
+        } else if (op == Envelope.Operation.UPDATE) {
+            RecordData after = extractAfterDataRecord(tableId, value, valueSchema);
+            if (changelogMode == DebeziumChangelogMode.ALL) {
+                RecordData before = extractBeforeDataRecord(tableId, value, valueSchema);
+                return Collections.singletonList(
+                        DataChangeEvent.updateEvent(tableId, before, after, meta));
+            }
+            return Collections.singletonList(
+                    DataChangeEvent.updateEvent(tableId, null, after, meta));
+        } else {
+            LOG.trace("Received {} operation, skip", op);
+            return Collections.emptyList();
+        }
+    }
+
+    @Override
     protected List<SchemaChangeEvent> deserializeSchemaChangeRecord(SourceRecord record) {
         if (includeSchemaChanges) {
             if (customParser == null) {
@@ -121,12 +162,63 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
                         historyRecord.document().getString(HistoryRecord.Fields.DDL_STATEMENTS);
                 customParser.setCurrentDatabase(databaseName);
                 customParser.parse(ddl, tables);
-                return customParser.getAndClearParsedEvents();
+                List<SchemaChangeEvent> schemaChangeEvents = customParser.getAndClearParsedEvents();
+                clearDataTypeCache(schemaChangeEvents);
+                return schemaChangeEvents;
             } catch (IOException e) {
                 throw new IllegalStateException("Failed to parse the schema change : " + record, e);
             }
         }
+        getOrCreateDataTypeCache().clear();
         return Collections.emptyList();
+    }
+
+    private RecordData extractBeforeDataRecord(TableId tableId, Struct value, Schema valueSchema)
+            throws Exception {
+        Schema beforeSchema = fieldSchema(valueSchema, Envelope.FieldName.BEFORE);
+        Struct beforeValue = fieldStruct(value, Envelope.FieldName.BEFORE);
+        return extractDataRecord(tableId, beforeValue, beforeSchema);
+    }
+
+    private RecordData extractAfterDataRecord(TableId tableId, Struct value, Schema valueSchema)
+            throws Exception {
+        Schema afterSchema = fieldSchema(valueSchema, Envelope.FieldName.AFTER);
+        Struct afterValue = fieldStruct(value, Envelope.FieldName.AFTER);
+        return extractDataRecord(tableId, afterValue, afterSchema);
+    }
+
+    private RecordData extractDataRecord(TableId tableId, Struct value, Schema valueSchema)
+            throws Exception {
+        DataType dataType = getOrInferDataType(tableId, value, valueSchema);
+        return convertDataRecord(value, valueSchema, dataType);
+    }
+
+    private DataType getOrInferDataType(TableId tableId, Struct value, Schema valueSchema) {
+        ConcurrentMap<TableId, DataType> cache = getOrCreateDataTypeCache();
+        DataType dataType = cache.get(tableId);
+        if (dataType == null) {
+            // Rows from the same table share the same schema until a schema change event arrives.
+            dataType =
+                    cache.computeIfAbsent(
+                            tableId, key -> schemaDataTypeInference.infer(value, valueSchema));
+        }
+        return dataType;
+    }
+
+    private void clearDataTypeCache(List<SchemaChangeEvent> schemaChangeEvents) {
+        ConcurrentMap<TableId, DataType> cache = getOrCreateDataTypeCache();
+        for (SchemaChangeEvent schemaChangeEvent : schemaChangeEvents) {
+            // Keep cache invalidation aligned with the normalized cache key in case-insensitive
+            // mode.
+            cache.remove(normalizeTableId(schemaChangeEvent.tableId()));
+        }
+    }
+
+    private ConcurrentMap<TableId, DataType> getOrCreateDataTypeCache() {
+        if (dataTypeCache == null) {
+            dataTypeCache = new ConcurrentHashMap<>();
+        }
+        return dataTypeCache;
     }
 
     @Override
@@ -151,7 +243,7 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
         Struct source = value.getStruct(Envelope.FieldName.SOURCE);
         String dbName = source.getString(DATABASE_NAME_KEY);
         String tableName = source.getString(TABLE_NAME_KEY);
-        return TableId.tableId(dbName, tableName);
+        return normalizeTableId(TableId.tableId(dbName, tableName));
     }
 
     @Override
@@ -201,5 +293,14 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
         } else {
             return BinaryStringData.fromString(dbzObj.toString());
         }
+    }
+
+    private TableId normalizeTableId(TableId tableId) {
+        if (isTableIdCaseInsensitive) {
+            return TableId.tableId(
+                    tableId.getSchemaName().toLowerCase(Locale.ROOT),
+                    tableId.getTableName().toLowerCase(Locale.ROOT));
+        }
+        return tableId;
     }
 }
