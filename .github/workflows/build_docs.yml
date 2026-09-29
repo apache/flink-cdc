@@ -56,6 +56,7 @@ jobs:
       matrix:
         branch:
           - master
+          - release-3.7
           - release-3.6
           - release-3.5
 
@@ -71,8 +72,8 @@ jobs:
           echo "flink_branch=${currentBranch}" >> ${GITHUB_ENV}
           
           if [ "${currentBranch}" = "master" ]; then
-          echo "flink_alias=release-3.7" >> ${GITHUB_ENV}
-          elif [ "${currentBranch}" = "release-3.6" ]; then
+          echo "flink_alias=release-3.8" >> ${GITHUB_ENV}
+          elif [ "${currentBranch}" = "release-3.7" ]; then
           echo "flink_alias=stable" >> ${GITHUB_ENV}
           fi
 
