@@ -111,6 +111,30 @@ class MaxComputeE2eITCase extends PipelineTestEnvironment {
         assertThat(result.get(1).get(1)).isEqualTo("NULL");
     }
 
+    @Test
+    void testSingleSplitSinglePartitionTable() throws Exception {
+        startTest("SINGLE_SPLIT_SINGLE_PARTITION_TABLE");
+        Instance instance =
+                SQLTask.run(
+                        MaxComputeUtils.getOdps(testOptions),
+                        "select pt, col1, col2 from table1 order by col1;");
+        instance.waitForSuccess();
+        List<Record> result = SQLTask.getResult(instance);
+        LOG.info("{}", result);
+        assertThat(result).hasSize(3);
+        // verify partition column is correctly extracted and data columns are
+        // mapped correctly when partition key is not the last column
+        assertThat(result.get(0).get(0)).isEqualTo("2024-01");
+        assertThat(result.get(0).get(1)).isEqualTo("1");
+        assertThat(result.get(0).get(2)).isEqualTo("a");
+        assertThat(result.get(1).get(0)).isEqualTo("2024-01");
+        assertThat(result.get(1).get(1)).isEqualTo("2");
+        assertThat(result.get(1).get(2)).isEqualTo("b");
+        assertThat(result.get(2).get(0)).isEqualTo("2024-02");
+        assertThat(result.get(2).get(1)).isEqualTo("3");
+        assertThat(result.get(2).get(2)).isEqualTo("c");
+    }
+
     private void startTest(String testSet) throws Exception {
         sendPOST(getEndpoint() + "/init", getEndpoint());
 

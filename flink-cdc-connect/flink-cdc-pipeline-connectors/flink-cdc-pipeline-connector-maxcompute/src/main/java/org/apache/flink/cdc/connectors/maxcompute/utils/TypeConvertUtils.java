@@ -180,11 +180,12 @@ public class TypeConvertUtils {
     public static void toMaxComputeRecord(Schema flinkSchema, RecordData from, ArrayRecord to) {
         Preconditions.checkNotNull(from, "flink record data");
         Preconditions.checkNotNull(to, "maxcompute arrayRecord");
-        int partitionKeyCount = flinkSchema.partitionKeys().size();
+        Set<String> partitionKeys = new HashSet<>(flinkSchema.partitionKeys());
+        int dataColumnCount = flinkSchema.getColumnCount() - partitionKeys.size();
 
         List<RecordData.FieldGetter> fieldGetters = createFieldGetters(flinkSchema);
 
-        if (to.getColumnCount() != (fieldGetters.size() - partitionKeyCount)) {
+        if (to.getColumnCount() != dataColumnCount) {
             throw new IllegalArgumentException(
                     "record data count not match, odps {"
                             + Arrays.stream(to.getColumns())
@@ -195,11 +196,15 @@ public class TypeConvertUtils {
                             + "vs flink {"
                             + flinkSchema
                             + "} count "
-                            + (fieldGetters.size() - partitionKeyCount));
+                            + dataColumnCount);
         }
-        for (int i = 0; i < (fieldGetters.size() - partitionKeyCount); i++) {
+        int dataColumnIndex = 0;
+        for (int i = 0; i < fieldGetters.size(); i++) {
+            if (partitionKeys.contains(flinkSchema.getColumns().get(i).getName())) {
+                continue;
+            }
             Object value = fieldGetters.get(i).getFieldOrNull(from);
-            to.set(i, value);
+            to.set(dataColumnIndex++, value);
         }
     }
 

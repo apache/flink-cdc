@@ -46,40 +46,45 @@ public class EmulatorTestBase {
     public static final DockerImageName MAXCOMPUTE_IMAGE =
             DockerImageName.parse("maxcompute/maxcompute-emulator:v0.0.7");
 
-    public static final GenericContainer<?> MAXCOMPUTE_CONTAINER =
-            new GenericContainer<>(MAXCOMPUTE_IMAGE)
-                    .withExposedPorts(8080)
-                    .waitingFor(
-                            Wait.forLogMessage(".*Started MaxcomputeEmulatorApplication.*\\n", 1))
-                    .withLogConsumer(new Slf4jLogConsumer(LOG));
+    // a fresh container per test class: a stopped GenericContainer instance cannot be restarted
+    public static GenericContainer<?> maxcomputeContainer;
 
     @BeforeAll
     static void createContainer() {
-        Startables.deepStart(MAXCOMPUTE_CONTAINER).join();
+        maxcomputeContainer =
+                new GenericContainer<>(MAXCOMPUTE_IMAGE)
+                        .withExposedPorts(8080)
+                        .waitingFor(
+                                Wait.forLogMessage(
+                                        ".*Started MaxcomputeEmulatorApplication.*\\n", 1))
+                        .withLogConsumer(new Slf4jLogConsumer(LOG));
+        Startables.deepStart(maxcomputeContainer).join();
     }
 
     @AfterAll
     static void destroyContainer() {
-        MAXCOMPUTE_CONTAINER.stop();
+        maxcomputeContainer.stop();
     }
 
     public final MaxComputeOptions testOptions =
-            MaxComputeOptions.builder("ak", "sk", getEndpoint(), "mocked_mc").build();
+            MaxComputeOptions.builder("ak", "sk", getEndpoint(), "mocked_mc")
+                    .withTunnelEndpoint(getEndpoint())
+                    .build();
 
     public final Odps odpsInstance = MaxComputeUtils.getOdps(testOptions);
 
     private String getEndpoint() {
         String ip;
-        if (MAXCOMPUTE_CONTAINER.getHost().equals("localhost")) {
+        if (maxcomputeContainer.getHost().equals("localhost")) {
             try {
                 ip = InetAddress.getLocalHost().getHostAddress();
             } catch (UnknownHostException e) {
                 ip = "127.0.0.1";
             }
         } else {
-            ip = MAXCOMPUTE_CONTAINER.getHost();
+            ip = maxcomputeContainer.getHost();
         }
-        String endpoint = "http://" + ip + ":" + MAXCOMPUTE_CONTAINER.getFirstMappedPort();
+        String endpoint = "http://" + ip + ":" + maxcomputeContainer.getFirstMappedPort();
         sendPOST(endpoint + "/init", endpoint);
         return endpoint;
     }
