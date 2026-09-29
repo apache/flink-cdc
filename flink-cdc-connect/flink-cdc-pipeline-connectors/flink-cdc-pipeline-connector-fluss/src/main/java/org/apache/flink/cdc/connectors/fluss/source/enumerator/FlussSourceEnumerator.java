@@ -82,8 +82,9 @@ import java.util.stream.Collectors;
  * <ol>
  *   <li>{@link #getSubscribedTableBuckets()} — discovers subscribed tables and enumerates all
  *       table-buckets including partitions (async).
- *   <li>{@link #checkTableBucketChanges} — compares discovered table-buckets with already-assigned
- *       ones and triggers split creation for new table-buckets (callback).
+ *   <li>{@link #checkTableBucketChanges} — compares discovered table-buckets with assigned,
+ *       pending, and initializing ones and triggers split creation for new table-buckets
+ *       (callback).
  *   <li>{@link #initPendingBucketSplits} — resolves starting offsets and creates splits for new
  *       table-buckets (async).
  *   <li>{@link #handleTableBucketChanges} — marks physical table paths as assigned and distributes
@@ -120,7 +121,7 @@ public class FlussSourceEnumerator
     private final Map<TablePath, Long> pendingRemovalRequests;
     private final Map<TablePath, Set<Integer>> removalAcknowledgements;
     private final Map<TableBucket, TablePath> pendingRemovalBuckets;
-    private final Set<TablePath> initializingTablePaths;
+    private final Set<PhysicalTablePath> initializingPhysicalTablePaths;
     private final Map<TablePath, Long> removalFences;
     private final Map<String, FlussSplitBase> fencedFreshSplits;
     private List<TableBucketInfo> lastDiscoveredTableBuckets;
@@ -158,7 +159,7 @@ public class FlussSourceEnumerator
         this.pendingRemovalRequests = new HashMap<>();
         this.removalAcknowledgements = new HashMap<>();
         this.pendingRemovalBuckets = new HashMap<>();
-        this.initializingTablePaths = new HashSet<>();
+        this.initializingPhysicalTablePaths = new HashSet<>();
         this.removalFences = new HashMap<>();
         this.fencedFreshSplits = new HashMap<>();
         this.lastDiscoveredTableBuckets = Collections.emptyList();
@@ -287,8 +288,8 @@ public class FlussSourceEnumerator
     // -------------------------------------------------------------------------
 
     /**
-     * Compares the discovered table-buckets against assigned and pending {@link PhysicalTablePath}s
-     * and triggers split creation for newly discovered table-buckets.
+     * Compares the discovered table-buckets against assigned, pending, and initializing {@link
+     * PhysicalTablePath}s and triggers split creation for newly discovered table-buckets.
      */
     private void checkTableBucketChanges(DiscoveryResult discoveryResult, Throwable error) {
         if (error != null) {
@@ -308,18 +309,17 @@ public class FlussSourceEnumerator
 
     private void initializeNewTableBuckets(List<TableBucketInfo> allBuckets) {
 
-        Set<PhysicalTablePath> assignedOrPendingPhysicalTablePaths =
-                new HashSet<>(assignedPhysicalTablePaths);
+        Set<PhysicalTablePath> knownPhysicalTablePaths = new HashSet<>(assignedPhysicalTablePaths);
+        knownPhysicalTablePaths.addAll(initializingPhysicalTablePaths);
         pendingPartitionSplitAssignment.values().stream()
                 .flatMap(Set::stream)
                 .map(FlussSplitBase::getPhysicalTablePath)
-                .forEach(assignedOrPendingPhysicalTablePaths::add);
+                .forEach(knownPhysicalTablePaths::add);
 
         List<TableBucketInfo> newBuckets = new ArrayList<>();
         for (TableBucketInfo info : allBuckets) {
-            if (!initializingTablePaths.contains(info.physicalTablePath.getTablePath())
-                    && !pendingRemovalTablePaths.contains(info.physicalTablePath.getTablePath())
-                    && !assignedOrPendingPhysicalTablePaths.contains(info.physicalTablePath)) {
+            if (!pendingRemovalTablePaths.contains(info.physicalTablePath.getTablePath())
+                    && !knownPhysicalTablePaths.contains(info.physicalTablePath)) {
                 newBuckets.add(info);
             }
         }
@@ -330,11 +330,9 @@ public class FlussSourceEnumerator
         }
 
         LOG.info("Discovered {} new table-bucket(s) to initialize.", newBuckets.size());
-        Set<TablePath> initializingPaths =
-                newBuckets.stream()
-                        .map(info -> info.physicalTablePath.getTablePath())
-                        .collect(Collectors.toSet());
-        initializingTablePaths.addAll(initializingPaths);
+        Set<PhysicalTablePath> initializingPaths =
+                newBuckets.stream().map(info -> info.physicalTablePath).collect(Collectors.toSet());
+        initializingPhysicalTablePaths.addAll(initializingPaths);
         context.callAsync(
                 () -> initPendingBucketSplits(newBuckets),
                 (splits, error) -> handleTableBucketChanges(splits, error, initializingPaths));
@@ -388,7 +386,8 @@ public class FlussSourceEnumerator
         }
         Set<TablePath> clearedTablePaths = new HashSet<>();
         for (TablePath tablePath : pendingRemovalTablePaths) {
-            if (!initializingTablePaths.contains(tablePath)
+            if (initializingPhysicalTablePaths.stream()
+                            .noneMatch(path -> path.getTablePath().equals(tablePath))
                     && removalAcknowledgements
                             .getOrDefault(tablePath, Collections.emptySet())
                             .containsAll(expectedReaders)) {
@@ -634,11 +633,14 @@ public class FlussSourceEnumerator
      * distributes the splits to registered readers.
      */
     private void handleTableBucketChanges(
-            List<FlussSplitBase> newSplits, Throwable error, Set<TablePath> initializingPaths) {
-        initializingTablePaths.removeAll(initializingPaths);
+            List<FlussSplitBase> newSplits,
+            Throwable error,
+            Set<PhysicalTablePath> initializingPaths) {
+        initializingPhysicalTablePaths.removeAll(initializingPaths);
         if (error != null) {
             boolean hasActiveInitializingPath =
                     initializingPaths.stream()
+                            .map(PhysicalTablePath::getTablePath)
                             .anyMatch(
                                     tablePath ->
                                             subscribedTablePaths.contains(tablePath)
