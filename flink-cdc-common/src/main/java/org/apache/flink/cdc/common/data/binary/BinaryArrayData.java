@@ -162,6 +162,17 @@ public final class BinaryArrayData extends BinarySection implements ArrayData {
     /** The position to start storing array elements. */
     private int elementOffset;
 
+    /**
+     * Lazily derived flag telling whether the {@code TIME(p > 3)} elements of this array were
+     * written by a pre-upgrade version of CDC, when such elements still occupied a 4-byte
+     * millisecond slot instead of the current 8-byte {@code Long.MIN_VALUE | nanoOfDay} slot.
+     *
+     * <p>The flag is derived from the payload itself (see {@link #usesLegacyMillisSlots()}) and
+     * must be reset in {@link #pointTo(MemorySegment[], int, int)} because {@link BinaryArrayData}
+     * instances are reused (e.g. by {@code ArrayDataSerializer} and {@link BinaryMapData}).
+     */
+    private Boolean legacyMillisSlots;
+
     public BinaryArrayData() {}
 
     private void assertIndexIsValid(int index) {
@@ -187,6 +198,9 @@ public final class BinaryArrayData extends BinarySection implements ArrayData {
         this.size = size;
         super.pointTo(segments, offset, sizeInBytes);
         this.elementOffset = offset + calculateHeaderInBytes(this.size);
+        // BinaryArrayData instances are reused, so the lazily derived flag must not survive a
+        // repoint to a different payload.
+        this.legacyMillisSlots = null;
     }
 
     @Override
@@ -232,7 +246,7 @@ public final class BinaryArrayData extends BinarySection implements ArrayData {
     @Override
     public TimeData getTime(int pos, int precision) {
         assertIndexIsValid(pos);
-        if (precision <= 3) {
+        if (precision <= 3 || usesLegacyMillisSlots()) {
             return TimeData.fromMillisOfDay(
                     BinarySegmentUtils.getInt(segments, getElementOffset(pos, 4)));
         }
@@ -242,6 +256,36 @@ public final class BinaryArrayData extends BinarySection implements ArrayData {
         }
         throw new IllegalStateException(
                 "High-precision TIME array uses the legacy millisecond binary layout");
+    }
+
+    /**
+     * Derives, from the payload itself, whether the {@code TIME(p > 3)} elements of this array are
+     * stored in the pre-upgrade 4-byte millisecond slot layout.
+     *
+     * <p>A {@code TIME} array has no variable-length part, so {@code sizeInBytes} exactly describes
+     * the fixed-length layout: {@code roundUpTo8(header + slotSize * size)}. The pre-upgrade code
+     * always used a 4-byte slot, and the current code uses an 8-byte slot for {@code p > 3}, so a
+     * payload that is smaller than the current 8-byte layout must have been written with 4-byte
+     * slots. The check is exact, not heuristic.
+     *
+     * <p>The value is cached because it is read for every element; it is invalidated by {@link
+     * #pointTo(MemorySegment[], int, int)}.
+     */
+    private boolean usesLegacyMillisSlots() {
+        if (legacyMillisSlots == null) {
+            int currentLayoutSize = roundUpTo8(calculateHeaderInBytes(size) + 8 * size);
+            legacyMillisSlots = sizeInBytes < currentLayoutSize;
+        }
+        return legacyMillisSlots;
+    }
+
+    /**
+     * Rounds the number of bytes up to the next multiple of 8, mirroring {@code
+     * AbstractBinaryWriter#roundNumberOfBytesToNearestWord} which is not visible from this module.
+     */
+    private static int roundUpTo8(int numBytes) {
+        int remainder = numBytes & 0x07;
+        return remainder == 0 ? numBytes : numBytes + (8 - remainder);
     }
 
     public void setInt(int pos, int value) {
