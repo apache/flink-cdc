@@ -31,29 +31,29 @@ import java.io.ObjectInputStream;
 /**
  * Serializer for {@link TimeData}.
  *
- * <p>TIME values with precision up to 3 retain the historical four-byte millisecond encoding.
- * Higher precisions use an eight-byte nanosecond-of-day encoding.
+ * <p>There is a single encoding path for every precision: an eight-byte {@code Long.MIN_VALUE |
+ * nanoOfDay} value, mirroring the in-memory layout used by the binary records and arrays. Only the
+ * serializer restored from a pre-upgrade checkpoint reads the historical four-byte millisecond
+ * encoding; new state is always written with the current format.
  */
 public final class TimeDataSerializer extends TypeSerializer<TimeData> {
 
     private static final long serialVersionUID = 1L;
 
-    /** The historical singleton represents the millisecond TIME encoding. */
-    public static final TimeDataSerializer INSTANCE = new TimeDataSerializer(3);
+    /**
+     * The current, precision-independent eight-byte {@code Long.MIN_VALUE | nanoOfDay} encoding.
+     */
+    public static final TimeDataSerializer INSTANCE = new TimeDataSerializer(false);
 
-    private int precision;
-    private boolean legacyFormat;
+    /**
+     * When {@code true}, this instance reads and writes the pre-upgrade four-byte millisecond
+     * encoding. It is only produced by {@link TimeDataSerializerSnapshot#restoreSerializer()} so
+     * that Flink can read old managed state and migrate it with {@link #INSTANCE}.
+     */
+    private boolean legacyMillisFormat;
 
-    public TimeDataSerializer(int precision) {
-        this(precision, false);
-    }
-
-    private TimeDataSerializer(int precision, boolean legacyFormat) {
-        if (precision < 0 || precision > 9) {
-            throw new IllegalArgumentException("TIME precision must be between 0 and 9");
-        }
-        this.precision = precision;
-        this.legacyFormat = legacyFormat;
+    TimeDataSerializer(boolean legacyMillisFormat) {
+        this.legacyMillisFormat = legacyMillisFormat;
     }
 
     @Override
@@ -63,7 +63,7 @@ public final class TimeDataSerializer extends TypeSerializer<TimeData> {
 
     @Override
     public TypeSerializer<TimeData> duplicate() {
-        return new TimeDataSerializer(precision, legacyFormat);
+        return new TimeDataSerializer(legacyMillisFormat);
     }
 
     @Override
@@ -83,23 +83,30 @@ public final class TimeDataSerializer extends TypeSerializer<TimeData> {
 
     @Override
     public int getLength() {
-        return usesMillisEncoding() ? Integer.BYTES : Long.BYTES;
+        return legacyMillisFormat ? Integer.BYTES : Long.BYTES;
     }
 
     @Override
     public void serialize(TimeData record, DataOutputView target) throws IOException {
-        if (usesMillisEncoding()) {
+        if (legacyMillisFormat) {
             target.writeInt(record.toMillisOfDay());
         } else {
-            target.writeLong(record.toNanoOfDay());
+            target.writeLong(Long.MIN_VALUE | record.toNanoOfDay());
         }
     }
 
     @Override
     public TimeData deserialize(DataInputView source) throws IOException {
-        return usesMillisEncoding()
-                ? TimeData.fromMillisOfDay(source.readInt())
-                : TimeData.fromNanoOfDay(source.readLong());
+        if (legacyMillisFormat) {
+            return TimeData.fromMillisOfDay(source.readInt());
+        }
+        long encoded = source.readLong();
+        if (encoded < 0) {
+            return TimeData.fromNanoOfDay(encoded & Long.MAX_VALUE);
+        }
+        // Defensive fallback for a payload written by a pre-upgrade serializer whose millisecond
+        // value occupies the low four bytes of the slot.
+        return TimeData.fromMillisOfDay((int) encoded);
     }
 
     @Override
@@ -109,15 +116,11 @@ public final class TimeDataSerializer extends TypeSerializer<TimeData> {
 
     @Override
     public void copy(DataInputView source, DataOutputView target) throws IOException {
-        if (usesMillisEncoding()) {
+        if (legacyMillisFormat) {
             target.writeInt(source.readInt());
         } else {
             target.writeLong(source.readLong());
         }
-    }
-
-    private boolean usesMillisEncoding() {
-        return legacyFormat || precision <= 3;
     }
 
     @Override
@@ -128,49 +131,44 @@ public final class TimeDataSerializer extends TypeSerializer<TimeData> {
         if (obj == null || getClass() != obj.getClass()) {
             return false;
         }
-        TimeDataSerializer that = (TimeDataSerializer) obj;
-        return precision == that.precision && legacyFormat == that.legacyFormat;
+        return legacyMillisFormat == ((TimeDataSerializer) obj).legacyMillisFormat;
     }
 
     @Override
     public int hashCode() {
-        return 31 * precision + Boolean.hashCode(legacyFormat);
+        return Boolean.hashCode(legacyMillisFormat);
     }
 
     @Override
     public TypeSerializerSnapshot<TimeData> snapshotConfiguration() {
-        return new TimeDataSerializerSnapshot(precision, legacyFormat);
+        return new TimeDataSerializerSnapshot(legacyMillisFormat);
     }
 
     /** Reads Java-serialized serializer instances embedded in old array/map snapshots. */
     private void readObject(ObjectInputStream input) throws IOException, ClassNotFoundException {
         ObjectInputStream.GetField fields = input.readFields();
-        if (fields.defaulted("precision")) {
-            precision = 3;
-            legacyFormat = true;
-        } else {
-            precision = fields.get("precision", 3);
-            legacyFormat = fields.get("legacyFormat", false);
-        }
+        // The historical singleton carried no configuration at all, so a missing field means the
+        // instance came from a pre-upgrade checkpoint and must use the millisecond encoding.
+        legacyMillisFormat =
+                fields.defaulted("legacyMillisFormat") || fields.get("legacyMillisFormat", false);
     }
 
     /** Serializer configuration snapshot for compatibility and format evolution. */
     public static final class TimeDataSerializerSnapshot
             implements TypeSerializerSnapshotAdapter<TimeData> {
 
-        // Versions 2 and 3 belonged to SimpleTypeSerializerSnapshot and contained no precision.
+        // Version 2 wrote the serializer class name; version 3 wrote nothing. Both belonged to
+        // SimpleTypeSerializerSnapshot and predate the explicit encoding marker.
         private static final int CURRENT_VERSION = 4;
 
-        private int previousPrecision;
-        private boolean previousLegacyFormat;
+        private boolean previousLegacyMillisFormat;
 
         public TimeDataSerializerSnapshot() {
             // Used when restoring from a checkpoint/savepoint.
         }
 
-        private TimeDataSerializerSnapshot(int precision, boolean legacyFormat) {
-            this.previousPrecision = precision;
-            this.previousLegacyFormat = legacyFormat;
+        private TimeDataSerializerSnapshot(boolean legacyMillisFormat) {
+            this.previousLegacyMillisFormat = legacyMillisFormat;
         }
 
         @Override
@@ -180,8 +178,7 @@ public final class TimeDataSerializer extends TypeSerializer<TimeData> {
 
         @Override
         public void writeSnapshot(DataOutputView out) throws IOException {
-            out.writeInt(previousPrecision);
-            out.writeBoolean(previousLegacyFormat);
+            out.writeBoolean(previousLegacyMillisFormat);
         }
 
         @Override
@@ -190,14 +187,11 @@ public final class TimeDataSerializer extends TypeSerializer<TimeData> {
             if (readVersion == 2) {
                 // SimpleTypeSerializerSnapshot v2 wrote its serializer class name.
                 in.readUTF();
-                previousPrecision = 3;
-                previousLegacyFormat = true;
+                previousLegacyMillisFormat = true;
             } else if (readVersion == 3) {
-                previousPrecision = 3;
-                previousLegacyFormat = true;
+                previousLegacyMillisFormat = true;
             } else if (readVersion == CURRENT_VERSION) {
-                previousPrecision = in.readInt();
-                previousLegacyFormat = in.readBoolean();
+                previousLegacyMillisFormat = in.readBoolean();
             } else {
                 throw new IOException(
                         "Unrecognized TimeDataSerializer snapshot version " + readVersion);
@@ -206,7 +200,7 @@ public final class TimeDataSerializer extends TypeSerializer<TimeData> {
 
         @Override
         public TypeSerializer<TimeData> restoreSerializer() {
-            return new TimeDataSerializer(previousPrecision, previousLegacyFormat);
+            return new TimeDataSerializer(previousLegacyMillisFormat);
         }
 
         @Override
@@ -216,8 +210,7 @@ public final class TimeDataSerializer extends TypeSerializer<TimeData> {
                 return TypeSerializerSchemaCompatibility.incompatible();
             }
             TimeDataSerializer timeSerializer = (TimeDataSerializer) newSerializer;
-            boolean previousMillisEncoding = previousLegacyFormat || previousPrecision <= 3;
-            return previousMillisEncoding == timeSerializer.usesMillisEncoding()
+            return previousLegacyMillisFormat == timeSerializer.legacyMillisFormat
                     ? TypeSerializerSchemaCompatibility.compatibleAsIs()
                     : TypeSerializerSchemaCompatibility.compatibleAfterMigration();
         }

@@ -33,7 +33,6 @@ import org.apache.flink.core.memory.MemorySegmentFactory;
 
 import java.lang.reflect.Array;
 
-import static org.apache.flink.cdc.common.types.DataTypeChecks.getPrecision;
 import static org.apache.flink.core.memory.MemoryUtils.UNSAFE;
 
 /**
@@ -150,7 +149,9 @@ public final class BinaryArrayData extends BinarySection implements ArrayData {
             case DATE:
                 return 4;
             case TIME_WITHOUT_TIME_ZONE:
-                return getPrecision(type) <= 3 ? 4 : 8;
+                // All precisions share the same eight-byte slot holding
+                // Long.MIN_VALUE | nanoOfDay, so that no precision-dependent layout is needed.
+                return 8;
             default:
                 throw new IllegalArgumentException();
         }
@@ -163,9 +164,9 @@ public final class BinaryArrayData extends BinarySection implements ArrayData {
     private int elementOffset;
 
     /**
-     * Lazily derived flag telling whether the {@code TIME(p > 3)} elements of this array were
-     * written by a pre-upgrade version of CDC, when such elements still occupied a 4-byte
-     * millisecond slot instead of the current 8-byte {@code Long.MIN_VALUE | nanoOfDay} slot.
+     * Lazily derived flag telling whether the {@code TIME} elements of this array were written by a
+     * pre-upgrade version of CDC, when such elements still occupied a 4-byte millisecond slot
+     * instead of the current 8-byte {@code Long.MIN_VALUE | nanoOfDay} slot.
      *
      * <p>The flag is derived from the payload itself (see {@link #usesLegacyMillisSlots()}) and
      * must be reset in {@link #pointTo(MemorySegment[], int, int)} because {@link BinaryArrayData}
@@ -244,9 +245,9 @@ public final class BinaryArrayData extends BinarySection implements ArrayData {
     }
 
     @Override
-    public TimeData getTime(int pos, int precision) {
+    public TimeData getTime(int pos) {
         assertIndexIsValid(pos);
-        if (precision <= 3 || usesLegacyMillisSlots()) {
+        if (usesLegacyMillisSlots()) {
             return TimeData.fromMillisOfDay(
                     BinarySegmentUtils.getInt(segments, getElementOffset(pos, 4)));
         }
@@ -254,19 +255,24 @@ public final class BinaryArrayData extends BinarySection implements ArrayData {
         if (encoded < 0) {
             return TimeData.fromNanoOfDay(encoded & Long.MAX_VALUE);
         }
-        throw new IllegalStateException(
-                "High-precision TIME array uses the legacy millisecond binary layout");
+        // A slot whose tag bit is clear comes from the pre-upgrade layout: the value sits in the
+        // low
+        // four bytes and the high four bytes are zero padding. This is the only way to read a
+        // single-element legacy array, whose payload length is identical to the current layout.
+        return TimeData.fromMillisOfDay((int) encoded);
     }
 
     /**
-     * Derives, from the payload itself, whether the {@code TIME(p > 3)} elements of this array are
-     * stored in the pre-upgrade 4-byte millisecond slot layout.
+     * Derives, from the payload itself, whether the {@code TIME} elements of this array are stored
+     * in the pre-upgrade 4-byte millisecond slot layout.
      *
      * <p>A {@code TIME} array has no variable-length part, so {@code sizeInBytes} exactly describes
      * the fixed-length layout: {@code roundUpTo8(header + slotSize * size)}. The pre-upgrade code
-     * always used a 4-byte slot, and the current code uses an 8-byte slot for {@code p > 3}, so a
-     * payload that is smaller than the current 8-byte layout must have been written with 4-byte
-     * slots. The check is exact, not heuristic.
+     * always used a 4-byte slot, and the current code always uses an 8-byte slot, so a payload that
+     * is smaller than the current layout must have been written with 4-byte slots. The check is
+     * exact for every array with more than one element; a single-element legacy array has the same
+     * rounded payload length as the current layout, and {@link #getTime(int)} falls back to the
+     * slot's tag bit for it.
      *
      * <p>The value is cached because it is read for every element; it is invalidated by {@link
      * #pointTo(MemorySegment[], int, int)}.

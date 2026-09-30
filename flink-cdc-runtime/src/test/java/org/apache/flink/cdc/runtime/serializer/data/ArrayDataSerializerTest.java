@@ -172,7 +172,7 @@ class ArrayDataSerializerTest extends SerializerTestBase<ArrayData> {
                 arraySerializer.toBinaryArray(
                         new GenericArrayData(new Object[] {TimeData.fromNanoOfDay(nanos), null}));
 
-        assertThat(times.getTime(0, 9).toNanoOfDay()).isEqualTo(nanos);
+        assertThat(times.getTime(0).toNanoOfDay()).isEqualTo(nanos);
         assertThat(times.isNullAt(1)).isTrue();
 
         Map<BinaryStringData, TimeData> source = new HashMap<>();
@@ -182,6 +182,6 @@ class ArrayDataSerializerTest extends SerializerTestBase<ArrayData> {
         MapData map = mapSerializer.toBinaryMap(new GenericMapData(source));
         int valueIndex = map.keyArray().getString(0).toString().equals("precise") ? 0 : -1;
         assertThat(valueIndex).isZero();
-        assertThat(map.valueArray().getTime(valueIndex, 9).toNanoOfDay()).isEqualTo(nanos);
+        assertThat(map.valueArray().getTime(valueIndex).toNanoOfDay()).isEqualTo(nanos);
     }
 }

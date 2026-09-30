@@ -24,16 +24,16 @@ import org.apache.flink.core.memory.MemorySegmentFactory;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Tests the reader-side migration of {@code TIME(p > 3)} array payloads.
+ * Tests the reader-side migration of pre-upgrade {@code TIME} array payloads.
  *
  * <p>Before high-precision {@code TIME} support, every {@code TIME} element of a {@link
- * BinaryArrayData} occupied a 4-byte millisecond slot. After the change, {@code TIME(p > 3)}
- * elements occupy an 8-byte slot holding {@code Long.MIN_VALUE | nanoOfDay}. A payload written by
- * the old code therefore has a different element stride, and {@link BinaryArrayData} must recover
- * the millisecond value by judging the slot width from {@code sizeInBytes} itself.
+ * BinaryArrayData} occupied a 4-byte millisecond slot. The current layout always uses an 8-byte
+ * slot holding {@code Long.MIN_VALUE | nanoOfDay}, independently of the element precision. A
+ * payload written by the old code therefore has a different element stride, and {@link
+ * BinaryArrayData} must recover the millisecond value by judging the slot width from {@code
+ * sizeInBytes} itself.
  */
 class BinaryArrayDataTest {
 
@@ -49,7 +49,7 @@ class BinaryArrayDataTest {
         assertThat(array.size()).isEqualTo(millis.length);
         assertThat(array.getSizeInBytes()).isEqualTo(24);
         for (int i = 0; i < millis.length; i++) {
-            assertThat(array.getTime(i, 6).toNanoOfDay()).isEqualTo(millis[i] * MILLIS_TO_NANO);
+            assertThat(array.getTime(i).toNanoOfDay()).isEqualTo(millis[i] * MILLIS_TO_NANO);
         }
     }
 
@@ -68,8 +68,24 @@ class BinaryArrayDataTest {
 
         assertThat(array.getSizeInBytes()).isEqualTo(24);
         for (int i = 0; i < nanos.length; i++) {
-            assertThat(array.getTime(i, 9).toNanoOfDay()).isEqualTo(nanos[i]);
+            assertThat(array.getTime(i).toNanoOfDay()).isEqualTo(nanos[i]);
         }
+    }
+
+    @Test
+    void readsSingleElementLegacyTimeArrayThroughTheSlotTag() {
+        // A one-element legacy array occupies the same rounded payload length as the current
+        // layout, so the element stride cannot be derived from sizeInBytes. The reader must fall
+        // back to the tag bit of the slot: the millisecond layout leaves it clear.
+        byte[] bytes = new byte[16];
+        MemorySegment segment = MemorySegmentFactory.wrap(bytes);
+        segment.putInt(0, 1);
+        segment.putInt(8, 3_723_123);
+
+        BinaryArrayData array = new BinaryArrayData();
+        array.pointTo(segment, 0, 16);
+
+        assertThat(array.getTime(0).toNanoOfDay()).isEqualTo(3_723_123L * MILLIS_TO_NANO);
     }
 
     @Test
@@ -91,7 +107,7 @@ class BinaryArrayDataTest {
         ArrayData nested = row.getArray(1);
         assertThat(nested.size()).isEqualTo(millis.length);
         for (int i = 0; i < millis.length; i++) {
-            assertThat(nested.getTime(i, 6).toNanoOfDay()).isEqualTo(millis[i] * MILLIS_TO_NANO);
+            assertThat(nested.getTime(i).toNanoOfDay()).isEqualTo(millis[i] * MILLIS_TO_NANO);
         }
     }
 
@@ -118,18 +134,8 @@ class BinaryArrayDataTest {
         assertThat(map.keyArray().getInt(0)).isEqualTo(10);
         assertThat(map.keyArray().getInt(1)).isEqualTo(20);
         for (int i = 0; i < millis.length; i++) {
-            assertThat(map.valueArray().getTime(i, 6).toNanoOfDay())
+            assertThat(map.valueArray().getTime(i).toNanoOfDay())
                     .isEqualTo(millis[i] * MILLIS_TO_NANO);
-        }
-    }
-
-    @Test
-    void legacyTimeArrayReadWithPrecisionUpTo3IsUnaffected() {
-        long[] millis = {1000L, 2000L, 3_723_123L};
-        BinaryArrayData array = pointToLegacyMillisArray(new byte[32], millis);
-
-        for (int i = 0; i < millis.length; i++) {
-            assertThat(array.getTime(i, 3).toNanoOfDay()).isEqualTo(millis[i] * MILLIS_TO_NANO);
         }
     }
 
@@ -148,28 +154,29 @@ class BinaryArrayDataTest {
 
         assertThat(array.isNullAt(0)).isTrue();
         assertThat(array.isNullAt(1)).isFalse();
-        assertThat(array.getTime(1, 6).toNanoOfDay()).isEqualTo(4_000L * MILLIS_TO_NANO);
+        assertThat(array.getTime(1).toNanoOfDay()).isEqualTo(4_000L * MILLIS_TO_NANO);
     }
 
     @Test
-    void currentLayoutRejectsNonNegativeEncodedSlot() {
+    void nullElementsInCurrentTimeArrayDecodeAsNull() {
         MemorySegment segment = MemorySegmentFactory.wrap(new byte[24]);
         segment.putInt(0, 2);
-        segment.putLong(8, Long.MIN_VALUE);
-        segment.putLong(16, 123L);
+        segment.putInt(4, 1);
+        segment.putLong(8, 0L);
+        segment.putLong(16, Long.MIN_VALUE | 4_000_123_456L);
 
         BinaryArrayData array = new BinaryArrayData();
         array.pointTo(segment, 0, 24);
 
-        assertThat(array.getTime(0, 6).toNanoOfDay()).isZero();
-        assertThatThrownBy(() -> array.getTime(1, 6)).isInstanceOf(IllegalStateException.class);
+        assertThat(array.isNullAt(0)).isTrue();
+        assertThat(array.getTime(1).toNanoOfDay()).isEqualTo(4_000_123_456L);
     }
 
     @Test
     void repointingResetsLegacyLayoutDetection() {
         long[] millis = {1000L, 2000L, 3_723_123L};
         BinaryArrayData array = pointToLegacyMillisArray(new byte[32], millis);
-        assertThat(array.getTime(0, 6).toNanoOfDay()).isEqualTo(millis[0] * MILLIS_TO_NANO);
+        assertThat(array.getTime(0).toNanoOfDay()).isEqualTo(millis[0] * MILLIS_TO_NANO);
 
         long nanos = 3_723_123_456_789L;
         MemorySegment current = MemorySegmentFactory.wrap(new byte[16]);
@@ -177,7 +184,7 @@ class BinaryArrayDataTest {
         current.putLong(8, Long.MIN_VALUE | nanos);
         array.pointTo(current, 0, 16);
 
-        assertThat(array.getTime(0, 9).toNanoOfDay()).isEqualTo(nanos);
+        assertThat(array.getTime(0).toNanoOfDay()).isEqualTo(nanos);
     }
 
     // ------------------------------------------------------------------------------------------

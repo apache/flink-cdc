@@ -55,8 +55,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * pre-upgrade configuration, so a plain {@code equals} comparison with the serializer built by the
  * upgraded code rejects the state even when the previous format is perfectly readable. These tests
  * feed the exact bytes a pre-upgrade job persisted to the new snapshot classes and pin both
- * directions: {@code TIME(<=3)} must restore without any migration, and nested changes that really
- * are unreadable must still be reported as incompatible.
+ * directions: readable legacy payloads may migrate, and nested changes that really are unreadable
+ * must still be reported as incompatible.
  */
 class NestedTimeStateCompatibilityTest {
 
@@ -80,12 +80,11 @@ class NestedTimeStateCompatibilityTest {
     void millisecondPrecisionTimeRestoresWithoutMigration() throws Exception {
         TypeSerializerSnapshot<TimeData> legacySnapshot = readLegacyDirectTimeSnapshot();
 
-        // The overwhelmingly common online configuration: TIME(<=3) must not require any migration.
-        assertThat(resolve(legacySnapshot, new TimeDataSerializer(0)).isCompatibleAsIs()).isTrue();
-        assertThat(resolve(legacySnapshot, new TimeDataSerializer(3)).isCompatibleAsIs()).isTrue();
-        // Higher precisions switch to the eight-byte encoding, which the historical state cannot
-        // teach, so the new serializer is allowed to migrate instead of being rejected.
-        assertThat(resolve(legacySnapshot, new TimeDataSerializer(6)).isCompatibleAfterMigration())
+        assertThat(
+                        resolve(legacySnapshot, TimeDataSerializer.INSTANCE)
+                                .isCompatibleAfterMigration())
+                .isTrue();
+        assertThat(resolve(legacySnapshot, new TimeDataSerializer(true)).isCompatibleAsIs())
                 .isTrue();
 
         DataOutputSerializer oldPayload = new DataOutputSerializer(Integer.BYTES);
@@ -112,14 +111,16 @@ class NestedTimeStateCompatibilityTest {
         assertThat(
                         resolve(
                                         legacySnapshot,
-                                        new NullableSerializerWrapper<>(new TimeDataSerializer(3)))
-                                .isCompatibleAsIs())
+                                        new NullableSerializerWrapper<>(
+                                                TimeDataSerializer.INSTANCE))
+                                .isCompatibleAfterMigration())
                 .isTrue();
         assertThat(
                         resolve(
                                         legacySnapshot,
-                                        new NullableSerializerWrapper<>(new TimeDataSerializer(6)))
-                                .isCompatibleAfterMigration())
+                                        new NullableSerializerWrapper<>(
+                                                new TimeDataSerializer(true)))
+                                .isCompatibleAsIs())
                 .isTrue();
     }
 
@@ -135,25 +136,15 @@ class NestedTimeStateCompatibilityTest {
                         3,
                         InstantiationUtil.serializeObject(DataTypes.TIME(3)),
                         InstantiationUtil.serializeObject(legacyElement));
-        TypeSerializerSnapshot<?> legacyNanosArray =
-                readManualSnapshot(
-                        ArrayDataSerializer.ArrayDataSerializerSnapshot.class,
-                        3,
-                        InstantiationUtil.serializeObject(DataTypes.TIME(6)),
-                        InstantiationUtil.serializeObject(legacyElement));
 
         assertThat(
                         resolve(legacyMillisArray, new ArrayDataSerializer(DataTypes.TIME(3)))
-                                .isCompatibleAsIs())
-                .isTrue();
-        assertThat(
-                        resolve(legacyNanosArray, new ArrayDataSerializer(DataTypes.TIME(6)))
                                 .isCompatibleAfterMigration())
                 .isTrue();
 
-        // Pre-upgrade array state is still readable. The restored serializer keeps the historical
-        // four-byte millisecond element encoding, and the migration-free new serializer reads those
-        // very bytes back with the same value.
+        // Pre-upgrade array state is still readable through the restored serializer, which keeps
+        // the
+        // historical four-byte millisecond element encoding.
         ArrayDataSerializer restoredMillisArray =
                 (ArrayDataSerializer) legacyMillisArray.restoreSerializer();
         DataOutputSerializer oldPayload = new DataOutputSerializer(Integer.BYTES * 4);
@@ -163,10 +154,6 @@ class NestedTimeStateCompatibilityTest {
         byte[] oldBytes = oldPayload.getCopyOfBuffer();
 
         assertThat(readArrayTime(restoredMillisArray, oldBytes).toMillisOfDay())
-                .isEqualTo(MILLIS_OF_DAY);
-        assertThat(
-                        readArrayTime(new ArrayDataSerializer(DataTypes.TIME(3)), oldBytes)
-                                .toMillisOfDay())
                 .isEqualTo(MILLIS_OF_DAY);
     }
 
@@ -184,32 +171,16 @@ class NestedTimeStateCompatibilityTest {
                         InstantiationUtil.serializeObject(
                                 InternalSerializers.create(DataTypes.STRING())),
                         InstantiationUtil.serializeObject(legacyMillisTime));
-        TypeSerializerSnapshot<?> legacyNanosMap =
-                readManualSnapshot(
-                        MapDataSerializer.MapDataSerializerSnapshot.class,
-                        0,
-                        InstantiationUtil.serializeObject(DataTypes.STRING()),
-                        InstantiationUtil.serializeObject(DataTypes.TIME(6)),
-                        InstantiationUtil.serializeObject(
-                                InternalSerializers.create(DataTypes.STRING())),
-                        InstantiationUtil.serializeObject(legacyMillisTime));
 
         assertThat(
                         resolve(
                                         legacyMillisMap,
                                         new MapDataSerializer(
                                                 DataTypes.STRING(), DataTypes.TIME(3)))
-                                .isCompatibleAsIs())
-                .isTrue();
-        assertThat(
-                        resolve(
-                                        legacyNanosMap,
-                                        new MapDataSerializer(
-                                                DataTypes.STRING(), DataTypes.TIME(6)))
                                 .isCompatibleAfterMigration())
                 .isTrue();
 
-        // Pre-upgrade map state with the unchanged millisecond layout stays readable.
+        // Pre-upgrade map state with the millisecond layout stays readable.
         MapDataSerializer restoredMillisMap =
                 (MapDataSerializer) legacyMillisMap.restoreSerializer();
         Map<StringData, TimeData> source = new LinkedHashMap<>();
@@ -219,7 +190,7 @@ class NestedTimeStateCompatibilityTest {
         MapData restored =
                 restoredMillisMap.deserialize(
                         new DataInputDeserializer(oldPayload.getCopyOfBuffer()));
-        assertThat(restored.valueArray().getTime(0, 3).toMillisOfDay()).isEqualTo(MILLIS_OF_DAY);
+        assertThat(restored.valueArray().getTime(0).toMillisOfDay()).isEqualTo(MILLIS_OF_DAY);
     }
 
     @Test
@@ -243,7 +214,7 @@ class NestedTimeStateCompatibilityTest {
                 RecordDataSerializer.INSTANCE.deserialize(
                         new DataInputDeserializer(oldPayload.getCopyOfBuffer()));
         assertThat(record).isInstanceOf(GenericRecordData.class);
-        assertThat(record.getTime(0, 3).toMillisOfDay()).isEqualTo(MILLIS_OF_DAY);
+        assertThat(record.getTime(0).toMillisOfDay()).isEqualTo(MILLIS_OF_DAY);
 
         // Binary rows are unaffected: RecordDataSerializer has no nested serializer configuration.
         DataOutputSerializer binaryPayload = new DataOutputSerializer(Integer.BYTES * 3);
@@ -316,7 +287,7 @@ class NestedTimeStateCompatibilityTest {
 
     private static TimeData readArrayTime(TypeSerializer<ArrayData> serializer, byte[] payload)
             throws IOException {
-        return serializer.deserialize(new DataInputDeserializer(payload)).getTime(0, 3);
+        return serializer.deserialize(new DataInputDeserializer(payload)).getTime(0);
     }
 
     /**

@@ -57,17 +57,17 @@ class BinaryRecordDataGeneratorTest {
                                     TimeData.fromNanoOfDay(3_723_123_456_789L)
                                 });
 
-        assertThat(precise.getTime(0, 3).toNanoOfDay()).isEqualTo(3_723_123_000_000L);
-        assertThat(precise.getTime(1, 6).toNanoOfDay()).isEqualTo(3_723_123_456_000L);
-        assertThat(precise.getTime(1, 0).toNanoOfDay()).isEqualTo(3_723_123_456_000L);
-        assertThat(precise.getTime(2, 9).toNanoOfDay()).isEqualTo(3_723_123_456_789L);
+        // Every precision reads back through the same accessor; the declared precision does not
+        // change the eight-byte layout.
+        assertThat(precise.getTime(0).toNanoOfDay()).isEqualTo(3_723_123_000_000L);
+        assertThat(precise.getTime(1).toNanoOfDay()).isEqualTo(3_723_123_456_000L);
         assertThat(precise.getTime(2).toNanoOfDay()).isEqualTo(3_723_123_456_789L);
 
         BinaryRecordData legacy = new BinaryRecordData(1);
         BinaryRecordDataWriter writer = new BinaryRecordDataWriter(legacy);
         writer.writeInt(0, 3_723_123);
         writer.complete();
-        assertThat(legacy.getTime(0, 6).toNanoOfDay()).isEqualTo(3_723_123_000_000L);
+        assertThat(legacy.getTime(0).toNanoOfDay()).isEqualTo(3_723_123_000_000L);
     }
 
     @Test

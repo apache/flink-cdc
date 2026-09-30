@@ -1143,7 +1143,7 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
         }
         RecordData streamRecord =
                 ((DataChangeEvent) fetchResultsAndCreateTableEvent(events, 1).f0.get(0)).after();
-        return streamRecord.getTime(4, 6).toMicroOfDay();
+        return streamRecord.getTime(4).toMicroOfDay();
     }
 
     private Object[] recordFields(RecordData record, RowType rowType) {

@@ -212,7 +212,7 @@ public final class GenericArrayData implements ArrayData {
     }
 
     @Override
-    public TimeData getTime(int pos, int precision) {
+    public TimeData getTime(int pos) {
         Object value = getObject(pos);
         if (value instanceof TimeData) {
             return (TimeData) value;

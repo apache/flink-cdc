@@ -18,10 +18,11 @@
 package org.apache.flink.cdc.runtime.serializer.data;
 
 import org.apache.flink.api.common.typeutils.TypeSerializer;
-import org.apache.flink.api.common.typeutils.TypeSerializerSchemaCompatibility;
 import org.apache.flink.api.common.typeutils.TypeSerializerSnapshot;
 import org.apache.flink.api.common.typeutils.TypeSerializerSnapshotSerializationUtil;
 import org.apache.flink.cdc.common.data.TimeData;
+import org.apache.flink.cdc.common.types.DataTypes;
+import org.apache.flink.cdc.runtime.serializer.InternalSerializers;
 import org.apache.flink.cdc.runtime.serializer.SerializerTestBase;
 import org.apache.flink.core.memory.DataInputDeserializer;
 import org.apache.flink.core.memory.DataOutputSerializer;
@@ -36,15 +37,16 @@ import java.util.Base64;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Tests for {@link TimeDataSerializer}. */
-abstract class TimeDataSerializerTest extends SerializerTestBase<TimeData> {
+class TimeDataSerializerTest extends SerializerTestBase<TimeData> {
+
     @Override
     protected TypeSerializer<TimeData> createSerializer() {
-        return new TimeDataSerializer(getPrecision());
+        return TimeDataSerializer.INSTANCE;
     }
 
     @Override
     protected int getLength() {
-        return getPrecision() <= 3 ? Integer.BYTES : Long.BYTES;
+        return Long.BYTES;
     }
 
     @Override
@@ -54,14 +56,6 @@ abstract class TimeDataSerializerTest extends SerializerTestBase<TimeData> {
 
     @Override
     protected TimeData[] getTestData() {
-        if (getPrecision() <= 3) {
-            return new TimeData[] {
-                TimeData.fromSecondOfDay(1024),
-                TimeData.fromMillisOfDay(20480),
-                TimeData.fromIsoLocalTimeString("14:28:25.123"),
-                TimeData.fromLocalTime(LocalTime.NOON)
-            };
-        }
         return new TimeData[] {
             TimeData.fromNanoOfDay(102_400),
             TimeData.fromNanoOfDay(20_480_123_456L),
@@ -70,42 +64,34 @@ abstract class TimeDataSerializerTest extends SerializerTestBase<TimeData> {
         };
     }
 
-    protected abstract int getPrecision();
-
     @Test
-    void roundTripRetainsDirectNumericPrecision() throws Exception {
-        long nanos = getPrecision() <= 3 ? 3_723_123_000_000L : 3_723_123_456_789L;
-        TimeDataSerializer serializer = new TimeDataSerializer(getPrecision());
-        DataOutputSerializer output = new DataOutputSerializer(serializer.getLength());
-        serializer.serialize(TimeData.fromNanoOfDay(nanos), output);
+    void roundTripKeepsNanosecondPrecision() throws Exception {
+        long nanos = 3_723_123_456_789L;
+        DataOutputSerializer output = new DataOutputSerializer(Long.BYTES);
+        TimeDataSerializer.INSTANCE.serialize(TimeData.fromNanoOfDay(nanos), output);
 
         TimeData restored =
-                serializer.deserialize(new DataInputDeserializer(output.getCopyOfBuffer()));
+                TimeDataSerializer.INSTANCE.deserialize(
+                        new DataInputDeserializer(output.getCopyOfBuffer()));
         assertThat(restored.toNanoOfDay()).isEqualTo(nanos);
     }
-}
 
-final class TimeDataSerializer3Test extends TimeDataSerializerTest {
-    @Override
-    protected int getPrecision() {
-        return 3;
+    @Test
+    void allPrecisionsShareTheSameEncodingWidth() {
+        // The element serializer is precision-independent: every TIME precision resolves to the
+        // same
+        // eight-byte serializer, so the previous precision-dependent width is gone.
+        assertThat(TimeDataSerializer.INSTANCE.getLength()).isEqualTo(Long.BYTES);
+        assertThat(InternalSerializers.create(DataTypes.TIME(0)))
+                .isSameAs(TimeDataSerializer.INSTANCE);
+        assertThat(InternalSerializers.create(DataTypes.TIME(3)))
+                .isSameAs(TimeDataSerializer.INSTANCE);
+        assertThat(InternalSerializers.create(DataTypes.TIME(9)))
+                .isSameAs(TimeDataSerializer.INSTANCE);
     }
 }
 
-final class TimeDataSerializer6Test extends TimeDataSerializerTest {
-    @Override
-    protected int getPrecision() {
-        return 6;
-    }
-}
-
-final class TimeDataSerializer9Test extends TimeDataSerializerTest {
-    @Override
-    protected int getPrecision() {
-        return 9;
-    }
-}
-
+/** Compatibility tests for {@link TimeDataSerializer} state written before the upgrade. */
 final class TimeDataSerializerCompatibilityTest {
 
     private static final String LEGACY_SERIALIZER_BASE64 =
@@ -115,7 +101,7 @@ final class TimeDataSerializerCompatibilityTest {
             "AAAAAgBab3JnLmFwYWNoZS5mbGluay5jZGMucnVudGltZS5zZXJpYWxpemVyLmRhdGEuVGltZURhdGFTZXJpYWxpemVyJFRpbWVEYXRhU2VyaWFsaXplclNuYXBzaG90AAAAAw==";
 
     @Test
-    void oldMillisecondSnapshotIsCompatibleOrMigratableByPrecision() throws Exception {
+    void oldMillisecondSnapshotIsMigratableToTheCurrentFormat() throws Exception {
         TimeDataSerializer.TimeDataSerializerSnapshot oldSnapshot =
                 new TimeDataSerializer.TimeDataSerializerSnapshot();
         oldSnapshot.readSnapshot(
@@ -123,12 +109,16 @@ final class TimeDataSerializerCompatibilityTest {
                 new DataInputDeserializer(new byte[0]),
                 Thread.currentThread().getContextClassLoader());
 
-        TypeSerializerSchemaCompatibility<TimeData> millisCompatibility =
-                oldSnapshot.resolveSchemaCompatibility(new TimeDataSerializer(3));
-        TypeSerializerSchemaCompatibility<TimeData> microsCompatibility =
-                oldSnapshot.resolveSchemaCompatibility(new TimeDataSerializer(6));
-        assertThat(millisCompatibility.isCompatibleAsIs()).isTrue();
-        assertThat(microsCompatibility.isCompatibleAfterMigration()).isTrue();
+        assertThat(
+                        oldSnapshot
+                                .resolveSchemaCompatibility(TimeDataSerializer.INSTANCE)
+                                .isCompatibleAfterMigration())
+                .isTrue();
+        assertThat(
+                        oldSnapshot
+                                .resolveSchemaCompatibility(new TimeDataSerializer(true))
+                                .isCompatibleAsIs())
+                .isTrue();
 
         DataOutputSerializer oldBytes = new DataOutputSerializer(Integer.BYTES);
         oldBytes.writeInt(3_723_123);
@@ -140,37 +130,6 @@ final class TimeDataSerializerCompatibilityTest {
     }
 
     @Test
-    void serializerCompatibilityDependsOnBinaryEncodingWidth() {
-        TimeDataSerializer.TimeDataSerializerSnapshot millisSnapshot =
-                (TimeDataSerializer.TimeDataSerializerSnapshot)
-                        new TimeDataSerializer(3).snapshotConfiguration();
-        TimeDataSerializer.TimeDataSerializerSnapshot nanosSnapshot =
-                (TimeDataSerializer.TimeDataSerializerSnapshot)
-                        new TimeDataSerializer(6).snapshotConfiguration();
-
-        assertThat(
-                        millisSnapshot
-                                .resolveSchemaCompatibility(new TimeDataSerializer(0))
-                                .isCompatibleAsIs())
-                .isTrue();
-        assertThat(
-                        nanosSnapshot
-                                .resolveSchemaCompatibility(new TimeDataSerializer(9))
-                                .isCompatibleAsIs())
-                .isTrue();
-        assertThat(
-                        millisSnapshot
-                                .resolveSchemaCompatibility(new TimeDataSerializer(6))
-                                .isCompatibleAfterMigration())
-                .isTrue();
-        assertThat(
-                        nanosSnapshot
-                                .resolveSchemaCompatibility(new TimeDataSerializer(3))
-                                .isCompatibleAfterMigration())
-                .isTrue();
-    }
-
-    @Test
     void readsLegacySnapshotEnvelopeAndFourBytePayload() throws Exception {
         TypeSerializerSnapshot<TimeData> snapshot =
                 TypeSerializerSnapshotSerializationUtil.readSerializerSnapshot(
@@ -178,13 +137,10 @@ final class TimeDataSerializerCompatibilityTest {
                                 Base64.getDecoder().decode(LEGACY_SNAPSHOT_BASE64)),
                         Thread.currentThread().getContextClassLoader());
         assertThat(snapshot).isInstanceOf(TimeDataSerializer.TimeDataSerializerSnapshot.class);
-        TimeDataSerializer.TimeDataSerializerSnapshot legacySnapshot =
-                (TimeDataSerializer.TimeDataSerializerSnapshot) snapshot;
 
         assertThat(
-                        legacySnapshot
-                                .resolveSchemaCompatibility(new TimeDataSerializer(3))
-                                .isCompatibleAsIs())
+                        snapshot.resolveSchemaCompatibility(TimeDataSerializer.INSTANCE)
+                                .isCompatibleAfterMigration())
                 .isTrue();
         DataOutputSerializer oldBytes = new DataOutputSerializer(Integer.BYTES);
         oldBytes.writeInt(3_723_123);
@@ -207,6 +163,12 @@ final class TimeDataSerializerCompatibilityTest {
                                 .deserialize(new DataInputDeserializer(oldBytes.getCopyOfBuffer()))
                                 .toNanoOfDay())
                 .isEqualTo(3_723_123_000_000L);
+        assertThat(
+                        serializer
+                                .snapshotConfiguration()
+                                .resolveSchemaCompatibility(TimeDataSerializer.INSTANCE)
+                                .isCompatibleAfterMigration())
+                .isTrue();
     }
 
     /**

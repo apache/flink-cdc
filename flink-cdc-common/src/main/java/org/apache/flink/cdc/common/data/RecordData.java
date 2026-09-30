@@ -170,16 +170,6 @@ public interface RecordData {
     /** Returns the Time data at the given position. */
     TimeData getTime(int pos);
 
-    /**
-     * Returns the Time data at the given position using its declared precision.
-     *
-     * <p>The default implementation preserves compatibility with record implementations whose
-     * representation is independent of precision.
-     */
-    default TimeData getTime(int pos, int precision) {
-        return getTime(pos);
-    }
-
     /** Returns the variant value at the given position. */
     Variant getVariant(int pos);
 
@@ -223,7 +213,7 @@ public interface RecordData {
                 fieldGetter = record -> record.getDate(fieldPos);
                 break;
             case TIME_WITHOUT_TIME_ZONE:
-                fieldGetter = record -> record.getTime(fieldPos, getPrecision(fieldType));
+                fieldGetter = record -> record.getTime(fieldPos);
                 break;
             case BIGINT:
                 fieldGetter = record -> record.getLong(fieldPos);
