@@ -25,9 +25,12 @@ import io.debezium.config.Configuration;
 import org.tikv.common.TiConfiguration;
 
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+
+import static org.apache.flink.cdc.common.utils.Preconditions.checkNotNull;
 
 /** The configuration for TiDB source. */
 public class TiDBSourceConfig extends JdbcSourceConfig {
@@ -122,7 +125,22 @@ public class TiDBSourceConfig extends JdbcSourceConfig {
         return this.jdbcProperties;
     }
 
-    public TiConfiguration getTiConfiguration() {
+    public synchronized TiConfiguration getTiConfiguration() {
+        if (this.tiConfiguration == null) {
+            Map<String, String> options = new HashMap<>();
+            jdbcProperties
+                    .stringPropertyNames()
+                    .forEach(
+                            property ->
+                                    options.put(property, jdbcProperties.getProperty(property)));
+            this.tiConfiguration =
+                    TiDBSourceOptions.getTiConfiguration(
+                            checkNotNull(
+                                    pdAddresses,
+                                    "PD addresses must be configured before creating a TiKV session."),
+                            hostMapping,
+                            options);
+        }
         return this.tiConfiguration;
     }
 

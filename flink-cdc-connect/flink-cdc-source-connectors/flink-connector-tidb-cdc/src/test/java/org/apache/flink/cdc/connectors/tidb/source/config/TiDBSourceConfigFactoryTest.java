@@ -19,10 +19,24 @@ package org.apache.flink.cdc.connectors.tidb.source.config;
 
 import org.junit.jupiter.api.Test;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Tests for {@link TiDBSourceConfigFactory}. */
 class TiDBSourceConfigFactoryTest {
+
+    @Test
+    void shouldCreateTiConfigurationWhenItIsNotExplicitlyConfigured() {
+        TiDBSourceConfigFactory configFactory = baseConfigFactory();
+        configFactory.tableList("inventory.products");
+
+        TiDBSourceConfig sourceConfig = configFactory.create(0);
+
+        assertThat(sourceConfig.getTiConfiguration()).isNotNull();
+        assertThat(sourceConfig.getTiConfiguration().getPdAddrs())
+                .extracting(Object::toString)
+                .containsExactly("http://localhost:2379");
+    }
 
     @Test
     void shouldRejectMultipleTableFiltersWhenCreatingConfig() {

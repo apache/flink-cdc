@@ -209,6 +209,11 @@ public class TiDBScanFetchTaskTest extends TiDBTestBase {
     private List<String> getDataInSnapshotScan(
             String[] changingDataSql, int hookType, boolean skipSnapshotBackfill) throws Exception {
         TiDBSourceConfigFactory tiDBSourceConfigFactory = new TiDBSourceConfigFactory();
+        String pdHost = PD.getHost();
+        String tikvHost = TIKV.getHost();
+        String pdAddress = pdHost + ":" + PD.getMappedPort(PD_PORT_ORIGIN);
+        String hostMapping = "pd0:" + pdHost + ";tikv0:" + tikvHost;
+        tiDBSourceConfigFactory.pdAddresses(pdAddress).hostMapping(hostMapping);
         tiDBSourceConfigFactory.hostname(TIDB.getHost());
         tiDBSourceConfigFactory.port(TIDB.getMappedPort(TIDB_PORT));
         tiDBSourceConfigFactory.username(TiDBTestBase.TIDB_USER);
