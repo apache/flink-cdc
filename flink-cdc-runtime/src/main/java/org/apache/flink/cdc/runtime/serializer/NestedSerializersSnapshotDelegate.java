@@ -21,6 +21,7 @@ import org.apache.flink.api.common.typeutils.CompositeTypeSerializerSnapshot;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.common.typeutils.TypeSerializerSchemaCompatibility;
 import org.apache.flink.api.common.typeutils.TypeSerializerSnapshot;
+import org.apache.flink.api.common.typeutils.TypeSerializerSnapshotAdapter;
 import org.apache.flink.api.common.typeutils.TypeSerializerUtils;
 import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataOutputView;
@@ -183,6 +184,63 @@ public class NestedSerializersSnapshotDelegate {
     // ------------------------------------------------------------------------
     //  Utilities
     // ------------------------------------------------------------------------
+
+    /**
+     * Resolves the compatibility of a serializer instance that was embedded in an older composite
+     * snapshot (an array, map, nullable wrapper, or any other outer serializer reusing the same
+     * nested-serializer layout).
+     *
+     * <p>Older composite snapshots stored the nested serializers themselves instead of their
+     * snapshots. When such a snapshot is restored, the nested serializer instance carries its
+     * historical configuration, which may legitimately differ from the configuration of the
+     * serializer produced by the upgraded code. Comparing the two instances with {@link
+     * Object#equals(Object)} therefore rejects every upgrade that changes a nested serializer's
+     * format, even when the previous format is still readable and migratable.
+     *
+     * <p>Instead of comparing configurations, this method asks the previous instance's own {@link
+     * TypeSerializerSnapshot} whether it can read the new serializer's format. Serializers that
+     * know how to migrate their data (for example {@code TimeDataSerializer}, which keeps a
+     * four-byte millisecond encoding for {@code TIME(<=3)} and switches to an eight-byte nanosecond
+     * encoding for higher precisions) return {@code compatibleAfterMigration} rather than a hard
+     * rejection.
+     *
+     * @param previousSerializer the serializer restored from the state that is being recovered
+     * @param newSerializer the serializer that the upgraded code would use for the same position
+     * @return the schema compatibility of {@code newSerializer} with respect to {@code
+     *     previousSerializer}
+     */
+    public static TypeSerializerSchemaCompatibility<?> resolveSerializerCompatibility(
+            TypeSerializer<?> previousSerializer, TypeSerializer<?> newSerializer) {
+        if (previousSerializer.equals(newSerializer)) {
+            return TypeSerializerSchemaCompatibility.compatibleAsIs();
+        }
+
+        TypeSerializerSnapshot<?> previousSnapshot = previousSerializer.snapshotConfiguration();
+        if (!(previousSnapshot instanceof TypeSerializerSnapshotAdapter)) {
+            return TypeSerializerSchemaCompatibility.incompatible();
+        }
+        return resolveCompatibility(
+                newSerializer, (TypeSerializerSnapshotAdapter<?>) previousSnapshot);
+    }
+
+    /**
+     * Utility method to conjure up a new scope for the adapter generic parameters.
+     *
+     * <p>Unlike {@link #resolveCompatibility(TypeSerializer, TypeSerializerSnapshot)}, which hands
+     * the new serializer's snapshot to the previous snapshot, this variant passes the new
+     * serializer instance itself, so that the previous snapshot can inspect its actual
+     * configuration.
+     */
+    @SuppressWarnings("unchecked")
+    private static <E> TypeSerializerSchemaCompatibility<E> resolveCompatibility(
+            TypeSerializer<?> serializer, TypeSerializerSnapshotAdapter<?> snapshot) {
+
+        TypeSerializer<E> typedSerializer = (TypeSerializer<E>) serializer;
+        TypeSerializerSnapshotAdapter<E> typedSnapshot =
+                (TypeSerializerSnapshotAdapter<E>) snapshot;
+
+        return typedSnapshot.resolveSchemaCompatibility(typedSerializer);
+    }
 
     /** Utility method to conjure up a new scope for the generic parameters. */
     @SuppressWarnings("unchecked")
