@@ -124,33 +124,29 @@ public class PostgresStreamFetchTask implements FetchTask<SourceSplitBase> {
     }
 
     public void commitCurrentOffset(@Nullable Offset offsetToCommit) {
+        if (offsetToCommit == null) {
+            // No stream offset was recorded for the checkpoint, e.g. it was taken before the
+            // stream split was assigned, or while newly added tables were being snapshotted. The
+            // LSN of postgresOffsetContext may already be beyond the offset of the latest
+            // completed checkpoint, so committing it could lose data for the reason below.
+            LOG.debug("Skip committing offset as the checkpoint has no stream offset.");
+            return;
+        }
         if (streamSplitReadTask != null && streamSplitReadTask.offsetContext != null) {
-            PostgresOffsetContext postgresOffsetContext = streamSplitReadTask.offsetContext;
+            // We should commit the checkpoint's LSN instead of postgresOffsetContext's LSN to
+            // the slot.
+            // If the checkpoint succeeds and a table UPDATE message arrives before the
+            // notifyCheckpoint is called, which is represented as a BEGIN/UPDATE/COMMIT WAL
+            // event sequence. The LSN of postgresOffsetContext will be updated to the LSN of
+            // the COMMIT event. Committing the COMMIT LSN to the slot is incorrect because if a
+            // failover occurs after the successful commission, Flink will recover from that
+            // checkpoint and consume WAL starting from the slot LSN that is the LSN of COMMIT
+            // event, rather than from the checkpoint's LSN. Therefore, UPDATE messages cannot
+            // be consumed, resulting in data loss.
+            long commitLsn = ((PostgresOffset) offsetToCommit).getLsn().asLong();
 
-            // only extracting and storing the lsn of the last commit
-            Long commitLsn =
-                    (Long)
-                            postgresOffsetContext
-                                    .getOffset()
-                                    .get(PostgresOffsetContext.LAST_COMMIT_LSN_KEY);
-
-            if (offsetToCommit != null) {
-                // We should commit the checkpoint's LSN instead of postgresOffsetContext's LSN to
-                // the slot.
-                // If the checkpoint succeeds and a table UPDATE message arrives before the
-                // notifyCheckpoint is called, which is represented as a BEGIN/UPDATE/COMMIT WAL
-                // event sequence. The LSN of postgresOffsetContext will be updated to the LSN of
-                // the COMMIT event. Committing the COMMIT LSN to the slot is incorrect because if a
-                // failover occurs after the successful commission, Flink will recover from that
-                // checkpoint and consume WAL starting from the slot LSN that is the LSN of COMMIT
-                // event, rather than from the checkpoint's LSN. Therefore, UPDATE messages cannot
-                // be consumed, resulting in data loss.
-                commitLsn = ((PostgresOffset) offsetToCommit).getLsn().asLong();
-            }
-
-            if (commitLsn != null
-                    && (lastCommitLsn == null
-                            || Lsn.valueOf(commitLsn).compareTo(Lsn.valueOf(lastCommitLsn)) > 0)) {
+            if (lastCommitLsn == null
+                    || Lsn.valueOf(commitLsn).compareTo(Lsn.valueOf(lastCommitLsn)) > 0) {
                 lastCommitLsn = commitLsn;
 
                 Map<String, Object> offsets = new HashMap<>();
