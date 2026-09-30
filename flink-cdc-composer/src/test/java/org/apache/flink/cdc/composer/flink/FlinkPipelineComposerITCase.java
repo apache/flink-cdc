@@ -1372,6 +1372,83 @@ class FlinkPipelineComposerITCase {
 
     @ParameterizedTest
     @EnumSource
+    void testRoutingTimeColumnsWithVariousPrecisions(ValuesDataSink.SinkApi sinkApi)
+            throws Exception {
+        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+
+        // Setup value source with a single table carrying every TIME precision
+        Configuration sourceConfig = new Configuration();
+        sourceConfig.set(
+                ValuesDataSourceOptions.EVENT_SET_ID,
+                ValuesDataSourceHelper.EventSetId.CUSTOM_SOURCE_EVENTS);
+
+        TableId sourceTable = TableId.tableId("default_namespace", "default_schema", "time_source");
+        TableId routedTable = TableId.tableId("default_namespace", "default_schema", "time_routed");
+        Schema tableSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("time_0", DataTypes.TIME(0))
+                        .physicalColumn("time_3", DataTypes.TIME(3))
+                        .physicalColumn("time_6", DataTypes.TIME(6))
+                        .physicalColumn("time_9", DataTypes.TIME(9))
+                        .primaryKey("id")
+                        .build();
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(
+                        tableSchema.getColumnDataTypes().toArray(new DataType[0]));
+
+        List<Event> events =
+                Arrays.asList(
+                        new CreateTableEvent(sourceTable, tableSchema),
+                        DataChangeEvent.insertEvent(
+                                sourceTable,
+                                generator.generate(
+                                        new Object[] {
+                                            1,
+                                            TimeData.fromNanoOfDay(52_137_000_000_000L),
+                                            TimeData.fromNanoOfDay(52_137_123_000_000L),
+                                            TimeData.fromNanoOfDay(52_137_123_456_000L),
+                                            TimeData.fromNanoOfDay(52_137_123_456_789L)
+                                        })));
+        ValuesDataSourceHelper.setSourceEvents(Collections.singletonList(events));
+
+        SourceDef sourceDef =
+                new SourceDef(ValuesDataFactory.IDENTIFIER, "Value Source", sourceConfig);
+
+        // Setup value sink
+        Configuration sinkConfig = new Configuration();
+        sinkConfig.set(ValuesDataSinkOptions.MATERIALIZED_IN_MEMORY, true);
+        sinkConfig.set(ValuesDataSinkOptions.SINK_API, sinkApi);
+        SinkDef sinkDef = new SinkDef(ValuesDataFactory.IDENTIFIER, "Value Sink", sinkConfig);
+
+        // Route the table to a new name, passing every column through
+        List<RouteDef> routeDef =
+                Collections.singletonList(
+                        new RouteDef(sourceTable.toString(), routedTable.toString(), null, null));
+
+        Configuration pipelineConfig = new Configuration();
+        pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
+        PipelineDef pipelineDef =
+                new PipelineDef(
+                        sourceDef,
+                        sinkDef,
+                        routeDef,
+                        Collections.emptyList(),
+                        Collections.emptyList(),
+                        pipelineConfig);
+
+        PipelineExecution execution = composer.compose(pipelineDef);
+        execution.execute();
+
+        String[] outputEvents = outCaptor.toString().trim().split("\n");
+        assertThat(outputEvents)
+                .containsExactly(
+                        "CreateTableEvent{tableId=default_namespace.default_schema.time_routed, schema=columns={`id` INT,`time_0` TIME(0),`time_3` TIME(3),`time_6` TIME(6),`time_9` TIME(9)}, primaryKeys=id, options=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.time_routed, before=[], after=[1, 14:28:57, 14:28:57.123, 14:28:57.123456, 14:28:57.123456789], op=INSERT, meta=()}");
+    }
+
+    @ParameterizedTest
+    @EnumSource
     void testMergingDecimalWithVariousPrecisions(ValuesDataSink.SinkApi sinkApi) throws Exception {
         List<Event> events = generateDecimalColumnEvents("default_table_");
         List<String> expected =

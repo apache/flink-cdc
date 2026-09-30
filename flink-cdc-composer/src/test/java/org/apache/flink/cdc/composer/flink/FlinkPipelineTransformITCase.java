@@ -2980,6 +2980,98 @@ class FlinkPipelineTransformITCase {
     }
 
     @Test
+    void testTransformTimeColumnsWithVariousPrecisions() throws Exception {
+        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+
+        // Setup value source
+        Configuration sourceConfig = new Configuration();
+        sourceConfig.set(
+                ValuesDataSourceOptions.EVENT_SET_ID,
+                ValuesDataSourceHelper.EventSetId.CUSTOM_SOURCE_EVENTS);
+
+        TableId tableId = TableId.tableId("default_namespace", "default_schema", "time_table");
+        Schema tableSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("time_0", DataTypes.TIME(0))
+                        .physicalColumn("time_3", DataTypes.TIME(3))
+                        .physicalColumn("time_6", DataTypes.TIME(6))
+                        .physicalColumn("time_9", DataTypes.TIME(9))
+                        .primaryKey("id")
+                        .build();
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(
+                        tableSchema.getColumnDataTypes().toArray(new DataType[0]));
+
+        List<Event> events =
+                Arrays.asList(
+                        new CreateTableEvent(tableId, tableSchema),
+                        DataChangeEvent.insertEvent(
+                                tableId,
+                                generator.generate(
+                                        new Object[] {
+                                            1,
+                                            TimeData.fromLocalTime(LocalTime.of(21, 48, 25)),
+                                            TimeData.fromLocalTime(
+                                                    LocalTime.of(21, 48, 25, 123000000)),
+                                            TimeData.fromLocalTime(
+                                                    LocalTime.of(21, 48, 25, 123456000)),
+                                            TimeData.fromLocalTime(
+                                                    LocalTime.of(21, 48, 25, 123456789))
+                                        })),
+                        DataChangeEvent.insertEvent(
+                                tableId,
+                                generator.generate(new Object[] {2, null, null, null, null})));
+
+        // The projection selects every TIME precision explicitly and reorders them, so the operator
+        // has to read each column at its own precision and re-encode it into the transformed
+        // record.
+        TransformDef transformDef =
+                new TransformDef(
+                        tableId.toString(),
+                        "id, time_9, time_6, time_3, time_0",
+                        null,
+                        "id",
+                        null,
+                        null,
+                        null,
+                        null);
+
+        ValuesDataSourceHelper.setSourceEvents(Collections.singletonList(events));
+
+        SourceDef sourceDef =
+                new SourceDef(ValuesDataFactory.IDENTIFIER, "Value Source", sourceConfig);
+
+        Configuration sinkConfig = new Configuration();
+        sinkConfig.set(ValuesDataSinkOptions.MATERIALIZED_IN_MEMORY, true);
+        sinkConfig.set(ValuesDataSinkOptions.SINK_API, ValuesDataSink.SinkApi.SINK_V2);
+        SinkDef sinkDef = new SinkDef(ValuesDataFactory.IDENTIFIER, "Value Sink", sinkConfig);
+
+        Configuration pipelineConfig = new Configuration();
+        pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
+        PipelineDef pipelineDef =
+                new PipelineDef(
+                        sourceDef,
+                        sinkDef,
+                        Collections.emptyList(),
+                        Collections.singletonList(transformDef),
+                        Collections.emptyList(),
+                        pipelineConfig);
+
+        PipelineExecution execution = composer.compose(pipelineDef);
+        execution.execute();
+
+        // Check the order and content of all received events
+        String[] outputEvents = outCaptor.toString().trim().split("\n");
+
+        assertThat(outputEvents)
+                .containsExactlyInAnyOrder(
+                        "CreateTableEvent{tableId=default_namespace.default_schema.time_table, schema=columns={`id` INT NOT NULL,`time_9` TIME(9),`time_6` TIME(6),`time_3` TIME(3),`time_0` TIME(0)}, primaryKeys=id, options=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.time_table, before=[], after=[1, 21:48:25.123456789, 21:48:25.123456, 21:48:25.123, 21:48:25], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.time_table, before=[], after=[2, null, null, null, null], op=INSERT, meta=()}");
+    }
+
+    @Test
     void testDateAndTimeCastingFunctions() throws Exception {
         FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
 
