@@ -197,13 +197,7 @@ final class TimeDataSerializerCompatibilityTest {
 
     @Test
     void readsLegacyJavaSerializedSingleton() throws Exception {
-        TimeDataSerializer serializer;
-        try (ObjectInputStream input =
-                new ObjectInputStream(
-                        new ByteArrayInputStream(
-                                Base64.getDecoder().decode(LEGACY_SERIALIZER_BASE64)))) {
-            serializer = (TimeDataSerializer) input.readObject();
-        }
+        TimeDataSerializer serializer = legacyMillisTimeSerializer();
 
         assertThat(serializer.getLength()).isEqualTo(Integer.BYTES);
         DataOutputSerializer oldBytes = new DataOutputSerializer(Integer.BYTES);
@@ -213,5 +207,27 @@ final class TimeDataSerializerCompatibilityTest {
                                 .deserialize(new DataInputDeserializer(oldBytes.getCopyOfBuffer()))
                                 .toNanoOfDay())
                 .isEqualTo(3_723_123_000_000L);
+    }
+
+    /**
+     * Restores the pre-upgrade {@link TimeDataSerializer} singleton from the exact bytes that older
+     * jobs persisted. The historical class carried no configuration, so {@code readObject} has to
+     * fall back to the millisecond encoding; nested composite snapshots restore their element
+     * serializers the same way.
+     */
+    static TimeDataSerializer legacyMillisTimeSerializer() throws Exception {
+        try (ObjectInputStream input =
+                new ObjectInputStream(
+                        new ByteArrayInputStream(legacyMillisTimeSerializerBytes()))) {
+            return (TimeDataSerializer) input.readObject();
+        }
+    }
+
+    /**
+     * The raw Java-serialization bytes of the pre-upgrade {@link TimeDataSerializer} singleton, as
+     * embedded inside the nested snapshots that stored serializers instead of snapshots.
+     */
+    static byte[] legacyMillisTimeSerializerBytes() {
+        return Base64.getDecoder().decode(LEGACY_SERIALIZER_BASE64);
     }
 }
