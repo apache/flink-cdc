@@ -256,6 +256,12 @@ class InternalObjectConverterTest {
         assertThat(convertToInternal(TimeData.fromNanoOfDay(14419123456789L), DataTypes.TIME(3)))
                 .isInstanceOf(TimeData.class)
                 .hasToString("04:00:19.123");
+        assertThat(convertToInternal(TimeData.fromNanoOfDay(14419123456789L), DataTypes.TIME(6)))
+                .isInstanceOf(TimeData.class)
+                .hasToString("04:00:19.123456");
+        assertThat(convertToInternal(TimeData.fromNanoOfDay(14419123456789L), DataTypes.TIME(9)))
+                .isInstanceOf(TimeData.class)
+                .hasToString("04:00:19.123456789");
         assertThat(convertToInternal(null, DataTypes.TIME())).isNull();
     }
 

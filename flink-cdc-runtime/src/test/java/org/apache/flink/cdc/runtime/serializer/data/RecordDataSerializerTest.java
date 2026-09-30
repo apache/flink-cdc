@@ -131,6 +131,20 @@ class RecordDataSerializerTest extends SerializerTestBase<RecordData> {
     }
 
     @Test
+    void testGenericRecordDataKeepsSubMillisecondTime() throws Exception {
+        RecordDataSerializer serializer = RecordDataSerializer.INSTANCE;
+        GenericRecordData record =
+                GenericRecordData.of(TimeData.fromNanoOfDay(43_200_123_456_789L));
+
+        DataOutputSerializer out = new DataOutputSerializer(32);
+        serializer.serialize(record, out);
+        RecordData deserialized =
+                serializer.deserialize(new DataInputDeserializer(out.getCopyOfBuffer()));
+
+        assertThat(deserialized.getTime(0).toNanoOfDay()).isEqualTo(43_200_123_456_789L);
+    }
+
+    @Test
     void testBinaryRecordDataWithVariousTypes() throws Exception {
         RecordDataSerializer serializer = RecordDataSerializer.INSTANCE;
 
