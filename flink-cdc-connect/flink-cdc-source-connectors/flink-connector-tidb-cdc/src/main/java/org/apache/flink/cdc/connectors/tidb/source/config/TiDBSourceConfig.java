@@ -73,7 +73,8 @@ public class TiDBSourceConfig extends JdbcSourceConfig {
             Map<ObjectPath, String> chunkKeyColumns,
             boolean skipSnapshotBackfill,
             boolean isScanNewlyAddedTableEnabled,
-            boolean assignUnboundedChunkFirst) {
+            boolean assignUnboundedChunkFirst,
+            boolean releaseSnapshotMetadataEnabled) {
         super(
                 startupOptions,
                 databaseList,
@@ -100,7 +101,8 @@ public class TiDBSourceConfig extends JdbcSourceConfig {
                 chunkKeyColumn,
                 skipSnapshotBackfill,
                 isScanNewlyAddedTableEnabled,
-                assignUnboundedChunkFirst);
+                assignUnboundedChunkFirst,
+                releaseSnapshotMetadataEnabled);
         this.compatibleMode = compatibleMode;
         this.pdAddresses = pdAddresses;
         this.hostMapping = hostMapping;

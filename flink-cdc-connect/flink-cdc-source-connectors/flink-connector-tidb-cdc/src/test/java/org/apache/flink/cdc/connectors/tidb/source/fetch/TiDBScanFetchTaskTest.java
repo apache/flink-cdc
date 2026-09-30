@@ -340,6 +340,11 @@ public class TiDBScanFetchTaskTest extends TiDBTestBase {
             boolean skipSnapshotBackfill) {
 
         TiDBSourceConfigFactory tiDBSourceConfigFactory = new TiDBSourceConfigFactory();
+        String pdHost = PD.getHost();
+        String tikvHost = TIKV.getHost();
+        tiDBSourceConfigFactory
+                .pdAddresses(pdHost + ":" + PD.getMappedPort(PD_PORT_ORIGIN))
+                .hostMapping("pd0:" + pdHost + ";tikv0:" + tikvHost);
         tiDBSourceConfigFactory.hostname(hostName);
         tiDBSourceConfigFactory.port(port);
         tiDBSourceConfigFactory.username(userName);

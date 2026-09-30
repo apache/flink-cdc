@@ -64,6 +64,7 @@ public class TiDBTestBase extends AbstractTestBase {
     public static final String TIDB_PASSWORD = "";
 
     public static final int TIDB_PORT = 4000;
+    public static final int  TIDB_PD_PORT=2379;
     public static final int TIKV_PORT_ORIGIN = 20160;
     public static final int PD_PORT_ORIGIN = 2379;
     public static int pdPort = PD_PORT_ORIGIN + RandomUtils.nextInt(0, 1000);
@@ -239,6 +240,11 @@ public class TiDBTestBase extends AbstractTestBase {
             boolean skipSnapshotBackfill) {
 
         TiDBSourceConfigFactory tiDBSourceConfigFactory = new TiDBSourceConfigFactory();
+        String pdHost = PD.getHost();
+        String tikvHost = TIKV.getHost();
+        tiDBSourceConfigFactory
+                .pdAddresses(pdHost + ":" + PD.getMappedPort(PD_PORT_ORIGIN))
+                .hostMapping("pd0:" + pdHost + ";tikv0:" + tikvHost);
         tiDBSourceConfigFactory.hostname(TIDB.getContainerIpAddress());
         tiDBSourceConfigFactory.port(TIDB.getMappedPort(TIDB_PORT));
         tiDBSourceConfigFactory.username(TIDB_USER);

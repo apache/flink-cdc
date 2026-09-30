@@ -66,6 +66,7 @@ public class TiDBSourceExampleTest extends TiDBTestBase {
                         .password(TiDBTestBase.TIDB_PASSWORD)
                         .databaseList(databaseName)
                         .tableList(this.databaseName + "." + this.tableName)
+                        .pdAddresses(TIDB.getHost() + ":" + TIDB.getMappedPort(TIDB_PD_PORT))
                         .splitSize(10)
                         .deserializer(buildRowDataDebeziumDeserializeSchema(dataType))
                         .build();

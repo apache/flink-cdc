@@ -151,7 +151,8 @@ public class TiDBSourceConfigFactory extends JdbcSourceConfigFactory {
                 chunkKeyColumns,
                 skipSnapshotBackfill,
                 scanNewlyAddedTableEnabled,
-                assignUnboundedChunkFirst);
+                assignUnboundedChunkFirst,
+                releaseSnapshotMetadataEnabled);
     }
 
     private void validateSingleTableConfiguration() {
