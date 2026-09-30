@@ -29,6 +29,8 @@ import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.model.AiModelClient;
+import org.apache.flink.cdc.common.pipeline.DecimalPrecisionMode;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.udf.UserDefinedFunctionContext;
@@ -41,12 +43,16 @@ import org.apache.flink.cdc.runtime.typeutils.BinaryInternalObjectConverter;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
+import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.flink.shaded.guava31.com.google.common.cache.CacheBuilder;
 import org.apache.flink.shaded.guava31.com.google.common.cache.CacheLoader;
 import org.apache.flink.shaded.guava31.com.google.common.cache.LoadingCache;
 import org.apache.flink.shaded.guava31.com.google.common.collect.HashBasedTable;
 import org.apache.flink.shaded.guava31.com.google.common.collect.Table;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 
@@ -69,8 +75,10 @@ public class PostTransformOperator extends AbstractStreamOperatorAdapter<Event>
         implements OneInputStreamOperator<Event, Event>, Serializable {
 
     private static final long serialVersionUID = 1L;
+    private static final Logger LOG = LoggerFactory.getLogger(PostTransformOperator.class);
 
     private final String timezone;
+    private final DecimalPrecisionMode decimalPrecisionMode;
     private final List<TransformRule> transformRules;
     private final Map<TableId, Boolean> hasAsteriskMap;
     private final Map<TableId, List<String>> projectedColumnsMap;
@@ -78,6 +86,9 @@ public class PostTransformOperator extends AbstractStreamOperatorAdapter<Event>
 
     // Tuple3 items are: function name, class path, and extra options.
     private final List<Tuple3<String, String, Map<String, String>>> udfFunctions;
+
+    // Serializable AI model clients keyed by model name, e.g. myModel.
+    private final Map<String, AiModelClient> modelClients;
 
     private transient List<PostTransformer> transformers;
     private transient List<UserDefinedFunctionDescriptor> udfDescriptors;
@@ -98,13 +109,17 @@ public class PostTransformOperator extends AbstractStreamOperatorAdapter<Event>
     PostTransformOperator(
             List<TransformRule> transformRules,
             String timezone,
-            List<Tuple3<String, String, Map<String, String>>> udfFunctions) {
+            DecimalPrecisionMode decimalPrecisionMode,
+            List<Tuple3<String, String, Map<String, String>>> udfFunctions,
+            Map<String, AiModelClient> modelClients) {
         this.timezone = timezone;
+        this.decimalPrecisionMode = decimalPrecisionMode;
         this.transformRules = transformRules;
         this.hasAsteriskMap = new HashMap<>();
         this.projectedColumnsMap = new HashMap<>();
         this.postTransformInfoMap = new ConcurrentHashMap<>();
         this.udfFunctions = udfFunctions;
+        this.modelClients = modelClients;
     }
 
     @Override
@@ -114,6 +129,9 @@ public class PostTransformOperator extends AbstractStreamOperatorAdapter<Event>
         // Initialize multi-key lookup tables
         this.projectionProcessors = HashBasedTable.create();
         this.filterProcessors = HashBasedTable.create();
+
+        // Initialize AI model clients
+        initializeAiModelClients();
 
         // Be sure to initialize UDF related fields before creating transformers
         initializeUdf();
@@ -136,6 +154,7 @@ public class PostTransformOperator extends AbstractStreamOperatorAdapter<Event>
         super.close();
         TransformExpressionCompiler.cleanUp();
         destroyUdf();
+        destroyAiModelClients();
     }
 
     @Override
@@ -368,7 +387,8 @@ public class PostTransformOperator extends AbstractStreamOperatorAdapter<Event>
                                 .orElse(null),
                         preSchema.getColumns(),
                         udfDescriptors,
-                        transformer.getSupportedMetadataColumns());
+                        transformer.getSupportedMetadataColumns(),
+                        decimalPrecisionMode);
         return preSchema.copy(
                 projectionColumns.stream()
                         .map(ProjectionColumn::getColumn)
@@ -445,9 +465,11 @@ public class PostTransformOperator extends AbstractStreamOperatorAdapter<Event>
                                     .map(TransformProjection::getProjection)
                                     .orElse(null),
                             timezone,
+                            decimalPrecisionMode,
                             udfDescriptors,
                             udfFunctionInstances,
-                            postTransformer.getSupportedMetadataColumns()));
+                            postTransformer.getSupportedMetadataColumns(),
+                            modelClients));
         }
         return projectionProcessors.get(tableId, postTransformer);
     }
@@ -460,7 +482,10 @@ public class PostTransformOperator extends AbstractStreamOperatorAdapter<Event>
             TableId tableId, PostTransformer postTransformer) {
         if (!filterProcessors.contains(tableId, postTransformer)) {
             if (!postTransformer.getFilter().isPresent()) {
-                filterProcessors.put(tableId, postTransformer, TransformFilterProcessor.ofNoOp());
+                filterProcessors.put(
+                        tableId,
+                        postTransformer,
+                        TransformFilterProcessor.ofNoOp(decimalPrecisionMode));
             } else {
                 PostTransformChangeInfo changeInfo = postTransformInfoMap.get(tableId);
                 filterProcessors.put(
@@ -470,9 +495,11 @@ public class PostTransformOperator extends AbstractStreamOperatorAdapter<Event>
                                 changeInfo,
                                 postTransformer.getFilter().orElse(null),
                                 timezone,
+                                decimalPrecisionMode,
                                 udfDescriptors,
                                 udfFunctionInstances,
-                                postTransformer.getSupportedMetadataColumns()));
+                                postTransformer.getSupportedMetadataColumns(),
+                                modelClients));
             }
         }
         return filterProcessors.get(tableId, postTransformer);
@@ -557,5 +584,29 @@ public class PostTransformOperator extends AbstractStreamOperatorAdapter<Event>
         }
         udfDescriptors.clear();
         udfFunctionInstances.clear();
+    }
+
+    private void initializeAiModelClients() {
+        for (Map.Entry<String, AiModelClient> entry : modelClients.entrySet()) {
+            try {
+                entry.getValue().open();
+                LOG.info("Successfully opened AI model client '{}'.", entry.getKey());
+            } catch (Exception e) {
+                LOG.error("Failed to open AI model client '{}'.", entry.getKey(), e);
+                throw new FlinkRuntimeException(
+                        "Failed to initialize AI model: " + entry.getKey(), e);
+            }
+        }
+    }
+
+    private void destroyAiModelClients() {
+        for (Map.Entry<String, AiModelClient> entry : modelClients.entrySet()) {
+            try {
+                entry.getValue().close();
+                LOG.info("Successfully closed AI model client '{}'.", entry.getKey());
+            } catch (Exception e) {
+                LOG.warn("Failed to close AI model client '{}'.", entry.getKey(), e);
+            }
+        }
     }
 }

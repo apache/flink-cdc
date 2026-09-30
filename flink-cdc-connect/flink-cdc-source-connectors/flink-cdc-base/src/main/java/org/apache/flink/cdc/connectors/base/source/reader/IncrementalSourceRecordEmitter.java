@@ -24,6 +24,7 @@ import org.apache.flink.cdc.connectors.base.source.meta.split.SourceRecords;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitState;
 import org.apache.flink.cdc.connectors.base.source.metrics.SourceReaderMetrics;
+import org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.cdc.debezium.history.FlinkJsonTableChangeSerializer;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
@@ -36,6 +37,7 @@ import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -45,7 +47,6 @@ import static org.apache.flink.cdc.connectors.base.source.meta.wartermark.Waterm
 import static org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils.getFetchTimestamp;
 import static org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils.getHistoryRecord;
 import static org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils.getMessageTimestamp;
-import static org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils.isDataChangeRecord;
 import static org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils.isHeartbeatEvent;
 import static org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils.isSchemaChangeEvent;
 
@@ -102,10 +103,7 @@ public class IncrementalSourceRecordEmitter<T>
             }
         } else if (isSchemaChangeEvent(element) && splitState.isStreamSplitState()) {
             LOG.trace("Process SchemaChangeEvent: {}; splitState = {}", element, splitState);
-            HistoryRecord historyRecord = getHistoryRecord(element);
-            Array tableChanges =
-                    historyRecord.document().getArray(HistoryRecord.Fields.TABLE_CHANGES);
-            TableChanges changes = TABLE_CHANGE_SERIALIZER.deserialize(tableChanges, true);
+            TableChanges changes = getTableChangeRecord(element);
             for (TableChanges.TableChange tableChange : changes) {
                 splitState.asStreamSplitState().recordSchema(tableChange.getId(), tableChange);
             }
@@ -128,7 +126,17 @@ public class IncrementalSourceRecordEmitter<T>
         }
     }
 
-    private void updateStreamSplitState(SourceSplitState splitState, SourceRecord element) {
+    protected boolean isDataChangeRecord(SourceRecord record) {
+        return SourceRecordUtils.isDataChangeRecord(record);
+    }
+
+    protected TableChanges getTableChangeRecord(SourceRecord element) throws IOException {
+        HistoryRecord historyRecord = getHistoryRecord(element);
+        Array tableChanges = historyRecord.document().getArray(HistoryRecord.Fields.TABLE_CHANGES);
+        return TABLE_CHANGE_SERIALIZER.deserialize(tableChanges, true);
+    }
+
+    protected void updateStreamSplitState(SourceSplitState splitState, SourceRecord element) {
         if (splitState.isStreamSplitState()) {
             Offset position = getOffsetPosition(element);
             splitState.asStreamSplitState().setStartingOffset(position);
@@ -161,16 +169,7 @@ public class IncrementalSourceRecordEmitter<T>
         debeziumDeserializationSchema.deserialize(element, outputCollector);
     }
 
-    /**
-     * Apply the split to the record emitter.
-     *
-     * <p>This method is called when a new split is assigned to the record emitter. It allows the
-     * record emitter to perform any necessary initialization or setup based on the characteristics
-     * of the assigned split. In this implementation, we may need to handle split-specific
-     * configurations or state initialization.
-     *
-     * @param split the split to apply
-     */
+    /** Called when a new split is assigned. Subclasses may override for split-specific setup. */
     public void applySplit(SourceSplitBase split) {}
 
     protected void reportMetrics(SourceRecord element) {

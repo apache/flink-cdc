@@ -46,6 +46,25 @@ public class OracleSchemaUtils {
 
     private static final Logger LOG = LoggerFactory.getLogger(OracleSchemaUtils.class);
 
+    /**
+     * Removes leading and trailing double quote characters from the provided string.
+     *
+     * <p>Oracle table and column names are inherently stored in upper-case; however, if the objects
+     * are created using double-quotes, the case of the object name is retained. This method will
+     * adhere to those rules and will always return the name in upper-case unless the provided name
+     * is double-quoted in which the returned value will have the double-quotes removed and case
+     * retained.
+     *
+     * @param text value to have double quotes removed
+     * @return string that has had quotes removed
+     */
+    public static String removeQuotes(String text) {
+        if (text != null && text.length() > 2 && text.startsWith("\"") && text.endsWith("\"")) {
+            return text.substring(1, text.length() - 1);
+        }
+        return text.toUpperCase();
+    }
+
     public static List<TableId> listTables(
             OracleSourceConfig sourceConfig, @Nullable String dbName) {
         try (JdbcConnection jdbc = createOracleConnection(sourceConfig)) {
@@ -127,16 +146,23 @@ public class OracleSchemaUtils {
                         .map(OracleSchemaUtils::toColumn)
                         .collect(Collectors.toList());
 
+        List<String> primaryKeys =
+                table.primaryKeyColumnNames().stream()
+                        .map(OracleSchemaUtils::removeQuotes)
+                        .collect(Collectors.toList());
+
         return Schema.newBuilder()
                 .setColumns(columns)
-                .primaryKey(table.primaryKeyColumnNames())
+                .primaryKey(primaryKeys)
                 .comment(table.comment())
                 .build();
     }
 
     public static Column toColumn(io.debezium.relational.Column column) {
         return Column.physicalColumn(
-                column.name(), OracleTypeUtils.fromDbzColumn(column), column.comment());
+                removeQuotes(column.name()),
+                OracleTypeUtils.fromDbzColumn(column),
+                column.comment());
     }
 
     public static io.debezium.relational.TableId toDbzTableId(TableId tableId) {
@@ -158,7 +184,7 @@ public class OracleSchemaUtils {
             DataType dataType = OracleTypeUtils.fromDbzColumn(column);
             org.apache.flink.cdc.common.schema.Column cdcColumn =
                     org.apache.flink.cdc.common.schema.Column.physicalColumn(
-                            column.name().toLowerCase(Locale.ROOT), dataType);
+                            removeQuotes(column.name()), dataType);
             list.add(cdcColumn);
         }
         return Schema.newBuilder().setColumns(list).primaryKey(pks).build();
@@ -181,7 +207,7 @@ public class OracleSchemaUtils {
                         while (rs.next()) {
                             String columnName;
                             columnName = rs.getString(1);
-                            list.add(columnName.toLowerCase(Locale.ROOT));
+                            list.add(removeQuotes(columnName));
                         }
                         return list;
                     });

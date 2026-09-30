@@ -120,6 +120,46 @@ class SchemaUtilsTest {
                                 .physicalColumn("col3", DataTypes.STRING())
                                 .build());
 
+        // wrong add column in before type
+        final Schema finalSchema = schema;
+        Assertions.assertThatThrownBy(
+                        () ->
+                                SchemaUtils.applySchemaChangeEvent(
+                                        finalSchema,
+                                        new AddColumnEvent(
+                                                tableId,
+                                                List.of(
+                                                        new AddColumnEvent.ColumnWithPosition(
+                                                                Column.physicalColumn(
+                                                                        "col6", DataTypes.STRING()),
+                                                                AddColumnEvent.ColumnPosition
+                                                                        .BEFORE,
+                                                                "col10")))))
+                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .hasMessage(
+                        String.format(
+                                "BEFORE type AddColumnEvent error: Column %s does not exist in table %s",
+                                "col10", tableId));
+
+        // wrong add column in after type
+        Assertions.assertThatThrownBy(
+                        () ->
+                                SchemaUtils.applySchemaChangeEvent(
+                                        finalSchema,
+                                        new AddColumnEvent(
+                                                tableId,
+                                                List.of(
+                                                        new AddColumnEvent.ColumnWithPosition(
+                                                                Column.physicalColumn(
+                                                                        "col6", DataTypes.STRING()),
+                                                                AddColumnEvent.ColumnPosition.AFTER,
+                                                                "col10")))))
+                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .hasMessage(
+                        String.format(
+                                "AFTER type AddColumnEvent error: Column %s does not exist in table %s",
+                                "col10", tableId));
+
         // drop columns
         DropColumnEvent dropColumnEvent =
                 new DropColumnEvent(tableId, Arrays.asList("col3", "col5"));
@@ -274,21 +314,15 @@ class SchemaUtilsTest {
                 .isEqualTo(DataTypes.DECIMAL(12, 4));
 
         // Test overflow decimal conversions
-        Assertions.assertThatThrownBy(
-                        () ->
-                                SchemaUtils.inferWiderType(
-                                        DataTypes.DECIMAL(5, 5), DataTypes.DECIMAL(38, 0)))
-                .isExactlyInstanceOf(IllegalArgumentException.class)
-                .hasMessage(
-                        "Failed to merge DECIMAL(5, 5) NOT NULL and DECIMAL(38, 0) NOT NULL type into DECIMAL. 43 precision digits required, 38 available");
+        Assertions.assertThat(
+                        SchemaUtils.inferWiderType(
+                                DataTypes.DECIMAL(5, 5), DataTypes.DECIMAL(38, 0)))
+                .isEqualTo(DataTypes.DECIMAL(38, 0));
 
-        Assertions.assertThatThrownBy(
-                        () ->
-                                SchemaUtils.inferWiderType(
-                                        DataTypes.DECIMAL(38, 0), DataTypes.DECIMAL(5, 5)))
-                .isExactlyInstanceOf(IllegalArgumentException.class)
-                .hasMessage(
-                        "Failed to merge DECIMAL(38, 0) NOT NULL and DECIMAL(5, 5) NOT NULL type into DECIMAL. 43 precision digits required, 38 available");
+        Assertions.assertThat(
+                        SchemaUtils.inferWiderType(
+                                DataTypes.DECIMAL(38, 0), DataTypes.DECIMAL(5, 5)))
+                .isEqualTo(DataTypes.DECIMAL(38, 0));
 
         // Test merging with nullability
         Assertions.assertThat(

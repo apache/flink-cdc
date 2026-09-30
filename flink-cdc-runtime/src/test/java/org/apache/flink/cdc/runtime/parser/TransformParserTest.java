@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.runtime.parser;
 
 import org.apache.flink.api.common.io.ParseException;
+import org.apache.flink.cdc.common.pipeline.DecimalPrecisionMode;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
@@ -33,6 +34,7 @@ import org.apache.calcite.jdbc.CalciteSchema;
 import org.apache.calcite.prepare.CalciteCatalogReader;
 import org.apache.calcite.rel.type.RelDataTypeSystem;
 import org.apache.calcite.runtime.CalciteContextException;
+import org.apache.calcite.sql.SqlBasicCall;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlSelect;
 import org.apache.calcite.sql.type.SqlTypeFactoryImpl;
@@ -59,6 +61,72 @@ class TransformParserTest {
                     .build();
 
     @Test
+    void testGenerateDatePartFunctionProjectionColumns() {
+        List<ProjectionColumn> projectionColumns =
+                TransformParser.generateProjectionColumns(
+                        "YEAR(date_col) AS year_col, "
+                                + "HOUR(time_col) AS hour_col, "
+                                + "EXTRACT(DAY FROM timestamp_col) AS day_col, "
+                                + "EXTRACT(HOUR FROM timestamp_ltz_col) AS ltz_hour_col",
+                        Arrays.asList(
+                                Column.physicalColumn("date_col", DataTypes.DATE()),
+                                Column.physicalColumn("time_col", DataTypes.TIME()),
+                                Column.physicalColumn("timestamp_col", DataTypes.TIMESTAMP()),
+                                Column.physicalColumn(
+                                        "timestamp_ltz_col", DataTypes.TIMESTAMP_LTZ())),
+                        Collections.emptyList(),
+                        new SupportedMetadataColumn[0]);
+
+        Assertions.assertThat(projectionColumns)
+                .extracting(ProjectionColumn::getDataType)
+                .containsExactly(
+                        DataTypes.BIGINT(),
+                        DataTypes.BIGINT(),
+                        DataTypes.BIGINT(),
+                        DataTypes.BIGINT());
+        Assertions.assertThat(projectionColumns)
+                .extracting(ProjectionColumn::getScriptExpression)
+                .containsExactly(
+                        "extract(\"YEAR\", $0, __time_zone__)",
+                        "extract(\"HOUR\", $0, __time_zone__)",
+                        "extract(\"DAY\", $0, __time_zone__)",
+                        "extract(\"HOUR\", $0, __time_zone__)");
+    }
+
+    @Test
+    void testGenerateIntervalArithmeticProjectionColumns() {
+        List<ProjectionColumn> projectionColumns =
+                TransformParser.generateProjectionColumns(
+                        "date_col + INTERVAL '1' DAY AS date_col, "
+                                + "time_col + INTERVAL '2:03' HOUR TO MINUTE AS time_col, "
+                                + "timestamp_col - INTERVAL '1-2' YEAR TO MONTH AS timestamp_col, "
+                                + "INTERVAL '3' DAY + timestamp_ltz_col AS timestamp_ltz_col",
+                        Arrays.asList(
+                                Column.physicalColumn("date_col", DataTypes.DATE()),
+                                Column.physicalColumn("time_col", DataTypes.TIME()),
+                                Column.physicalColumn("timestamp_col", DataTypes.TIMESTAMP()),
+                                Column.physicalColumn(
+                                        "timestamp_ltz_col", DataTypes.TIMESTAMP_LTZ())),
+                        Collections.emptyList(),
+                        new SupportedMetadataColumn[0]);
+
+        Assertions.assertThat(projectionColumns)
+                .extracting(ProjectionColumn::getDataType)
+                .containsExactly(
+                        DataTypes.DATE(),
+                        DataTypes.TIME(),
+                        DataTypes.TIMESTAMP(3),
+                        DataTypes.TIMESTAMP_LTZ(3));
+        Assertions.assertThat(projectionColumns)
+                .extracting(ProjectionColumn::getScriptExpression)
+                .containsExactly(
+                        "temporalPlusMillis($0, 86400000L)",
+                        "temporalPlusMillis($0, 7380000L)",
+                        "temporalPlusMonths($0, -14L)",
+                        "temporalPlusMillis($0, 259200000L)");
+    }
+
+    @Test
     void testCalciteParser() {
         SqlSelect parse =
                 TransformParser.parseSelect(
@@ -67,6 +135,116 @@ class TransformParserTest {
                 .hasToString("`CONCAT`(`id`, `order_id`) AS `uniq_id`, *");
 
         Assertions.assertThat(parse.getWhere()).hasToString("`uniq_id` > 10 AND `id` IS NOT NULL");
+    }
+
+    @Test
+    void testCollectionConstructorsAndFunctions() {
+        List<Column> columns =
+                List.of(
+                        Column.physicalColumn("id", DataTypes.BIGINT()),
+                        Column.physicalColumn("arr", DataTypes.ARRAY(DataTypes.INT())),
+                        Column.physicalColumn(
+                                "m", DataTypes.MAP(DataTypes.STRING(), DataTypes.INT())));
+
+        List<ProjectionColumn> projectionColumns =
+                TransformParser.generateProjectionColumns(
+                        "ARRAY[1, id] AS array_col, "
+                                + "MAP['one', 1, 'id', id] AS map_col, "
+                                + "ROW(id, arr) AS row_col, "
+                                + "CARDINALITY(arr) AS array_size, "
+                                + "CARDINALITY(m) AS map_size, "
+                                + "ARRAY_CONTAINS(arr, 2) AS contains_two, "
+                                + "ARRAY_POSITION(arr, 2) AS position_two, "
+                                + "ELEMENT(ARRAY[id]) AS only_element, "
+                                + "ARRAY[ARRAY[1], ARRAY[id]] AS nested_array",
+                        columns,
+                        Collections.emptyList(),
+                        new SupportedMetadataColumn[0]);
+
+        Assertions.assertThat(projectionColumns)
+                .extracting(ProjectionColumn::getDataType)
+                .containsExactly(
+                        DataTypes.ARRAY(DataTypes.BIGINT()),
+                        DataTypes.MAP(DataTypes.STRING(), DataTypes.BIGINT()),
+                        DataTypes.ROW(DataTypes.BIGINT(), DataTypes.ARRAY(DataTypes.INT())),
+                        DataTypes.INT(),
+                        DataTypes.INT(),
+                        DataTypes.BOOLEAN(),
+                        DataTypes.INT(),
+                        DataTypes.BIGINT(),
+                        DataTypes.ARRAY(DataTypes.ARRAY(DataTypes.BIGINT())));
+        Assertions.assertThat(projectionColumns)
+                .extracting(ProjectionColumn::getScriptExpression)
+                .containsExactly(
+                        "array(castToLong(1), $0)",
+                        "map(\"one\", castToLong(1), \"id\", $0)",
+                        "row($0, $1)",
+                        "cardinality($0)",
+                        "cardinality($0)",
+                        "arrayContains($0, 2)",
+                        "arrayPosition($0, 2)",
+                        "(java.lang.Long) element(array($0))",
+                        "array(array(castToLong(1)), array($0))");
+    }
+
+    @Test
+    void testCollectionConstructorWithIncompatibleElementTypes() {
+        Assertions.assertThatThrownBy(
+                        () ->
+                                TransformParser.generateProjectionColumns(
+                                        "ARRAY[1, TRUE] AS invalid_array",
+                                        Collections.emptyList(),
+                                        Collections.emptyList(),
+                                        new SupportedMetadataColumn[0]))
+                .isExactlyInstanceOf(CalciteContextException.class)
+                .hasMessageContaining("Parameters must be of the same type");
+    }
+
+    @Test
+    void testPreservesNamedRowFieldsInCollectionTypes() {
+        DataType namedRowType =
+                DataTypes.ROW(
+                        DataTypes.FIELD("name", DataTypes.STRING()),
+                        DataTypes.FIELD("length", DataTypes.INT()));
+        List<Column> columns = List.of(Column.physicalColumn("complex_row_", namedRowType));
+
+        List<ProjectionColumn> projectionColumns =
+                TransformParser.generateProjectionColumns(
+                        "ELEMENT(ARRAY[complex_row_]) AS row_element, "
+                                + "ARRAY[complex_row_] AS row_array, "
+                                + "MAP['row', complex_row_] AS row_map",
+                        columns,
+                        Collections.emptyList(),
+                        new SupportedMetadataColumn[0]);
+
+        Assertions.assertThat(projectionColumns)
+                .extracting(ProjectionColumn::getDataType)
+                .containsExactly(
+                        namedRowType,
+                        DataTypes.ARRAY(namedRowType),
+                        DataTypes.MAP(DataTypes.STRING(), namedRowType));
+    }
+
+    @Test
+    void testTranslateCollectionFunctionsToJaninoExpression() {
+        List<Column> columns =
+                List.of(
+                        Column.physicalColumn("id", DataTypes.BIGINT()),
+                        Column.physicalColumn("arr", DataTypes.ARRAY(DataTypes.INT())),
+                        Column.physicalColumn(
+                                "m", DataTypes.MAP(DataTypes.STRING(), DataTypes.INT())));
+
+        testFilterExpressionWithColumns("CARDINALITY(arr)", "cardinality(arr)", columns);
+        testFilterExpressionWithColumns("ARRAY_CONTAINS(arr, 2)", "arrayContains(arr, 2)", columns);
+        testFilterExpressionWithColumns("ARRAY_POSITION(arr, 2)", "arrayPosition(arr, 2)", columns);
+        testFilterExpressionWithColumns(
+                "ELEMENT(ARRAY[id])", "(java.lang.Long) element(array(id))", columns);
+        testFilterExpressionWithColumns(
+                "MAP['one', 1]['one']",
+                "(java.lang.Integer) itemAccess(map(\"one\", 1), \"one\")",
+                columns);
+        testFilterExpressionWithColumns(
+                "ROW(id, arr)[2]", "(java.util.List) itemAccess(row(id, arr), 2)", columns);
     }
 
     @Test
@@ -172,32 +350,106 @@ class TransformParserTest {
 
     @Test
     void testTranslateFilterToJaninoExpression() {
-        testFilterExpression("id is not null", "null != id");
-        testFilterExpression("id is null", "null == id");
+        testFilterExpression("id is not null", "isNotNull(id)");
+        testFilterExpression("id is null", "isNull(id)");
         testFilterExpression("id = 1 and uid = 2", "valueEquals(id, 1) && valueEquals(uid, 2)");
         testFilterExpression("id = 1 or id = 2", "valueEquals(id, 1) || valueEquals(id, 2)");
-        testFilterExpression("not (id = 1)", "!valueEquals(id, 1)");
+        testFilterExpression("not (id = 1)", "not(valueEquals(id, 1))");
         testFilterExpression("id = '1'", "valueEquals(id, \"1\")");
         testFilterExpression("id <> '1'", "!valueEquals(id, \"1\")");
+        testFilterExpression("id is distinct from '1'", "isDistinctFrom(id, \"1\")");
+        testFilterExpression("id is not distinct from '1'", "isNotDistinctFrom(id, \"1\")");
         testFilterExpression("d between d1 and d2", "betweenAsymmetric(d, d1, d2)");
         testFilterExpression("d not between d1 and d2", "notBetweenAsymmetric(d, d1, d2)");
         testFilterExpression("d in (d1, d2)", "in(d, d1, d2)");
         testFilterExpression("d not in (d1, d2)", "notIn(d, d1, d2)");
-        testFilterExpression("id is false", "false == id");
-        testFilterExpression("id is not false", "true == id");
-        testFilterExpression("id is true", "true == id");
-        testFilterExpression("id is not true", "false == id");
+        testFilterExpression("id is false", "isFalse(id)");
+        testFilterExpression("id is not false", "isNotFalse(id)");
+        testFilterExpression("id is true", "isTrue(id)");
+        testFilterExpression("id is not true", "isNotTrue(id)");
+        testFilterExpression("id is unknown", "isNull(id)");
+        testFilterExpression("id is not unknown", "isNotNull(id)");
         testFilterExpression("a || b", "concat(a, b)");
         testFilterExpression("CHAR_LENGTH(id)", "charLength(id)");
         testFilterExpression("trim(id)", "trim(\"BOTH\", \" \", id)");
         testFilterExpression(
                 "REGEXP_REPLACE(id, '[a-zA-Z]', '')", "regexpReplace(id, \"[a-zA-Z]\", \"\")");
+        testFilterExpression(
+                "REGEXP_EXTRACT('foothebar', 'foo(.*?)(bar)', 2)",
+                "regexpExtract(\"foothebar\", \"foo(.*?)(bar)\", 2)");
+        testFilterExpression(
+                "REGEXP_EXTRACT('foothebar', 'foo(.*?)(bar)')",
+                "regexpExtract(\"foothebar\", \"foo(.*?)(bar)\")");
+        testFilterExpression(
+                "REGEXP_EXTRACT_ALL('100-200, 300-400', '([0-9]+)-([0-9]+)', 2)",
+                "regexpExtractAll(\"100-200, 300-400\", \"([0-9]+)-([0-9]+)\", 2)");
+        testFilterExpression(
+                "REGEXP_EXTRACT_ALL('100-200, 300-400', '([0-9]+)-([0-9]+)')",
+                "regexpExtractAll(\"100-200, 300-400\", \"([0-9]+)-([0-9]+)\")");
+        testFilterExpression(
+                "REGEXP_COUNT('abc123xyz456', '[0-9]')",
+                "regexpCount(\"abc123xyz456\", \"[0-9]\")");
+        testFilterExpression(
+                "REGEXP_INSTR('abc123xyz456', '[0-9]')",
+                "regexpInstr(\"abc123xyz456\", \"[0-9]\")");
+        testFilterExpression(
+                "REGEXP_SUBSTR('100-200, 300-400', '([0-9]+)-([0-9]+)')",
+                "regexpSubstr(\"100-200, 300-400\", \"([0-9]+)-([0-9]+)\")");
         testFilterExpression("upper(id)", "upper(id)");
         testFilterExpression("lower(id)", "lower(id)");
         testFilterExpression("concat(a,b)", "concat(a, b)");
         testFilterExpression("SUBSTR(a,1)", "substr(a, 1)");
+        testFilterExpression("OVERLAY(id PLACING 'x' FROM 2)", "overlay(id, \"x\", 2)");
+        testFilterExpression("OVERLAY(id PLACING 'x' FROM 2 FOR 3)", "overlay(id, \"x\", 2, 3)");
+        testFilterExpression("POSITION('b' IN id)", "position(\"b\", id)");
+        testFilterExpression("POSITION('b' IN id FROM 2)", "position(\"b\", id, 2)");
+        testFilterExpression("LOCATE('b', id)", "locate(\"b\", id)");
+        testFilterExpression("LOCATE('b', id, 2)", "locate(\"b\", id, 2)");
+        testFilterExpression("INSTR(id, 'b')", "instr(id, \"b\")");
+        testFilterExpression("LTRIM(id)", "ltrim(id)");
+        testFilterExpression("LTRIM(id, 'x')", "ltrim(id, \"x\")");
+        testFilterExpression("RTRIM(id)", "rtrim(id)");
+        testFilterExpression("RTRIM(id, 'x')", "rtrim(id, \"x\")");
+        testFilterExpression("BTRIM(id)", "btrim(id)");
+        testFilterExpression("BTRIM(id, 'x')", "btrim(id, \"x\")");
+        testFilterExpression("CONCAT_WS(',', a, b)", "concatWs(\",\", a, b)");
+        testFilterExpression("LPAD(id, 5, 'x')", "lpad(id, 5, \"x\")");
+        testFilterExpression("RPAD(id, 5, 'x')", "rpad(id, 5, \"x\")");
+        testFilterExpression("REPLACE(id, 'a', 'b')", "replace(id, \"a\", \"b\")");
+        testFilterExpression("REPEAT(id, 2)", "repeat(id, 2)");
+        testFilterExpression("LEFT(id, 2)", "left(id, 2)");
+        testFilterExpression("RIGHT(id, 2)", "right(id, 2)");
+        testFilterExpression("STARTSWITH(id, 'a')", "startswith(id, \"a\")");
+        testFilterExpression("ENDSWITH(id, 'a')", "endswith(id, \"a\")");
+        List<Column> binaryColumns =
+                Arrays.asList(
+                        Column.physicalColumn("binary_value", DataTypes.VARBINARY(16)),
+                        Column.physicalColumn("binary_part", DataTypes.BINARY(2)));
+        testFilterExpressionWithColumns(
+                "STARTSWITH(binary_value, binary_part)",
+                "startswith(binary_value, binary_part)",
+                binaryColumns);
+        testFilterExpressionWithColumns(
+                "ENDSWITH(binary_value, binary_part)",
+                "endswith(binary_value, binary_part)",
+                binaryColumns);
+        testFilterExpressionWithColumns(
+                "POSITION(binary_part IN binary_value)",
+                "position(binary_part, binary_value)",
+                binaryColumns);
+        testFilterExpressionWithColumns(
+                "OVERLAY(binary_value PLACING binary_part FROM 1)",
+                "overlay(binary_value, binary_part, 1)",
+                binaryColumns);
+        testFilterExpression("TO_BASE64(id)", "toBase64(id)");
+        testFilterExpression("TO_BASE64(binary_value)", "toBase64(binary_value)");
+        testFilterExpression("FROM_BASE64(id)", "fromBase64(id)");
+        testFilterExpression("FROM_BASE64_BINARY(id)", "fromBase64Binary(id)");
         testFilterExpression("id like '^[a-zA-Z]'", "like(id, \"^[a-zA-Z]\")");
         testFilterExpression("id not like '^[a-zA-Z]'", "notLike(id, \"^[a-zA-Z]\")");
+        testFilterExpression("id like 'A$%' escape '$'", "like(id, \"A$%\", \"$\")");
+        testFilterExpression("id similar to '(A|B)%'", "similarTo(id, \"(A|B)%\")");
+        testFilterExpression("id not similar to '(A|B)%'", "notSimilarTo(id, \"(A|B)%\")");
         testFilterExpression("abs(2)", "abs(2)");
         testFilterExpression("ceil(2)", "ceil(2)");
         testFilterExpression("ceiling(2)", "ceil(2)");
@@ -227,10 +479,18 @@ class TransformParserTest {
         testFilterExpression(
                 "UNIX_TIMESTAMP('1970-01-01 08:00:01.001 +0800', 'yyyy-MM-dd HH:mm:ss.SSS X')",
                 "unixTimestamp(\"1970-01-01 08:00:01.001 +0800\", \"yyyy-MM-dd HH:mm:ss.SSS X\", __epoch_time__, __time_zone__)");
-        testFilterExpression("YEAR(dt)", "year(dt)");
-        testFilterExpression("QUARTER(dt)", "quarter(dt)");
-        testFilterExpression("MONTH(dt)", "month(dt)");
-        testFilterExpression("WEEK(dt)", "week(dt)");
+        testFilterExpression("YEAR(dt)", "extract(\"YEAR\", dt, __time_zone__)");
+        testFilterExpression("QUARTER(dt)", "extract(\"QUARTER\", dt, __time_zone__)");
+        testFilterExpression("MONTH(dt)", "extract(\"MONTH\", dt, __time_zone__)");
+        testFilterExpression("WEEK(dt)", "extract(\"WEEK\", dt, __time_zone__)");
+        testFilterExpression("DAYOFYEAR(dt)", "extract(\"DOY\", dt, __time_zone__)");
+        testFilterExpression("DAYOFMONTH(dt)", "extract(\"DAY\", dt, __time_zone__)");
+        testFilterExpression("DAYOFWEEK(dt)", "extract(\"DOW\", dt, __time_zone__)");
+        testFilterExpression("HOUR(dt)", "extract(\"HOUR\", dt, __time_zone__)");
+        testFilterExpression("MINUTE(dt)", "extract(\"MINUTE\", dt, __time_zone__)");
+        testFilterExpression("SECOND(dt)", "extract(\"SECOND\", dt, __time_zone__)");
+        testFilterExpression("EXTRACT(YEAR FROM dt)", "extract(\"YEAR\", dt, __time_zone__)");
+        testFilterExpression("EXTRACT(DOY FROM dt)", "extract(\"DOY\", dt, __time_zone__)");
         testFilterExpression(
                 "DATE_FORMAT(dt,'yyyy-MM-dd')", "dateFormat(dt, \"yyyy-MM-dd\", __time_zone__)");
         testFilterExpression("TO_DATE(dt, 'yyyy-MM-dd')", "toDate(dt, \"yyyy-MM-dd\")");
@@ -329,14 +589,19 @@ class TransformParserTest {
                 "TIMESTAMPADD(YEAR, 1, dt)", "timestampadd(\"YEAR\", 1, dt, __time_zone__)");
         testFilterExpression(
                 "timestampadd(year, 1, dt)", "timestampadd(\"YEAR\", 1, dt, __time_zone__)");
-        testFilterExpression("IF(a>b,a,b)", "greaterThan(a, b) ? a : b");
-        testFilterExpression("NULLIF(a,b)", "nullif(a, b)");
+        testFilterExpression("IF(a>b,a,b)", "isTrue(greaterThan(a, b)) ? a : b");
+        testFilterExpression("NULLIF(id,id)", "(java.lang.Integer) nullIf(id, id)");
         testFilterExpression("COALESCE(a,b,c)", "coalesce(a, b, c)");
         testFilterExpression("id + 2", "id + 2");
         testFilterExpression("id - 2", "id - 2");
         testFilterExpression("id * 2", "id * 2");
         testFilterExpression("id / 2", "id / 2");
         testFilterExpression("id % 2", "id % 2");
+        testFilterExpression("dt + INTERVAL '1' DAY", "temporalPlusMillis(dt, 86400000L)");
+        testFilterExpression("dt - INTERVAL '1-2' YEAR TO MONTH", "temporalPlusMonths(dt, -14L)");
+        testFilterExpression(
+                "INTERVAL '2:03' HOUR TO MINUTE + dt", "temporalPlusMillis(dt, 7380000L)");
+        testFilterExpression("dt + INTERVAL '-1' SECOND", "temporalPlusMillis(dt, -1000L)");
         testFilterExpression("a < b", "lessThan(a, b)");
         testFilterExpression("a <= b", "lessThanOrEqual(a, b)");
         testFilterExpression("a > b", "greaterThan(a, b)");
@@ -348,19 +613,19 @@ class TransformParserTest {
         testFilterExpression("upper(lower(id))", "upper(lower(id))");
         testFilterExpression(
                 "abs(uniq_id) > 10 and id is not null",
-                "greaterThan(abs(uniq_id), 10) && null != id");
+                "greaterThan(abs(uniq_id), 10) && isNotNull(id)");
         testFilterExpression(
                 "case id when 1 then 'a' when 2 then 'b' else 'c' end",
-                "(valueEquals(id, 1) ? \"a\" : valueEquals(id, 2) ? \"b\" : \"c\")");
+                "(isTrue(valueEquals(id, 1)) ? \"a\" : isTrue(valueEquals(id, 2)) ? \"b\" : \"c\")");
         testFilterExpression(
                 "case when id = 1 then 'a' when id = 2 then 'b' else 'c' end",
-                "(valueEquals(id, 1) ? \"a\" : valueEquals(id, 2) ? \"b\" : \"c\")");
+                "(isTrue(valueEquals(id, 1)) ? \"a\" : isTrue(valueEquals(id, 2)) ? \"b\" : \"c\")");
         testFilterExpression(
                 "case id when 1 then 'a' when 2 then 'b' else 'c' end",
-                "(valueEquals(id, 1) ? \"a\" : valueEquals(id, 2) ? \"b\" : \"c\")");
+                "(isTrue(valueEquals(id, 1)) ? \"a\" : isTrue(valueEquals(id, 2)) ? \"b\" : \"c\")");
         testFilterExpression(
                 "case when id = 1 then 'a' when id = 2 then 'b' else 'c' end",
-                "(valueEquals(id, 1) ? \"a\" : valueEquals(id, 2) ? \"b\" : \"c\")");
+                "(isTrue(valueEquals(id, 1)) ? \"a\" : isTrue(valueEquals(id, 2)) ? \"b\" : \"c\")");
         testFilterExpression("cast(id||'0' as int)", "castToInteger(concat(id, \"0\"))");
         testFilterExpression("cast(1 as string)", "castToString(1)");
         testFilterExpression("cast(1 as boolean)", "castToBoolean(1)");
@@ -387,8 +652,162 @@ class TransformParserTest {
                 "cast(CURRENT_TIMESTAMP as TIMESTAMP)",
                 "castToTimestamp(currentTimestamp(__epoch_time__), __time_zone__)");
         testFilterExpression("cast(dt as TIMESTAMP)", "castToTimestamp(dt, __time_zone__)");
+        testFilterExpression("try_cast(id||'0' as int)", "tryCastToInteger(concat(id, \"0\"))");
+        testFilterExpression("try_cast(1 as string)", "tryCastToString(1)");
+        testFilterExpression("try_cast(1 as boolean)", "tryCastToBoolean(1)");
+        testFilterExpression("try_cast(1 as tinyint)", "tryCastToByte(1)");
+        testFilterExpression("try_cast(1 as smallint)", "tryCastToShort(1)");
+        testFilterExpression("try_cast(1 as bigint)", "tryCastToLong(1)");
+        testFilterExpression("try_cast(1 as float)", "tryCastToFloat(1)");
+        testFilterExpression("try_cast(1 as double)", "tryCastToDouble(1)");
+        testFilterExpression("try_cast(1 as decimal)", "tryCastToBigDecimal(1, 10, 0)");
+        testFilterExpression("try_cast(1 as char)", "tryCastToString(1)");
+        testFilterExpression("try_cast(1 as varchar)", "tryCastToString(1)");
+        testFilterExpression("try_cast(dt as timestamp)", "tryCastToTimestamp(dt, __time_zone__)");
+        testFilterExpression(
+                "try_cast(try_cast(id as int) as varchar)",
+                "tryCastToString(tryCastToInteger(id))");
+        testFilterExpression(
+                "ifnull(null, 1)",
+                "(java.lang.Integer) ifNull(castToInteger(null), castToInteger(1))");
         testFilterExpression("parse_json(jsonStr)", "parseJson(jsonStr)");
         testFilterExpression("try_parse_json(jsonStr)", "tryParseJson(jsonStr)");
+    }
+
+    @Test
+    void testStringFunctionArgumentValidation() {
+        List<Column> columns =
+                Arrays.asList(
+                        Column.physicalColumn("s", DataTypes.STRING()),
+                        Column.physicalColumn("binary_value", DataTypes.VARBINARY(16)),
+                        Column.physicalColumn("binary_part", DataTypes.BINARY(2)));
+        SqlSelect positionSelect =
+                TransformParser.parseSelect(
+                        "SELECT POSITION(binary_part IN binary_value) AS position_value FROM TB");
+        SqlBasicCall positionAlias = (SqlBasicCall) positionSelect.getSelectList().get(0);
+        SqlBasicCall positionCall = (SqlBasicCall) positionAlias.operand(0);
+
+        Assertions.assertThat(positionCall.getOperator())
+                .isSameAs(TransformSqlOperatorTable.POSITION);
+
+        Assertions.assertThatThrownBy(
+                        () ->
+                                TransformParser.generateProjectionColumns(
+                                        "INSTR(s, 'a', 1) AS invalid_value",
+                                        columns,
+                                        Collections.emptyList(),
+                                        new SupportedMetadataColumn[0]))
+                .isExactlyInstanceOf(CalciteContextException.class)
+                .hasMessageContaining("INSTR");
+        Assertions.assertThatThrownBy(
+                        () ->
+                                TransformParser.generateProjectionColumns(
+                                        "LPAD(s, true, 'x') AS invalid_value",
+                                        columns,
+                                        Collections.emptyList(),
+                                        new SupportedMetadataColumn[0]))
+                .isExactlyInstanceOf(CalciteContextException.class)
+                .hasMessageContaining("LPAD");
+        Assertions.assertThatThrownBy(
+                        () ->
+                                TransformParser.generateProjectionColumns(
+                                        "OVERLAY(s PLACING binary_part FROM 1) AS invalid_value",
+                                        columns,
+                                        Collections.emptyList(),
+                                        new SupportedMetadataColumn[0]))
+                .isExactlyInstanceOf(CalciteContextException.class)
+                .hasMessageContaining("is not comparable to");
+        Assertions.assertThat(
+                        TransformParser.generateProjectionColumns(
+                                "POSITION(binary_part IN binary_value) AS position_value",
+                                columns,
+                                Collections.emptyList(),
+                                new SupportedMetadataColumn[0]))
+                .hasSize(1);
+        Assertions.assertThat(
+                        TransformParser.generateProjectionColumns(
+                                "POSITION('a' IN s FROM 2) AS position_value",
+                                columns,
+                                Collections.emptyList(),
+                                new SupportedMetadataColumn[0]))
+                .hasSize(1);
+        Assertions.assertThat(
+                        TransformParser.generateProjectionColumns(
+                                "OVERLAY(binary_value PLACING binary_part FROM 1) AS overlaid_value, "
+                                        + "POSITION(binary_part IN binary_value) AS position_value, "
+                                        + "TO_BASE64(binary_value) AS encoded_value, "
+                                        + "FROM_BASE64_BINARY(s) AS decoded_value",
+                                columns,
+                                Collections.emptyList(),
+                                new SupportedMetadataColumn[0]))
+                .extracting(ProjectionColumn::getDataType)
+                .containsExactly(
+                        DataTypes.VARBINARY(18),
+                        DataTypes.INT(),
+                        DataTypes.STRING(),
+                        DataTypes.VARBINARY(65536));
+    }
+
+    @Test
+    void testTranslateLogicalFilterToJaninoExpressionByNullability() {
+        List<Column> columns =
+                List.of(
+                        Column.physicalColumn("left_bool", DataTypes.BOOLEAN().notNull()),
+                        Column.physicalColumn("right_bool", DataTypes.BOOLEAN().notNull()),
+                        Column.physicalColumn("nullable_bool", DataTypes.BOOLEAN()));
+
+        testFilterExpressionWithColumns(
+                "left_bool and right_bool", "left_bool && right_bool", columns);
+        testFilterExpressionWithColumns(
+                "left_bool or right_bool", "left_bool || right_bool", columns);
+        testFilterExpressionWithColumns(
+                "left_bool and nullable_bool",
+                "left_bool ? nullable_bool : Boolean.FALSE",
+                columns);
+        testFilterExpressionWithColumns(
+                "left_bool or nullable_bool", "left_bool ? Boolean.TRUE : nullable_bool", columns);
+        testFilterExpressionWithColumns(
+                "nullable_bool and right_bool",
+                lazyLogicalFunction("and", "nullable_bool", "right_bool"),
+                columns);
+        testFilterExpressionWithColumns(
+                "nullable_bool or right_bool",
+                lazyLogicalFunction("or", "nullable_bool", "right_bool"),
+                columns);
+        testFilterExpressionWithColumns(
+                "nullable_bool or false",
+                lazyLogicalFunction("or", "nullable_bool", "false"),
+                columns);
+    }
+
+    @Test
+    void testTranslateNestedExpressionPreservesOperatorPrecedence() {
+        List<Column> arithmeticColumns =
+                List.of(
+                        Column.physicalColumn("a", DataTypes.INT()),
+                        Column.physicalColumn("b", DataTypes.INT()),
+                        Column.physicalColumn("c", DataTypes.INT()));
+
+        testFilterExpressionWithColumns("(a + b) * c", "((( a + b ))) * c", arithmeticColumns);
+        testFilterExpressionWithColumns("a / (b * c)", "a / ((( b * c )))", arithmeticColumns);
+        testFilterExpressionWithColumns("a - (b - c)", "a - ((( b - c )))", arithmeticColumns);
+        testFilterExpressionWithColumns("a + b * c", "a + b * c", arithmeticColumns);
+        testFilterExpressionWithColumns("(a - b) - c", "a - b - c", arithmeticColumns);
+        testFilterExpressionWithColumns(
+                "IF(a > b, a, b) + c",
+                "((( isTrue(greaterThan(a, b)) ? a : b ))) + c",
+                arithmeticColumns);
+        testFilterExpressionWithColumns(
+                "c * IF(a > b, a, b)",
+                "c * ((( isTrue(greaterThan(a, b)) ? a : b )))",
+                arithmeticColumns);
+
+        List<Column> booleanColumns =
+                List.of(
+                        Column.physicalColumn("a", DataTypes.BOOLEAN().notNull()),
+                        Column.physicalColumn("b", DataTypes.BOOLEAN().notNull()),
+                        Column.physicalColumn("c", DataTypes.BOOLEAN().notNull()));
+        testFilterExpressionWithColumns("(a OR b) AND c", "((( a || b ))) && c", booleanColumns);
     }
 
     @Test
@@ -450,6 +869,16 @@ class TransformParserTest {
 
     @Test
     public void testTranslateFilterToJaninoExpressionError() {
+        Assertions.assertThatThrownBy(
+                        () ->
+                                TransformParser.translateFilterExpressionToJaninoExpression(
+                                        "INTERVAL '1' DAY - dt",
+                                        Collections.emptyList(),
+                                        Collections.emptyList(),
+                                        new SupportedMetadataColumn[0],
+                                        Collections.emptyMap()))
+                .isExactlyInstanceOf(ParseException.class)
+                .hasMessageStartingWith("Unsupported interval arithmetic:");
         Assertions.assertThatThrownBy(
                         () -> {
                             TransformParser.translateFilterExpressionToJaninoExpression(
@@ -528,8 +957,20 @@ class TransformParserTest {
                         "ProjectionColumn{column=`newCreateTime` TIMESTAMP(3) 'newCreateTime', expression='createTime', scriptExpression='$0', originalColumnNames=[createTime], columnNameMap={createTime=$0}}",
                         "ProjectionColumn{column=`newAddress` VARCHAR(50) 'newAddress', expression='address', scriptExpression='$0', originalColumnNames=[address], columnNameMap={address=$0}}",
                         "ProjectionColumn{column=`deposits` DECIMAL(10, 2) 'deposit', expression='deposit', scriptExpression='$0', originalColumnNames=[deposit], columnNameMap={deposit=$0}}",
-                        "ProjectionColumn{column=`bmi` DOUBLE, expression='`TB`.`weight` / (`TB`.`height` * `TB`.`height`)', scriptExpression='$0 / $1 * $1', originalColumnNames=[weight, height, height], columnNameMap={weight=$0, height=$1}}");
+                        "ProjectionColumn{column=`bmi` DOUBLE, expression='`TB`.`weight` / (`TB`.`height` * `TB`.`height`)', scriptExpression='$0 / ((( $1 * $1 )))', originalColumnNames=[weight, height, height], columnNameMap={weight=$0, height=$1}}");
         Assertions.assertThat(result).hasToString("[" + String.join(", ", expected) + "]");
+
+        List<ProjectionColumn> regexpResult =
+                TransformParser.generateProjectionColumns(
+                        "REGEXP_EXTRACT_ALL(name, '([0-9]+)-([0-9]+)') AS regexp_values",
+                        testColumns,
+                        Collections.emptyList(),
+                        new SupportedMetadataColumn[0]);
+        Assertions.assertThat(regexpResult).hasSize(1);
+        Assertions.assertThat(regexpResult.get(0).getDataType())
+                .isEqualTo(DataTypes.ARRAY(DataTypes.STRING()));
+        Assertions.assertThat(regexpResult.get(0).getScriptExpression())
+                .isEqualTo("regexpExtractAll($0, \"([0-9]+)-([0-9]+)\")");
 
         List<ProjectionColumn> metadataResult =
                 TransformParser.generateProjectionColumns(
@@ -570,6 +1011,53 @@ class TransformParserTest {
     }
 
     @Test
+    void testNullHelperAndTryCastTypeInference() {
+        List<Column> columns =
+                List.of(
+                        Column.physicalColumn("text", DataTypes.STRING()),
+                        Column.physicalColumn("nullable_int", DataTypes.INT()),
+                        Column.physicalColumn("not_null_int", DataTypes.INT().notNull()),
+                        Column.physicalColumn("nullable_bigint", DataTypes.BIGINT()));
+
+        List<ProjectionColumn> result =
+                TransformParser.generateProjectionColumns(
+                        "TRY_CAST(text AS INT) AS try_int, "
+                                + "NULLIF(nullable_int, 1) AS nullif_int, "
+                                + "IFNULL(nullable_int, 1) AS ifnull_not_null, "
+                                + "IFNULL(nullable_int, nullable_bigint) AS ifnull_nullable, "
+                                + "IFNULL(not_null_int, nullable_bigint) AS ifnull_input_not_null",
+                        columns,
+                        Collections.emptyList(),
+                        new SupportedMetadataColumn[0]);
+
+        Assertions.assertThat(result)
+                .extracting(ProjectionColumn::getDataType)
+                .containsExactly(
+                        DataTypes.INT(),
+                        DataTypes.INT(),
+                        DataTypes.INT().notNull(),
+                        DataTypes.BIGINT(),
+                        DataTypes.INT().notNull());
+
+        Assertions.assertThatThrownBy(
+                        () ->
+                                TransformParser.generateProjectionColumns(
+                                        "IFNULL(nullable_int, DATE '2024-01-01') AS invalid",
+                                        columns,
+                                        Collections.emptyList(),
+                                        new SupportedMetadataColumn[0]))
+                .hasMessageContaining("Parameters must be of the same type");
+        Assertions.assertThatThrownBy(
+                        () ->
+                                TransformParser.generateProjectionColumns(
+                                        "TRY_CAST(text AS ARRAY<INT>) AS unsupported",
+                                        columns,
+                                        Collections.emptyList(),
+                                        new SupportedMetadataColumn[0]))
+                .isInstanceOf(RuntimeException.class);
+    }
+
+    @Test
     public void testGenerateProjectionColumnsWithPrecision() {
         List<Column> testColumns =
                 Arrays.asList(
@@ -596,13 +1084,46 @@ class TransformParserTest {
                         "ProjectionColumn{column=`id` INT 'id', expression='id', scriptExpression='$0', originalColumnNames=[id], columnNameMap={id=$0}}",
                         "ProjectionColumn{column=`name2` STRING, expression='UPPER(`TB`.`name`)', scriptExpression='upper($0)', originalColumnNames=[name], columnNameMap={name=$0}}",
                         "ProjectionColumn{column=`sex2` STRING, expression='UPPER(`TB`.`sex`)', scriptExpression='upper($0)', originalColumnNames=[sex], columnNameMap={sex=$0}}",
-                        "ProjectionColumn{column=`address2` BINARY(50), expression='CASE WHEN `TB`.`address` IS NOT NULL THEN `TB`.`address` ELSE `TB`.`address` END', scriptExpression='(null != $0 ? $0 : $0)', originalColumnNames=[address, address, address], columnNameMap={address=$0}}",
-                        "ProjectionColumn{column=`phone2` VARBINARY(50), expression='CASE WHEN `TB`.`phone` IS NOT NULL THEN `TB`.`phone` ELSE `TB`.`phone` END', scriptExpression='(null != $0 ? $0 : $0)', originalColumnNames=[phone, phone, phone], columnNameMap={phone=$0}}",
-                        "ProjectionColumn{column=`deposit2` DECIMAL(10, 2), expression='CASE WHEN `TB`.`deposit` IS NOT NULL THEN `TB`.`deposit` ELSE `TB`.`deposit` END', scriptExpression='(null != $0 ? $0 : $0)', originalColumnNames=[deposit, deposit, deposit], columnNameMap={deposit=$0}}",
-                        "ProjectionColumn{column=`birthday2` TIMESTAMP(3), expression='CASE WHEN `TB`.`birthday` IS NOT NULL THEN `TB`.`birthday` ELSE `TB`.`birthday` END', scriptExpression='(null != $0 ? $0 : $0)', originalColumnNames=[birthday, birthday, birthday], columnNameMap={birthday=$0}}",
-                        "ProjectionColumn{column=`birthday_ltz2` TIMESTAMP_LTZ(3), expression='CASE WHEN `TB`.`birthday_ltz` IS NOT NULL THEN `TB`.`birthday_ltz` ELSE `TB`.`birthday_ltz` END', scriptExpression='(null != $0 ? $0 : $0)', originalColumnNames=[birthday_ltz, birthday_ltz, birthday_ltz], columnNameMap={birthday_ltz=$0}}",
-                        "ProjectionColumn{column=`update_time2` TIME(3), expression='CASE WHEN `TB`.`update_time` IS NOT NULL THEN `TB`.`update_time` ELSE `TB`.`update_time` END', scriptExpression='(null != $0 ? $0 : $0)', originalColumnNames=[update_time, update_time, update_time], columnNameMap={update_time=$0}}");
+                        "ProjectionColumn{column=`address2` BINARY(50), expression='CASE WHEN `TB`.`address` IS NOT NULL THEN `TB`.`address` ELSE `TB`.`address` END', scriptExpression='(isTrue(isNotNull($0)) ? $0 : $0)', originalColumnNames=[address, address, address], columnNameMap={address=$0}}",
+                        "ProjectionColumn{column=`phone2` VARBINARY(50), expression='CASE WHEN `TB`.`phone` IS NOT NULL THEN `TB`.`phone` ELSE `TB`.`phone` END', scriptExpression='(isTrue(isNotNull($0)) ? $0 : $0)', originalColumnNames=[phone, phone, phone], columnNameMap={phone=$0}}",
+                        "ProjectionColumn{column=`deposit2` DECIMAL(10, 2), expression='CASE WHEN `TB`.`deposit` IS NOT NULL THEN `TB`.`deposit` ELSE `TB`.`deposit` END', scriptExpression='(isTrue(isNotNull($0)) ? $0 : $0)', originalColumnNames=[deposit, deposit, deposit], columnNameMap={deposit=$0}}",
+                        "ProjectionColumn{column=`birthday2` TIMESTAMP(3), expression='CASE WHEN `TB`.`birthday` IS NOT NULL THEN `TB`.`birthday` ELSE `TB`.`birthday` END', scriptExpression='(isTrue(isNotNull($0)) ? $0 : $0)', originalColumnNames=[birthday, birthday, birthday], columnNameMap={birthday=$0}}",
+                        "ProjectionColumn{column=`birthday_ltz2` TIMESTAMP_LTZ(3), expression='CASE WHEN `TB`.`birthday_ltz` IS NOT NULL THEN `TB`.`birthday_ltz` ELSE `TB`.`birthday_ltz` END', scriptExpression='(isTrue(isNotNull($0)) ? $0 : $0)', originalColumnNames=[birthday_ltz, birthday_ltz, birthday_ltz], columnNameMap={birthday_ltz=$0}}",
+                        "ProjectionColumn{column=`update_time2` TIME(3), expression='CASE WHEN `TB`.`update_time` IS NOT NULL THEN `TB`.`update_time` ELSE `TB`.`update_time` END', scriptExpression='(isTrue(isNotNull($0)) ? $0 : $0)', originalColumnNames=[update_time, update_time, update_time], columnNameMap={update_time=$0}}");
         Assertions.assertThat(result).hasToString("[" + String.join(", ", expected) + "]");
+    }
+
+    @Test
+    void testGenerateProjectionColumnsWithDecimalPrecisionMode() {
+        List<Column> columns =
+                Arrays.asList(
+                        Column.physicalColumn("id", DataTypes.INT()),
+                        Column.physicalColumn("deposit", DataTypes.DECIMAL(20, 2)));
+        String projection =
+                "deposit + CAST(1 AS DECIMAL(1, 0)) AS amount, "
+                        + "id IS DISTINCT FROM 1 AS changed";
+
+        List<ProjectionColumn> upTo19 =
+                TransformParser.generateProjectionColumns(
+                        projection,
+                        columns,
+                        Collections.emptyList(),
+                        new SupportedMetadataColumn[0],
+                        DecimalPrecisionMode.UP_TO_19);
+        List<ProjectionColumn> upTo38 =
+                TransformParser.generateProjectionColumns(
+                        projection,
+                        columns,
+                        Collections.emptyList(),
+                        new SupportedMetadataColumn[0],
+                        DecimalPrecisionMode.UP_TO_38);
+
+        Assertions.assertThat(upTo19)
+                .extracting(ProjectionColumn::getDataType)
+                .containsExactly(DataTypes.DECIMAL(19, 2), DataTypes.BOOLEAN());
+        Assertions.assertThat(upTo38)
+                .extracting(ProjectionColumn::getDataType)
+                .containsExactly(DataTypes.DECIMAL(21, 2), DataTypes.BOOLEAN());
     }
 
     @Test
@@ -644,45 +1165,91 @@ class TransformParserTest {
     @Test
     void testTranslateUdfFilterToJaninoExpression() {
         testFilterExpressionWithUdf(
-                "format(upper(id))", "__instanceOfFormatFunctionClass.eval(upper(id))");
+                "IFNULL(format(id), 'fallback')",
+                "(java.lang.String) ifNull(__udf_format.eval(id), \"fallback\")");
         testFilterExpressionWithUdf(
-                "format(lower(id))", "__instanceOfFormatFunctionClass.eval(lower(id))");
+                "NULLIF(format(id), '1')",
+                "(java.lang.String) nullIf(__udf_format.eval(id), \"1\")");
+        testFilterExpressionWithUdf("format(upper(id))", "__udf_format.eval(upper(id))");
+        testFilterExpressionWithUdf("format(lower(id))", "__udf_format.eval(lower(id))");
+        testFilterExpressionWithUdf("format(concat(a,b))", "__udf_format.eval(concat(a, b))");
+        testFilterExpressionWithUdf("format(SUBSTR(a,1))", "__udf_format.eval(substr(a, 1))");
         testFilterExpressionWithUdf(
-                "format(concat(a,b))", "__instanceOfFormatFunctionClass.eval(concat(a, b))");
+                "typeof(id like '^[a-zA-Z]')", "__udf_typeof.eval(like(id, \"^[a-zA-Z]\"))");
         testFilterExpressionWithUdf(
-                "format(SUBSTR(a,1))", "__instanceOfFormatFunctionClass.eval(substr(a, 1))");
-        testFilterExpressionWithUdf(
-                "typeof(id like '^[a-zA-Z]')",
-                "__instanceOfTypeOfFunctionClass.eval(like(id, \"^[a-zA-Z]\"))");
-        testFilterExpressionWithUdf(
-                "typeof(id not like '^[a-zA-Z]')",
-                "__instanceOfTypeOfFunctionClass.eval(notLike(id, \"^[a-zA-Z]\"))");
-        testFilterExpressionWithUdf(
-                "typeof(abs(2))", "__instanceOfTypeOfFunctionClass.eval(abs(2))");
-        testFilterExpressionWithUdf(
-                "typeof(ceil(2))", "__instanceOfTypeOfFunctionClass.eval(ceil(2))");
-        testFilterExpressionWithUdf(
-                "typeof(ceiling(2))", "__instanceOfTypeOfFunctionClass.eval(ceil(2))");
-        testFilterExpressionWithUdf(
-                "typeof(floor(2))", "__instanceOfTypeOfFunctionClass.eval(floor(2))");
-        testFilterExpressionWithUdf(
-                "typeof(round(2,2))", "__instanceOfTypeOfFunctionClass.eval(round(2, 2))");
-        testFilterExpressionWithUdf(
-                "typeof(id + 2)", "__instanceOfTypeOfFunctionClass.eval(id + 2)");
-        testFilterExpressionWithUdf(
-                "typeof(id - 2)", "__instanceOfTypeOfFunctionClass.eval(id - 2)");
-        testFilterExpressionWithUdf(
-                "typeof(id * 2)", "__instanceOfTypeOfFunctionClass.eval(id * 2)");
-        testFilterExpressionWithUdf(
-                "typeof(id / 2)", "__instanceOfTypeOfFunctionClass.eval(id / 2)");
-        testFilterExpressionWithUdf(
-                "typeof(id % 2)", "__instanceOfTypeOfFunctionClass.eval(id % 2)");
+                "typeof(id not like '^[a-zA-Z]')", "__udf_typeof.eval(notLike(id, \"^[a-zA-Z]\"))");
+        testFilterExpressionWithUdf("typeof(abs(2))", "__udf_typeof.eval(abs(2))");
+        testFilterExpressionWithUdf("typeof(ceil(2))", "__udf_typeof.eval(ceil(2))");
+        testFilterExpressionWithUdf("typeof(ceiling(2))", "__udf_typeof.eval(ceil(2))");
+        testFilterExpressionWithUdf("typeof(floor(2))", "__udf_typeof.eval(floor(2))");
+        testFilterExpressionWithUdf("typeof(round(2,2))", "__udf_typeof.eval(round(2, 2))");
+        testFilterExpressionWithUdf("typeof(id + 2)", "__udf_typeof.eval(id + 2)");
+        testFilterExpressionWithUdf("typeof(id - 2)", "__udf_typeof.eval(id - 2)");
+        testFilterExpressionWithUdf("typeof(id * 2)", "__udf_typeof.eval(id * 2)");
+        testFilterExpressionWithUdf("typeof(id / 2)", "__udf_typeof.eval(id / 2)");
+        testFilterExpressionWithUdf("typeof(id % 2)", "__udf_typeof.eval(id % 2)");
         testFilterExpressionWithUdf(
                 "addone(addone(id)) > 4 OR typeof(id) <> 'bool' AND format('from %s to %s is %s', 'a', 'z', 'lie') <> ''",
-                "greaterThan(__instanceOfAddOneFunctionClass.eval(__instanceOfAddOneFunctionClass.eval(id)), 4) || !valueEquals(__instanceOfTypeOfFunctionClass.eval(id), \"bool\") && !valueEquals(__instanceOfFormatFunctionClass.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")");
+                "greaterThan(__udf_addone.eval(__udf_addone.eval(id)), 4) || !valueEquals(__udf_typeof.eval(id), \"bool\") && !valueEquals(__udf_format.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")");
         testFilterExpressionWithUdf(
                 "ADDONE(ADDONE(id)) > 4 OR TYPEOF(id) <> 'bool' AND FORMAT('from %s to %s is %s', 'a', 'z', 'lie') <> ''",
-                "greaterThan(__instanceOfAddOneFunctionClass.eval(__instanceOfAddOneFunctionClass.eval(id)), 4) || !valueEquals(__instanceOfTypeOfFunctionClass.eval(id), \"bool\") && !valueEquals(__instanceOfFormatFunctionClass.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")");
+                "greaterThan(__udf_addone.eval(__udf_addone.eval(id)), 4) || !valueEquals(__udf_typeof.eval(id), \"bool\") && !valueEquals(__udf_format.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")");
+    }
+
+    @Test
+    void testUdfTakesPrecedenceOverBuiltInFunction() {
+        List<UserDefinedFunctionDescriptor> udfDescriptors =
+                Arrays.asList(
+                        new UserDefinedFunctionDescriptor(
+                                "ifnull",
+                                "org.apache.flink.cdc.udf.examples.java.AddOneFunctionClass"),
+                        new UserDefinedFunctionDescriptor(
+                                "try_cast",
+                                "org.apache.flink.cdc.udf.examples.java.TypeOfFunctionClass"),
+                        new UserDefinedFunctionDescriptor(
+                                "nullif",
+                                "org.apache.flink.cdc.udf.examples.java.FormatFunctionClass"));
+
+        testFilterExpressionWithUdf(
+                "IFNULL(id)",
+                "__udf_ifnull.eval(id)",
+                DUMMY_COLUMNS,
+                Collections.emptyMap(),
+                udfDescriptors);
+        testFilterExpressionWithUdf(
+                "TRY_CAST(id)",
+                "__udf_try_cast.eval(id)",
+                DUMMY_COLUMNS,
+                Collections.emptyMap(),
+                udfDescriptors);
+        testFilterExpressionWithUdf(
+                "NULLIF('%s', 'udf')",
+                "__udf_nullif.eval(\"%s\", \"udf\")",
+                DUMMY_COLUMNS,
+                Collections.emptyMap(),
+                udfDescriptors);
+    }
+
+    @Test
+    void testUdfDoesNotReplaceStructuralOperator() {
+        List<UserDefinedFunctionDescriptor> udfDescriptors =
+                Collections.singletonList(
+                        new UserDefinedFunctionDescriptor(
+                                "as",
+                                "org.apache.flink.cdc.udf.examples.java.AddOneFunctionClass"));
+
+        List<ProjectionColumn> projectionColumns =
+                TransformParser.generateProjectionColumns(
+                        "id AS alias",
+                        DUMMY_COLUMNS,
+                        udfDescriptors,
+                        new SupportedMetadataColumn[0]);
+
+        Assertions.assertThat(projectionColumns).hasSize(1);
+        ProjectionColumn projectionColumn = projectionColumns.get(0);
+        Assertions.assertThat(projectionColumn.getColumnName()).isEqualTo("alias");
+        Assertions.assertThat(projectionColumn.getDataType()).isEqualTo(DataTypes.INT());
+        Assertions.assertThat(projectionColumn.getScriptExpression()).isEqualTo("$0");
     }
 
     @Test
@@ -699,53 +1266,38 @@ class TransformParserTest {
         columnNameMap.put("a-b", "$2");
 
         testFilterExpressionWithUdf(
-                "format(upper(a))",
-                "__instanceOfFormatFunctionClass.eval(upper($0))",
-                columns,
-                columnNameMap);
+                "format(upper(a))", "__udf_format.eval(upper($0))", columns, columnNameMap);
         testFilterExpressionWithUdf(
-                "format(lower(b))",
-                "__instanceOfFormatFunctionClass.eval(lower($1))",
-                columns,
-                columnNameMap);
+                "format(lower(b))", "__udf_format.eval(lower($1))", columns, columnNameMap);
         testFilterExpressionWithUdf(
-                "format(concat(a,b))",
-                "__instanceOfFormatFunctionClass.eval(concat($0, $1))",
-                columns,
-                columnNameMap);
+                "format(concat(a,b))", "__udf_format.eval(concat($0, $1))", columns, columnNameMap);
         testFilterExpressionWithUdf(
                 "format(SUBSTR(`a-b`,1))",
-                "__instanceOfFormatFunctionClass.eval(substr($2, 1))",
+                "__udf_format.eval(substr($2, 1))",
                 columns,
                 columnNameMap);
         testFilterExpressionWithUdf(
                 "typeof(`a-b` like '^[a-zA-Z]')",
-                "__instanceOfTypeOfFunctionClass.eval(like($2, \"^[a-zA-Z]\"))",
+                "__udf_typeof.eval(like($2, \"^[a-zA-Z]\"))",
                 columns,
                 columnNameMap);
         testFilterExpressionWithUdf(
                 "typeof(`a-b` not like '^[a-zA-Z]')",
-                "__instanceOfTypeOfFunctionClass.eval(notLike($2, \"^[a-zA-Z]\"))",
+                "__udf_typeof.eval(notLike($2, \"^[a-zA-Z]\"))",
                 columns,
                 columnNameMap);
         testFilterExpressionWithUdf(
-                "typeof(a-b-`a-b`)",
-                "__instanceOfTypeOfFunctionClass.eval($0 - $1 - $2)",
-                columns,
-                columnNameMap);
+                "typeof(a-b-`a-b`)", "__udf_typeof.eval($0 - $1 - $2)", columns, columnNameMap);
         testFilterExpressionWithUdf(
-                "typeof(a-b-2)",
-                "__instanceOfTypeOfFunctionClass.eval($0 - $1 - 2)",
-                columns,
-                columnNameMap);
+                "typeof(a-b-2)", "__udf_typeof.eval($0 - $1 - 2)", columns, columnNameMap);
         testFilterExpressionWithUdf(
                 "addone(addone(`a-b`)) > 4 OR typeof(a-b) <> 'bool' AND format('from %s to %s is %s', 'a', 'z', 'lie') <> ''",
-                "greaterThan(__instanceOfAddOneFunctionClass.eval(__instanceOfAddOneFunctionClass.eval($2)), 4) || !valueEquals(__instanceOfTypeOfFunctionClass.eval($0 - $1), \"bool\") && !valueEquals(__instanceOfFormatFunctionClass.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")",
+                "greaterThan(__udf_addone.eval(__udf_addone.eval($2)), 4) || !valueEquals(__udf_typeof.eval($0 - $1), \"bool\") && !valueEquals(__udf_format.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")",
                 columns,
                 columnNameMap);
         testFilterExpressionWithUdf(
                 "ADDONE(ADDONE(`a-b`)) > 4 OR TYPEOF(a-b) <> 'bool' AND FORMAT('from %s to %s is %s', 'a', 'z', 'lie') <> ''",
-                "greaterThan(__instanceOfAddOneFunctionClass.eval(__instanceOfAddOneFunctionClass.eval($2)), 4) || !valueEquals(__instanceOfTypeOfFunctionClass.eval($0 - $1), \"bool\") && !valueEquals(__instanceOfFormatFunctionClass.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")",
+                "greaterThan(__udf_addone.eval(__udf_addone.eval($2)), 4) || !valueEquals(__udf_typeof.eval($0 - $1), \"bool\") && !valueEquals(__udf_format.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")",
                 columns,
                 columnNameMap);
     }
@@ -887,6 +1439,13 @@ class TransformParserTest {
         Assertions.assertThat(janinoExpression).isEqualTo(expressionExpect);
     }
 
+    private static String lazyLogicalFunction(
+            String functionName, String leftOperand, String rightOperand) {
+        return String.format(
+                "%s(%s, new java.util.function.Supplier<Boolean>() { public Boolean get() { return %s; } })",
+                functionName, leftOperand, rightOperand);
+    }
+
     private void testFilterExpressionWithUdf(String expression, String expressionExpect) {
         testFilterExpressionWithUdf(
                 expression, expressionExpect, DUMMY_COLUMNS, Collections.emptyMap());
@@ -897,20 +1456,34 @@ class TransformParserTest {
             String expressionExpect,
             List<Column> columns,
             Map<String, String> columnNameMap) {
+        testFilterExpressionWithUdf(
+                expression,
+                expressionExpect,
+                columns,
+                columnNameMap,
+                Arrays.asList(
+                        new UserDefinedFunctionDescriptor(
+                                "format",
+                                "org.apache.flink.cdc.udf.examples.java.FormatFunctionClass"),
+                        new UserDefinedFunctionDescriptor(
+                                "addone",
+                                "org.apache.flink.cdc.udf.examples.java.AddOneFunctionClass"),
+                        new UserDefinedFunctionDescriptor(
+                                "typeof",
+                                "org.apache.flink.cdc.udf.examples.java.TypeOfFunctionClass")));
+    }
+
+    private void testFilterExpressionWithUdf(
+            String expression,
+            String expressionExpect,
+            List<Column> columns,
+            Map<String, String> columnNameMap,
+            List<UserDefinedFunctionDescriptor> udfDescriptors) {
         String janinoExpression =
                 TransformParser.translateFilterExpressionToJaninoExpression(
                         expression,
                         columns,
-                        Arrays.asList(
-                                new UserDefinedFunctionDescriptor(
-                                        "format",
-                                        "org.apache.flink.cdc.udf.examples.java.FormatFunctionClass"),
-                                new UserDefinedFunctionDescriptor(
-                                        "addone",
-                                        "org.apache.flink.cdc.udf.examples.java.AddOneFunctionClass"),
-                                new UserDefinedFunctionDescriptor(
-                                        "typeof",
-                                        "org.apache.flink.cdc.udf.examples.java.TypeOfFunctionClass")),
+                        udfDescriptors,
                         new SupportedMetadataColumn[0],
                         columnNameMap);
         Assertions.assertThat(janinoExpression).isEqualTo(expressionExpect);

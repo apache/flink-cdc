@@ -237,6 +237,61 @@ class PostgresSourceITCase extends PostgresTestBase {
                 scanStartupMode);
     }
 
+    @Test
+    void testCoordinatorReleasesSnapshotMetadataInGroupFetchPath() throws Exception {
+        // A small chunk size yields many snapshot splits and a small meta-group size forces the
+        // reader to fetch metadata over several groups, which is the path where the coordinator
+        // holds (and, with the option on, releases) the bulk snapshot-split metadata. No failover:
+        // this asserts the release does not drop any snapshot or stream data.
+        testPostgresParallelSource(
+                DEFAULT_PARALLELISM,
+                DEFAULT_SCAN_STARTUP_MODE,
+                PostgresTestUtils.FailoverType.NONE,
+                PostgresTestUtils.FailoverPhase.NEVER,
+                new String[] {"Customers", "customers_1"},
+                1,
+                0,
+                releaseEnabledGroupFetchOptions());
+    }
+
+    @Test
+    void testCoordinatorReleaseSurvivesStreamPhaseFailover() throws Exception {
+        // JobManager (coordinator) failover in the stream phase after the release: the light,
+        // released state must restore correctly and lose no data.
+        testPostgresParallelSource(
+                DEFAULT_PARALLELISM,
+                DEFAULT_SCAN_STARTUP_MODE,
+                PostgresTestUtils.FailoverType.JM,
+                PostgresTestUtils.FailoverPhase.STREAM,
+                new String[] {"Customers", "customers_1"},
+                1,
+                0,
+                releaseEnabledGroupFetchOptions());
+    }
+
+    @Test
+    void testCoordinatorReleaseSurvivesStreamPhaseReaderFailover() throws Exception {
+        // TaskManager (reader) failover in the stream phase with the release enabled: the
+        // generation guard must reject any stale assembled report and no data is lost.
+        testPostgresParallelSource(
+                DEFAULT_PARALLELISM,
+                DEFAULT_SCAN_STARTUP_MODE,
+                PostgresTestUtils.FailoverType.TM,
+                PostgresTestUtils.FailoverPhase.STREAM,
+                new String[] {"Customers", "customers_1"},
+                1,
+                0,
+                releaseEnabledGroupFetchOptions());
+    }
+
+    private static Map<String, String> releaseEnabledGroupFetchOptions() {
+        Map<String, String> options = new HashMap<>();
+        options.put("scan.incremental.snapshot.chunk.size", "2");
+        options.put("chunk-meta.group.size", "2");
+        options.put("scan.incremental.snapshot.metadata.release.enabled", "true");
+        return options;
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"initial", "latest-offset"})
     void testTaskManagerFailoverSingleParallelism(String scanStartupMode) throws Exception {
@@ -899,7 +954,7 @@ class PostgresSourceITCase extends PostgresTestBase {
                         + " 'schema-name' = '%s',"
                         + " 'table-name' = '%s',"
                         + " 'scan.startup.mode' = '%s',"
-                        + " 'scan.incremental.snapshot.chunk.size' = '100',"
+                        + " 'scan.incremental.snapshot.chunk.size' = '%s',"
                         + " 'decoding.plugin.name' = 'pgoutput', "
                         + " 'slot.name' = '%s',"
                         + " 'scan.lsn-commit.checkpoints-num-delay' = '1'"
@@ -914,17 +969,17 @@ class PostgresSourceITCase extends PostgresTestBase {
                 SCHEMA_NAME,
                 getTableNameRegex(captureCustomerTables),
                 scanStartupMode,
+                otherOptions.getOrDefault("scan.incremental.snapshot.chunk.size", "100"),
                 slotName,
-                otherOptions.isEmpty()
-                        ? ""
-                        : ","
-                                + otherOptions.entrySet().stream()
-                                        .map(
-                                                e ->
-                                                        String.format(
-                                                                "'%s'='%s'",
-                                                                e.getKey(), e.getValue()))
-                                        .collect(Collectors.joining(",")));
+                otherOptions.entrySet().stream()
+                        .filter(
+                                e ->
+                                        !e.getKey().equals("connector")
+                                                && !e.getKey()
+                                                        .equals(
+                                                                "scan.incremental.snapshot.chunk.size"))
+                        .map(e -> String.format(",'%s'='%s'", e.getKey(), e.getValue()))
+                        .collect(Collectors.joining()));
     }
 
     private void checkSnapshotData(

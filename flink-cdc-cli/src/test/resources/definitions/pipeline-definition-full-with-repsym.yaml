@@ -58,5 +58,6 @@ transform:
 pipeline:
   name: source-database-sync-pipe
   parallelism: 4
+  sink.partitioning.strategy: TABLE_ID
   schema.change.behavior: evolve
   schema-operator.rpc-timeout: 1 h

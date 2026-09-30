@@ -31,9 +31,74 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Unit tests for {@link StructFunctions}. */
 class StructFunctionsTest {
+
+    @Nested
+    class CollectionFunctionTests {
+
+        @Test
+        void testCollectionConstructors() {
+            assertThat(StructFunctions.array(1, "two", null)).containsExactly(1, "two", null);
+            assertThat(StructFunctions.row(1, "two", null)).containsExactly(1, "two", null);
+            assertThat(StructFunctions.map("one", 1, "two", 2, "one", 3))
+                    .containsExactlyInAnyOrderEntriesOf(Map.of("one", 3, "two", 2));
+        }
+
+        @Test
+        void testInvalidMapConstructor() {
+            assertThatThrownBy(() -> StructFunctions.map())
+                    .isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> StructFunctions.map("one", 1, "two"))
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+
+        @Test
+        void testCardinality() {
+            assertThat(StructFunctions.cardinality(Arrays.asList(1, 2, 3))).isEqualTo(3);
+            assertThat(StructFunctions.cardinality(Map.of("one", 1, "two", 2))).isEqualTo(2);
+            assertThat(StructFunctions.cardinality((List<?>) null)).isNull();
+            assertThat(StructFunctions.cardinality((Map<?, ?>) null)).isNull();
+        }
+
+        @Test
+        void testArrayContains() {
+            List<Object> array =
+                    Arrays.asList(
+                            1, null, new byte[] {1, 2}, Arrays.asList(2, Map.of("three", 3L)));
+
+            assertThat(StructFunctions.arrayContains(array, 1L)).isTrue();
+            assertThat(StructFunctions.arrayContains(array, null)).isTrue();
+            assertThat(StructFunctions.arrayContains(array, new byte[] {1, 2})).isTrue();
+            assertThat(StructFunctions.arrayContains(array, Arrays.asList(2L, Map.of("three", 3))))
+                    .isTrue();
+            assertThat(StructFunctions.arrayContains(array, 4)).isFalse();
+            assertThat(StructFunctions.arrayContains(null, 1)).isNull();
+        }
+
+        @Test
+        void testArrayPosition() {
+            List<Object> array = Arrays.asList(1, null, 2L, 1);
+
+            assertThat(StructFunctions.arrayPosition(array, 1L)).isEqualTo(1);
+            assertThat(StructFunctions.arrayPosition(array, 2)).isEqualTo(3);
+            assertThat(StructFunctions.arrayPosition(array, 3)).isZero();
+            assertThat(StructFunctions.arrayPosition(array, null)).isNull();
+            assertThat(StructFunctions.arrayPosition(null, 1)).isNull();
+        }
+
+        @Test
+        void testElement() {
+            assertThat((Object) StructFunctions.element(null)).isNull();
+            assertThat((Object) StructFunctions.element(Collections.emptyList())).isNull();
+            assertThat(StructFunctions.element(Collections.singletonList("one"))).isEqualTo("one");
+            assertThatThrownBy(() -> StructFunctions.element(Arrays.asList("one", "two")))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("Array has more than one element.");
+        }
+    }
 
     // ========================================
     // List (ARRAY) Access Tests

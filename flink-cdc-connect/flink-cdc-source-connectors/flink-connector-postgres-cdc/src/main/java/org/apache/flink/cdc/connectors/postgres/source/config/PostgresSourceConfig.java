@@ -40,6 +40,7 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
     private final int lsnCommitCheckpointsDelay;
     private final boolean includePartitionedTables;
     private final boolean includeDatabaseInTableId;
+    private final List<String> logicalMessagePrefixes;
 
     public PostgresSourceConfig(
             int subtaskId,
@@ -71,7 +72,9 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
             int lsnCommitCheckpointsDelay,
             boolean assignUnboundedChunkFirst,
             boolean includePartitionedTables,
-            boolean includeDatabaseInTableId) {
+            boolean includeDatabaseInTableId,
+            List<String> logicalMessagePrefixes,
+            boolean releaseSnapshotMetadataEnabled) {
         super(
                 startupOptions,
                 databaseList,
@@ -98,11 +101,13 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
                 chunkKeyColumn,
                 skipSnapshotBackfill,
                 isScanNewlyAddedTableEnabled,
-                assignUnboundedChunkFirst);
+                assignUnboundedChunkFirst,
+                releaseSnapshotMetadataEnabled);
         this.subtaskId = subtaskId;
         this.lsnCommitCheckpointsDelay = lsnCommitCheckpointsDelay;
         this.includePartitionedTables = includePartitionedTables;
         this.includeDatabaseInTableId = includeDatabaseInTableId;
+        this.logicalMessagePrefixes = logicalMessagePrefixes;
     }
 
     /**
@@ -152,12 +157,13 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
         return new PostgresConnectorConfig(getDbzConfiguration());
     }
 
-    /**
-     * Returns whether to include database in the generated Table ID.
-     *
-     * @return whether to include database in the generated Table ID
-     */
+    /** Returns whether to include database in the generated Table ID. */
     public boolean isIncludeDatabaseInTableId() {
         return includeDatabaseInTableId;
+    }
+
+    /** Returns the prefixes for Postgres logical decoding messages. */
+    public List<String> getLogicalMessagePrefixes() {
+        return logicalMessagePrefixes;
     }
 }

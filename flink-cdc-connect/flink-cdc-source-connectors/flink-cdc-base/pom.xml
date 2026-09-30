@@ -28,7 +28,7 @@ limitations under the License.
     <artifactId>flink-cdc-base</artifactId>
 
     <properties>
-        <mockito.version>3.4.6</mockito.version>
+        <mockito.version>3.12.4</mockito.version>
     </properties>
 
     <dependencies>

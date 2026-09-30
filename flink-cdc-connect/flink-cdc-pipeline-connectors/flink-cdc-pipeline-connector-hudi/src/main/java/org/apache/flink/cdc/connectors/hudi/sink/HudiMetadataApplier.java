@@ -122,6 +122,10 @@ public class HudiMetadataApplier implements MetadataApplier {
                     truncateTableEvent -> {
                         throw new UnsupportedOperationException(
                                 "TruncateTableEvent is not supported");
+                    },
+                    alterTableCommentEvent -> {
+                        throw new UnsupportedOperationException(
+                                "AlterTableCommentEvent is not supported");
                     });
         } catch (Exception e) {
             LOG.error("Failed to apply schema change for table {}", schemaChangeEvent.tableId(), e);

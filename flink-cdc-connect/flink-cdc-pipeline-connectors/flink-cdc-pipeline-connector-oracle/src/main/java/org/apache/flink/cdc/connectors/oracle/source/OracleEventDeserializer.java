@@ -24,6 +24,7 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.connectors.oracle.source.parser.OracleAntlrDdlParser;
 import org.apache.flink.cdc.connectors.oracle.table.OracleReadableMetaData;
 import org.apache.flink.cdc.debezium.event.DebeziumEventDeserializationSchema;
+import org.apache.flink.cdc.debezium.history.FlinkJsonTableChangeSerializer;
 import org.apache.flink.cdc.debezium.table.DebeziumChangelogMode;
 import org.apache.flink.table.data.TimestampData;
 
@@ -31,8 +32,10 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMap
 
 import io.debezium.data.Envelope;
 import io.debezium.data.geometry.Geometry;
+import io.debezium.document.Array;
 import io.debezium.relational.Tables;
 import io.debezium.relational.history.HistoryRecord;
+import io.debezium.relational.history.TableChanges;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
@@ -58,6 +61,8 @@ public class OracleEventDeserializer extends DebeziumEventDeserializationSchema 
             "io.debezium.connector.oracle.SchemaChangeKey";
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final FlinkJsonTableChangeSerializer TABLE_CHANGE_SERIALIZER =
+            new FlinkJsonTableChangeSerializer();
 
     private final boolean includeSchemaChanges;
 
@@ -89,6 +94,25 @@ public class OracleEventDeserializer extends DebeziumEventDeserializationSchema 
                 if (customParser == null) {
                     customParser = new OracleAntlrDdlParser(databaseName, schemaName);
                     tables = new Tables();
+                }
+                Array tableChanges =
+                        historyRecord.document().getArray(HistoryRecord.Fields.TABLE_CHANGES);
+                if (tableChanges != null) {
+                    TableChanges changes = TABLE_CHANGE_SERIALIZER.deserialize(tableChanges, true);
+                    for (TableChanges.TableChange tableChange : changes) {
+                        switch (tableChange.getType()) {
+                            case CREATE:
+                            case ALTER:
+                                tables.overwriteTable(tableChange.getTable());
+                                break;
+                            case DROP:
+                                // Keep current cache behavior for DROP: parser state relies on
+                                // overwrite and downstream events handle table drop separately.
+                                break;
+                            default:
+                                break;
+                        }
+                    }
                 }
                 String ddl =
                         historyRecord.document().getString(HistoryRecord.Fields.DDL_STATEMENTS);

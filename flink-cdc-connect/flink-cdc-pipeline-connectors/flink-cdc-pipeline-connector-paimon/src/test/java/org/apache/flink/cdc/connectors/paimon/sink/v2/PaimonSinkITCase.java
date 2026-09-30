@@ -45,7 +45,6 @@ import org.apache.flink.cdc.common.event.SchemaChangeEventTypeFamily;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
-import org.apache.flink.cdc.common.exceptions.UnsupportedSchemaChangeEventException;
 import org.apache.flink.cdc.common.factories.DataSinkFactory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
@@ -134,7 +133,7 @@ public class PaimonSinkITCase {
     private final TableId table1 = TableId.tableId("test", "table1");
     private final TableId table2 = TableId.tableId("test", "table2");
 
-    private static int checkpointId = 1;
+    private int checkpointId = 1;
 
     public static final String TEST_DATABASE = "test";
     private static final String HADOOP_CONF_DIR =
@@ -217,7 +216,18 @@ public class PaimonSinkITCase {
                         .physicalColumn("col2", STRING())
                         .option("deletion-vectors.enabled", String.valueOf(enableDeleteVectors))
                         .build();
-        CreateTableEvent createTableEvent = new CreateTableEvent(table1, schema);
+
+        Schema upstreamSchema = schema;
+        if (schemaChange == SchemaChange.COMPATIBLE_NOT_NULL_PRIMARY_KEY_COLUMN) {
+            upstreamSchema =
+                    schema.copy(
+                            Schema.newBuilder()
+                                    .physicalColumn("col1", VARCHAR(64).notNull())
+                                    .physicalColumn("col2", STRING())
+                                    .build()
+                                    .getColumns());
+        }
+        CreateTableEvent createTableEvent = new CreateTableEvent(table1, upstreamSchema);
         testEvents.add(createTableEvent);
         PaimonMetadataApplier metadataApplier = new PaimonMetadataApplier(catalogOptions);
         if (schemaChange != null) {
@@ -264,6 +274,18 @@ public class PaimonSinkITCase {
                             .physicalColumn("col2", VARCHAR(10));
                     break;
                 }
+            case INCOMPATIBLE_PRIMARY_KEY_COLUMN:
+                {
+                    builder.physicalColumn("col1", INT().notNull())
+                            .physicalColumn("col2", STRING());
+                    break;
+                }
+            case COMPATIBLE_NOT_NULL_PRIMARY_KEY_COLUMN:
+                {
+                    builder.physicalColumn("col1", STRING().notNull())
+                            .physicalColumn("col2", STRING());
+                    break;
+                }
         }
         return schema.copy(builder.build().getColumns());
     }
@@ -279,7 +301,8 @@ public class PaimonSinkITCase {
         initialize(metastore);
         PaimonSink<Event> paimonSink =
                 new PaimonSink<>(
-                        catalogOptions, new PaimonRecordEventSerializer(ZoneId.systemDefault()));
+                        catalogOptions,
+                        new PaimonRecordEventSerializer(ZoneId.systemDefault(), catalogOptions));
         PaimonWriter<Event> writer = paimonSink.createWriter(new MockInitContext());
         Committer<MultiTableCommittable> committer =
                 paimonSink.createCommitter(new MockCommitterInitContext());
@@ -341,7 +364,8 @@ public class PaimonSinkITCase {
         initialize(metastore);
         PaimonSink<Event> paimonSink =
                 new PaimonSink<>(
-                        catalogOptions, new PaimonRecordEventSerializer(ZoneId.systemDefault()));
+                        catalogOptions,
+                        new PaimonRecordEventSerializer(ZoneId.systemDefault(), catalogOptions));
         PaimonWriter<Event> writer = paimonSink.createWriter(new MockInitContext());
         Committer<MultiTableCommittable> committer =
                 paimonSink.createCommitter(new MockCommitterInitContext());
@@ -407,7 +431,8 @@ public class PaimonSinkITCase {
         initialize(metastore);
         PaimonSink<Event> paimonSink =
                 new PaimonSink<>(
-                        catalogOptions, new PaimonRecordEventSerializer(ZoneId.systemDefault()));
+                        catalogOptions,
+                        new PaimonRecordEventSerializer(ZoneId.systemDefault(), catalogOptions));
         PaimonWriter<Event> writer = paimonSink.createWriter(new MockInitContext());
         Committer<MultiTableCommittable> committer =
                 paimonSink.createCommitter(new MockCommitterInitContext());
@@ -489,18 +514,8 @@ public class PaimonSinkITCase {
                         Row.ofKind(RowKind.INSERT, "6", "6"));
 
         TruncateTableEvent truncateTableEvent = new TruncateTableEvent(table1);
-        if (enableDeleteVector) {
-            Assertions.assertThatThrownBy(
-                            () -> metadataApplier.applySchemaChange(truncateTableEvent))
-                    .isExactlyInstanceOf(SchemaEvolveException.class)
-                    .cause()
-                    .isExactlyInstanceOf(UnsupportedSchemaChangeEventException.class)
-                    .extracting("exceptionMessage")
-                    .isEqualTo("Unable to truncate a table with deletion vectors enabled.");
-        } else {
-            metadataApplier.applySchemaChange(truncateTableEvent);
-            Assertions.assertThat(fetchResults(table1)).isEmpty();
-        }
+        metadataApplier.applySchemaChange(truncateTableEvent);
+        Assertions.assertThat(fetchResults(table1)).isEmpty();
 
         DropTableEvent dropTableEvent = new DropTableEvent(table1);
         metadataApplier.applySchemaChange(dropTableEvent);
@@ -514,7 +529,9 @@ public class PaimonSinkITCase {
         ADD_COLUMN,
         REMOVE_COLUMN,
         REORDER_COLUMN,
-        MODIFY_COLUMN;
+        MODIFY_COLUMN,
+        INCOMPATIBLE_PRIMARY_KEY_COLUMN,
+        COMPATIBLE_NOT_NULL_PRIMARY_KEY_COLUMN;
     }
 
     @ParameterizedTest
@@ -523,7 +540,8 @@ public class PaimonSinkITCase {
         initialize("filesystem");
         PaimonSink<Event> paimonSink =
                 new PaimonSink<>(
-                        catalogOptions, new PaimonRecordEventSerializer(ZoneId.systemDefault()));
+                        catalogOptions,
+                        new PaimonRecordEventSerializer(ZoneId.systemDefault(), catalogOptions));
         PaimonWriter<Event> writer = paimonSink.createWriter(new MockInitContext());
         Committer<MultiTableCommittable> committer =
                 paimonSink.createCommitter(new MockCommitterInitContext());
@@ -534,6 +552,34 @@ public class PaimonSinkITCase {
                 .thenReturn(Optional.empty());
         bucketAssignOperator.setSchemaEvolutionClient(schemaEvolutionClient);
         bucketAssignOperator.open(new TaskInfoImpl("test_TaskInfo", 1, 0, 1, 0));
+
+        if (schemaChange == SchemaChange.INCOMPATIBLE_PRIMARY_KEY_COLUMN) {
+            Assertions.assertThatThrownBy(
+                            () ->
+                                    writeAndCommit(
+                                            bucketAssignOperator,
+                                            writer,
+                                            committer,
+                                            createTestEvents(false, false, true, schemaChange)
+                                                    .toArray(new Event[0])))
+                    .isExactlyInstanceOf(IllegalStateException.class)
+                    .hasMessage(
+                            "The primary key column col1 of test.table1 is INT NOT NULL, which is not compatible with upstream column type STRING NOT NULL.");
+            return;
+        }
+
+        if (schemaChange == SchemaChange.COMPATIBLE_NOT_NULL_PRIMARY_KEY_COLUMN) {
+            writeAndCommit(
+                    bucketAssignOperator,
+                    writer,
+                    committer,
+                    createTestEvents(false, false, true, schemaChange).toArray(new Event[0]));
+            Assertions.assertThat(fetchResults(table1))
+                    .containsExactlyInAnyOrder(
+                            Row.ofKind(RowKind.INSERT, "1", "1"),
+                            Row.ofKind(RowKind.INSERT, "2", "2"));
+            return;
+        }
 
         // 1. receive only DataChangeEvents during one checkpoint
         writeAndCommit(
@@ -735,7 +781,8 @@ public class PaimonSinkITCase {
         initialize(metastore);
         PaimonSink<Event> paimonSink =
                 new PaimonSink<>(
-                        catalogOptions, new PaimonRecordEventSerializer(ZoneId.systemDefault()));
+                        catalogOptions,
+                        new PaimonRecordEventSerializer(ZoneId.systemDefault(), catalogOptions));
         PaimonWriter<Event> writer = paimonSink.createWriter(new MockInitContext());
         Committer<MultiTableCommittable> committer =
                 paimonSink.createCommitter(new MockCommitterInitContext());
@@ -767,18 +814,17 @@ public class PaimonSinkITCase {
                 .containsExactlyInAnyOrder(Row.ofKind(RowKind.INSERT, "1", "1"));
     }
 
-    private static void commit(
-            PaimonWriter<Event> writer, Committer<MultiTableCommittable> committer)
+    private void commit(PaimonWriter<Event> writer, Committer<MultiTableCommittable> committer)
             throws IOException, InterruptedException {
         Collection<Committer.CommitRequest<MultiTableCommittable>> commitRequests =
                 writer.prepareCommit().stream()
-                        .map(PaimonSinkITCase::correctCheckpointId)
+                        .map(this::correctCheckpointId)
                         .map(MockCommitRequestImpl::new)
                         .collect(Collectors.toList());
         committer.commit(commitRequests);
     }
 
-    private static void writeAndCommit(
+    private void writeAndCommit(
             PaimonWriter<Event> writer, Committer<MultiTableCommittable> committer, Event... events)
             throws IOException, InterruptedException {
         for (Event event : events) {
@@ -788,7 +834,7 @@ public class PaimonSinkITCase {
         commit(writer, committer);
     }
 
-    private static void writeAndCommit(
+    private void writeAndCommit(
             BucketAssignOperator bucketAssignOperator,
             PaimonWriter<Event> writer,
             Committer<MultiTableCommittable> committer,
@@ -867,7 +913,8 @@ public class PaimonSinkITCase {
         initialize(metastore);
         PaimonSink<Event> paimonSink =
                 new PaimonSink<>(
-                        catalogOptions, new PaimonRecordEventSerializer(ZoneId.systemDefault()));
+                        catalogOptions,
+                        new PaimonRecordEventSerializer(ZoneId.systemDefault(), catalogOptions));
         PaimonWriter<Event> writer = paimonSink.createWriter(new MockInitContext());
         Committer<MultiTableCommittable> committer =
                 paimonSink.createCommitter(new MockCommitterInitContext());
@@ -879,7 +926,7 @@ public class PaimonSinkITCase {
         writer.flush(false);
         Collection<Committer.CommitRequest<MultiTableCommittable>> commitRequests =
                 writer.prepareCommit().stream()
-                        .map(PaimonSinkITCase::correctCheckpointId)
+                        .map(this::correctCheckpointId)
                         .map(MockCommitRequestImpl::new)
                         .collect(Collectors.toList());
         committer.commit(commitRequests);
@@ -911,7 +958,7 @@ public class PaimonSinkITCase {
             // Checkpoint id start from 1
             committer.commit(
                     writer.prepareCommit().stream()
-                            .map(PaimonSinkITCase::correctCheckpointId)
+                            .map(this::correctCheckpointId)
                             .map(MockCommitRequestImpl::new)
                             .collect(Collectors.toList()));
         }
@@ -1050,14 +1097,13 @@ public class PaimonSinkITCase {
         env.execute("runJobWithEvents").getJobExecutionResult();
     }
 
-    private static MultiTableCommittable correctCheckpointId(MultiTableCommittable committable) {
+    private MultiTableCommittable correctCheckpointId(MultiTableCommittable committable) {
         // update the right checkpointId for MultiTableCommittable
         return new MultiTableCommittable(
                 committable.getDatabase(),
                 committable.getTable(),
                 checkpointId++,
-                committable.kind(),
-                committable.wrappedCommittable());
+                committable.commitMessage());
     }
 
     private static class MockCommitRequestImpl<CommT> extends CommitRequestImpl<CommT> {

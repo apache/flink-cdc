@@ -108,9 +108,7 @@ OceanBase CDC 源端读取方案：
 
 ### SQL Client JAR
 
-```下载链接仅在已发布版本可用，请在文档网站左下角选择浏览已发布的版本。```
-
-下载[flink-sql-connector-oceanbase-cdc-{{< param Version >}}.jar](https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-oceanbase-cdc/{{< param Version >}}/flink-sql-connector-oceanbase-cdc-{{< param Version >}}.jar)  到 `<FLINK_HOME>/lib/` 目录下。
+下载[flink-sql-connector-oceanbase-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-oceanbase-cdc)  到 `<FLINK_HOME>/lib/` 目录下。
 
 **注意:** 参考 [flink-sql-connector-oceanbase-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-oceanbase-cdc) 当前已发布的所有版本都可以在 Maven 中央仓库获取。
 
@@ -833,14 +831,14 @@ CREATE TABLE products (
       </td>
       <td>
       空间数据类型将转换为具有固定 Json 格式的字符串。
-      请参考 <a href="#a-name-id-003-a">空间数据类型映射</a> 章节了解更多详细信息。
+      请参考 <a href="#空间数据类型映射">空间数据类型映射</a> 章节了解更多详细信息。
       </td>
     </tr>
     </tbody>
 </table>
 </div>
 
-### 空间数据类型映射<a name="空间数据类型映射" id="003"></a>
+### 空间数据类型映射
 
 除`GEOMETRYCOLLECTION`之外的空间数据类型都会转换为 Json 字符串，格式固定，如：<br>
 ```json

@@ -45,11 +45,16 @@ import org.testcontainers.utility.DockerImageName;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Timestamp;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
+import java.util.TimeZone;
 import java.util.concurrent.ExecutionException;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT;
@@ -711,6 +716,169 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
         Assertions.assertThat(actual).isEqualTo(expected);
 
         result.getJobClient().get().cancel().get();
+    }
+
+    @Test
+    void testPreEpochTimestampWallClockConversion() throws Throwable {
+        TimeZone originalTimeZone = TimeZone.getDefault();
+        try {
+            TimeZone.setDefault(TimeZone.getTimeZone("Asia/Shanghai"));
+            setup(true);
+            initializePostgresTable(POSTGIS_CONTAINER, "column_type_test");
+            insertPreEpochTimestampRow();
+
+            String sourceDDL = preEpochTimestampSourceDdl("true");
+            String sinkDDL =
+                    "CREATE TABLE sink ("
+                            + "    id INTEGER NOT NULL,"
+                            + "    small_c SMALLINT,"
+                            + "    timestamp3_c TIMESTAMP(3),"
+                            + "    timestamp6_c TIMESTAMP(6),"
+                            + "    PRIMARY KEY (id) NOT ENFORCED"
+                            + ") WITH ("
+                            + " 'connector' = 'values',"
+                            + " 'sink-insert-only' = 'false'"
+                            + ")";
+            tEnv.executeSql(sourceDDL);
+            tEnv.executeSql(sinkDDL);
+
+            TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM full_types");
+
+            waitForSinkSize("sink", 2);
+            // the stored value is read as it is during the snapshot phase
+            Assertions.assertThat(preEpochSnapshotRecords())
+                    .containsExactly(
+                            "+I(2,32767,1900-01-01T00:00:00.123,1900-01-01T00:00:00.123456)");
+
+            // wait a bit to make sure the replication slot is ready
+            Thread.sleep(5000);
+            try (Connection connection = getJdbcConnection(POSTGIS_CONTAINER);
+                    Statement statement = connection.createStatement()) {
+                statement.execute("UPDATE inventory.full_types SET small_c=0 WHERE id=2;");
+            }
+
+            waitForSinkSize("sink", 4);
+            // the stored value is also kept during the change log phase
+            List<String> expected =
+                    Arrays.asList(
+                            "+I(2,32767,1900-01-01T00:00:00.123,1900-01-01T00:00:00.123456)",
+                            "-D(2,32767,1900-01-01T00:00:00.123,1900-01-01T00:00:00.123456)",
+                            "+I(2,0,1900-01-01T00:00:00.123,1900-01-01T00:00:00.123456)");
+            Assertions.assertThat(preEpochChangeLogRecords()).containsExactlyElementsOf(expected);
+
+            result.getJobClient().get().cancel().get();
+        } finally {
+            TimeZone.setDefault(originalTimeZone);
+        }
+    }
+
+    @Test
+    void testPreEpochTimestampConversionUnchangedByDefault() throws Throwable {
+        TimeZone originalTimeZone = TimeZone.getDefault();
+        try {
+            TimeZone.setDefault(TimeZone.getTimeZone("Asia/Shanghai"));
+            setup(true);
+            initializePostgresTable(POSTGIS_CONTAINER, "column_type_test");
+            insertPreEpochTimestampRow();
+
+            // the option is not configured, so the previous conversion behavior is expected
+            String sourceDDL = preEpochTimestampSourceDdl(null);
+            String sinkDDL =
+                    "CREATE TABLE sink ("
+                            + "    id INTEGER NOT NULL,"
+                            + "    small_c SMALLINT,"
+                            + "    timestamp3_c TIMESTAMP(3),"
+                            + "    timestamp6_c TIMESTAMP(6),"
+                            + "    PRIMARY KEY (id) NOT ENFORCED"
+                            + ") WITH ("
+                            + " 'connector' = 'values',"
+                            + " 'sink-insert-only' = 'false'"
+                            + ")";
+            tEnv.executeSql(sourceDDL);
+            tEnv.executeSql(sinkDDL);
+
+            TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM full_types");
+
+            waitForSinkSize("sink", 2);
+            String timestamp3 = legacyConvertedTimestamp("1900-01-01 00:00:00.123");
+            String timestamp6 = legacyConvertedTimestamp("1900-01-01 00:00:00.123456");
+            Assertions.assertThat(preEpochSnapshotRecords())
+                    .containsExactly(String.format("+I(2,32767,%s,%s)", timestamp3, timestamp6));
+
+            result.getJobClient().get().cancel().get();
+        } finally {
+            TimeZone.setDefault(originalTimeZone);
+        }
+    }
+
+    private void insertPreEpochTimestampRow() throws SQLException {
+        try (Connection connection = getJdbcConnection(POSTGIS_CONTAINER);
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "INSERT INTO inventory.full_types "
+                            + "(id, small_c, timestamp3_c, timestamp6_c) VALUES "
+                            + "(2, 32767, '1900-01-01 00:00:00.123', "
+                            + "'1900-01-01 00:00:00.123456');");
+        }
+    }
+
+    private String preEpochTimestampSourceDdl(String wallClockConversionEnabled) {
+        String option =
+                wallClockConversionEnabled == null
+                        ? ""
+                        : " 'scan.pre-epoch-timestamp.wall-clock-conversion.enabled' = '"
+                                + wallClockConversionEnabled
+                                + "',";
+        return String.format(
+                "CREATE TABLE full_types ("
+                        + "    id INTEGER NOT NULL,"
+                        + "    small_c SMALLINT,"
+                        + "    timestamp3_c TIMESTAMP(3),"
+                        + "    timestamp6_c TIMESTAMP(6)"
+                        + ") WITH ("
+                        + " 'connector' = 'postgres-cdc',"
+                        + " 'hostname' = '%s',"
+                        + " 'port' = '%s',"
+                        + " 'username' = '%s',"
+                        + " 'password' = '%s',"
+                        + " 'database-name' = '%s',"
+                        + " 'schema-name' = '%s',"
+                        + " 'table-name' = '%s',"
+                        + " 'scan.incremental.snapshot.enabled' = 'true',"
+                        + option
+                        + " 'decoding.plugin.name' = 'pgoutput', "
+                        + " 'slot.name' = '%s'"
+                        + ")",
+                POSTGIS_CONTAINER.getHost(),
+                POSTGIS_CONTAINER.getMappedPort(POSTGRESQL_PORT),
+                POSTGIS_CONTAINER.getUsername(),
+                POSTGIS_CONTAINER.getPassword(),
+                POSTGIS_CONTAINER.getDatabaseName(),
+                "inventory",
+                "full_types",
+                getSlotName());
+    }
+
+    private List<String> preEpochSnapshotRecords() {
+        return TestValuesTableFactory.getRawResultsAsStrings("sink").stream()
+                .filter(record -> record.startsWith("+I(2,"))
+                .collect(Collectors.toList());
+    }
+
+    private List<String> preEpochChangeLogRecords() {
+        return TestValuesTableFactory.getRawResultsAsStrings("sink").stream()
+                .filter(record -> record.startsWith("+I(2,") || record.startsWith("-D(2,"))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Returns the string of a stored {@code timestamp} value before 1970-01-01 after the conversion
+     * which Debezium does, i.e. through an instant with the default time zone of the JVM.
+     */
+    private static String legacyConvertedTimestamp(String timestamp) {
+        return LocalDateTime.ofInstant(
+                        Timestamp.valueOf(timestamp).toInstant(), ZoneId.systemDefault())
+                .toString();
     }
 
     @ParameterizedTest

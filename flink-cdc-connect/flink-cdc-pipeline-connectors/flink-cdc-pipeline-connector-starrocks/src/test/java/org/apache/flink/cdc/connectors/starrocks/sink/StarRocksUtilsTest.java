@@ -195,6 +195,36 @@ class StarRocksUtilsTest {
     }
 
     @Test
+    void testToStarRocksTableWithUnicodeCharMaxBytes() {
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.BIGINT().notNull())
+                        .physicalColumn("name", DataTypes.VARCHAR(17))
+                        .physicalColumn("code", DataTypes.CHAR(17))
+                        .primaryKey("id")
+                        .build();
+
+        TableId tableId = TableId.tableId("db", "table");
+        // unicode-char.max-bytes = 4 to fit utf8mb4 characters
+        TableCreateConfig config = new TableCreateConfig(null, Collections.emptyMap(), 4);
+
+        StarRocksTable table = StarRocksUtils.toStarRocksTable(tableId, schema, config);
+
+        List<StarRocksColumn> columns = table.getColumns();
+        assertThat(columns).hasSize(3);
+
+        StarRocksColumn nameColumn = columns.get(1);
+        assertThat(nameColumn.getColumnName()).isEqualTo("name");
+        assertThat(nameColumn.getDataType()).isEqualTo(StarRocksUtils.VARCHAR);
+        assertThat(nameColumn.getColumnSize()).hasValue(68);
+
+        StarRocksColumn codeColumn = columns.get(2);
+        assertThat(codeColumn.getColumnName()).isEqualTo("code");
+        assertThat(codeColumn.getDataType()).isEqualTo(StarRocksUtils.CHAR);
+        assertThat(codeColumn.getColumnSize()).hasValue(68);
+    }
+
+    @Test
     void testToStarRocksTableWithComment() {
         Schema schema =
                 Schema.newBuilder()
@@ -208,6 +238,30 @@ class StarRocksUtilsTest {
 
         StarRocksTable table = StarRocksUtils.toStarRocksTable(tableId, schema, config);
         assertThat(table.getComment()).hasValue("test table comment");
+    }
+
+    @Test
+    void testToStarRocksTableEscapesColumnDefaultValueAndComment() {
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.BIGINT().notNull())
+                        .physicalColumn(
+                                "escaped",
+                                DataTypes.VARCHAR(100),
+                                "comment \"quoted\" \\ path",
+                                "default \"quoted\" \\ path")
+                        .primaryKey("id")
+                        .build();
+
+        StarRocksTable table =
+                StarRocksUtils.toStarRocksTable(
+                        TableId.tableId("db", "table"),
+                        schema,
+                        new TableCreateConfig(null, Collections.emptyMap()));
+
+        StarRocksColumn column = table.getColumn("escaped");
+        assertThat(column.getColumnComment()).hasValue("comment \\\"quoted\\\" \\\\ path");
+        assertThat(column.getDefaultValue()).hasValue("default \\\"quoted\\\" \\\\ path");
     }
 
     // --------------------------------------------------------------------------------------------

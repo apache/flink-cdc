@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.base.source.enumerator;
 
+import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.connector.source.Boundedness;
 import org.apache.flink.api.connector.source.SourceEvent;
 import org.apache.flink.api.connector.source.SplitEnumerator;
@@ -32,6 +33,7 @@ import org.apache.flink.cdc.connectors.base.source.meta.events.FinishedSnapshotS
 import org.apache.flink.cdc.connectors.base.source.meta.events.LatestFinishedSplitsNumberEvent;
 import org.apache.flink.cdc.connectors.base.source.meta.events.LatestFinishedSplitsNumberRequestEvent;
 import org.apache.flink.cdc.connectors.base.source.meta.events.StreamSplitAssignedEvent;
+import org.apache.flink.cdc.connectors.base.source.meta.events.StreamSplitMetaAssembledEvent;
 import org.apache.flink.cdc.connectors.base.source.meta.events.StreamSplitMetaEvent;
 import org.apache.flink.cdc.connectors.base.source.meta.events.StreamSplitMetaRequestEvent;
 import org.apache.flink.cdc.connectors.base.source.meta.events.StreamSplitUpdateAckEvent;
@@ -84,6 +86,14 @@ public class IncrementalSourceEnumerator
     @Nullable protected Integer streamSplitTaskId = null;
     private boolean isStreamSplitUpdateRequestAlreadySent = false;
 
+    // Snapshot-metadata release state (FLINK-40697). The reader reports the metadata assembled; the
+    // release is armed at the next checkpoint and performed once it completes. The generation is
+    // bumped on every stream-reader reset so a stale assembled report cannot arm a premature
+    // release.
+    private boolean streamSplitMetaAssembled = false;
+    @Nullable private Long releaseCheckpointId = null;
+    private int streamSplitMetaAssignmentGeneration = 0;
+
     public IncrementalSourceEnumerator(
             SplitEnumeratorContext<SourceSplitBase> context,
             SourceConfig sourceConfig,
@@ -126,10 +136,27 @@ public class IncrementalSourceEnumerator
         if (streamSplit.isPresent()) {
             LOG.info("The enumerator adds add stream split back: {}", streamSplit);
             this.streamSplitTaskId = null;
+            onStreamReaderReset();
+        } else if (streamSplitTaskId != null && streamSplitTaskId.equals(subtaskId)) {
+            // The reader holding the stream split reset without handing it back (its assignment was
+            // already checkpoint-covered, so addSplitsBack gets an empty list). Invalidate any
+            // in-flight assembly so a stale report cannot arm a premature release.
+            onStreamReaderReset();
         }
         if (!CollectionUtil.isNullOrEmpty(splits)) {
             splitAssigner.addSplits(splits);
         }
+    }
+
+    /**
+     * Invalidates any in-flight stream-split metadata assembly when the stream reader resets, so a
+     * stale assembled report from the failed attempt cannot arm a release. Bumps the assignment
+     * generation so the new reader's report is distinguishable from the stale one.
+     */
+    private void onStreamReaderReset() {
+        streamSplitMetaAssignmentGeneration++;
+        streamSplitMetaAssembled = false;
+        releaseCheckpointId = null;
     }
 
     @Override
@@ -176,17 +203,33 @@ public class IncrementalSourceEnumerator
                     "The enumerator receives notice from subtask {} for the stream split assignment. ",
                     subtaskId);
             this.streamSplitTaskId = subtaskId;
+        } else if (sourceEvent instanceof StreamSplitMetaAssembledEvent) {
+            StreamSplitMetaAssembledEvent assembledEvent =
+                    (StreamSplitMetaAssembledEvent) sourceEvent;
+            int reportedGeneration = assembledEvent.getAssignmentGeneration();
+            if (reportedGeneration == StreamSplitMetaAssembledEvent.COMPLETE_WITHOUT_META_GENERATION
+                    || reportedGeneration == streamSplitMetaAssignmentGeneration) {
+                streamSplitMetaAssembled = true;
+            } else {
+                LOG.info(
+                        "Ignoring a stale stream-split assembled report (generation {}, current {}) from subtask {}.",
+                        reportedGeneration,
+                        streamSplitMetaAssignmentGeneration,
+                        subtaskId);
+            }
         }
     }
 
     @Override
     public PendingSplitsState snapshotState(long checkpointId) {
+        maybeArmSnapshotMetaRelease(checkpointId);
         return splitAssigner.snapshotState(checkpointId);
     }
 
     @Override
     public void notifyCheckpointComplete(long checkpointId) {
         splitAssigner.notifyCheckpointComplete(checkpointId);
+        maybeReleaseSnapshotMeta(checkpointId);
         // stream split may be available after checkpoint complete
         assignSplits();
     }
@@ -195,6 +238,51 @@ public class IncrementalSourceEnumerator
     public void close() throws IOException {
         LOG.info("Closing enumerator...");
         splitAssigner.close();
+    }
+
+    /**
+     * Arms the release at the current checkpoint once the reader reports the metadata assembled.
+     * Skipped when newly-added-table capture is enabled (that flow still needs the metadata) or it
+     * was already released. The clearing runs in {@link #maybeReleaseSnapshotMeta(long)} after the
+     * checkpoint completes, so the assignment is always checkpoint-covered.
+     */
+    private void maybeArmSnapshotMetaRelease(long checkpointId) {
+        if (streamSplitMetaAssembled
+                && releaseCheckpointId == null
+                && sourceConfig.isReleaseSnapshotMetadataEnabled()
+                && !sourceConfig.isScanNewlyAddedTableEnabled()
+                && !splitAssigner.isSnapshotMetaReleased()) {
+            releaseCheckpointId = checkpointId;
+            LOG.info("Arming snapshot-metadata release at checkpoint {}.", checkpointId);
+        }
+    }
+
+    /** Releases the snapshot metadata once the checkpoint that armed it has completed. */
+    private void maybeReleaseSnapshotMeta(long checkpointId) {
+        if (releaseCheckpointId == null || checkpointId < releaseCheckpointId) {
+            return;
+        }
+        // Fire at most once per arming. Clearing the armed checkpoint also keeps a stream-only
+        // job, whose assigner holds no snapshot metadata to drop, from re-entering this on every
+        // later checkpoint.
+        releaseCheckpointId = null;
+        if (splitAssigner.isSnapshotMetaReleased()) {
+            return;
+        }
+        splitAssigner.releaseSnapshotMetadata();
+        if (splitAssigner.isSnapshotMetaReleased()) {
+            // drop the enumerator's own copy of the finished-split metadata; a post-release meta
+            // request is ignored in sendStreamMetaRequestEvent.
+            finishedSnapshotSplitMeta = null;
+            LOG.info(
+                    "Released snapshot split metadata from the coordinator at checkpoint {}.",
+                    checkpointId);
+        }
+    }
+
+    @VisibleForTesting
+    List<List<FinishedSnapshotSplitInfo>> getFinishedSnapshotSplitMeta() {
+        return finishedSnapshotSplitMeta;
     }
 
     // ------------------------------------------------------------------------------------------
@@ -300,6 +388,15 @@ public class IncrementalSourceEnumerator
     }
 
     private void sendStreamMetaRequestEvent(int subTask, StreamSplitMetaRequestEvent requestEvent) {
+        if (splitAssigner.isSnapshotMetaReleased()) {
+            // The snapshot metadata has already been released. A late request can only come from a
+            // failed reader attempt (a live reader restores its assembled split and never
+            // re-requests), so ignore it instead of rebuilding from the emptied assigner.
+            LOG.info(
+                    "Ignoring a stream-split meta request from subtask {} after the snapshot metadata was released.",
+                    subTask);
+            return;
+        }
         // initialize once
         if (finishedSnapshotSplitMeta == null) {
             final List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos =
@@ -328,7 +425,8 @@ public class IncrementalSourceEnumerator
                             requestEvent.getSplitId(),
                             requestMetaGroupId,
                             null,
-                            totalFinishedSplitSizeOfEnumerator);
+                            totalFinishedSplitSizeOfEnumerator,
+                            streamSplitMetaAssignmentGeneration);
             context.sendEventToSourceReader(subTask, metadataEvent);
         } else if (finishedSnapshotSplitMeta.size() > requestMetaGroupId) {
             List<FinishedSnapshotSplitInfo> metaToSend =
@@ -340,7 +438,8 @@ public class IncrementalSourceEnumerator
                             metaToSend.stream()
                                     .map(FinishedSnapshotSplitInfo::serialize)
                                     .collect(Collectors.toList()),
-                            totalFinishedSplitSizeOfEnumerator);
+                            totalFinishedSplitSizeOfEnumerator,
+                            streamSplitMetaAssignmentGeneration);
             context.sendEventToSourceReader(subTask, metadataEvent);
         } else {
             throw new FlinkRuntimeException(

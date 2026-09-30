@@ -25,11 +25,32 @@ under the License.
 -->
 
 # Fluss Pipeline 连接器
-Fluss Pipeline 连接器可用作 Pipeline 的 *Data Sink*，将数据写入 [Fluss](https://fluss.apache.org)。本文档介绍如何配置 Fluss Pipeline 连接器。
+Fluss Pipeline 连接器可用作 Pipeline 的 *Data Source* 或 *Data Sink*，从 [Fluss](https://fluss.apache.org)
+读取或向其写入数据。本文档介绍这两种用法的配置。
 
 ## What can the connector do?
 * 自动创建不存在的表 
 * 数据同步
+* Schema 变更同步（lenient 模式）
+* 动态 Source 表订阅
+
+## Fluss Source
+
+以下是动态发现 Fluss 表并读取的最小配置：
+
+```yaml
+source:
+  type: fluss
+  bootstrap.servers: localhost:9123
+  table.discoverer.type: fluss-default
+  table.discoverer.pattern: 'inventory\..*'
+  scan.discovery.interval: 10 s
+  scan.startup.mode: earliest
+```
+
+`table.discoverer.type` 用于选择 Source 的表发现器。`fluss-default` 通过
+`table.discoverer.pattern` 匹配全限定表名；选择其他发现器时，需配置其必需的
+`table.discoverer.*` 参数。
 
 How to create Pipeline
 ----------------
@@ -60,6 +81,7 @@ sink:
 pipeline:
   name: MySQL to Fluss Pipeline
   parallelism: 2
+  schema.change.behavior: LENIENT
 ```
 
 Pipeline Connector Options
@@ -96,6 +118,13 @@ Pipeline Connector Options
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>用于建立与 Fluss 集群初始连接的主机/端口对列表。 </td>
+    </tr>
+    <tr>
+      <td>sink.partitioning.strategy</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">DEFAULT</td>
+      <td>String</td>
+      <td>DataChangeEvent 路由使用的分区策略。可选值为 <code>DEFAULT</code> 和 <code>FORWARD</code>。<code>DEFAULT</code> 对主键表按主键进行哈希分区，对日志表采用随机分发，将事件分散到各下游 subtask 以实现负载均衡。<code>FORWARD</code> 将数据事件发送到与上游 subtask 索引相同的下游 subtask，用于 Fluss 到 Fluss 的数据同步。上游数据分布必须与 Fluss 表的分桶策略保持一致，否则可能出现数据正确性问题。</td>
     </tr>
     <tr>
       <td>bucket.key</td>
@@ -135,12 +164,32 @@ Pipeline Connector Options
 
 * 支持 Fluss 主键表和日志表。
 
+### 动态 Source 订阅
+
+当 Fluss 作为带表发现器的 Source 使用时，每次成功发现的结果都是当前订阅表的完整权威集合。配置正数
+`scan.discovery.interval` 才会周期性更新订阅。空结果会退订全部已发现的表；发现失败不会修改当前订阅，并会使作业失败。
+
+退订表只会停止并清理 Source 侧 reader，不会删除 Fluss 表，也不会改变 Sink 行为。恢复后的 reader 会先等待新的订阅快照，
+再打开 checkpoint 中恢复的 split，因此当前仍处于退订状态的表不会通过恢复的 split 输出记录。表再次被订阅时会作为新表处理，
+并使用配置的 `scan.startup.mode`。
+
+移除与 checkpoint 状态协同：故障恢复时会从最近一次成功 checkpoint 恢复 Source split 和待移除 tombstone；订阅由发现流程刷新。如果退订和重新订阅都发生在
+相邻两次已完成的 checkpoint 之间，故障回滚时可以表现为从未退订过；若人为恢复到移除 tombstone 之前的 checkpoint，
+而该表当前已重新订阅，则不承诺重新开始一个全新的表生命周期。对于主键表，移除时不会提前释放快照 lease，仍由现有的
+过期和关闭逻辑处理。
+
 * 关于自动建表
   * 没有分区键
   * 桶数量由 `bucket.num` 选项控制
   * 数据分布由 `bucket.key` 选项控制。对于主键表，若未指定分桶键，则分桶键默认为主键（不含分区键）；对于无主键的日志表，若未指定分桶键，则数据将随机分配到各个桶中。 
 
-* 不支持 schema 变更同步。如果需要忽略 schema 变更，可使用 `schema.change.behavior: IGNORE`。
+* 支持在 `lenient` 模式下进行 Schema 变更同步，通过 `schema.change.behavior: lenient` 配置。支持以下 Schema 变更事件：
+  * **新增列** — 新列会追加到 Fluss 表中。
+  * **删除列** — 在 lenient 模式下不会真正删除列，而是忽略该删除操作，后续写入时将该列的值设为 null。
+  * **重命名列** — 在 lenient 模式下，此操作会被转换为新增列 + 将旧列类型修改为可空的序列。
+  * **修改列类型** — 不支持。
+
+  要启用 Schema 变更同步，请在 pipeline 中配置 `schema.change.behavior: lenient`。如果想要忽略所有 Schema 变更，使用 `schema.change.behavior: IGNORE`。
 
 * 关于数据同步， Pipeline 连接器使用 [Fluss Java Client](https://fluss.apache.org/docs/apis/java-client/) 向 Fluss 写入数据.
 
@@ -235,6 +284,21 @@ Data Type Mapping
       <td>VARBINARY(N)</td>
       <td>BYTES</td>
       <td></td>
+    </tr>
+    <tr>
+      <td>ARRAY</td>
+      <td>ARRAY</td>
+      <td>元素类型递归映射。</td>
+    </tr>
+    <tr>
+      <td>MAP</td>
+      <td>MAP</td>
+      <td>键和值类型递归映射。</td>
+    </tr>
+    <tr>
+      <td>ROW</td>
+      <td>ROW</td>
+      <td>字段类型递归映射。</td>
     </tr>
     </tbody>
 </table>

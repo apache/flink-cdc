@@ -26,11 +26,33 @@ under the License.
 
 # Fluss Pipeline Connector
 
-The Fluss Pipeline connector can be used as the *Data Sink* of the pipeline, and write data to [Fluss](https://fluss.apache.org). This document describes how to set up the Fluss Pipeline connector.
+The Fluss Pipeline connector can be used as a *Data Source* or *Data Sink* of the pipeline. It
+reads from or writes data to [Fluss](https://fluss.apache.org). This document describes how to set
+up both roles.
 
 ## What can the connector do?
 * Create table automatically if not exist
 * Data synchronization
+* Schema change synchronization (lenient mode)
+* Dynamic source table subscriptions
+
+## Fluss Source
+
+The following is the minimal configuration for reading dynamically discovered Fluss tables:
+
+```yaml
+source:
+  type: fluss
+  bootstrap.servers: localhost:9123
+  table.discoverer.type: fluss-default
+  table.discoverer.pattern: 'inventory\..*'
+  scan.discovery.interval: 10 s
+  scan.startup.mode: earliest
+```
+
+`table.discoverer.type` selects the source table discoverer. `fluss-default` matches fully
+qualified table names with `table.discoverer.pattern`; configure another discoverer's required
+`table.discoverer.*` options when selecting it instead.
 
 How to create Pipeline
 ----------------
@@ -61,6 +83,7 @@ sink:
 pipeline:
   name: MySQL to Fluss Pipeline
   parallelism: 2
+  schema.change.behavior: LENIENT
 ```
 
 Pipeline Connector Options
@@ -97,6 +120,13 @@ Pipeline Connector Options
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>The bootstrap servers for the Fluss sink connection. </td>
+    </tr>
+    <tr>
+      <td>sink.partitioning.strategy</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">DEFAULT</td>
+      <td>String</td>
+      <td>The partitioning strategy for DataChangeEvent routing. Available values are <code>DEFAULT</code> and <code>FORWARD</code>. <code>DEFAULT</code> hashes primary key tables by primary keys and randomly distributes log table events across downstream subtasks for balanced load. <code>FORWARD</code> routes data events to downstream subtasks with the same indices as upstream and is intended for Fluss-to-Fluss data synchronization. The upstream data distribution must match the Fluss table bucket distribution; otherwise, data correctness issues may occur.</td>
     </tr>
     <tr>
       <td>bucket.key</td>
@@ -137,12 +167,39 @@ Pipeline Connector Options
 
 * Support Fluss primary key table and log table.
 
+### Dynamic source subscriptions
+
+When Fluss is used as a source with a table discoverer, each successful discovery result is the
+authoritative complete subscription set. Set a positive `scan.discovery.interval` to enable
+periodic updates. An empty result unsubscribes every discovered table; a discovery failure does not
+change the current subscription and fails the job.
+
+Unsubscribing a table only stops and cleans up its source-side readers. It does not delete the Fluss
+table or change sink behavior. A restored reader waits for a fresh subscription snapshot before it
+opens restored splits, so a table that remains unsubscribed cannot emit from restored splits after recovery.
+If a table is subscribed again, it is treated as a new table and uses the configured
+`scan.startup.mode`.
+
+Removal is coordinated with checkpoint state: a failure restores source splits and pending removal
+tombstones from the latest completed checkpoint; subscription is refreshed by discovery. A removal
+and re-addition that both occur between the same two completed checkpoints may be rolled back as
+though the removal had not occurred. Restoring a checkpoint from before a removal tombstone while
+the table is currently re-subscribed does not promise a fresh table lifecycle. For primary key
+tables, snapshot leases are not released early during removal;
+their existing expiry and close handling remain in effect.
+
 * For creating table automatically
   * There is no partition key
   * The number of buckets is controlled by `bucket.num`
   * The distribution keys are controlled by option `bucket.key`. For primary key table and a bucket key is not specified, the bucket key will be used as primary key(excluding the partition key). For log table has no primary key and the bucket key is not specified, the data will be distributed to each bucket randomly. 
 
-* Not support schema change synchronization.If you want to ignore schema change, use `schema.change.behavior: IGNORE`.
+* Supports schema change synchronization in `lenient` mode with `schema.change.behavior: lenient`. The following schema change events are supported:
+  * **Add column** — new columns are appended to the Fluss table.
+  * **Drop column** — the column is not physically removed in lenient mode. The drop operation is ignored, and subsequent writes will set the column value to null.
+  * **Rename column** — in lenient mode, this is translated into an add-new-column + alter-old-column-type-to-nullable sequence.
+  * **Alter column type** — not supported. 
+
+  To enable schema change synchronization, configure the pipeline with `schema.change.behavior: lenient`. If you want to ignore all schema changes, use `schema.change.behavior: IGNORE`.
 
 * For data synchronization, the pipeline connector uses [Fluss Java Client](https://fluss.apache.org/docs/apis/java-client/)
   to write data to Fluss.
@@ -238,6 +295,21 @@ Data Type Mapping
       <td>VARBINARY(N)</td>
       <td>BYTES</td>
       <td></td>
+    </tr>
+    <tr>
+      <td>ARRAY</td>
+      <td>ARRAY</td>
+      <td>Element type is mapped recursively.</td>
+    </tr>
+    <tr>
+      <td>MAP</td>
+      <td>MAP</td>
+      <td>Key and value types are mapped recursively.</td>
+    </tr>
+    <tr>
+      <td>ROW</td>
+      <td>ROW</td>
+      <td>Field types are mapped recursively.</td>
     </tr>
     </tbody>
 </table>

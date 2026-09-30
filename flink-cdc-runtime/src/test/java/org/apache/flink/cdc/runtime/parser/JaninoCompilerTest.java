@@ -18,6 +18,9 @@
 package org.apache.flink.cdc.runtime.parser;
 
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.cdc.common.schema.Column;
+import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
+import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.variant.BinaryVariantInternalBuilder;
 import org.apache.flink.cdc.common.types.variant.Variant;
 import org.apache.flink.cdc.common.types.variant.VariantTypeException;
@@ -39,6 +42,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 
 /** Unit tests for the {@link JaninoCompiler}. */
@@ -215,6 +219,178 @@ class JaninoCompilerTest {
     }
 
     @Test
+    void testTranslatedLogicalExpressionCompilesWithJanino() throws InvocationTargetException {
+        List<Column> columns =
+                List.of(
+                        Column.physicalColumn("id", DataTypes.INT()),
+                        Column.physicalColumn("uid", DataTypes.INT()));
+        Map<String, String> columnNameMap = Map.of("id", "$0", "uid", "$1");
+
+        ExpressionEvaluator andEvaluator =
+                compileTranslatedFilterExpression("id = 1 and 1 / uid > 0", columns, columnNameMap);
+        Assertions.assertThat(andEvaluator.evaluate(new Object[] {2, 0})).isEqualTo(false);
+
+        ExpressionEvaluator orEvaluator =
+                compileTranslatedFilterExpression("id = 1 or 1 / uid > 0", columns, columnNameMap);
+        Assertions.assertThat(orEvaluator.evaluate(new Object[] {1, 0})).isEqualTo(true);
+
+        List<Column> booleanColumns =
+                List.of(
+                        Column.physicalColumn("left_bool", DataTypes.BOOLEAN().notNull()),
+                        Column.physicalColumn("right_bool", DataTypes.BOOLEAN().notNull()),
+                        Column.physicalColumn("divisor", DataTypes.INT()));
+        Map<String, String> booleanColumnNameMap =
+                Map.of("left_bool", "$0", "right_bool", "$1", "divisor", "$2");
+        List<String> booleanColumnNames = List.of("$0", "$1", "$2");
+        List<Class<?>> booleanColumnTypes = List.of(Boolean.class, Boolean.class, Integer.class);
+
+        ExpressionEvaluator nativeAndEvaluator =
+                compileTranslatedFilterExpression(
+                        "left_bool and right_bool",
+                        booleanColumns,
+                        booleanColumnNameMap,
+                        booleanColumnNames,
+                        booleanColumnTypes);
+        Assertions.assertThat(nativeAndEvaluator.evaluate(new Object[] {true, true, 0}))
+                .isEqualTo(true);
+
+        ExpressionEvaluator conditionalAndEvaluator =
+                compileTranslatedFilterExpression(
+                        "left_bool and 1 / divisor > 0",
+                        booleanColumns,
+                        booleanColumnNameMap,
+                        booleanColumnNames,
+                        booleanColumnTypes);
+        Assertions.assertThat(conditionalAndEvaluator.evaluate(new Object[] {false, true, 0}))
+                .isEqualTo(false);
+
+        ExpressionEvaluator conditionalOrEvaluator =
+                compileTranslatedFilterExpression(
+                        "left_bool or 1 / divisor > 0",
+                        booleanColumns,
+                        booleanColumnNameMap,
+                        booleanColumnNames,
+                        booleanColumnTypes);
+        Assertions.assertThat(conditionalOrEvaluator.evaluate(new Object[] {true, false, 0}))
+                .isEqualTo(true);
+
+        List<Column> nullableBooleanColumns =
+                List.of(Column.physicalColumn("nullable_bool", DataTypes.BOOLEAN()));
+        Map<String, String> nullableBooleanColumnNameMap = Map.of("nullable_bool", "$0");
+        ExpressionEvaluator nullableOrEvaluator =
+                compileTranslatedFilterExpression(
+                        "nullable_bool or false",
+                        nullableBooleanColumns,
+                        nullableBooleanColumnNameMap,
+                        List.of("$0"),
+                        List.of(Boolean.class));
+        Assertions.assertThat(nullableOrEvaluator.evaluate(new Object[] {null})).isNull();
+    }
+
+    @Test
+    void testTranslatedNestedExpressionPreservesSemantics() throws InvocationTargetException {
+        List<Column> arithmeticColumns =
+                List.of(
+                        Column.physicalColumn("a", DataTypes.INT()),
+                        Column.physicalColumn("b", DataTypes.INT()),
+                        Column.physicalColumn("c", DataTypes.INT()));
+        Map<String, String> columnNameMap = Map.of("a", "$0", "b", "$1", "c", "$2");
+        List<String> columnNames = List.of("$0", "$1", "$2");
+        List<Class<?>> columnTypes = List.of(Integer.class, Integer.class, Integer.class);
+
+        ExpressionEvaluator additiveOperandEvaluator =
+                compileTranslatedFilterExpression(
+                        "(a + b) * c = 9",
+                        arithmeticColumns,
+                        columnNameMap,
+                        columnNames,
+                        columnTypes);
+        Assertions.assertThat(additiveOperandEvaluator.evaluate(new Object[] {1, 2, 3}))
+                .isEqualTo(true);
+
+        ExpressionEvaluator multiplicativeRightOperandEvaluator =
+                compileTranslatedFilterExpression(
+                        "a / (b * c) = 2",
+                        arithmeticColumns,
+                        columnNameMap,
+                        columnNames,
+                        columnTypes);
+        Assertions.assertThat(multiplicativeRightOperandEvaluator.evaluate(new Object[] {12, 2, 3}))
+                .isEqualTo(true);
+
+        ExpressionEvaluator subtractiveRightOperandEvaluator =
+                compileTranslatedFilterExpression(
+                        "a - (b - c) = 6",
+                        arithmeticColumns,
+                        columnNameMap,
+                        columnNames,
+                        columnTypes);
+        Assertions.assertThat(subtractiveRightOperandEvaluator.evaluate(new Object[] {10, 6, 2}))
+                .isEqualTo(true);
+
+        ExpressionEvaluator conditionalLeftOperandEvaluator =
+                compileTranslatedFilterExpression(
+                        "IF(a > b, a, b) + c = 13",
+                        arithmeticColumns,
+                        columnNameMap,
+                        columnNames,
+                        columnTypes);
+        Assertions.assertThat(conditionalLeftOperandEvaluator.evaluate(new Object[] {10, 2, 3}))
+                .isEqualTo(true);
+
+        ExpressionEvaluator conditionalRightOperandEvaluator =
+                compileTranslatedFilterExpression(
+                        "c * IF(a > b, a, b) = 30",
+                        arithmeticColumns,
+                        columnNameMap,
+                        columnNames,
+                        columnTypes);
+        Assertions.assertThat(conditionalRightOperandEvaluator.evaluate(new Object[] {10, 2, 3}))
+                .isEqualTo(true);
+
+        List<Column> booleanColumns =
+                List.of(
+                        Column.physicalColumn("a", DataTypes.BOOLEAN().notNull()),
+                        Column.physicalColumn("b", DataTypes.BOOLEAN().notNull()),
+                        Column.physicalColumn("c", DataTypes.BOOLEAN().notNull()));
+        ExpressionEvaluator logicalOperandEvaluator =
+                compileTranslatedFilterExpression(
+                        "(a OR b) AND c",
+                        booleanColumns,
+                        columnNameMap,
+                        columnNames,
+                        List.of(Boolean.class, Boolean.class, Boolean.class));
+        Assertions.assertThat(logicalOperandEvaluator.evaluate(new Object[] {true, false, false}))
+                .isEqualTo(false);
+    }
+
+    @Test
+    void testTranslatedNullFunctionsCompileWithJanino() throws InvocationTargetException {
+        List<Column> columns = List.of(Column.physicalColumn("input_value", DataTypes.STRING()));
+        Map<String, String> columnNameMap = Map.of("input_value", "$0");
+
+        ExpressionEvaluator tryCastEvaluator =
+                compileTranslatedFilterExpression(
+                        "IFNULL(TRY_CAST(input_value AS INT), 42) = 42",
+                        columns,
+                        columnNameMap,
+                        List.of("$0"),
+                        List.of(String.class));
+        Assertions.assertThat(tryCastEvaluator.evaluate(new Object[] {"invalid"})).isEqualTo(true);
+        Assertions.assertThat(tryCastEvaluator.evaluate(new Object[] {"7"})).isEqualTo(false);
+
+        ExpressionEvaluator nullIfEvaluator =
+                compileTranslatedFilterExpression(
+                        "NULLIF(CAST(input_value AS INT), CAST(1 AS BIGINT)) IS NULL",
+                        columns,
+                        columnNameMap,
+                        List.of("$0"),
+                        List.of(String.class));
+        Assertions.assertThat(nullIfEvaluator.evaluate(new Object[] {"1"})).isEqualTo(true);
+        Assertions.assertThat(nullIfEvaluator.evaluate(new Object[] {"2"})).isEqualTo(false);
+    }
+
+    @Test
     void testLargeNumericLiterals() {
         // Test parsing integer literals
         Stream.of(
@@ -292,5 +468,35 @@ class JaninoCompilerTest {
                                 throw new RuntimeException(e);
                             }
                         });
+    }
+
+    private static ExpressionEvaluator compileTranslatedFilterExpression(
+            String expression, List<Column> columns, Map<String, String> columnNameMap) {
+        return compileTranslatedFilterExpression(
+                expression,
+                columns,
+                columnNameMap,
+                List.of("$0", "$1"),
+                List.of(Integer.class, Integer.class));
+    }
+
+    private static ExpressionEvaluator compileTranslatedFilterExpression(
+            String expression,
+            List<Column> columns,
+            Map<String, String> columnNameMap,
+            List<String> columnNames,
+            List<Class<?>> columnTypes) {
+        String janinoExpression =
+                TransformParser.translateFilterExpressionToJaninoExpression(
+                        expression,
+                        columns,
+                        Collections.emptyList(),
+                        new SupportedMetadataColumn[0],
+                        columnNameMap);
+        return JaninoCompiler.compileExpression(
+                JaninoCompiler.loadSystemFunction(janinoExpression),
+                columnNames,
+                columnTypes,
+                Boolean.class);
     }
 }

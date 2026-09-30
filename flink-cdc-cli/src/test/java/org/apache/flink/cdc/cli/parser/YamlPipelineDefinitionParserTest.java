@@ -19,6 +19,7 @@ package org.apache.flink.cdc.cli.parser;
 
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
+import org.apache.flink.cdc.common.pipeline.ExistingTableSchemaExpansionMode;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.composer.definition.ModelDef;
 import org.apache.flink.cdc.composer.definition.PipelineDef;
@@ -45,6 +46,7 @@ import java.util.Set;
 
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.ADD_COLUMN;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.ALTER_COLUMN_TYPE;
+import static org.apache.flink.cdc.common.event.SchemaChangeEventType.ALTER_TABLE_COMMENT;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.CREATE_TABLE;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.DROP_COLUMN;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.DROP_TABLE;
@@ -207,6 +209,139 @@ class YamlPipelineDefinitionParserTest {
     }
 
     @Test
+    void testPythonUdfDefinition() throws Exception {
+        URL resource =
+                Resources.getResource("definitions/pipeline-definition-with-python-udf.yaml");
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+        PipelineDef pipelineDef = parser.parse(new Path(resource.toURI()), new Configuration());
+        assertThat(pipelineDef).isEqualTo(pipelineDefWithPythonUdf);
+    }
+
+    @Test
+    void testPythonUdfRejectsClasspathAndPythonCodeTogether() {
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+        assertThatThrownBy(
+                        () ->
+                                parser.parse(
+                                        buildPipelineDefWithPythonUdf(
+                                                "py_identity",
+                                                "classpath: org.example.MyFunction\n"
+                                                        + "      python-code: |\n"
+                                                        + "        def eval(x: int) -> int:\n"
+                                                        + "          return x\n"
+                                                        + "      python-executable: /usr/bin/python3\n"),
+                                        new Configuration()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage(
+                        "UDF configuration cannot define both \"classpath\" and \"python-code\"");
+    }
+
+    @Test
+    void testPythonUdfRejectsOptionsAlongsidePythonCode() {
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+        assertThatThrownBy(
+                        () ->
+                                parser.parse(
+                                        buildPipelineDefWithPythonUdf(
+                                                "py_identity",
+                                                "python-code: |\n"
+                                                        + "        def eval(x: int) -> int:\n"
+                                                        + "          return x\n"
+                                                        + "      options:\n"
+                                                        + "        cache.enabled: true\n"),
+                                        new Configuration()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage(
+                        "UDF configuration using \"python-code\" cannot define \"options\"; use top-level \"python-executable\" and \"python-files\" instead");
+    }
+
+    @Test
+    void testPythonExecutableRequiresPythonCode() {
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+        assertThatThrownBy(
+                        () ->
+                                parser.parse(
+                                        buildPipelineDefWithPythonUdf(
+                                                "py_identity",
+                                                "python-executable: /usr/bin/python3\n"
+                                                        + "      classpath: org.example.MyFunction\n"),
+                                        new Configuration()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage(
+                        "UDF configuration using \"python-executable\" or \"python-files\" requires \"python-code\"");
+    }
+
+    @Test
+    void testPythonFilesRequiresPythonCode() {
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+        assertThatThrownBy(
+                        () ->
+                                parser.parse(
+                                        buildPipelineDefWithPythonUdf(
+                                                "py_identity",
+                                                "python-files:\n"
+                                                        + "        - /flink/usrlib/deps.zip\n"
+                                                        + "      classpath: org.example.MyFunction\n"),
+                                        new Configuration()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage(
+                        "UDF configuration using \"python-executable\" or \"python-files\" requires \"python-code\"");
+    }
+
+    @Test
+    void testPythonFilesMustUseListSyntax() {
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+        assertThatThrownBy(
+                        () ->
+                                parser.parse(
+                                        buildPipelineDefWithPythonUdf(
+                                                "py_identity",
+                                                "python-code: |\n"
+                                                        + "        def eval(x: int) -> int:\n"
+                                                        + "          return x\n"
+                                                        + "      python-files: /flink/usrlib/deps.zip\n"),
+                                        new Configuration()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage(
+                        "YAML UDF field `python-files` should be a list when used with `python-code`.");
+    }
+
+    @Test
+    void testUdfRequiresClasspathOrPythonCode() {
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+        assertThatThrownBy(
+                        () ->
+                                parser.parse(
+                                        buildPipelineDefWithPythonUdf("py_identity", ""),
+                                        new Configuration()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage(
+                        "Missing required field \"classpath\" or \"python-code\" in UDF configuration");
+    }
+
+    @Test
+    void testPythonUdfRequiresName() {
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+        assertThatThrownBy(
+                        () ->
+                                parser.parse(
+                                        "source:\n"
+                                                + "  type: values\n"
+                                                + "\n"
+                                                + "sink:\n"
+                                                + "  type: values\n"
+                                                + "\n"
+                                                + "pipeline:\n"
+                                                + "  user-defined-function:\n"
+                                                + "    - python-code: |\n"
+                                                + "        def eval(x: int) -> int:\n"
+                                                + "          return x\n",
+                                        new Configuration()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Missing required field \"name\" in UDF configuration");
+    }
+
+    @Test
     void testRouteMode() throws Exception {
         URL resource =
                 Resources.getResource("definitions/pipeline-definition-with-route-mode.yaml");
@@ -222,6 +357,7 @@ class YamlPipelineDefinitionParserTest {
                 null,
                 null,
                 ImmutableSet.of(
+                        ALTER_TABLE_COMMENT,
                         ADD_COLUMN,
                         ALTER_COLUMN_TYPE,
                         CREATE_TABLE,
@@ -234,6 +370,7 @@ class YamlPipelineDefinitionParserTest {
                 null,
                 null,
                 ImmutableSet.of(
+                        ALTER_TABLE_COMMENT,
                         ADD_COLUMN,
                         ALTER_COLUMN_TYPE,
                         CREATE_TABLE,
@@ -246,6 +383,7 @@ class YamlPipelineDefinitionParserTest {
                 "[column, table]",
                 "[drop]",
                 ImmutableSet.of(
+                        ALTER_TABLE_COMMENT,
                         ADD_COLUMN,
                         ALTER_COLUMN_TYPE,
                         CREATE_TABLE,
@@ -256,12 +394,18 @@ class YamlPipelineDefinitionParserTest {
                 null,
                 null,
                 ImmutableSet.of(
-                        ADD_COLUMN, ALTER_COLUMN_TYPE, CREATE_TABLE, DROP_COLUMN, RENAME_COLUMN));
+                        ALTER_TABLE_COMMENT,
+                        ADD_COLUMN,
+                        ALTER_COLUMN_TYPE,
+                        CREATE_TABLE,
+                        DROP_COLUMN,
+                        RENAME_COLUMN));
         testSchemaEvolutionTypesParsing(
                 "lenient",
                 null,
                 "[]",
                 ImmutableSet.of(
+                        ALTER_TABLE_COMMENT,
                         ADD_COLUMN,
                         ALTER_COLUMN_TYPE,
                         CREATE_TABLE,
@@ -354,6 +498,201 @@ class YamlPipelineDefinitionParserTest {
                                                 .build())));
     }
 
+    @Test
+    void testExistingTableSchemaExpansionModeParsing() throws Exception {
+        for (ExistingTableSchemaExpansionMode mode : ExistingTableSchemaExpansionMode.values()) {
+            PipelineDef parsed =
+                    new YamlPipelineDefinitionParser()
+                            .parse(
+                                    "source:\n"
+                                            + "  type: foo\n"
+                                            + "sink:\n"
+                                            + "  type: bar\n"
+                                            + "  existing-table.schema-expansion.mode: "
+                                            + mode.name()
+                                            + "\n",
+                                    new Configuration());
+            assertThat(parsed.getSink().getExistingTableSchemaExpansionMode()).isEqualTo(mode);
+            assertThat(parsed.getSink().getConfig().toMap())
+                    .doesNotContainKey("existing-table.schema-expansion.mode");
+        }
+    }
+
+    @Test
+    void testExistingTableSchemaExpansionModeIsCaseInsensitive() throws Exception {
+        PipelineDef parsed =
+                new YamlPipelineDefinitionParser()
+                        .parse(
+                                "source:\n"
+                                        + "  type: foo\n"
+                                        + "sink:\n"
+                                        + "  type: bar\n"
+                                        + "  existing-table.schema-expansion.mode: \"check\"\n",
+                                new Configuration());
+        assertThat(parsed.getSink().getExistingTableSchemaExpansionMode())
+                .isEqualTo(ExistingTableSchemaExpansionMode.CHECK);
+    }
+
+    @Test
+    void testExistingTableSchemaExpansionModeDefaultsToDisabled() throws Exception {
+        PipelineDef defaultPipeline =
+                new YamlPipelineDefinitionParser()
+                        .parse("source:\n  type: foo\nsink:\n  type: bar\n", new Configuration());
+        assertThat(defaultPipeline.getSink().getExistingTableSchemaExpansionMode())
+                .isEqualTo(ExistingTableSchemaExpansionMode.DISABLED);
+    }
+
+    @Test
+    void testRejectsInvalidExpansionMode() {
+        assertThatThrownBy(
+                        () ->
+                                new YamlPipelineDefinitionParser()
+                                        .parse(
+                                                "source:\n"
+                                                        + "  type: foo\n"
+                                                        + "sink:\n"
+                                                        + "  type: bar\n"
+                                                        + "  existing-table.schema-expansion.mode: INVALID\n",
+                                                new Configuration()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("DISABLED, CHECK, TRY_EXPAND, EXPAND");
+
+        assertThatThrownBy(
+                        () ->
+                                new YamlPipelineDefinitionParser()
+                                        .parse(
+                                                "source:\n"
+                                                        + "  type: foo\n"
+                                                        + "sink:\n"
+                                                        + "  type: bar\n"
+                                                        + "  existing-table.schema-expansion.mode: true\n",
+                                                new Configuration()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("DISABLED, CHECK, TRY_EXPAND, EXPAND");
+
+        assertThatThrownBy(
+                        () ->
+                                new YamlPipelineDefinitionParser()
+                                        .parse(
+                                                "source:\n"
+                                                        + "  type: foo\n"
+                                                        + "sink:\n"
+                                                        + "  type: bar\n"
+                                                        + "  existing-table.schema-expansion.mode: false\n",
+                                                new Configuration()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("DISABLED, CHECK, TRY_EXPAND, EXPAND");
+    }
+
+    @Test
+    void testParsingFactoryBasedModel() throws Exception {
+        String yaml =
+                "source:\n"
+                        + "  type: values\n"
+                        + "sink:\n"
+                        + "  type: values\n"
+                        + "pipeline:\n"
+                        + "  model:\n"
+                        + "    name: completion_model\n"
+                        + "    type: dummy\n"
+                        + "    options:\n"
+                        + "      debug: true\n"
+                        + "      retries: 3\n";
+
+        PipelineDef pipelineDef =
+                new YamlPipelineDefinitionParser().parse(yaml, new Configuration());
+
+        assertThat(pipelineDef.getModels())
+                .containsExactly(
+                        ModelDef.of(
+                                "completion_model",
+                                "dummy",
+                                ImmutableMap.of("debug", "true", "retries", "3")));
+    }
+
+    @Test
+    void testParsingFactoryBasedModelWithFlatModelNameOption() throws Exception {
+        String yaml =
+                "source:\n"
+                        + "  type: values\n"
+                        + "sink:\n"
+                        + "  type: values\n"
+                        + "pipeline:\n"
+                        + "  model:\n"
+                        + "    name: completion_model\n"
+                        + "    type: openai-compatible\n"
+                        + "    model-name: model-v1\n";
+
+        PipelineDef pipelineDef =
+                new YamlPipelineDefinitionParser().parse(yaml, new Configuration());
+
+        assertThat(pipelineDef.getModels())
+                .containsExactly(
+                        ModelDef.of(
+                                "completion_model",
+                                "openai-compatible",
+                                Collections.singletonMap("model-name", "model-v1")));
+    }
+
+    @Test
+    void testParsingLegacyAndFactoryBasedModelsTogether() throws Exception {
+        String yaml =
+                "source:\n"
+                        + "  type: values\n"
+                        + "sink:\n"
+                        + "  type: values\n"
+                        + "pipeline:\n"
+                        + "  model:\n"
+                        + "    - model-name: LEGACY_CHAT\n"
+                        + "      class-name: OpenAIChatModel\n"
+                        + "      openai.model: legacy-model\n"
+                        + "    - name: completion_model\n"
+                        + "      type: dummy\n"
+                        + "      debug: false\n";
+
+        PipelineDef pipelineDef =
+                new YamlPipelineDefinitionParser().parse(yaml, new Configuration());
+
+        assertThat(pipelineDef.getModels()).hasSize(2);
+        assertThat(pipelineDef.getModels().get(0).isLegacy()).isTrue();
+        assertThat(pipelineDef.getModels().get(1))
+                .isEqualTo(
+                        ModelDef.of(
+                                "completion_model",
+                                "dummy",
+                                Collections.singletonMap("debug", "false")));
+    }
+
+    @Test
+    void testDuplicateAndInvalidModelNames() {
+        String duplicate =
+                "source:\n"
+                        + "  type: values\n"
+                        + "sink:\n"
+                        + "  type: values\n"
+                        + "pipeline:\n"
+                        + "  model:\n"
+                        + "    - name: duplicated\n"
+                        + "      type: dummy\n"
+                        + "    - model-name: duplicated\n"
+                        + "      class-name: OpenAIChatModel\n";
+        String invalid =
+                "source:\n"
+                        + "  type: values\n"
+                        + "sink:\n"
+                        + "  type: values\n"
+                        + "pipeline:\n"
+                        + "  model:\n"
+                        + "    name: invalid-name\n"
+                        + "    type: dummy\n";
+
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+        assertThatThrownBy(() -> parser.parse(duplicate, new Configuration()))
+                .hasMessage("Duplicate model name 'duplicated' in pipeline definition.");
+        assertThatThrownBy(() -> parser.parse(invalid, new Configuration()))
+                .hasMessageContaining("is not a valid identifier");
+    }
+
     private final PipelineDef fullDef =
             new PipelineDef(
                     new SourceDef(
@@ -428,6 +767,7 @@ class YamlPipelineDefinitionParserTest {
                             ImmutableMap.<String, String>builder()
                                     .put("name", "source-database-sync-pipe")
                                     .put("parallelism", "4")
+                                    .put("sink.partitioning.strategy", "TABLE_ID")
                                     .put("execution.runtime-mode", "STREAMING")
                                     .put("schema.change.behavior", "evolve")
                                     .put("schema-operator.rpc-timeout", "1 h")
@@ -478,6 +818,7 @@ class YamlPipelineDefinitionParserTest {
                         + "pipeline:\n"
                         + "  name: source-database-sync-pipe\n"
                         + "  parallelism: 4\n"
+                        + "  sink.partitioning.strategy: TABLE_ID\n"
                         + "  schema.change.behavior: evolve\n"
                         + "  schema-operator.rpc-timeout: 1 h\n"
                         + "  execution.runtime-mode: STREAMING\n"
@@ -566,6 +907,7 @@ class YamlPipelineDefinitionParserTest {
                             ImmutableMap.<String, String>builder()
                                     .put("name", "source-database-sync-pipe")
                                     .put("parallelism", "4")
+                                    .put("sink.partitioning.strategy", "TABLE_ID")
                                     .put("schema.change.behavior", "evolve")
                                     .put("schema-operator.rpc-timeout", "1 h")
                                     .put("execution.runtime-mode", "STREAMING")
@@ -594,6 +936,7 @@ class YamlPipelineDefinitionParserTest {
                                             .put("bootstrap-servers", "localhost:9092")
                                             .build()),
                             ImmutableSet.of(
+                                    ALTER_TABLE_COMMENT,
                                     DROP_COLUMN,
                                     ALTER_COLUMN_TYPE,
                                     ADD_COLUMN,
@@ -620,6 +963,7 @@ class YamlPipelineDefinitionParserTest {
                             null,
                             new Configuration(),
                             ImmutableSet.of(
+                                    ALTER_TABLE_COMMENT,
                                     DROP_COLUMN,
                                     ALTER_COLUMN_TYPE,
                                     ADD_COLUMN,
@@ -694,6 +1038,7 @@ class YamlPipelineDefinitionParserTest {
                             ImmutableMap.<String, String>builder()
                                     .put("name", "source-database-sync-pipe")
                                     .put("parallelism", "4")
+                                    .put("sink.partitioning.strategy", "TABLE_ID")
                                     .put("schema.change.behavior", "evolve")
                                     .put("schema-operator.rpc-timeout", "1 h")
                                     .build()));
@@ -706,6 +1051,7 @@ class YamlPipelineDefinitionParserTest {
                             null,
                             new Configuration(),
                             ImmutableSet.of(
+                                    ALTER_TABLE_COMMENT,
                                     DROP_COLUMN,
                                     ALTER_COLUMN_TYPE,
                                     ADD_COLUMN,
@@ -742,6 +1088,7 @@ class YamlPipelineDefinitionParserTest {
                             null,
                             new Configuration(),
                             ImmutableSet.of(
+                                    ALTER_TABLE_COMMENT,
                                     DROP_COLUMN,
                                     ALTER_COLUMN_TYPE,
                                     ADD_COLUMN,
@@ -772,6 +1119,49 @@ class YamlPipelineDefinitionParserTest {
                                     .put("parallelism", "1")
                                     .build()));
 
+    private final PipelineDef pipelineDefWithPythonUdf =
+            new PipelineDef(
+                    new SourceDef("values", null, new Configuration()),
+                    new SinkDef(
+                            "values",
+                            null,
+                            new Configuration(),
+                            ImmutableSet.of(
+                                    ALTER_TABLE_COMMENT,
+                                    DROP_COLUMN,
+                                    ALTER_COLUMN_TYPE,
+                                    ADD_COLUMN,
+                                    CREATE_TABLE,
+                                    RENAME_COLUMN)),
+                    Collections.emptyList(),
+                    Collections.singletonList(
+                            new TransformDef(
+                                    "mydb.web_order",
+                                    "*, py_identity(id) as py_id",
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                    ",",
+                                    null,
+                                    null)),
+                    Collections.singletonList(
+                            new UdfDef(
+                                    "py_identity",
+                                    "org.apache.flink.cdc.python.PythonUdf",
+                                    ImmutableMap.<String, String>builder()
+                                            .put("source", "def eval(x: int) -> int:\n  return x\n")
+                                            .put("python-executable", "/usr/bin/python3")
+                                            .put(
+                                                    "python-files",
+                                                    "/flink/usrlib/deps.zip,/flink/usrlib/shared")
+                                            .build())),
+                    Collections.emptyList(),
+                    Configuration.fromMap(
+                            ImmutableMap.<String, String>builder()
+                                    .put("parallelism", "1")
+                                    .build()));
+
     private final PipelineDef pipelineDefWithRouteMode =
             new PipelineDef(
                     new SourceDef(
@@ -797,6 +1187,7 @@ class YamlPipelineDefinitionParserTest {
                                             .put("password", "")
                                             .build()),
                             ImmutableSet.of(
+                                    ALTER_TABLE_COMMENT,
                                     DROP_COLUMN,
                                     ALTER_COLUMN_TYPE,
                                     ADD_COLUMN,
@@ -827,4 +1218,26 @@ class YamlPipelineDefinitionParserTest {
                                     .put("parallelism", "2")
                                     .put("route-mode", "FIRST_MATCH")
                                     .build()));
+
+    private static String buildPipelineDefWithPythonUdf(String name, String udfBody) {
+        return "source:\n"
+                + "  type: values\n"
+                + "\n"
+                + "sink:\n"
+                + "  type: values\n"
+                + "\n"
+                + "transform:\n"
+                + "  - source-table: mydb.web_order\n"
+                + "    projection: \"*, "
+                + name
+                + "(id) as py_id\"\n"
+                + "\n"
+                + "pipeline:\n"
+                + "  parallelism: 1\n"
+                + "  user-defined-function:\n"
+                + "    - name: "
+                + name
+                + "\n"
+                + (udfBody.isEmpty() ? "" : "      " + udfBody);
+    }
 }

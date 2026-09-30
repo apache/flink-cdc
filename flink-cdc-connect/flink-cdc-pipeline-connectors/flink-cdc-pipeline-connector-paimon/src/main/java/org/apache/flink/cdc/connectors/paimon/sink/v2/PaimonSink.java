@@ -98,7 +98,10 @@ public class PaimonSink<InputT>
                 context.getRestoredCheckpointId()
                         .orElse(CheckpointIDCounter.INITIAL_CHECKPOINT_ID - 1);
         Preconditions.checkNotNull(paimonWriterStates);
-        String storedCommitUser = paimonWriterStates.iterator().next().getCommitUser();
+        String storedCommitUser =
+                paimonWriterStates.isEmpty()
+                        ? this.commitUser
+                        : paimonWriterStates.iterator().next().getCommitUser();
         return new PaimonWriter<>(
                 catalogOptions,
                 context.metricGroup(),

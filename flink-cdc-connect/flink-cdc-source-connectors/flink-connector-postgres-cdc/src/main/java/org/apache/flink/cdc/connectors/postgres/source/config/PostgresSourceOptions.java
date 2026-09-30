@@ -106,4 +106,25 @@ public class PostgresSourceOptions extends JdbcSourceOptions {
                             "Whether to include database in the generated Table ID.\n"
                                     + "If set to true, the Table ID will be in the format (database, schema, table).\n"
                                     + "If set to false, the Table ID will be in the format (schema, table). Defaults to false.");
+
+    public static final ConfigOption<Boolean>
+            SCAN_PRE_EPOCH_TIMESTAMP_WALL_CLOCK_CONVERSION_ENABLED =
+                    ConfigOptions.key("scan.pre-epoch-timestamp.wall-clock-conversion.enabled")
+                            .booleanType()
+                            .defaultValue(false)
+                            .withDescription(
+                                    "Whether to convert the values of PostgreSQL \"timestamp without time zone\" columns which are "
+                                            + "before 1970-01-01 (the epoch) by keeping the date and time (wall clock) stored in the "
+                                            + "database.\n"
+                                            + "If set to true, such a value is not changed by the time zone of the JVM running the job. "
+                                            + "This matters in time zones which have historical offsets: with the JVM time zone set to "
+                                            + "Asia/Shanghai, the stored value \"1900-01-01 00:00:00.123\" would otherwise be read as "
+                                            + "\"1900-01-01 00:05:43.123\".\n"
+                                            + "If set to false (default), the previous conversion behavior is kept.\n"
+                                            + "Values which are not before 1970-01-01 are converted in the same way whatever the value "
+                                            + "of this option is, and this option never changes the data type of a column.\n"
+                                            + "This option only takes effect when 'scan.incremental.snapshot.enabled' is true, because "
+                                            + "the values of the non-incremental snapshot source are converted by Debezium itself.\n"
+                                            + "When the source is created with the DataStream API, this behavior is enabled by adding "
+                                            + "this option key to the Debezium properties.");
 }

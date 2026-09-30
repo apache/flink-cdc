@@ -106,9 +106,7 @@ In order to set up the OceanBase CDC connector, the following table provides dep
 
 ### SQL Client JAR
 
-```Download link is available only for stable releases.```
-
-Download [flink-sql-connector-oceanbase-cdc-{{< param Version >}}.jar](https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-oceanbase-cdc/{{< param Version >}}/flink-sql-connector-oceanbase-cdc-{{< param Version >}}.jar) and put it under `<FLINK_HOME>/lib/`.
+Download [flink-sql-connector-oceanbase-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-oceanbase-cdc) and put it under `<FLINK_HOME>/lib/`.
 
 **Note:** Refer to [flink-sql-connector-oceanbase-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-oceanbase-cdc), more released versions will be available in the Maven central warehouse.
 
@@ -856,7 +854,7 @@ Data Type Mapping
       </td>
       <td>
       The spatial data types will be converted into STRING with a fixed Json format.
-      Please see <a href="#patial-data-types-mapping ">Spatial Data Types Mapping</a> section for more detailed information.
+      Please see <a href="#spatial-data-types-mapping">Spatial Data Types Mapping</a> section for more detailed information.
       </td>
     </tr>
     </tbody>

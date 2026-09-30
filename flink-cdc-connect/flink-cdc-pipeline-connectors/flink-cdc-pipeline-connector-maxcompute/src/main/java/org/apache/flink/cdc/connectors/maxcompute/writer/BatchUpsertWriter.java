@@ -18,6 +18,7 @@
 
 package org.apache.flink.cdc.connectors.maxcompute.writer;
 
+import org.apache.flink.cdc.common.utils.StringUtils;
 import org.apache.flink.cdc.connectors.maxcompute.common.SessionIdentifier;
 import org.apache.flink.cdc.connectors.maxcompute.common.UncheckedOdpsException;
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeOptions;
@@ -69,14 +70,17 @@ public class BatchUpsertWriter implements MaxComputeWriter {
         String partitionSpec = identifier.getPartitionName();
         String sessionId = identifier.getSessionId();
         try {
-            this.upsertSession =
+            Builder builder =
                     ((Builder)
                                     tunnel.buildUpsertSession(
                                             identifier.getProject(), identifier.getTable()))
                             .setConfig(tunnel.getConfig())
-                            .setSchemaName(identifier.getSchema())
-                            .setPartitionSpec(partitionSpec)
-                            .setUpsertId(sessionId)
+                            .setSchemaName(identifier.getSchema());
+            if (!StringUtils.isNullOrWhitespaceOnly(partitionSpec)) {
+                builder.setPartitionSpec(partitionSpec);
+            }
+            this.upsertSession =
+                    builder.setUpsertId(sessionId)
                             .setConcurrentNum(writeOptions.getFlushConcurrent())
                             .build();
             this.upsertStream =

@@ -38,6 +38,8 @@ import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.lifecycle.Startables;
 import org.testcontainers.utility.DockerImageName;
 
+import javax.annotation.Nullable;
+
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -51,7 +53,7 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -123,15 +125,14 @@ public abstract class PostgresTestBase extends AbstractTestBase {
                         PostgresConnectionPoolFactory.JDBC_URL_PATTERN,
                         container.getHost(),
                         container.getMappedPort(PostgreSQLContainer.POSTGRESQL_PORT),
-                        databaseName);
+                        databaseName,
+                        "test-driver");
         return DriverManager.getConnection(
                 jdbcUrl, container.getUsername(), container.getPassword());
     }
 
     public static String getSlotName() {
-        final Random random = new Random();
-        int id = random.nextInt(10000);
-        return "flink_" + id;
+        return "flink_" + UUID.randomUUID().toString().replace("-", "");
     }
 
     /**
@@ -248,13 +249,14 @@ public abstract class PostgresTestBase extends AbstractTestBase {
     protected PostgresSourceConfigFactory getMockPostgresSourceConfigFactory(
             UniqueDatabase database, String schemaName, String tableName, int splitSize) {
         return getMockPostgresSourceConfigFactory(
-                database, schemaName, tableName, splitSize, false);
+                database, schemaName, tableName, null, splitSize, false);
     }
 
     protected PostgresSourceConfigFactory getMockPostgresSourceConfigFactory(
             UniqueDatabase database,
             String schemaName,
             String tableName,
+            @Nullable String slotName,
             int splitSize,
             boolean skipSnapshotBackfill) {
 
@@ -270,6 +272,10 @@ public abstract class PostgresTestBase extends AbstractTestBase {
         postgresSourceConfigFactory.skipSnapshotBackfill(skipSnapshotBackfill);
         postgresSourceConfigFactory.setLsnCommitCheckpointsDelay(1);
         postgresSourceConfigFactory.decodingPluginName("pgoutput");
+        if (slotName != null) {
+            postgresSourceConfigFactory.slotName(slotName);
+        }
+
         return postgresSourceConfigFactory;
     }
 

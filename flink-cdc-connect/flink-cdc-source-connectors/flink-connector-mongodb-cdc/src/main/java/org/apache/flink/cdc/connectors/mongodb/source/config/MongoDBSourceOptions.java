@@ -178,4 +178,68 @@ public class MongoDBSourceOptions {
                     .defaultValue(true)
                     .withDescription(
                             "MongoDB server normally times out idle cursors after an inactivity period (10 minutes) to prevent excess memory use. Set this option to true to prevent that.");
+
+    // SSL/TLS options
+
+    public static final ConfigOption<Boolean> SSL_ENABLED =
+            ConfigOptions.key("mongodb.ssl.enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Whether the connector will use SSL to connect to MongoDB instances.");
+
+    public static final ConfigOption<Boolean> SSL_INVALID_HOSTNAME_ALLOWED =
+            ConfigOptions.key("mongodb.ssl.invalid.hostname.allowed")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "When SSL is enabled, this setting controls whether strict hostname checking is disabled "
+                                    + "during the connection phase. If true, the connection will not prevent man-in-the-middle attacks.");
+
+    public static final ConfigOption<String> SSL_KEYSTORE =
+            ConfigOptions.key("mongodb.ssl.keystore")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "The location of the key store file. "
+                                    + "This is optional and can be used for two-way authentication between the client and the MongoDB server.");
+
+    public static final ConfigOption<String> SSL_KEYSTORE_PASSWORD =
+            ConfigOptions.key("mongodb.ssl.keystore.password")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "The password for the key store file. "
+                                    + "This is optional and only needed if 'mongodb.ssl.keystore' is configured.");
+
+    public static final ConfigOption<String> SSL_KEYSTORE_TYPE =
+            ConfigOptions.key("mongodb.ssl.keystore.type")
+                    .stringType()
+                    .defaultValue("PKCS12")
+                    .withDescription(
+                            "The type of key store file. "
+                                    + "This is optional and only needed if 'mongodb.ssl.keystore' is configured. Defaults to PKCS12.");
+
+    public static final ConfigOption<String> SSL_TRUSTSTORE =
+            ConfigOptions.key("mongodb.ssl.truststore")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "The location of the trust store file for the server certificate verification.");
+
+    public static final ConfigOption<String> SSL_TRUSTSTORE_PASSWORD =
+            ConfigOptions.key("mongodb.ssl.truststore.password")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "The password for the trust store file. "
+                                    + "Used to check the integrity of the truststore, and unlock the truststore.");
+
+    public static final ConfigOption<String> SSL_TRUSTSTORE_TYPE =
+            ConfigOptions.key("mongodb.ssl.truststore.type")
+                    .stringType()
+                    .defaultValue("PKCS12")
+                    .withDescription(
+                            "The type of trust store file. "
+                                    + "This is optional and only needed if 'mongodb.ssl.truststore' is configured. Defaults to PKCS12.");
 }

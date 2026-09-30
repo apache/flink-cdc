@@ -242,7 +242,11 @@ public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
 
     @Override
     public void alterColumnType(
-            String databaseName, String tableName, String columnName, DataType dataType) {
+            String databaseName,
+            String tableName,
+            String columnName,
+            DataType dataType,
+            String comment) {
         Preconditions.checkArgument(
                 !StringUtils.isNullOrWhitespaceOnly(databaseName),
                 "database name cannot be null or empty.");
@@ -261,6 +265,20 @@ public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
                         quote(tableName),
                         quote(columnName),
                         oceanBaseColumn.getDataType());
+
+        // If comment is provided, we need to alter the column comment separately
+        // since MODIFY COLUMN doesn't support COMMENT in the same statement for OceanBase MySQL
+        if (comment != null && !comment.isEmpty()) {
+            String escapedComment = comment.replace("'", "''");
+            alterTypeSql =
+                    String.format(
+                            "ALTER TABLE %s.%s MODIFY COLUMN %s %s COMMENT '%s';",
+                            quote(databaseName),
+                            quote(tableName),
+                            quote(columnName),
+                            oceanBaseColumn.getDataType(),
+                            escapedComment);
+        }
 
         try {
             long startTimeMillis = System.currentTimeMillis();
@@ -382,6 +400,34 @@ public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
                     e);
             throw new OceanBaseCatalogException(
                     String.format("Failed to truncate table %s.%s ", databaseName, tableName), e);
+        }
+    }
+
+    @Override
+    public void alterTable(String schemaName, String tableName, String comment) {
+        String escapedComment = comment == null ? "" : comment.replace("'", "''");
+        String alterTableDDL =
+                String.format(
+                        "ALTER TABLE `%s`.`%s` SET COMMENT '%s'",
+                        schemaName, tableName, escapedComment);
+        try {
+            long startTimeMillis = System.currentTimeMillis();
+            executeUpdateStatement(alterTableDDL);
+            LOG.info(
+                    "Success to alter table {}.{}, duration: {}ms, sql: {}",
+                    schemaName,
+                    tableName,
+                    System.currentTimeMillis() - startTimeMillis,
+                    alterTableDDL);
+        } catch (Exception e) {
+            LOG.error(
+                    "Failed to alter table {}.{}, sql: {}",
+                    schemaName,
+                    tableName,
+                    alterTableDDL,
+                    e);
+            throw new OceanBaseCatalogException(
+                    String.format("Failed to alter table %s.%s ", schemaName, tableName), e);
         }
     }
 

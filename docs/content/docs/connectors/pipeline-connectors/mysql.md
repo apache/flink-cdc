@@ -146,6 +146,13 @@ pipeline:
       <td>Whether to send schema change events, so that downstream sinks can respond to schema changes and achieve table structure synchronization.</td>
     </tr>
     <tr>
+      <td>server-time-zone</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>The session time zone in database server. If not set, then ZoneId.systemDefault() is used to determine the server time zone.</td>
+    </tr>
+    <tr>
       <td>server-id</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
@@ -244,7 +251,7 @@ pipeline:
     <tr>
           <td>jdbc.properties.*</td>
           <td>optional</td>
-          <td style="word-wrap: break-word;">20</td>
+          <td style="word-wrap: break-word;">(none)</td>
           <td>String</td>
           <td>Option to pass custom JDBC URL properties. User can pass custom properties like 'jdbc.properties.useSSL' = 'false'.</td>
     </tr>
@@ -281,6 +288,13 @@ pipeline:
       <td style="word-wrap: break-word;">false</td>
       <td>Boolean</td>
       <td>Whether to enable scan the newly added tables feature or not, by default is false. This option is only useful when we start the job from a savepoint/checkpoint.</td>
+    </tr>
+    <tr>
+      <td>scan.incremental.snapshot.metadata.release.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>Whether to release the snapshot split metadata held by the source coordinator after entering the binlog phase to reduce JobManager memory. Incompatible with scan.newly-added-table.enabled (enabling both fails at startup); disabled by default. Release happens only after a successful checkpoint; if checkpointing is disabled or no checkpoint completes, the metadata is retained, so this option has no effect without checkpointing. A checkpoint or savepoint taken with this option enabled cannot be used to restore the job after downgrading to Flink CDC 3.6.0 or an earlier version.</td>
     </tr>
     <tr>
       <td>scan.binlog.newly-added-table.enabled</td>
@@ -358,7 +372,7 @@ pipeline:
     <tr>
       <td>metadata.list</td>
       <td>optional</td>
-      <td style="word-wrap: break-word;">false</td>
+      <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>
         List of readable metadata from SourceRecord to be passed to downstream and could be used in transform module, split by `,`. Available readable metadata are: op_ts.

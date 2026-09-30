@@ -41,7 +41,7 @@ In order to setup the Postgres CDC connector, the following table provides depen
 
 ```Download link is available only for stable releases.```
 
-Download [flink-sql-connector-postgres-cdc-{{< param Version >}}.jar](https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-postgres-cdc/{{< param Version >}}/flink-sql-connector-postgres-cdc-{{< param Version >}}.jar) and put it under `<FLINK_HOME>/lib/`.
+Download [flink-sql-connector-postgres-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-postgres-cdc) and put it under `<FLINK_HOME>/lib/`.
 
 **Note:** Refer to [flink-sql-connector-postgres-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-postgres-cdc), more released versions will be available in the Maven central warehouse.
 
@@ -219,10 +219,10 @@ Connector Options
           <td>Boolean</td>
           <td>Incremental snapshot is a new mechanism to read snapshot of a table. Compared to the old snapshot mechanism,
               the incremental snapshot has many advantages, including:
-                (1) source can be parallel during snapshot reading,
-                (2) source can perform checkpoints in the chunk granularity during snapshot reading,
-                (3) source doesn't need to acquire global read lock (FLUSH TABLES WITH READ LOCK) before snapshot reading.
-              Please see <a href="#incremental-snapshot-reading ">Incremental Snapshot Reading</a>section for more detailed information.
+                <br/>(1) source can be parallel during snapshot reading,
+                <br/>(2) source can perform checkpoints in the chunk granularity during snapshot reading,
+                <br/>(3) source doesn't need to acquire global read lock (FLUSH TABLES WITH READ LOCK) before snapshot reading.
+              <br/>Please see <a href="#incremental-snapshot-reading-experimental">Incremental Snapshot Reading</a> section for more detailed information.
           </td>
     </tr>
     <tr>
@@ -235,6 +235,13 @@ Connector Options
           If the flink version is greater than or equal to 1.15, the default value of 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' has been changed to true,
           so it does not need to be explicitly configured 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' = 'true'
       </td>
+    </tr>
+    <tr>
+      <td>scan.incremental.snapshot.metadata.release.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>是否在 source 进入增量阶段后，释放 source coordinator 持有的快照分片元数据（已分配的分片、已完成分片的位点以及表结构），以降低快照分片数量非常大的作业的 JobManager 内存占用。默认关闭。与 scan.newly-added-table.enabled 不兼容：同时开启两者会导致作业启动失败，且已释放元数据的作业无法再开启动态加表功能。仅在成功完成一次 checkpoint 后才会释放；若未开启 checkpoint 或没有 checkpoint 完成，则会保留该元数据，因此该配置项在未开启 checkpoint 时不生效。开启该配置项后生成的 checkpoint 或 savepoint，无法在降级到 Flink CDC 3.6.0 及更早版本后用于恢复作业。</td>
     </tr>
     <tr>
       <td>scan.lsn-commit.checkpoints-num-delay</td>
@@ -290,6 +297,21 @@ Connector Options
         If enabled:
           (1) PUBLICATION must be created beforehand with parameter publish_via_partition_root=true
           (2) Table list (regex or predefined list) should only match the parent table name, if table list matches both parent and child tables, snapshot data will be read twice.
+      </td>
+    </tr>
+    <tr>
+      <td>scan.pre-epoch-timestamp.wall-clock-conversion.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        是否对 1970-01-01（epoch）之前的 PostgreSQL "timestamp without time zone" 列值，按照数据库中存储的日期时间（wall clock）进行转换。<br>
+        开启后，该值不会受运行任务的 JVM 时区影响，这在存在历史时区偏移的时区下很重要：当 JVM 时区为 Asia/Shanghai 时，
+        数据库中存储的 "1900-01-01 00:00:00.123" 否则会被读取为 "1900-01-01 00:05:43.123"。<br>
+        关闭（默认值）时保持原有的转换行为。1970-01-01 及之后的值无论是否开启该选项都会被同样地转换，
+        且该选项不会改变列的数据类型。<br>
+        该选项仅在 <code>scan.incremental.snapshot.enabled</code> 为 true 时生效，因为非增量快照源的数据值由 Debezium 自身转换。<br>
+        使用 DataStream API 时，可以通过在 Debezium 参数中添加 "scan.pre-epoch-timestamp.wall-clock-conversion.enabled" 来开启该行为。
       </td>
     </tr>
     </tbody>
@@ -573,7 +595,7 @@ $ ./bin/flink run \
       --from-savepoint /tmp/flink-savepoints/savepoint-cca7bc-bb1e257f0dab \
       ./FlinkCDCExample.jar
 ```
-**注意:** 请参考文档 [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.17/docs/deployment/cli/#command-line-interface) 了解更多详细信息。
+**注意:** 请参考文档 [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.20/docs/deployment/cli/#command-line-interface) 了解更多详细信息。
 
 ### DataStream Source
 

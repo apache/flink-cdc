@@ -51,6 +51,8 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import static org.apache.flink.cdc.common.utils.SchemaMergingUtils.createDecimalBounded;
+
 /** Utils for {@link Schema} to perform the ability of evolution. */
 @PublicEvolving
 public class SchemaUtils {
@@ -115,7 +117,8 @@ public class SchemaUtils {
                 dropColumnEvent -> applyDropColumnEvent(dropColumnEvent, schema),
                 dropTableEvent -> schema,
                 renameColumnEvent -> applyRenameColumnEvent(renameColumnEvent, schema),
-                truncateTableEvent -> schema);
+                truncateTableEvent -> schema,
+                alterTableCommentEvent -> schema.copy(alterTableCommentEvent.getComment()));
     }
 
     private static Schema applyAddColumnEvent(AddColumnEvent event, Schema oldSchema) {
@@ -142,8 +145,10 @@ public class SchemaUtils {
                         int index = columnNames.indexOf(columnWithPosition.getExistedColumnName());
                         if (index < 0) {
                             throw new IllegalArgumentException(
-                                    columnWithPosition.getExistedColumnName()
-                                            + " of AddColumnEvent is not existed");
+                                    String.format(
+                                            "BEFORE type AddColumnEvent error: Column %s does not exist in table %s",
+                                            columnWithPosition.getExistedColumnName(),
+                                            event.tableId()));
                         }
                         columns.add(index, columnWithPosition.getAddColumn());
                         break;
@@ -158,8 +163,10 @@ public class SchemaUtils {
                         int index = columnNames.indexOf(columnWithPosition.getExistedColumnName());
                         if (index < 0) {
                             throw new IllegalArgumentException(
-                                    columnWithPosition.getExistedColumnName()
-                                            + " of AddColumnEvent is not existed");
+                                    String.format(
+                                            "AFTER type AddColumnEvent error: Column %s does not exist in table %s",
+                                            columnWithPosition.getExistedColumnName(),
+                                            event.tableId()));
                         }
                         columns.add(index + 1, columnWithPosition.getAddColumn());
                         break;
@@ -280,10 +287,18 @@ public class SchemaUtils {
                                 .filter(e -> referencedColumns.contains(e.getKey()))
                                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
                 if (!newDataTypeMap.isEmpty()) {
-                    evolvedSchemaChangeEvent =
-                            Optional.of(
-                                    new AlterColumnTypeEvent(
-                                            alterColumnTypeEvent.tableId(), newDataTypeMap));
+                    AlterColumnTypeEvent value =
+                            new AlterColumnTypeEvent(
+                                    alterColumnTypeEvent.tableId(), newDataTypeMap);
+                    alterColumnTypeEvent
+                            .getComments()
+                            .forEach(
+                                    (name, comment) -> {
+                                        if (referencedColumns.contains(name)) {
+                                            value.addColumnComment(name, comment);
+                                        }
+                                    });
+                    evolvedSchemaChangeEvent = Optional.of(value);
                 }
             }
         } else if (event instanceof RenameColumnEvent) {
@@ -386,6 +401,11 @@ public class SchemaUtils {
                         },
                         truncateTableEvent -> {
                             // We have no way to ensure if a TruncateTableEvent has been applied
+                            // before. Just assume it's not.
+                            return false;
+                        },
+                        tableCommentEvent -> {
+                            // We have no way to ensure if a AlterTableCommentEvent has been applied
                             // before. Just assume it's not.
                             return false;
                         }));
@@ -557,15 +577,7 @@ public class SchemaUtils {
                             lhsDecimal.getPrecision() - lhsDecimal.getScale(),
                             rhsDecimal.getPrecision() - rhsDecimal.getScale());
             int resultScale = Math.max(lhsDecimal.getScale(), rhsDecimal.getScale());
-            Preconditions.checkArgument(
-                    resultIntDigits + resultScale <= DecimalType.MAX_PRECISION,
-                    String.format(
-                            "Failed to merge %s and %s type into DECIMAL. %d precision digits required, %d available",
-                            lType,
-                            rType,
-                            resultIntDigits + resultScale,
-                            DecimalType.MAX_PRECISION));
-            mergedType = DataTypes.DECIMAL(resultIntDigits + resultScale, resultScale);
+            mergedType = createDecimalBounded(resultIntDigits + resultScale, resultScale);
         } else if (lType instanceof DecimalType && rType.is(DataTypeFamily.EXACT_NUMERIC)) {
             // Merge decimal and int
             mergedType = mergeExactNumericsIntoDecimal((DecimalType) lType, rType);
@@ -590,12 +602,7 @@ public class SchemaUtils {
                 Math.max(
                         decimalType.getPrecision(),
                         decimalType.getScale() + getNumericPrecision(otherType));
-        Preconditions.checkArgument(
-                resultPrecision <= DecimalType.MAX_PRECISION,
-                String.format(
-                        "Failed to merge %s and %s type into DECIMAL. %d precision digits required, %d available",
-                        decimalType, otherType, resultPrecision, DecimalType.MAX_PRECISION));
-        return DataTypes.DECIMAL(resultPrecision, decimalType.getScale());
+        return createDecimalBounded(resultPrecision, decimalType.getScale());
     }
 
     @Deprecated

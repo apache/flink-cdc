@@ -21,11 +21,16 @@ import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
 
+import io.debezium.config.Configuration;
+import io.debezium.jdbc.JdbcConfiguration;
+import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import java.sql.SQLException;
 import java.time.ZoneId;
+import java.util.Collections;
 import java.util.List;
 
 /** Tests for {@link org.apache.flink.cdc.connectors.mysql.source.assigners.MySqlChunkSplitter}. */
@@ -84,5 +89,56 @@ class MySqlChunkSplitterTest {
                         ChunkRange.of(null, 2147483637),
                         ChunkRange.of(2147483637, 2147483647),
                         ChunkRange.of(2147483647, null));
+    }
+
+    @Test
+    void testNextChunkEndReturnsNullWhenMaxRowRemoved() throws Exception {
+        // given a MySqlChunkSplitter instance
+        MySqlSourceConfig sourceConfig =
+                new MySqlSourceConfigFactory()
+                        .startupOptions(StartupOptions.initial())
+                        .databaseList("")
+                        .tableList("")
+                        .hostname("")
+                        .username("")
+                        .password("")
+                        .serverTimeZone(ZoneId.of("UTC").toString())
+                        .assignUnboundedChunkFirst(false)
+                        .createConfig(0);
+        MySqlChunkSplitter splitter = new MySqlChunkSplitter(null, sourceConfig);
+
+        // and a JdbcConnection whose prepareQueryAndMap always returns null,
+        // so that StatementUtils.queryNextChunkMax(... ) returns null
+        JdbcConfiguration jdbcConfiguration =
+                JdbcConfiguration.adapt(Configuration.from(Collections.emptyMap()));
+        JdbcConnection jdbc =
+                new JdbcConnection(
+                        jdbcConfiguration,
+                        config -> {
+                            throw new SQLException("Connection not used in test");
+                        },
+                        "`",
+                        "`") {
+                    @Override
+                    public <T> T prepareQueryAndMap(
+                            String query,
+                            StatementPreparer statementPreparer,
+                            ResultSetMapper<T> mapper)
+                            throws SQLException {
+                        return null;
+                    }
+                };
+
+        TableId tableId = new TableId("catalog", "db", "tab");
+        Object previousChunkEnd = 10;
+        Object max = 100;
+        int chunkSize = 5;
+
+        Object result =
+                splitter.nextChunkEnd(jdbc, previousChunkEnd, tableId, "id", max, chunkSize);
+
+        // when queryNextChunkMax returns null, nextChunkEnd should also return null
+        // instead of propagating the null further and causing errors
+        Assertions.assertThat(result).isNull();
     }
 }

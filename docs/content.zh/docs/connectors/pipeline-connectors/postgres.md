@@ -27,7 +27,6 @@ under the License.
 # Postgres Connector
 
 Postgres CDC Pipeline 连接器允许从 Postgres 数据库读取快照数据和增量数据，并提供端到端的整库数据同步能力。 本文描述了如何设置 Postgres CDC Pipeline 连接器。
-注意：因为Postgres的wal log日志中展示没有办法解析表结构变更记录，因此Postgres CDC Pipeline Source暂时不支持同步表结构变更。
 
 ## 示例
 
@@ -35,7 +34,7 @@ Postgres CDC Pipeline 连接器允许从 Postgres 数据库读取快照数据和
 
 ```yaml
 source:
-   type: posgtres
+   type: postgres
    name: Postgres Source
    hostname: 127.0.0.1
    port: 5432
@@ -45,6 +44,7 @@ source:
    tables: adb.\.*.\.*
    decoding.plugin.name:  pgoutput
    slot.name: pgtest
+   schema-change.enabled: true
 
 sink:
   type: fluss
@@ -59,6 +59,7 @@ sink:
 pipeline:
    name: Postgres to Fluss Pipeline
    parallelism: 4
+   schema.change.behavior: lenient
 ```
 
 ## 连接器配置项
@@ -279,6 +280,42 @@ pipeline:
         是否在生成的 Table ID 中包含数据库名称。<br>
         如果设置为 true，Table ID 的格式为 (数据库, 模式, 表)。<br>
         如果设置为 false，Table ID 的格式为 (模式, 表)。<br>
+        默认值为 false。
+      </td>
+    </tr>
+    <tr>
+      <td>scan.newly-added-table.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        是否扫描新增的表。默认值为 false。
+        该选项仅在从 savepoint 或 checkpoint 恢复时生效，
+        会启用 SnapshotSplitAssigner#captureNewlyAddedTables() 代码路径，
+        以发现在 savepoint 时刻未被捕获但匹配 source <code>tables</code> 模式的新表。
+      </td>
+    </tr>
+    <tr>
+      <td>scan.pre-epoch-timestamp.wall-clock-conversion.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        是否对 1970-01-01（epoch）之前的 PostgreSQL "timestamp without time zone" 列值，按照数据库中存储的日期时间（wall clock）进行转换。<br>
+        开启后，该值不会受运行任务的 JVM 时区影响，这在存在历史时区偏移的时区下很重要：当 JVM 时区为 Asia/Shanghai 时，
+        数据库中存储的 "1900-01-01 00:00:00.123" 否则会被读取为 "1900-01-01 00:05:43.123"。<br>
+        关闭（默认值）时保持原有的转换行为。1970-01-01 及之后的值无论是否开启该选项都会被同样地转换，
+        且该选项不会改变列的数据类型。
+      </td>
+    </tr>
+    <tr>
+      <td>schema-change.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        是否开启 Postgres 源的 Schema 变更推导。开启后，连接器会通过对比 pgoutput Relation 消息与缓存的 Schema 来推导 Schema 变更事件（新增列、删除列、重命名列、修改列类型）。<br>
+        需要将 <code>decoding.plugin.name</code> 设置为 <code>pgoutput</code>。<br>
         默认值为 false。
       </td>
     </tr>

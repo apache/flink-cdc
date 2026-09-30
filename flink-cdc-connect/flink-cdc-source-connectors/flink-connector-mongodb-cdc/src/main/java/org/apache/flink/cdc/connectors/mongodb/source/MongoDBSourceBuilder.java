@@ -278,11 +278,69 @@ public class MongoDBSourceBuilder<T> {
     }
 
     /**
+     * Whether to release the finished snapshot split metadata from the coordinator after entering
+     * the stream phase, to reduce JobManager memory pressure (FLINK-40697).
+     */
+    public MongoDBSourceBuilder<T> releaseSnapshotMetadataEnabled(
+            boolean releaseSnapshotMetadataEnabled) {
+        this.configFactory.releaseSnapshotMetadataEnabled(releaseSnapshotMetadataEnabled);
+        return this;
+    }
+
+    /**
      * Build the {@link MongoDBSource}.
      *
      * @return a MongoDBParallelSource with the settings made for this builder.
      */
     public MongoDBSource<T> build() {
         return new MongoDBSource<>(configFactory, checkNotNull(deserializer));
+    }
+
+    /** Whether the connector will use SSL to connect to MongoDB instances. */
+    public MongoDBSourceBuilder<T> sslEnabled(boolean sslEnabled) {
+        this.configFactory.sslEnabled(sslEnabled);
+        return this;
+    }
+
+    /** When SSL is enabled, controls whether strict hostname checking is disabled. */
+    public MongoDBSourceBuilder<T> sslInvalidHostnameAllowed(boolean sslInvalidHostnameAllowed) {
+        this.configFactory.sslInvalidHostnameAllowed(sslInvalidHostnameAllowed);
+        return this;
+    }
+
+    /** The location of the key store file for two-way authentication. */
+    public MongoDBSourceBuilder<T> sslKeyStore(String sslKeyStore) {
+        this.configFactory.sslKeyStore(sslKeyStore);
+        return this;
+    }
+
+    /** The password for the key store file. */
+    public MongoDBSourceBuilder<T> sslKeyStorePassword(String sslKeyStorePassword) {
+        this.configFactory.sslKeyStorePassword(sslKeyStorePassword);
+        return this;
+    }
+
+    /** The type of key store file. */
+    public MongoDBSourceBuilder<T> sslKeyStoreType(String sslKeyStoreType) {
+        this.configFactory.sslKeyStoreType(sslKeyStoreType);
+        return this;
+    }
+
+    /** The location of the trust store file for the server certificate verification. */
+    public MongoDBSourceBuilder<T> sslTrustStore(String sslTrustStore) {
+        this.configFactory.sslTrustStore(sslTrustStore);
+        return this;
+    }
+
+    /** The password for the trust store file. */
+    public MongoDBSourceBuilder<T> sslTrustStorePassword(String sslTrustStorePassword) {
+        this.configFactory.sslTrustStorePassword(sslTrustStorePassword);
+        return this;
+    }
+
+    /** The type of trust store file. */
+    public MongoDBSourceBuilder<T> sslTrustStoreType(String sslTrustStoreType) {
+        this.configFactory.sslTrustStoreType(sslTrustStoreType);
+        return this;
     }
 }

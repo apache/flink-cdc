@@ -18,9 +18,10 @@
 ################################################################################
 
 function random_timezone() {
-    local rnd=$(expr $RANDOM % 25)
-    local hh=$(expr $rnd / 2)
-    local mm=$(expr $rnd % 2 \* 3)"0"
+    # Keep CI-generated zones on hour boundaries. Some connector dependencies do not handle
+    # sub-hour JVM offsets consistently, and connector-specific timezone cases cover that behavior.
+    local hh=$(expr $RANDOM % 13)
+    local mm="00"
     local sgn=$(expr $RANDOM % 2)
     if [ $sgn -eq 0 ]
     then

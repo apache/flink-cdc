@@ -58,6 +58,23 @@ class SplitKeyUtilsTest {
     }
 
     @Test
+    void testSortFinishedSplitInfosWithByteArraySplitKey() {
+        TableId tableId = new TableId("test_db", null, "test_table");
+
+        List<FinishedSnapshotSplitInfo> splits = new ArrayList<>();
+        splits.add(createSplit(tableId, "split-80", new Object[] {bytes(0x80)}, null));
+        splits.add(createSplit(tableId, "split-7f", new Object[] {bytes(0x7f)}, null));
+        splits.add(createSplit(tableId, "split-ff", new Object[] {bytes(0xff)}, null));
+        splits.add(createSplit(tableId, "split-00", null, null));
+
+        SplitKeyUtils.sortFinishedSplitInfos(splits);
+
+        Assertions.assertThat(splits)
+                .extracting(FinishedSnapshotSplitInfo::getSplitId)
+                .containsExactly("split-00", "split-7f", "split-80", "split-ff");
+    }
+
+    @Test
     void testFindSplitByKeyBinary() {
         TableId tableId = new TableId("test_db", null, "test_table");
 
@@ -99,6 +116,48 @@ class SplitKeyUtilsTest {
         result = SplitKeyUtils.findSplitByKeyBinary(sortedSplits, new Object[] {99L});
         Assertions.assertThat(result).isNotNull();
         Assertions.assertThat(result.getSplitId()).isEqualTo("split-0");
+    }
+
+    @Test
+    void testFindSplitByKeyBinaryWithByteArraySplitKey() {
+        TableId tableId = new TableId("test_db", null, "test_table");
+
+        List<FinishedSnapshotSplitInfo> sortedSplits = new ArrayList<>();
+        sortedSplits.add(createSplit(tableId, "split-before-7f", null, new Object[] {bytes(0x7f)}));
+        sortedSplits.add(
+                createSplit(
+                        tableId,
+                        "split-7f",
+                        new Object[] {bytes(0x7f)},
+                        new Object[] {bytes(0x80)}));
+        sortedSplits.add(
+                createSplit(
+                        tableId,
+                        "split-80",
+                        new Object[] {bytes(0x80)},
+                        new Object[] {bytes(0xff)}));
+        sortedSplits.add(createSplit(tableId, "split-ff", new Object[] {bytes(0xff)}, null));
+
+        FinishedSnapshotSplitInfo result =
+                SplitKeyUtils.findSplitByKeyBinary(sortedSplits, new Object[] {bytes(0x00)});
+        Assertions.assertThat(result).isNotNull();
+        Assertions.assertThat(result.getSplitId()).isEqualTo("split-before-7f");
+
+        result = SplitKeyUtils.findSplitByKeyBinary(sortedSplits, new Object[] {bytes(0x7f)});
+        Assertions.assertThat(result).isNotNull();
+        Assertions.assertThat(result.getSplitId()).isEqualTo("split-7f");
+
+        result = SplitKeyUtils.findSplitByKeyBinary(sortedSplits, new Object[] {bytes(0x80)});
+        Assertions.assertThat(result).isNotNull();
+        Assertions.assertThat(result.getSplitId()).isEqualTo("split-80");
+
+        result = SplitKeyUtils.findSplitByKeyBinary(sortedSplits, new Object[] {bytes(0xfe)});
+        Assertions.assertThat(result).isNotNull();
+        Assertions.assertThat(result.getSplitId()).isEqualTo("split-80");
+
+        result = SplitKeyUtils.findSplitByKeyBinary(sortedSplits, new Object[] {bytes(0xff)});
+        Assertions.assertThat(result).isNotNull();
+        Assertions.assertThat(result.getSplitId()).isEqualTo("split-ff");
     }
 
     @Test
@@ -202,5 +261,13 @@ class SplitKeyUtilsTest {
             TableId tableId, String splitId, Object[] splitStart, Object[] splitEnd) {
         return new FinishedSnapshotSplitInfo(
                 tableId, splitId, splitStart, splitEnd, BinlogOffset.ofEarliest());
+    }
+
+    private static byte[] bytes(int... values) {
+        byte[] bytes = new byte[values.length];
+        for (int i = 0; i < values.length; i++) {
+            bytes[i] = (byte) values[i];
+        }
+        return bytes;
     }
 }

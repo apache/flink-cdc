@@ -47,6 +47,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.apache.flink.cdc.connectors.starrocks.sink.StarRocksUtils.toStarRocksDataType;
+import static org.apache.flink.cdc.connectors.starrocks.sink.utils.StarRocksEscapingUtils.escape;
 
 /** A {@code MetadataApplier} that applies metadata changes to StarRocks. */
 public class StarRocksMetadataApplier implements MetadataApplier {
@@ -104,35 +105,22 @@ public class StarRocksMetadataApplier implements MetadataApplier {
             catalog.open();
         }
 
-        SchemaChangeEventVisitor.visit(
+        SchemaChangeEventVisitor.voidVisit(
                 schemaChangeEvent,
-                addColumnEvent -> {
-                    applyAddColumn(addColumnEvent);
-                    return null;
-                },
-                alterColumnTypeEvent -> {
-                    applyAlterColumnType(alterColumnTypeEvent);
-                    return null;
-                },
-                createTableEvent -> {
-                    applyCreateTable(createTableEvent);
-                    return null;
-                },
-                dropColumnEvent -> {
-                    applyDropColumn(dropColumnEvent);
-                    return null;
-                },
-                dropTableEvent -> {
-                    applyDropTable(dropTableEvent);
-                    return null;
-                },
-                renameColumnEvent -> {
-                    applyRenameColumn(renameColumnEvent);
-                    return null;
-                },
-                truncateTableEvent -> {
-                    applyTruncateTable(truncateTableEvent);
-                    return null;
+                this::applyAddColumn,
+                this::applyAlterColumnType,
+                this::applyCreateTable,
+                this::applyDropColumn,
+                this::applyDropTable,
+                this::applyRenameColumn,
+                this::applyTruncateTable,
+                alterTableCommentEvent -> {
+                    // TODO Currently, table comments cannot be modified.
+                    // See
+                    // https://docs.starrocks.io/docs/sql-reference/sql-statements/table_bucket_part_index/ALTER_TABLE/#alter-table-comment-from-v31
+                    LOG.warn(
+                            "AlterTableCommentEvent is not supported by StarRocks connector yet. Event: {}",
+                            alterTableCommentEvent);
                 });
     }
 
@@ -171,11 +159,13 @@ public class StarRocksMetadataApplier implements MetadataApplier {
                     new StarRocksColumn.Builder()
                             .setColumnName(column.getName())
                             .setOrdinalPosition(-1)
-                            .setColumnComment(column.getComment())
+                            .setColumnComment(escape(column.getComment()))
                             .setDefaultValue(
-                                    StarRocksUtils.convertInvalidTimestampDefaultValue(
-                                            column.getDefaultValueExpression(), column.getType()));
-            toStarRocksDataType(column, false, builder);
+                                    escape(
+                                            StarRocksUtils.convertInvalidTimestampDefaultValue(
+                                                    column.getDefaultValueExpression(),
+                                                    column.getType())));
+            toStarRocksDataType(column, false, builder, tableCreateConfig.getUnicodeCharMaxBytes());
             addColumns.add(builder.build());
         }
 
@@ -334,7 +324,11 @@ public class StarRocksMetadataApplier implements MetadataApplier {
             for (Map.Entry<String, DataType> entry : typeMapping.entrySet()) {
                 StarRocksColumn.Builder builder =
                         new StarRocksColumn.Builder().setColumnName(entry.getKey());
-                toStarRocksDataType(entry.getValue(), false, builder);
+                toStarRocksDataType(
+                        entry.getValue(),
+                        false,
+                        builder,
+                        tableCreateConfig.getUnicodeCharMaxBytes());
                 catalog.alterColumnType(
                         tableId.getSchemaName(), tableId.getTableName(), builder.build());
             }

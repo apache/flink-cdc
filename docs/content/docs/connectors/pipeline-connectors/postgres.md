@@ -28,7 +28,6 @@ under the License.
 
 Postgres connector allows reading snapshot data and incremental data from Postgres database and provides end-to-end full-database data synchronization capabilities.
 This document describes how to setup the Postgres connector.
-Note: Since the Postgres WAL log cannot parse table structure change records, Postgres CDC Pipeline Source does not support synchronizing table structure changes currently.
 
 ## Example
 
@@ -46,6 +45,7 @@ source:
    tables: adb.\.*.\.*
    decoding.plugin.name:  pgoutput
    slot.name: pgtest
+   schema-change.enabled: true
 
 sink:
   type: fluss
@@ -60,6 +60,7 @@ sink:
 pipeline:
    name: Postgres to Fluss Pipeline
    parallelism: 4
+   schema.change.behavior: lenient
 ```
 
 ## Connector Options
@@ -271,6 +272,45 @@ pipeline:
         Whether to include database in the generated Table ID.<br>
         If set to true, the Table ID will be in the format (database, schema, table).<br>
         If set to false, the Table ID will be in the format (schema, table).<br>
+        Defaults to false.
+      </td>
+    </tr>
+    <tr>
+      <td>scan.newly-added-table.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        Whether to scan the newly added tables or not. Defaults to false.
+        This option only takes effect when restoring from a savepoint or checkpoint,
+        and enables the existing SnapshotSplitAssigner#captureNewlyAddedTables() code path
+        to discover tables that match the source <code>tables</code> pattern but were not part of
+        the captured set at savepoint time.
+      </td>
+    </tr>
+    <tr>
+      <td>scan.pre-epoch-timestamp.wall-clock-conversion.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        Whether to convert the values of PostgreSQL "timestamp without time zone" columns which are before 1970-01-01 (the epoch)
+        by keeping the date and time (wall clock) stored in the database.<br>
+        If enabled, such a value is not changed by the time zone of the JVM running the job, which matters in time zones which have
+        historical offsets: with the JVM time zone set to Asia/Shanghai, the stored value "1900-01-01 00:00:00.123" would otherwise
+        be read as "1900-01-01 00:05:43.123".<br>
+        If disabled (default), the previous conversion behavior is kept. Values which are not before 1970-01-01 are converted in the
+        same way whatever the value of this option is, and this option never changes the data type of a column.
+      </td>
+    </tr>
+    <tr>
+      <td>schema-change.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        Whether to enable schema change inference for the Postgres source. When enabled, the connector infers schema change events (add column, drop column, rename column, alter column type) by comparing pgoutput Relation messages against the cached schema.<br>
+        Requires <code>decoding.plugin.name</code> to be set to <code>pgoutput</code>.<br>
         Defaults to false.
       </td>
     </tr>

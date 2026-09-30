@@ -59,12 +59,15 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.apache.flink.api.common.JobStatus.RUNNING;
 import static org.apache.flink.cdc.connectors.mysql.LegacyMySqlSourceTest.currentMySqlLatestOffset;
 import static org.apache.flink.cdc.connectors.mysql.MySqlTestUtils.waitForJobStatus;
+import static org.apache.flink.cdc.connectors.mysql.MySqlTestUtils.waitUntilCondition;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Integration tests for MySQL Table source. */
@@ -1136,43 +1139,68 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
 
         // async submit job
         TableResult result = tEnv.executeSql("SELECT * FROM varbinary_pk_table");
-
-        // wait for the source startup, we don't have a better way to wait it, use sleep for now
-        do {
-            Thread.sleep(5000L);
-        } while (result.getJobClient().get().getJobStatus().get() != RUNNING);
+        JobClient jobClient = result.getJobClient().get();
+        waitForJobStatus(
+                jobClient,
+                Collections.singletonList(RUNNING),
+                Deadline.fromNow(Duration.ofSeconds(120)));
 
         CloseableIterator<Row> iterator = result.collect();
-
-        try (Connection connection = inventoryDatabase.getJdbcConnection();
-                Statement statement = connection.createStatement()) {
-            statement.execute(
-                    "INSERT INTO varbinary_pk_table VALUES (b'0000010000000100000001000000010000000100000001000000010000000101','2021-03-08', 30, 500, 'flink');"); // 110
-            statement.execute(
-                    "INSERT INTO varbinary_pk_table VALUES (b'0000010000000100000001000000010000000100000001000000010000000110','2021-03-08', 30, 500, 'flink-sql');");
-            statement.execute(
-                    "UPDATE varbinary_pk_table SET quantity=50 WHERE order_id=b'0000010000000100000001000000010000000100000001000000010000000101';");
-            statement.execute(
-                    "DELETE FROM varbinary_pk_table WHERE order_id=b'0000010000000100000001000000010000000100000001000000010000000110';");
-        }
-
-        String[] expected =
+        String[] expectedSnapshot =
                 new String[] {
-                    // snapshot records
                     "+I[[4, 4, 4, 4, 4, 4, 4, 0], 2021-03-08, 0, 0, flink]",
                     "+I[[4, 4, 4, 4, 4, 4, 4, 1], 2021-03-08, 10, 100, flink]",
                     "+I[[4, 4, 4, 4, 4, 4, 4, 2], 2021-03-08, 20, 200, flink]",
                     "+I[[4, 4, 4, 4, 4, 4, 4, 3], 2021-03-08, 30, 300, flink]",
-                    "+I[[4, 4, 4, 4, 4, 4, 4, 4], 2021-03-08, 40, 400, flink]",
-                    // binlog records
+                    "+I[[4, 4, 4, 4, 4, 4, 4, 4], 2021-03-08, 40, 400, flink]"
+                };
+        String[] expectedBinlog =
+                new String[] {
                     "+I[[4, 4, 4, 4, 4, 4, 4, 5], 2021-03-08, 30, 500, flink]",
                     "+I[[4, 4, 4, 4, 4, 4, 4, 6], 2021-03-08, 30, 500, flink-sql]",
                     "-U[[4, 4, 4, 4, 4, 4, 4, 5], 2021-03-08, 30, 500, flink]",
                     "+U[[4, 4, 4, 4, 4, 4, 4, 5], 2021-03-08, 50, 500, flink]",
                     "-D[[4, 4, 4, 4, 4, 4, 4, 6], 2021-03-08, 30, 500, flink-sql]"
                 };
-        assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
-        result.getJobClient().get().cancel().get();
+        List<String> actual =
+                new ArrayList<>(
+                        waitAndFetchRows(
+                                iterator,
+                                expectedSnapshot.length,
+                                Duration.ofMinutes(5),
+                                "snapshot rows for varbinary_pk_table"));
+
+        try {
+            Thread.sleep(1000L);
+
+            try (Connection connection = inventoryDatabase.getJdbcConnection();
+                    Statement statement = connection.createStatement()) {
+                statement.execute(
+                        "INSERT INTO varbinary_pk_table VALUES (b'0000010000000100000001000000010000000100000001000000010000000101','2021-03-08', 30, 500, 'flink');"); // 110
+                statement.execute(
+                        "INSERT INTO varbinary_pk_table VALUES (b'0000010000000100000001000000010000000100000001000000010000000110','2021-03-08', 30, 500, 'flink-sql');");
+                statement.execute(
+                        "UPDATE varbinary_pk_table SET quantity=50 WHERE order_id=b'0000010000000100000001000000010000000100000001000000010000000101';");
+                statement.execute(
+                        "DELETE FROM varbinary_pk_table WHERE order_id=b'0000010000000100000001000000010000000100000001000000010000000110';");
+            }
+
+            actual.addAll(
+                    waitAndFetchRows(
+                            iterator,
+                            expectedBinlog.length,
+                            Duration.ofMinutes(5),
+                            String.format(
+                                    "varbinary_pk_table to emit %d binlog rows",
+                                    expectedBinlog.length)));
+
+            List<String> expected = new ArrayList<>(Arrays.asList(expectedSnapshot));
+            expected.addAll(Arrays.asList(expectedBinlog));
+            assertEqualsInAnyOrder(expected, new ArrayList<>(actual));
+        } finally {
+            jobClient.cancel().get();
+            iterator.close();
+        }
     }
 
     @ParameterizedTest(name = "incrementalSnapshot = {0}")
@@ -2114,7 +2142,16 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
                                     "Insert into blackhole_table0 select * from debezium_source0");
                             statementSet.addInsertSql(
                                     "Insert into blackhole_table1 select * from debezium_source1");
-                            statementSet.execute().await();
+                            TableResult result = statementSet.execute();
+                            JobClient jobClient = result.getJobClient().get();
+                            CompletableFuture<?> jobExecutionResultFuture =
+                                    jobClient.getJobExecutionResult();
+                            waitUntilCondition(
+                                    jobExecutionResultFuture::isDone,
+                                    Deadline.fromNow(Duration.ofSeconds(120)),
+                                    100L,
+                                    "Condition was not met in given timeout.");
+                            jobExecutionResultFuture.get(1, TimeUnit.SECONDS);
                         })
                 .hasStackTraceContaining(
                         "The 'server-id' in the mysql cdc connector should be globally unique, but conflicts happen now.\n"
@@ -2267,6 +2304,37 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
         return rows;
     }
 
+    private static List<String> waitAndFetchRows(
+            CloseableIterator<Row> iterator, int size, Duration timeout, String description)
+            throws Exception {
+        List<String> rows = Collections.synchronizedList(new ArrayList<>(size));
+        CompletableFuture<Void> collectFuture =
+                CompletableFuture.runAsync(
+                        () -> {
+                            while (rows.size() < size) {
+                                try {
+                                    if (!iterator.hasNext()) {
+                                        Thread.sleep(100L);
+                                        continue;
+                                    }
+                                    rows.add(iterator.next().toString());
+                                } catch (InterruptedException e) {
+                                    Thread.currentThread().interrupt();
+                                    throw new RuntimeException(e);
+                                } catch (Exception e) {
+                                    throw new RuntimeException(e);
+                                }
+                            }
+                        });
+        waitUntilCondition(
+                () -> rows.size() >= size,
+                Deadline.fromNow(timeout),
+                100L,
+                String.format("Timed out waiting for %s", description));
+        collectFuture.get(1, TimeUnit.SECONDS);
+        return new ArrayList<>(rows);
+    }
+
     private static void waitForSnapshotStarted(CloseableIterator<Row> iterator) throws Exception {
         while (!iterator.hasNext()) {
             Thread.sleep(1000);
@@ -2313,12 +2381,8 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
         // async submit job
         TableResult result = tEnv.executeSql("SELECT * FROM varbinary_base64_table");
 
-        // wait for the source startup, we don't have a better way to wait it, use sleep for now
-        do {
-            Thread.sleep(5000L);
-        } while (result.getJobClient().get().getJobStatus().get() != RUNNING);
-
         CloseableIterator<Row> iterator = result.collect();
+        waitForSnapshotStarted(iterator);
 
         try (Connection connection = inventoryDatabase.getJdbcConnection();
                 Statement statement = connection.createStatement()) {

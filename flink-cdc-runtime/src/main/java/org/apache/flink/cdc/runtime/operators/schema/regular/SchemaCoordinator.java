@@ -23,6 +23,7 @@ import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
 import org.apache.flink.cdc.common.exceptions.UnsupportedSchemaChangeEventException;
+import org.apache.flink.cdc.common.pipeline.ExistingTableSchemaExpansionMode;
 import org.apache.flink.cdc.common.pipeline.RouteMode;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.route.RouteRule;
@@ -64,6 +65,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
@@ -74,7 +76,7 @@ public class SchemaCoordinator extends SchemaRegistry {
     private static final Logger LOG = LoggerFactory.getLogger(SchemaCoordinator.class);
 
     /** Executor service to execute schema change. */
-    private final ExecutorService schemaChangeThreadPool;
+    private transient ExecutorService schemaChangeThreadPool;
 
     /**
      * Sink writers which have sent flush success events for the request.<br>
@@ -104,6 +106,28 @@ public class SchemaCoordinator extends SchemaRegistry {
             RouteMode routeMode,
             SchemaChangeBehavior schemaChangeBehavior,
             Duration rpcTimeout) {
+        this(
+                operatorName,
+                context,
+                coordinatorExecutor,
+                metadataApplier,
+                routes,
+                routeMode,
+                schemaChangeBehavior,
+                ExistingTableSchemaExpansionMode.DISABLED,
+                rpcTimeout);
+    }
+
+    public SchemaCoordinator(
+            String operatorName,
+            OperatorCoordinator.Context context,
+            ExecutorService coordinatorExecutor,
+            MetadataApplier metadataApplier,
+            List<RouteRule> routes,
+            RouteMode routeMode,
+            SchemaChangeBehavior schemaChangeBehavior,
+            ExistingTableSchemaExpansionMode existingTableSchemaExpansionMode,
+            Duration rpcTimeout) {
         super(
                 context,
                 operatorName,
@@ -112,15 +136,34 @@ public class SchemaCoordinator extends SchemaRegistry {
                 routes,
                 routeMode,
                 schemaChangeBehavior,
+                existingTableSchemaExpansionMode,
                 rpcTimeout);
         this.schemaChangeThreadPool = Executors.newSingleThreadExecutor();
     }
 
     @Override
-    public void start() throws Exception {
-        super.start();
+    protected void initialize() {
+        if (pendingRequests != null) {
+            pendingRequests.forEach(
+                    (index, tuple) ->
+                            tuple.f1.completeExceptionally(
+                                    new FlinkRuntimeException(
+                                            "Schema coordinator request was cancelled by checkpoint reset.")));
+        }
         this.flushedSinkWriters = new ConcurrentHashMap<>();
         this.pendingRequests = new ConcurrentHashMap<>();
+        if (schemaChangeThreadPool == null || schemaChangeThreadPool.isShutdown()) {
+            schemaChangeThreadPool = Executors.newSingleThreadExecutor();
+        }
+    }
+
+    @Override
+    protected void shutdown() throws Exception {
+        schemaChangeThreadPool.shutdownNow();
+        if (!schemaChangeThreadPool.awaitTermination(
+                rpcTimeout.toMillis(), TimeUnit.MILLISECONDS)) {
+            throw new TimeoutException("Schema change executor did not terminate during reset.");
+        }
     }
 
     @Override
@@ -227,10 +270,9 @@ public class SchemaCoordinator extends SchemaRegistry {
         super.handleUnrecoverableError(taskDescription, t);
 
         // For each pending future, release it exceptionally before quitting
-        pendingRequests.forEach(
-                (index, tuple) -> {
-                    tuple.f1.completeExceptionally(t);
-                });
+        if (pendingRequests != null) {
+            pendingRequests.forEach((index, tuple) -> tuple.f1.completeExceptionally(t));
+        }
     }
 
     /**
@@ -436,8 +478,15 @@ public class SchemaCoordinator extends SchemaRegistry {
     }
 
     private boolean applyAndUpdateEvolvedSchemaChange(SchemaChangeEvent schemaChangeEvent) {
+        // The initial existing-table handling runs outside the tolerant try-catch: CHECK/EXPAND
+        // failures must fail the job even under TRY_EVOLVE, while TRY_EXPAND swallows its own
+        // failures internally.
+        boolean shouldApplyOriginalCreateTable =
+                expandExistingTableSchemaIfNeeded(schemaChangeEvent);
         try {
-            metadataApplier.applySchemaChange(schemaChangeEvent);
+            if (shouldApplyOriginalCreateTable) {
+                metadataApplier.applySchemaChange(schemaChangeEvent);
+            }
             schemaManager.applyEvolvedSchemaChange(schemaChangeEvent);
             LOG.info(
                     "Successfully applied schema change event {} to external system.",

@@ -58,6 +58,7 @@ public class IcebergSink
 
     protected final Map<String, String> catalogOptions;
     protected final Map<String, String> tableOptions;
+    protected final Map<String, String> hadoopConfOptions;
 
     private final ZoneId zoneId;
 
@@ -72,13 +73,15 @@ public class IcebergSink
             Map<String, String> tableOptions,
             ZoneId zoneId,
             CompactionOptions compactionOptions,
-            String jobIdPrefix) {
+            String jobIdPrefix,
+            Map<String, String> hadoopConfOptions) {
         this.catalogOptions = catalogOptions;
         this.tableOptions = tableOptions;
         this.zoneId = zoneId;
         this.compactionOptions = compactionOptions;
         this.jobId = jobIdPrefix + UUID.randomUUID();
         this.operatorId = UUID.randomUUID().toString();
+        this.hadoopConfOptions = hadoopConfOptions;
     }
 
     @Override
@@ -87,14 +90,14 @@ public class IcebergSink
     }
 
     public Committer<WriteResultWrapper> createCommitter() {
-        return new IcebergCommitter(catalogOptions);
+        return new IcebergCommitter(catalogOptions, hadoopConfOptions);
     }
 
     @Override
     public Committer<WriteResultWrapper> createCommitter(
             CommitterInitContext committerInitContext) {
         SinkCommitterMetricGroup metricGroup = committerInitContext.metricGroup();
-        return new IcebergCommitter(catalogOptions, metricGroup);
+        return new IcebergCommitter(catalogOptions, metricGroup, hadoopConfOptions);
     }
 
     @Override
@@ -115,7 +118,8 @@ public class IcebergSink
                 zoneId,
                 lastCheckpointId,
                 jobId,
-                operatorId);
+                operatorId,
+                hadoopConfOptions);
     }
 
     @Override
@@ -130,7 +134,8 @@ public class IcebergSink
                 zoneId,
                 lastCheckpointId,
                 jobId,
-                operatorId);
+                operatorId,
+                hadoopConfOptions);
     }
 
     @Override
@@ -153,7 +158,8 @@ public class IcebergSink
                 zoneId,
                 lastCheckpointId,
                 jobId,
-                operatorId);
+                operatorId,
+                hadoopConfOptions);
     }
 
     @Override
@@ -208,7 +214,8 @@ public class IcebergSink
                     .transform(
                             "Compaction",
                             typeInformation,
-                            new CompactionOperator(catalogOptions, compactionOptions))
+                            new CompactionOperator(
+                                    catalogOptions, compactionOptions, hadoopConfOptions))
                     .setParallelism(parallelism);
         }
     }

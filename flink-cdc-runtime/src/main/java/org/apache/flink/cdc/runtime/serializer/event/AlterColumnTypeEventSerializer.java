@@ -46,6 +46,8 @@ public class AlterColumnTypeEventSerializer extends TypeSerializerSingleton<Alte
     private final TableIdSerializer tableIdSerializer = TableIdSerializer.INSTANCE;
     private final MapSerializer<String, DataType> typeMapSerializer =
             new MapSerializer<>(StringSerializer.INSTANCE, new DataTypeSerializer());
+    private final MapSerializer<String, String> commentsSerializer =
+            new MapSerializer<>(StringSerializer.INSTANCE, StringSerializer.INSTANCE);
 
     @Override
     public boolean isImmutableType() {
@@ -62,7 +64,8 @@ public class AlterColumnTypeEventSerializer extends TypeSerializerSingleton<Alte
         return new AlterColumnTypeEvent(
                 from.tableId(),
                 typeMapSerializer.copy(from.getTypeMapping()),
-                typeMapSerializer.copy(from.getOldTypeMapping()));
+                typeMapSerializer.copy(from.getOldTypeMapping()),
+                commentsSerializer.copy(from.getComments()));
     }
 
     @Override
@@ -80,6 +83,7 @@ public class AlterColumnTypeEventSerializer extends TypeSerializerSingleton<Alte
         tableIdSerializer.serialize(record.tableId(), target);
         typeMapSerializer.serialize(record.getTypeMapping(), target);
         typeMapSerializer.serialize(record.getOldTypeMapping(), target);
+        commentsSerializer.serialize(record.getComments(), target);
     }
 
     @Override
@@ -87,7 +91,8 @@ public class AlterColumnTypeEventSerializer extends TypeSerializerSingleton<Alte
         return new AlterColumnTypeEvent(
                 tableIdSerializer.deserialize(source),
                 typeMapSerializer.deserialize(source),
-                typeMapSerializer.deserialize(source));
+                typeMapSerializer.deserialize(source),
+                commentsSerializer.deserialize(source));
     }
 
     @Override

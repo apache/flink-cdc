@@ -18,7 +18,6 @@
 package org.apache.flink.cdc.connectors.kafka.json.debezium;
 
 import org.apache.flink.api.common.serialization.SerializationSchema;
-import org.apache.flink.cdc.connectors.kafka.utils.JsonRowDataSerializationSchemaUtils;
 import org.apache.flink.formats.common.TimestampFormat;
 import org.apache.flink.formats.json.JsonFormatOptions;
 import org.apache.flink.formats.json.JsonParserRowDataDeserializationSchema;
@@ -90,7 +89,7 @@ public class DebeziumJsonRowDataSerializationSchema implements SerializationSche
         this.mapNullKeyLiteral = mapNullKeyLiteral;
         this.encodeDecimalAsPlainNumber = encodeDecimalAsPlainNumber;
         this.runtimeConverter =
-                JsonRowDataSerializationSchemaUtils.createRowDataToJsonConverters(
+                new RowDataToJsonConverters(
                                 timestampFormat,
                                 mapNullKeyMode,
                                 mapNullKeyLiteral,

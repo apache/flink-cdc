@@ -45,6 +45,7 @@ public class FlussSink<InputT> implements Sink<InputT> {
     }
 
     @Deprecated
+    @Override
     public SinkWriter<InputT> createWriter(InitContext context) throws IOException {
         FlussSinkWriter<InputT> flinkSinkWriter =
                 new FlussSinkWriter<>(flussConfig, context.getMailboxExecutor(), serializer);

@@ -20,11 +20,16 @@ package org.apache.flink.cdc.composer.flink;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.function.HashFunctionProvider;
+import org.apache.flink.cdc.common.pipeline.HashFunctionStrategy;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.pipeline.RuntimeExecutionMode;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.sink.DataSink;
+import org.apache.flink.cdc.common.sink.DefaultDataChangeEventHashFunctionProvider;
+import org.apache.flink.cdc.common.sink.TableIdHashFunctionProvider;
 import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.composer.PipelineComposer;
 import org.apache.flink.cdc.composer.PipelineExecution;
@@ -65,6 +70,30 @@ public class FlinkPipelineComposer implements PipelineComposer {
     public static FlinkPipelineComposer ofRemoteCluster(
             org.apache.flink.configuration.Configuration flinkConfig, List<Path> additionalJars) {
         StreamExecutionEnvironment env = new StreamExecutionEnvironment(flinkConfig);
+        addAdditionalJars(env, additionalJars);
+        return new FlinkPipelineComposer(env, false);
+    }
+
+    public static FlinkPipelineComposer ofApplicationCluster(StreamExecutionEnvironment env) {
+        return new FlinkPipelineComposer(env, false);
+    }
+
+    @VisibleForTesting
+    public static FlinkPipelineComposer ofMiniCluster() {
+        return new FlinkPipelineComposer(
+                StreamExecutionEnvironment.getExecutionEnvironment(), true);
+    }
+
+    public static FlinkPipelineComposer ofMiniCluster(
+            org.apache.flink.configuration.Configuration flinkConfig, List<Path> additionalJars) {
+        StreamExecutionEnvironment env =
+                StreamExecutionEnvironment.getExecutionEnvironment(flinkConfig);
+        addAdditionalJars(env, additionalJars);
+        return new FlinkPipelineComposer(env, true);
+    }
+
+    private static void addAdditionalJars(
+            StreamExecutionEnvironment env, List<Path> additionalJars) {
         additionalJars.forEach(
                 jarPath -> {
                     try {
@@ -79,16 +108,6 @@ public class FlinkPipelineComposer implements PipelineComposer {
                                 e);
                     }
                 });
-        return new FlinkPipelineComposer(env, false);
-    }
-
-    public static FlinkPipelineComposer ofApplicationCluster(StreamExecutionEnvironment env) {
-        return new FlinkPipelineComposer(env, false);
-    }
-
-    public static FlinkPipelineComposer ofMiniCluster() {
-        return new FlinkPipelineComposer(
-                StreamExecutionEnvironment.getExecutionEnvironment(), true);
     }
 
     private FlinkPipelineComposer(StreamExecutionEnvironment env, boolean isBlocking) {
@@ -128,22 +147,13 @@ public class FlinkPipelineComposer implements PipelineComposer {
         }
 
         // Validate configuration
+        validatePipelineConfiguration(pipelineDef.getConfig());
+
         String schemaOperatorUid =
                 pipelineDefConfig.get(PipelineOptions.PIPELINE_SCHEMA_OPERATOR_UID);
         @Nullable
         String operatorUidPrefix =
                 pipelineDefConfig.get(PipelineOptions.PIPELINE_OPERATOR_UID_PREFIX);
-        if (!Objects.equals(
-                        schemaOperatorUid,
-                        PipelineOptions.PIPELINE_SCHEMA_OPERATOR_UID.defaultValue())
-                && operatorUidPrefix != null) {
-            throw new IllegalArgumentException(
-                    String.format(
-                            "Only one of the %s and %s pipeline options can be set.",
-                            PipelineOptions.PIPELINE_OPERATOR_UID_PREFIX.key(),
-                            PipelineOptions.PIPELINE_SCHEMA_OPERATOR_UID.key()));
-        }
-
         OperatorUidGenerator operatorUidGenerator = new OperatorUidGenerator(operatorUidPrefix);
 
         if (operatorUidPrefix != null) {
@@ -157,6 +167,7 @@ public class FlinkPipelineComposer implements PipelineComposer {
         SchemaOperatorTranslator schemaOperatorTranslator =
                 new SchemaOperatorTranslator(
                         schemaChangeBehavior,
+                        pipelineDef.getSink().getExistingTableSchemaExpansionMode(),
                         schemaOperatorUid,
                         pipelineDefConfig.get(PipelineOptions.PIPELINE_SCHEMA_OPERATOR_RPC_TIMEOUT),
                         pipelineDefConfig.get(PipelineOptions.PIPELINE_LOCAL_TIME_ZONE));
@@ -168,6 +179,12 @@ public class FlinkPipelineComposer implements PipelineComposer {
                 sourceTranslator.createDataSource(pipelineDef.getSource(), pipelineDefConfig, env);
         DataSink dataSink =
                 sinkTranslator.createDataSink(pipelineDef.getSink(), pipelineDefConfig, env);
+        HashFunctionProvider<DataChangeEvent> sinkDefinedHashFunctionProvider =
+                dataSink.getDataChangeEventHashFunctionProvider(parallelism);
+        validatePartitioningStrategyCompatibility(pipelineDef, sinkDefinedHashFunctionProvider);
+
+        HashFunctionProvider<DataChangeEvent> hashFunctionProvider =
+                resolveHashFunctionProvider(pipelineDefConfig, sinkDefinedHashFunctionProvider);
 
         boolean isParallelMetadataSource = dataSource.isParallelMetadataSource();
 
@@ -190,25 +207,47 @@ public class FlinkPipelineComposer implements PipelineComposer {
                         dataSource.supportedMetadataColumns());
 
         // PreTransform ---> PostTransform
-        stream =
-                transformTranslator.translatePostTransform(
-                        stream,
-                        pipelineDef.getTransforms(),
-                        pipelineDef.getConfig().get(PipelineOptions.PIPELINE_LOCAL_TIME_ZONE),
-                        pipelineDef.getUdfs(),
-                        pipelineDef.getModels(),
-                        dataSource.supportedMetadataColumns(),
-                        operatorUidGenerator);
+        if (pipelineDefConfig.get(PipelineOptions.PIPELINE_TRANSFORM_ASYNC_EXECUTION_ENABLED)) {
+            stream =
+                    transformTranslator.translateAsyncPostTransform(
+                            stream,
+                            pipelineDef.getTransforms(),
+                            pipelineDefConfig.get(PipelineOptions.PIPELINE_LOCAL_TIME_ZONE),
+                            pipelineDefConfig.get(
+                                    PipelineOptions.PIPELINE_TRANSFORM_DECIMAL_PRECISION_MODE),
+                            pipelineDef.getUdfs(),
+                            pipelineDef.getModels(),
+                            dataSource.supportedMetadataColumns(),
+                            operatorUidGenerator,
+                            pipelineDefConfig.get(
+                                    PipelineOptions.PIPELINE_TRANSFORM_ASYNC_EXECUTION_TIMEOUT),
+                            pipelineDefConfig.get(
+                                    PipelineOptions.PIPELINE_TRANSFORM_ASYNC_EXECUTION_CAPACITY),
+                            pipelineDefConfig.get(
+                                    PipelineOptions
+                                            .PIPELINE_TRANSFORM_ASYNC_EXECUTION_WORKER_THREADS),
+                            env);
+        } else {
+            stream =
+                    transformTranslator.translatePostTransform(
+                            stream,
+                            pipelineDef.getTransforms(),
+                            pipelineDefConfig.get(PipelineOptions.PIPELINE_LOCAL_TIME_ZONE),
+                            pipelineDefConfig.get(
+                                    PipelineOptions.PIPELINE_TRANSFORM_DECIMAL_PRECISION_MODE),
+                            pipelineDef.getUdfs(),
+                            pipelineDef.getModels(),
+                            dataSource.supportedMetadataColumns(),
+                            operatorUidGenerator,
+                            env);
+        }
 
         if (isParallelMetadataSource) {
             // Translate a distributed topology for sources with distributed tables
             // PostTransform -> Partitioning
             DataStream<PartitioningEvent> partitionedStream =
                     partitioningTranslator.translateDistributed(
-                            stream,
-                            parallelism,
-                            parallelism,
-                            dataSink.getDataChangeEventHashFunctionProvider(parallelism));
+                            stream, parallelism, parallelism, hashFunctionProvider);
 
             // Partitioning -> Schema Operator
             stream =
@@ -247,7 +286,7 @@ public class FlinkPipelineComposer implements PipelineComposer {
                             parallelism,
                             isBatchMode,
                             schemaOperatorIDGenerator.generate(),
-                            dataSink.getDataChangeEventHashFunctionProvider(parallelism),
+                            hashFunctionProvider,
                             operatorUidGenerator);
         }
 
@@ -290,6 +329,65 @@ public class FlinkPipelineComposer implements PipelineComposer {
             return Optional.empty();
         }
         return Optional.of(container);
+    }
+
+    private void validatePipelineConfiguration(Configuration pipelineConfig) {
+        String schemaOperatorUid = pipelineConfig.get(PipelineOptions.PIPELINE_SCHEMA_OPERATOR_UID);
+        @Nullable
+        String operatorUidPrefix = pipelineConfig.get(PipelineOptions.PIPELINE_OPERATOR_UID_PREFIX);
+        if (!Objects.equals(
+                        schemaOperatorUid,
+                        PipelineOptions.PIPELINE_SCHEMA_OPERATOR_UID.defaultValue())
+                && operatorUidPrefix != null) {
+            throw new IllegalArgumentException(
+                    String.format(
+                            "Only one of the %s and %s pipeline options can be set.",
+                            PipelineOptions.PIPELINE_OPERATOR_UID_PREFIX.key(),
+                            PipelineOptions.PIPELINE_SCHEMA_OPERATOR_UID.key()));
+        }
+    }
+
+    private void validatePartitioningStrategyCompatibility(
+            PipelineDef pipelineDef,
+            HashFunctionProvider<DataChangeEvent> sinkDefinedHashFunctionProvider) {
+        HashFunctionStrategy partitioningStrategy =
+                pipelineDef.getConfig().get(PipelineOptions.PIPELINE_PARTITIONING_STRATEGY);
+        if (!(sinkDefinedHashFunctionProvider instanceof DefaultDataChangeEventHashFunctionProvider)
+                && partitioningStrategy != HashFunctionStrategy.SINK_DEFINED) {
+            throw new IllegalArgumentException(
+                    String.format(
+                            "Sink type '%s' only supports %s=%s when DataSink.getDataChangeEventHashFunctionProvider(...) returns a custom HashFunctionProvider, but found %s.",
+                            pipelineDef.getSink().getType(),
+                            PipelineOptions.PIPELINE_PARTITIONING_STRATEGY.key(),
+                            HashFunctionStrategy.SINK_DEFINED,
+                            partitioningStrategy));
+        }
+    }
+
+    /**
+     * Resolves the {@link HashFunctionProvider} to use for partitioning based on pipeline
+     * configuration.
+     *
+     * @param pipelineConfig the pipeline configuration
+     * @param sinkDefinedHashFunctionProvider the provider returned by the sink
+     * @return the resolved HashFunctionProvider
+     */
+    private HashFunctionProvider<DataChangeEvent> resolveHashFunctionProvider(
+            Configuration pipelineConfig,
+            HashFunctionProvider<DataChangeEvent> sinkDefinedHashFunctionProvider) {
+        HashFunctionStrategy strategy =
+                pipelineConfig.get(PipelineOptions.PIPELINE_PARTITIONING_STRATEGY);
+
+        switch (strategy) {
+            case SINK_DEFINED:
+                return sinkDefinedHashFunctionProvider;
+            case PRIMARY_KEY:
+                return new DefaultDataChangeEventHashFunctionProvider();
+            case TABLE_ID:
+                return new TableIdHashFunctionProvider();
+        }
+
+        throw new IllegalStateException("Unexpected hash function strategy: " + strategy);
     }
 
     @VisibleForTesting

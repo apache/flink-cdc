@@ -1,5 +1,5 @@
 ---
-title: "ORACLE"
+title: "Oracle"
 weight: 2
 type: docs
 aliases:

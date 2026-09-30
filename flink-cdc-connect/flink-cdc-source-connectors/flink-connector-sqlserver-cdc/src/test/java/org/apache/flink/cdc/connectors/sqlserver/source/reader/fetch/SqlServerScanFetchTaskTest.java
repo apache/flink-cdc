@@ -203,6 +203,65 @@ class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
     }
 
     @Test
+    void testMultipleSplitsWithBackfill() throws Exception {
+        String databaseName = "customer";
+        String tableName = "dbo.customers";
+
+        initializeSqlServerTable(databaseName);
+
+        SqlServerSourceConfigFactory sourceConfigFactory =
+                getConfigFactory(databaseName, new String[] {tableName}, 4);
+        SqlServerSourceConfig sourceConfig = sourceConfigFactory.create(0);
+        SqlServerDialect sqlServerDialect = new SqlServerDialect(sourceConfig);
+
+        String tableId = databaseName + "." + tableName;
+        SnapshotPhaseHooks hooks = new SnapshotPhaseHooks();
+        hooks.setPreHighWatermarkAction(
+                (config, split) -> {
+                    executeSql(
+                            (SqlServerSourceConfig) config,
+                            new String[] {
+                                "UPDATE " + tableId + " SET address = 'Beijing' WHERE id = 103"
+                            });
+                    try {
+                        Thread.sleep(10 * 1000);
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+        SqlServerSourceFetchTaskContext sqlServerSourceFetchTaskContext =
+                new SqlServerSourceFetchTaskContext(
+                        sourceConfig,
+                        sqlServerDialect,
+                        createSqlServerConnection(sourceConfig.getDbzConnectorConfig()),
+                        createSqlServerConnection(sourceConfig.getDbzConnectorConfig()));
+
+        final DataType dataType =
+                DataTypes.ROW(
+                        DataTypes.FIELD("id", DataTypes.BIGINT()),
+                        DataTypes.FIELD("name", DataTypes.STRING()),
+                        DataTypes.FIELD("address", DataTypes.STRING()),
+                        DataTypes.FIELD("phone_number", DataTypes.STRING()));
+        List<SnapshotSplit> snapshotSplits = getSnapshotSplits(sourceConfig, sqlServerDialect);
+
+        List<String> actual =
+                readTableSnapshotSplits(
+                        reOrderSnapshotSplits(snapshotSplits),
+                        sqlServerSourceFetchTaskContext,
+                        snapshotSplits.size(),
+                        dataType,
+                        hooks);
+
+        // Verify the ScanFetcher can successfully process all splits without getting stuck
+        // (the FLINK-39207 bug would cause the reader to appear finished/stuck
+        // when reusing a stopped ScanFetcher for the next split).
+        // The preHighWatermark hook forces backfill phase for each split by making
+        // highWatermark > lowWatermark.
+        Assertions.assertThat(actual).hasSize(21);
+        Assertions.assertThat(actual).contains("+I[103, user_3, Beijing, 123567891234]");
+    }
+
+    @Test
     void testDateTimePrimaryKey() throws Exception {
         String databaseName = "pk";
         String tableName = "dbo.dt_pk";

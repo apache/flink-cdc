@@ -23,34 +23,43 @@ import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.types.RowKind;
 
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 /** Utils for convertion of {@link RowData} and {@link DataChangeEvent}. */
 public class RowDataUtils {
 
-    /** Convert {@link DataChangeEvent} to {@link RowData}. */
-    public static RowData convertDataChangeEventToRowData(
+    /**
+     * Convert a {@link DataChangeEvent} to one or two {@link RowData}.
+     *
+     * <p>An {@code UPDATE} is split into a {@code DELETE} built from the before-image followed by
+     * an {@code INSERT} built from the after-image, rather than a single after-image row. Iceberg
+     * derives both the equality-delete key and the delete's target partition from the row passed to
+     * the writer; collapsing an UPDATE to just the after-image (as before) means a partition key
+     * change is never deleted from its old partition, leaving a stale duplicate behind.
+     */
+    public static List<RowData> convertDataChangeEventToRowData(
             DataChangeEvent dataChangeEvent, List<RecordData.FieldGetter> fieldGetters) {
-        RecordData recordData;
-        RowKind kind;
         switch (dataChangeEvent.op()) {
             case INSERT:
-            case UPDATE:
             case REPLACE:
-                {
-                    recordData = dataChangeEvent.after();
-                    kind = RowKind.INSERT;
-                    break;
-                }
+                return Collections.singletonList(
+                        toRowData(dataChangeEvent.after(), fieldGetters, RowKind.INSERT));
             case DELETE:
-                {
-                    recordData = dataChangeEvent.before();
-                    kind = RowKind.DELETE;
-                    break;
-                }
+                return Collections.singletonList(
+                        toRowData(dataChangeEvent.before(), fieldGetters, RowKind.DELETE));
+            case UPDATE:
+                return Arrays.asList(
+                        toRowData(dataChangeEvent.before(), fieldGetters, RowKind.DELETE),
+                        toRowData(dataChangeEvent.after(), fieldGetters, RowKind.INSERT));
             default:
                 throw new IllegalArgumentException("don't support type of " + dataChangeEvent.op());
         }
+    }
+
+    private static RowData toRowData(
+            RecordData recordData, List<RecordData.FieldGetter> fieldGetters, RowKind kind) {
         GenericRowData genericRowData = new GenericRowData(recordData.getArity());
         genericRowData.setRowKind(kind);
         for (int i = 0; i < recordData.getArity(); i++) {

@@ -50,6 +50,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Properties;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -72,8 +73,11 @@ import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSource
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.SCAN_LSN_COMMIT_CHECKPOINTS_DELAY;
+import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED;
+import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.SCAN_PRE_EPOCH_TIMESTAMP_WALL_CLOCK_CONVERSION_ENABLED;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.SCAN_STARTUP_MODE;
+import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.SCHEMA_CHANGE_ENABLED;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.SERVER_TIME_ZONE;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.SLOT_NAME;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND;
@@ -131,6 +135,8 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
         boolean skipSnapshotBackfill = config.get(SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP);
         int lsnCommitCheckpointsDelay = config.get(SCAN_LSN_COMMIT_CHECKPOINTS_DELAY);
         boolean tableIdIncludeDatabase = config.get(TABLE_ID_INCLUDE_DATABASE);
+        boolean includeSchemaChanges = config.get(SCHEMA_CHANGE_ENABLED);
+        boolean scanNewlyAddedTableEnabled = config.get(SCAN_NEWLY_ADDED_TABLE_ENABLED);
 
         validateIntegerOption(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE, splitSize, 1);
         validateIntegerOption(CHUNK_META_GROUP_SIZE, splitMetaGroupSize, 1);
@@ -155,7 +161,7 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
                         .decodingPluginName(pluginName)
                         .slotName(slotName)
                         .serverTimeZone(serverTimeZone.getId())
-                        .debeziumProperties(getDebeziumProperties(configMap))
+                        .debeziumProperties(getDbzProperties(config, configMap))
                         .splitSize(splitSize)
                         .splitMetaGroupSize(splitMetaGroupSize)
                         .distributionFactorUpper(distributionFactorUpper)
@@ -172,6 +178,8 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
                         .lsnCommitCheckpointsDelay(lsnCommitCheckpointsDelay)
                         .assignUnboundedChunkFirst(isAssignUnboundedChunkFirst)
                         .includeDatabaseInTableId(tableIdIncludeDatabase)
+                        .includeSchemaChanges(includeSchemaChanges)
+                        .scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled)
                         .getConfigFactory();
 
         List<TableId> tableIds = PostgresSchemaUtils.listTables(configFactory.create(0), null);
@@ -228,6 +236,26 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
                         String.join(", ", readableMetadataList)));
     }
 
+    /**
+     * Returns the Debezium properties of the pipeline source. The timestamp conversion is done by
+     * the Debezium value converter, so {@link
+     * #SCAN_PRE_EPOCH_TIMESTAMP_WALL_CLOCK_CONVERSION_ENABLED} is forwarded as a Debezium property.
+     * It is only set when it's configured explicitly to keep a property configured via
+     * 'debezium.scan.pre-epoch-timestamp.wall-clock-conversion.enabled' effective.
+     */
+    private static Properties getDbzProperties(
+            Configuration config, Map<String, String> configMap) {
+        Properties dbzProperties = getDebeziumProperties(configMap);
+        config.getOptional(SCAN_PRE_EPOCH_TIMESTAMP_WALL_CLOCK_CONVERSION_ENABLED)
+                .ifPresent(
+                        enabled ->
+                                dbzProperties.setProperty(
+                                        SCAN_PRE_EPOCH_TIMESTAMP_WALL_CLOCK_CONVERSION_ENABLED
+                                                .key(),
+                                        String.valueOf(enabled)));
+        return dbzProperties;
+    }
+
     @Override
     public Set<ConfigOption<?>> requiredOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
@@ -262,6 +290,9 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
         options.add(METADATA_LIST);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED);
         options.add(TABLE_ID_INCLUDE_DATABASE);
+        options.add(SCHEMA_CHANGE_ENABLED);
+        options.add(SCAN_NEWLY_ADDED_TABLE_ENABLED);
+        options.add(SCAN_PRE_EPOCH_TIMESTAMP_WALL_CLOCK_CONVERSION_ENABLED);
         return options;
     }
 
@@ -379,7 +410,7 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
                     tableNameParts.length == 3,
                     String.format(
                             "Tables format must db.schema.table, can not 'tables' = %s",
-                            TABLES.key()));
+                            trimmedTableName));
             String currentDbName = tableNameParts[0];
 
             checkState(

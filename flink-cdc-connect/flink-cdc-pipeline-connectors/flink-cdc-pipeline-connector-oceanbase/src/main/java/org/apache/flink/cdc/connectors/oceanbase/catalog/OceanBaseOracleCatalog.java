@@ -79,7 +79,11 @@ public class OceanBaseOracleCatalog extends OceanBaseCatalog {
 
     @Override
     public void alterColumnType(
-            String schemaName, String tableName, String columnName, DataType dataType) {
+            String schemaName,
+            String tableName,
+            String columnName,
+            DataType dataType,
+            String comment) {
         throw new OceanBaseCatalogException(
                 "This operation under oracle tenant is not supported currently.");
     }
@@ -99,6 +103,12 @@ public class OceanBaseOracleCatalog extends OceanBaseCatalog {
 
     @Override
     public void truncateTable(String schemaName, String tableName) {
+        throw new OceanBaseCatalogException(
+                "This operation under oracle tenant is not supported currently.");
+    }
+
+    @Override
+    public void alterTable(String schemaName, String tableName, String comment) {
         throw new OceanBaseCatalogException(
                 "This operation under oracle tenant is not supported currently.");
     }

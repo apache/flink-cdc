@@ -17,7 +17,6 @@
 
 package org.apache.flink.cdc.connectors.elasticsearch.serializer;
 
-import org.apache.flink.api.connector.sink2.Sink;
 import org.apache.flink.api.connector.sink2.SinkWriter;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
@@ -250,10 +249,5 @@ public class ElasticsearchEventSerializer implements ElementConverter<Event, Bul
         if (index < 0 || index >= size) {
             throw new IndexOutOfBoundsException("Index: " + index + ", Size: " + size);
         }
-    }
-
-    @Override
-    public void open(Sink.InitContext context) {
-        ElementConverter.super.open(context);
     }
 }

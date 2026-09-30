@@ -17,9 +17,11 @@
 
 package org.apache.flink.cdc.cli.parser;
 
+import org.apache.flink.cdc.cli.utils.ConfigurationUtils;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.SchemaChangeEventTypeFamily;
+import org.apache.flink.cdc.common.pipeline.ExistingTableSchemaExpansionMode;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.utils.ChangeEventUtils;
 import org.apache.flink.cdc.common.utils.Preconditions;
@@ -41,11 +43,14 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMap
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -68,12 +73,15 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     private static final String TRANSFORM_KEY = "transform";
     private static final String PIPELINE_KEY = "pipeline";
     private static final String MODEL_KEY = "model";
+    private static final String FLINK_KEY = "flink-conf";
 
     // Source / sink keys
     private static final String TYPE_KEY = "type";
     private static final String NAME_KEY = "name";
     private static final String INCLUDE_SCHEMA_EVOLUTION_TYPES = "include.schema.changes";
     private static final String EXCLUDE_SCHEMA_EVOLUTION_TYPES = "exclude.schema.changes";
+    private static final String EXISTING_TABLE_SCHEMA_EXPANSION_MODE =
+            "existing-table.schema-expansion.mode";
 
     // Route keys
     private static final String ROUTE_SOURCE_TABLE_KEY = "source-table";
@@ -93,12 +101,18 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     private static final String UDF_KEY = "user-defined-function";
     private static final String UDF_FUNCTION_NAME_KEY = "name";
     private static final String UDF_CLASSPATH_KEY = "classpath";
+    private static final String UDF_PYTHON_CODE_KEY = "python-code";
+    private static final String UDF_PYTHON_EXECUTABLE_KEY = "python-executable";
+    private static final String UDF_PYTHON_FILES_KEY = "python-files";
     private static final String UDF_OPTIONS_KEY = "options";
+    private static final String PYTHON_UDF_CLASSPATH = "org.apache.flink.cdc.python.PythonUdf";
 
     // Model related keys
-    private static final String MODEL_NAME_KEY = "model-name";
-
-    private static final String MODEL_CLASS_NAME_KEY = "class-name";
+    private static final String MODEL_NAME_KEY = "name";
+    private static final String MODEL_TYPE_KEY = "type";
+    private static final String MODEL_OPTIONS_KEY = "options";
+    private static final String LEGACY_MODEL_NAME_KEY = "model-name";
+    private static final String LEGACY_MODEL_CLASS_NAME_KEY = "class-name";
 
     public static final String TRANSFORM_PRIMARY_KEY_KEY = "primary-keys";
 
@@ -106,7 +120,9 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
 
     public static final String TRANSFORM_TABLE_OPTION_KEY = "table-options";
 
-    private final ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
+    public static final String TRANSFORM_TABLE_OPTION_DELIMITER_KEY = "table-options.delimiter";
+
+    private static final ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
 
     /** Parse the specified pipeline definition file. */
     @Override
@@ -143,8 +159,9 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
 
             Optional.ofNullable(
                             ((ObjectNode) pipelineDefJsonNode.get(PIPELINE_KEY)).remove(MODEL_KEY))
-                    .map(node -> validateArray("model", node))
                     .ifPresent(node -> modelDefs.addAll(parseModels(node)));
+
+            ((ObjectNode) pipelineDefJsonNode.get(PIPELINE_KEY)).remove(FLINK_KEY);
         }
 
         // Pipeline configs are optional
@@ -215,6 +232,8 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         List<String> includedSETypes = new ArrayList<>();
         List<String> excludedSETypes = new ArrayList<>();
         boolean excludedFieldNotPresent = sinkNode.get(EXCLUDE_SCHEMA_EVOLUTION_TYPES) == null;
+        ExistingTableSchemaExpansionMode existingTableSchemaExpansionMode =
+                parseExpansionMode(sinkNode.get(EXISTING_TABLE_SCHEMA_EXPANSION_MODE));
 
         Optional.ofNullable(sinkNode.get(INCLUDE_SCHEMA_EVOLUTION_TYPES))
                 .ifPresent(e -> e.forEach(tag -> includedSETypes.add(tag.asText())));
@@ -257,6 +276,7 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         if (sinkNode instanceof ObjectNode) {
             ((ObjectNode) sinkNode).remove(INCLUDE_SCHEMA_EVOLUTION_TYPES);
             ((ObjectNode) sinkNode).remove(EXCLUDE_SCHEMA_EVOLUTION_TYPES);
+            ((ObjectNode) sinkNode).remove(EXISTING_TABLE_SCHEMA_EXPANSION_MODE);
         }
 
         Map<String, String> sinkMap =
@@ -272,7 +292,34 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         // "name" field is optional
         String name = sinkMap.remove(NAME_KEY);
 
-        return new SinkDef(type, name, Configuration.fromMap(sinkMap), declaredSETypes);
+        return new SinkDef(
+                type,
+                name,
+                Configuration.fromMap(sinkMap),
+                declaredSETypes,
+                existingTableSchemaExpansionMode);
+    }
+
+    private static ExistingTableSchemaExpansionMode parseExpansionMode(JsonNode optionValue) {
+        if (optionValue == null) {
+            return ExistingTableSchemaExpansionMode.DISABLED;
+        }
+        if (!optionValue.isTextual()) {
+            throw new IllegalArgumentException(
+                    String.format(
+                            "Option \"%s\" must be one of DISABLED, CHECK, TRY_EXPAND, EXPAND, but was \"%s\".",
+                            EXISTING_TABLE_SCHEMA_EXPANSION_MODE, optionValue));
+        }
+        String value = optionValue.asText();
+        for (ExistingTableSchemaExpansionMode mode : ExistingTableSchemaExpansionMode.values()) {
+            if (mode.name().equalsIgnoreCase(value)) {
+                return mode;
+            }
+        }
+        throw new IllegalArgumentException(
+                String.format(
+                        "Option \"%s\" must be one of DISABLED, CHECK, TRY_EXPAND, EXPAND, but was \"%s\".",
+                        EXISTING_TABLE_SCHEMA_EXPANSION_MODE, value));
     }
 
     private RouteDef toRouteDef(JsonNode routeNode) {
@@ -309,8 +356,13 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         validateJsonNodeKeys(
                 "UDF",
                 udfNode,
-                Arrays.asList(UDF_FUNCTION_NAME_KEY, UDF_CLASSPATH_KEY),
-                Collections.singletonList(UDF_OPTIONS_KEY));
+                Collections.singletonList(UDF_FUNCTION_NAME_KEY),
+                Arrays.asList(
+                        UDF_CLASSPATH_KEY,
+                        UDF_PYTHON_CODE_KEY,
+                        UDF_PYTHON_EXECUTABLE_KEY,
+                        UDF_PYTHON_FILES_KEY,
+                        UDF_OPTIONS_KEY));
 
         String functionName =
                 checkNotNull(
@@ -318,12 +370,22 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                                 "Missing required field \"%s\" in UDF configuration",
                                 UDF_FUNCTION_NAME_KEY)
                         .asText();
-        String classpath =
-                checkNotNull(
-                                udfNode.get(UDF_CLASSPATH_KEY),
-                                "Missing required field \"%s\" in UDF configuration",
-                                UDF_CLASSPATH_KEY)
-                        .asText();
+        JsonNode classpathNode = udfNode.get(UDF_CLASSPATH_KEY);
+        JsonNode pythonCodeNode = udfNode.get(UDF_PYTHON_CODE_KEY);
+
+        Preconditions.checkArgument(
+                classpathNode != null || pythonCodeNode != null,
+                "Missing required field \"%s\" or \"%s\" in UDF configuration",
+                UDF_CLASSPATH_KEY,
+                UDF_PYTHON_CODE_KEY);
+        Preconditions.checkArgument(
+                classpathNode == null || pythonCodeNode == null,
+                "UDF configuration cannot define both \"%s\" and \"%s\"",
+                UDF_CLASSPATH_KEY,
+                UDF_PYTHON_CODE_KEY);
+
+        JsonNode pythonExecutableNode = udfNode.get(UDF_PYTHON_EXECUTABLE_KEY);
+        JsonNode pythonFilesNode = udfNode.get(UDF_PYTHON_FILES_KEY);
 
         Map<String, String> options =
                 Optional.ofNullable(udfNode.get(UDF_OPTIONS_KEY))
@@ -331,9 +393,55 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                                 node ->
                                         mapper.convertValue(
                                                 node, new TypeReference<Map<String, String>>() {}))
-                        .orElse(null);
+                        .orElseGet(HashMap::new);
 
+        if (pythonCodeNode != null) {
+            Preconditions.checkArgument(
+                    udfNode.get(UDF_OPTIONS_KEY) == null,
+                    "UDF configuration using \"%s\" cannot define \"%s\"; use top-level \"%s\" and \"%s\" instead",
+                    UDF_PYTHON_CODE_KEY,
+                    UDF_OPTIONS_KEY,
+                    UDF_PYTHON_EXECUTABLE_KEY,
+                    UDF_PYTHON_FILES_KEY);
+            options.put("source", pythonCodeNode.asText());
+            Optional.ofNullable(pythonExecutableNode)
+                    .map(JsonNode::asText)
+                    .ifPresent(value -> options.put("python-executable", value));
+            Optional.ofNullable(normalizePythonFiles(pythonFilesNode))
+                    .ifPresent(value -> options.put("python-files", value));
+            return new UdfDef(functionName, PYTHON_UDF_CLASSPATH, options);
+        }
+
+        Preconditions.checkArgument(
+                pythonExecutableNode == null && pythonFilesNode == null,
+                "UDF configuration using \"%s\" or \"%s\" requires \"%s\"",
+                UDF_PYTHON_EXECUTABLE_KEY,
+                UDF_PYTHON_FILES_KEY,
+                UDF_PYTHON_CODE_KEY);
+
+        String classpath = classpathNode.asText();
         return new UdfDef(functionName, classpath, options);
+    }
+
+    private String normalizePythonFiles(JsonNode pythonFilesNode) {
+        if (pythonFilesNode == null || pythonFilesNode.isNull()) {
+            return null;
+        }
+        if (pythonFilesNode.isTextual()) {
+            throw new IllegalArgumentException(
+                    String.format(
+                            "YAML UDF field `%s` should be a list when used with `python-code`.",
+                            UDF_PYTHON_FILES_KEY));
+        }
+        if (!pythonFilesNode.isArray()) {
+            throw new IllegalArgumentException(
+                    String.format(
+                            "YAML UDF field `%s` should be a list, but got %s.",
+                            UDF_PYTHON_FILES_KEY, pythonFilesNode.getNodeType()));
+        }
+        List<String> pythonFiles = new ArrayList<>();
+        pythonFilesNode.forEach(node -> pythonFiles.add(node.asText()));
+        return String.join(",", pythonFiles);
     }
 
     private TransformDef toTransformDef(JsonNode transformNode) {
@@ -347,6 +455,7 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                         TRANSFORM_PRIMARY_KEY_KEY,
                         TRANSFORM_PARTITION_KEY_KEY,
                         TRANSFORM_TABLE_OPTION_KEY,
+                        TRANSFORM_TABLE_OPTION_DELIMITER_KEY,
                         TRANSFORM_DESCRIPTION_KEY,
                         TRANSFORM_CONVERTER_AFTER_TRANSFORM_KEY));
 
@@ -380,6 +489,10 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                 Optional.ofNullable(transformNode.get(TRANSFORM_TABLE_OPTION_KEY))
                         .map(JsonNode::asText)
                         .orElse(null);
+        String tableOptionsDelimiter =
+                Optional.ofNullable(transformNode.get(TRANSFORM_TABLE_OPTION_DELIMITER_KEY))
+                        .map(JsonNode::asText)
+                        .orElse(",");
         String description =
                 Optional.ofNullable(transformNode.get(TRANSFORM_DESCRIPTION_KEY))
                         .map(JsonNode::asText)
@@ -396,6 +509,7 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                 primaryKeys,
                 partitionKeys,
                 tableOptions,
+                tableOptionsDelimiter,
                 description,
                 postTransformConverter);
     }
@@ -420,24 +534,98 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         } else {
             modelDefs.add(convertJsonNodeToModelDef(modelsNode));
         }
+        Set<String> seenNames = new HashSet<>();
+        for (ModelDef model : modelDefs) {
+            if (!seenNames.add(model.getName())) {
+                throw new IllegalArgumentException(
+                        "Duplicate model name '" + model.getName() + "' in pipeline definition.");
+            }
+        }
         return modelDefs;
     }
 
     private ModelDef convertJsonNodeToModelDef(JsonNode modelNode) {
+        Preconditions.checkArgument(
+                modelNode instanceof ObjectNode,
+                "`model` in `pipeline` should be an object, but got %s",
+                modelNode);
+        ObjectNode node = ((ObjectNode) modelNode).deepCopy();
+        boolean usesNewFormat = node.has(MODEL_NAME_KEY) || node.has(MODEL_TYPE_KEY);
+        boolean usesLegacyFormat =
+                node.has(LEGACY_MODEL_NAME_KEY) && node.has(LEGACY_MODEL_CLASS_NAME_KEY);
+        Preconditions.checkArgument(
+                !(usesNewFormat && usesLegacyFormat),
+                "Model definition must use either name/type/options or model-name/class-name, but not both: %s",
+                modelNode);
+
+        if (usesLegacyFormat) {
+            String modelName =
+                    checkNotNull(
+                                    node.get(LEGACY_MODEL_NAME_KEY),
+                                    "Missing required field \"%s\" in `model`",
+                                    LEGACY_MODEL_NAME_KEY)
+                            .asText();
+            validateModelName(modelName);
+            String className =
+                    checkNotNull(
+                                    node.get(LEGACY_MODEL_CLASS_NAME_KEY),
+                                    "Missing required field \"%s\" in `model`",
+                                    LEGACY_MODEL_CLASS_NAME_KEY)
+                            .asText();
+            Map<String, String> parameters =
+                    mapper.convertValue(node, new TypeReference<Map<String, String>>() {});
+            return new ModelDef(modelName, className, parameters);
+        }
+
         String name =
                 checkNotNull(
-                                modelNode.get(MODEL_NAME_KEY),
+                                node.remove(MODEL_NAME_KEY),
                                 "Missing required field \"%s\" in `model`",
                                 MODEL_NAME_KEY)
                         .asText();
-        String model =
+        validateModelName(name);
+        String type =
                 checkNotNull(
-                                modelNode.get(MODEL_CLASS_NAME_KEY),
+                                node.remove(MODEL_TYPE_KEY),
                                 "Missing required field \"%s\" in `model`",
-                                MODEL_CLASS_NAME_KEY)
+                                MODEL_TYPE_KEY)
                         .asText();
-        Map<String, String> properties = mapper.convertValue(modelNode, Map.class);
-        return new ModelDef(name, model, properties);
+        Preconditions.checkArgument(
+                !StringUtils.isNullOrWhitespaceOnly(type),
+                "Model type must not be empty for model '%s'.",
+                name);
+
+        Map<String, String> options = new LinkedHashMap<>();
+        JsonNode optionsNode = node.remove(MODEL_OPTIONS_KEY);
+        if (optionsNode != null) {
+            Preconditions.checkArgument(
+                    optionsNode instanceof ObjectNode,
+                    "Model options must be an object, but got %s",
+                    optionsNode);
+            options.putAll(
+                    mapper.convertValue(optionsNode, new TypeReference<Map<String, String>>() {}));
+        }
+        node.fields()
+                .forEachRemaining(
+                        entry -> {
+                            Preconditions.checkArgument(
+                                    !options.containsKey(entry.getKey()),
+                                    "Duplicate model option '%s' for model '%s'.",
+                                    entry.getKey(),
+                                    name);
+                            options.put(entry.getKey(), entry.getValue().asText());
+                        });
+        return ModelDef.of(name, type, options);
+    }
+
+    private void validateModelName(String name) {
+        Preconditions.checkArgument(
+                name.matches("[a-zA-Z_][a-zA-Z0-9_]*") && !name.startsWith("__"),
+                "Model name \"%s\" is not a valid identifier. "
+                        + "It must start with a letter or underscore, "
+                        + "contain only letters, digits, or underscores, "
+                        + "and must not start with double underscores.",
+                name);
     }
 
     private void validateJsonNodeKeys(
@@ -490,6 +678,26 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                     String.format(
                             "YAML %s block is expecting an array children, but got an %s (%s). Perhaps you missed a dash prefix `-`?",
                             contextName, jsonNode.getNodeType(), jsonNode));
+        }
+    }
+
+    public static Map<String, String> getFlinkConfigFromPipelineDef(Path pipelineDefPath)
+            throws IOException {
+        FileSystem fileSystem = FileSystem.get(pipelineDefPath.toUri());
+        try (FSDataInputStream pipelineInStream = fileSystem.open(pipelineDefPath)) {
+            JsonNode pipelineDefJsonNode = mapper.readTree(pipelineInStream);
+            return Optional.ofNullable(pipelineDefJsonNode.get(PIPELINE_KEY))
+                    .map(node -> node.get(FLINK_KEY))
+                    .filter(JsonNode::isObject)
+                    .map(
+                            flinkNode -> {
+                                Map<String, Object> rawMap =
+                                        mapper.convertValue(
+                                                flinkNode,
+                                                new TypeReference<Map<String, Object>>() {});
+                                return ConfigurationUtils.flattenConfigMap(rawMap, "");
+                            })
+                    .orElse(Collections.emptyMap());
         }
     }
 }

@@ -22,9 +22,11 @@ import org.apache.flink.cdc.connectors.postgres.PostgresTestBase;
 import org.assertj.core.api.Assertions;
 import org.testcontainers.containers.PostgreSQLContainer;
 
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.URL;
-import java.nio.file.Files;
-import java.nio.file.Paths;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -129,21 +131,25 @@ public class UniqueDatabase {
             createDatabase(databaseName);
             try (Connection connection =
                             PostgresTestBase.getJdbcConnection(container, databaseName);
-                    Statement statement = connection.createStatement()) {
+                    Statement statement = connection.createStatement();
+                    InputStream inputStream =
+                            UniqueDatabase.class.getClassLoader().getResourceAsStream(ddlFile);
+                    BufferedReader reader =
+                            new BufferedReader(
+                                    new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
+                final String ddl =
+                        reader.lines()
+                                .map(String::trim)
+                                .filter(x -> !x.startsWith("--") && !x.isEmpty())
+                                .map(
+                                        x -> {
+                                            final Matcher m = COMMENT_PATTERN.matcher(x);
+                                            return m.matches() ? m.group(1) : x;
+                                        })
+                                .map(this::convertSQL)
+                                .collect(Collectors.joining("\n"));
                 final List<String> statements =
-                        Arrays.stream(
-                                        Files.readAllLines(Paths.get(ddlTestFile.toURI())).stream()
-                                                .map(String::trim)
-                                                .filter(x -> !x.startsWith("--") && !x.isEmpty())
-                                                .map(
-                                                        x -> {
-                                                            final Matcher m =
-                                                                    COMMENT_PATTERN.matcher(x);
-                                                            return m.matches() ? m.group(1) : x;
-                                                        })
-                                                .map(this::convertSQL)
-                                                .collect(Collectors.joining("\n"))
-                                                .split(";"))
+                        Arrays.stream(ddl.split(";"))
                                 .map(x -> x.replace("$$", ";"))
                                 .collect(Collectors.toList());
                 for (String stmt : statements) {

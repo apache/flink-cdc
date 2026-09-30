@@ -52,6 +52,7 @@ public class ValuesDataSourceHelper {
     public enum EventSetId {
         SINGLE_SPLIT_SINGLE_TABLE,
         SINGLE_SPLIT_SINGLE_TABLE_WITH_DEFAULT_VALUE,
+        SINGLE_SPLIT_SINGLE_PARTITION_TABLE,
         SINGLE_SPLIT_MULTI_TABLES,
         MULTI_SPLITS_SINGLE_TABLE,
         CUSTOM_SOURCE_EVENTS,
@@ -61,7 +62,8 @@ public class ValuesDataSourceHelper {
         SINGLE_SPLIT_SINGLE_BATCH_TABLE,
         SINGLE_SPLIT_MULTI_BATCH_TABLE,
         MULTI_SPLITS_SINGLE_BATCH_TABLE,
-        TRANSFORM_BATCH_TABLE;
+        TRANSFORM_BATCH_TABLE,
+        APPEND_ONLY_BLOB_TABLE;
 
         public boolean isBatchEvent() {
             switch (this) {
@@ -121,6 +123,11 @@ public class ValuesDataSourceHelper {
                     sourceEvents = singleSplitSingleTableWithDefaultValue();
                     break;
                 }
+            case SINGLE_SPLIT_SINGLE_PARTITION_TABLE:
+                {
+                    sourceEvents = singleSplitSinglePartitionTable();
+                    break;
+                }
             case SINGLE_SPLIT_MULTI_TABLES:
                 {
                     sourceEvents = singleSplitMultiTables();
@@ -165,9 +172,76 @@ public class ValuesDataSourceHelper {
                     sourceEvents = transformBatchTable();
                     break;
                 }
+            case APPEND_ONLY_BLOB_TABLE:
+                {
+                    sourceEvents = appendOnlyBlobTable();
+                    break;
+                }
             default:
                 throw new IllegalArgumentException(eventType + " is not supported");
         }
+    }
+
+    public static List<List<Event>> appendOnlyBlobTable() {
+        List<List<Event>> eventOfSplits = new ArrayList<>();
+        List<Event> split1 = new ArrayList<>();
+
+        TableId tableId = TableId.tableId("default_database", "table1");
+
+        // create table without primary key, with VARBINARY blob column
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("uuid", DataTypes.STRING().notNull())
+                        .physicalColumn("path", DataTypes.STRING())
+                        .physicalColumn("blobContent", DataTypes.VARBINARY(1000))
+                        .build();
+        CreateTableEvent createTableEvent = new CreateTableEvent(tableId, schema);
+        split1.add(createTableEvent);
+
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(
+                        RowType.of(
+                                DataTypes.STRING().notNull(),
+                                DataTypes.STRING(),
+                                DataTypes.VARBINARY(1000)));
+
+        // insert 3 events with uuid, path and blobContent
+        split1.add(
+                DataChangeEvent.insertEvent(
+                        tableId,
+                        generator.generate(
+                                new Object[] {
+                                    BinaryStringData.fromString(
+                                            "550e8400-e29b-41d4-a716-446655440000"),
+                                    BinaryStringData.fromString(
+                                            "oss://my-bucket/data/files/document_001.pdf"),
+                                    "PDF binary content for document 001".getBytes()
+                                })));
+        split1.add(
+                DataChangeEvent.insertEvent(
+                        tableId,
+                        generator.generate(
+                                new Object[] {
+                                    BinaryStringData.fromString(
+                                            "6ba7b810-9dad-11d1-80b4-00c04fd430c8"),
+                                    BinaryStringData.fromString(
+                                            "oss://my-bucket/data/images/photo_002.jpg"),
+                                    "JPG binary content for photo 002".getBytes()
+                                })));
+        split1.add(
+                DataChangeEvent.insertEvent(
+                        tableId,
+                        generator.generate(
+                                new Object[] {
+                                    BinaryStringData.fromString(
+                                            "f47ac10b-58cc-4372-a567-0e02b2c3d479"),
+                                    BinaryStringData.fromString(
+                                            "oss://my-bucket/data/videos/movie_003.mp4"),
+                                    "MP4 binary content for movie 003".getBytes()
+                                })));
+
+        eventOfSplits.add(split1);
+        return eventOfSplits;
     }
 
     public static List<List<Event>> singleSplitSingleTable() {
@@ -271,6 +345,63 @@ public class ValuesDataSourceHelper {
         // rename column with default value
         eventOfSplits.get(0).add(renameColumnWithDefaultValue(TABLE_1));
 
+        return eventOfSplits;
+    }
+
+    /**
+     * A single split with a single partitioned table. The partition column is intentionally placed
+     * before data columns to verify partition handling when partition key is not at the end of the
+     * schema.
+     */
+    public static List<List<Event>> singleSplitSinglePartitionTable() {
+        List<List<Event>> eventOfSplits = new ArrayList<>();
+        List<Event> split1 = new ArrayList<>();
+
+        // create table with partition column before data columns
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("pt", DataTypes.STRING())
+                        .physicalColumn("col1", DataTypes.STRING())
+                        .physicalColumn("col2", DataTypes.STRING())
+                        .partitionKey("pt")
+                        .primaryKey("col1")
+                        .build();
+        split1.add(new CreateTableEvent(TABLE_1, schema));
+
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(
+                        RowType.of(DataTypes.STRING(), DataTypes.STRING(), DataTypes.STRING()));
+
+        // insert into different partitions
+        split1.add(
+                DataChangeEvent.insertEvent(
+                        TABLE_1,
+                        generator.generate(
+                                new Object[] {
+                                    BinaryStringData.fromString("2024-01"),
+                                    BinaryStringData.fromString("1"),
+                                    BinaryStringData.fromString("a")
+                                })));
+        split1.add(
+                DataChangeEvent.insertEvent(
+                        TABLE_1,
+                        generator.generate(
+                                new Object[] {
+                                    BinaryStringData.fromString("2024-01"),
+                                    BinaryStringData.fromString("2"),
+                                    BinaryStringData.fromString("b")
+                                })));
+        split1.add(
+                DataChangeEvent.insertEvent(
+                        TABLE_1,
+                        generator.generate(
+                                new Object[] {
+                                    BinaryStringData.fromString("2024-02"),
+                                    BinaryStringData.fromString("3"),
+                                    BinaryStringData.fromString("c")
+                                })));
+
+        eventOfSplits.add(split1);
         return eventOfSplits;
     }
 

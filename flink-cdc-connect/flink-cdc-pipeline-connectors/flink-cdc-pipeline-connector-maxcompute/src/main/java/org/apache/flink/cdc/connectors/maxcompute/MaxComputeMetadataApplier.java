@@ -20,6 +20,7 @@ package org.apache.flink.cdc.connectors.maxcompute;
 
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
+import org.apache.flink.cdc.common.event.AlterTableCommentEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.DropTableEvent;
@@ -83,7 +84,8 @@ public class MaxComputeMetadataApplier implements MetadataApplier {
                 SchemaEvolutionUtils.alterColumnType(
                         maxComputeOptions,
                         alterColumnTypeEvent.tableId(),
-                        alterColumnTypeEvent.getTypeMapping());
+                        alterColumnTypeEvent.getTypeMapping(),
+                        alterColumnTypeEvent.getComments());
             } else if (schemaChangeEvent instanceof DropColumnEvent) {
                 DropColumnEvent dropColumnEvent = (DropColumnEvent) schemaChangeEvent;
                 SchemaEvolutionUtils.dropColumn(
@@ -108,6 +110,13 @@ public class MaxComputeMetadataApplier implements MetadataApplier {
             } else if (schemaChangeEvent instanceof TruncateTableEvent) {
                 TruncateTableEvent truncateTableEvent = (TruncateTableEvent) schemaChangeEvent;
                 SchemaEvolutionUtils.truncateTable(maxComputeOptions, truncateTableEvent.tableId());
+            } else if (schemaChangeEvent instanceof AlterTableCommentEvent) {
+                AlterTableCommentEvent alterTableCommentEvent =
+                        (AlterTableCommentEvent) schemaChangeEvent;
+                SchemaEvolutionUtils.alterTableComment(
+                        maxComputeOptions,
+                        alterTableCommentEvent.tableId(),
+                        alterTableCommentEvent.getComment());
             } else {
                 throw new UnsupportedOperationException(
                         "Unsupported schema change event: "

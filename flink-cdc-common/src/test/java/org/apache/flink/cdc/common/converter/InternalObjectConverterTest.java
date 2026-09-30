@@ -195,7 +195,7 @@ class InternalObjectConverterTest {
                 .hasToString("4.2");
         assertThat(convertToInternal(new BigDecimal("-3.1415926"), DataTypes.DECIMAL(20, 10)))
                 .isInstanceOf(DecimalData.class)
-                .hasToString("-3.1415926");
+                .hasToString("-3.1415926000");
 
         assertThat(
                         convertToInternal(

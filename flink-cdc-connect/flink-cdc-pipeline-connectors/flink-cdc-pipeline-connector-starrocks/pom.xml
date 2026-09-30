@@ -28,8 +28,7 @@ limitations under the License.
     <artifactId>flink-cdc-pipeline-connector-starrocks</artifactId>
 
     <properties>
-        <!-- TODO: Update this, when StarRocks releases a 1.20 compatible connector. -->
-        <starrocks.connector.version>1.2.10_flink-1.19</starrocks.connector.version>
+        <starrocks.connector.version>1.2.14_flink-1.20</starrocks.connector.version>
     </properties>
 
     <dependencies>

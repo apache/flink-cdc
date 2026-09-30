@@ -21,9 +21,12 @@ import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.factories.DataSinkFactory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.sink.DataSink;
+import org.apache.flink.cdc.common.sink.ForwardHashFunctionProvider;
 import org.apache.flink.cdc.composer.utils.FactoryDiscoveryUtils;
 import org.apache.flink.cdc.connectors.fluss.sink.FlussDataSink;
 import org.apache.flink.cdc.connectors.fluss.sink.FlussDataSinkOptions;
+import org.apache.flink.cdc.connectors.fluss.sink.FlussDataSinkOptions.SinkPartitioningStrategy;
+import org.apache.flink.cdc.connectors.fluss.sink.FlussHashFunctionProvider;
 import org.apache.flink.table.api.ValidationException;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
@@ -47,6 +50,24 @@ public class FlussDataSinkFactoryTest {
                         new FactoryHelper.DefaultContext(
                                 conf, conf, Thread.currentThread().getContextClassLoader()));
         Assertions.assertThat(dataSink).isInstanceOf(FlussDataSink.class);
+        Assertions.assertThat(dataSink.getDataChangeEventHashFunctionProvider())
+                .isInstanceOf(FlussHashFunctionProvider.class);
+    }
+
+    @Test
+    void testCreateDataSinkWithForwardPartitioningStrategy() {
+        DataSinkFactory sinkFactory =
+                FactoryDiscoveryUtils.getFactoryByIdentifier("fluss", DataSinkFactory.class);
+        Configuration conf = createValidConfiguration();
+        conf.set(FlussDataSinkOptions.SINK_PARTITIONING_STRATEGY, SinkPartitioningStrategy.FORWARD);
+
+        DataSink dataSink =
+                sinkFactory.createDataSink(
+                        new FactoryHelper.DefaultContext(
+                                conf, conf, Thread.currentThread().getContextClassLoader()));
+
+        Assertions.assertThat(dataSink.getDataChangeEventHashFunctionProvider())
+                .isInstanceOf(ForwardHashFunctionProvider.class);
     }
 
     @Test

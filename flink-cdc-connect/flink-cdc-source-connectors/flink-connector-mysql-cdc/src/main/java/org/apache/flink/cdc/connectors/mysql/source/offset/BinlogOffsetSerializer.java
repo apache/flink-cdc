@@ -30,15 +30,15 @@ public class BinlogOffsetSerializer {
 
     public static final BinlogOffsetSerializer INSTANCE = new BinlogOffsetSerializer();
 
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
     public byte[] serialize(BinlogOffset binlogOffset) throws IOException {
         // use JSON serialization
-        ObjectMapper objectMapper = new ObjectMapper();
-        return objectMapper.writeValueAsBytes(binlogOffset.getOffset());
+        return OBJECT_MAPPER.writeValueAsBytes(binlogOffset.getOffset());
     }
 
     public BinlogOffset deserialize(byte[] bytes) throws IOException {
-        ObjectMapper objectMapper = new ObjectMapper();
-        Map<String, String> offset = objectMapper.readValue(bytes, Map.class);
+        Map<String, String> offset = OBJECT_MAPPER.readValue(bytes, Map.class);
         return new BinlogOffset(offset);
     }
 }
