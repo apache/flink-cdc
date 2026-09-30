@@ -57,7 +57,6 @@ public class TiDBTableSource implements ScanTableSource, SupportsReadingMetadata
     private final ResolvedSchema physicalSchema;
 
     private final StartupOptions startupOptions;
-    private final String tableList;
     private final String tableName;
     private final Duration connectTimeout;
     private final String jdbcDriver;
@@ -100,7 +99,6 @@ public class TiDBTableSource implements ScanTableSource, SupportsReadingMetadata
             String hostName,
             String database,
             String tableName,
-            String tableList,
             String username,
             String password,
             String serverTimeZone,
@@ -148,7 +146,6 @@ public class TiDBTableSource implements ScanTableSource, SupportsReadingMetadata
         this.heartbeatInterval = heartbeatInterval;
         this.jdbcDriver = jdbcDriver;
         this.connectTimeout = connectTimeout;
-        this.tableList = tableList;
         this.hostMapping = hostMapping;
         this.startupOptions = startupOptions;
         this.producedDataType = physicalSchema.toPhysicalRowDataType();
@@ -226,7 +223,6 @@ public class TiDBTableSource implements ScanTableSource, SupportsReadingMetadata
                         hostName,
                         database,
                         tableName,
-                        tableList,
                         username,
                         password,
                         serverTimeZone,
@@ -310,7 +306,6 @@ public class TiDBTableSource implements ScanTableSource, SupportsReadingMetadata
                 && Double.compare(that.distributionFactorLower, distributionFactorLower) == 0
                 && physicalSchema.equals(that.physicalSchema)
                 && startupOptions.equals(that.startupOptions)
-                && Objects.equals(tableList, that.tableList)
                 && Objects.equals(tableName, that.tableName)
                 && Objects.equals(connectTimeout, that.connectTimeout)
                 && Objects.equals(jdbcDriver, that.jdbcDriver)
@@ -335,7 +330,6 @@ public class TiDBTableSource implements ScanTableSource, SupportsReadingMetadata
         return Objects.hash(
                 physicalSchema,
                 startupOptions,
-                tableList,
                 tableName,
                 connectTimeout,
                 jdbcDriver,

@@ -51,13 +51,6 @@ public class TiDBSourceOptions extends JdbcSourceOptions {
                     .withDescription(
                             "Optional interval of sending heartbeat event for tracing the latest available replication slot offsets");
 
-    public static final ConfigOption<String> TABLE_LIST =
-            ConfigOptions.key("table-list")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription(
-                            "List of full names of tables, separated by commas, e.g. \"db1.table1, db2.table2\".");
-
     public static final ConfigOption<String> HOST_MAPPING =
             ConfigOptions.key("host-mapping")
                     .stringType()

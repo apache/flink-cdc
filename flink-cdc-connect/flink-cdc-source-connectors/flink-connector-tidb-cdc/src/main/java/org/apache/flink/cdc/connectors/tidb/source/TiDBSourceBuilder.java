@@ -67,6 +67,10 @@ public class TiDBSourceBuilder<T> {
         return this;
     }
 
+    /**
+     * Sets the table filter to capture. The current TiDB source supports exactly one filter, and
+     * that filter must resolve to exactly one physical table.
+     */
     public TiDBSourceBuilder<T> tableList(String... tableList) {
         this.configFactory.tableList(tableList);
         return this;

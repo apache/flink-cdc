@@ -121,13 +121,25 @@ public class TiDBDialect implements JdbcDataSourceDialect {
                             sourceConfig.getDatabaseList().get(0),
                             jdbc,
                             sourceConfig.getTableFilters());
-            if (tableIds.isEmpty()) {
-                throw new FlinkRuntimeException(
-                        "No tables discovered for the given tables:" + sourceConfig.getTableList());
-            }
+            validateSingleDiscoveredTable(tableIds, sourceConfig.getTableList());
             return tableIds;
         } catch (SQLException e) {
             throw new FlinkRuntimeException("Error to discover tables:" + e.getMessage(), e);
+        }
+    }
+
+    static void validateSingleDiscoveredTable(
+            List<TableId> discoveredTableIds, List<String> configuredTableFilters) {
+        if (discoveredTableIds.isEmpty()) {
+            throw new FlinkRuntimeException(
+                    "No tables discovered for the configured table filter: "
+                            + configuredTableFilters);
+        }
+        if (discoveredTableIds.size() != 1) {
+            throw new FlinkRuntimeException(
+                    String.format(
+                            "The TiDB CDC source supports exactly one table, but %d tables were discovered for table filter %s: %s",
+                            discoveredTableIds.size(), configuredTableFilters, discoveredTableIds));
         }
     }
 

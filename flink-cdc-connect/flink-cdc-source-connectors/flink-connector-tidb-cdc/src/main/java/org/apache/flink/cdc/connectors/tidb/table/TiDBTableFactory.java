@@ -58,7 +58,6 @@ import static org.apache.flink.cdc.connectors.tidb.source.config.TiDBSourceOptio
 import static org.apache.flink.cdc.connectors.tidb.source.config.TiDBSourceOptions.HOST_MAPPING;
 import static org.apache.flink.cdc.connectors.tidb.source.config.TiDBSourceOptions.JDBC_DRIVER;
 import static org.apache.flink.cdc.connectors.tidb.source.config.TiDBSourceOptions.PD_ADDRESSES;
-import static org.apache.flink.cdc.connectors.tidb.source.config.TiDBSourceOptions.TABLE_LIST;
 import static org.apache.flink.cdc.connectors.tidb.source.config.TiDBSourceOptions.TIDB_PORT;
 import static org.apache.flink.cdc.debezium.table.DebeziumOptions.getDebeziumProperties;
 import static org.apache.flink.cdc.debezium.utils.ResolvedSchemaUtils.getPhysicalSchema;
@@ -80,6 +79,8 @@ public class TiDBTableFactory implements DynamicTableSourceFactory {
         options.add(PASSWORD);
         options.add(PD_ADDRESSES);
         options.add(TIDB_PORT);
+        options.add(DATABASE_NAME);
+        options.add(TABLE_NAME);
 
         return options;
     }
@@ -90,9 +91,6 @@ public class TiDBTableFactory implements DynamicTableSourceFactory {
         options.add(SCAN_STARTUP_MODE);
         options.add(SCAN_STARTUP_TIMESTAMP_MILLIS);
 
-        options.add(DATABASE_NAME);
-        options.add(TABLE_NAME);
-        options.add(TABLE_LIST);
         options.add(CONNECT_TIMEOUT);
         options.add(SERVER_TIME_ZONE);
         options.add(HOST_MAPPING);
@@ -160,7 +158,6 @@ public class TiDBTableFactory implements DynamicTableSourceFactory {
         String password = config.get(PASSWORD);
         String databaseName = config.get(DATABASE_NAME);
         String tableName = config.get(TABLE_NAME);
-        String tableList = config.get(TABLE_LIST);
 
         int port = config.get(TIDB_PORT);
         String serverTimeZone = config.get(SERVER_TIME_ZONE);
@@ -209,7 +206,6 @@ public class TiDBTableFactory implements DynamicTableSourceFactory {
                 hostname,
                 databaseName,
                 tableName,
-                tableList,
                 username,
                 password,
                 serverTimeZone,

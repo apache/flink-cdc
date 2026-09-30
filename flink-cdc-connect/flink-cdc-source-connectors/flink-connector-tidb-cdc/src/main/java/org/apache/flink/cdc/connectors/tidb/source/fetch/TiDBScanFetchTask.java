@@ -20,12 +20,11 @@ package org.apache.flink.cdc.connectors.tidb.source.fetch;
 import org.apache.flink.cdc.connectors.base.relational.JdbcSourceEventDispatcher;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
-import org.apache.flink.cdc.connectors.base.source.meta.wartermark.WatermarkKind;
 import org.apache.flink.cdc.connectors.base.source.reader.external.AbstractScanFetchTask;
 import org.apache.flink.cdc.connectors.tidb.source.config.TiDBConnectorConfig;
 import org.apache.flink.cdc.connectors.tidb.source.connection.TiDBConnection;
-import org.apache.flink.cdc.connectors.tidb.source.offset.EventOffset;
 import org.apache.flink.cdc.connectors.tidb.source.offset.EventOffsetContext;
+import org.apache.flink.cdc.connectors.tidb.source.offset.EventOffsetUtils;
 import org.apache.flink.cdc.connectors.tidb.source.schema.TiDBDatabaseSchema;
 import org.apache.flink.cdc.connectors.tidb.utils.TiDBUtils;
 
@@ -56,6 +55,8 @@ import java.time.Duration;
 /** A wrapped task to fetch snapshot split of table. */
 public class TiDBScanFetchTask extends AbstractScanFetchTask {
     private static final Logger LOG = LoggerFactory.getLogger(TiDBScanFetchTask.class);
+    private volatile EventSourceReader backfillEventSourceReader;
+    private volatile StoppableChangeEventSourceContext backfillSourceContext;
 
     public TiDBScanFetchTask(SnapshotSplit split) {
         super(split);
@@ -64,18 +65,61 @@ public class TiDBScanFetchTask extends AbstractScanFetchTask {
     @Override
     protected void executeBackfillTask(Context context, StreamSplit backfillStreamSplit)
             throws Exception {
-
-        // just for test
         TiDBSourceFetchTaskContext ctx = (TiDBSourceFetchTaskContext) context;
-        final EventOffset currentOffset =
-                EventOffset.of(
-                        ((TiDBSourceFetchTaskContext) context).getOffsetContext().getOffset());
-        JdbcSourceEventDispatcher dispatcher = ctx.getEventDispatcher();
-        dispatcher.dispatchWatermarkEvent(
-                ctx.getPartition().getSourcePartition(),
-                backfillStreamSplit,
-                currentOffset,
-                WatermarkKind.END);
+        final EventOffsetContext.Loader loader =
+                new EventOffsetContext.Loader(ctx.getDbzConnectorConfig());
+        final EventOffsetContext cdcEventOffsetContext =
+                EventOffsetUtils.getEventOffsetContext(
+                        loader, backfillStreamSplit.getStartingOffset());
+        final EventSourceReader cdcEventSource =
+                new EventSourceReader(
+                        ctx.getDbzConnectorConfig(),
+                        ctx.getEventDispatcher(),
+                        ctx.getErrorHandler(),
+                        ctx.getTaskContext(),
+                        backfillStreamSplit);
+        final StoppableChangeEventSourceContext changeEventSourceContext =
+                new StoppableChangeEventSourceContext();
+        this.backfillEventSourceReader = cdcEventSource;
+        this.backfillSourceContext = changeEventSourceContext;
+
+        LOG.info(
+                "Execute bounded backfill task for snapshot split {} with stream split {}",
+                snapshotSplit,
+                backfillStreamSplit);
+        try {
+            if (!taskRunning) {
+                return;
+            }
+            cdcEventSource.init();
+            if (!taskRunning) {
+                return;
+            }
+            final boolean completed =
+                    cdcEventSource.executeBackfill(
+                            changeEventSourceContext, ctx.getPartition(), cdcEventOffsetContext);
+            if (completed) {
+                dispatchEndWaterMarkEvent(
+                        context, backfillStreamSplit, backfillStreamSplit.getEndingOffset());
+            }
+        } finally {
+            cdcEventSource.close();
+            this.backfillEventSourceReader = null;
+            this.backfillSourceContext = null;
+        }
+    }
+
+    @Override
+    public void close() {
+        super.close();
+        StoppableChangeEventSourceContext sourceContext = backfillSourceContext;
+        if (sourceContext != null) {
+            sourceContext.stopChangeEventSource();
+        }
+        EventSourceReader eventSourceReader = backfillEventSourceReader;
+        if (eventSourceReader != null) {
+            eventSourceReader.close();
+        }
     }
 
     /**

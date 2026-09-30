@@ -79,7 +79,9 @@ SELECT * FROM orders;
 ```
 
 {{< hint info >}}
-如果 TiDB 表存在主键，请在 Flink 表中定义相同的主键。下游算子和 Sink 可以借助主键正确处理更新和删除。当前 Connector 为一张捕获表创建一个流读取器，因此每个 Flink SQL Source 表只应对应一张 TiDB 表。
+如果 TiDB 表存在主键，请在 Flink 表中定义相同的主键。下游算子和 Sink 可以借助主键正确处理更新和删除。
+
+当前 TiDB CDC Source 每个 Source 仅支持采集一张物理表。SQL 必须同时配置 `database-name` 和 `table-name`，且不支持 `table-list`。DataStream API 必须分别只配置一个 `databaseList(...)` 和一个 `tableList(...)` 过滤规则，并且该过滤规则只能匹配一张物理表。构建 Source 时会拒绝多个过滤规则；若单个规则实际匹配多张表，则会在开始快照前校验失败。多表采集请为每张表分别创建 Source。
 {{< /hint >}}
 
 Connector 参数
@@ -111,9 +113,10 @@ Connector 参数
 | `chunk-key.even-distribution.factor.lower-bound` | 否 | `0.05` | Double | 判断 Chunk Key 是否均匀分布的下界。 |
 | `host-mapping` | 否 | 无 | String | 将 TiKV 发布的主机映射为 Flink 可访问的地址，格式为 `内网主机:外部主机;内网主机2:外部主机2`，端口保持不变。 |
 | `heartbeat.interval.ms` | 否 | `30s` | Duration | 配置的心跳间隔。当前 TiDB SQL 运行路径会保存该值，但尚未把心跳配置传入 Source Builder。 |
-| `table-list` | 否 | 无 | String | Factory 可以接收该参数，但当前 SQL 运行路径通过 `database-name` 和 `table-name` 构造捕获列表，不能用它替代这两个参数。 |
 
 `jdbc.properties.*`、`debezium.*` 和 `tikv.*` 前缀的参数都能通过表参数校验。当前 SQL 运行路径不会把任意 `tikv.*` 参数复制到 `TiConfiguration`，因此这些参数目前不会产生运行时效果。
+
+`debezium.max.queue.size` 同时限制每个 Source Reader 的 TiDB CDC 已提交事件暂存队列，默认值为 `8192`。队列满后 TiDB 拉取线程会阻塞，并将背压向上游传播，而不是继续在堆内存中累积变更事件。
 
 启动模式
 --------
@@ -176,7 +179,7 @@ CREATE TABLE products (
 DataStream Source
 -----------------
 
-DataStream API 应使用 `TiDBSourceBuilder.TiDBIncrementalSource` 和 `StreamExecutionEnvironment#fromSource`。旧文档中的 `SourceFunction` 版 `TiDBSource` API 已不属于当前 Connector。
+DataStream API 应使用 `TiDBSourceBuilder.TiDBIncrementalSource` 和 `StreamExecutionEnvironment#fromSource`。旧文档中的 `SourceFunction` 版 `TiDBSource` API 已不属于当前 Connector。`databaseList(...)` 和 `tableList(...)` 都只能传入一个值，并且表过滤规则必须只匹配一张物理表。
 
 ```java
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;

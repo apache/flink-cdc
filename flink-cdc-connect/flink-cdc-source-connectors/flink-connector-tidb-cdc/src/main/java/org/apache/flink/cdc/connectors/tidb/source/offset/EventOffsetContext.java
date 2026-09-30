@@ -155,14 +155,23 @@ public class EventOffsetContext implements OffsetContext {
         sourceInfo.tableEvent((TableId) collectionId);
     }
 
+    /** Updates source metadata and the checkpoint offset for a TiKV event. */
+    public void event(DataCollectionId collectionId, long commitVersion) {
+        Instant sourceTime = Instant.ofEpochMilli(TiTimestamp.extractPhysical(commitVersion));
+        sourceInfo.setSourceTime(sourceTime);
+        sourceInfo.setCommitVersion(commitVersion);
+        sourceInfo.tableEvent((TableId) collectionId);
+        setCheckpoint(sourceTime, String.valueOf(commitVersion));
+    }
+
     @Override
     public TransactionContext getTransactionContext() {
         return transactionContext;
     }
 
     public void setCheckpoint(Instant timestamp, String commitVersion) {
-        this.timestamp = String.valueOf(timestamp.toEpochMilli());
-        if (commitVersion == null) {
+        this.timestamp = timestamp == null ? null : String.valueOf(timestamp.toEpochMilli());
+        if (commitVersion == null && timestamp != null) {
             commitVersion =
                     String.valueOf(new TiTimestamp(timestamp.toEpochMilli(), 0).getVersion());
         }
@@ -202,9 +211,7 @@ public class EventOffsetContext implements OffsetContext {
                             new TiDBSourceInfo(connectorConfig));
             String timestamp = (String) offset.get(TIMESTAMP_KEY);
             offsetContext.setCheckpoint(
-                    timestamp == null
-                            ? Instant.now()
-                            : Instant.ofEpochMilli(Long.parseLong(timestamp)),
+                    timestamp == null ? null : Instant.ofEpochMilli(Long.parseLong(timestamp)),
                     (String) offset.get(COMMIT_VERSION_KEY));
             return offsetContext;
         }

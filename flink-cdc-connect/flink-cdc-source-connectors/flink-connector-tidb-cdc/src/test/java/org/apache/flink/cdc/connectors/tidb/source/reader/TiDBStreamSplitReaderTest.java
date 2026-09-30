@@ -18,10 +18,14 @@
 package org.apache.flink.cdc.connectors.tidb.source.reader;
 
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
+import org.apache.flink.cdc.connectors.base.source.meta.offset.OffsetFactory;
 import org.apache.flink.cdc.connectors.base.source.meta.split.ChangeEventRecords;
 import org.apache.flink.cdc.connectors.base.source.meta.split.FinishedSnapshotSplitInfo;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceRecords;
+import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
+import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitSerializer;
 import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
+import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplitState;
 import org.apache.flink.cdc.connectors.base.source.reader.IncrementalSourceReaderContext;
 import org.apache.flink.cdc.connectors.base.source.reader.IncrementalSourceSplitReader;
 import org.apache.flink.cdc.connectors.base.source.utils.hooks.SnapshotPhaseHooks;
@@ -46,10 +50,13 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tikv.common.TiConfiguration;
+import org.tikv.common.meta.TiTimestamp;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
 import static java.util.Collections.singletonList;
@@ -179,5 +186,147 @@ public class TiDBStreamSplitReaderTest extends TiDBTestBase {
         } finally {
             streamSplitReader.close();
         }
+    }
+
+    @Test
+    public void testCheckpointRestoreDoesNotReemitPreCheckpointRecords() throws Exception {
+        EventOffset initialOffset = (EventOffset) tiDBDialect.displayCurrentOffset(sourceConfig);
+        StreamSplit initialSplit = createStreamSplit(initialOffset);
+        StreamSplit restoredSplit;
+
+        IncrementalSourceSplitReader<JdbcSourceConfig> firstReader = createStreamSplitReader();
+        try {
+            assignSplit(firstReader, initialSplit);
+            insertCustomer(112, "before_checkpoint");
+            SourceRecord checkpointRecord = waitForRecord(firstReader, 112);
+            EventOffset checkpointOffset = new EventOffset(checkpointRecord.sourceOffset());
+
+            Assertions.assertThat(checkpointOffset.getTimestamp())
+                    .isEqualTo(
+                            String.valueOf(
+                                    TiTimestamp.extractPhysical(
+                                            Long.parseLong(checkpointOffset.getCommitVersion()))));
+            restoredSplit = restoreCheckpoint(initialSplit, checkpointOffset);
+        } finally {
+            firstReader.close();
+        }
+
+        insertCustomer(113, "after_checkpoint");
+        IncrementalSourceSplitReader<JdbcSourceConfig> restoredReader = createStreamSplitReader();
+        try {
+            assignSplit(restoredReader, restoredSplit);
+            List<Integer> restoredIds = waitForRecordsThrough(restoredReader, 113);
+
+            Assertions.assertThat(restoredIds).containsExactly(113);
+        } finally {
+            restoredReader.close();
+        }
+    }
+
+    private IncrementalSourceSplitReader<JdbcSourceConfig> createStreamSplitReader() {
+        IncrementalSourceReaderContext readerContext =
+                new IncrementalSourceReaderContext(new TestingReaderContext());
+        return new IncrementalSourceSplitReader<>(
+                0, tiDBDialect, sourceConfig, readerContext, SnapshotPhaseHooks.empty());
+    }
+
+    private StreamSplit createStreamSplit(EventOffset startOffset) {
+        TableId tableId = new TableId(databaseName, null, tableName);
+        Map<TableId, TableChanges.TableChange> tableSchemas =
+                tiDBDialect.discoverDataCollectionSchemas(sourceConfig);
+        FinishedSnapshotSplitInfo finishedSnapshotSplitInfo =
+                new FinishedSnapshotSplitInfo(
+                        tableId, STREAM_SPLIT_ID, null, null, startOffset, cdcEventOffsetFactory);
+        return new StreamSplit(
+                STREAM_SPLIT_ID,
+                startOffset,
+                cdcEventOffsetFactory.createNoStoppingOffset(),
+                Collections.singletonList(finishedSnapshotSplitInfo),
+                tableSchemas,
+                1,
+                false,
+                true);
+    }
+
+    private void assignSplit(
+            IncrementalSourceSplitReader<JdbcSourceConfig> reader, StreamSplit streamSplit) {
+        Assertions.assertThat(reader.canAssignNextSplit()).isTrue();
+        reader.handleSplitsChanges(new SplitsAddition<>(singletonList(streamSplit)));
+    }
+
+    private void insertCustomer(int id, String name) throws Exception {
+        String insertSql =
+                String.format(
+                        "INSERT INTO %s.%s VALUES(%d, '%s','Shanghai','123567891234')",
+                        databaseName, tableName, id, name);
+        try (TiDBConnection connection = tiDBDialect.openJdbcConnection()) {
+            connection.execute(new String[] {insertSql});
+            connection.commit();
+        }
+    }
+
+    private SourceRecord waitForRecord(
+            IncrementalSourceSplitReader<JdbcSourceConfig> reader, int expectedId)
+            throws Exception {
+        for (int retry = 0; retry < MAX_RETRY_TIMES; retry++) {
+            for (SourceRecord record : fetchRecords(reader)) {
+                if (recordId(record) == expectedId) {
+                    return record;
+                }
+            }
+        }
+        throw new AssertionError("Timed out waiting for record " + expectedId + '.');
+    }
+
+    private List<Integer> waitForRecordsThrough(
+            IncrementalSourceSplitReader<JdbcSourceConfig> reader, int expectedLastId)
+            throws Exception {
+        List<Integer> ids = new ArrayList<>();
+        for (int retry = 0; retry < MAX_RETRY_TIMES; retry++) {
+            for (SourceRecord record : fetchRecords(reader)) {
+                int id = recordId(record);
+                ids.add(id);
+                if (id == expectedLastId) {
+                    return ids;
+                }
+            }
+        }
+        throw new AssertionError("Timed out waiting for record " + expectedLastId + '.');
+    }
+
+    private List<SourceRecord> fetchRecords(IncrementalSourceSplitReader<JdbcSourceConfig> reader)
+            throws Exception {
+        List<SourceRecord> result = new ArrayList<>();
+        ChangeEventRecords records = (ChangeEventRecords) reader.fetch();
+        if (records.nextSplit() == null) {
+            return result;
+        }
+        SourceRecords sourceRecords;
+        while ((sourceRecords = records.nextRecordFromSplit()) != null) {
+            sourceRecords.iterator().forEachRemaining(result::add);
+        }
+        return result;
+    }
+
+    private int recordId(SourceRecord record) {
+        Struct value = (Struct) record.value();
+        Struct after = value.getStruct("after");
+        return after.getInt32("id");
+    }
+
+    private StreamSplit restoreCheckpoint(StreamSplit split, EventOffset checkpointOffset)
+            throws Exception {
+        StreamSplitState checkpointState = new StreamSplitState(split);
+        checkpointState.setStartingOffset(checkpointOffset);
+        SourceSplitSerializer serializer =
+                new SourceSplitSerializer() {
+                    @Override
+                    public OffsetFactory getOffsetFactory() {
+                        return cdcEventOffsetFactory;
+                    }
+                };
+        byte[] checkpointBytes = serializer.serialize(checkpointState.toSourceSplit());
+        SourceSplitBase restored = serializer.deserialize(serializer.getVersion(), checkpointBytes);
+        return restored.asStreamSplit();
     }
 }

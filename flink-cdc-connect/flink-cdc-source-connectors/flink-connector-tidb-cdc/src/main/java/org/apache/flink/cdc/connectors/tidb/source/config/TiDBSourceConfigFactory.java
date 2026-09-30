@@ -91,6 +91,7 @@ public class TiDBSourceConfigFactory extends JdbcSourceConfigFactory {
 
     @Override
     public TiDBSourceConfig create(int subtask) {
+        validateSingleTableConfiguration();
         checkSupportCheckpointsAfterTasksFinished(closeIdleReaders);
         Properties props = new Properties();
         props.setProperty("database.server.name", "tidb_cdc");
@@ -151,5 +152,23 @@ public class TiDBSourceConfigFactory extends JdbcSourceConfigFactory {
                 skipSnapshotBackfill,
                 scanNewlyAddedTableEnabled,
                 assignUnboundedChunkFirst);
+    }
+
+    private void validateSingleTableConfiguration() {
+        int databaseCount = databaseList == null ? 0 : databaseList.size();
+        if (databaseCount != 1) {
+            throw new IllegalArgumentException(
+                    String.format(
+                            "The TiDB CDC source supports exactly one database, but %d were configured.",
+                            databaseCount));
+        }
+
+        int tableCount = tableList == null ? 0 : tableList.size();
+        if (tableCount != 1) {
+            throw new IllegalArgumentException(
+                    String.format(
+                            "The TiDB CDC source supports exactly one table filter, but %d were configured.",
+                            tableCount));
+        }
     }
 }

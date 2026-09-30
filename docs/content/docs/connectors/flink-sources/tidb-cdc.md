@@ -79,7 +79,9 @@ SELECT * FROM orders;
 ```
 
 {{< hint info >}}
-Define a primary key in the Flink table whenever the TiDB table has one. The key lets downstream operators and sinks interpret updates and deletes correctly. The connector currently creates one stream reader for one captured table, so use one SQL source table per TiDB table.
+Define a primary key in the Flink table whenever the TiDB table has one. The key lets downstream operators and sinks interpret updates and deletes correctly.
+
+The current TiDB CDC source supports exactly one physical table per source. For SQL, both `database-name` and `table-name` are required and `table-list` is not supported. For DataStream, configure exactly one database and one `tableList(...)` filter; the filter must resolve to exactly one physical table. The connector rejects multiple configured filters while building the source and rejects a filter that discovers multiple tables before snapshotting starts. Create one source per table for multi-table ingestion.
 {{< /hint >}}
 
 Connector options
@@ -111,9 +113,10 @@ Connector options
 | `chunk-key.even-distribution.factor.lower-bound` | No | `0.05` | Double | Lower bound used to decide whether the chunk key is evenly distributed. |
 | `host-mapping` | No | (none) | String | Maps advertised TiKV hosts to addresses reachable by Flink. Format: `internalHost:externalHost;internalHost2:externalHost2`. The port is preserved. |
 | `heartbeat.interval.ms` | No | `30s` | Duration | Configured heartbeat interval. The current TiDB SQL runtime stores this value but does not attach a heartbeat setting to the source builder. |
-| `table-list` | No | (none) | String | Accepted by the factory, but the current SQL runtime builds the capture list from `database-name` and `table-name`; do not use it as a replacement for those options. |
 
 Options prefixed with `jdbc.properties.`, `debezium.`, and `tikv.` are accepted during table validation. In the current SQL runtime, arbitrary `tikv.*` keys are not copied into `TiConfiguration` and therefore have no runtime effect.
+
+`debezium.max.queue.size` also limits the TiDB CDC committed-event staging queue for each source reader. Its default value is `8192`. When this queue is full, the TiDB polling thread blocks and propagates backpressure upstream instead of continuing to retain change events in heap memory.
 
 Startup modes
 -------------
@@ -176,7 +179,7 @@ CREATE TABLE products (
 DataStream Source
 -----------------
 
-Use `TiDBSourceBuilder.TiDBIncrementalSource` with `StreamExecutionEnvironment#fromSource`. The legacy `SourceFunction`-based `TiDBSource` API shown in older documentation is not part of the current connector.
+Use `TiDBSourceBuilder.TiDBIncrementalSource` with `StreamExecutionEnvironment#fromSource`. The legacy `SourceFunction`-based `TiDBSource` API shown in older documentation is not part of the current connector. Pass exactly one value to `databaseList(...)` and `tableList(...)`; the table filter must match exactly one physical table.
 
 ```java
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;

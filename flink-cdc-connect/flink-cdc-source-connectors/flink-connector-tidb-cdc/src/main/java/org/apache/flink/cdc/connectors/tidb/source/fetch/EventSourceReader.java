@@ -47,7 +47,7 @@ import org.tikv.kvproto.Coprocessor;
 import org.tikv.shade.com.google.protobuf.ByteString;
 
 import java.io.Serializable;
-import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -139,10 +139,9 @@ public class EventSourceReader
             cdcClient = new CDCClient(session, keyRange);
             prewrites = new TreeMap<>();
             commits = new TreeMap<>();
-            // cdc event will lose if pull cdc event block when region split
-            // use queue to separate read and write to ensure pull event unblock.
-            // since sink jdbc is slow, 5000W queue size may be safe size.
-            committedEvents = new LinkedBlockingQueue<>();
+            // Decouple TiKV polling from event emission with a bounded queue. Once it is full,
+            // blocking the polling thread propagates downstream backpressure to the CDC client.
+            initializeCommittedEventsQueue();
             resolvedTs = EventOffset.getStartTs(this.split.getStartingOffset());
             ThreadFactory threadFactory =
                     new ThreadFactoryBuilder().setNameFormat("tidb-source-function-0").build();
@@ -192,6 +191,38 @@ public class EventSourceReader
         }
     }
 
+    /** Executes a bounded stream read used to backfill a snapshot split. */
+    public boolean executeBackfill(
+            ChangeEventSourceContext context,
+            TiDBPartition partition,
+            EventOffsetContext offsetContext)
+            throws Exception {
+        if (closed.get()) {
+            return false;
+        }
+        this.context = context;
+        this.executionThread = Thread.currentThread();
+        running = true;
+        try {
+            assureNonEmptySchema();
+            startCdcClient(resolvedTs);
+            EventOffsetContext effectiveOffsetContext =
+                    offsetContext != null
+                            ? offsetContext
+                            : EventOffsetContext.initial(this.connectorConfig);
+            return readBackfillChangeEvents(partition, effectiveOffsetContext);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            if (!closed.get()) {
+                throw e;
+            }
+            return false;
+        } finally {
+            running = false;
+            executionThread = null;
+        }
+    }
+
     protected void readChangeEvents(TiDBPartition partition, EventOffsetContext offsetContext)
             throws Exception {
         LOG.info("read change event from resolvedTs:{}", resolvedTs);
@@ -200,7 +231,7 @@ public class EventSourceReader
                 () -> {
                     while (running && context.isRunning()) {
                         try {
-                            Cdcpb.Event.Row committedRow = committedEvents.take();
+                            Cdcpb.Event.Row committedRow = takeCommittedEvent();
                             emitChangeEvent(partition, offsetContext, committedRow);
                             // use startTs of row as messageTs, use commitTs of row as fetchTs
                         } catch (InterruptedException e) {
@@ -208,8 +239,9 @@ public class EventSourceReader
                             break;
                         } catch (Exception e) {
                             if (running && context.isRunning()) {
-                                LOG.error("Read change events error.", e);
+                                handleEmissionFailure(e);
                             }
+                            break;
                         }
                     }
                 });
@@ -228,6 +260,73 @@ public class EventSourceReader
         }
     }
 
+    private boolean readBackfillChangeEvents(
+            TiDBPartition partition, EventOffsetContext offsetContext) throws Exception {
+        final long endingTs = EventOffset.getStartTs(split.getEndingOffset());
+        LOG.info(
+                "Read backfill change events from resolvedTs {} to endingTs {}",
+                resolvedTs,
+                endingTs);
+        while (running && context.isRunning() && resolvedTs >= STREAMING_VERSION_START_EPOCH) {
+            for (int i = 0; i < 1000; i++) {
+                final Cdcpb.Event.Row row = pollChangeEvent();
+                if (row == null) {
+                    break;
+                }
+                handleRow(row);
+            }
+
+            // A bounded read is complete only after every covered region has resolved past the
+            // high watermark. Using the maximum would finish as soon as only one region advances.
+            resolvedTs = getMinResolvedTs();
+            final long flushTs = Math.min(resolvedTs, endingTs);
+            for (Cdcpb.Event.Row committedRow : drainCommittedRows(flushTs)) {
+                emitChangeEvent(partition, offsetContext, committedRow);
+            }
+            if (resolvedTs >= endingTs) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    protected void assureNonEmptySchema() {
+        this.taskContext.getDatabaseSchema().assureNonEmptySchema();
+    }
+
+    protected void startCdcClient(long startTs) {
+        cdcClient.start(startTs);
+    }
+
+    protected Cdcpb.Event.Row pollChangeEvent() throws InterruptedException {
+        return cdcClient.get();
+    }
+
+    protected long getMinResolvedTs() {
+        return cdcClient.getMinResolvedTs();
+    }
+
+    void handleEmissionFailure(Throwable failure) {
+        running = false;
+        ChangeEventSourceContext currentContext = context;
+        if (currentContext instanceof StoppableChangeEventSourceContext) {
+            ((StoppableChangeEventSourceContext) currentContext).stopChangeEventSource();
+        }
+        errorHandler.setProducerThrowable(failure);
+    }
+
+    void initializeCommittedEventsQueue() {
+        committedEvents = new LinkedBlockingQueue<>(connectorConfig.getMaxQueueSize());
+    }
+
+    void enqueueCommittedEvent(Cdcpb.Event.Row row) throws InterruptedException {
+        committedEvents.put(row);
+    }
+
+    Cdcpb.Event.Row takeCommittedEvent() throws InterruptedException {
+        return committedEvents.take();
+    }
+
     protected void emitChangeEvent(
             TiDBPartition partition, EventOffsetContext offsetContext, final Cdcpb.Event.Row row)
             throws Exception {
@@ -244,7 +343,7 @@ public class EventSourceReader
             LOG.warn("No table schema found, skipping log message: {}", row);
             return;
         }
-        offsetContext.event(tableSchema.id(), Instant.ofEpochMilli(row.getCommitTs()));
+        offsetContext.event(tableSchema.id(), row.getCommitTs());
         Set<Integer> fieldIndex = fieldIndexConverter(tableInfo.getColumns(), tableSchema);
 
         Serializable[] before = null;
@@ -355,16 +454,32 @@ public class EventSourceReader
     }
 
     protected void flushRows(final long timestamp) throws Exception {
+        for (Cdcpb.Event.Row committedRow : drainCommittedRows(timestamp)) {
+            enqueueCommittedEvent(committedRow);
+        }
+    }
+
+    List<Cdcpb.Event.Row> drainCommittedRows(final long timestamp) {
         Preconditions.checkState(context != null, "sourceContext shouldn't be null");
+        final List<Cdcpb.Event.Row> committedRows = new ArrayList<>();
         synchronized (context) {
             while (!commits.isEmpty() && commits.firstKey().timestamp <= timestamp) {
                 final Cdcpb.Event.Row commitRow = commits.pollFirstEntry().getValue();
                 final Cdcpb.Event.Row prewriteRow =
                         prewrites.remove(RowKeyWithTs.ofStart(commitRow));
-                // if pull cdc event block when region split, cdc event will lose.
-                committedEvents.offer(prewriteRow);
+                if (prewriteRow == null) {
+                    throw new IllegalStateException(
+                            String.format(
+                                    "Missing PREWRITE event for COMMIT: startTs=%d, commitTs=%d, resolvedTs=%d, key=%s. Failing the source to prevent silent data loss.",
+                                    commitRow.getStartTs(),
+                                    commitRow.getCommitTs(),
+                                    timestamp,
+                                    commitRow.getKey()));
+                }
+                committedRows.add(prewriteRow);
             }
         }
+        return committedRows;
     }
 
     private void handleRow(final Cdcpb.Event.Row row) {

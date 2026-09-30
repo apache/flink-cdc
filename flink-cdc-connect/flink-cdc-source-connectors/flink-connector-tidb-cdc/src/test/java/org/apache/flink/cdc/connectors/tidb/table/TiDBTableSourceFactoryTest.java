@@ -21,6 +21,7 @@ import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.Schema;
+import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.CatalogTableAdapter;
 import org.apache.flink.table.catalog.Column;
 import org.apache.flink.table.catalog.ObjectIdentifier;
@@ -105,7 +106,6 @@ public class TiDBTableSourceFactoryTest {
                         MY_HOSTNAME,
                         MY_DATABASE,
                         MY_TABLE,
-                        null,
                         MY_USERNAME,
                         MY_PASSWORD,
                         ZoneId.of("UTC").toString(),
@@ -156,7 +156,6 @@ public class TiDBTableSourceFactoryTest {
                         MY_HOSTNAME,
                         MY_DATABASE,
                         MY_TABLE,
-                        null,
                         MY_USERNAME,
                         MY_PASSWORD,
                         ZoneId.of("UTC").toString(),
@@ -179,6 +178,23 @@ public class TiDBTableSourceFactoryTest {
                         JDBC_DRIVER.defaultValue(),
                         StartupOptions.initial());
         Assertions.assertThat(expectedSource).isEqualTo(actualSource);
+    }
+
+    @Test
+    public void testTableListOptionIsRejected() {
+        Map<String, String> properties = getAllOptions();
+        properties.put("table-list", "inventory.products,inventory.customers");
+
+        Throwable validationFailure =
+                Assertions.catchThrowable(() -> createTableSource(properties));
+
+        Assertions.assertThat(validationFailure)
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining("table-list");
+        Assertions.assertThat(validationFailure.getCause())
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining("Unsupported options")
+                .hasMessageContaining("table-list");
     }
 
     private Map<String, String> getAllOptions() {
