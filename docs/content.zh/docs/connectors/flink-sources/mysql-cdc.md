@@ -41,14 +41,7 @@ MySQL CDC 连接器允许从 MySQL 数据库读取快照数据和增量数据。
 
 ### Maven dependency
 
-```
-<dependency>
-   <groupId>org.apache.flink</groupId>
-   <artifactId>flink-connector-mysql-cdc</artifactId>
-   <!--  请使用已发布的版本依赖，snapshot 版本的依赖需要本地自行编译。 -->
-   <version>3.3-SNAPSHOT</version>
-</dependency>
-```
+{{< artifact flink-connector-mysql-cdc >}}
 
 ### SQL Client JAR
 
@@ -109,7 +102,7 @@ mysql> FLUSH PRIVILEGES;
 ### 为每个 Reader 设置不同的 Server id
 
 每个用于读取 binlog 的 MySQL 数据库客户端都应该有一个唯一的 id，称为 Server id。 MySQL 服务器将使用此 id 来维护网络连接和 binlog 位置。 因此，如果不同的作业共享相同的 Server id， 则可能导致从错误的 binlog 位置读取数据。
-因此，建议通过为每个 Reader 设置不同的 Server id  [SQL Hints](https://nightlies.apache.org/flink/flink-docs-release-1.20/zh/docs/dev/table/sql/queries/hints/),
+因此，建议通过 [SQL Hints](https://nightlies.apache.org/flink/flink-docs-release-1.20/zh/docs/dev/table/sql/queries/hints/) 为每个 Reader 设置不同的 Server id，
 假设 Source 并行度为 4, 我们可以使用 `SELECT * FROM source_table /*+ OPTIONS('server-id'='5401-5404') */ ;` 来为 4 个 Source readers 中的每一个分配唯一的 Server id。
 
 
@@ -231,7 +224,7 @@ Flink SQL> SELECT * FROM orders;
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>读取数据使用的 server id，server id 可以是个整数或者一个整数范围，比如 '5400' 或 '5400-5408', 
-      建议在 'scan.incremental.snapshot.enabled' 参数为启用时，配置成整数范围。因为在当前 MySQL 集群中运行的所有 slave 节点，标记每个 salve 节点的 id 都必须是唯一的。 所以当连接器加入 MySQL 集群作为另一个 slave 节点（并且具有唯一 id 的情况下），它就可以读取 binlog。 默认情况下，连接器会在 5400 和 6400 之间生成一个随机数，但是我们建议用户明确指定 Server id。
+      建议在 'scan.incremental.snapshot.enabled' 参数为启用时，配置成整数范围。每个 id 在 MySQL 集群中当前运行的所有数据库进程之间必须是唯一的。该连接器以另一个 server 的身份（具有此唯一 id）加入 MySQL 集群，从而可以读取 binlog。 默认情况下，连接器会在 5400 和 6400 之间生成一个随机数，但是我们建议用户明确指定 Server id。
       </td>
     </tr>
     <tr>
@@ -242,8 +235,8 @@ Flink SQL> SELECT * FROM orders;
           <td>增量快照是一种读取表快照的新机制，与旧的快照机制相比，
               增量快照有许多优点，包括：
               （1）在快照读取期间，Source 支持并发读取，
-              （2）在快照读取期间，Source 支持进行 chunk 粒度的 checkpoint，
-              （3）在快照读取之前，Source 不需要数据库锁权限。
+              （2）在快照读取期间，Source 支持进行分片粒度的 checkpoint，
+              （3）在快照读取之前，Source 不需要获取全局读锁（FLUSH TABLES WITH READ LOCK）。
               如果希望 Source 并行运行，则每个并行 Readers 都应该具有唯一的 Server id，所以
               Server id 必须是类似 `5400-6400` 的范围，并且该范围必须大于并行度。
               请查阅 <a href="#增量快照读取">增量快照读取</a> 章节了解更多详细信息。
@@ -254,7 +247,7 @@ Flink SQL> SELECT * FROM orders;
           <td>optional</td>
           <td style="word-wrap: break-word;">8096</td>
           <td>Integer</td>
-          <td>表快照的块大小（行数），读取表的快照时，捕获的表被拆分为多个块。</td>
+          <td>表快照的分片大小（行数），读取表的快照时，捕获的表被拆分为多个分片。</td>
     </tr>
     <tr>
           <td>scan.snapshot.fetch.size</td>
@@ -337,8 +330,7 @@ Flink SQL> SELECT * FROM orders;
       </td>
     </tr>
     <tr>
-      <td>debezium.min.row.
-      count.to.stream.result</td>
+      <td>debezium.min.row.count.to.stream.result</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">1000</td>
       <td>Integer</td>
@@ -369,7 +361,7 @@ Flink SQL> SELECT * FROM orders;
     <tr>
           <td>jdbc.properties.*</td>
           <td>optional</td>
-          <td style="word-wrap: break-word;"></td>
+          <td style="word-wrap: break-word;">(none)</td>
           <td>String</td>
           <td>传递自定义 JDBC URL 属性的选项。用户可以传递自定义属性，如 'jdbc.properties.useSSL' = 'false'.</td>
     </tr>
@@ -378,7 +370,7 @@ Flink SQL> SELECT * FROM orders;
           <td>optional</td>
           <td style="word-wrap: break-word;">30s</td>
           <td>Duration</td>
-          <td>用于跟踪最新可用 binlog 偏移的发送心跳事件的间隔。</td>
+          <td>用于跟踪最新可用 binlog 位点的发送心跳事件的间隔。</td>
     </tr>
     <tr>
       <td>debezium.*</td>
@@ -386,7 +378,7 @@ Flink SQL> SELECT * FROM orders;
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>将 Debezium 的属性传递给 Debezium 嵌入式引擎，该引擎用于从 MySQL 服务器捕获数据更改。
-          For example: <code>'debezium.snapshot.mode' = 'never'</code>.
+          例如：<code>'debezium.snapshot.mode' = 'never'</code>.
           查看更多关于 <a href="https://debezium.io/documentation/reference/1.9/connectors/mysql.html#mysql-connector-properties"> Debezium 的  MySQL 连接器属性</a></td> 
     </tr>
     <tr>
@@ -401,7 +393,22 @@ Flink SQL> SELECT * FROM orders;
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>
       <td>Boolean</td>
-      <td>是否在快照结束后关闭空闲的 Reader。 此特性需要 flink 版本大于等于 1.14 并且 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' 需要设置为 true。</td>
+      <td>是否在快照阶段结束后关闭空闲的 Reader。 <br>
+          当 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' 设置为 true 时，要求 flink 版本大于等于 1.14。<br>
+          如果 flink 版本大于等于 1.15，'execution.checkpointing.checkpoints-after-tasks-finish.enabled' 的默认值已变更为 true，
+          因此不需要显式配置 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' = 'true'
+      </td>
+    </tr>
+    <tr>
+      <td>debezium.binary.handling.mode</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>debezium.binary.handling.mode 可以设置为以下值之一：
+          none：不做任何处理，binary 数据类型以字节数组（byte array）的形式传输。
+          base64：将 binary 数据类型转换为 Base64 编码的字符串进行传输。
+          hex：将 binary 数据类型转换为十六进制字符串进行传输。
+      默认值为 none。可以根据需求和数据类型选择合适的处理模式。如果数据库中包含大量 binary 数据类型，建议使用 base64 或 hex 模式，以便在传输过程中更易于处理。</td> 
     </tr>
     <tr>
       <td>scan.parse.online.schema.changes.enabled</td>
@@ -412,7 +419,19 @@ Flink SQL> SELECT * FROM orders;
         是否尝试解析由 <a href="https://github.com/github/gh-ost">gh-ost</a> 或 <a href="https://docs.percona.com/percona-toolkit/pt-online-schema-change.html">pt-osc</a> 工具生成的表结构变更事件。
         这些工具会在变更表结构时，将变更语句应用到“影子表”之上，并稍后将其与主表进行交换，以达到表结构变更的目的。
         <br>
-        这是一项实验性功能。
+        这是一项实验性功能，未来可能会发生变化。
+      </td>
+    </tr>
+    <tr>
+      <td>use.legacy.json.format</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">true</td>
+      <td>Boolean</td>
+      <td>是否使用 legacy JSON 格式来转换 Binlog 中的 JSON 类型的数据。 <br>
+          这代表着是否使用 legacy JSON 格式来转换 Binlog 中的 JSON 类型的数据。
+          如果用户配置 'use.legacy.json.format' = 'true'，则从 Binlog 中转换 JSON 类型的数据时，会移除值之前的空格和逗号之后的空格。例如，
+          Binlog 中 JSON 类型的数据 {"key1": "value1", "key2": "value2"} 会被转换为 {"key1":"value1","key2":"value2"}。
+          如果设置 'use.legacy.json.format' = 'false'， 这条数据会被转换为 {"key1": "value1", "key2": "value2"}， 也就是 key 和 value 前的空格都会被保留。
       </td>
     </tr>
     <tr>
@@ -422,7 +441,7 @@ Flink SQL> SELECT * FROM orders;
       <td>Boolean</td>
       <td>
         快照读取阶段是否先分配 UnboundedChunk。<br>
-        这有助于降低 TaskManager 在快照阶段同步最后一个chunk时遇到内存溢出 (OOM) 的风险。<br> 
+        这可能有助于降低 TaskManager 在对最大的 UnboundedChunk 执行快照时出现内存溢出 (OOM) 错误的风险。<br> 
       </td>
     </tr>
     <tr>
@@ -448,17 +467,6 @@ Flink SQL> SELECT * FROM orders;
         如果跳过 backfill ，快照阶段捕获表的更改将在稍后的 binlog 读取阶段被回放，而不是合并到快照中。<br>
         警告：跳过 backfill 可能会导致数据不一致，因为快照阶段发生的某些 binlog 事件可能会被重放（仅保证 at-least-once ）。
         例如，更新快照阶段已更新的值，或删除快照阶段已删除的数据。这些重放的 binlog 事件应进行特殊处理。
-    </tr>
-    <tr>
-      <td>use.legacy.json.format</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">true</td>
-      <td>Boolean</td>
-      <td>是否使用 legacy JSON 格式来转换 Binlog 中的 JSON 类型的数据。 <br>
-          这代表着是否使用 legacy JSON 格式来转换 Binlog 中的 JSON 类型的数据。
-          如果用户配置 'use.legacy.json.format' = 'true'，则从 Binlog 中转换 JSON 类型的数据时，会移除值之前的空格和逗号之后的空格。例如，
-          Binlog 中 JSON 类型的数据 {"key1": "value1", "key2": "value2"} 会被转换为 {"key1":"value1","key2":"value2"}。
-          如果设置 'use.legacy.json.format' = 'false'， 这条数据会被转换为 {"key1": "value1", "key2": "value2"}， 也就是 key 和 value 前的空格都会被保留。
       </td>
     </tr>
     </tbody>
@@ -498,60 +506,64 @@ Flink SQL> SELECT * FROM orders;
       <td>row_kind</td>
       <td>STRING NOT NULL</td>
       <td>当前记录的变更类型。<br>
-         注意：如果 Source 算子选择为每条记录输出 row_kind 列，则下游 SQL 操作符在处理回撤时可能会由于此新添加的列而无法比较，导致出现非确定性更新问题。建议仅在简单的同步作业中使用此元数据列。<br>
+         注意：如果 Source 算子选择为每条记录输出 row_kind 列，则下游 SQL 操作符在处理回撤时可能会由于此新添加的列而无法比较。建议仅在简单的同步作业中使用此元数据列。<br>
          '+I' 表示 INSERT 消息，'-D' 表示 DELETE 消息，'-U' 表示 UPDATE_BEFORE 消息，'+U' 表示 UPDATE_AFTER 消息。</td>
     </tr>
   </tbody>
 </table>
 
 下述创建表示例展示元数据列的用法：
+
 ```sql
-CREATE TABLE products (
-    db_name STRING METADATA FROM 'database_name' VIRTUAL,
-    table_name STRING METADATA  FROM 'table_name' VIRTUAL,
-    operation_ts TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
-    operation STRING METADATA FROM 'row_kind' VIRTUAL,
-    order_id INT,
-    order_date TIMESTAMP(0),
+CREATE TABLE products
+(
+    db_name       STRING METADATA FROM 'database_name' VIRTUAL,
+    table_name    STRING METADATA FROM 'table_name' VIRTUAL,
+    operation_ts  TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
+    operation     STRING METADATA FROM 'row_kind' VIRTUAL,
+    order_id      INT,
+    order_date    TIMESTAMP(0),
     customer_name STRING,
-    price DECIMAL(10, 5),
-    product_id INT,
-    order_status BOOLEAN,
-    PRIMARY KEY(order_id) NOT ENFORCED
+    price         DECIMAL(10, 5),
+    product_id    INT,
+    order_status  BOOLEAN,
+    PRIMARY KEY (order_id) NOT ENFORCED
 ) WITH (
-    'connector' = 'mysql-cdc',
-    'hostname' = 'localhost',
-    'port' = '3306',
-    'username' = 'root',
-    'password' = '123456',
-    'database-name' = 'mydb',
-    'table-name' = 'orders'
-);
+      'connector' = 'mysql-cdc',
+      'hostname' = 'localhost',
+      'port' = '3306',
+      'username' = 'root',
+      'password' = '123456',
+      'database-name' = 'mydb',
+      'table-name' = 'orders'
+      );
 ```
 
 下述创建表示例展示使用正则表达式匹配多张库表的用法：
+
 ```sql
-CREATE TABLE products (
-    db_name STRING METADATA FROM 'database_name' VIRTUAL,
-    table_name STRING METADATA  FROM 'table_name' VIRTUAL,
-    operation_ts TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
-    operation STRING METADATA FROM 'row_kind' VIRTUAL,
-    order_id INT,
-    order_date TIMESTAMP(0),
+CREATE TABLE products
+(
+    db_name       STRING METADATA FROM 'database_name' VIRTUAL,
+    table_name    STRING METADATA FROM 'table_name' VIRTUAL,
+    operation_ts  TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
+    operation     STRING METADATA FROM 'row_kind' VIRTUAL,
+    order_id      INT,
+    order_date    TIMESTAMP(0),
     customer_name STRING,
-    price DECIMAL(10, 5),
-    product_id INT,
-    order_status BOOLEAN,
-    PRIMARY KEY(order_id) NOT ENFORCED
+    price         DECIMAL(10, 5),
+    product_id    INT,
+    order_status  BOOLEAN,
+    PRIMARY KEY (order_id) NOT ENFORCED
 ) WITH (
-    'connector' = 'mysql-cdc',
-    'hostname' = 'localhost',
-    'port' = '3306',
-    'username' = 'root',
-    'password' = '123456',
-    'database-name' = '(^(test).*|^(tpc).*|txc|.*[p$]|t{2})',
-    'table-name' = '(t[5-8]|tt)'
-);
+      'connector' = 'mysql-cdc',
+      'hostname' = 'localhost',
+      'port' = '3306',
+      'username' = 'root',
+      'password' = '123456',
+      'database-name' = '(^(test).*|^(tpc).*|txc|.*[p$]|t{2})',
+      'table-name' = '(t[5-8]|tt)'
+      );
 ```
 <table class="colwidths-auto docutils">
   <thead>
@@ -589,17 +601,17 @@ CREATE TABLE products (
 
 增量快照读取是一种读取表快照的新机制。与旧的快照机制相比，增量快照具有许多优点，包括：
 * （1）在快照读取期间，Source 支持并发读取，
-* （2）在快照读取期间，Source 支持进行 chunk 粒度的 checkpoint，
-* （3）在快照读取之前，Source 不需要数据库锁权限。
+* （2）在快照读取期间，Source 支持进行分片粒度的 checkpoint，
+* （3）在快照读取之前，Source 不需要获取全局读锁（FLUSH TABLES WITH READ LOCK）。
 
 如果希望 source 并行运行，则每个并行 reader 都应该具有唯一的 server id，因此`server id`的范围必须类似于 `5400-6400`，
-且范围必须大于并行度。在增量快照读取过程中，MySQL CDC Source 源首先会根据您指定的表块键将表分块(chunk）
-然后 MySQL CDC Source 将多个块分配给多个 reader 以并行读取表的数据。
+且范围必须大于并行度。在增量快照读取过程中，MySQL CDC Source 首先会根据您指定的分片键将表拆分为多个分片（chunk），
+然后 MySQL CDC Source 将多个分片分配给多个 reader 以并行读取表的数据。
 
 #### 并发读取
 
 增量快照读取提供了并行读取快照数据的能力。
-你可以通过设置作业并行度的方式来控制 Source 的并行度 `parallelism.default`. For example, in SQL CLI:
+你可以通过设置作业并行度的方式来控制 Source 的并行度 `parallelism.default`。例如，在 SQL CLI 中：
 
 ```sql
 Flink SQL> SET 'parallelism.default' = 8;
@@ -607,22 +619,22 @@ Flink SQL> SET 'parallelism.default' = 8;
 
 #### 全量阶段支持 checkpoint
 
-增量快照读取提供了在区块级别执行检查点的能力。它使用新的快照读取机制解决了以前版本中的检查点超时问题。
+增量快照读取提供了在分片级别执行 checkpoint 的能力。它使用新的快照读取机制解决了以前版本中的 checkpoint 超时问题。
 
 #### 无锁算法
 
-MySQL CDC source 使用 增量快照算法, 避免了数据库锁的使用，因此不需要 “RELOAD” 权限。
+MySQL CDC source 使用**增量快照算法**，避免了获取全局读锁（FLUSH TABLES WITH READ LOCK），因此不需要 `RELOAD` 权限。
 
 #### MySQL高可用性支持
 
-```mysql cdc``` 连接器通过使用 [GTID](https://dev.mysql.com/doc/refman/5.7/en/replication-gtids-concepts.html) 提供 MySQL 高可用集群的高可用性信息。为了获得高可用性， MySQL集群需要启用 GTID 模式，MySQL 配置文件中的 GTID 模式应该包含以下设置：
+```mysql-cdc``` 连接器通过使用 [GTID](https://dev.mysql.com/doc/refman/5.7/en/replication-gtids-concepts.html) 信息提供 MySQL 高可用集群的高可用性。为了获得高可用性， MySQL集群需要启用 GTID 模式，MySQL 配置文件中的 GTID 模式应该包含以下设置：
 
 ```yaml
 gtid_mode = on
 enforce_gtid_consistency = on
 ```
 
-如果监控的MySQL服务器地址包含从实例，则需要对MySQL配置文件设置以下设置。设置 ```log slave updates=1``` 允许从实例也将从主实例同步的数据写入其binlog， 这确保了```mysql cdc```连接器可以使用从实例中的全部数据。
+如果监控的MySQL服务器地址包含从实例，则需要对MySQL配置文件设置以下设置。设置 ```log-slave-updates = 1``` 允许从实例也将从主实例同步的数据写入其binlog， 这确保了```mysql-cdc```连接器可以使用从实例中的全部数据。
 
 ```yaml
 gtid_mode = on
@@ -630,41 +642,41 @@ enforce_gtid_consistency = on
 log-slave-updates = 1
 ```
 
-MySQL 集群中你监控的服务器出现故障后, 你只需将受监视的服务器地址更改为其他可用服务器，然后从最新的检查点/保存点重新启动作业, 作业将从 checkpoint/savepoint 恢复，不会丢失任何记录。
+MySQL 集群中你监控的服务器出现故障后, 你只需将受监视的服务器地址更改为其他可用服务器，然后从最新的 checkpoint/savepoint 重新启动作业, 作业将从 checkpoint/savepoint 恢复，不会丢失任何记录。
 
-建议为 MySQL 集群配置 DNS（域名服务）或 VIP（虚拟 IP 地址）， 使用```mysql cdc```连接器的 DNS 或 VIP 地址， DNS或VIP将自动将网络请求路由到活动MySQL服务器。 这样，你就不再需要修改地址和重新启动管道。
+建议为 MySQL 集群配置 DNS（域名服务）或 VIP（虚拟 IP 地址）， 使用```mysql-cdc```连接器的 DNS 或 VIP 地址， DNS或VIP将自动将网络请求路由到活动MySQL服务器。 这样，你就不再需要修改地址和重新启动管道。
 
 #### MySQL心跳事件支持
 
 如果表不经常更新，则 binlog 文件或 GTID 集可能已在其最后提交的 binlog 位置被清理。
-在这种情况下，CDC 作业可能会重新启动失败。因此心跳事件将帮助更新 binlog 位置。 默认情况下，MySQL CDC Source 启用心跳事件，间隔设置为30秒。 可以使用表选项```heartbeat```指定间隔。或将选项设置为```0s```以禁用心跳事件。
+在这种情况下，CDC 作业可能会重新启动失败。因此心跳事件将帮助更新 binlog 位置。 默认情况下，MySQL CDC Source 启用心跳事件，间隔设置为30秒。 可以使用表选项```heartbeat.interval```指定间隔。或将选项设置为`0s`以禁用心跳事件。
 
 #### 增量快照读取的工作原理
 
 当 MySQL CDC Source 启动时，它并行读取表的快照，然后以单并行度的方式读取表的 binlog。
 
-在快照阶段，快照会根据表的分块键和表行的大小切割成多个快照块。
-快照块被分配给多个快照读取器。每个快照读取器使用 [区块读取算法](#区块读取算法) 并将读取的数据发送到下游。
-Source 会管理块的进程状态（完成或未完成），因此快照阶段的 Source 可以支持块级别的 checkpoint。
-如果发生故障，可以恢复 Source 并继续从最后完成的块中读取块。
+在快照阶段，快照会根据表的分片键和表行的大小切割成多个快照分片。
+快照分片被分配给多个快照读取器。每个快照读取器使用 [分片读取算法](#分片读取算法) 读取其接收到的分片，并将读取的数据发送到下游。
+Source 会管理分片的进程状态（完成或未完成），因此快照阶段的 Source 可以支持分片级别的 checkpoint。
+如果发生故障，可以恢复 Source 并继续从最后完成的分片中读取分片。
 
-所有快照块完成后，Source 将继续在单个任务中读取 binlog。
-为了保证快照记录和 binlog 记录的全局数据顺序，binlog reader 将开始读取数据直到快照块完成后并有一个完整的 checkpoint，以确保所有快照数据已被下游消费。
+所有快照分片完成后，Source 将继续在单个任务中读取 binlog。
+为了保证快照记录和 binlog 记录的全局数据顺序，binlog reader 将开始读取数据直到快照分片完成后并有一个完整的 checkpoint，以确保所有快照数据已被下游消费。
 binlog reader 在状态中跟踪所使用的 binlog 位置，因此 binlog 阶段的 Source 可以支持行级别的 checkpoint。
 
-Flink 定期为 Source 执行 checkpoint，在故障转移的情况下，作业将重新启动并从最后一个成功的 checkpoint 状态恢复，并保证只执行一次语义。
+Flink 定期为 Source 执行 checkpoint，在故障转移的情况下，作业将重新启动并从最后一个成功的 checkpoint 状态恢复，并保证 Exactly once 语义。
 
 ##### 全量阶段分片算法
 
-在执行增量快照读取时，MySQL CDC source 需要一个用于分片的的算法。
-MySQL CDC Source 使用主键列将表划分为多个分片（chunk）。 默认情况下，MySQL CDC source 会识别表的主键列，并使用主键中的第一列作为用作分片列。
-如果表中没有主键，用户必须指定 `scan.incremental.snapshot.chunk.key-column`、
+在执行增量快照读取时，MySQL CDC source 需要一个用于分片的算法。
+MySQL CDC Source 使用拆分列将表划分为多个分片（chunk）。 默认情况下，MySQL CDC source 会识别表的主键列，并使用主键中的第一列作为拆分列。
+如果表中没有主键，用户必须指定 `scan.incremental.snapshot.chunk.key-column`，
 否则增量快照读取将失败，你可以禁用 `scan.incremental.snapshot.enabled` 恢复到旧的快照读取机制。
-请注意，使用不在主键中的列作为分块键可能会降低表的查询性能。
+请注意，使用不在主键中的列作为分片键可能会降低表的查询性能。
 
-对于数值和自动增量拆分列，MySQL CDC Source 按固定步长高效地拆分块。
+对于数值和自动增量拆分列，MySQL CDC Source 按固定步长高效地拆分分片。
 例如，如果你有一个主键列为`id`的表，它是自动增量 BIGINT 类型，最小值为`0`，最大值为`100`，
-和表选项 `scan.incremental.snapshot.chunk.size` 大小 `value`为`25`，表将被拆分为以下块：
+且表选项 `scan.incremental.snapshot.chunk.size` 的值为 `25`，则表将被拆分为以下分片：
 
 ```
  (-∞, 25),
@@ -674,8 +686,8 @@ MySQL CDC Source 使用主键列将表划分为多个分片（chunk）。 默认
  [100, +∞)
 ```
 
-对于其他主键列类型， MySQL CDC Source 将以下形式执行语句： `SELECT MAX(STR_ID) AS chunk_high FROM (SELECT * FROM TestTable WHERE STR_ID > 'uuid-001' ORDER BY STR_ID ASC LIMIT 25)` 来获得每个区块的低值和高值，
-分割块集如下所示：
+对于其他主键列类型， MySQL CDC Source 将以以下形式执行语句： `SELECT MAX(STR_ID) AS chunk_high FROM (SELECT * FROM TestTable WHERE STR_ID > 'uuid-001' ORDER BY STR_ID ASC LIMIT 25)` 来获得每个分片的低值和高值，
+分割后的分片集如下所示：
 
  ```
  (-∞, 'uuid-001'),
@@ -685,36 +697,37 @@ MySQL CDC Source 使用主键列将表划分为多个分片（chunk）。 默认
  [uuid-def, +∞).
 ```
 
-##### 区块读取算法
+##### 分片读取算法
 
-对于上面的示例`MyTable`，如果 MySQL CDC Source 并行度设置为 4，MySQL CDC Source 将在每一个 executes 运行 4 个 Readers **通过偏移信号算法**
-获取快照区块的最终一致输出。 **偏移信号算法**简单描述如下：
+对于上面的示例`MyTable`，如果 MySQL CDC Source 并行度设置为 4，MySQL CDC Source 将运行 4 个 reader，每个 reader 都执行**偏移信号算法**
+来获取快照分片的最终一致输出。 **偏移信号算法**简单描述如下：
 
 * (1) 将当前 binlog 位置记录为`LOW`偏移量
-* (2) 通过执行语句读取并缓冲快照区块记录 `SELECT * FROM MyTable WHERE id > chunk_low AND id <= chunk_high`
+* (2) 通过执行语句读取并缓冲快照分片记录 `SELECT * FROM MyTable WHERE id > chunk_low AND id <= chunk_high`
 * (3) 将当前 binlog 位置记录为`HIGH`偏移量
-* (4) 从`LOW`偏移量到`HIGH`偏移量读取属于快照区块的 binlog 记录
-* (5) 将读取的 binlog 记录向上插入缓冲区块记录，并发出缓冲区中的所有记录作为快照区块的最终输出（全部作为插入记录）
-* (6) 继续读取并发出属于 *单个 binlog reader* 中`HIGH`偏移量之后的区块的 binlog 记录。
+* (4) 从`LOW`偏移量到`HIGH`偏移量读取属于快照分片的 binlog 记录
+* (5) 将读取的 binlog 记录 Upsert 到缓冲分片记录中，并发出缓冲区中的所有记录作为快照分片的最终输出（全部作为插入记录）
+* (6) 继续读取并发出属于 *单个 binlog reader* 中`HIGH`偏移量之后的分片的 binlog 记录。
 
-该算法的是基于 [DBLog Paper](https://arxiv.org/pdf/2010.12597v1.pdf) 并结合 Flink 的一个变种, 请参考它了解更多详细信息。
+该算法受 [DBLog Paper](https://arxiv.org/pdf/2010.12597v1.pdf) 的启发，请参考该论文了解更多细节。
 
 **注意:** 如果主键的实际值在其范围内分布不均匀，则在增量快照读取时可能会导致任务不平衡。
 
 ### Exactly-Once 处理
 
-MySQL CDC 连接器是一个 Flink Source 连接器，它将首先读取表快照块，然后继续读取 binlog，
+MySQL CDC 连接器是一个 Flink Source 连接器，它将首先读取表快照分片，然后继续读取 binlog，
 无论是在快照阶段还是读取 binlog 阶段，MySQL CDC 连接器都会在处理时**准确读取数据**，即使任务出现了故障。
 
 ### 启动模式
 
-配置选项```scan.startup.mode```指定 MySQL CDC 使用者的启动模式。有效枚举包括：
+配置选项`scan.startup.mode`指定 MySQL CDC 使用者的启动模式。有效枚举包括：
 
 - `initial` （默认）：在第一次启动时对受监视的数据库表执行初始快照，并继续读取最新的 binlog。
 - `earliest-offset`：跳过快照阶段，从可读取的最早 binlog 位点开始读取
 - `latest-offset`：首次启动时，从不对受监视的数据库表执行快照， 连接器仅从 binlog 的结尾处开始读取，这意味着连接器只能读取在连接器启动之后的数据更改。
 - `specific-offset`：跳过快照阶段，从指定的 binlog 位点开始读取。位点可通过 binlog 文件名和位置指定，或者在 GTID 在集群上启用时通过 GTID 集合指定。
 - `timestamp`：跳过快照阶段，从指定的时间戳开始读取 binlog 事件。
+- `snapshot`：仅执行快照阶段，并在快照阶段读取完成后退出。
 
 例如使用 DataStream API:
 ```java
@@ -734,15 +747,15 @@ MySQLSource.builder()
 ```SQL
 CREATE TABLE mysql_source (...) WITH (
     'connector' = 'mysql-cdc',
-    'scan.startup.mode' = 'earliest-offset', -- 从最早位点启动
-    'scan.startup.mode' = 'latest-offset', -- 从最晚位点启动
-    'scan.startup.mode' = 'specific-offset', -- 从特定位点启动
-    'scan.startup.mode' = 'timestamp', -- 从特定位点启动
-    'scan.startup.mode' = 'snapshot', -- 仅读取快照
-    'scan.startup.specific-offset.file' = 'mysql-bin.000003', -- 在特定位点启动模式下指定 binlog 文件名
-    'scan.startup.specific-offset.pos' = '4', -- 在特定位点启动模式下指定 binlog 位置
-    'scan.startup.specific-offset.gtid-set' = '24DA167-0C0C-11E8-8442-00059A3C7B00:1-19', -- 在特定位点启动模式下指定 GTID 集合
-    'scan.startup.timestamp-millis' = '1667232000000' -- 在时间戳启动模式下指定启动时间戳
+    'scan.startup.mode' = 'earliest-offset', -- Start from earliest offset
+    'scan.startup.mode' = 'latest-offset', -- Start from latest offset
+    'scan.startup.mode' = 'specific-offset', -- Start from specific offset
+    'scan.startup.mode' = 'timestamp', -- Start from timestamp
+    'scan.startup.mode' = 'snapshot', -- Read snapshot only
+    'scan.startup.specific-offset.file' = 'mysql-bin.000003', -- Binlog filename under specific offset startup mode
+    'scan.startup.specific-offset.pos' = '4', -- Binlog position under specific offset mode
+    'scan.startup.specific-offset.gtid-set' = '24DA167-0C0C-11E8-8442-00059A3C7B00:1-19', -- GTID set under specific offset startup mode
+    'scan.startup.timestamp-millis' = '1667232000000' -- Timestamp under timestamp startup mode
     ...
 )
 ```
@@ -881,6 +894,35 @@ $ ./bin/flink run \
 
 由于**处理顺序**无法保证，最终 `id=0` 的 `pid` 可能为 `2` 或 `4`，从而导致数据不一致。
 
+### 关于将 binary 类型数据转换为 base64 编码数据
+
+```sql
+CREATE TABLE products (
+    db_name STRING METADATA FROM 'database_name' VIRTUAL,
+    table_name STRING METADATA  FROM 'table_name' VIRTUAL,
+    operation_ts TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
+    order_id INT,
+    order_date TIMESTAMP(0),
+    customer_name STRING,
+    price DECIMAL(10, 5),
+    product_id INT,
+    order_status BOOLEAN,
+    binary_data STRING,
+    PRIMARY KEY(order_id) NOT ENFORCED
+) WITH (
+    'connector' = 'mysql-cdc',
+    'hostname' = 'localhost',
+    'port' = '3306',
+    'username' = 'root',
+    'password' = '123456',
+    'database-name' = 'test_db',
+    'table-name' = 'test_tb',
+    'debezium.binary.handling.mode' = 'base64'
+);
+```
+
+数据库中的 `binary_data` 字段类型为 VARBINARY(N)。在某些场景中，我们需要将 binary 数据转换为 base64 编码的字符串数据。可以通过添加参数 'debezium.binary.handling.mode'='base64' 来启用此功能，
+添加该参数后，我们可以在 Flink SQL 中将 binary 字段类型映射为 'STRING'，从而获得 base64 编码的字符串数据。
 
 ### 可用的指标
 
@@ -1013,7 +1055,7 @@ $ ./bin/flink run \
         where 38 < p <= 65<br>
       </td>
       <td>STRING</td>
-      <td>在 MySQL 中，十进制数据类型的精度高达 65，但在 Flink 中，十进制数据类型的精度仅限于 38。所以，如果定义精度大于 38 的十进制列，则应将其映射到字符串以避免精度损失。在 MySQL 中，十进制数据类型的精度高达65，但在Flink中，十进制数据类型的精度仅限于38。所以，如果定义精度大于 38 的十进制列，则应将其映射到字符串以避免精度损失。</td>
+      <td>在 MySQL 中，十进制数据类型的精度高达 65，但在 Flink 中，十进制数据类型的精度仅限于 38。所以，如果定义精度大于 38 的十进制列，则应将其映射到字符串以避免精度损失。</td>
     </tr>
     <tr>
       <td>
@@ -1060,7 +1102,7 @@ $ ./bin/flink run \
       <td>
         BIT(n)
       </td>
-      <td>BINARY(⌈n/8⌉)</td>
+      <td>BINARY(⌈(n + 7) / 8⌉)</td>
       <td></td>
     </tr>
     <tr>
@@ -1157,7 +1199,7 @@ MySQL中除`GEOMETRYCOLLECTION`之外的空间数据类型都会转换为 Json �
 {"srid": 0 , "type": "xxx", "coordinates": [0, 0]}
 ```
 字段`srid`标识定义几何体的 SRS，如果未指定 SRID，则 SRID 0 是新几何体值的默认值。
-由于 MySQL 8+ 在定义空间数据类型时只支持特定的 SRID，因此在版本较低的MySQL中，字段`srid`将始终为 0。
+由于只有 MySQL 8+ 在定义空间数据类型时支持指定 SRID，因此在版本较低的MySQL中，字段`srid`将始终为 0。
 
 字段`type`标识空间数据类型，例如`POINT`/`LINESTRING`/`POLYGON`。
 
@@ -1168,15 +1210,15 @@ MySQL中除`GEOMETRYCOLLECTION`之外的空间数据类型都会转换为 Json �
 {"srid": 0 , "type": "GeometryCollection", "geometries": [{"type":"Point","coordinates":[10,10]}]}
 ```
 
-`Geometrics`字段是一个包含所有空间数据的数组。
+`geometries`字段是一个包含所有空间数据的数组。
 
 不同空间数据类型映射的示例如下：
 <div class="wy-table-responsive">
 <table class="colwidths-auto docutils">
     <thead>
       <tr>
-        <th class="text-left">Spatial data in MySQL</th>
-        <th class="text-left">Json String converted in Flink</th>
+        <th class="text-left">MySQL 中的空间数据</th>
+        <th class="text-left">在 Flink 中转换的 Json 字符串</th>
       </tr>
     </thead>
     <tbody>
