@@ -58,7 +58,6 @@ jobs:
           - master
           - release-3.7
           - release-3.6
-          - release-3.5
 
     steps:
       - uses: actions/checkout@v6
