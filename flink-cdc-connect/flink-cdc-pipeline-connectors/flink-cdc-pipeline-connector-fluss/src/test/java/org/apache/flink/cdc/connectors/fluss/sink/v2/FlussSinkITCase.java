@@ -167,7 +167,7 @@ public class FlussSinkITCase extends AbstractTestBase {
     }
 
     @Test
-    void testWrongTableOptions() {
+    void testWrongTableOptions() throws Exception {
         TableId tableId = TableId.tableId("default_namespace", DEFAULT_DB, "test_wrong_options");
         Schema schema =
                 Schema.newBuilder()
@@ -176,19 +176,21 @@ public class FlussSinkITCase extends AbstractTestBase {
                         .build();
         Map<String, String> tableProperties = new HashMap<>();
         tableProperties.put("table.non-key", "non-key-value");
-        FlussMetaDataApplier metaDataApplier =
+        try (FlussMetaDataApplier metaDataApplier =
                 new FlussMetaDataApplier(
                         FLUSS_CLUSTER_EXTENSION.getClientConfig(),
                         tableProperties,
                         Collections.emptyMap(),
-                        Collections.emptyMap());
+                        Collections.emptyMap())) {
 
-        assertThatThrownBy(
-                        () ->
-                                metaDataApplier.applySchemaChange(
-                                        new CreateTableEvent(tableId, schema)))
-                .rootCause()
-                .hasMessageContaining("'table.non-key' is not a recognized Fluss table property");
+            assertThatThrownBy(
+                            () ->
+                                    metaDataApplier.applySchemaChange(
+                                            new CreateTableEvent(tableId, schema)))
+                    .rootCause()
+                    .hasMessageContaining(
+                            "'table.non-key' is not a recognized Fluss table property");
+        }
     }
 
     @ParameterizedTest
