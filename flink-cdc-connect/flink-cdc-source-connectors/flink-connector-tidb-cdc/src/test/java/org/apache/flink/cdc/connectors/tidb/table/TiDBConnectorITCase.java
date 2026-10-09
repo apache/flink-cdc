@@ -72,12 +72,19 @@ class TiDBConnectorITCase extends TiDBTestBase {
                                 + " PRIMARY KEY (`id`) NOT ENFORCED"
                                 + ") WITH ("
                                 + " 'connector' = 'tidb-cdc',"
-                                + " 'tikv.grpc.timeout_in_ms' = '20000',"
                                 + " 'pd-addresses' = '%s',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'username' = '%s',"
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s'"
                                 + ")",
                         PD.getContainerIpAddress() + ":" + PD.getMappedPort(PD_PORT_ORIGIN),
+                        TIDB.getHost(),
+                        TIDB.getMappedPort(TIDB_PORT),
+                        TIDB_PASSWORD,
+                        TIDB_USER,
                         "inventory",
                         "products");
 
@@ -177,12 +184,19 @@ class TiDBConnectorITCase extends TiDBTestBase {
                                 + " PRIMARY KEY (`id`) NOT ENFORCED"
                                 + ") WITH ("
                                 + " 'connector' = 'tidb-cdc',"
-                                + " 'tikv.grpc.timeout_in_ms' = '20000',"
                                 + " 'pd-addresses' = '%s',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'username' = '%s',"
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s'"
                                 + ")",
                         PD.getContainerIpAddress() + ":" + PD.getMappedPort(PD_PORT_ORIGIN),
+                        TIDB.getHost(),
+                        TIDB.getMappedPort(TIDB_PORT),
+                        TIDB_PASSWORD,
+                        TIDB_USER,
                         "inventory",
                         "products");
 
@@ -256,12 +270,19 @@ class TiDBConnectorITCase extends TiDBTestBase {
                                 + " PRIMARY KEY (`id`) NOT ENFORCED"
                                 + ") WITH ("
                                 + " 'connector' = 'tidb-cdc',"
-                                + " 'tikv.grpc.timeout_in_ms' = '20000',"
                                 + " 'pd-addresses' = '%s',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'username' = '%s',"
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s'"
                                 + ")",
                         PD.getContainerIpAddress() + ":" + PD.getMappedPort(PD_PORT_ORIGIN),
+                        TIDB.getHost(),
+                        TIDB.getMappedPort(TIDB_PORT),
+                        TIDB_PASSWORD,
+                        TIDB_USER,
                         "inventory",
                         "products");
 
@@ -344,12 +365,19 @@ class TiDBConnectorITCase extends TiDBTestBase {
                                 + " PRIMARY KEY (`id`) NOT ENFORCED"
                                 + ") WITH ("
                                 + " 'connector' = 'tidb-cdc',"
-                                + " 'tikv.grpc.timeout_in_ms' = '20000',"
                                 + " 'pd-addresses' = '%s',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'username' = '%s',"
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s'"
                                 + ")",
                         PD.getContainerIpAddress() + ":" + PD.getMappedPort(PD_PORT_ORIGIN),
+                        TIDB.getHost(),
+                        TIDB.getMappedPort(TIDB_PORT),
+                        TIDB_PASSWORD,
+                        TIDB_USER,
                         "inventory",
                         "products");
 
@@ -394,8 +422,8 @@ class TiDBConnectorITCase extends TiDBTestBase {
                         "+I(inventory,products,107,rocks,box of assorted rocks,5.3000000000)",
                         "+I(inventory,products,108,jacket,water resistent black wind breaker,0.1000000000)",
                         "+I(inventory,products,109,spare tire,24 inch spare tire,22.2000000000)",
-                        "+U(inventory,products,106,hammer,18oz carpenter hammer,1.0000000000)",
-                        "-U(inventory,products,106,hammer,16oz carpenter's hammer,1.0000000000)");
+                        "-U(inventory,products,106,hammer,16oz carpenter's hammer,1.0000000000)",
+                        "+U(inventory,products,106,hammer,18oz carpenter hammer,1.0000000000)");
         List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
         assertEqualsInAnyOrder(expected, actual);
         result.getJobClient().get().cancel().get();
@@ -456,10 +484,18 @@ class TiDBConnectorITCase extends TiDBTestBase {
                                 + " 'connector' = 'tidb-cdc',"
                                 + " 'tikv.grpc.timeout_in_ms' = '20000',"
                                 + " 'pd-addresses' = '%s',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'username' = '%s',"
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s'"
                                 + ")",
                         PD.getContainerIpAddress() + ":" + PD.getMappedPort(PD_PORT_ORIGIN),
+                        TIDB.getHost(),
+                        TIDB.getMappedPort(TIDB_PORT),
+                        TIDB_PASSWORD,
+                        TIDB_USER,
                         "column_type_test",
                         "full_types");
 
@@ -530,8 +566,8 @@ class TiDBConnectorITCase extends TiDBTestBase {
 
         List<String> expected =
                 Arrays.asList(
-                        "+I(1,127,255,32767,65535,8388607,16777215,2147483647,4294967295,2147483647,9223372036854775807,18446744073709551615,Hello World,abc,123.102,123.102,404.4443,123.4567,346,34567892.1,false,true,true,2020-07-17,18:00:22,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,2020-07-17T18:00:22,[101, 26, -17, -65, -67, 8, 57, 15, 72, -17, -65, -67, -17, -65, -67, -17, -65, -67, 54, -17, -65, -67, 62, 123, 116, 0],[4, 4, 4, 4, 4, 4, 4, 4],text,[16],[16],[16],[16],2021,red,[a, b],{\"key1\":\"value1\"})",
-                        "+U(1,127,255,32767,65535,8388607,16777215,2147483647,4294967295,2147483647,9223372036854775807,18446744073709551615,Hello World,abc,123.102,123.102,404.4443,123.4567,346,34567892.1,false,true,true,2020-07-17,18:00:22,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,2020-07-17T18:33:22,[101, 26, -17, -65, -67, 8, 57, 15, 72, -17, -65, -67, -17, -65, -67, -17, -65, -67, 54, -17, -65, -67, 62, 123, 116, 0],[4, 4, 4, 4, 4, 4, 4, 4],text,[16],[16],[16],[16],2021,red,[a, b],{\"key1\":\"value1\"})");
+                        "+I(1,127,255,32767,65535,8388607,16777215,2147483647,4294967295,2147483647,9223372036854775807,18446744073709551615,Hello World,abc,123.102,123.102,404.4443,123.4567,346,34567892.1,false,true,true,2020-07-17,18:00:22,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,2020-07-17T18:00:22,[101, 26, -19, 8, 57, 15, 72, -109, -78, -15, 54, -110, 62, 123, 116, 0],[4, 4, 4, 4, 4, 4, 4, 4],text,[16],[16],[16],[16],2021,red,[a, b],{\"key1\": \"value1\"})",
+                        "+U(1,127,255,32767,65535,8388607,16777215,2147483647,4294967295,2147483647,9223372036854775807,18446744073709551615,Hello World,abc,123.102,123.102,404.4443,123.4567,346,34567892.1,false,true,true,2020-07-17,18:00:22,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,2020-07-17T18:33:22,[101, 26, -19, 8, 57, 15, 72, -109, -78, -15, 54, -110, 62, 123, 116, 0],[4, 4, 4, 4, 4, 4, 4, 4],text,[16],[16],[16],[16],2021,red,[a, b],{\"key1\":\"value1\"})");
 
         List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
         assertEqualsInAnyOrder(expected, actual);
@@ -569,12 +605,22 @@ class TiDBConnectorITCase extends TiDBTestBase {
                                 + " 'connector' = 'tidb-cdc',"
                                 + " 'tikv.grpc.timeout_in_ms' = '20000',"
                                 + " 'pd-addresses' = '%s',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'username' = '%s',"
                                 + " 'database-name' = '%s',"
-                                + " 'table-name' = '%s'"
+                                + " 'table-name' = '%s',"
+                                + " 'server-time-zone' = '%s'"
                                 + ")",
                         PD.getContainerIpAddress() + ":" + PD.getMappedPort(PD_PORT_ORIGIN),
+                        TIDB.getHost(),
+                        TIDB.getMappedPort(TIDB_PORT),
+                        TIDB_PASSWORD,
+                        TIDB_USER,
                         "column_type_test",
-                        "full_types");
+                        "full_types",
+                        timezone);
 
         String sinkDDL =
                 "CREATE TABLE sink ("
