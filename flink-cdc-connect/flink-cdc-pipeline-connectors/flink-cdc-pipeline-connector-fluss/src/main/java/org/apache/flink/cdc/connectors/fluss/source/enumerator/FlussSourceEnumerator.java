@@ -43,6 +43,7 @@ import org.apache.fluss.client.initializer.BucketOffsetsRetrieverImpl;
 import org.apache.fluss.client.initializer.OffsetsInitializer;
 import org.apache.fluss.client.initializer.SnapshotOffsetsInitializer;
 import org.apache.fluss.client.metadata.KvSnapshots;
+import org.apache.fluss.exception.RetriableException;
 import org.apache.fluss.exception.UnsupportedVersionException;
 import org.apache.fluss.metadata.PartitionInfo;
 import org.apache.fluss.metadata.PhysicalTablePath;
@@ -293,6 +294,14 @@ public class FlussSourceEnumerator
      */
     private void checkTableBucketChanges(DiscoveryResult discoveryResult, Throwable error) {
         if (error != null) {
+            if (scanDiscoveryIntervalMs > 0
+                    && ExceptionUtils.findThrowable(error, RetriableException.class).isPresent()) {
+                LOG.warn(
+                        "Failed to discover subscribed table-buckets. Keeping the last successful "
+                                + "discovery state and retrying on the next discovery cycle.",
+                        error);
+                return;
+            }
             throw new FlinkRuntimeException("Failed to discover subscribed table-buckets.", error);
         }
 
