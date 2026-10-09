@@ -31,6 +31,8 @@ import org.apache.flink.cdc.connectors.postgres.source.PostgresDialect;
 import org.apache.flink.cdc.connectors.postgres.source.PostgresSourceBuilder;
 import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfig;
 import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfigFactory;
+import org.apache.flink.cdc.connectors.postgres.source.events.OffsetCommitEvent;
+import org.apache.flink.cdc.connectors.postgres.source.offset.PostgresOffset;
 import org.apache.flink.cdc.connectors.postgres.source.offset.PostgresOffsetFactory;
 import org.apache.flink.cdc.connectors.postgres.testutils.RecordsFormatter;
 import org.apache.flink.cdc.connectors.postgres.testutils.UniqueDatabase;
@@ -43,6 +45,7 @@ import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.Collector;
 
+import io.debezium.connector.postgresql.connection.Lsn;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges;
 import org.apache.kafka.connect.source.SourceRecord;
@@ -53,6 +56,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.sql.Connection;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
@@ -69,6 +73,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 public class PostgresSourceReaderTest extends PostgresTestBase {
     private static final String DB_NAME_PREFIX = "postgres";
     private static final String SCHEMA_NAME = "customer";
+    private static final DataType CUSTOMER_TYPE =
+            DataTypes.ROW(
+                    DataTypes.FIELD("Id", DataTypes.BIGINT()),
+                    DataTypes.FIELD("Name", DataTypes.STRING()),
+                    DataTypes.FIELD("address", DataTypes.STRING()),
+                    DataTypes.FIELD("phone_number", DataTypes.STRING()));
     private String slotName;
     private final UniqueDatabase customDatabase =
             new UniqueDatabase(
@@ -187,6 +197,209 @@ public class PostgresSourceReaderTest extends PostgresTestBase {
         assertThat(completedCheckpointIds).isEmpty();
         reader.notifyCheckpointComplete(104L);
         assertThat(completedCheckpointIds).containsExactly(101L);
+    }
+
+    /**
+     * Checkpoints taken before the stream split is assigned (e.g. during the snapshot phase) have
+     * no stream offset. With a commit delay, such a checkpoint is still committed after the stream
+     * phase has started. The committed LSN must not go beyond the offset of the latest completed
+     * checkpoint, otherwise the changes in between are lost when restoring from it.
+     */
+    @Test
+    void testLsnCommitDoesNotPassLatestCompletedCheckpoint() throws Exception {
+        PostgresSourceConfig sourceConfig = createConfigFactory().create(0);
+        try (PostgresDialect dialect = new PostgresDialect(sourceConfig);
+                PostgresSourceReader reader = createStreamReader(3)) {
+            Lsn checkpointLsn =
+                    streamOffsetLsn(completeCheckpointsAcrossStreamStart(reader, dialect));
+
+            // checkpoint 4 is committed by now, watch the slot for a while
+            Lsn confirmedFlushLsn = watchConfirmedFlushLsn(checkpointLsn, 15_000L);
+            assertThat(confirmedFlushLsn)
+                    .as(
+                            "confirmed_flush_lsn %s must not pass the offset %s of the latest"
+                                    + " completed checkpoint",
+                            confirmedFlushLsn, checkpointLsn)
+                    .isLessThanOrEqualTo(checkpointLsn);
+        }
+    }
+
+    /** Same as above, but restores from the latest completed checkpoint and checks the data. */
+    @Test
+    void testNoDataLossWhenRestoringAfterLsnCommit() throws Exception {
+        PostgresSourceConfig sourceConfig = createConfigFactory().create(0);
+        List<SourceSplitBase> checkpointState;
+        try (PostgresDialect dialect = new PostgresDialect(sourceConfig);
+                PostgresSourceReader reader = createStreamReader(3)) {
+            checkpointState = completeCheckpointsAcrossStreamStart(reader, dialect);
+            // give the slot time to receive what was committed
+            Thread.sleep(15_000L);
+        }
+
+        // restore from checkpoint 4, the latest completed one
+        try (PostgresSourceReader reader = createStreamReader(3)) {
+            reader.start();
+            reader.addSplits(checkpointState);
+            Thread.sleep(1000L);
+            insertCustomer(3003);
+
+            List<String> records = new ArrayList<>();
+            long deadline = System.currentTimeMillis() + 30_000L;
+            while (!records.contains(customerRecord(3003))
+                    && System.currentTimeMillis() < deadline) {
+                records.addAll(pollStreamRecords(reader, CUSTOMER_TYPE, 1_000L));
+            }
+            assertThat(records).contains(customerRecord(3003)).contains(customerRecord(3002));
+        }
+    }
+
+    /**
+     * With scan.newly-added-table.enabled, the enumerator turns offset commit off while newly added
+     * tables are snapshotted, and the reader drops the stream offsets of the checkpoints taken
+     * meanwhile. Once offset commit is turned on again, those checkpoints are still committed
+     * because of the commit delay. The committed LSN must not go beyond the offset of the latest
+     * completed checkpoint.
+     */
+    @Test
+    void testLsnCommitDoesNotPassLatestCompletedCheckpointAfterNewlyAddedTables() throws Exception {
+        PostgresSourceConfig sourceConfig = createConfigFactory().create(0);
+        try (PostgresDialect dialect = new PostgresDialect(sourceConfig);
+                PostgresSourceReader reader = createStreamReader(3, true)) {
+            reader.start();
+            reader.handleSourceEvents(new OffsetCommitEvent(true));
+            reader.addSplits(Collections.singletonList(createStreamSplit(dialect)));
+            Thread.sleep(1000L);
+
+            insertCustomer(3001);
+            assertThat(pollStreamRecords(reader, CUSTOMER_TYPE, 5_000L))
+                    .containsExactly(customerRecord(3001));
+            long checkpointId = 1L;
+            for (; checkpointId <= 3L; checkpointId++) {
+                reader.snapshotState(checkpointId);
+                reader.notifyCheckpointComplete(checkpointId);
+            }
+
+            // newly added tables are being snapshotted
+            reader.handleSourceEvents(new OffsetCommitEvent(false));
+            for (; checkpointId <= 6L; checkpointId++) {
+                reader.snapshotState(checkpointId);
+                reader.notifyCheckpointComplete(checkpointId);
+            }
+
+            // the snapshot of newly added tables has finished
+            reader.handleSourceEvents(new OffsetCommitEvent(true));
+            Lsn checkpointLsn = streamOffsetLsn(reader.snapshotState(checkpointId));
+
+            // a change after the latest checkpoint, which must be replayed when restoring from it
+            insertCustomer(3002);
+            pollStreamRecords(reader, CUSTOMER_TYPE, 5_000L);
+            reader.notifyCheckpointComplete(checkpointId);
+
+            Lsn confirmedFlushLsn = watchConfirmedFlushLsn(checkpointLsn, 15_000L);
+            assertThat(confirmedFlushLsn)
+                    .as(
+                            "confirmed_flush_lsn %s must not pass the offset %s of the latest"
+                                    + " completed checkpoint",
+                            confirmedFlushLsn, checkpointLsn)
+                    .isLessThanOrEqualTo(checkpointLsn);
+        }
+    }
+
+    /**
+     * Takes checkpoints 1 to 3 before the stream split is assigned, then checkpoint 4 in the stream
+     * phase after change 3001, then reads change 3002, and completes checkpoints 1 to 7. Returns
+     * the state of checkpoint 4.
+     */
+    private List<SourceSplitBase> completeCheckpointsAcrossStreamStart(
+            PostgresSourceReader reader, PostgresDialect dialect) throws Exception {
+        reader.start();
+
+        // checkpoints taken before the stream split is assigned
+        reader.snapshotState(1L);
+        reader.snapshotState(2L);
+        reader.snapshotState(3L);
+
+        reader.addSplits(Collections.singletonList(createStreamSplit(dialect)));
+        Thread.sleep(1000L);
+
+        insertCustomer(3001);
+        assertThat(pollStreamRecords(reader, CUSTOMER_TYPE, 5_000L))
+                .containsExactly(customerRecord(3001));
+        List<SourceSplitBase> checkpointState = reader.snapshotState(4L);
+
+        // a change after checkpoint 4, which must be replayed when restoring from it. Keep
+        // polling so that the stream reader reads it and moves its offset context forward.
+        insertCustomer(3002);
+        pollStreamRecords(reader, CUSTOMER_TYPE, 5_000L);
+
+        for (long checkpointId = 1L; checkpointId <= 7L; checkpointId++) {
+            if (checkpointId > 4L) {
+                reader.snapshotState(checkpointId);
+            }
+            reader.notifyCheckpointComplete(checkpointId);
+        }
+        return checkpointState;
+    }
+
+    private StreamSplit createStreamSplit(PostgresDialect dialect) {
+        PostgresOffsetFactory offsetFactory = new PostgresOffsetFactory();
+        return new StreamSplit(
+                StreamSplit.STREAM_SPLIT_ID,
+                offsetFactory.createInitialOffset(),
+                offsetFactory.createNoStoppingOffset(),
+                Collections.emptyList(),
+                dialect.discoverDataCollectionSchemas(createConfigFactory().create(0)),
+                0);
+    }
+
+    private static String customerRecord(int id) {
+        return String.format("+I[%d, user, Beijing, 123]", id);
+    }
+
+    private void insertCustomer(int id) throws SQLException {
+        try (Connection conn =
+                        getJdbcConnection(POSTGRES_CONTAINER, customDatabase.getDatabaseName());
+                Statement stmt = conn.createStatement()) {
+            stmt.execute(
+                    String.format(
+                            "INSERT INTO customer.\"Customers\" VALUES (%d, 'user', 'Beijing', '123')",
+                            id));
+        }
+    }
+
+    private static Lsn streamOffsetLsn(List<SourceSplitBase> splits) {
+        return splits.stream()
+                .filter(SourceSplitBase::isStreamSplit)
+                .map(split -> ((PostgresOffset) split.asStreamSplit().getStartingOffset()).getLsn())
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("No stream split in state"));
+    }
+
+    /** Returns the first confirmed_flush_lsn beyond the limit, or the last one seen. */
+    private Lsn watchConfirmedFlushLsn(Lsn limit, long timeoutMillis) throws Exception {
+        long deadline = System.currentTimeMillis() + timeoutMillis;
+        Lsn lsn = null;
+        while (System.currentTimeMillis() < deadline) {
+            try (Connection conn =
+                            getJdbcConnection(
+                                    POSTGRES_CONTAINER, customDatabase.getDatabaseName());
+                    Statement stmt = conn.createStatement();
+                    ResultSet rs =
+                            stmt.executeQuery(
+                                    String.format(
+                                            "SELECT confirmed_flush_lsn FROM pg_replication_slots"
+                                                    + " WHERE slot_name = '%s'",
+                                            slotName))) {
+                if (rs.next() && rs.getString(1) != null) {
+                    lsn = Lsn.valueOf(rs.getString(1));
+                    if (lsn.compareTo(limit) > 0) {
+                        return lsn;
+                    }
+                }
+            }
+            Thread.sleep(500L);
+        }
+        return lsn;
     }
 
     @ParameterizedTest
@@ -390,6 +603,19 @@ public class PostgresSourceReaderTest extends PostgresTestBase {
         return formatter.format(output.getResults());
     }
 
+    private List<String> pollStreamRecords(
+            PostgresSourceReader sourceReader, DataType recordType, long timeoutMillis)
+            throws Exception {
+        final SimpleReaderOutput output = new SimpleReaderOutput();
+        long deadline = System.currentTimeMillis() + timeoutMillis;
+        while (System.currentTimeMillis() < deadline) {
+            if (sourceReader.pollNext(output) != MORE_AVAILABLE) {
+                Thread.sleep(100L);
+            }
+        }
+        return new RecordsFormatter(recordType).format(output.getResults());
+    }
+
     private List<String> consumeStreamRecords(
             PostgresSourceReader sourceReader, DataType recordType, int size) throws Exception {
         // Poll all the n records of the single split.
@@ -421,10 +647,22 @@ public class PostgresSourceReaderTest extends PostgresTestBase {
     }
 
     private PostgresSourceReader createStreamReader() throws Exception {
+        return createStreamReader(1);
+    }
+
+    private PostgresSourceReader createStreamReader(final int lsnCommitCheckpointsDelay)
+            throws Exception {
+        return createStreamReader(lsnCommitCheckpointsDelay, false);
+    }
+
+    private PostgresSourceReader createStreamReader(
+            final int lsnCommitCheckpointsDelay, boolean scanNewlyAddedTableEnabled)
+            throws Exception {
         final PostgresOffsetFactory offsetFactory = new PostgresOffsetFactory();
         final PostgresSourceConfigFactory configFactory = createConfigFactory();
         configFactory.startupOptions(StartupOptions.latest());
-        configFactory.setLsnCommitCheckpointsDelay(1);
+        configFactory.setLsnCommitCheckpointsDelay(lsnCommitCheckpointsDelay);
+        configFactory.scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled);
         PostgresDialect dialect = new PostgresDialect(configFactory.create(0));
         final PostgresSourceBuilder.PostgresIncrementalSource<?> source =
                 new PostgresSourceBuilder.PostgresIncrementalSource<>(
