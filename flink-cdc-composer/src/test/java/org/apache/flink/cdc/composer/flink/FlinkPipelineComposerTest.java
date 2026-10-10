@@ -32,8 +32,11 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.common.sink.EventSinkProvider;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
+import org.apache.flink.cdc.common.sink.SupportsTargetTableDiscovery;
 import org.apache.flink.cdc.common.source.DataSource;
+import org.apache.flink.cdc.common.source.SupportsTableDiscovery;
 import org.apache.flink.cdc.composer.definition.PipelineDef;
+import org.apache.flink.cdc.composer.definition.RouteDef;
 import org.apache.flink.cdc.composer.definition.SinkDef;
 import org.apache.flink.cdc.composer.definition.SourceDef;
 import org.apache.flink.cdc.composer.utils.FactoryDiscoveryUtils;
@@ -58,6 +61,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 import static org.apache.flink.configuration.CheckpointingOptions.CHECKPOINTING_INTERVAL;
@@ -95,6 +99,57 @@ class FlinkPipelineComposerTest {
     }
 
     @Test
+    void discoversTargetsBeforeCreatingSinkProvider() {
+        Configuration sourceConfig = new Configuration();
+        sourceConfig.set(TestDataSourceFactory.DISCOVER_TABLES, true);
+        Configuration sinkConfig = new Configuration();
+        sinkConfig.set(TestDataSinkFactory.DISCOVER_TARGETS, true);
+        PipelineDef pipeline =
+                new PipelineDef(
+                        new SourceDef(TestDataSourceFactory.IDENTIFIER, null, sourceConfig),
+                        new SinkDef(TestDataSinkFactory.IDENTIFIER, null, sinkConfig),
+                        Collections.singletonList(
+                                new RouteDef("source.orders", "sales.orders", null, null)),
+                        Collections.emptyList(),
+                        Collections.emptyList(),
+                        new Configuration());
+        assertThatCode(() -> FlinkPipelineComposer.ofMiniCluster().compose(pipeline))
+                .doesNotThrowAnyException();
+    }
+
+    private static class DiscoveringSink implements DataSink, SupportsTargetTableDiscovery {
+        private List<TableId> targets;
+
+        @Override
+        public void discoverTargetTables(Supplier<List<TableId>> targetTables) {
+            targets = targetTables.get();
+        }
+
+        @Override
+        public EventSinkProvider getEventSinkProvider() {
+            Assertions.assertThat(targets).containsExactly(TableId.parse("sales.orders"));
+            return null;
+        }
+
+        @Override
+        public MetadataApplier getMetadataApplier() {
+            return event -> {};
+        }
+    }
+
+    private static class DiscoveringSource extends ValuesDataSource
+            implements SupportsTableDiscovery {
+        private DiscoveringSource() {
+            super(ValuesDataSourceHelper.EventSetId.SINGLE_SPLIT_SINGLE_TABLE, Integer.MAX_VALUE);
+        }
+
+        @Override
+        public List<TableId> listCapturedTables() {
+            return Collections.singletonList(TableId.parse("source.orders"));
+        }
+    }
+
+    @Test
     void testGettingFlinkConfiguration() {
         FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
         PipelineDef pipelineDef =
@@ -113,6 +168,8 @@ class FlinkPipelineComposerTest {
     public static class TestDataSinkFactory implements DataSinkFactory {
 
         public static final String IDENTIFIER = "test-sink-factory";
+        public static final ConfigOption<Boolean> DISCOVER_TARGETS =
+                ConfigOptions.key("discover-targets").booleanType().defaultValue(false);
         public static final ConfigOption<Boolean> CUSTOM_HASH_PROVIDER =
                 ConfigOptions.key("custom-hash-provider").booleanType().defaultValue(false);
 
@@ -122,6 +179,9 @@ class FlinkPipelineComposerTest {
             if (!"local".equals(target)) {
                 throw new IllegalArgumentException(
                         "The flink configuration is invalid. Please check the pipeline configuration.");
+            }
+            if (context.getFactoryConfiguration().get(DISCOVER_TARGETS)) {
+                return new DiscoveringSink();
             }
             if (!context.getFactoryConfiguration().get(CUSTOM_HASH_PROVIDER)) {
                 return new DataSink() {
@@ -169,6 +229,7 @@ class FlinkPipelineComposerTest {
         public Set<ConfigOption<?>> optionalOptions() {
             Set<ConfigOption<?>> options = new HashSet<>();
             options.add(CUSTOM_HASH_PROVIDER);
+            options.add(DISCOVER_TARGETS);
             return options;
         }
     }
@@ -185,6 +246,8 @@ class FlinkPipelineComposerTest {
     public static class TestDataSourceFactory implements DataSourceFactory {
 
         public static final String IDENTIFIER = "test-source-factory";
+        public static final ConfigOption<Boolean> DISCOVER_TABLES =
+                ConfigOptions.key("discover-tables").booleanType().defaultValue(false);
 
         @Override
         public DataSource createDataSource(Context context) {
@@ -193,6 +256,9 @@ class FlinkPipelineComposerTest {
             if (!"local".equals(target)) {
                 throw new IllegalArgumentException(
                         "The flink configuration is invalid. Please check the pipeline configuration.");
+            }
+            if (context.getFactoryConfiguration().get(DISCOVER_TABLES)) {
+                return new DiscoveringSource();
             }
             return new ValuesDataSource(
                     ValuesDataSourceHelper.EventSetId.SINGLE_SPLIT_SINGLE_TABLE, Integer.MAX_VALUE);
@@ -210,7 +276,7 @@ class FlinkPipelineComposerTest {
 
         @Override
         public Set<ConfigOption<?>> optionalOptions() {
-            return new HashSet<>();
+            return Collections.singleton(DISCOVER_TABLES);
         }
     }
 
