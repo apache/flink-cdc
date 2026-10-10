@@ -79,6 +79,7 @@ limitations under the License.
         <shaded.guava.version>${flink.1.x.shaded.guava.version}</shaded.guava.version>
         <flink.shaded.version>17.0</flink.shaded.version>
         <debezium.version>1.9.8.Final</debezium.version>
+        <hikaricp.version>7.1.0</hikaricp.version>
         <tikv.version>3.2.0</tikv.version>
         <geometry.version>2.2.0</geometry.version>
         <testcontainers.version>1.21.4</testcontainers.version>
