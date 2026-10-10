@@ -24,14 +24,14 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-# Oracle CDC Connector
+# Oracle CDC 连接器
 
-The Oracle CDC connector allows for reading snapshot data and incremental data from Oracle database. This document describes how to setup the Oracle CDC connector to run SQL queries against Oracle databases.
+Oracle CDC 连接器允许从 Oracle 数据库读取快照数据和增量数据。本文描述了如何设置 Oracle CDC 连接器来对 Oracle 数据库运行 SQL 查询。
 
-Dependencies
+依赖
 ------------
 
-In order to setup the Oracle CDC connector, the following table provides dependency information for both projects using a build automation tool (such as Maven or SBT) and SQL Client with SQL JAR bundles.
+为了设置 Oracle CDC 连接器，下表提供了使用构建自动化工具（如 Maven 或 SBT ）和带有 SQL JAR 包的 SQL 客户端的两个项目的依赖关系信息。
 
 ### Maven dependency
 
@@ -39,11 +39,12 @@ In order to setup the Oracle CDC connector, the following table provides depende
 
 ### SQL Client JAR
 
-**Download link is available only for stable releases.**
+**下载链接仅适用于稳定版本。**
 
-Download [flink-sql-connector-oracle-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-oracle-cdc) and put it under `<FLINK_HOME>/lib/`.
+下载 [flink-sql-connector-oracle-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-oracle-cdc) 到 `<FLINK_HOME>/lib/` 目录下。
 
-**Note:** Refer to [flink-sql-connector-oracle-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-oracle-cdc), more released versions will be available in the Maven central warehouse.
+**注意:** 参考 [flink-sql-connector-oracle-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-oracle-cdc) 当前已发布的所有版本都可以在 Maven 中央仓库获取。
+
 
 由于 Oracle Connector 采用的 FUTC 协议与 Flink CDC 项目不兼容，我们无法在 jar 包中提供 Oracle 连接器。
 您可能需要手动配置以下依赖：
@@ -71,15 +72,15 @@ Download [flink-sql-connector-oracle-cdc](https://mvnrepository.com/artifact/org
 </table>
 </div>
 
-Setup Oracle
+设置 Oracle
 ----------------
-You have to enable log archiving for Oracle database and define an Oracle user with appropriate permissions on all databases that the Debezium Oracle connector monitors.
+你必须为 Oracle 数据库启用日志归档，并定义一个 Oracle 用户，该用户对 Debezium Oracle 连接器监视的所有数据库都应该具有相应的权限。
 
-### For Non-CDB database
+### 非 CDB 数据库
 
-1. Enable log archiving 
+1. 启用日志归档 
 
-   (1.1). Connect to the database as DBA
+   (1.1). 以 DBA 身份连接到数据库
     ```sql
     ORACLE_SID=SID
     export ORACLE_SID
@@ -87,7 +88,7 @@ You have to enable log archiving for Oracle database and define an Oracle user w
       CONNECT sys/password AS SYSDBA
     ```
 
-   (1.2). Enable log archiving
+   (1.2). 启用日志归档
     ```sql
     alter system set db_recovery_file_dest_size = 10G;
     alter system set db_recovery_file_dest = '/opt/oracle/oradata/recovery_area' scope=spfile;
@@ -119,16 +120,16 @@ You have to enable log archiving for Oracle database and define an Oracle user w
    ALTER DATABASE ADD SUPPLEMENTAL LOG DATA;
    ```
 
-2. Create an Oracle user with permissions
+2. 创建具有权限的 Oracle 用户
 
-   (2.1). Create Tablespace
+   (2.1). 创建表空间
    ```sql
    sqlplus sys/password@host:port/SID AS SYSDBA;
      CREATE TABLESPACE logminer_tbs DATAFILE '/opt/oracle/oradata/SID/logminer_tbs.dbf' SIZE 25M REUSE AUTOEXTEND ON MAXSIZE UNLIMITED;
      exit;
    ```
 
-   (2.2). Create a user and grant permissions
+   (2.2). 创建用户并授予权限
    ```sql
    sqlplus sys/password@host:port/SID AS SYSDBA;
      CREATE USER flinkuser IDENTIFIED BY flinkpw DEFAULT TABLESPACE LOGMINER_TBS QUOTA UNLIMITED ON LOGMINER_TBS;
@@ -163,10 +164,10 @@ You have to enable log archiving for Oracle database and define an Oracle user w
      exit;
    ```
    
-### For CDB database
+### CDB 数据库
 
-Overall, the steps for configuring CDB database is quite similar to non-CDB database, but the commands may be different.
-1. Enable log archiving
+总体而言，配置 CDB 数据库的步骤与非 CDB 数据库非常相似，但命令可能有所不同。
+1. 启用日志归档
    ```sql
    ORACLE_SID=ORCLCDB
    export ORACLE_SID
@@ -183,8 +184,8 @@ Overall, the steps for configuring CDB database is quite similar to non-CDB data
      archive log list
      exit;
    ```
-   **Note:**
-   You can also use the following commands to enable supplemental logging:
+   **注意:**
+   你也可以使用以下命令来启用补充日志：
    ```sql
    -- Enable supplemental logging for a specific table:
    ALTER TABLE inventory.customers ADD SUPPLEMENTAL LOG DATA (ALL) COLUMNS;
@@ -192,7 +193,7 @@ Overall, the steps for configuring CDB database is quite similar to non-CDB data
    ALTER DATABASE ADD SUPPLEMENTAL LOG DATA;
    ```
 
-2. Create an Oracle user with permissions
+2. 创建具有权限的 Oracle 用户
    ```sql
    sqlplus sys/password@//localhost:1521/ORCLCDB as sysdba
      CREATE TABLESPACE logminer_tbs DATAFILE '/opt/oracle/oradata/ORCLCDB/logminer_tbs.dbf' SIZE 25M REUSE AUTOEXTEND ON MAXSIZE UNLIMITED;
@@ -234,12 +235,12 @@ Overall, the steps for configuring CDB database is quite similar to non-CDB data
      exit
    ```
    
-See more about the [Setting up Oracle](https://debezium.io/documentation/reference/1.9/connectors/oracle.html#setting-up-oracle)
+查看更多关于 [Setting up Oracle](https://debezium.io/documentation/reference/1.9/connectors/oracle.html#setting-up-oracle) 的信息
 
-How to create an Oracle CDC table
+如何创建 Oracle CDC 表
 ----------------
 
-The Oracle CDC table can be defined as following:
+Oracle CDC 表可以定义如下：
 
 ```sql 
 -- register an Oracle table 'products' in Flink SQL
@@ -262,13 +263,13 @@ Flink SQL> CREATE TABLE products (
 -- read snapshot and redo logs from products table
 Flink SQL> SELECT * FROM products;
 ```
-**Note:**
-When working with the CDB + PDB model, you are expected to add an extra option `'debezium.database.pdb.name' = 'xxx'` in Flink DDL to specific the name of the PDB to connect to.
+**注意:**
+在使用 CDB + PDB 模型时，需要在 Flink DDL 中添加一个额外的选项 `'debezium.database.pdb.name' = 'xxx'` 来指定要连接的 PDB 的名称。
 
-**Note:**
-While the connector might work with a variety of Oracle versions and editions, only Oracle 9i, 10g, 11g and 12c have been tested.
+**注意:**
+虽然该连接器可能适用于多种 Oracle 版本和发行版，但仅对 Oracle 9i、10g、11g 和 12c 进行了测试。
 
-Connector Options
+连接器配置项
 ----------------
 <div class="highlight">
 <table class="colwidths-auto docutils">
@@ -287,90 +288,90 @@ Connector Options
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Specify what connector to use, here should be <code>'oracle-cdc'</code>.</td>
+      <td>指定要使用的连接器, 这里应该是 <code>'oracle-cdc'</code>.</td>
     </tr>
     <tr>
       <td>hostname</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>IP address or hostname of the Oracle database server. If the url is not empty, hostname may not be configured, otherwise hostname can not be empty</td>
+      <td> Oracle 数据库服务器的 IP 地址或主机名。如果 url 不为空，则可以不配置 hostname，否则 hostname 不能为空</td>
     </tr>
     <tr>
       <td>username</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Name of the Oracle database to use when connecting to the Oracle database server.</td>
+      <td>连接到 Oracle 数据库服务器时要使用的 Oracle 用户的名称。</td>
     </tr>
     <tr>
       <td>password</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Password to use when connecting to the Oracle database server.</td>
+      <td>连接 Oracle 数据库服务器时使用的密码。</td>
     </tr>
     <tr>
       <td>database-name</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Database name of the Oracle server to monitor.</td>
+      <td>要监视的 Oracle 服务器的数据库名称。</td>
     </tr>
     <tr>
       <td>schema-name</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Schema name of the Oracle database to monitor.</td>
+      <td>要监视的 Oracle 数据库的 schema 名称。</td>
     </tr>
     <tr>
       <td>table-name</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Table name of the Oracle database to monitor.</td>
+      <td>要监视的 Oracle 数据库的表名。</td>
     </tr>
     <tr>
       <td>port</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">1521</td>
       <td>Integer</td>
-      <td>Integer port number of the Oracle database server.</td>
+      <td> Oracle 数据库服务器的整数端口号。</td>
     </tr>
   <tr>
       <td>url</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">jdbc:oracle:thin:@{hostname}:{port}:{database-name}</td>
       <td>String</td>
-      <td>JdbcUrl of the oracle database server . If the hostname and port parameter is configured, the URL is concatenated by hostname port database-name in SID format by default. Otherwise, you need to configure the URL parameter</td>
+      <td>Oracle 数据库服务器的 JdbcUrl。如果配置了 hostname 和 port 参数，默认情况下，URL 会按 SID 格式由 hostname、port、database-name 拼接而成。否则，你需要配置 URL 参数</td>
     </tr>
     <tr>
       <td>scan.startup.mode</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">initial</td>
       <td>String</td>
-      <td>Optional startup mode for Oracle CDC consumer, valid enumerations are "initial"
-           , "latest-offset" , specific-offset. 
-           Please see <a href="#startup-reading-position">Startup Reading Position</a> section for more detailed information.</td>
+      <td>Oracle CDC 消费者可选的启动模式，
+           合法的模式为 "initial"，"latest-offset"，"specific-offset"。 
+           请查阅 <a href="#启动模式">启动模式</a> 章节了解更多详细信息。</td>
     </tr>
     <tr>
       <td>scan.startup.specific-offset.scn</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>Long</td>
-      <td>Optional SCN used in case of "specific-offset" startup mode</td>
+      <td>在 "specific-offset" 启动模式下使用的可选 SCN</td>
     </tr>
     <tr>
           <td>scan.incremental.snapshot.enabled</td>
           <td>optional</td>
           <td style="word-wrap: break-word;">true</td>
           <td>Boolean</td>
-          <td>Incremental snapshot is a new mechanism to read snapshot of a table. Compared to the old snapshot mechanism,
-              the incremental snapshot has many advantages, including:
-                (1) source can be parallel during snapshot reading, 
-                (2) source can perform checkpoints in the chunk granularity during snapshot reading, 
-                (3) source doesn't need to acquire ROW SHARE MODE lock before snapshot reading.
+          <td>增量快照是一种读取表快照的新机制，与旧的快照机制相比，
+              增量快照有许多优点，包括：
+                （1）在快照读取期间，Source 支持并发读取， 
+                （2）在快照读取期间，Source 支持进行 chunk 粒度的 checkpoint， 
+                （3）在快照读取之前，Source 不需要获取 ROW SHARE MODE 锁。
           </td>
     </tr>
     <tr>
@@ -378,47 +379,47 @@ Connector Options
           <td>optional</td>
           <td style="word-wrap: break-word;">8096</td>
           <td>Integer</td>
-          <td>The chunk size (number of rows) of table snapshot, captured tables are split into multiple chunks when read the snapshot of table.</td>
+          <td>表快照的分片大小（行数），读取表的快照时，捕获的表被拆分为多个分片。</td>
     </tr>
     <tr>
           <td>scan.snapshot.fetch.size</td>
           <td>optional</td>
           <td style="word-wrap: break-word;">1024</td>
           <td>Integer</td>
-          <td>The maximum fetch size for per poll when read table snapshot.</td>
+          <td>读取表快照时每次读取数据的最大条数。</td>
     </tr>
     <tr>
           <td>connect.max-retries</td>
           <td>optional</td>
           <td style="word-wrap: break-word;">3</td>
           <td>Integer</td>
-          <td>The max retry times that the connector should retry to build Oracle database server connection.</td>
+          <td>连接器应重试以建立 Oracle 数据库服务器连接的最大重试次数。</td>
     </tr>
     <tr>
           <td>connection.pool.size</td>
           <td>optional</td>
           <td style="word-wrap: break-word;">20</td>
           <td>Integer</td>
-          <td>The connection pool size.</td>
+          <td>连接池大小。</td>
     </tr>
     <tr>
       <td>debezium.*</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Pass-through Debezium's properties to Debezium Embedded Engine which is used to capture data changes from Oracle server.
-          For example: <code>'debezium.snapshot.mode' = 'never'</code>.
-          See more about the <a href="https://debezium.io/documentation/reference/1.9/connectors/oracle.html#oracle-connector-properties">Debezium's Oracle Connector properties</a></td> 
+      <td>将 Debezium 的属性传递给 Debezium 嵌入式引擎，该引擎用于从 Oracle 服务器捕获数据更改。
+          例如：<code>'debezium.snapshot.mode' = 'never'</code>.
+          查看更多关于 <a href="https://debezium.io/documentation/reference/1.9/connectors/oracle.html#oracle-connector-properties"> Debezium 的  Oracle 连接器属性</a></td> 
     </tr>
     <tr>
       <td>scan.incremental.close-idle-reader.enabled</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>
       <td>Boolean</td>
-      <td>Whether to close idle readers at the end of the snapshot phase. <br>
-          The flink version is required to be greater than or equal to 1.14 when 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' is set to true.<br>
-          If the flink version is greater than or equal to 1.15, the default value of 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' has been changed to true,
-          so it does not need to be explicitly configured 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' = 'true'
+      <td>是否在快照阶段结束后关闭空闲的 Reader。 <br>
+          当 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' 设置为 true 时，要求 flink 版本大于等于 1.14。<br>
+          如果 flink 版本大于等于 1.15，'execution.checkpointing.checkpoints-after-tasks-finish.enabled' 的默认值已变更为 true，
+          因此不需要显式配置 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' = 'true'
       </td>
     </tr>
     <tr>
@@ -433,10 +434,10 @@ Connector Options
           <td>optional</td>
           <td style="word-wrap: break-word;">(none)</td>
           <td>String</td>
-          <td>The chunk key of table snapshot, captured tables are split into multiple chunks by a chunk key when read the snapshot of table.
-            By default, the chunk key is 'ROWID'. A column that is not part of the primary key can be used as a chunk key, but this may lead to slower query performance.
+          <td>表快照的分片键，在读取表的快照时，被捕获的表会按分片键拆分为多个分片。
+            默认情况下，分片键是 'ROWID'。可以使用非主键列作为分片键，但这可能会导致查询性能下降。
             <br>
-            <b>Warning:</b> Using a non-primary key column as a chunk key may lead to data inconsistencies. Please see <a href="#warning">Warning</a> for details.
+            <b>警告：</b> 使用非主键列作为分片键可能会导致数据不一致。请参阅 <a href="#警告">警告</a> 了解详细信息。
           </td>
     </tr>
     <tr>
@@ -445,8 +446,8 @@ Connector Options
       <td style="word-wrap: break-word;">true</td>
       <td>Boolean</td>
       <td>
-        Whether to assign the unbounded chunks first during snapshot reading phase.<br>
-        This might help reduce the risk of the TaskManager experiencing an out-of-memory (OOM) error when taking a snapshot of the largest unbounded chunk.<br> 
+        快照读取阶段是否先分配 UnboundedChunk。<br>
+        这可能有助于降低 TaskManager 在对最大的 UnboundedChunk 执行快照时出现内存溢出 (OOM) 错误的风险。<br> 
       </td>
     </tr>
     <tr>
@@ -455,21 +456,21 @@ Connector Options
       <td style="word-wrap: break-word;">false</td>
       <td>Boolean</td>
       <td>
-        Whether to skip backfill in snapshot reading phase.<br> 
-        If backfill is skipped, changes on captured tables during snapshot phase will be consumed later in change log reading phase instead of being merged into the snapshot.<br>
-        WARNING: Skipping backfill might lead to data inconsistency because some change log events happened within the snapshot phase might be replayed (only at-least-once semantic is promised).
-        For example updating an already updated value in snapshot, or deleting an already deleted entry in snapshot. These replayed change log events should be handled specially.
+        是否在快照读取阶段跳过 backfill 。<br> 
+        如果跳过 backfill ，快照阶段捕获表的更改将在稍后的 change log 读取阶段被回放，而不是合并到快照中。<br>
+        警告：跳过 backfill 可能会导致数据不一致，因为快照阶段发生的某些 change log 事件可能会被重放（仅保证 at-least-once ）。
+        例如，更新快照阶段已更新的值，或删除快照阶段已删除的数据。这些重放的 change log 事件应进行特殊处理。
       </td>
     </tr>
     </tbody>
 </table>    
 </div>
 
-Limitation
+限制
 --------
 
-### Can't perform checkpoint during scanning snapshot of tables
-During scanning snapshot of database tables, since there is no recoverable position, we can't perform checkpoints. In order to not perform checkpoints, Oracle CDC source will keep the checkpoint waiting to timeout. The timeout checkpoint will be recognized as failed checkpoint, by default, this will trigger a failover for the Flink job. So if the database table is large, it is recommended to add following Flink configurations to avoid failover because of the timeout checkpoints:
+### 扫描表快照期间无法执行 checkpoint
+在扫描数据库表快照期间，由于没有可恢复的位点，我们无法执行 checkpoint。为了不执行 checkpoint，Oracle CDC source 会让 checkpoint 一直等待直至超时。超时的 checkpoint 会被视为失败的 checkpoint，默认情况下，这将触发 Flink 作业的故障转移。因此，如果数据库表很大，建议添加以下 Flink 配置，以避免因 checkpoint 超时而触发故障转移：
 
 ```
 execution.checkpointing.interval: 10min
@@ -478,10 +479,10 @@ restart-strategy: fixed-delay
 restart-strategy.fixed-delay.attempts: 2147483647
 ```
 
-Available Metadata
+可用的元数据
 ----------------
 
-The following format metadata can be exposed as read-only (VIRTUAL) columns in a table definition.
+下表中的元数据可以在 DDL 中作为只读（虚拟）meta 列声明。
 
 <table class="colwidths-auto docutils">
   <thead>
@@ -495,27 +496,27 @@ The following format metadata can be exposed as read-only (VIRTUAL) columns in a
     <tr>
       <td>table_name</td>
       <td>STRING NOT NULL</td>
-      <td>Name of the table that contain the row.</td>
+      <td>当前记录所属的表名称。</td>
     </tr>
     <tr>
       <td>schema_name</td>
       <td>STRING NOT NULL</td>
-      <td>Name of the schema that contain the row.</td>
+      <td>当前记录所属的 schema 名称。</td>
     </tr>
     <tr>
       <td>database_name</td>
       <td>STRING NOT NULL</td>
-      <td>Name of the database that contain the row.</td>
+      <td>当前记录所属的库名称。</td>
     </tr>
     <tr>
       <td>op_ts</td>
       <td>TIMESTAMP_LTZ(3) NOT NULL</td>
-      <td>It indicates the time that the change was made in the database. <br>If the record is read from snapshot of the table instead of the change stream, the value is always 0.</td>
+      <td>当前记录表在数据库中更新的时间。 <br>如果从表的快照而不是更改流读取记录，该值将始终为0。</td>
     </tr>
   </tbody>
 </table>
 
-The extended CREATE TABLE example demonstrates the syntax for exposing these metadata fields:
+下述创建表示例展示元数据列的用法：
 ```sql
 CREATE TABLE products (
     db_name STRING METADATA FROM 'database_name' VIRTUAL,
@@ -541,29 +542,29 @@ CREATE TABLE products (
 );
 ```
 
-**Note** : The Oracle dialect is case-sensitive, it converts field name to uppercase if the field name is not quoted, Flink SQL doesn't convert the field name. Thus for physical columns from oracle database, we should use its converted field name in Oracle when define an `oracle-cdc` table in Flink SQL.
+**注意** : Oracle 方言是大小写敏感的，如果字段名没有加引号，它会将字段名转换为大写，而 Flink SQL 不会转换字段名。因此，对于来自 Oracle 数据库的物理列，在 Flink SQL 中定义 `oracle-cdc` 表时，应该使用其在 Oracle 中转换后的字段名。
 
-Features
+特性
 --------
 
-### Exactly-Once Processing
+### Exactly-Once 处理
 
-The Oracle CDC connector is a Flink Source connector which will read database snapshot first and then continues to read change events with **exactly-once processing** even failures happen. Please read [How the connector works](https://debezium.io/documentation/reference/1.9/connectors/oracle.html#how-the-oracle-connector-works).
+Oracle CDC 连接器是一个 Flink Source 连接器，它将首先读取数据库快照，然后继续读取变更事件，即使在处理时出现故障，也能**准确读取数据**。请参阅 [How the connector works](https://debezium.io/documentation/reference/1.9/connectors/oracle.html#how-the-oracle-connector-works)。
 
-### Startup Reading Position
+### 启动模式
 
-The config option `scan.startup.mode` specifies the startup mode for Oracle CDC consumer. The valid enumerations are:
+配置选项`scan.startup.mode`指定 Oracle CDC 使用者的启动模式。有效枚举包括：
 
-- `initial` (default): Performs an initial snapshot on the monitored database tables upon first startup, and continue to read the latest redo log.
-- `latest-offset`: Never to perform a snapshot on the monitored database tables upon first startup, just read from
-  the change since the connector was started.
-- `specific-offset`: Skip snapshot phase and start reading redo log from a specific offset with scn.
+- `initial` （默认）：在第一次启动时对受监视的数据库表执行初始快照，并继续读取最新的 redo log。
+- `latest-offset`：首次启动时，从不对受监视的数据库表执行快照，仅读取
+  连接器启动之后的数据更改。
+- `specific-offset`：跳过快照阶段，使用 scn 从特定位点开始读取 redo log。
 
-_Note: the mechanism of `scan.startup.mode` option relying on Debezium's `snapshot.mode` configuration. So please do not use them together. If you specific both `scan.startup.mode` and `debezium.snapshot.mode` options in the table DDL, it may make `scan.startup.mode` doesn't work._
+_注意：`scan.startup.mode` 选项的机制依赖于 Debezium 的 `snapshot.mode` 配置，因此请不要同时使用它们。如果在表 DDL 中同时指定 `scan.startup.mode` 和 `debezium.snapshot.mode` 选项，可能会导致 `scan.startup.mode` 失效。_
 
-### Single Thread Reading
+### 单线程读取
 
-The Oracle CDC source can't work in parallel reading, because there is only one task can receive change events.
+Oracle CDC source 无法以并行读取的方式工作，因为只有一个任务可以接收变更事件。
 
 ### 动态加表
 
@@ -628,12 +629,12 @@ $ ./bin/flink run \
 
 ### DataStream Source
 
-The Oracle CDC connector can also be a DataStream source. There are two modes for the DataStream source:
+Oracle CDC 连接器也可以是一个数据流源。DataStream 源有两种模式：
 
-- incremental snapshot based, which allows parallel reading
-- SourceFunction based, which only supports single thread reading
+- 基于增量快照，允许并行读取
+- 基于 SourceFunction，仅支持单线程读取
 
-#### Incremental Snapshot based DataStream (Experimental)
+#### 基于增量快照的 DataStream（实验性）
 
 ```java
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
@@ -683,7 +684,7 @@ public class OracleParallelSourceExample {
 }
 ```
 
-#### SourceFunction-based DataStream
+#### 基于 SourceFunction 的 DataStream
 
 ```java
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -735,43 +736,42 @@ public class OracleSourceExample {
 1. Group 名称是 `namespace.schema.table`，这里的 `namespace` 是实际的数据库名称， `schema` 是实际的 schema 名称， `table` 是实际的表名称。
 2. 对于 Oracle，Group 的名称会类似于 `test_database.test_schema.test_table`。
 
-### Tables Without primary keys
+### 关于无主键表
 
-Starting from version 3.4.0, Oracle CDC support tables that do not have a primary key. To use a table without primary keys, you must configure the `scan.incremental.snapshot.chunk.key-column` option and specify one non-null field.
+从3.4.0 版本开始支持无主键表，使用无主键表必须设置 `scan.incremental.snapshot.chunk.key-column`，且只能选择非空类型的一个字段。
 
-There are two places that need to be taken care of.
+在使用无主键表时，需要注意以下两种情况。
 
-1. If there is an index in the table, try to use a column which is contained in the index in `scan.incremental.snapshot.chunk.key-column`. This will increase the speed of select statement.
-2. The processing semantics of an Oracle CDC table without primary keys is determined based on the behavior of the column that are specified by the `scan.incremental.snapshot.chunk.key-column`.
-* If no update operation is performed on the specified column, the exactly-once semantics is ensured.
-* If the update operation is performed on the specified column, only the at-least-once semantics is ensured. However, you can specify primary keys at downstream and perform the idempotence operation to ensure data correctness.
+1. 配置 `scan.incremental.snapshot.chunk.key-column` 时，如果表中存在索引，请尽量使用索引中的列来加快 select 速度。
+2. 无主键表的处理语义由 `scan.incremental.snapshot.chunk.key-column` 指定的列的行为决定：
+* 如果指定的列不存在更新操作，此时可以保证 Exactly once 语义。
+* 如果指定的列存在更新操作，此时只能保证 At least once 语义。但可以结合下游，通过指定下游主键，结合幂等性操作来保证数据的正确性。
 
-#### Warning
+#### 警告
 
-Using a **non-primary key column** as the `scan.incremental.snapshot.chunk.key-column` for an oracle table with primary keys may lead to data inconsistencies. Below is a scenario illustrating this issue and recommendations to mitigate potential problems.
+在 Oracle 表中，若使用 **非主键列** 作为有主键表的 `scan.incremental.snapshot.chunk.key-column`，可能导致**数据不一致**。以下为可能出现的问题及其缓解方案。
 
-#### Problem Scenario
+#### 问题场景
 
-- **Table Structure:**
-   - **Primary Key:** `id`
-   - **Chunk Key Column:** `pid` (Not a primary key)
+- **表结构：**
+   - **主键：** `id`
+   - **分片键列 ：** `pid`（非主键）
 
-- **Snapshot Splits:**
-   - **Split 0:** `1 < pid <= 3`
-   - **Split 1:** `3 < pid <= 5`
+- **快照分片 ：**
+   - **分片 0:** `1 < pid <= 3`
+   - **分片 1:** `3 < pid <= 5`
 
-- **Operation:**
-   - Two different subtasks are reading Split 0 and Split 1 concurrently.
-   - An update operation changes `pid` from `2` to `4` for `id=0` while both splits are being read. This update occurs between the low and high watermark of both splits.
+- **操作 ：**
+   - 两个子任务并行读取 **分片 0** 和 **分片 1**。
+   - 在读取过程中，发生了一次 **更新** 操作，使 `id=0` 的 `pid` 从 `2` 变为 `4`，在两个分片的**高低水位**间都包含此次变更，导致该更新操作在增量阶段不会被处理。
 
-- **Result:**
-   - **Split 0:** Contains the record `[id=0, pid=2]`
-   - **Split 1:** Contains the record `[id=0, pid=4]`
+- **结果 ：**
+   - **分片 0:** 记录 `[id=0, pid=2]`
+   - **分片 1:** 记录 `[id=0, pid=4]`
 
-Since the order of processing these records cannot be guaranteed, the final value of `pid` for `id=0` may end up being either `2` or `4`, leading to potential data inconsistencies.
+由于**处理顺序**无法保证，最终 `id=0` 的 `pid` 可能为 `2` 或 `4`，从而导致数据不一致。
 
-
-Data Type Mapping
+数据类型映射
 ----------------
 <div class="wy-table-responsive">
 <table class="colwidths-auto docutils">

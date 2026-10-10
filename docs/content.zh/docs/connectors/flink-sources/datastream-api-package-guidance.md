@@ -25,11 +25,11 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-# DataStream API Package Guidance
+# DataStream API 打包指南
 
-This guide provides a simple `pom.xml` example for packaging DataStream job JARs with MySQL CDC source.
+本指南提供一个简单的 `pom.xml` 示例，用于打包带有 MySQL CDC source 的 DataStream 作业 JAR。
 
-## Example for `pom.xml` with Flink 1.20.x
+## Flink 1.20.x 的 `pom.xml` 示例
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -238,7 +238,7 @@ This guide provides a simple `pom.xml` example for packaging DataStream job JARs
 </project>
 ```
 
-## Example for `pom.xml` with Flink 2.2.x
+## Flink 2.2.x 的 `pom.xml` 示例
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -445,7 +445,7 @@ This guide provides a simple `pom.xml` example for packaging DataStream job JARs
 </project>
 ```
 
-## Example for Code
+## 代码示例
 
 ```java
 package org.apache.flink.flink.cdc;

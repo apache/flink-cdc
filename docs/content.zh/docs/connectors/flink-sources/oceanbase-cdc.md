@@ -92,7 +92,7 @@ OceanBase CDC 源端读取方案：
 
 **注意事项**: oceanbase-cdc 连接器 从 3.5 版本开始进行了以下大的改动：
 - 先前基于 OceanBase Log Proxy 服务实现的连接器已被正式移除，当前将仅支持连接到 OceanBase Binlog 服务。
-- 当前版本 oceanbase-cdc 将基于 mysql-cdc 连接器实现，主要改进了对 OceanBase Binlog 服务的兼容性，包含一些 Bug 修复，推荐使用。
+- 当前版本 oceanbase-cdc 连接器基于 mysql-cdc 连接器重建，改进了对 OceanBase Binlog 服务的兼容性，包含关键的 Bug 修复，强烈建议升级到该版本。
 - 由于 OceanBase Binlog 服务兼容 MySQL 复制协议，仍然支持使用 [MySQL CDC](mysql-cdc.md) 连接器连接到 OceanBase Binlog 服务。
 - 暂不支持 OceanBase Oracle 兼容模式下的增量订阅服务，请联系企业技术支持。
 
@@ -100,7 +100,7 @@ OceanBase CDC 源端读取方案：
 依赖
 ------------
 
-为了使用 OceanBase CDC 连接器，您必须提供相关的依赖信息。以下依赖信息适用于使用自动构建工具（如 Maven 或 SBT）构建的项目和带有 SQL JAR 包的 SQL 客户端。
+为了设置 OceanBase CDC 连接器，下表提供了使用构建自动化工具（如 Maven 或 SBT ）和带有 SQL JAR 包的 SQL 客户端的两个项目的依赖关系信息。
 
 ### Maven dependency
 
@@ -112,7 +112,7 @@ OceanBase CDC 源端读取方案：
 
 **注意:** 参考 [flink-sql-connector-oceanbase-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-oceanbase-cdc) 当前已发布的所有版本都可以在 Maven 中央仓库获取。
 
-由于 MySQL Driver 使用的开源协议与 Flink CDC 项目不兼容，我们无法在 jar 包中提供驱动。 您可能需要手动配置以下依赖：
+由于 MySQL Driver 和 OceanBase Driver 使用的开源协议都与 Flink CDC 项目不兼容，我们无法在 jar 包中提供驱动。 您可能需要手动配置以下依赖：
 
 <div class="wy-table-responsive">
 <table class="colwidths-auto docutils">
@@ -141,12 +141,13 @@ OceanBase CDC 源端读取方案：
 使用文档
 ----------------
 
-**注意事项**：
-- 当前版本 oceanbase-cdc 连接器基于 mysql-cdc 连接器实现，只修改了部分内部实现。外部接口、使用参数等 和 mysql-cdc 基本保持一致，使用文档也可参考[MySQL CDC 使用文档](mysql-cdc.md)。
+**注意**：
+- 当前版本的 **oceanbase-cdc 连接器**基于 **mysql-cdc 连接器**实现，**仅修改了部分内部实现**。
+   - **外部接口**和**配置参数**与 mysql-cdc 连接器**完全一致**。
+   - 详细的使用说明，请参考 [**MySQL CDC 使用文档**](mysql-cdc.md)。
 
-### 创建 OceanBase CDC 表
-
-OceanBase CDC 表可以定义如下：
+创建 OceanBase CDC 表
+----------------
 
 ```sql
 -- 每 3 秒做一次 checkpoint，用于测试，生产配置建议5到10分钟                      
@@ -244,7 +245,7 @@ Flink SQL> SELECT * FROM orders;
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>读取数据使用的 server id，server id 可以是个整数或者一个整数范围，比如 '5400' 或 '5400-5408', 
-      建议在 'scan.incremental.snapshot.enabled' 参数为启用时，配置成整数范围。 默认情况下，连接器会在 5400 和 6400 之间生成一个随机数，但是我们建议用户明确指定 Server id。
+      建议在 'scan.incremental.snapshot.enabled' 参数为启用时，配置成整数范围。每个 id 在 OceanBase 集群中当前运行的所有数据库进程之间必须是唯一的。该连接器以另一个 server 的身份（具有此唯一 id）加入 OceanBase 集群，从而可以读取 binlog。 默认情况下，连接器会在 5400 和 6400 之间生成一个随机数，但是我们建议用户明确指定 Server id。
       </td>
     </tr>
     <tr>
@@ -267,7 +268,7 @@ Flink SQL> SELECT * FROM orders;
           <td>optional</td>
           <td style="word-wrap: break-word;">8096</td>
           <td>Integer</td>
-          <td>表快照的块大小（行数），读取表的快照时，捕获的表被拆分为多个块。</td>
+          <td>表快照的分片大小（行数），读取表的快照时，捕获的表被拆分为多个分片。</td>
     </tr>
     <tr>
           <td>scan.snapshot.fetch.size</td>
@@ -284,7 +285,7 @@ Flink SQL> SELECT * FROM orders;
           <td>表快照的分片键，在读取表的快照时，被捕获的表会按分片键拆分为多个分片。  
               默认情况下，分片键是主键的第一列。可以使用非主键列作为分片键，但这可能会导致查询性能下降。  
               <br>  
-              <b>警告：</b> 使用非主键列作为分片键可能会导致数据不一致。请参阅 <a href="./mysql-cdc.md#警告">增量快照读取</a> 章节了解详细信息。  
+              <b>警告：</b> 使用非主键列作为分片键可能会导致数据不一致。请参阅 <a href="./mysql-cdc.md#警告">警告</a> 章节了解详细信息。  
           </td>
     </tr>
     <tr>
@@ -350,8 +351,7 @@ Flink SQL> SELECT * FROM orders;
       </td>
     </tr>
     <tr>
-      <td>debezium.min.row.
-      count.to.stream.result</td>
+      <td>debezium.min.row.count.to.stream.result</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">1000</td>
       <td>Integer</td>
@@ -391,7 +391,7 @@ Flink SQL> SELECT * FROM orders;
           <td>optional</td>
           <td style="word-wrap: break-word;">30s</td>
           <td>Duration</td>
-          <td>用于跟踪最新可用 binlog 偏移的发送心跳事件的间隔。</td>
+          <td>用于跟踪最新可用 binlog 位点的发送心跳事件的间隔。</td>
     </tr>
     <tr>
       <td>debezium.*</td>
@@ -399,7 +399,7 @@ Flink SQL> SELECT * FROM orders;
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>将 Debezium 的属性传递给 Debezium 嵌入式引擎，该引擎用于从 OceanBase 服务器捕获数据更改。
-          For example: <code>'debezium.snapshot.mode' = 'never'</code>.
+          例如：<code>'debezium.snapshot.mode' = 'never'</code>.
           查看更多关于 <a href="https://debezium.io/documentation/reference/1.9/connectors/mysql.html#mysql-connector-properties"> Debezium 的  MySQL 连接器属性</a></td> 
     </tr>
     <tr>
@@ -407,7 +407,22 @@ Flink SQL> SELECT * FROM orders;
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>
       <td>Boolean</td>
-      <td>是否在快照结束后关闭空闲的 Reader。 此特性需要 flink 版本大于等于 1.14 并且 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' 需要设置为 true。</td>
+      <td>是否在快照阶段结束后关闭空闲的 Reader。 <br>
+          当 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' 设置为 true 时，要求 flink 版本大于等于 1.14。<br>
+          如果 flink 版本大于等于 1.15，'execution.checkpointing.checkpoints-after-tasks-finish.enabled' 的默认值已变更为 true，
+          因此不需要显式配置 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' = 'true'
+      </td>
+    </tr>
+    <tr>
+      <td>debezium.binary.handling.mode</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>debezium.binary.handling.mode 可以设置为以下值之一：
+          none：不做任何处理，binary 数据类型以字节数组（byte array）的形式传输。
+          base64：将 binary 数据类型转换为 Base64 编码的字符串进行传输。
+          hex：将 binary 数据类型转换为十六进制字符串进行传输。
+      默认值为 none。可以根据需求和数据类型选择合适的处理模式。如果数据库中包含大量 binary 数据类型，建议使用 base64 或 hex 模式，以便在传输过程中更易于处理。</td> 
     </tr>
     <tr>
       <td>scan.parse.online.schema.changes.enabled</td>
@@ -418,7 +433,19 @@ Flink SQL> SELECT * FROM orders;
         是否尝试解析由 <a href="https://github.com/github/gh-ost">gh-ost</a> 或 <a href="https://docs.percona.com/percona-toolkit/pt-online-schema-change.html">pt-osc</a> 工具生成的表结构变更事件。
         这些工具会在变更表结构时，将变更语句应用到“影子表”之上，并稍后将其与主表进行交换，以达到表结构变更的目的。
         <br>
-        这是一项实验性功能。
+        这是一项实验性功能，未来可能会发生变化。
+      </td>
+    </tr>
+    <tr>
+      <td>use.legacy.json.format</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">true</td>
+      <td>Boolean</td>
+      <td>是否使用 legacy JSON 格式来转换 Binlog 中的 JSON 类型的数据。 <br>
+          这代表着是否使用 legacy JSON 格式来转换 Binlog 中的 JSON 类型的数据。
+          如果用户配置 'use.legacy.json.format' = 'true'，则从 Binlog 中转换 JSON 类型的数据时，会移除值之前的空格和逗号之后的空格。例如，
+          Binlog 中 JSON 类型的数据 {"key1": "value1", "key2": "value2"} 会被转换为 {"key1":"value1","key2":"value2"}。
+          如果设置 'use.legacy.json.format' = 'false'， 这条数据会被转换为 {"key1": "value1", "key2": "value2"}， 也就是 key 和 value 前的空格都会被保留。
       </td>
     </tr>
     <tr>
@@ -428,8 +455,8 @@ Flink SQL> SELECT * FROM orders;
       <td>Boolean</td>
       <td>
         快照读取阶段是否先分配 UnboundedChunk。<br>
-        这有助于降低 TaskManager 在快照阶段同步最后一个chunk时遇到内存溢出 (OOM) 的风险。<br> 
-        这是一项实验特性，默认为 false。
+        这可能有助于降低 TaskManager 在对最大的 UnboundedChunk 执行快照时出现内存溢出 (OOM) 错误的风险。<br> 
+        实验性配置项，默认为 false。
       </td>
     </tr>
     <tr>
@@ -455,17 +482,6 @@ Flink SQL> SELECT * FROM orders;
         如果跳过 backfill ，快照阶段捕获表的更改将在稍后的 binlog 读取阶段被回放，而不是合并到快照中。<br>
         警告：跳过 backfill 可能会导致数据不一致，因为快照阶段发生的某些 binlog 事件可能会被重放（仅保证 at-least-once ）。
         例如，更新快照阶段已更新的值，或删除快照阶段已删除的数据。这些重放的 binlog 事件应进行特殊处理。
-    </tr>
-    <tr>
-      <td>use.legacy.json.format</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">true</td>
-      <td>Boolean</td>
-      <td>是否使用 legacy JSON 格式来转换 Binlog 中的 JSON 类型的数据。 <br>
-          这代表着是否使用 legacy JSON 格式来转换 Binlog 中的 JSON 类型的数据。
-          如果用户配置 'use.legacy.json.format' = 'true'，则从 Binlog 中转换 JSON 类型的数据时，会移除值之前的空格和逗号之后的空格。例如，
-          Binlog 中 JSON 类型的数据 {"key1": "value1", "key2": "value2"} 会被转换为 {"key1":"value1","key2":"value2"}。
-          如果设置 'use.legacy.json.format' = 'false'， 这条数据会被转换为 {"key1": "value1", "key2": "value2"}， 也就是 key 和 value 前的空格都会被保留。
       </td>
     </tr>
     </tbody>
@@ -505,60 +521,64 @@ Flink SQL> SELECT * FROM orders;
       <td>row_kind</td>
       <td>STRING NOT NULL</td>
       <td>当前记录的变更类型。<br>
-         注意：如果 Source 算子选择为每条记录输出 row_kind 列，则下游 SQL 操作符在处理回撤时可能会由于此新添加的列而无法比较，导致出现非确定性更新问题。建议仅在简单的同步作业中使用此元数据列。<br>
+         注意：如果 Source 算子选择为每条记录输出 row_kind 列，则下游 SQL 操作符在处理回撤时可能会由于此新添加的列而无法比较。建议仅在简单的同步作业中使用此元数据列。<br>
          '+I' 表示 INSERT 消息，'-D' 表示 DELETE 消息，'-U' 表示 UPDATE_BEFORE 消息，'+U' 表示 UPDATE_AFTER 消息。</td>
     </tr>
   </tbody>
 </table>
 
 下述创建表示例展示元数据列的用法：
+
 ```sql
-CREATE TABLE products (
-    db_name STRING METADATA FROM 'database_name' VIRTUAL,
-    table_name STRING METADATA  FROM 'table_name' VIRTUAL,
-    operation_ts TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
-    operation STRING METADATA FROM 'row_kind' VIRTUAL,
-    order_id INT,
-    order_date TIMESTAMP(0),
+CREATE TABLE products
+(
+    db_name       STRING METADATA FROM 'database_name' VIRTUAL,
+    table_name    STRING METADATA FROM 'table_name' VIRTUAL,
+    operation_ts  TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
+    operation     STRING METADATA FROM 'row_kind' VIRTUAL,
+    order_id      INT,
+    order_date    TIMESTAMP(0),
     customer_name STRING,
-    price DECIMAL(10, 5),
-    product_id INT,
-    order_status BOOLEAN,
-    PRIMARY KEY(order_id) NOT ENFORCED
+    price         DECIMAL(10, 5),
+    product_id    INT,
+    order_status  BOOLEAN,
+    PRIMARY KEY (order_id) NOT ENFORCED
 ) WITH (
-    'connector' = 'oceanbase-cdc',
-    'hostname' = 'localhost',
-    'port' = '2881',
-    'username' = 'root',
-    'password' = '123456',
-    'database-name' = 'mydb',
-    'table-name' = 'orders'
-);
+      'connector' = 'oceanbase-cdc',
+      'hostname' = 'localhost',
+      'port' = '2881',
+      'username' = 'root',
+      'password' = '123456',
+      'database-name' = 'mydb',
+      'table-name' = 'orders'
+      );
 ```
 
 下述创建表示例展示使用正则表达式匹配多张库表的用法：
+
 ```sql
-CREATE TABLE products (
-    db_name STRING METADATA FROM 'database_name' VIRTUAL,
-    table_name STRING METADATA  FROM 'table_name' VIRTUAL,
-    operation_ts TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
-    operation STRING METADATA FROM 'row_kind' VIRTUAL,
-    order_id INT,
-    order_date TIMESTAMP(0),
+CREATE TABLE products
+(
+    db_name       STRING METADATA FROM 'database_name' VIRTUAL,
+    table_name    STRING METADATA FROM 'table_name' VIRTUAL,
+    operation_ts  TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
+    operation     STRING METADATA FROM 'row_kind' VIRTUAL,
+    order_id      INT,
+    order_date    TIMESTAMP(0),
     customer_name STRING,
-    price DECIMAL(10, 5),
-    product_id INT,
-    order_status BOOLEAN,
-    PRIMARY KEY(order_id) NOT ENFORCED
+    price         DECIMAL(10, 5),
+    product_id    INT,
+    order_status  BOOLEAN,
+    PRIMARY KEY (order_id) NOT ENFORCED
 ) WITH (
-    'connector' = 'oceanbase-cdc',
-    'hostname' = 'localhost',
-    'port' = '2881',
-    'username' = 'root',
-    'password' = '123456',
-    'database-name' = '(^(test).*|^(tpc).*|txc|.*[p$]|t{2})',
-    'table-name' = '(t[5-8]|tt)'
-);
+      'connector' = 'oceanbase-cdc',
+      'hostname' = 'localhost',
+      'port' = '2881',
+      'username' = 'root',
+      'password' = '123456',
+      'database-name' = '(^(test).*|^(tpc).*|txc|.*[p$]|t{2})',
+      'table-name' = '(t[5-8]|tt)'
+      );
 ```
 <table class="colwidths-auto docutils">
   <thead>
@@ -582,7 +602,7 @@ CREATE TABLE products (
     <tr>
       <td>特定匹配</td>
       <td>txc</td>
-      <td>匹配具体的数据库名或表名。</td>
+      <td>匹配具体的数据库名或表名，例如 txc。</td>
     </tr>
   </tbody>
 </table>
@@ -748,7 +768,7 @@ CREATE TABLE products (
       <td>
         BIT(n)
       </td>
-      <td>BINARY(⌈n/8⌉)</td>
+      <td>BINARY(⌈(n + 7) / 8⌉)</td>
       <td></td>
     </tr>
     <tr>
@@ -855,15 +875,15 @@ CREATE TABLE products (
 {"srid": 0 , "type": "GeometryCollection", "geometries": [{"type":"Point","coordinates":[10,10]}]}
 ```
 
-`Geometrics`字段是一个包含所有空间数据的数组。
+`geometries`字段是一个包含所有空间数据的数组。
 
 不同空间数据类型映射的示例如下：
 <div class="wy-table-responsive">
 <table class="colwidths-auto docutils">
     <thead>
       <tr>
-        <th class="text-left">Spatial data</th>
-        <th class="text-left">Json String converted in Flink</th>
+        <th class="text-left">空间数据</th>
+        <th class="text-left">在 Flink 中转换的 Json 字符串</th>
       </tr>
     </thead>
     <tbody>
