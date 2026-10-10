@@ -126,8 +126,11 @@ public final class BinaryArrayWriter extends AbstractBinaryWriter {
                 break;
             case INTEGER:
             case DATE:
-            case TIME_WITHOUT_TIME_ZONE:
                 setNullInt(pos);
+                break;
+            case TIME_WITHOUT_TIME_ZONE:
+                // All TIME precisions use the same eight-byte slot.
+                setNullLong(pos);
                 break;
             case BIGINT:
             case TIMESTAMP_WITHOUT_TIME_ZONE:
@@ -248,8 +251,9 @@ public final class BinaryArrayWriter extends AbstractBinaryWriter {
                 return BinaryArrayWriter::setNullShort;
             case INTEGER:
             case DATE:
-            case TIME_WITHOUT_TIME_ZONE:
                 return BinaryArrayWriter::setNullInt;
+            case TIME_WITHOUT_TIME_ZONE:
+                return BinaryArrayWriter::setNullLong;
             case FLOAT:
                 return BinaryArrayWriter::setNullFloat;
             case DOUBLE:

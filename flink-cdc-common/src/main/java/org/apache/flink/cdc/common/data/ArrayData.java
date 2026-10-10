@@ -72,6 +72,19 @@ public interface ArrayData {
     /** Returns the double value at the given position. */
     double getDouble(int pos);
 
+    /**
+     * Returns the time value at the given position.
+     *
+     * <p>All precisions share the same eight-byte representation, so no precision is required to
+     * decode the value. The default reads the historical millisecond integer representation that
+     * callers without a dedicated {@code TIME} accessor still produce; {@link
+     * org.apache.flink.cdc.common.data.binary.BinaryArrayData} and {@link GenericArrayData}
+     * override it.
+     */
+    default TimeData getTime(int pos) {
+        return TimeData.fromMillisOfDay(getInt(pos));
+    }
+
     /** Returns the string value at the given position. */
     StringData getString(int pos);
 
@@ -180,8 +193,10 @@ public interface ArrayData {
                 break;
             case INTEGER:
             case DATE:
-            case TIME_WITHOUT_TIME_ZONE:
                 elementGetter = ArrayData::getInt;
+                break;
+            case TIME_WITHOUT_TIME_ZONE:
+                elementGetter = ArrayData::getTime;
                 break;
             case BIGINT:
                 elementGetter = ArrayData::getLong;
