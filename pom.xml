@@ -653,6 +653,23 @@ limitations under the License.
                             </rules>
                         </configuration>
                     </execution>
+                    <execution>
+                        <id>enforce-maven</id>
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <requireMavenVersion>
+                                    <!-- enforce at least mvn version 3.1.1 (see FLINK-12447) -->
+                                    <version>[3.1.1,)</version>
+                                </requireMavenVersion>
+                                <requireJavaVersion>
+                                    <version>${source.java.version}</version>
+                                </requireJavaVersion>
+                            </rules>
+                        </configuration>
+                    </execution>
                 </executions>
             </plugin>
 
@@ -713,29 +730,6 @@ limitations under the License.
                 <configuration>
                     <generateBackupPoms>false</generateBackupPoms>
                 </configuration>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-enforcer-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <id>enforce-maven</id>
-                        <goals>
-                            <goal>enforce</goal>
-                        </goals>
-                        <configuration>
-                            <rules>
-                                <requireMavenVersion>
-                                    <!-- enforce at least mvn version 3.1.1 (see FLINK-12447) -->
-                                    <version>[3.1.1,)</version>
-                                </requireMavenVersion>
-                                <requireJavaVersion>
-                                    <version>${source.java.version}</version>
-                                </requireJavaVersion>
-                            </rules>
-                        </configuration>
-                    </execution>
-                </executions>
             </plugin>
         </plugins>
     </build>

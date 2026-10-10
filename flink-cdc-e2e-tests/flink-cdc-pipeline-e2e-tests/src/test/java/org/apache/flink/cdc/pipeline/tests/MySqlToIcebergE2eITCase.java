@@ -213,9 +213,24 @@ public class MySqlToIcebergE2eITCase extends PipelineTestEnvironment {
             stat.execute("UPDATE products SET description='Fay' WHERE id=106;");
             stat.execute("UPDATE products SET weight='5.125' WHERE id=107;");
 
+            // Same row updated twice before the schema-change flush below.
+            stat.execute("UPDATE products SET description='Bob v1' WHERE id=102;");
+            stat.execute("UPDATE products SET description='Bob v2' WHERE id=102;");
+
             // modify table schema
             stat.execute("ALTER TABLE products DROP COLUMN point_c;");
             stat.execute("DELETE FROM products WHERE id=101;");
+
+            // And once more after the flush; the latest value should win, no duplicate.
+            stat.execute("UPDATE products SET weight='1.125' WHERE id=102;");
+            // Update then delete the same row; it should be gone.
+            stat.execute("UPDATE products SET description='Cecily v2' WHERE id=103;");
+            stat.execute("DELETE FROM products WHERE id=103;");
+            // Delete then re-insert the same id; the re-inserted row should survive.
+            stat.execute("DELETE FROM products WHERE id=104;");
+            stat.execute(
+                    "INSERT INTO products (id, name, description, weight, enum_c, json_c) "
+                            + "VALUES (104, 'Four', 'Reborn', 9.875, 'white', null);");
 
             stat.execute(
                     "INSERT INTO products VALUES (default,'Eleven','Kryo',5.18, null, null);"); // 111
@@ -229,9 +244,8 @@ public class MySqlToIcebergE2eITCase extends PipelineTestEnvironment {
         List<String> recordsInSnapshotPhase =
                 new ArrayList<>(
                         Arrays.asList(
-                                "102, Two, Bob, 1.703, white, {\"key2\": \"value2\"}, null, null, null, null, null, null, null, null, null, null",
-                                "103, Three, Cecily, 4.105, red, {\"key3\": \"value3\"}, null, null, null, null, null, null, null, null, null, null",
-                                "104, Four, Derrida, 1.857, white, {\"key4\": \"value4\"}, null, null, null, null, null, null, null, null, null, null",
+                                "102, Two, Bob v2, 1.125, white, {\"key2\":\"value2\"}, null, null, null, null, null, null, null, null, null, null",
+                                "104, Four, Reborn, 9.875, white, null, null, null, null, null, null, null, null, null, null, null",
                                 "105, Five, Evelyn, 5.211, red, {\"K\": \"V\", \"k\": \"v\"}, null, null, null, null, null, null, null, null, null, null",
                                 "106, Six, Fay, 9.813, null, null, null, null, null, null, null, null, null, null, null, null",
                                 "107, Seven, Grace, 5.125, null, null, null, null, null, null, null, null, null, null, null, null",

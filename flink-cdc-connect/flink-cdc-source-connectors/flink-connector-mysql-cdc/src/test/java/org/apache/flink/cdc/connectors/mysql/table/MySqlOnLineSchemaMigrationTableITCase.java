@@ -78,7 +78,7 @@ class MySqlOnLineSchemaMigrationTableITCase extends MySqlSourceTestBase {
     private static final String TEST_USER = "mysqluser";
     private static final String TEST_PASSWORD = "mysqlpw";
 
-    private static final String PERCONA_TOOLKIT = "perconalab/percona-toolkit:3.7.1";
+    private static final String PERCONA_TOOLKIT = "perconalab/percona-toolkit:3.7.1-4";
 
     protected static final GenericContainer<?> PERCONA_TOOLKIT_CONTAINER =
             createPerconaToolkitContainer();
