@@ -435,6 +435,16 @@ Connector Options
       <td>String</td>
       <td>The type of trust store file. This is optional and only needed if <code>mongodb.ssl.truststore</code> is configured. Defaults to PKCS12.</td>
     </tr>
+    <tr>
+      <td>records.per.second</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">true</td>
+      <td>Double</td>
+      <td>
+        The maximum number of records emitted per second, the default value: -1, means no rate limiting.(only for flink2.x)<br>
+        WARNING: Incremental/binlog phase: Rate limiting can cause the connector to fall behind the upstream change stream, risking binlog/WAL purging before the connector catches up (data loss for MySQL, replication slot issues for PostgreSQL).
+      </td>
+    </tr>
     </tbody>
 </table>
 </div>

@@ -337,6 +337,11 @@ class IncrementalSourceReaderTest {
         public boolean isAssignUnboundedChunkFirst() {
             return false;
         }
+
+        @Override
+        public double getRecordsPerSecond() {
+            return -1d;
+        }
     }
 
     /** A dialect that captures every table and discovers no schema. */

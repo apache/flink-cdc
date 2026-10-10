@@ -69,7 +69,8 @@ public class MockPostgreSQLTableSource extends PostgreSQLTableSource {
                 (boolean) get(postgreSQLTableSource, "assignUnboundedChunkFirst"),
                 (boolean) get(postgreSQLTableSource, "appendOnly"),
                 (boolean) get(postgreSQLTableSource, "includePartitionedTables"),
-                (boolean) get(postgreSQLTableSource, "releaseSnapshotMetadataEnabled"));
+                (boolean) get(postgreSQLTableSource, "releaseSnapshotMetadataEnabled"),
+                (double) get(postgreSQLTableSource, "recordsPerSecond"));
     }
 
     @Override

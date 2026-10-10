@@ -462,5 +462,10 @@ class SnapshotSplitAssignerReleaseTest {
         public boolean isReleaseSnapshotMetadataEnabled() {
             return releaseSnapshotMetadataEnabled;
         }
+
+        @Override
+        public double getRecordsPerSecond() {
+            return -1d;
+        }
     }
 }

@@ -277,6 +277,11 @@ public class MongoDBSourceBuilder<T> {
         return this;
     }
 
+    public MongoDBSourceBuilder<T> recordsPerSecond(double recordsPerSecond) {
+        this.configFactory.recordsPerSecond(recordsPerSecond);
+        return this;
+    }
+
     /**
      * Whether to release the finished snapshot split metadata from the coordinator after entering
      * the stream phase, to reduce JobManager memory pressure (FLINK-40697).

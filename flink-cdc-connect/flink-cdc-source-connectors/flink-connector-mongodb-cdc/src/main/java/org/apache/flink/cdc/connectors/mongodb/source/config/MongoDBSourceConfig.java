@@ -67,6 +67,7 @@ public class MongoDBSourceConfig implements SourceConfig {
     @Nullable private final String sslTrustStore;
     @Nullable private final String sslTrustStorePassword;
     private final String sslTrustStoreType;
+    private final double recordsPerSecond;
 
     MongoDBSourceConfig(
             String scheme,
@@ -99,7 +100,8 @@ public class MongoDBSourceConfig implements SourceConfig {
             String sslKeyStoreType,
             @Nullable String sslTrustStore,
             @Nullable String sslTrustStorePassword,
-            String sslTrustStoreType) {
+            String sslTrustStoreType,
+            double recordsPerSecond) {
         this.scheme = checkNotNull(scheme);
         this.hosts = checkNotNull(hosts);
         this.username = username;
@@ -138,6 +140,7 @@ public class MongoDBSourceConfig implements SourceConfig {
         this.sslTrustStore = sslTrustStore;
         this.sslTrustStorePassword = sslTrustStorePassword;
         this.sslTrustStoreType = sslTrustStoreType;
+        this.recordsPerSecond = recordsPerSecond;
     }
 
     public String getScheme() {
@@ -284,6 +287,11 @@ public class MongoDBSourceConfig implements SourceConfig {
     }
 
     @Override
+    public double getRecordsPerSecond() {
+        return recordsPerSecond;
+    }
+
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
@@ -319,7 +327,8 @@ public class MongoDBSourceConfig implements SourceConfig {
                 && Objects.equals(sslKeyStoreType, that.sslKeyStoreType)
                 && Objects.equals(sslTrustStore, that.sslTrustStore)
                 && Objects.equals(sslTrustStorePassword, that.sslTrustStorePassword)
-                && Objects.equals(sslTrustStoreType, that.sslTrustStoreType);
+                && Objects.equals(sslTrustStoreType, that.sslTrustStoreType)
+                && recordsPerSecond == that.recordsPerSecond;
     }
 
     @Override
@@ -352,6 +361,7 @@ public class MongoDBSourceConfig implements SourceConfig {
                 sslKeyStoreType,
                 sslTrustStore,
                 sslTrustStorePassword,
-                sslTrustStoreType);
+                sslTrustStoreType,
+                recordsPerSecond);
     }
 }

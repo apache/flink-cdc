@@ -270,6 +270,16 @@ SELECT * FROM orders;
         例如，更新快照阶段已更新的值，或删除快照阶段已删除的数据。这些重放的 change log 事件应进行特殊处理。
       </td>
     </tr>
+    <tr>
+      <td>records.per.second</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">true</td>
+      <td>Double</td>
+      <td>
+        The maximum number of records emitted per second, the default value: -1, means no rate limiting.(only for flink2.x)<br>
+        WARNING: Incremental/binlog phase: Rate limiting can cause the connector to fall behind the upstream change stream, risking binlog/WAL purging before the connector catches up (data loss for MySQL, replication slot issues for PostgreSQL).
+      </td>
+    </tr>
     </tbody>
 </table>    
 </div>
