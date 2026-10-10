@@ -28,11 +28,13 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.IntType;
 import org.apache.flink.cdc.runtime.operators.schema.common.ExistingTableSchemaExpander;
+import org.apache.flink.table.api.ValidationException;
 
 import org.apache.fluss.client.Connection;
 import org.apache.fluss.client.ConnectionFactory;
 import org.apache.fluss.client.admin.Admin;
 import org.apache.fluss.exception.InvalidConfigException;
+import org.apache.fluss.metadata.DatabaseDescriptor;
 import org.apache.fluss.metadata.TableDescriptor;
 import org.apache.fluss.metadata.TableInfo;
 import org.apache.fluss.metadata.TablePath;
@@ -46,12 +48,14 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
+import static org.apache.flink.cdc.connectors.fluss.utils.FlussConversions.toFlussSchema;
 import static org.apache.fluss.config.ConfigOptions.TABLE_REPLICATION_FACTOR;
 import static org.apache.fluss.types.DataTypeChecks.equalsWithFieldId;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -669,6 +673,59 @@ public class FlussMetadataApplierTest {
                         Collections.emptyMap(),
                         Collections.emptyMap())) {
             applier.applySchemaChange(new CreateTableEvent(tableId, sameSchema));
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"tenant,id", "tenant"})
+    void testExistingPrimaryKeyTableWithCustomBucketKeys(String bucketKeys) throws Exception {
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT().notNull())
+                        .physicalColumn("tenant", DataTypes.INT().notNull())
+                        .physicalColumn("marker", DataTypes.STRING())
+                        .primaryKey("id", "tenant")
+                        .build();
+        TablePath tablePath = new TablePath(DATABASE_NAME, "table1");
+        CreateTableEvent event =
+                new CreateTableEvent(TableId.tableId(DATABASE_NAME, "table1"), schema);
+        List<String> currentBucketKeys = Arrays.asList(bucketKeys.split(","));
+        admin.createDatabase(DATABASE_NAME, DatabaseDescriptor.EMPTY, true).get();
+        admin.createTable(
+                        tablePath,
+                        TableDescriptor.builder()
+                                .schema(toFlussSchema(schema))
+                                .distributedBy(2, currentBucketKeys)
+                                .build(),
+                        false)
+                .get();
+        TableInfo originalTableInfo = admin.getTableInfo(tablePath).get();
+
+        try (FlussMetaDataApplier applier =
+                new FlussMetaDataApplier(
+                        FLUSS_CLUSTER_EXTENSION.getClientConfig(),
+                        Collections.emptyMap(),
+                        Collections.emptyMap(),
+                        Collections.emptyMap())) {
+            applier.applySchemaChange(event);
+            TableInfo tableInfo = admin.getTableInfo(tablePath).get();
+            assertThat(tableInfo.getTableId()).isEqualTo(originalTableInfo.getTableId());
+            assertThat(tableInfo.getBucketKeys()).containsExactlyElementsOf(currentBucketKeys);
+            assertThat(tableInfo.getNumBuckets()).isEqualTo(2);
+        }
+
+        try (FlussMetaDataApplier applier =
+                new FlussMetaDataApplier(
+                        FLUSS_CLUSTER_EXTENSION.getClientConfig(),
+                        Collections.emptyMap(),
+                        Collections.singletonMap(
+                                DATABASE_NAME + ".table1", Arrays.asList("id", "tenant")),
+                        Collections.emptyMap())) {
+            assertThatThrownBy(() -> applier.applySchemaChange(event))
+                    .rootCause()
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessageContaining("New Fluss table's bucket keys : [id, tenant]")
+                    .hasMessageContaining("Current Fluss's bucket keys: " + currentBucketKeys);
         }
     }
 

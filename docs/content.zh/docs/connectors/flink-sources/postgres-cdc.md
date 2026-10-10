@@ -24,14 +24,13 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-# Postgres CDC Connector
+# Postgres CDC 连接器
 
-The Postgres CDC connector allows for reading snapshot data and incremental data from PostgreSQL database. This document describes how to setup the Postgres CDC connector to run SQL queries against PostgreSQL databases.
+Postgres CDC 连接器允许从 PostgreSQL 数据库读取快照数据和增量数据。本文描述了如何设置 Postgres CDC 连接器来对 PostgreSQL 数据库运行 SQL 查询。
 
-Dependencies
-------------
+## 依赖
 
-In order to setup the Postgres CDC connector, the following table provides dependency information for both projects using a build automation tool (such as Maven or SBT) and SQL Client with SQL JAR bundles.
+为了设置 Postgres CDC 连接器，下表提供了使用构建自动化工具（如 Maven 或 SBT ）和带有 SQL JAR 包的 SQL 客户端的两个项目的依赖关系信息。
 
 ### Maven dependency
 
@@ -39,16 +38,15 @@ In order to setup the Postgres CDC connector, the following table provides depen
 
 ### SQL Client JAR
 
-```Download link is available only for stable releases.```
+```下载链接仅适用于稳定版本。```
 
-Download [flink-sql-connector-postgres-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-postgres-cdc) and put it under `<FLINK_HOME>/lib/`.
+下载 [flink-sql-connector-postgres-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-postgres-cdc) 到 `<FLINK_HOME>/lib/` 目录下。
 
-**Note:** Refer to [flink-sql-connector-postgres-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-postgres-cdc), more released versions will be available in the Maven central warehouse.
+**注意:** 参考 [flink-sql-connector-postgres-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-postgres-cdc) 当前已发布的所有版本都可以在 Maven 中央仓库获取。
 
-How to create a Postgres CDC table
-----------------
+## 如何创建 Postgres CDC 表
 
-The Postgres CDC table can be defined as following:
+Postgres CDC 表可以定义如下：
 
 ```sql
 -- register a PostgreSQL table 'shipments' in Flink SQL
@@ -76,8 +74,7 @@ CREATE TABLE shipments (
 SELECT * FROM shipments;
 ```
 
-Connector Options
-----------------
+## 连接器配置项
 
 <div class="highlight">
 <table class="colwidths-auto docutils">
@@ -96,107 +93,106 @@ Connector Options
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Specify what connector to use, here should be <code>'postgres-cdc'</code>.</td>
+      <td>指定要使用的连接器, 这里应该是 <code>'postgres-cdc'</code>.</td>
     </tr>
     <tr>
       <td>hostname</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>IP address or hostname of the PostgreSQL database server.</td>
+      <td>PostgreSQL 数据库服务器的 IP 地址或主机名。</td>
     </tr>
     <tr>
       <td>username</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Name of the PostgreSQL database to use when connecting to the PostgreSQL database server.</td>
+      <td>连接到 PostgreSQL 数据库服务器时要使用的 PostgreSQL 用户的名称。</td>
     </tr>
     <tr>
       <td>password</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Password to use when connecting to the PostgreSQL database server.</td>
+      <td>连接 PostgreSQL 数据库服务器时使用的密码。</td>
     </tr>
     <tr>
       <td>database-name</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Database name of the PostgreSQL server to monitor.</td>
+      <td>要监视的 PostgreSQL 服务器的数据库名称。</td>
     </tr>
     <tr>
       <td>schema-name</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Schema name of the PostgreSQL database to monitor.</td>
+      <td>要监视的 PostgreSQL 数据库的 Schema 名称。Schema 名称还支持正则表达式，以监视满足正则表达式的多个 schema。</td>
     </tr>
     <tr>
       <td>table-name</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Table name of the PostgreSQL database to monitor.</td>
+      <td>需要监视的 PostgreSQL 数据库的表名。表名还支持正则表达式，以监视满足正则表达式的多个表。</td>
     </tr>
     <tr>
       <td>port</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">5432</td>
       <td>Integer</td>
-      <td>Integer port number of the PostgreSQL database server.</td>
+      <td>PostgreSQL 数据库服务器的整数端口号。</td>
     </tr>
     <tr>
       <td>slot.name</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>The name of the PostgreSQL logical decoding slot that was created for streaming changes from a particular plug-in
-          for a particular database/schema. The server uses this slot to stream events to the connector that you are configuring.
-          <br/>Slot names must conform to <a href="https://www.postgresql.org/docs/current/static/warm-standby.html#STREAMING-REPLICATION-SLOTS-MANIPULATION">PostgreSQL replication slot naming rules</a>, which state: "Each replication slot has a name, which can contain lower-case letters, numbers, and the underscore character."</td>
+      <td>为从特定插件以流式传输方式获取某个数据库/模式的变更数据，所创建的 Postgres 逻辑解码槽（logical decoding slot）的名称。服务器使用这个槽（slot）将事件流式传输给你要配置的连接器（connector）。
+          <br/>复制槽名称必须符合 <a href="https://www.postgresql.org/docs/current/static/warm-standby.html#STREAMING-REPLICATION-SLOTS-MANIPULATION">PostgreSQL 复制槽的命名规则</a>, 其规则如下: "Each replication slot has a name, which can contain lower-case letters, numbers, and the underscore character."</td>
     </tr> 
     <tr>
       <td>decoding.plugin.name</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">decoderbufs</td>
       <td>String</td>
-      <td>The name of the Postgres logical decoding plug-in installed on the server.
-          Supported values are decoderbufs, wal2json, wal2json_rds, wal2json_streaming, wal2json_rds_streaming and pgoutput.</td>
+      <td>安装在服务器上的 Postgres 逻辑解码插件的名称。
+          支持的值为 decoderbufs、wal2json、wal2json_rds、wal2json_streaming、wal2json_rds_streaming 和 pgoutput。</td>
     </tr>
     <tr>
       <td>changelog-mode</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">all</td>
       <td>String</td>
-      <td>The changelog mode used for encoding streaming changes. Supported values are <code>all</code> (which encodes changes as retract stream using all RowKinds) and <code>upsert</code> (which encodes changes as upsert stream that describes idempotent updates on a key).
-          <br/> <code>upsert</code> mode can be used for tables with primary keys when replica identity <code>FULL</code> is not an option. Primary keys must be set to use <code>upsert</code> mode.</td>
+      <td>用于编码流式变更的 changelog 模式。支持的值为 <code>all</code>（使用所有 RowKind 将变更编码为回撤流）和 <code>upsert</code>（将变更编码为描述针对某个键的幂等更新的 upsert 流）。
+          <br/> 当副本标识（replica identity）无法设置为 <code>FULL</code> 时，<code>upsert</code> 模式可用于有主键的表。使用 <code>upsert</code> 模式必须设置主键。</td>
     </tr>
     <tr>
       <td>heartbeat.interval.ms</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">30s</td>
       <td>Duration</td>
-      <td>The interval of sending heartbeat event for tracing the latest available replication slot offsets</td>
+      <td>用于跟踪最新可用复制槽位点的发送心跳事件的间隔。</td>
     </tr>
    <tr>
       <td>debezium.*</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Pass-through Debezium's properties to Debezium Embedded Engine which is used to capture data changes from Postgres server.
-          For example: <code>'debezium.snapshot.mode' = 'never'</code>.
-          See more about the <a href="https://debezium.io/documentation/reference/1.9/connectors/postgresql.html#postgresql-connector-properties">Debezium's Postgres Connector properties</a></td>
+      <td>将 Debezium 的属性传递给 Debezium 嵌入式引擎，该引擎用于从 Postgres 服务器捕获数据更改。
+          例如: <code>'debezium.snapshot.mode' = 'never'</code>.
+          查看更多关于 <a href="https://debezium.io/documentation/reference/1.9/connectors/postgresql.html#postgresql-connector-properties"> Debezium 的  Postgres 连接器属性</a></td>
     </tr>
     <tr>
       <td>debezium.snapshot.select.statement.overrides</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>If you encounter a situation where there is a large amount of data in the table and you don't need all the historical data. You can try to specify the underlying configuration in debezium to select the data range you want to snapshot. This parameter only affects snapshots and does not affect subsequent data reading consumption.
-        <br/> Note: PostgreSQL must use schema name and table name.
-        <br/> For example: <code>'debezium.snapshot.select.statement.overrides' = 'schema.table'</code>.
-        <br/> After specifying the above attributes, you must also add the following attributes:
+      <td>如果你遇到表中数据量很大，而你不需要所有历史数据的情况，可以尝试在 debezium 中指定底层配置来选择你想要快照的数据范围。该参数只影响快照，不影响后续的数据读取消费。
+        <br/> 注意: PostgreSQL 必须使用 schema 名称和表名。
+        <br/> 例如: <code>'debezium.snapshot.select.statement.overrides' = 'schema.table'</code>.
+        <br/> 指定上述属性后，你还必须添加以下属性:
         <code> debezium.snapshot.select.statement.overrides.[schema].[table] </code>
       </td>
     </tr>
@@ -205,11 +201,11 @@ Connector Options
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>You can specify SQL statements to limit the data range of snapshot.
-        <br/> Note1: Schema and table need to be specified in the SQL statement, and the SQL should conform to the syntax of the data source.Currently.
-        <br/> For example: <code>'debezium.snapshot.select.statement.overrides.schema.table' = 'select * from schema.table where 1 != 1'</code>.
-        <br/> Note2: The Flink SQL client submission task does not support functions with single quotation marks in the content.
-        <br/> For example: <code>'debezium.snapshot.select.statement.overrides.schema.table' = 'select * from schema.table where to_char(rq, 'yyyy-MM-dd')'</code>.
+      <td>你可以指定 SQL 语句来限制快照的数据范围。
+        <br/> 注意1: SQL 语句中需要指定 schema 和表，且 SQL 应符合数据源的语法。
+        <br/> 例如: <code>'debezium.snapshot.select.statement.overrides.schema.table' = 'select * from schema.table where 1 != 1'</code>.
+        <br/> 注意2: Flink SQL 客户端提交的任务不支持内容中带单引号的函数。
+        <br/> 例如: <code>'debezium.snapshot.select.statement.overrides.schema.table' = 'select * from schema.table where to_char(rq, 'yyyy-MM-dd')'</code>.
       </td>
     </tr>
     <tr>
@@ -217,12 +213,12 @@ Connector Options
           <td>optional</td>
           <td style="word-wrap: break-word;">false</td>
           <td>Boolean</td>
-          <td>Incremental snapshot is a new mechanism to read snapshot of a table. Compared to the old snapshot mechanism,
-              the incremental snapshot has many advantages, including:
-                <br/>(1) source can be parallel during snapshot reading,
-                <br/>(2) source can perform checkpoints in the chunk granularity during snapshot reading,
-                <br/>(3) source doesn't need to acquire global read lock (FLUSH TABLES WITH READ LOCK) before snapshot reading.
-              <br/>Please see <a href="#incremental-snapshot-reading-experimental">Incremental Snapshot Reading</a> section for more detailed information.
+          <td>增量快照是一种读取表快照的新机制，与旧的快照机制相比，
+              增量快照有许多优点，包括：
+                <br/>（1）在快照读取期间，Source 支持并发读取，
+                <br/>（2）在快照读取期间，Source 支持进行 chunk 粒度的 checkpoint，
+                <br/>（3）在快照读取之前，Source 不需要获取全局读锁（FLUSH TABLES WITH READ LOCK）。
+              <br/>请查阅 <a href="#增量快照读取实验性">增量快照读取</a> 章节了解更多详细信息。
           </td>
     </tr>
     <tr>
@@ -230,10 +226,10 @@ Connector Options
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>
       <td>Boolean</td>
-      <td>Whether to close idle readers at the end of the snapshot phase. <br>
-          The flink version is required to be greater than or equal to 1.14 when 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' is set to true.<br>
-          If the flink version is greater than or equal to 1.15, the default value of 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' has been changed to true,
-          so it does not need to be explicitly configured 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' = 'true'
+      <td>是否在快照阶段结束后关闭空闲的 Reader。 <br>
+          当 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' 设置为 true 时，要求 flink 版本大于等于 1.14。<br>
+          如果 flink 版本大于等于 1.15，'execution.checkpointing.checkpoints-after-tasks-finish.enabled' 的默认值已变更为 true，
+          因此不需要显式配置 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' = 'true'
       </td>
     </tr>
     <tr>
@@ -248,8 +244,8 @@ Connector Options
       <td>optional</td>
       <td style="word-wrap: break-word;">3</td>
       <td>Integer</td>
-      <td>The number of checkpoint delays before starting to commit the LSN offsets. <br>
-          The checkpoint LSN offsets will be committed in rolling fashion, the earliest checkpoint identifier will be committed first from the delayed checkpoints.
+      <td>在开始提交 LSN 位点之前，允许延迟的 checkpoint 次数。 <br>
+          checkpoint 的 LSN 位点将以滚动方式提交，最早的那个 checkpoint 标识符将首先从延迟的 checkpoint 中被提交。
       </td>
     </tr>
     <tr>
@@ -258,8 +254,8 @@ Connector Options
       <td style="word-wrap: break-word;">true</td>
       <td>Boolean</td>
       <td>
-        Whether to assign the unbounded chunks first during snapshot reading phase.<br>
-        This might help reduce the risk of the TaskManager experiencing an out-of-memory (OOM) error when taking a snapshot of the largest unbounded chunk.<br> 
+        快照读取阶段是否先分配 UnboundedChunk。<br>
+        这可能有助于降低 TaskManager 在对最大的 UnboundedChunk 执行快照时出现内存溢出 (OOM) 错误的风险。<br> 
       </td>
     </tr>
     <tr>
@@ -268,10 +264,10 @@ Connector Options
       <td style="word-wrap: break-word;">false</td>
       <td>Boolean</td>
       <td>
-        Whether to skip backfill in snapshot reading phase.<br> 
-        If backfill is skipped, changes on captured tables during snapshot phase will be consumed later in change log reading phase instead of being merged into the snapshot.<br>
-        WARNING: Skipping backfill might lead to data inconsistency because some change log events happened within the snapshot phase might be replayed (only at-least-once semantic is promised).
-        For example updating an already updated value in snapshot, or deleting an already deleted entry in snapshot. These replayed change log events should be handled specially.
+        是否在快照读取阶段跳过 backfill 。<br> 
+        如果跳过 backfill ，快照阶段捕获表的更改将在稍后的 changelog 读取阶段被回放，而不是合并到快照中。<br>
+        警告：跳过 backfill 可能会导致数据不一致，因为快照阶段发生的某些 changelog 事件可能会被重放（仅保证 at-least-once ）。
+        例如，更新快照阶段已更新的值，或删除快照阶段已删除的数据。这些重放的 changelog 事件应进行特殊处理。
       </td>
     </tr>
     <tr>
@@ -293,10 +289,10 @@ Connector Options
       <td style="word-wrap: break-word;">false</td>
       <td>Boolean</td>
       <td>
-        Whether to enable reading partitioned tables via partition root.<br>
-        If enabled:
-          (1) PUBLICATION must be created beforehand with parameter publish_via_partition_root=true
-          (2) Table list (regex or predefined list) should only match the parent table name, if table list matches both parent and child tables, snapshot data will be read twice.
+        是否启用通过分区根读取分区表。<br>
+        如果启用：
+          （1）必须事先创建 PUBLICATION，并带有参数 publish_via_partition_root=true
+          （2）表列表（正则表达式或预定义列表）应当只匹配父表名，如果表列表同时匹配父表和子表，快照数据将被读取两次。
       </td>
     </tr>
     <tr>
@@ -319,19 +315,19 @@ Connector Options
 </div>
 <div>
 
-### Notes
+### 注意事项
 
-#### `slot.name` option
+#### `slot.name` 选项
 
-The `slot.name` is recommended to set for different tables to avoid the potential `PSQLException: ERROR: replication slot "flink" is active for PID 974` error. See more [here](https://debezium.io/documentation/reference/1.9/connectors/postgresql.html#postgresql-property-slot-name).
+建议为不同的表设置不同的 `slot.name`，以避免潜在的 `PSQLException: ERROR: replication slot "flink" is active for PID 974` 错误。更多信息请参阅 [这里](https://debezium.io/documentation/reference/1.9/connectors/postgresql.html#postgresql-property-slot-name)。
 
-#### `scan.lsn-commit.checkpoints-num-delay` option
+#### `scan.lsn-commit.checkpoints-num-delay` 选项
 
-When consuming PostgreSQL logs, the LSN offset must be committed to trigger the log data cleanup for the corresponding slot. However, once the LSN offset is committed, earlier offsets become invalid. To ensure access to earlier LSN offsets for job recovery, we delay the LSN commit by `scan.lsn-commit.checkpoints-num-delay` (default value is `3`) checkpoints. This feature is available when config option `scan.incremental.snapshot.enabled` is set to true.
+在消费 PostgreSQL 日志时，必须提交 LSN 位点以触发对应复制槽的日志数据清理。然而，一旦 LSN 位点被提交，更早的位点就会失效。为了确保作业恢复时能够访问更早的 LSN 位点，我们将 LSN 的提交延迟 `scan.lsn-commit.checkpoints-num-delay`（默认值为 `3`）个 checkpoint。该特性在配置选项 `scan.incremental.snapshot.enabled` 设置为 true 时可用。
 
-### Incremental Snapshot Options
+### 增量快照选项
 
-The following options is available only when `scan.incremental.snapshot.enabled=true`:
+以下选项仅在 `scan.incremental.snapshot.enabled=true` 时可用：
 
 <div class="highlight">
 <table class="colwidths-auto docutils">
@@ -350,60 +346,60 @@ The following options is available only when `scan.incremental.snapshot.enabled=
           <td>optional</td>
           <td style="word-wrap: break-word;">8096</td>
           <td>Integer</td>
-          <td>The chunk size (number of rows) of table snapshot, captured tables are split into multiple chunks when read the snapshot of table.</td>
+          <td>表快照的分片大小（行数），读取表的快照时，捕获的表被拆分为多个分片。</td>
     </tr>
     <tr>
       <td>scan.startup.mode</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">initial</td>
       <td>String</td>
-      <td>Optional startup mode for Postgres CDC consumer, valid enumerations are "initial", "latest-offset", "committed-offset" and "snapshot".
-           Please see <a href="#startup-reading-position">Startup Reading Position</a> section for more detailed information.</td>
+      <td>Postgres CDC 消费者可选的启动模式，合法的模式为 "initial"，"latest-offset"，"committed-offset" 和 "snapshot"。
+           请查阅 <a href="#启动模式">启动模式</a> 章节了解更多详细信息。</td>
     </tr>
     <tr>
       <td>chunk-meta.group.size</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">1000</td>
       <td>Integer</td>
-      <td>The group size of chunk meta, if the meta size exceeds the group size, the meta will be divided into multiple groups.</td>
+      <td>分片元数据的分组大小，如果元数据大小超过分组大小，则元数据将被划分为多个分组。</td>
     </tr>
     <tr>
           <td>connect.timeout</td>
           <td>optional</td>
           <td style="word-wrap: break-word;">30s</td>
           <td>Duration</td>
-          <td>The maximum time that the connector should wait after trying to connect to the PostgreSQL database server before timing out.</td>
+          <td>连接器在尝试连接到 PostgreSQL 数据库服务器后超时前应等待的最长时间。</td>
     </tr>
     <tr>
           <td>connect.pool.size</td>
           <td>optional</td>
           <td style="word-wrap: break-word;">30</td>
           <td>Integer</td>
-          <td>The connection pool size.</td>
+          <td>连接池大小。</td>
     </tr>
     <tr>
           <td>connect.max-retries</td>
           <td>optional</td>
           <td style="word-wrap: break-word;">3</td>
           <td>Integer</td>
-          <td>The max retry times that the connector should retry to build database server connection.</td>
+          <td>连接器应重试以建立 PostgreSQL 数据库服务器连接的最大重试次数。</td>
     </tr>
     <tr>
           <td>scan.snapshot.fetch.size</td>
           <td>optional</td>
           <td style="word-wrap: break-word;">1024</td>
           <td>Integer</td>
-          <td>The maximum fetch size for per poll when read table snapshot.</td>
+          <td>读取表快照时每次读取数据的最大条数。</td>
     </tr>
     <tr>
           <td>scan.incremental.snapshot.chunk.key-column</td>
           <td>optional</td>
           <td style="word-wrap: break-word;">(none)</td>
           <td>String</td>
-          <td>The chunk key of table snapshot, captured tables are split into multiple chunks by a chunk key when read the snapshot of table.
-            By default, the chunk key is the first column of the primary key. A column that is not part of the primary key can be used as a chunk key, but this may lead to slower query performance.
-            <br>
-            <b>Warning:</b> Using a non-primary key column as a chunk key may lead to data inconsistencies. Please see <a href="#warning">Warning</a> for details.
+          <td>表快照的分片键，在读取表的快照时，被捕获的表会按分片键拆分为多个分片。
+            默认情况下，分片键是主键的第一列。可以使用非主键列作为分片键，但这可能会导致查询性能下降。
+          <br>
+            <b>警告：</b> 使用非主键列作为分片键可能会导致数据不一致。请参阅 <a href="#警告">警告</a> 了解详细信息。
           </td>
     </tr>
     <tr>
@@ -411,27 +407,26 @@ The following options is available only when `scan.incremental.snapshot.enabled=
           <td>optional</td>
           <td style="word-wrap: break-word;">0.05d</td>
           <td>Double</td>
-          <td>The lower bound of chunk key distribution factor. The distribution factor is used to determine whether the table is evenly distribution or not.
-              The table chunks would use evenly calculation optimization when the data distribution is even, and the query for splitting would happen when it is uneven.
-              The distribution factor could be calculated by (MAX(id) - MIN(id) + 1) / rowCount.</td>
+          <td>分片键分布因子的下界。分布因子用于判断表的数据分布是否均匀。
+              当数据分布均匀时，表分片将使用均匀计算优化，当数据分布不均匀时，将通过查询进行拆分。
+              分布因子可以通过 (MAX(id) - MIN(id) + 1) / rowCount 计算得出。</td>
     </tr>
     <tr>
           <td>chunk-key.even-distribution.factor.upper-bound</td>
           <td>optional</td>
           <td style="word-wrap: break-word;">1000.0d</td>
           <td>Double</td>
-          <td>The upper bound of chunk key distribution factor. The distribution factor is used to determine whether the table is evenly distribution or not.
-              The table chunks would use evenly calculation optimization when the data distribution is even, and the query for splitting would happen when it is uneven.
-              The distribution factor could be calculated by (MAX(id) - MIN(id) + 1) / rowCount.</td>
+          <td>分片键分布因子的上界。分布因子用于判断表的数据分布是否均匀。
+              当数据分布均匀时，表分片将使用均匀计算优化，当数据分布不均匀时，将通过查询进行拆分。
+              分布因子可以通过 (MAX(id) - MIN(id) + 1) / rowCount 计算得出。</td>
     </tr>
     </tbody>
 </table>
 </div>
 
-Available Metadata
-----------------
+## 可用的元数据
 
-The following format metadata can be exposed as read-only (VIRTUAL) columns in a table definition.
+下表中的元数据可以在 DDL 中作为只读（虚拟）meta 列声明。
 
 <table class="colwidths-auto docutils">
   <thead>
@@ -445,34 +440,40 @@ The following format metadata can be exposed as read-only (VIRTUAL) columns in a
     <tr>
       <td>table_name</td>
       <td>STRING NOT NULL</td>
-      <td>Name of the table that contain the row.</td>
+      <td>当前记录所属的表名称。</td>
     </tr>
     <tr>
       <td>schema_name</td>
       <td>STRING NOT NULL</td>
-      <td>Name of the schema that contain the row.</td>
+      <td>当前记录所属的 schema 名称。</td>
     </tr>
     <tr>
       <td>database_name</td>
       <td>STRING NOT NULL</td>
-      <td>Name of the database that contain the row.</td>
+      <td>当前记录所属的库名称。</td>
     </tr>
     <tr>
       <td>op_ts</td>
       <td>TIMESTAMP_LTZ(3) NOT NULL</td>
-      <td>It indicates the time that the change was made in the database. <br>If the record is read from snapshot of the table instead of the change stream, the value is always 0.</td>
+      <td>当前记录表在数据库中更新的时间。 <br>如果从表的快照而不是更改流读取记录，该值将始终为0。</td>
+    </tr>
+    <tr>
+      <td>row_kind</td>
+      <td>STRING NOT NULL</td>
+      <td>当前记录的变更类型。<br>
+         注意：如果 Source 算子选择为每条记录输出 row_kind 列，则下游 SQL 操作符在处理回撤时可能会由于此新添加的列而无法比较。建议仅在简单的同步作业中使用此元数据列。<br>
+         '+I' 表示 INSERT 消息，'-D' 表示 DELETE 消息，'-U' 表示 UPDATE_BEFORE 消息，'+U' 表示 UPDATE_AFTER 消息。</td>
     </tr>
   </tbody>
 </table>
 
-Limitation
---------
+## 限制
 
-### Can't perform checkpoint during scanning snapshot of tables when incremental snapshot is disabled
+### 增量快照关闭时，无法在扫描表快照期间执行 checkpoint
 
-When `scan.incremental.snapshot.enabled=false`, we have the following limitation.
+当 `scan.incremental.snapshot.enabled=false` 时，存在以下限制。
 
-During scanning snapshot of database tables, since there is no recoverable position, we can't perform checkpoints. In order to not perform checkpoints, Postgres CDC source will keep the checkpoint waiting to timeout. The timeout checkpoint will be recognized as failed checkpoint, by default, this will trigger a failover for the Flink job. So if the database table is large, it is recommended to add following Flink configurations to avoid failover because of the timeout checkpoints:
+在扫描数据库表的快照期间，由于没有可恢复的位点，我们无法执行 checkpoint。为了不执行 checkpoint，Postgres CDC source 会让 checkpoint 一直等待直至超时。超时的 checkpoint 将被认定为失败的 checkpoint，默认情况下，这会触发 Flink 作业的故障转移。因此，如果数据库表很大，建议添加以下 Flink 配置，以避免因 checkpoint 超时而触发故障转移：
 
 ```
 execution.checkpointing.interval: 10min
@@ -481,7 +482,7 @@ restart-strategy: fixed-delay
 restart-strategy.fixed-delay.attempts: 2147483647
 ```
 
-The extended CREATE TABLE example demonstrates the syntax for exposing these metadata fields:
+下述创建表示例展示元数据列的用法：
 ```sql
 CREATE TABLE products (
     db_name STRING METADATA FROM 'database_name' VIRTUAL,
@@ -505,32 +506,30 @@ CREATE TABLE products (
 );
 ```
 
-Features
---------
+## 特性
 
-### Incremental Snapshot Reading (Experimental)
+### 增量快照读取（实验性）
 
-Incremental snapshot reading is a new mechanism to read snapshot of a table. Compared to the old snapshot mechanism, the incremental snapshot has many advantages, including:
-* (1) PostgreSQL CDC Source can be parallel during snapshot reading
-* (2) PostgreSQL CDC Source can perform checkpoints in the chunk granularity during snapshot reading
-* (3) PostgreSQL CDC Source doesn't need to acquire global read lock before snapshot reading
+增量快照读取是一种读取表快照的新机制。与旧的快照机制相比，增量快照具有许多优点，包括：
+* （1）在快照读取期间，PostgreSQL CDC Source 支持并发读取
+* （2）在快照读取期间，PostgreSQL CDC Source 支持进行 chunk 粒度的 checkpoint
+* （3）在快照读取之前，PostgreSQL CDC Source 不需要获取全局读锁
 
-During the incremental snapshot reading, the PostgreSQL CDC Source firstly splits snapshot chunks (splits) by user specified chunk key of table,
-and then PostgreSQL CDC Source assigns the chunks to multiple readers to read the data of snapshot chunk.
+在增量快照读取过程中，PostgreSQL CDC Source 首先会根据用户指定的表分片键将快照切分为多个分片（splits），
+然后 PostgreSQL CDC Source 将这些分片分配给多个 reader，以读取快照分片的数据。
 
-### Exactly-Once Processing
+### Exactly-Once 处理
 
-The Postgres CDC connector is a Flink Source connector which will read database snapshot first and then continues to read binlogs with **exactly-once processing** even failures happen. Please read [How the connector works](https://debezium.io/documentation/reference/1.9/connectors/postgresql.html#how-the-postgresql-connector-works).
+Postgres CDC 连接器是一个 Flink Source 连接器，它将首先读取数据库快照，然后继续读取 binlog，即使在处理时出现故障，也能**准确读取数据**。请参阅 [How the connector works](https://debezium.io/documentation/reference/1.9/connectors/postgresql.html#how-the-postgresql-connector-works)。
 
-### Startup Reading Position
+### 启动模式
 
-The config option `scan.startup.mode` specifies the startup mode for PostgreSQL CDC consumer. The valid enumerations are:
+配置选项`scan.startup.mode`指定 PostgreSQL CDC 使用者的启动模式。有效枚举包括：
 
-- `initial` (default): Performs an initial snapshot on the monitored database tables upon first startup, and continue to read the replication slot.
-- `latest-offset`: Never to perform snapshot on the monitored database tables upon first startup, just read from
-  the end of the replication which means only have the changes since the connector was started.
-- `committed-offset`: Skip snapshot phase and start reading events from a `confirmed_flush_lsn` offset of replication slot.
-- `snapshot`: Only the snapshot phase is performed and exits after the snapshot phase reading is completed.
+- `initial` （默认）：在第一次启动时对受监视的数据库表执行初始快照，并继续读取复制槽。
+- `latest-offset`：首次启动时，从不对受监视的数据库表执行快照， 连接器仅从复制槽的结尾处开始读取，这意味着连接器只能读取在连接器启动之后的数据更改。
+- `committed-offset`：跳过快照阶段，从复制槽的 `confirmed_flush_lsn` 位点开始读取事件。
+- `snapshot`：仅执行快照阶段，并在快照阶段读取完成后退出。
 
 ### 动态加表
 
@@ -599,12 +598,12 @@ $ ./bin/flink run \
 
 ### DataStream Source
 
-The Postgres CDC connector can also be a DataStream source. There are two modes for the DataStream source:
+Postgres CDC 连接器也可以是一个数据流源。DataStream 源有两种模式：
 
-- incremental snapshot based, which allows parallel reading
-- SourceFunction based, which only supports single thread reading
+- 基于增量快照，允许并行读取
+- 基于 SourceFunction，仅支持单线程读取
 
-#### Incremental Snapshot based DataStream (Experimental)
+#### 基于增量快照的 DataStream（实验性）
 
 ```java
 import org.apache.flink.cdc.connectors.base.source.jdbc.JdbcIncrementalSource;
@@ -652,7 +651,7 @@ public class PostgresParallelSourceExample {
 }
 ```
 
-#### SourceFunction-based DataStream
+#### 基于 SourceFunction 的 DataStream
 
 ```java
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -704,43 +703,42 @@ public class PostgreSQLSourceExample {
 1. Group 名称是 `namespace.schema.table`，这里的 `namespace` 是实际的数据库名称， `schema` 是实际的 schema 名称， `table` 是实际的表名称。
 2. 对于 PostgreSQL，Group 的名称会类似于 `test_database.test_schema.test_table`。
 
-### Tables Without primary keys
+### 关于无主键表
 
-Starting from version 3.4.0, Postgres CDC support tables that do not have a primary key. To use a table without primary keys, you must configure the `scan.incremental.snapshot.chunk.key-column` option and specify one non-null field.
+从3.4.0 版本开始支持无主键表，使用无主键表必须设置 `scan.incremental.snapshot.chunk.key-column`，且只能选择非空类型的一个字段。
 
-There are two places that need to be taken care of.
+在使用无主键表时，需要注意以下两种情况。
 
-1. If there is an index in the table, try to use a column which is contained in the index in `scan.incremental.snapshot.chunk.key-column`. This will increase the speed of select statement.
-2. The processing semantics of a Postgres CDC table without primary keys is determined based on the behavior of the column that are specified by the `scan.incremental.snapshot.chunk.key-column`.
-* If no update operation is performed on the specified column, the exactly-once semantics is ensured.
-* If the update operation is performed on the specified column, only the at-least-once semantics is ensured. However, you can specify primary keys at downstream and perform the idempotence operation to ensure data correctness.
+1. 配置 `scan.incremental.snapshot.chunk.key-column` 时，如果表中存在索引，请尽量使用索引中的列来加快 select 速度。
+2. 无主键表的处理语义由 `scan.incremental.snapshot.chunk.key-column` 指定的列的行为决定：
+* 如果指定的列不存在更新操作，此时可以保证 Exactly once 语义。
+* 如果指定的列存在更新操作，此时只能保证 At least once 语义。但可以结合下游，通过指定下游主键，结合幂等性操作来保证数据的正确性。
 
-#### Warning
+#### 警告
 
-Using a **non-primary key column** as the `scan.incremental.snapshot.chunk.key-column` for a Postgres table with primary keys may lead to data inconsistencies. Below is a scenario illustrating this issue and recommendations to mitigate potential problems.
+在 Postgres 表中，若使用 **非主键列** 作为有主键表的 `scan.incremental.snapshot.chunk.key-column`，可能导致**数据不一致**。以下为可能出现的问题及其缓解方案。
 
-#### Problem Scenario
+#### 问题场景
 
-- **Table Structure:**
-    - **Primary Key:** `id`
-    - **Chunk Key Column:** `pid` (Not a primary key)
+- **表结构：**
+    - **主键：** `id`
+    - **分片键列 ：** `pid`（非主键）
 
-- **Snapshot Splits:**
-    - **Split 0:** `1 < pid <= 3`
-    - **Split 1:** `3 < pid <= 5`
+- **快照分片 ：**
+    - **分片 0:** `1 < pid <= 3`
+    - **分片 1:** `3 < pid <= 5`
 
-- **Operation:**
-    - Two different subtasks are reading Split 0 and Split 1 concurrently.
-    - An update operation changes `pid` from `2` to `4` for `id=0` while both splits are being read. This update occurs between the low and high watermark of both splits.
+- **操作 ：**
+    - 两个子任务并行读取 **分片 0** 和 **分片 1**。
+    - 在读取过程中，发生了一次 **更新** 操作，使 `id=0` 的 `pid` 从 `2` 变为 `4`，在两个分片的**高低水位**间都包含此次变更，导致该更新操作在增量阶段不会被处理。
 
-- **Result:**
-    - **Split 0:** Contains the record `[id=0, pid=2]`
-    - **Split 1:** Contains the record `[id=0, pid=4]`
+- **结果 ：**
+    - **分片 0:** 记录 `[id=0, pid=2]`
+    - **分片 1:** 记录 `[id=0, pid=4]`
 
-Since the order of processing these records cannot be guaranteed, the final value of `pid` for `id=0` may end up being either `2` or `4`, leading to potential data inconsistencies.
+由于**处理顺序**无法保证，最终 `id=0` 的 `pid` 可能为 `2` 或 `4`，从而导致数据不一致。
 
-Data Type Mapping
-----------------
+## 数据类型映射
 
 <div class="wy-table-responsive">
 <table class="colwidths-auto docutils">
@@ -816,6 +814,10 @@ Data Type Mapping
     <tr>
       <td>TIMESTAMP [(p)] [WITHOUT TIMEZONE]</td>
       <td>TIMESTAMP [(p)] [WITHOUT TIMEZONE]</td>
+    </tr>
+    <tr>
+      <td>TIMESTAMP [ (p) ] WITH TIME ZONE</td>
+      <td>TIMESTAMP_LTZ(p)</td>
     </tr>
     <tr>
       <td>

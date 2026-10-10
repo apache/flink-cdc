@@ -31,25 +31,19 @@ MongoDB CDC 连接器允许从 MongoDB 读取快照数据和增量数据。 本�
 依赖
 ------------
 
-为了设置 MongoDB CDC 连接器, 下表提供了使用构建自动化工具（如 Maven 或 SBT ）和带有 SQLJar 捆绑包的 SQLClient 的两个项目的依赖关系信息。
+为了设置 MongoDB CDC 连接器，下表提供了使用构建自动化工具（如 Maven 或 SBT ）和带有 SQL JAR 包的 SQL 客户端的两个项目的依赖关系信息。
 
 ### Maven dependency
-```
-<dependency>
-   <groupId>org.apache.flink</groupId>
-   <artifactId>flink-connector-mongodb-cdc</artifactId>
-   <!--  请使用已发布的版本依赖，snapshot 版本的依赖需要本地自行编译。 -->
-   <version>3.3-SNAPSHOT</version>
-</dependency>
-```
+
+{{< artifact flink-connector-mongodb-cdc >}}
 
 ### SQL Client JAR
 
 ```下载链接仅适用于稳定版本。```
 
-下载 [flink-sql-connector-mongodb-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-mongodb-cdc)， 把它放在 `<FLINK_HOME>/lib/`.
+下载 [flink-sql-connector-mongodb-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-mongodb-cdc) 到 `<FLINK_HOME>/lib/` 目录下。
 
-**注意:** 参考 [flink-sql-connector-mongodb-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-mongodb-cdc)， 当前已发布的版本将在 Maven 中央仓库中提供。
+**注意:** 参考 [flink-sql-connector-mongodb-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-mongodb-cdc) 当前已发布的所有版本都可以在 Maven 中央仓库获取。
 
 设置 MongoDB
 ----------------
@@ -75,7 +69,7 @@ MongoDB CDC 连接器允许从 MongoDB 读取快照数据和增量数据。 本�
 
 - 权限
 
-  `changeStream` and `read` 是 MongoDB Kafka Connector 必需权限。
+  `changeStream` 和 `read` 权限是 MongoDB Kafka Connector 所必需的。
 
   你可以使用以下示例进行简单的授权。<br>
   有关更详细的授权, 请参照 [MongoDB 数据库用户角色](https://docs.mongodb.com/manual/reference/built-in-roles/#database-user-roles).
@@ -86,7 +80,7 @@ MongoDB CDC 连接器允许从 MongoDB 读取快照数据和增量数据。 本�
       {
           role: "flinkrole",
           privileges: [{
-              // 所有数据库中所有非系统集合的 grant 权限
+              // Grant privileges on all non-system collections in all databases
               resource: { db: "", collection: "" },
               actions: [
                   "splitVector",
@@ -97,8 +91,8 @@ MongoDB CDC 连接器允许从 MongoDB 读取快照数据和增量数据。 本�
                   "changeStream" ]
           }],
           roles: [
-             // 阅读 config.collections 和 config.chunks
-             // 用于分片集群快照拆分。
+              // Read config.collections and config.chunks
+              // for sharded cluster snapshot splitting.
               { role: 'read', db: 'config' }
           ]
       }
@@ -146,7 +140,7 @@ SELECT * FROM products;
 
 **请注意**
 
-MongoDB 的更改事件记录在消息之前没有更新。因此，我们只能将其转换为 Flink 的 UPSERT 更改日志流。
+MongoDB 的更改事件记录没有 UPDATE_BEFORE 消息。因此，我们只能将其转换为 Flink 的 UPSERT 更改日志流。
 因为 upsert 流需要唯一键，所以我们必须声明 `_id` 作为主键。
 我们不能将其他列声明为主键, 因为删除操作不包含除 `_id` 和 `sharding key` 之外的键和值。
 
@@ -305,6 +299,13 @@ MongoDB 的更改事件记录在消息之前没有更新。因此，我们只能
       <td>心跳间隔（毫秒）。使用 0 禁用。</td>
     </tr>
     <tr>
+      <td>scan.full-changelog</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>是否尝试基于 MongoDB 中的前镜像和后镜像生成 full-mode changelog。详情请参阅 <a href="#a-name-id-003-a">Full Changelog</a>。仅支持 MongoDB 6.0 及以上版本。</td>
+    </tr>
+    <tr>
       <td>scan.incremental.snapshot.enabled</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>
@@ -316,14 +317,25 @@ MongoDB 的更改事件记录在消息之前没有更新。因此，我们只能
       <td>optional</td>
       <td style="word-wrap: break-word;">64</td>
       <td>Integer</td>
-      <td>增量快照的区块大小 mb。</td>
+      <td>增量快照的分片大小 mb。</td>
+    </tr>
+    <tr>
+      <td>scan.incremental.snapshot.chunk.samples</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">20</td>
+      <td>Integer</td>
+      <td>增量快照期间使用 sample 分区策略时每个分片的采样数量。</td>
     </tr>
     <tr>
       <td>scan.incremental.close-idle-reader.enabled</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>
       <td>Boolean</td>
-      <td>是否在快照结束后关闭空闲的 Reader。 此特性需要 flink 版本大于等于 1.14 并且 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' 需要设置为 true。</td>
+      <td>是否在快照阶段结束后关闭空闲的 Reader。 <br>
+          当 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' 设置为 true 时，要求 flink 版本大于等于 1.14。<br>
+          如果 flink 版本大于等于 1.15，'execution.checkpointing.checkpoints-after-tasks-finish.enabled' 的默认值已变更为 true，
+          因此不需要显式配置 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' = 'true'
+      </td>
     </tr>
     <tr>
       <td>scan.incremental.snapshot.metadata.release.enabled</td>
@@ -333,13 +345,20 @@ MongoDB 的更改事件记录在消息之前没有更新。因此，我们只能
       <td>是否在 source 进入增量阶段后，释放 source coordinator 持有的快照分片元数据（已分配的分片、已完成分片的位点以及表结构），以降低快照分片数量非常大的作业的 JobManager 内存占用。默认关闭。与 scan.newly-added-table.enabled 不兼容：同时开启两者会导致作业启动失败，且已释放元数据的作业无法再开启动态加表功能。仅在成功完成一次 checkpoint 后才会释放；若未开启 checkpoint 或没有 checkpoint 完成，则会保留该元数据，因此该配置项在未开启 checkpoint 时不生效。开启该配置项后生成的 checkpoint 或 savepoint，无法在降级到 Flink CDC 3.6.0 及更早版本后用于恢复作业。</td>
     </tr>
     <tr>
+      <td>scan.cursor.no-timeout</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">true</td>
+      <td>Boolean</td>
+      <td>MongoDB 服务器通常会在空闲一段时间（10 分钟）后使游标超时，以防止占用过多内存。将该选项设置为 true 可以避免游标超时。仅在启用并行快照时可用。</td>
+    </tr>
+    <tr>
       <td>scan.incremental.snapshot.unbounded-chunk-first.enabled</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">true</td>
       <td>Boolean</td>
       <td>
         快照读取阶段是否先分配 UnboundedChunk。<br>
-        这有助于降低 TaskManager 在快照阶段同步最后一个chunk时遇到内存溢出 (OOM) 的风险。<br> 
+        这可能有助于降低 TaskManager 在对最大的 UnboundedChunk 执行快照时出现内存溢出 (OOM) 错误的风险。<br> 
       </td>
     </tr>
     <tr>
@@ -348,10 +367,10 @@ MongoDB 的更改事件记录在消息之前没有更新。因此，我们只能
       <td style="word-wrap: break-word;">false</td>
       <td>Boolean</td>
       <td>
-        Whether to skip backfill in snapshot reading phase.<br> 
-        If backfill is skipped, changes on captured tables during snapshot phase will be consumed later in change log reading phase instead of being merged into the snapshot.<br>
-        WARNING: Skipping backfill might lead to data inconsistency because some change log events happened within the snapshot phase might be replayed (only at-least-once semantic is promised).
-        For example updating an already updated value in snapshot, or deleting an already deleted entry in snapshot. These replayed change log events should be handled specially.
+        是否在快照读取阶段跳过 backfill 。<br> 
+        如果跳过 backfill ，快照阶段捕获表的更改将在稍后的 changelog 读取阶段被回放，而不是合并到快照中。<br>
+        警告：跳过 backfill 可能会导致数据不一致，因为快照阶段发生的某些 changelog 事件可能会被重放（仅保证 at-least-once ）。
+        例如，更新快照阶段已更新的值，或删除快照阶段已删除的数据。这些重放的 changelog 事件应进行特殊处理。
       </td>
     </tr>
     <tr>
@@ -415,7 +434,7 @@ MongoDB 的更改事件记录在消息之前没有更新。因此，我们只能
 </div>
 
 注意: `heartbeat.interval.ms` 强烈建议设置一个大于 0 的适当值 **如果集合更改缓慢**.
-当我们从检查点或保存点恢复 Flink 作业时，心跳事件可以向前推送 `resumeToken`，以避免 `resumeToken` 过期。
+当我们从 checkpoint 或 savepoint 恢复 Flink 作业时，心跳事件可以向前推送 `resumeToken`，以避免 `resumeToken` 过期。
 
 注意: `mongodb.ssl.*` 相关配置仅在开启增量快照（`scan.incremental.snapshot.enabled` = `true`）时才会生效，非增量快照的数据源会忽略这些配置。
 
@@ -446,7 +465,7 @@ MongoDB 的更改事件记录在消息之前没有更新。因此，我们只能
     <tr>
       <td>op_ts</td>
       <td>TIMESTAMP_LTZ(3) NOT NULL</td>
-      <td>它指示在数据库中进行更改的时间。 <br>如果记录是从表的快照而不是改变流中读取的，该值将始终为0。</td>
+      <td>当前记录表在数据库中更新的时间。 <br>如果从表的快照而不是更改流读取记录，该值将始终为0。</td>
     </tr>
     <tr>
       <td>row_kind</td>
@@ -484,13 +503,13 @@ CREATE TABLE products (
 特性
 --------
 
-### 精确一次处理
+### Exactly-Once 处理
 
-MongoDB CDC 连接器是一个 Flink Source 连接器，它将首先读取数据库快照，然后在处理**甚至失败时继续读取带有**的更改流事件。
+MongoDB CDC 连接器是一个 Flink Source 连接器，它将首先读取数据库快照，然后继续读取更改流事件，即使在处理时出现故障，也能**准确读取数据**。
 
 ### 启动模式
 
-配置选项```scan.startup.mode```指定 MongoDB CDC 消费者的启动模式。有效枚举包括：
+配置选项`scan.startup.mode`指定 MongoDB CDC 消费者的启动模式。有效枚举包括：
 
 - `initial` （默认）：在第一次启动时对受监视的数据库表执行初始快照，并继续读取最新的 oplog。
 - `latest-offset`：首次启动时，从不对受监视的数据库表执行快照， 连接器仅从 oplog 的结尾处开始读取，这意味着连接器只能读取在连接器启动之后的数据更改。
@@ -504,22 +523,18 @@ MongoDBSource.builder()
     .build()
 ```
 
-and with SQL:
+使用 SQL:
 
 ```SQL
 CREATE TABLE mongodb_source (...) WITH (
     'connector' = 'mongodb-cdc',
-    'scan.startup.mode' = 'latest-offset', -- 从最晚位点启动
+    'scan.startup.mode' = 'latest-offset', -- Start from latest offset
     ...
-    'scan.incremental.snapshot.enabled' = 'true', -- 指定时间戳启动，需要开启增量快照读
-    'scan.startup.mode' = 'timestamp', -- 指定时间戳启动模式
-    'scan.startup.timestamp-millis' = '1667232000000' -- 启动毫秒时间
+    'scan.startup.mode' = 'timestamp', -- Start from timestamp
+    'scan.startup.timestamp-millis' = '1667232000000' -- Timestamp under timestamp startup mode
     ...
 )
 ```
-
-**Notes:**
-- 'timestamp' 指定时间戳启动模式，需要开启增量快照读。
 
 ### 快照数据筛选器
 
@@ -534,31 +549,31 @@ CREATE TABLE mongodb_source (...) WITH (
 
 ### 更改流
 
-我们将 [MongoDB's official Kafka Connector](https://docs.mongodb.com/kafka-connector/current/kafka-source/) 从 MongoDB 中读取快照或更改事件，并通过 Debezium 的 `EmbeddedEngine` 进行驱动。
+我们集成了 [MongoDB's official Kafka Connector](https://docs.mongodb.com/kafka-connector/current/kafka-source/)，从 MongoDB 中读取快照或更改事件，并通过 Debezium 的 `EmbeddedEngine` 进行驱动。
 
 Debezium 的 `EmbeddedEngine` 提供了一种在应用程序进程中运行单个 Kafka Connect `SourceConnector` 的机制，并且它可以正确地驱动任何标准的 Kafka Connect `SourceConnector`，即使它不是由 Debezium 提供的。
 
 我们选择 **MongoDB 的官方 Kafka连接器**，而不是 **Debezium 的MongoDB 连接器**，因为它们使用了不同的更改数据捕获机制。
 
-- 对于 Debezium 的 MongoDB 连接器，它读取每个复制集主节点的 `oplog.rs` 集合。
+- 对于 Debezium 的 MongoDB 连接器，它读取每个副本集主节点的 `oplog.rs` 集合。
 - 对于 MongoDB 的 Kafka 连接器，它订阅了 MongoDB 的 `更改流`。
 
-MongoDB 的`oplog.rs` 集合没有在状态之前保持更改记录的更新， 因此，很难通过单个 `oplog.rs` 记录提取完整的文档状态，并将其转换为 Flink 接受的更改日志流（Insert Only，Upsert，All）。
+MongoDB 的 `oplog.rs` 集合不会保留更改记录的更新前状态，因此很难通过单个 `oplog.rs` 记录提取完整的文档状态，并将其转换为 Flink 接受的更改日志流（Insert Only，Upsert，All）。
 此外，MongoDB 5（2021 7月发布）改变了 oplog 格式，因此当前的 Debezium 连接器不能与其一起使用。
 
-**Change Stream**是 MongoDB 3.6 为副本集和分片集群提供的一项新功能，它允许应用程序访问实时数据更改，而不会带来跟踪操作日志的复杂性和风险。<br>
-应用程序可以使用更改流来订阅单个集合上的所有数据更改， 数据库或整个部署，并立即对其做出反应。
+**Change Stream**是 MongoDB 3.6 为副本集和分片集群提供的一项新功能，它允许应用程序访问实时数据更改，而不会带来跟踪 oplog 的复杂性和风险。<br>
+应用程序可以使用更改流来订阅单个集合、数据库或整个部署上的所有数据更改，并立即对其做出反应。
 
-**查找更新操作的完整文档**是**变更流**提供的一项功能，它可以配置变更流以返回更新文档的最新多数提交版本。由于该功能，我们可以轻松收集最新的完整文档，并将更改日志转换为 Flink 的**Upsert Changelog Stream**。
+**查找更新操作的完整文档**是**更改流**提供的一项功能，它可以配置更改流以返回更新文档的最新多数提交版本。由于该功能，我们可以轻松收集最新的完整文档，并将更改日志转换为 Flink 的**Upsert Changelog Stream**。
 
-顺便说一句，[DBZ-435](https://issues.redhat.com/browse/DBZ-435)提到的Debezium的MongoDB变更流探索,正在制定路线图。<br>
+顺便说一句，[DBZ-435](https://issues.redhat.com/browse/DBZ-435)提到的Debezium的MongoDB更改流探索,正在制定路线图。<br>
 如果完成了，我们可以考虑集成两种源连接器供用户选择。
 
 ### 动态加表
 
 **注意:** 该功能从 Flink CDC 3.1.0 版本开始支持。
 
-动态加表功能使你可以为正在运行的作业添加新集合进行监控。新添加的集合将首先读取其快照数据,然后自动读取其变更流。
+动态加表功能使你可以为正在运行的作业添加新集合进行监控。新添加的集合将首先读取其快照数据,然后自动读取其更改流。
 
 想象一下这个场景:一开始,Flink 作业监控集合 `[product, user, address]`,但几天后,我们希望这个作业还可以监控集合 `[order, custom]`,这些集合包含历史数据,我们需要作业仍然可以复用作业的已有状态。动态加表功能可以优雅地解决此问题。
 
@@ -567,14 +582,14 @@ MongoDB 的`oplog.rs` 集合没有在状态之前保持更改记录的更新， 
 ```java
     MongoDBSource<String> mongoSource = MongoDBSource.<String>builder()
         .hosts("yourHostname:27017")
-        .databaseList("db") // 设置捕获的数据库
-        .collectionList("db.product", "db.user", "db.address") // 设置捕获的集合
+        .databaseList("db") // set captured database
+        .collectionList("db.product", "db.user", "db.address") // set captured collections
         .username("yourUsername")
         .password("yourPassword")
-        .scanNewlyAddedTableEnabled(true) // 启用扫描新添加的表功能
-        .deserializer(new JsonDebeziumDeserializationSchema()) // 将 SourceRecord 转换为 JSON 字符串
+        .scanNewlyAddedTableEnabled(true) // enable scan the newly added collections feature
+        .deserializer(new JsonDebeziumDeserializationSchema()) // converts SourceRecord to JSON String
         .build();
-   // 你的业务代码
+   // your business code
 ```
 
 如果我们想添加新集合 `[order, custom]` 到现有的 Flink 作业,只需更新作业的 `collectionList()` 将新增集合 `[order, custom]` 加入并从已有的 savepoint 恢复作业。
@@ -594,13 +609,13 @@ _Step 2_: 更新现有 Flink 作业的集合列表选项。
     MongoDBSource<String> mongoSource = MongoDBSource.<String>builder()
         .hosts("yourHostname:27017")
         .databaseList("db")
-        .collectionList("db.product", "db.user", "db.address", "db.order", "db.custom") // 设置捕获的集合 [product, user, address, order, custom]
+        .collectionList("db.product", "db.user", "db.address", "db.order", "db.custom") // set captured collections [product, user, address, order, custom]
         .username("yourUsername")
         .password("yourPassword")
-        .scanNewlyAddedTableEnabled(true)
-        .deserializer(new JsonDebeziumDeserializationSchema()) // 将 SourceRecord 转换为 JSON 字符串
+        .scanNewlyAddedTableEnabled(true) // enable scan newly added tables feature
+        .deserializer(new JsonDebeziumDeserializationSchema()) // converts SourceRecord to JSON String
         .build();
-   // 你的业务代码
+   // your business code
 ```
 _Step 3_: 从 savepoint 还原更新后的 Flink 作业。
 ```shell
@@ -627,15 +642,15 @@ public class MongoDBSourceExample {
                 .hosts("localhost:27017")
                 .username("flink")
                 .password("flinkpw")
-                .databaseList("inventory") // 设置捕获的数据库，支持正则表达式
-                .collectionList("inventory.products", "inventory.orders") //设置捕获的集合，支持正则表达式
+                .databaseList("inventory") // set captured database, support regex
+                .collectionList("inventory.products", "inventory.orders") //set captured collections, support regex
                 .deserializer(new JsonDebeziumDeserializationSchema())
                 .build();
 
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 
         env.addSource(sourceFunction)
-                .print().setParallelism(1); // 对 sink 使用并行度 1 以保持消息顺序
+                .print().setParallelism(1); // use parallelism 1 for sink to keep message ordering
 
         env.execute();
     }
@@ -654,17 +669,17 @@ public class MongoDBIncrementalSourceExample {
         MongoDBSource<String> mongoSource =
                 MongoDBSource.<String>builder()
                         .hosts("localhost:27017")
-                        .databaseList("inventory") // 设置捕获的数据库，支持正则表达式
-                        .collectionList("inventory.products", "inventory.orders") //设置捕获的集合，支持正则表达式
+                        .databaseList("inventory") // set captured database, support regex
+                        .collectionList("inventory.products", "inventory.orders") //set captured collections, support regex
                         .username("flink")
                         .password("flinkpw")
                         .deserializer(new JsonDebeziumDeserializationSchema())
                         .build();
 
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-        // 启用检查点
+        // enable checkpoint
         env.enableCheckpointing(3000);
-        // 将 source 并行度设置为 2
+        // set the source parallelism to 2
         env.fromSource(mongoSource, WatermarkStrategy.noWatermarks(), "MongoDBIncrementalSource")
                 .setParallelism(2)
                 .print()
@@ -678,6 +693,59 @@ public class MongoDBIncrementalSourceExample {
 **注意:**
 - 如果使用数据库正则表达式，则需要 `readAnyDatabase` 角色。
 - 增量快照功能仅支持 MongoDB 4.0 之后的版本。
+
+### 完整的 Changelog<a name="Full Changelog" id="003" ></a>
+
+MongoDB 6.0 以及更高的版本支持发送更改流事件，其中包含文档的更新前和更新后的内容（或者说数据的前后镜像）。
+
+- 前镜像是指被替换、更新或删除之前的文档。对于插入操作没有前镜像。
+
+- 后镜像是指被插入、替换或更新之后的文档。对于删除操作没有后镜像。
+
+MongoDB CDC 能够使用前镜像和后镜像来生成完整的更改日志流，包括插入、更新前、更新后和删除的数据行，从而避免了额外的 `ChangelogNormalize` 下游节点。
+
+为了启用此功能，你需要满足以下条件：
+
+- MongoDB 的版本必须为 6.0 或更高版本。
+- 在数据库级别启用 `preAndPostImages` 功能：
+```javascript
+db.runCommand({
+  setClusterParameter: {
+    changeStreamOptions: {
+      preAndPostImages: {
+        expireAfterSeconds: 'off' // replace with custom image expiration time
+      }
+    }
+  }
+})
+```
+- 为希望监控的 collection 启用 `changeStreamPreAndPostImages` 功能：
+```javascript
+db.runCommand({
+  collMod: "<< collection name >>", 
+  changeStreamPreAndPostImages: {
+    enabled: true 
+  } 
+})
+```
+- 启用 MongoDB CDC 的 `scan.full-changelog` 功能：
+
+```java
+MongoDBSource.builder()
+    .scanFullChangelog(true)
+    ...
+    .build()
+```
+
+或者使用 Flink SQL:
+
+```SQL
+CREATE TABLE mongodb_source (...) WITH (
+    'connector' = 'mongodb-cdc',
+    'scan.full-changelog' = 'true',
+    ...
+)
+```
 
 ### 可用的指标
 
@@ -698,62 +766,6 @@ public class MongoDBIncrementalSourceExample {
 注意:
 1. Group 名称是 `namespace.schema.table`，这里的 `namespace` 是实际的数据库名称， `schema` 是实际的 schema 名称， `table` 是实际的表名称。
 2. 对于 MongoDB，这里的 `namespace` 会被设置成默认值 ""，也就是一个空字符串，Group 名称的格式会类似于 `test_database.test_table`。
-
-### 完整的 Changelog
-
-MongoDB 6.0 以及更高的版本支持发送变更流事件，其中包含文档的更新前和更新后的内容（或者说数据的前后镜像）。
-
-- 前镜像是指被替换、更新或删除之前的文档。对于插入操作没有前镜像。
-
-- 后镜像是指被替换、更新或删除之后的文档。对于删除操作没有后镜像。
-
-MongoDB CDC 能够使用前镜像和后镜像来生成完整的变更日志流，包括插入、更新前、更新后和删除的数据行，从而避免了额外的 `ChangelogNormalize` 下游节点。
-
-为了启用此功能，你需要满足以下条件：
-
-- MongoDB 的版本必须为 6.0 或更高版本。
-- 启用 `preAndPostImages` 功能。
-
-```javascript
-db.runCommand({
-  setClusterParameter: {
-    changeStreamOptions: {
-      preAndPostImages: {
-        expireAfterSeconds: 'off' // replace with custom image expiration time
-      }
-    }
-  }
-})
-```
-
-- 为希望监控的 collection 启用 `changeStreamPreAndPostImages` 功能：
-```javascript
-db.runCommand({
-  collMod: "<< collection name >>", 
-  changeStreamPreAndPostImages: {
-    enabled: true 
-  } 
-})
-```
-
-在 DataStream 中开启 MongoDB CDC 的 `scan.full-changelog` 功能：
-
-```java
-MongoDBSource.builder()
-    .scanFullChangelog(true)
-    ...
-    .build()
-```
-
-或者使用 Flink SQL:
-
-```SQL
-CREATE TABLE mongodb_source (...) WITH (
-    'connector' = 'mongodb-cdc',
-    'scan.full-changelog' = 'true',
-    ...
-)
-```
 
 数据类型映射
 ----------------
@@ -876,6 +888,7 @@ CREATE TABLE mongodb_source (...) WITH (
 - [WiredTiger](https://docs.mongodb.com/manual/core/wiredtiger/#std-label-storage-wiredtiger)
 - [Replica set protocol](https://docs.mongodb.com/manual/reference/replica-configuration/#mongodb-rsconf-rsconf.protocolVersion)
 - [Connection String Options](https://docs.mongodb.com/manual/reference/connection-string/#std-label-connections-connection-options)
+- [Document Pre- and Post-Images](https://www.mongodb.com/docs/v6.0/changeStreams/#change-streams-with-document-pre--and-post-images)
 - [BSON Types](https://docs.mongodb.com/manual/reference/bson-types/)
 - [Flink DataTypes](https://nightlies.apache.org/flink/flink-docs-release-1.20/docs/dev/table/types/)
 

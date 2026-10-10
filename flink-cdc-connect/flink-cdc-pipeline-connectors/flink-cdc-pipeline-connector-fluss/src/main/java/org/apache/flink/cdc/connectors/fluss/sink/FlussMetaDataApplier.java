@@ -173,7 +173,10 @@ public class FlussMetaDataApplier implements MetadataApplier, ExistingTableSchem
             } else {
                 TableInfo currentTableInfo = admin.getTableInfo(tablePath).get();
                 // sanity check to prevent unexpected table schema evolution.
-                sanityCheck(inferredFlussTable, currentTableInfo);
+                sanityCheck(
+                        inferredFlussTable,
+                        currentTableInfo,
+                        bucketKeysMap.containsKey(tableIdentifier));
             }
         } catch (Exception e) {
             LOG.error("Failed to apply schema change {}", event, e);
@@ -253,7 +256,10 @@ public class FlussMetaDataApplier implements MetadataApplier, ExistingTableSchem
         IOUtils.closeAll(adminToClose, connectionToClose);
     }
 
-    private void sanityCheck(TableDescriptor inferredFlussTable, TableInfo currentTableInfo) {
+    private void sanityCheck(
+            TableDescriptor inferredFlussTable,
+            TableInfo currentTableInfo,
+            boolean hasExplicitBucketKeys) {
         List<String> inferredPrimaryKeyColumnNames =
                 inferredFlussTable.getSchema().getPrimaryKeyColumnNames().stream()
                         .sorted()
@@ -273,7 +279,11 @@ public class FlussMetaDataApplier implements MetadataApplier, ExistingTableSchem
 
         List<String> inferredBucketKeys = inferredFlussTable.getBucketKeys();
         List<String> currentBucketKeys = currentTableInfo.getBucketKeys();
-        if (!inferredBucketKeys.equals(currentBucketKeys)) {
+        boolean bucketKeysMatch =
+                !hasExplicitBucketKeys && !inferredPrimaryKeyColumnNames.isEmpty()
+                        ? inferredBucketKeys.containsAll(currentBucketKeys)
+                        : inferredBucketKeys.equals(currentBucketKeys);
+        if (!bucketKeysMatch) {
             throw new ValidationException(
                     "The table schema inferred by Flink CDC is not matched with current Fluss table schema. "
                             + "\n New Fluss table's bucket keys : "
