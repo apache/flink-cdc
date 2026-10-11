@@ -19,6 +19,9 @@ package org.apache.flink.cdc.connectors.dws.sink.v2;
 
 import org.junit.jupiter.api.Test;
 
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -31,18 +34,57 @@ class DwsWriterStateSerializerTest {
 
         DwsWriterState restored =
                 serializer.deserialize(
-                        serializer.getVersion(), serializer.serialize(new DwsWriterState("job")));
+                        serializer.getVersion(),
+                        serializer.serialize(DwsWriterState.nativeClientMarker()));
 
-        assertThat(restored.getJobId()).isEqualTo("job");
+        assertThat(serializer.getVersion()).isEqualTo(2);
+        assertThat(restored).isEqualTo(DwsWriterState.nativeClientMarker());
+        assertThat(serializer.serialize(restored))
+                .isEqualTo("DWS_NATIVE_CLIENT_V2".getBytes(StandardCharsets.US_ASCII));
     }
 
     @Test
-    void testRejectUnknownVersion() throws Exception {
+    void testRejectLegacyStagingStateAndUnknownVersion() throws Exception {
         DwsWriterStateSerializer serializer = new DwsWriterStateSerializer();
-        byte[] serialized = serializer.serialize(new DwsWriterState("job"));
+        byte[] serialized = serializer.serialize(DwsWriterState.nativeClientMarker());
+        byte[] legacy = readHex("compatibility/legacy-writer-state-v1.hex");
+
+        assertThatThrownBy(() -> serializer.deserialize(1, legacy))
+                .isInstanceOf(java.io.IOException.class)
+                .hasMessageContaining("legacy staging writer state");
 
         assertThatThrownBy(() -> serializer.deserialize(serializer.getVersion() + 1, serialized))
                 .isInstanceOf(java.io.IOException.class)
                 .hasMessageContaining("Unknown DWS writer state serializer version");
+    }
+
+    @Test
+    void testRejectCorruptMarker() {
+        DwsWriterStateSerializer serializer = new DwsWriterStateSerializer();
+
+        assertThatThrownBy(
+                        () ->
+                                serializer.deserialize(
+                                        serializer.getVersion(),
+                                        "not-the-marker".getBytes(StandardCharsets.US_ASCII)))
+                .isInstanceOf(java.io.IOException.class)
+                .hasMessageContaining("marker");
+    }
+
+    private static byte[] readHex(String resource) throws Exception {
+        try (InputStream stream =
+                DwsWriterStateSerializerTest.class.getClassLoader().getResourceAsStream(resource)) {
+            if (stream == null) {
+                throw new IllegalStateException("Missing compatibility fixture: " + resource);
+            }
+            String hex =
+                    new String(stream.readAllBytes(), StandardCharsets.US_ASCII)
+                            .replaceAll("\\s", "");
+            byte[] bytes = new byte[hex.length() / 2];
+            for (int i = 0; i < bytes.length; i++) {
+                bytes[i] = (byte) Integer.parseInt(hex.substring(i * 2, i * 2 + 2), 16);
+            }
+            return bytes;
+        }
     }
 }

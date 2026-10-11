@@ -1,0 +1,14 @@
+.git/
+.github/
+.idea/
+.vscode/
+.DS_Store
+*.log
+*.log.*
+.env
+.env.*
+coverage/
+node_modules/
+docs/_build/
+**/.flattened-pom.xml
+**/dependency-reduced-pom.xml

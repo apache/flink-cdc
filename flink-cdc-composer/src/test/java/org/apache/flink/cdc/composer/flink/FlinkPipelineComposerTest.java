@@ -69,6 +69,24 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class FlinkPipelineComposerTest {
 
     @Test
+    void testDataSinksOptOutOfPrimaryKeyUpdateSplittingByDefault() {
+        DataSink sink =
+                new DataSink() {
+                    @Override
+                    public EventSinkProvider getEventSinkProvider() {
+                        return null;
+                    }
+
+                    @Override
+                    public MetadataApplier getMetadataApplier() {
+                        return schemaChangeEvent -> {};
+                    }
+                };
+
+        assertThat(sink.requiresPrimaryKeyUpdateSplit()).isFalse();
+    }
+
+    @Test
     void testCreateDataSinkFromSinkDef() {
         SinkDef sinkDef =
                 new SinkDef(

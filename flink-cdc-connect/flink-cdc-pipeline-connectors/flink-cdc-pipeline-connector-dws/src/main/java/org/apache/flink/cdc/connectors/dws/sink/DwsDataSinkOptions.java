@@ -25,8 +25,6 @@ import com.huaweicloud.dws.client.model.Constants;
 
 import java.time.Duration;
 
-import static com.huaweicloud.dws.connectors.flink.config.DwsConnectionOptions.DEF_CONNECTION_MAX_USE_TIME_SECONDS;
-
 /** Configuration options for the GaussDB DWS pipeline sink. */
 public final class DwsDataSinkOptions {
 
@@ -60,31 +58,26 @@ public final class DwsDataSinkOptions {
             ConfigOptions.key("write-mode")
                     .stringType()
                     .noDefaultValue()
+                    .withFallbackKeys("dws.client.write.mode")
                     .withDescription(
                             Description.builder()
                                     .text(
-                                            "Compatibility option for the legacy Huawei DWS client write mode.")
-                                    .linebreak()
-                                    .text(
-                                            "SinkV2 uses JDBC staging tables for two-phase commit and validates but does not apply this native client mode.")
-                                    .linebreak()
-                                    .text(
-                                            "Supported legacy values include copy_merge, auto, upsert, copy_upsert, copy, update, update_auto, and copy_update.")
+                                            "Native DWS client write mode. Supported values are auto, upsert, copy_upsert, and copy_merge.")
                                     .build());
 
     public static final ConfigOption<Integer> AUTO_BATCH_FLUSH_SIZE =
             ConfigOptions.key("auto-batch-flush-size")
                     .intType()
-                    .defaultValue(50_000)
-                    .withDescription(
-                            "Compatibility option for the legacy native DWS client. SinkV2 staging-table writes are flushed on checkpoints and schema barriers.");
+                    .defaultValue(30_000)
+                    .withFallbackKeys("dws.client.write.auto-flush-size")
+                    .withDescription("Native DWS client automatic flush batch size.");
 
     public static final ConfigOption<Duration> AUTO_FLUSH_MAX_INTERVAL =
             ConfigOptions.key("auto-flush-max-interval")
                     .durationType()
-                    .defaultValue(Duration.ofMinutes(3))
-                    .withDescription(
-                            "Compatibility option for the legacy native DWS client automatic flush interval. SinkV2 staging-table writes are flushed on checkpoints and schema barriers.");
+                    .defaultValue(Duration.ofSeconds(3))
+                    .withFallbackKeys("dws.client.write.auto-flush-max-interval")
+                    .withDescription("Native DWS client automatic flush interval.");
 
     public static final ConfigOption<String> TABLE_NAME =
             ConfigOptions.key("sink-table")
@@ -132,14 +125,32 @@ public final class DwsDataSinkOptions {
     public static final ConfigOption<Integer> CONNECTION_MAX_USE_TIME_SECONDS =
             ConfigOptions.key("connectionMaxUseTimeSeconds")
                     .intType()
-                    .defaultValue(DEF_CONNECTION_MAX_USE_TIME_SECONDS)
+                    .defaultValue(3600)
                     .withDescription("Maximum lifetime of a connection in seconds.");
+
+    public static final ConfigOption<Integer> CONNECTION_MAX_USE_TIME_THRESHOLD =
+            ConfigOptions.key("connectionMaxUseTimeThreshold")
+                    .intType()
+                    .noDefaultValue()
+                    .withDescription("Compatibility connection lifetime in seconds.");
+
+    public static final ConfigOption<Duration> DWS_CLIENT_JDBC_MAX_USE_TIME =
+            ConfigOptions.key("dws.client.jdbc.max.use-time")
+                    .durationType()
+                    .noDefaultValue()
+                    .withDescription("Native DWS connection lifetime.");
 
     public static final ConfigOption<Integer> CONNECTION_MAX_IDLE_MS =
             ConfigOptions.key("connectionMaxIdleMs")
                     .intType()
                     .defaultValue(60_000)
                     .withDescription("Maximum idle time for a connection in milliseconds.");
+
+    public static final ConfigOption<Duration> DWS_CLIENT_JDBC_MAX_IDLE =
+            ConfigOptions.key("dws.client.jdbc.max.idle")
+                    .durationType()
+                    .noDefaultValue()
+                    .withDescription("Native DWS connection idle duration.");
 
     public static final ConfigOption<Long> CONNECTION_TIME_OUT =
             ConfigOptions.key("connectionTimeOut")
@@ -199,8 +210,7 @@ public final class DwsDataSinkOptions {
             ConfigOptions.key("enable-auto-flush")
                     .booleanType()
                     .defaultValue(true)
-                    .withDescription(
-                            "Compatibility option for the legacy native DWS client. SinkV2 staging-table writes are flushed on checkpoints and schema barriers.");
+                    .withDescription("Whether native batch and interval auto flush are enabled.");
 
     public static final ConfigOption<Boolean> ENABLE_DN_PARTITION =
             ConfigOptions.key("enable-dn-partition")
@@ -211,23 +221,20 @@ public final class DwsDataSinkOptions {
     public static final ConfigOption<Integer> DWS_CLIENT_WRITE_THREAD_SIZE =
             ConfigOptions.key("dws.client.write.thread-size")
                     .intType()
-                    .defaultValue(3)
-                    .withDescription(
-                            "Compatibility option for the legacy native DWS client write worker thread count. SinkV2 staging-table writes do not use the native DWS client execution pool.");
+                    .defaultValue(1)
+                    .withDescription("Native DWS client write worker thread count.");
 
     public static final ConfigOption<Integer> DWS_CLIENT_WRITE_USE_COPY_SIZE =
             ConfigOptions.key("dws.client.write.use-copy-size")
                     .intType()
                     .defaultValue(1000)
-                    .withDescription(
-                            "Compatibility option for the legacy native DWS client COPY mode switch threshold. SinkV2 staging-table writes do not use native DWS client batching.");
+                    .withDescription("Native DWS client AUTO-to-COPY threshold.");
 
     public static final ConfigOption<Integer> DWS_CLIENT_WRITE_FORCE_FLUSH_SIZE =
             ConfigOptions.key("dws.client.write.force-flush-size")
                     .intType()
                     .defaultValue(40000)
-                    .withDescription(
-                            "Compatibility option for the legacy native DWS client force flush threshold. SinkV2 staging-table writes do not use native DWS client batching.");
+                    .withDescription("Finite native DWS client force flush threshold.");
 
     public static final ConfigOption<String> DISTRIBUTION_KEY =
             ConfigOptions.key("distribution-key")
@@ -239,8 +246,68 @@ public final class DwsDataSinkOptions {
             ConfigOptions.key("sink.max-retries")
                     .intType()
                     .defaultValue(3)
-                    .withDescription(
-                            "Compatibility option for the legacy native DWS client retry count. SinkV2 commit retries are controlled by Flink's committer retry flow.");
+                    .withFallbackKeys("dws.client.retry.max-times")
+                    .withDescription("Native DWS client total attempt count.");
+
+    public static final ConfigOption<Duration> DWS_CLIENT_RETRY_SLEEP_BASE_TIME =
+            ConfigOptions.key("dws.client.retry.sleep-base-time")
+                    .durationType()
+                    .defaultValue(Duration.ofSeconds(1))
+                    .withDescription("Base delay between native DWS client attempts.");
+
+    public static final ConfigOption<Duration> DWS_CLIENT_RETRY_SLEEP_RANDOM_TIME =
+            ConfigOptions.key("dws.client.retry.sleep-random-time")
+                    .durationType()
+                    .defaultValue(Duration.ofMillis(300))
+                    .withDescription("Positive random retry jitter for the native DWS client.");
+
+    public static final ConfigOption<Duration> DWS_CLIENT_TIMEOUT_TASK =
+            ConfigOptions.key("dws.client.timeout.task")
+                    .durationType()
+                    .defaultValue(Duration.ofMinutes(10))
+                    .withDescription("Finite native task timeout; not a whole-flush deadline.");
+
+    public static final ConfigOption<Duration> DWS_CLIENT_TIMEOUT_STATEMENT =
+            ConfigOptions.key("dws.client.timeout.statement")
+                    .durationType()
+                    .defaultValue(Duration.ofMinutes(5))
+                    .withDescription("DWS statement timeout.");
+
+    public static final ConfigOption<String> DWS_CLIENT_BUFFER_ALL_MAX_BYTES =
+            ConfigOptions.key("dws.client.write.buffer.all-max-bytes")
+                    .stringType()
+                    .defaultValue("128MiB")
+                    .withDescription("Estimated total native buffer budget per sink writer.");
+
+    public static final ConfigOption<String> DWS_CLIENT_BUFFER_TABLE_MAX_BYTES =
+            ConfigOptions.key("dws.client.write.buffer.table-max-bytes")
+                    .stringType()
+                    .defaultValue("64MiB")
+                    .withDescription("Estimated native buffer budget per table and sink writer.");
+
+    public static final ConfigOption<String> DWS_CLIENT_BUFFER_PARTITION_MAX_BYTES =
+            ConfigOptions.key("dws.client.write.buffer.partition-max-bytes")
+                    .stringType()
+                    .defaultValue("32MiB")
+                    .withDescription("Estimated native buffer budget for the fixed partition.");
+
+    public static final ConfigOption<String> DWS_CLIENT_WRITE_PARTITION_POLICY =
+            ConfigOptions.key("dws.client.write.partition-policy")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription("Reserved native partition policy; connector-fixed.");
+
+    public static final ConfigOption<Integer> DWS_CLIENT_WRITE_PARTITION_MIN =
+            ConfigOptions.key("dws.client.write.partition-min")
+                    .intType()
+                    .noDefaultValue()
+                    .withDescription("Reserved native minimum partition count; connector-fixed.");
+
+    public static final ConfigOption<Integer> DWS_CLIENT_WRITE_PARTITION_MAX =
+            ConfigOptions.key("dws.client.write.partition-max")
+                    .intType()
+                    .noDefaultValue()
+                    .withDescription("Reserved native maximum partition count; connector-fixed.");
 
     public static final ConfigOption<Boolean> SINK_ENABLE_DELETE =
             ConfigOptions.key("sink.enable-delete")

@@ -20,14 +20,15 @@ package org.apache.flink.cdc.connectors.dws.sink.v2;
 
 import org.apache.flink.core.io.SimpleVersionedSerializer;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 
 /** Serializer for {@link DwsWriterState}. */
 public class DwsWriterStateSerializer implements SimpleVersionedSerializer<DwsWriterState> {
 
-    private static final int VERSION = 1;
+    private static final int VERSION = 2;
+    private static final byte[] MARKER = "DWS_NATIVE_CLIENT_V2".getBytes(StandardCharsets.US_ASCII);
 
     @Override
     public int getVersion() {
@@ -36,20 +37,24 @@ public class DwsWriterStateSerializer implements SimpleVersionedSerializer<DwsWr
 
     @Override
     public byte[] serialize(DwsWriterState state) throws IOException {
-        java.io.ByteArrayOutputStream byteArrayOutputStream = new java.io.ByteArrayOutputStream();
-        DataOutputStream out = new DataOutputStream(byteArrayOutputStream);
-        out.writeUTF(state.getJobId());
-        out.flush();
-        return byteArrayOutputStream.toByteArray();
+        if (!DwsWriterState.nativeClientMarker().equals(state)) {
+            throw new IOException("Unsupported DWS writer state marker.");
+        }
+        return Arrays.copyOf(MARKER, MARKER.length);
     }
 
     @Override
     public DwsWriterState deserialize(int version, byte[] serialized) throws IOException {
+        if (version == 1) {
+            throw new IOException(
+                    "Cannot restore legacy staging writer state with the native-client sink protocol.");
+        }
         if (version != VERSION) {
             throw new IOException("Unknown DWS writer state serializer version: " + version);
         }
-
-        DataInputStream in = new DataInputStream(new java.io.ByteArrayInputStream(serialized));
-        return new DwsWriterState(in.readUTF());
+        if (!Arrays.equals(MARKER, serialized)) {
+            throw new IOException("Invalid DWS native-client writer state marker.");
+        }
+        return DwsWriterState.nativeClientMarker();
     }
 }

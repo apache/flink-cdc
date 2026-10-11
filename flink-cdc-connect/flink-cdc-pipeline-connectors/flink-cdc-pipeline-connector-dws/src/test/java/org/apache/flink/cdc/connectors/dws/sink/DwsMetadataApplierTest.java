@@ -29,6 +29,7 @@ import org.junit.jupiter.api.Test;
 import java.util.EnumSet;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Tests for {@link DwsMetadataApplier}. */
 class DwsMetadataApplierTest {
@@ -79,12 +80,12 @@ class DwsMetadataApplierTest {
                 Schema.newBuilder()
                         .column(
                                 Column.physicalColumn(
-                                        "User\"Name",
+                                        "UserName",
                                         DataTypes.VARCHAR(10).notNull(),
                                         null,
                                         "O'Reilly"))
                         .physicalColumn("CreatedAt", DataTypes.TIMESTAMP_LTZ(9))
-                        .primaryKey("User\"Name")
+                        .primaryKey("UserName")
                         .build();
 
         String sql =
@@ -95,8 +96,8 @@ class DwsMetadataApplierTest {
         assertThat(sql)
                 .isEqualTo(
                         "CREATE TABLE IF NOT EXISTS \"Sales\".\"Orders\" "
-                                + "(\"User\"\"Name\" VARCHAR(10) DEFAULT 'O''Reilly' NOT NULL, "
-                                + "\"CreatedAt\" TIMESTAMPTZ(6), PRIMARY KEY (\"User\"\"Name\"))");
+                                + "(\"UserName\" VARCHAR(10) DEFAULT 'O''Reilly' NOT NULL, "
+                                + "\"CreatedAt\" TIMESTAMPTZ(6), PRIMARY KEY (\"UserName\"))");
     }
 
     @Test
@@ -134,7 +135,7 @@ class DwsMetadataApplierTest {
     }
 
     @Test
-    void testBuildCreateTableSqlEscapesCaseInsensitiveIdentifiers() {
+    void testRejectsEmbeddedQuoteInsteadOfUsingDifferentWriterAndDdlSemantics() {
         DwsMetadataApplier metadataApplier =
                 new DwsMetadataApplier(
                         "jdbc:gaussdb://localhost:8000/test",
@@ -151,14 +152,13 @@ class DwsMetadataApplierTest {
                         .primaryKey("User\"Name")
                         .build();
 
-        String sql =
-                metadataApplier.buildCreateTableSql(
-                        new CreateTableEvent(TableId.tableId("Sales", "Orders"), schema));
-
-        assertThat(sql)
-                .isEqualTo(
-                        "CREATE TABLE IF NOT EXISTS \"sales\".\"orders\" "
-                                + "(\"user\"\"name\" TEXT NOT NULL, PRIMARY KEY (\"user\"\"name\"))");
+        assertThatThrownBy(
+                        () ->
+                                metadataApplier.buildCreateTableSql(
+                                        new CreateTableEvent(
+                                                TableId.tableId("Sales", "Orders"), schema)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("embedded quote");
     }
 
     @Test
@@ -180,5 +180,28 @@ class DwsMetadataApplierTest {
                 .isTrue();
         assertThat(metadataApplier.acceptsSchemaEvolutionType(SchemaChangeEventType.ADD_COLUMN))
                 .isFalse();
+    }
+
+    @Test
+    void testRejectsDistributionColumnsMissingFromCreateSchema() {
+        DwsMetadataApplier metadataApplier =
+                new DwsMetadataApplier(
+                        "jdbc:gaussdb://localhost:8000/test",
+                        "user",
+                        "password",
+                        false,
+                        "public",
+                        true,
+                        "missing_column");
+        Schema schema =
+                Schema.newBuilder().physicalColumn("id", DataTypes.INT()).primaryKey("id").build();
+
+        assertThatThrownBy(
+                        () ->
+                                metadataApplier.buildCreateTableSql(
+                                        new CreateTableEvent(TableId.tableId("orders"), schema)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("does not exist")
+                .hasMessageContaining("missing_column");
     }
 }

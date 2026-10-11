@@ -18,39 +18,27 @@
 
 package org.apache.flink.cdc.connectors.dws.sink.v2;
 
-import org.apache.flink.api.connector.sink2.Committer;
-import org.apache.flink.api.connector.sink2.CommitterInitContext;
+import org.apache.flink.api.common.operators.MailboxExecutor;
+import org.apache.flink.api.common.operators.ProcessingTimeService;
 import org.apache.flink.api.connector.sink2.Sink;
 import org.apache.flink.api.connector.sink2.SinkWriter;
 import org.apache.flink.api.connector.sink2.StatefulSinkWriter;
 import org.apache.flink.api.connector.sink2.SupportsWriterState;
-import org.apache.flink.api.connector.sink2.TwoPhaseCommittingSink;
 import org.apache.flink.api.connector.sink2.WriterInitContext;
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.connectors.dws.sink.DwsDataSinkConfig;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
-import org.apache.flink.runtime.checkpoint.CheckpointIDCounter;
 
 import java.time.ZoneId;
 import java.util.Collection;
-import java.util.UUID;
 
-/** A SinkV2 DWS sink with staging-table based application-level two-phase commit. */
-public class DwsSink
-        implements TwoPhaseCommittingSink<Event, DwsCommittable>,
-                SupportsWriterState<Event, DwsWriterState> {
+/** A SinkV2 DWS sink backed by the official native client AUTO mode. */
+public class DwsSink implements Sink<Event>, SupportsWriterState<Event, DwsWriterState> {
 
     private static final long serialVersionUID = 1L;
     private static final String DEFAULT_SCHEMA = "public";
 
-    private final String jdbcUrl;
-    private final String username;
-    private final String password;
-    private final ZoneId zoneId;
-    private final boolean caseSensitive;
-    private final String defaultSchema;
-    private final boolean enableDelete;
-
-    private String jobId;
+    private final DwsDataSinkConfig settings;
 
     public DwsSink(
             String jdbcUrl,
@@ -60,62 +48,46 @@ public class DwsSink
             boolean caseSensitive,
             String defaultSchema,
             boolean enableDelete) {
-        this.jdbcUrl = jdbcUrl;
-        this.username = username;
-        this.password = password;
-        this.zoneId = zoneId;
-        this.caseSensitive = caseSensitive;
-        this.defaultSchema = normalizeDefaultSchema(defaultSchema);
-        this.enableDelete = enableDelete;
-        this.jobId = "dws-" + UUID.randomUUID();
+        this(
+                DwsDataSinkConfig.builder()
+                        .withUrl(jdbcUrl)
+                        .withUsername(username)
+                        .withPassword(password)
+                        .withZoneId(zoneId)
+                        .withCaseSensitive(caseSensitive)
+                        .withDefaultSchema(normalizeDefaultSchema(defaultSchema))
+                        .withEnableDelete(enableDelete)
+                        .build());
+    }
+
+    public DwsSink(DwsDataSinkConfig settings) {
+        this.settings = settings;
     }
 
     @Deprecated
     @Override
     public SinkWriter<Event> createWriter(Sink.InitContext context) {
-        long lastCheckpointId =
-                context.getRestoredCheckpointId()
-                        .orElse(CheckpointIDCounter.INITIAL_CHECKPOINT_ID - 1);
-        return createWriter(context.getTaskInfo().getIndexOfThisSubtask(), lastCheckpointId);
+        return createWriter(
+                context.getMailboxExecutor(),
+                context.getProcessingTimeService(),
+                DwsWriterMetrics.registered(context.metricGroup()));
     }
 
     @Override
     public SinkWriter<Event> createWriter(WriterInitContext context) {
-        long lastCheckpointId =
-                context.getRestoredCheckpointId()
-                        .orElse(CheckpointIDCounter.INITIAL_CHECKPOINT_ID - 1);
-        return createWriter(context.getTaskInfo().getIndexOfThisSubtask(), lastCheckpointId);
+        return createWriter(
+                context.getMailboxExecutor(),
+                context.getProcessingTimeService(),
+                DwsWriterMetrics.registered(context.metricGroup()));
     }
 
     @Override
     public StatefulSinkWriter<Event, DwsWriterState> restoreWriter(
             WriterInitContext context, Collection<DwsWriterState> writerStates) {
-        long lastCheckpointId =
-                context.getRestoredCheckpointId()
-                        .orElse(CheckpointIDCounter.INITIAL_CHECKPOINT_ID - 1);
-        if (writerStates != null && !writerStates.isEmpty()) {
-            jobId = writerStates.iterator().next().getJobId();
-        }
-        return createWriter(context.getTaskInfo().getIndexOfThisSubtask(), lastCheckpointId);
-    }
-
-    @Override
-    public Committer<DwsCommittable> createCommitter(CommitterInitContext context) {
-        return createCommitter();
-    }
-
-    @Override
-    public Committer<DwsCommittable> createCommitter() {
-        return new DwsCommitter(jdbcUrl, username, password, defaultSchema, caseSensitive);
-    }
-
-    @Override
-    public SimpleVersionedSerializer<DwsCommittable> getCommittableSerializer() {
-        return new DwsCommittableSerializer();
-    }
-
-    public SimpleVersionedSerializer<DwsCommittable> getWriteResultSerializer() {
-        return getCommittableSerializer();
+        return createWriter(
+                context.getMailboxExecutor(),
+                context.getProcessingTimeService(),
+                DwsWriterMetrics.registered(context.metricGroup()));
     }
 
     @Override
@@ -123,18 +95,17 @@ public class DwsSink
         return new DwsWriterStateSerializer();
     }
 
-    private DwsWriter createWriter(int subtaskId, long lastCheckpointId) {
+    private DwsWriter createWriter(
+            MailboxExecutor mailboxExecutor,
+            ProcessingTimeService processingTimeService,
+            DwsWriterMetrics metrics) {
         return new DwsWriter(
-                jdbcUrl,
-                username,
-                password,
-                zoneId,
-                caseSensitive,
-                defaultSchema,
-                enableDelete,
-                jobId,
-                subtaskId,
-                lastCheckpointId);
+                settings,
+                new DwsClientFacade.Official(settings),
+                "native-client-v2",
+                metrics,
+                mailboxExecutor,
+                processingTimeService);
     }
 
     private static String normalizeDefaultSchema(String defaultSchema) {
