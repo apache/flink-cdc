@@ -47,4 +47,12 @@ public interface DataSink {
         return getDataChangeEventHashFunctionProvider(); // fallback to nullary version if it isn't
         // overridden
     }
+
+    /**
+     * Whether primary-key-changing updates must be split into an update-before event and a replace
+     * event before partitioning.
+     */
+    default boolean requiresPrimaryKeyUpdateSplit() {
+        return false;
+    }
 }

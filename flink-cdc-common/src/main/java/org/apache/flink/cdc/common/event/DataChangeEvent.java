@@ -85,6 +85,8 @@ public class DataChangeEvent implements ChangeEvent, Serializable {
                 return "+I";
             case UPDATE:
                 return isAfter ? "+U" : "-U";
+            case UPDATE_BEFORE:
+                return "-U";
             case DELETE:
                 return "-D";
             default:
@@ -137,6 +139,18 @@ public class DataChangeEvent implements ChangeEvent, Serializable {
     public static DataChangeEvent updateEvent(
             TableId tableId, RecordData before, RecordData after, Map<String, String> meta) {
         return new DataChangeEvent(tableId, before, after, OperationType.UPDATE, meta);
+    }
+
+    /** Creates an update-before event containing only the record before a change. */
+    public static DataChangeEvent updateBeforeEvent(TableId tableId, RecordData before) {
+        return new DataChangeEvent(
+                tableId, before, null, OperationType.UPDATE_BEFORE, Collections.emptyMap());
+    }
+
+    /** Creates an update-before event containing only the record before a change and meta info. */
+    public static DataChangeEvent updateBeforeEvent(
+            TableId tableId, RecordData before, Map<String, String> meta) {
+        return new DataChangeEvent(tableId, before, null, OperationType.UPDATE_BEFORE, meta);
     }
 
     /** Creates a {@link DataChangeEvent} instance that describes the replace event. */

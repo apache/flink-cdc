@@ -64,7 +64,10 @@ public class DefaultDataChangeEventHashFunctionProvider
 
             // Primary key
             RecordData data =
-                    event.op().equals(OperationType.DELETE) ? event.before() : event.after();
+                    event.op().equals(OperationType.DELETE)
+                                    || event.op().equals(OperationType.UPDATE_BEFORE)
+                            ? event.before()
+                            : event.after();
             for (FieldGetter primaryKeyGetter : primaryKeyGetters) {
                 objectsToHash.add(primaryKeyGetter.getFieldOrNull(data));
             }

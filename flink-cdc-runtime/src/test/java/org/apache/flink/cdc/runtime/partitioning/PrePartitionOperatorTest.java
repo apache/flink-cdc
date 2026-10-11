@@ -18,11 +18,15 @@
 package org.apache.flink.cdc.runtime.partitioning;
 
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
+import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
+import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
+import org.apache.flink.cdc.common.event.OperationType;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.DefaultDataChangeEventHashFunctionProvider;
 import org.apache.flink.cdc.common.types.DataTypes;
@@ -35,10 +39,12 @@ import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** Unit test for {@link RegularPrePartitionOperator}. */
+/** Unit tests for the pre-partition operators. */
 class PrePartitionOperatorTest {
     private static final TableId CUSTOMERS =
             TableId.tableId("my_company", "my_branch", "customers");
@@ -139,6 +145,262 @@ class PrePartitionOperatorTest {
         }
     }
 
+    @Test
+    void testRegularTopologySplitsPrimaryKeyUpdateBeforePartitioning() throws Exception {
+        try (RegularEventOperatorTestHarness<RegularPrePartitionOperator, PartitioningEvent>
+                testHarness = createTestHarness(true)) {
+            testHarness.open();
+            testHarness.registerTableSchema(CUSTOMERS, CUSTOMERS_SCHEMA);
+            DataChangeEvent update = customersUpdate(1, 2);
+
+            testHarness.getOperator().processElement(new StreamRecord<>(update));
+
+            assertSplitOutput(testHarness.getOutputRecords(), update, false, 0);
+        }
+    }
+
+    @Test
+    void testDistributedTopologySplitsPrimaryKeyUpdateBeforePartitioning() throws Exception {
+        DistributedPrePartitionOperator operator =
+                new DistributedPrePartitionOperator(
+                        DOWNSTREAM_PARALLELISM,
+                        new DefaultDataChangeEventHashFunctionProvider(),
+                        true);
+        try (RegularEventOperatorTestHarness<DistributedPrePartitionOperator, PartitioningEvent>
+                testHarness =
+                        RegularEventOperatorTestHarness.with(operator, DOWNSTREAM_PARALLELISM)) {
+            testHarness.open();
+            operator.processElement(
+                    new StreamRecord<Event>(new CreateTableEvent(CUSTOMERS, CUSTOMERS_SCHEMA)));
+            testHarness.clearOutputRecords();
+            DataChangeEvent update = customersUpdate(1, 2);
+
+            operator.processElement(new StreamRecord<>(update));
+
+            assertSplitOutput(testHarness.getOutputRecords(), update, true, 0);
+        }
+    }
+
+    @Test
+    void testBatchTopologySplitsPrimaryKeyUpdateBeforePartitioning() throws Exception {
+        BatchRegularPrePartitionOperator operator =
+                new BatchRegularPrePartitionOperator(
+                        DOWNSTREAM_PARALLELISM,
+                        new DefaultDataChangeEventHashFunctionProvider(),
+                        true);
+        try (RegularEventOperatorTestHarness<BatchRegularPrePartitionOperator, PartitioningEvent>
+                testHarness =
+                        RegularEventOperatorTestHarness.with(operator, DOWNSTREAM_PARALLELISM)) {
+            testHarness.open();
+            operator.processElement(
+                    new StreamRecord<Event>(new CreateTableEvent(CUSTOMERS, CUSTOMERS_SCHEMA)));
+            testHarness.clearOutputRecords();
+            DataChangeEvent update = customersUpdate(1, 2);
+
+            operator.processElement(new StreamRecord<>(update));
+
+            assertSplitOutput(testHarness.getOutputRecords(), update, false, 0);
+        }
+    }
+
+    @Test
+    void testSplitOptOutKeepsPrimaryKeyUpdateIntact() throws Exception {
+        try (RegularEventOperatorTestHarness<RegularPrePartitionOperator, PartitioningEvent>
+                testHarness = createTestHarness(false)) {
+            testHarness.open();
+            testHarness.registerTableSchema(CUSTOMERS, CUSTOMERS_SCHEMA);
+            DataChangeEvent update = customersUpdate(1, 2);
+
+            testHarness.getOperator().processElement(new StreamRecord<>(update));
+
+            assertThat(testHarness.getOutputRecords()).hasSize(1);
+            assertThat(testHarness.getOutputRecords().getFirst().getValue().getPayload())
+                    .isSameAs(update);
+        }
+    }
+
+    @Test
+    void testSplitterUsesDeepPrimaryKeyEqualityInsteadOfHash() {
+        Schema stringKeySchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.STRING())
+                        .physicalColumn("payload", DataTypes.INT())
+                        .primaryKey("id")
+                        .build();
+        BinaryRecordDataGenerator stringGenerator =
+                new BinaryRecordDataGenerator((RowType) stringKeySchema.toRowDataType());
+        DataChangeEvent collidingHashUpdate =
+                DataChangeEvent.updateEvent(
+                        CUSTOMERS,
+                        stringGenerator.generate(
+                                new Object[] {BinaryStringData.fromString("FB"), 1}),
+                        stringGenerator.generate(
+                                new Object[] {BinaryStringData.fromString("Ea"), 2}),
+                        Collections.singletonMap("source", "collision"));
+
+        List<DataChangeEvent> collisionResult =
+                new PrimaryKeyUpdateSplitter(stringKeySchema).split(collidingHashUpdate);
+
+        assertThat(collisionResult).hasSize(2);
+        assertThat(collisionResult.get(0).op()).isEqualTo(OperationType.UPDATE_BEFORE);
+        assertThat(collisionResult.get(1).op()).isEqualTo(OperationType.REPLACE);
+        assertThat(collisionResult.get(0).meta()).containsEntry("source", "collision");
+        assertThat(collisionResult.get(1).meta()).containsEntry("source", "collision");
+
+        Schema binaryKeySchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.BYTES())
+                        .physicalColumn("payload", DataTypes.INT())
+                        .primaryKey("id")
+                        .build();
+        BinaryRecordDataGenerator binaryGenerator =
+                new BinaryRecordDataGenerator((RowType) binaryKeySchema.toRowDataType());
+        DataChangeEvent equalBinaryKeyUpdate =
+                DataChangeEvent.updateEvent(
+                        CUSTOMERS,
+                        binaryGenerator.generate(new Object[] {new byte[] {1, 2, 3}, 1}),
+                        binaryGenerator.generate(new Object[] {new byte[] {1, 2, 3}, 2}));
+
+        assertThat(new PrimaryKeyUpdateSplitter(binaryKeySchema).split(equalBinaryKeyUpdate))
+                .containsExactly(equalBinaryKeyUpdate);
+    }
+
+    @Test
+    void testSplitterFailsClosedForInvalidUpdate() {
+        Schema noPrimaryKey = Schema.newBuilder().physicalColumn("id", DataTypes.INT()).build();
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(RowType.of(DataTypes.INT()));
+        DataChangeEvent valid =
+                DataChangeEvent.updateEvent(
+                        CUSTOMERS,
+                        generator.generate(new Object[] {1}),
+                        generator.generate(new Object[] {2}));
+
+        assertThatThrownBy(() -> new PrimaryKeyUpdateSplitter(noPrimaryKey).split(valid))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("primary key");
+        PrimaryKeyUpdateSplitter splitter =
+                new PrimaryKeyUpdateSplitter(
+                        Schema.newBuilder()
+                                .physicalColumn("id", DataTypes.INT())
+                                .primaryKey("id")
+                                .build());
+        assertThatThrownBy(
+                        () ->
+                                splitter.split(
+                                        DataChangeEvent.updateEvent(
+                                                CUSTOMERS,
+                                                null,
+                                                generator.generate(new Object[] {2}))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("before");
+        assertThatThrownBy(
+                        () ->
+                                splitter.split(
+                                        DataChangeEvent.updateEvent(
+                                                CUSTOMERS,
+                                                generator.generate(new Object[] {1}),
+                                                null)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("after");
+    }
+
+    @Test
+    void testRegularTopologyRefreshesSplitterGettersWithSchema() throws Exception {
+        Schema evolvedSchema =
+                Schema.newBuilder()
+                        .physicalColumn("prefix", DataTypes.STRING())
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .physicalColumn("phone", DataTypes.BIGINT())
+                        .primaryKey("id")
+                        .build();
+        AddColumnEvent addPrefix =
+                new AddColumnEvent(
+                        CUSTOMERS,
+                        Collections.singletonList(
+                                AddColumnEvent.first(
+                                        Column.physicalColumn("prefix", DataTypes.STRING()))));
+        try (RegularEventOperatorTestHarness<RegularPrePartitionOperator, PartitioningEvent>
+                testHarness = createTestHarness(true)) {
+            testHarness.open();
+            testHarness.registerTableSchema(CUSTOMERS, CUSTOMERS_SCHEMA);
+            testHarness.registerEvolvedSchema(CUSTOMERS, evolvedSchema);
+            testHarness.getOperator().processElement(new StreamRecord<>(addPrefix));
+            testHarness.clearOutputRecords();
+            BinaryRecordDataGenerator generator =
+                    new BinaryRecordDataGenerator((RowType) evolvedSchema.toRowDataType());
+            DataChangeEvent update =
+                    DataChangeEvent.updateEvent(
+                            CUSTOMERS,
+                            generator.generate(
+                                    new Object[] {
+                                        BinaryStringData.fromString("same"),
+                                        1,
+                                        BinaryStringData.fromString("Alice"),
+                                        12345678L
+                                    }),
+                            generator.generate(
+                                    new Object[] {
+                                        BinaryStringData.fromString("same"),
+                                        2,
+                                        BinaryStringData.fromString("Alice"),
+                                        12345678L
+                                    }));
+
+            testHarness.getOperator().processElement(new StreamRecord<>(update));
+
+            assertThat(testHarness.getOutputRecords()).hasSize(2);
+            assertThat(
+                            ((DataChangeEvent)
+                                            testHarness
+                                                    .getOutputRecords()
+                                                    .getFirst()
+                                                    .getValue()
+                                                    .getPayload())
+                                    .op())
+                    .isEqualTo(OperationType.UPDATE_BEFORE);
+        }
+    }
+
+    private DataChangeEvent customersUpdate(int beforeId, int afterId) {
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator((RowType) CUSTOMERS_SCHEMA.toRowDataType());
+        return DataChangeEvent.updateEvent(
+                CUSTOMERS,
+                generator.generate(
+                        new Object[] {beforeId, BinaryStringData.fromString("Alice"), 12345678L}),
+                generator.generate(
+                        new Object[] {afterId, BinaryStringData.fromString("Alice"), 12345678L}),
+                Collections.singletonMap("source", "test"));
+    }
+
+    private void assertSplitOutput(
+            List<StreamRecord<PartitioningEvent>> output,
+            DataChangeEvent original,
+            boolean distributed,
+            int sourcePartition) {
+        assertThat(output).hasSize(2);
+        PartitioningEvent retract = output.get(0).getValue();
+        PartitioningEvent replacement = output.get(1).getValue();
+        DataChangeEvent retractPayload = (DataChangeEvent) retract.getPayload();
+        DataChangeEvent replacementPayload = (DataChangeEvent) replacement.getPayload();
+        assertThat(retractPayload.op()).isEqualTo(OperationType.UPDATE_BEFORE);
+        assertThat(retractPayload.before()).isEqualTo(original.before());
+        assertThat(retractPayload.after()).isNull();
+        assertThat(replacementPayload.op()).isEqualTo(OperationType.REPLACE);
+        assertThat(replacementPayload.before()).isNull();
+        assertThat(replacementPayload.after()).isEqualTo(original.after());
+        assertThat(retractPayload.meta()).isEqualTo(original.meta());
+        assertThat(replacementPayload.meta()).isEqualTo(original.meta());
+        assertThat(retract.getTargetPartition())
+                .isEqualTo(getPartitioningTarget(CUSTOMERS_SCHEMA, retractPayload));
+        assertThat(replacement.getTargetPartition())
+                .isEqualTo(getPartitioningTarget(CUSTOMERS_SCHEMA, replacementPayload));
+        assertThat(retract.getSourcePartition()).isEqualTo(distributed ? sourcePartition : -1);
+        assertThat(replacement.getSourcePartition()).isEqualTo(distributed ? sourcePartition : -1);
+    }
+
     private int getPartitioningTarget(Schema schema, DataChangeEvent dataChangeEvent) {
         return new DefaultDataChangeEventHashFunctionProvider()
                         .getHashFunction(null, schema)
@@ -148,11 +410,17 @@ class PrePartitionOperatorTest {
 
     private RegularEventOperatorTestHarness<RegularPrePartitionOperator, PartitioningEvent>
             createTestHarness() {
+        return createTestHarness(false);
+    }
+
+    private RegularEventOperatorTestHarness<RegularPrePartitionOperator, PartitioningEvent>
+            createTestHarness(boolean requiresPrimaryKeyUpdateSplit) {
         RegularPrePartitionOperator operator =
                 new RegularPrePartitionOperator(
                         TestingSchemaRegistryGateway.SCHEMA_OPERATOR_ID,
                         DOWNSTREAM_PARALLELISM,
-                        new DefaultDataChangeEventHashFunctionProvider());
+                        new DefaultDataChangeEventHashFunctionProvider(),
+                        requiresPrimaryKeyUpdateSplit);
         return RegularEventOperatorTestHarness.with(operator, DOWNSTREAM_PARALLELISM);
     }
 }

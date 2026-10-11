@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,9 +17,9 @@
 
 package org.apache.flink.cdc.connectors.dws.sink.v2;
 
-import org.apache.flink.api.connector.sink2.CommittingSinkWriter;
+import org.apache.flink.api.common.operators.MailboxExecutor;
+import org.apache.flink.api.common.operators.ProcessingTimeService;
 import org.apache.flink.api.connector.sink2.StatefulSinkWriter;
-import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.DropTableEvent;
@@ -29,61 +28,118 @@ import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.event.TruncateTableEvent;
-import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.FlushEventSinkWriter;
-import org.apache.flink.cdc.common.types.DataType;
-import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
+import org.apache.flink.cdc.connectors.dws.sink.DwsDataSinkConfig;
+import org.apache.flink.cdc.connectors.dws.sink.DwsRecordConverter;
 import org.apache.flink.cdc.connectors.dws.utils.DwsUtils;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.sql.Types;
+import java.lang.reflect.Array;
+import java.nio.charset.StandardCharsets;
 import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.stream.Collectors;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.atomic.AtomicReference;
 
-/** A SinkV2 writer that writes records into checkpoint-scoped DWS staging tables. */
-public class DwsWriter
-        implements CommittingSinkWriter<Event, DwsCommittable>,
-                StatefulSinkWriter<Event, DwsWriterState>,
-                FlushEventSinkWriter {
+/** SinkV2 writer backed by one official DWS client per Flink sink writer. */
+public class DwsWriter implements StatefulSinkWriter<Event, DwsWriterState>, FlushEventSinkWriter {
 
     private static final Logger LOG = LoggerFactory.getLogger(DwsWriter.class);
+    private static final long HEALTH_CHECK_INTERVAL_MILLIS = 1_000L;
 
-    private final String jdbcUrl;
-    private final String username;
-    private final String password;
-    private final ZoneId zoneId;
-    private final boolean caseSensitive;
-    private final String defaultSchema;
-    private final boolean enableDelete;
-    private final String jobId;
-    private final int subtaskId;
+    private final DwsDataSinkConfig settings;
+    private final DwsClientFacade client;
     private final DwsWriterState stateCache;
     private final Map<TableId, TableInfo> tableInfoCache = new HashMap<>();
-    private final Map<TableId, StagingTable> stagingTables = new HashMap<>();
-    private final List<DwsCommittable> sealedCommittables = new ArrayList<>();
+    private final Map<String, Long> bufferedTableBytes = new HashMap<>();
+    private final AtomicReference<Throwable> firstAsyncFailure = new AtomicReference<>();
+    private final MailboxExecutor mailboxExecutor;
+    private final ProcessingTimeService processingTimeService;
+    private final DwsWriterMetrics metrics;
 
-    private transient Connection connection;
-    private long lastCheckpointId;
-    private long sequence;
-    private int stagingTableSequence;
+    private ScheduledFuture<?> healthCheckTimer;
+    private long bufferedAllBytes;
+    private long bufferedRecords;
+    private boolean closed;
 
+    public DwsWriter(DwsDataSinkConfig settings, String jobId) {
+        this(
+                settings,
+                new DwsClientFacade.Official(settings),
+                jobId,
+                DwsWriterMetrics.testing(),
+                null,
+                null);
+    }
+
+    public DwsWriter(
+            DwsDataSinkConfig settings,
+            String jobId,
+            MailboxExecutor mailboxExecutor,
+            ProcessingTimeService processingTimeService) {
+        this(
+                settings,
+                new DwsClientFacade.Official(settings),
+                jobId,
+                DwsWriterMetrics.testing(),
+                mailboxExecutor,
+                processingTimeService);
+    }
+
+    DwsWriter(DwsDataSinkConfig settings, DwsClientFacade client) {
+        this(settings, client, "test-writer", DwsWriterMetrics.testing(), null, null);
+    }
+
+    DwsWriter(
+            DwsDataSinkConfig settings,
+            DwsClientFacade client,
+            MailboxExecutor mailboxExecutor,
+            ProcessingTimeService processingTimeService) {
+        this(
+                settings,
+                client,
+                "test-writer",
+                DwsWriterMetrics.testing(),
+                mailboxExecutor,
+                processingTimeService);
+    }
+
+    DwsWriter(
+            DwsDataSinkConfig settings,
+            DwsClientFacade client,
+            DwsWriterMetrics metrics,
+            MailboxExecutor mailboxExecutor,
+            ProcessingTimeService processingTimeService) {
+        this(settings, client, "test-writer", metrics, mailboxExecutor, processingTimeService);
+    }
+
+    DwsWriter(
+            DwsDataSinkConfig settings,
+            DwsClientFacade client,
+            String jobId,
+            DwsWriterMetrics metrics,
+            MailboxExecutor mailboxExecutor,
+            ProcessingTimeService processingTimeService) {
+        this.settings = Objects.requireNonNull(settings, "settings");
+        this.client = Objects.requireNonNull(client, "client");
+        this.stateCache = DwsWriterState.nativeClientMarker();
+        this.mailboxExecutor = mailboxExecutor;
+        this.processingTimeService = processingTimeService;
+        this.metrics = Objects.requireNonNull(metrics, "metrics");
+        LOG.info("Initialized DWS writer: {}", safeConfigurationSummary());
+        scheduleNextHealthCheck();
+    }
+
+    /** Compatibility constructor retained for callers of the former staging writer API. */
     public DwsWriter(
             String jdbcUrl,
             String username,
@@ -95,177 +151,294 @@ public class DwsWriter
             String jobId,
             int subtaskId,
             long lastCheckpointId) {
-        this.jdbcUrl = jdbcUrl;
-        this.username = username;
-        this.password = password;
-        this.zoneId = zoneId;
-        this.caseSensitive = caseSensitive;
-        this.defaultSchema = defaultSchema;
-        this.enableDelete = enableDelete;
-        this.jobId = jobId;
-        this.subtaskId = subtaskId;
-        this.lastCheckpointId = lastCheckpointId;
-        this.stateCache = new DwsWriterState(jobId);
+        this(
+                DwsDataSinkConfig.builder()
+                        .withUrl(jdbcUrl)
+                        .withUsername(username)
+                        .withPassword(password)
+                        .withZoneId(zoneId)
+                        .withCaseSensitive(caseSensitive)
+                        .withDefaultSchema(defaultSchema)
+                        .withEnableDelete(enableDelete)
+                        .build(),
+                jobId);
     }
 
     @Override
-    public void write(Event event, Context context) throws IOException, InterruptedException {
+    public void write(Event event, Context context) throws IOException {
+        checkAsyncFailure();
         if (event instanceof DataChangeEvent) {
-            processDataChangeEvent((DataChangeEvent) event);
+            try {
+                processDataChangeEvent((DataChangeEvent) event);
+            } catch (IOException | RuntimeException failure) {
+                metrics.recordDefiniteFailure();
+                throw failure;
+            }
         } else if (event instanceof SchemaChangeEvent) {
             handleSchemaChangeEvent((SchemaChangeEvent) event);
         }
+        checkAsyncFailure();
     }
 
     @Override
-    public Collection<DwsCommittable> prepareCommit() throws IOException, InterruptedException {
-        List<DwsCommittable> committables = new ArrayList<>(sealedCommittables);
-        sealedCommittables.clear();
-
-        List<TableId> tableIds = new ArrayList<>(stagingTables.keySet());
-        for (TableId tableId : tableIds) {
-            DwsCommittable committable = sealStagingTable(tableId);
-            if (committable != null) {
-                committables.add(committable);
-            }
-        }
-
-        lastCheckpointId++;
-        sequence = 0L;
-        stagingTableSequence = 0;
-        LOG.debug(
-                "Prepared {} DWS committables for checkpoint {}.",
-                committables.size(),
-                lastCheckpointId);
-        return committables;
+    public void flush(boolean endOfInput) throws IOException {
+        flushClientAndResetCounters();
     }
 
     @Override
-    public void flush(boolean endOfInput) throws IOException, InterruptedException {
-        for (StagingTable stagingTable : stagingTables.values()) {
-            flushStagingTable(stagingTable);
-        }
-    }
-
-    @Override
-    public void flush(FlushEvent event) throws IOException, InterruptedException {
-        List<DwsCommittable> committables = new ArrayList<>();
-        Collection<TableId> tableIds =
-                event.getTableIds().isEmpty()
-                        ? new ArrayList<>(stagingTables.keySet())
-                        : event.getTableIds();
-        for (TableId tableId : tableIds) {
-            DwsCommittable committable = sealStagingTable(tableId);
-            if (committable != null) {
-                committables.add(committable);
-            }
-        }
-
-        if (committables.isEmpty()) {
-            return;
-        }
-
-        DwsCommitter committer =
-                new DwsCommitter(jdbcUrl, username, password, defaultSchema, caseSensitive);
-        IOException failure = null;
-        try {
-            committer.commitCommittables(committables);
-        } catch (Exception e) {
-            failure = new IOException("Failed to flush DWS staging tables for schema change.", e);
-            throw failure;
-        } finally {
-            try {
-                committer.close();
-            } catch (Exception e) {
-                if (failure != null) {
-                    failure.addSuppressed(e);
-                } else {
-                    throw new IOException("Failed to close DWS committer after schema flush.", e);
-                }
-            }
-        }
-    }
-
-    @Override
-    public void close() throws Exception {
-        for (StagingTable stagingTable : stagingTables.values()) {
-            closeStagingTable(stagingTable);
-        }
-        stagingTables.clear();
-        if (connection != null) {
-            connection.close();
-            connection = null;
-        }
+    public void flush(FlushEvent event) throws IOException {
+        flushClientAndResetCounters();
     }
 
     @Override
     public List<DwsWriterState> snapshotState(long checkpointId) throws IOException {
+        flush(false);
         return Collections.singletonList(stateCache);
     }
 
-    private void processDataChangeEvent(DataChangeEvent event) throws IOException {
-        switch (event.op()) {
-            case INSERT:
-            case REPLACE:
-                appendStagingRecord(
-                        event.after(),
-                        event,
-                        getRequiredTableInfo(event.tableId()),
-                        DwsSqlUtils.UPSERT_OPERATION);
-                break;
-            case UPDATE:
-                TableInfo tableInfo = getRequiredTableInfo(event.tableId());
-                if (isPrimaryKeyChanged(event, tableInfo)) {
-                    appendStagingRecord(
-                            event.before(), event, tableInfo, DwsSqlUtils.DELETE_OPERATION);
-                }
-                appendStagingRecord(event.after(), event, tableInfo, DwsSqlUtils.UPSERT_OPERATION);
-                break;
-            case DELETE:
-                if (!enableDelete) {
-                    LOG.debug(
-                            "Skip DELETE for {} because sink.enable-delete=false", event.tableId());
-                    return;
-                }
-                appendStagingRecord(
-                        event.before(),
-                        event,
-                        getRequiredTableInfo(event.tableId()),
-                        DwsSqlUtils.DELETE_OPERATION);
-                break;
-            default:
-                LOG.warn("Unsupported operation {} for {}", event.op(), event.tableId());
+    @Override
+    public void close() throws IOException {
+        if (closed) {
+            return;
+        }
+        closed = true;
+        if (healthCheckTimer != null) {
+            healthCheckTimer.cancel(false);
+        }
+
+        IOException failure = currentAsyncFailure();
+        try {
+            client.close();
+        } catch (IOException closeFailure) {
+            if (failure != null) {
+                failure.addSuppressed(closeFailure);
+            } else {
+                failure = closeFailure;
+            }
+        }
+        if (failure != null) {
+            throw failure;
         }
     }
 
-    private void appendStagingRecord(
-            RecordData recordData, DataChangeEvent event, TableInfo tableInfo, String operation)
+    void recordAsyncFailure(Throwable failure) {
+        if (firstAsyncFailure.compareAndSet(null, Objects.requireNonNull(failure, "failure"))) {
+            metrics.recordFirstAsyncFailure();
+        }
+    }
+
+    private void checkAsyncFailure() throws IOException {
+        IOException failure = currentAsyncFailure();
+        if (failure != null) {
+            throw failure;
+        }
+    }
+
+    private IOException currentAsyncFailure() {
+        Throwable failure = firstAsyncFailure.get();
+        if (failure == null) {
+            failure = client.asyncFailure();
+            if (failure != null) {
+                if (firstAsyncFailure.compareAndSet(null, failure)) {
+                    metrics.recordFirstAsyncFailure();
+                }
+                failure = firstAsyncFailure.get();
+            }
+        }
+        return failure == null
+                ? null
+                : new IOException("Asynchronous DWS client failure.", failure);
+    }
+
+    private void scheduleNextHealthCheck() {
+        if (processingTimeService == null || mailboxExecutor == null || closed) {
+            return;
+        }
+        long timestamp =
+                processingTimeService.getCurrentProcessingTime() + HEALTH_CHECK_INTERVAL_MILLIS;
+        healthCheckTimer =
+                processingTimeService.registerTimer(
+                        timestamp,
+                        ignoredTimestamp -> {
+                            if (closed) {
+                                return;
+                            }
+                            if (currentAsyncFailure() != null) {
+                                mailboxExecutor.execute(
+                                        this::checkAsyncFailure,
+                                        "Propagate asynchronous DWS client failure");
+                            } else {
+                                scheduleNextHealthCheck();
+                            }
+                        });
+    }
+
+    private void processDataChangeEvent(DataChangeEvent event) throws IOException {
+        TableInfo tableInfo = getRequiredTableInfo(event.tableId());
+        String tableName = resolveTableName(event.tableId());
+        switch (event.op()) {
+            case INSERT:
+            case REPLACE:
+                submitWrite(tableName, tableInfo.converter.convertWrite(event.after()));
+                break;
+            case UPDATE:
+                ensurePrimaryKeyUnchanged(event, tableInfo);
+                submitWrite(tableName, tableInfo.converter.convertWrite(event.after()));
+                break;
+            case UPDATE_BEFORE:
+                submitDelete(tableName, tableInfo.converter.convertDelete(event.before()));
+                break;
+            case DELETE:
+                if (settings.isEnableDelete()) {
+                    submitDelete(tableName, tableInfo.converter.convertDelete(event.before()));
+                }
+                break;
+            default:
+                throw new IOException("Unsupported DWS data operation: " + event.op());
+        }
+    }
+
+    private void submitWrite(String tableName, Map<String, Object> values) throws IOException {
+        long estimatedBytes = prepareBuffer(tableName, values);
+        client.write(tableName, values);
+        recordAcceptedBytes(tableName, estimatedBytes);
+    }
+
+    private void submitDelete(String tableName, Map<String, Object> values) throws IOException {
+        long estimatedBytes = prepareBuffer(tableName, values);
+        client.delete(tableName, values);
+        recordAcceptedBytes(tableName, estimatedBytes);
+    }
+
+    private long prepareBuffer(String tableName, Map<String, Object> values) throws IOException {
+        long estimatedBytes = estimateRecordBytes(tableName, values);
+        long perTableLimit =
+                Math.min(settings.getBufferTableMaxBytes(), settings.getBufferPartitionMaxBytes());
+        if (estimatedBytes > perTableLimit || estimatedBytes > settings.getBufferAllMaxBytes()) {
+            throw new IOException(
+                    String.format(
+                            "Estimated single DWS record size %d bytes exceeds the writer buffer budget for table %s.",
+                            estimatedBytes, tableName));
+        }
+
+        long tableBytes = bufferedTableBytes.getOrDefault(tableName, 0L);
+        if (wouldExceed(bufferedAllBytes, estimatedBytes, settings.getBufferAllMaxBytes())
+                || wouldExceed(tableBytes, estimatedBytes, perTableLimit)) {
+            flushClientAndResetCounters();
+        }
+        return estimatedBytes;
+    }
+
+    private void recordAcceptedBytes(String tableName, long estimatedBytes) {
+        bufferedAllBytes += estimatedBytes;
+        bufferedRecords++;
+        bufferedTableBytes.merge(tableName, estimatedBytes, Long::sum);
+        metrics.recordAccepted(bufferedAllBytes);
+    }
+
+    private void flushClientAndResetCounters() throws IOException {
+        checkAsyncFailure();
+        long startedNanos = System.nanoTime();
+        client.flush();
+        checkAsyncFailure();
+        long durationMillis =
+                java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(
+                        System.nanoTime() - startedNanos);
+        metrics.recordSuccessfulFlush(bufferedRecords, bufferedAllBytes, durationMillis);
+        bufferedAllBytes = 0L;
+        bufferedRecords = 0L;
+        bufferedTableBytes.clear();
+    }
+
+    String safeConfigurationSummary() {
+        return String.format(
+                "client=official, writeMode=%s, autoFlush=%s, retryMaxTimes=%d, retryBase=%s, retryJitter=%s, taskTimeout=%s, statementTimeout=%s, allBufferBytes=%d, tableBufferBytes=%d, partitionBufferBytes=%d, bufferAccounting=conservative-estimate, nativeBufferMetrics=unavailable",
+                settings.getWriteMode(),
+                settings.isEnableAutoFlush(),
+                settings.getRetryMaxTimes(),
+                settings.getRetrySleepBaseTime(),
+                settings.getRetrySleepRandomTime(),
+                settings.getTaskTimeout(),
+                settings.getStatementTimeout(),
+                settings.getBufferAllMaxBytes(),
+                settings.getBufferTableMaxBytes(),
+                settings.getBufferPartitionMaxBytes());
+    }
+
+    private static boolean wouldExceed(long current, long additional, long limit) {
+        return additional > limit - current;
+    }
+
+    private static long estimateRecordBytes(String tableName, Map<String, Object> values) {
+        long bytes = 64L + utf8Length(tableName);
+        for (Map.Entry<String, Object> entry : values.entrySet()) {
+            bytes += 32L + utf8Length(entry.getKey()) + estimateValueBytes(entry.getValue());
+        }
+        return bytes;
+    }
+
+    private static long estimateValueBytes(Object value) {
+        if (value == null) {
+            return 8L;
+        }
+        if (value instanceof byte[]) {
+            return 16L + ((byte[]) value).length;
+        }
+        if (value instanceof CharSequence) {
+            return 16L + utf8Length(value.toString());
+        }
+        if (value instanceof Number || value instanceof Boolean || value instanceof Character) {
+            return 16L;
+        }
+        if (value.getClass().isArray()) {
+            int length = Array.getLength(value);
+            long bytes = 16L;
+            for (int i = 0; i < length; i++) {
+                bytes += estimateValueBytes(Array.get(value, i));
+            }
+            return bytes;
+        }
+        return 32L + utf8Length(String.valueOf(value));
+    }
+
+    private static int utf8Length(String value) {
+        return value.getBytes(StandardCharsets.UTF_8).length;
+    }
+
+    private void ensurePrimaryKeyUnchanged(DataChangeEvent event, TableInfo tableInfo)
             throws IOException {
-        if (recordData == null) {
-            LOG.warn(
-                    "Skip {} for {} because the record payload is null.",
-                    operation,
-                    event.tableId());
+        Map<String, Object> beforeKeys = tableInfo.converter.convertDelete(event.before());
+        Map<String, Object> afterKeys = tableInfo.converter.convertDelete(event.after());
+        for (String primaryKey : beforeKeys.keySet()) {
+            if (!Objects.deepEquals(beforeKeys.get(primaryKey), afterKeys.get(primaryKey))) {
+                throw new IOException(
+                        "Primary-key-changing UPDATE must be split before reaching DWS writer.");
+            }
+        }
+    }
+
+    private void handleSchemaChangeEvent(SchemaChangeEvent event) throws IOException {
+        String tableName = resolveTableName(event.tableId());
+        if (event instanceof DropTableEvent) {
+            client.removeTableSchema(tableName);
+            tableInfoCache.remove(event.tableId());
+            return;
+        }
+        if (event instanceof TruncateTableEvent) {
             return;
         }
 
-        Preconditions.checkArgument(tableInfo.schema.getColumnCount() == recordData.getArity());
-
-        StagingTable stagingTable = getOrCreateStagingTable(event.tableId(), tableInfo);
-        try {
-            PreparedStatement statement = stagingTable.insertStatement;
-            statement.setString(1, operation);
-            statement.setLong(2, sequence++);
-            for (int i = 0; i < tableInfo.schema.getColumnCount(); i++) {
-                Object fieldValue = tableInfo.fieldGetters[i].getFieldOrNull(recordData);
-                setFieldValue(statement, i + 3, fieldValue, tableInfo.schema.getColumns().get(i));
-            }
-            statement.addBatch();
-            stagingTable.hasPendingBatch = true;
-            stagingTable.rowCount++;
-        } catch (Exception e) {
-            throw new IOException("Failed to write record into DWS staging table.", e);
+        Schema newSchema;
+        if (event instanceof CreateTableEvent) {
+            newSchema = ((CreateTableEvent) event).getSchema();
+        } else {
+            TableInfo current = getRequiredTableInfo(event.tableId());
+            newSchema = SchemaUtils.applySchemaChangeEvent(current.schema, event);
         }
+        TableInfo newTableInfo =
+                new TableInfo(newSchema, new DwsRecordConverter(newSchema, settings.getZoneId()));
+        client.refreshTableSchema(tableName);
+        tableInfoCache.put(event.tableId(), newTableInfo);
     }
 
     private TableInfo getRequiredTableInfo(TableId tableId) throws IOException {
@@ -276,265 +449,18 @@ public class DwsWriter
         return tableInfo;
     }
 
-    private boolean isPrimaryKeyChanged(DataChangeEvent event, TableInfo tableInfo) {
-        if (event.before() == null || event.after() == null) {
-            return false;
-        }
-        Preconditions.checkArgument(tableInfo.schema.getColumnCount() == event.before().getArity());
-        Preconditions.checkArgument(tableInfo.schema.getColumnCount() == event.after().getArity());
-
-        for (int primaryKeyIndex : tableInfo.primaryKeyIndexes) {
-            Object beforeValue =
-                    tableInfo.fieldGetters[primaryKeyIndex].getFieldOrNull(event.before());
-            Object afterValue =
-                    tableInfo.fieldGetters[primaryKeyIndex].getFieldOrNull(event.after());
-            if (!Objects.equals(beforeValue, afterValue)) {
-                return true;
-            }
-        }
-        return false;
+    private String resolveTableName(TableId tableId) {
+        return DwsUtils.formatNativeTableName(
+                tableId, settings.getDefaultSchema(), settings.isCaseSensitive());
     }
 
-    private List<Integer> createPrimaryKeyIndexes(Schema schema) {
-        List<Integer> primaryKeyIndexes = new ArrayList<>();
-        for (String primaryKey : schema.primaryKeys()) {
-            int primaryKeyIndex = -1;
-            for (int i = 0; i < schema.getColumnCount(); i++) {
-                if (schema.getColumns().get(i).getName().equals(primaryKey)) {
-                    primaryKeyIndex = i;
-                    break;
-                }
-            }
-            Preconditions.checkArgument(
-                    primaryKeyIndex >= 0,
-                    "Primary key %s is missing in DWS table schema.",
-                    primaryKey);
-            primaryKeyIndexes.add(primaryKeyIndex);
-        }
-        return primaryKeyIndexes;
-    }
-
-    private void setFieldValue(
-            PreparedStatement statement, int parameterIndex, Object fieldValue, Column column)
-            throws SQLException {
-        DataType dataType = column.getType();
-        switch (dataType.getTypeRoot()) {
-            case MAP:
-            case ROW:
-                if (fieldValue == null) {
-                    statement.setNull(parameterIndex, Types.OTHER);
-                } else {
-                    statement.setObject(parameterIndex, fieldValue, Types.OTHER);
-                }
-                break;
-            default:
-                statement.setObject(parameterIndex, fieldValue);
-        }
-    }
-
-    private void handleSchemaChangeEvent(SchemaChangeEvent event) throws IOException {
-        DwsCommittable sealed = sealStagingTable(event.tableId());
-        if (sealed != null) {
-            sealedCommittables.add(sealed);
-        }
-
-        if (event instanceof DropTableEvent) {
-            tableInfoCache.remove(event.tableId());
-            return;
-        }
-
-        if (event instanceof TruncateTableEvent) {
-            return;
-        }
-
-        Schema newSchema;
-        if (event instanceof CreateTableEvent) {
-            newSchema = ((CreateTableEvent) event).getSchema();
-        } else {
-            TableInfo currentTableInfo = tableInfoCache.get(event.tableId());
-            if (currentTableInfo == null) {
-                throw new IOException("Schema cache is missing for " + event.tableId());
-            }
-            newSchema = SchemaUtils.applySchemaChangeEvent(currentTableInfo.schema, event);
-        }
-        tableInfoCache.put(event.tableId(), createTableInfo(newSchema));
-    }
-
-    private StagingTable getOrCreateStagingTable(TableId tableId, TableInfo tableInfo)
-            throws IOException {
-        StagingTable existing = stagingTables.get(tableId);
-        if (existing != null) {
-            return existing;
-        }
-
-        if (tableInfo.schema.primaryKeys().isEmpty()) {
-            throw new IOException(
-                    "DWS application-level two-phase commit requires primary keys for "
-                            + tableId.identifier());
-        }
-
-        String targetSchema =
-                DwsSqlUtils.normalizeSchemaName(tableId, defaultSchema, caseSensitive);
-        String targetTable = DwsSqlUtils.normalizeTableName(tableId, caseSensitive);
-        long checkpointId = lastCheckpointId + 1;
-        String stagingTableName =
-                DwsSqlUtils.buildStagingTableName(
-                        targetSchema,
-                        targetTable,
-                        jobId,
-                        checkpointId,
-                        subtaskId,
-                        stagingTableSequence++,
-                        caseSensitive);
-        List<String> columnNames =
-                tableInfo.schema.getColumns().stream()
-                        .map(Column::getName)
-                        .collect(Collectors.toList());
-        List<String> primaryKeys = new ArrayList<>(tableInfo.schema.primaryKeys());
-
-        try (Statement statement = getConnection().createStatement()) {
-            statement.execute(
-                    DwsSqlUtils.buildCreateStagingTableSql(
-                            targetSchema, stagingTableName, tableInfo.schema, caseSensitive));
-        } catch (SQLException e) {
-            throw new IOException("Failed to create DWS staging table.", e);
-        }
-
-        try {
-            PreparedStatement insertStatement =
-                    getConnection()
-                            .prepareStatement(
-                                    DwsSqlUtils.buildInsertStagingSql(
-                                            targetSchema,
-                                            stagingTableName,
-                                            columnNames,
-                                            caseSensitive));
-            StagingTable stagingTable =
-                    new StagingTable(
-                            targetSchema,
-                            targetTable,
-                            stagingTableName,
-                            columnNames,
-                            primaryKeys,
-                            insertStatement);
-            stagingTables.put(tableId, stagingTable);
-            LOG.debug(
-                    "Created DWS staging table {}.{} for checkpoint {}.",
-                    targetSchema,
-                    stagingTableName,
-                    checkpointId);
-            return stagingTable;
-        } catch (SQLException e) {
-            throw new IOException("Failed to prepare DWS staging insert statement.", e);
-        }
-    }
-
-    private DwsCommittable sealStagingTable(TableId tableId) throws IOException {
-        StagingTable stagingTable = stagingTables.remove(tableId);
-        if (stagingTable == null) {
-            return null;
-        }
-
-        try {
-            flushStagingTable(stagingTable);
-            if (stagingTable.rowCount == 0) {
-                return null;
-            }
-            return new DwsCommittable(
-                    jobId,
-                    lastCheckpointId + 1,
-                    subtaskId,
-                    stagingTable.targetSchema,
-                    stagingTable.targetTable,
-                    stagingTable.targetSchema,
-                    stagingTable.stagingTable,
-                    stagingTable.columnNames,
-                    stagingTable.primaryKeys);
-        } finally {
-            closeStagingTable(stagingTable);
-        }
-    }
-
-    private void flushStagingTable(StagingTable stagingTable) throws IOException {
-        if (!stagingTable.hasPendingBatch) {
-            return;
-        }
-        try {
-            stagingTable.insertStatement.executeBatch();
-            stagingTable.insertStatement.clearBatch();
-            stagingTable.hasPendingBatch = false;
-        } catch (SQLException e) {
-            throw new IOException(
-                    "Failed to flush DWS staging table " + stagingTable.stagingTable, e);
-        }
-    }
-
-    private void closeStagingTable(StagingTable stagingTable) throws IOException {
-        try {
-            stagingTable.insertStatement.close();
-        } catch (SQLException e) {
-            throw new IOException("Failed to close DWS staging statement.", e);
-        }
-    }
-
-    private Connection getConnection() throws SQLException {
-        if (connection == null || connection.isClosed()) {
-            connection = DriverManager.getConnection(jdbcUrl, username, password);
-            connection.setAutoCommit(true);
-        }
-        return connection;
-    }
-
-    private TableInfo createTableInfo(Schema schema) {
-        RecordData.FieldGetter[] fieldGetters = new RecordData.FieldGetter[schema.getColumnCount()];
-        for (int i = 0; i < schema.getColumnCount(); i++) {
-            fieldGetters[i] =
-                    DwsUtils.createFieldGetter(schema.getColumns().get(i).getType(), i, zoneId);
-        }
-        return new TableInfo(schema, fieldGetters, createPrimaryKeyIndexes(schema));
-    }
-
-    private static class TableInfo {
-
+    private static final class TableInfo {
         private final Schema schema;
-        private final RecordData.FieldGetter[] fieldGetters;
-        private final List<Integer> primaryKeyIndexes;
+        private final DwsRecordConverter converter;
 
-        private TableInfo(
-                Schema schema,
-                RecordData.FieldGetter[] fieldGetters,
-                List<Integer> primaryKeyIndexes) {
+        private TableInfo(Schema schema, DwsRecordConverter converter) {
             this.schema = schema;
-            this.fieldGetters = fieldGetters;
-            this.primaryKeyIndexes = primaryKeyIndexes;
-        }
-    }
-
-    private static class StagingTable {
-
-        private final String targetSchema;
-        private final String targetTable;
-        private final String stagingTable;
-        private final List<String> columnNames;
-        private final List<String> primaryKeys;
-        private final PreparedStatement insertStatement;
-
-        private long rowCount;
-        private boolean hasPendingBatch;
-
-        private StagingTable(
-                String targetSchema,
-                String targetTable,
-                String stagingTable,
-                List<String> columnNames,
-                List<String> primaryKeys,
-                PreparedStatement insertStatement) {
-            this.targetSchema = targetSchema;
-            this.targetTable = targetTable;
-            this.stagingTable = stagingTable;
-            this.columnNames = columnNames;
-            this.primaryKeys = primaryKeys;
-            this.insertStatement = insertStatement;
+            this.converter = converter;
         }
     }
 }

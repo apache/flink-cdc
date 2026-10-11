@@ -43,6 +43,8 @@ import org.apache.flink.shaded.guava31.com.google.common.cache.LoadingCache;
 
 import java.io.Serializable;
 import java.time.Duration;
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -59,18 +61,28 @@ public class RegularPrePartitionOperator extends AbstractStreamOperatorAdapter<P
     private final OperatorID schemaOperatorId;
     private final int downstreamParallelism;
     private final HashFunctionProvider<DataChangeEvent> hashFunctionProvider;
+    private final boolean requiresPrimaryKeyUpdateSplit;
 
     private transient SchemaEvolutionClient schemaEvolutionClient;
-    private transient LoadingCache<TableId, HashFunction<DataChangeEvent>> cachedHashFunctions;
+    private transient LoadingCache<TableId, PartitioningFunctions> cachedPartitioningFunctions;
 
     public RegularPrePartitionOperator(
             OperatorID schemaOperatorId,
             int downstreamParallelism,
             HashFunctionProvider<DataChangeEvent> hashFunctionProvider) {
+        this(schemaOperatorId, downstreamParallelism, hashFunctionProvider, false);
+    }
+
+    public RegularPrePartitionOperator(
+            OperatorID schemaOperatorId,
+            int downstreamParallelism,
+            HashFunctionProvider<DataChangeEvent> hashFunctionProvider,
+            boolean requiresPrimaryKeyUpdateSplit) {
         this.chainingStrategy = ChainingStrategy.ALWAYS;
         this.schemaOperatorId = schemaOperatorId;
         this.downstreamParallelism = downstreamParallelism;
         this.hashFunctionProvider = hashFunctionProvider;
+        this.requiresPrimaryKeyUpdateSplit = requiresPrimaryKeyUpdateSplit;
     }
 
     @Override
@@ -79,7 +91,7 @@ public class RegularPrePartitionOperator extends AbstractStreamOperatorAdapter<P
         TaskOperatorEventGateway toCoordinator =
                 getContainingTask().getEnvironment().getOperatorCoordinatorEventGateway();
         schemaEvolutionClient = new SchemaEvolutionClient(toCoordinator, schemaOperatorId);
-        cachedHashFunctions = createCache();
+        cachedPartitioningFunctions = createCache();
     }
 
     @Override
@@ -88,7 +100,7 @@ public class RegularPrePartitionOperator extends AbstractStreamOperatorAdapter<P
         if (event instanceof SchemaChangeEvent) {
             // Update hash function
             TableId tableId = ((SchemaChangeEvent) event).tableId();
-            cachedHashFunctions.put(tableId, recreateHashFunction(tableId));
+            cachedPartitioningFunctions.put(tableId, recreatePartitioningFunctions(tableId));
             // Broadcast SchemaChangeEvent
             broadcastEvent(event);
         } else if (event instanceof FlushEvent) {
@@ -101,14 +113,16 @@ public class RegularPrePartitionOperator extends AbstractStreamOperatorAdapter<P
     }
 
     private void partitionBy(DataChangeEvent dataChangeEvent) throws Exception {
-        output.collect(
-                new StreamRecord<>(
-                        PartitioningEvent.ofRegular(
-                                dataChangeEvent,
-                                cachedHashFunctions
-                                                .get(dataChangeEvent.tableId())
-                                                .hashcode(dataChangeEvent)
-                                        % downstreamParallelism)));
+        PartitioningFunctions functions =
+                cachedPartitioningFunctions.get(dataChangeEvent.tableId());
+        for (DataChangeEvent event : functions.split(dataChangeEvent)) {
+            output.collect(
+                    new StreamRecord<>(
+                            PartitioningEvent.ofRegular(
+                                    event,
+                                    functions.hashFunction.hashcode(event)
+                                            % downstreamParallelism)));
+        }
     }
 
     private void broadcastEvent(Event toBroadcast) {
@@ -136,20 +150,38 @@ public class RegularPrePartitionOperator extends AbstractStreamOperatorAdapter<P
         return schema.get();
     }
 
-    private HashFunction<DataChangeEvent> recreateHashFunction(TableId tableId) {
-        return hashFunctionProvider.getHashFunction(tableId, loadLatestSchemaFromRegistry(tableId));
+    private PartitioningFunctions recreatePartitioningFunctions(TableId tableId) {
+        Schema schema = loadLatestSchemaFromRegistry(tableId);
+        return new PartitioningFunctions(
+                hashFunctionProvider.getHashFunction(tableId, schema),
+                requiresPrimaryKeyUpdateSplit ? new PrimaryKeyUpdateSplitter(schema) : null);
     }
 
-    private LoadingCache<TableId, HashFunction<DataChangeEvent>> createCache() {
+    private LoadingCache<TableId, PartitioningFunctions> createCache() {
         return CacheBuilder.newBuilder()
                 .expireAfterAccess(CACHE_EXPIRE_DURATION)
                 .build(
-                        new CacheLoader<TableId, HashFunction<DataChangeEvent>>() {
+                        new CacheLoader<TableId, PartitioningFunctions>() {
                             @Override
-                            public HashFunction<DataChangeEvent> load(TableId key) {
-                                return recreateHashFunction(key);
+                            public PartitioningFunctions load(TableId key) {
+                                return recreatePartitioningFunctions(key);
                             }
                         });
+    }
+
+    private static final class PartitioningFunctions {
+        private final HashFunction<DataChangeEvent> hashFunction;
+        private final PrimaryKeyUpdateSplitter splitter;
+
+        private PartitioningFunctions(
+                HashFunction<DataChangeEvent> hashFunction, PrimaryKeyUpdateSplitter splitter) {
+            this.hashFunction = hashFunction;
+            this.splitter = splitter;
+        }
+
+        private List<DataChangeEvent> split(DataChangeEvent event) {
+            return splitter == null ? Collections.singletonList(event) : splitter.split(event);
+        }
     }
 
     @Override

@@ -35,7 +35,9 @@ import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 
 import java.io.Serializable;
 import java.time.Duration;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -53,21 +55,32 @@ public class BatchRegularPrePartitionOperator
 
     private final int downstreamParallelism;
     private final HashFunctionProvider<DataChangeEvent> hashFunctionProvider;
+    private final boolean requiresPrimaryKeyUpdateSplit;
 
     private transient Map<TableId, HashFunction<DataChangeEvent>> cachedHashFunctions;
+    private transient Map<TableId, PrimaryKeyUpdateSplitter> primaryKeyUpdateSplitters;
     private transient volatile Map<TableId, Schema> originalSchemaMap;
 
     public BatchRegularPrePartitionOperator(
             int downstreamParallelism, HashFunctionProvider<DataChangeEvent> hashFunctionProvider) {
+        this(downstreamParallelism, hashFunctionProvider, false);
+    }
+
+    public BatchRegularPrePartitionOperator(
+            int downstreamParallelism,
+            HashFunctionProvider<DataChangeEvent> hashFunctionProvider,
+            boolean requiresPrimaryKeyUpdateSplit) {
         this.chainingStrategy = ChainingStrategy.ALWAYS;
         this.downstreamParallelism = downstreamParallelism;
         this.hashFunctionProvider = hashFunctionProvider;
+        this.requiresPrimaryKeyUpdateSplit = requiresPrimaryKeyUpdateSplit;
     }
 
     @Override
     public void open() throws Exception {
         super.open();
         cachedHashFunctions = new HashMap<>();
+        primaryKeyUpdateSplitters = new HashMap<>();
         originalSchemaMap = new HashMap<>();
     }
 
@@ -80,6 +93,10 @@ public class BatchRegularPrePartitionOperator
             TableId tableId = createTableEvent.tableId();
             originalSchemaMap.put(tableId, createTableEvent.getSchema());
             cachedHashFunctions.put(tableId, recreateHashFunction(tableId));
+            if (requiresPrimaryKeyUpdateSplit) {
+                primaryKeyUpdateSplitters.put(
+                        tableId, new PrimaryKeyUpdateSplitter(createTableEvent.getSchema()));
+            }
             // Broadcast CreateTableEvent
             broadcastEvent(event);
         } else if (event instanceof DataChangeEvent) {
@@ -89,14 +106,20 @@ public class BatchRegularPrePartitionOperator
     }
 
     private void partitionBy(DataChangeEvent dataChangeEvent) throws Exception {
-        output.collect(
-                new StreamRecord<>(
-                        PartitioningEvent.ofRegular(
-                                dataChangeEvent,
-                                cachedHashFunctions
-                                                .get(dataChangeEvent.tableId())
-                                                .hashcode(dataChangeEvent)
-                                        % downstreamParallelism)));
+        List<DataChangeEvent> events =
+                requiresPrimaryKeyUpdateSplit
+                        ? primaryKeyUpdateSplitters
+                                .get(dataChangeEvent.tableId())
+                                .split(dataChangeEvent)
+                        : Collections.singletonList(dataChangeEvent);
+        for (DataChangeEvent event : events) {
+            output.collect(
+                    new StreamRecord<>(
+                            PartitioningEvent.ofRegular(
+                                    event,
+                                    cachedHashFunctions.get(event.tableId()).hashcode(event)
+                                            % downstreamParallelism)));
+        }
     }
 
     private void broadcastEvent(Event toBroadcast) {

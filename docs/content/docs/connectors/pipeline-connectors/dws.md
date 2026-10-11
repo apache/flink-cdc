@@ -26,313 +26,142 @@ under the License.
 
 # GaussDB DWS Connector
 
-The GaussDB DWS connector is a pipeline sink connector that writes Flink CDC events to Huawei Cloud GaussDB(DWS).
-This document describes how to set up the GaussDB DWS pipeline sink connector.
+The GaussDB DWS pipeline sink writes Flink CDC events through the official DWS client. The default `auto` mode lets that client choose UPSERT or COPY-based execution for each supported batch. Target tables must have primary keys.
 
-The sink uses SinkV2 staging tables for application-level two-phase commit. Records are first written to checkpoint-scoped staging tables and then committed into target tables by the committer. Data change events require primary keys so staged rows can be merged idempotently.
+The sink provides at-least-once recovery and final convergence when the source is replayable. It does not provide checkpoint-transaction visibility or exactly-once delivery. A checkpoint flushes the official client before writer state is snapshotted.
 
 ## Example
 
-The following example shows how to write data from a Values source to GaussDB DWS:
-
 ```yaml
 source:
-   type: values
-   name: Values Source
+  type: values
+  name: Values Source
 
 sink:
-   type: dws
-   name: GaussDB DWS Sink
-   jdbc-url: jdbc:gaussdb://127.0.0.1:8000/postgres
-   username: gaussdb
-   password: password
-   schema: public
-   sink.enable-delete: true
+  type: dws
+  name: GaussDB DWS Sink
+  jdbc-url: jdbc:gaussdb://127.0.0.1:8000/postgres?connectTimeout=10&socketTimeout=60
+  username: gaussdb
+  password: INJECT_WITH_APPROVED_SECRET_MECHANISM
+  schema: public
+  sink.enable-delete: true
+  write-mode: auto
+  auto-batch-flush-size: 30000
+  auto-flush-max-interval: 3s
+  dws.client.write.force-flush-size: 40000
+  dws.client.write.buffer.all-max-bytes: 128MiB
+  dws.client.write.buffer.table-max-bytes: 64MiB
+  dws.client.write.buffer.partition-max-bytes: 32MiB
 
 pipeline:
-   name: Values to GaussDB DWS Pipeline
-   parallelism: 1
+  name: Values to GaussDB DWS Pipeline
+  parallelism: 4
 ```
+
+The password example is a placeholder. Supply credentials through the deployment platform's approved secret mechanism; the pipeline parser does not promise environment-variable expansion.
 
 ## Connector Options
 
-<div class="highlight">
-<table class="colwidths-auto docutils">
-    <thead>
-      <tr>
-        <th class="text-left" style="width: 10%">Option</th>
-        <th class="text-left" style="width: 8%">Required</th>
-        <th class="text-left" style="width: 7%">Default</th>
-        <th class="text-left" style="width: 10%">Type</th>
-        <th class="text-left" style="width: 65%">Description</th>
-      </tr>
-    </thead>
-    <tbody>
-    <tr>
-      <td>type</td>
-      <td>required</td>
-      <td style="word-wrap: break-word;">(none)</td>
-      <td>String</td>
-      <td>Specify the sink to use. For GaussDB DWS, set this option to <code>dws</code>.</td>
-    </tr>
-    <tr>
-      <td>jdbc-url</td>
-      <td>required</td>
-      <td style="word-wrap: break-word;">(none)</td>
-      <td>String</td>
-      <td>GaussDB DWS JDBC URL. The target database must be specified in this URL.</td>
-    </tr>
-    <tr>
-      <td>username</td>
-      <td>required</td>
-      <td style="word-wrap: break-word;">(none)</td>
-      <td>String</td>
-      <td>Name of the GaussDB DWS user used to connect to the database.</td>
-    </tr>
-    <tr>
-      <td>password</td>
-      <td>required</td>
-      <td style="word-wrap: break-word;">(none)</td>
-      <td>String</td>
-      <td>Password of the GaussDB DWS user used to connect to the database.</td>
-    </tr>
-    <tr>
-      <td>schema</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">public</td>
-      <td>String</td>
-      <td>Default target schema used when incoming table identifiers do not contain a schema.</td>
-    </tr>
-    <tr>
-      <td>sink-table</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">(none)</td>
-      <td>String</td>
-      <td>Optional target table name override passed to the native DWS client.</td>
-    </tr>
-    <tr>
-      <td>driver</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">com.huawei.gauss200.jdbc.Driver</td>
-      <td>String</td>
-      <td>GaussDB DWS JDBC driver class.</td>
-    </tr>
-    <tr>
-      <td>case-sensitive</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">true</td>
-      <td>Boolean</td>
-      <td>Whether target identifiers preserve case. When disabled, identifiers are normalized to lower case.</td>
-    </tr>
-    <tr>
-      <td>write-mode</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">(none)</td>
-      <td>String</td>
-      <td>Compatibility option. The SinkV2 staging-table writer commits by primary-key merge and does not use native DWS write modes.</td>
-    </tr>
-    <tr>
-      <td>sink.enable-delete</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">true</td>
-      <td>Boolean</td>
-      <td>Whether DELETE events are forwarded to the sink.</td>
-    </tr>
-    <tr>
-      <td>sink.max-retries</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">3</td>
-      <td>Integer</td>
-      <td>Compatibility option for native DWS client retries. SinkV2 commit retries are handled by Flink's committer retry mechanism.</td>
-    </tr>
-    <tr>
-      <td>sink.parallelism</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">(none)</td>
-      <td>Integer</td>
-      <td>Custom sink parallelism. If unset, the planner derives it automatically.</td>
-    </tr>
-    <tr>
-      <td>enable-auto-flush</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">true</td>
-      <td>Boolean</td>
-      <td>Compatibility option. The SinkV2 staging-table writer flushes staged records during checkpoint commit.</td>
-    </tr>
-    <tr>
-      <td>auto-batch-flush-size</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">50000</td>
-      <td>Integer</td>
-      <td>Compatibility option for the native DWS client automatic flush threshold.</td>
-    </tr>
-    <tr>
-      <td>auto-flush-max-interval</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">3 min</td>
-      <td>Duration</td>
-      <td>Compatibility option for the native DWS client automatic flush interval.</td>
-    </tr>
-    <tr>
-      <td>enable-dn-partition</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">false</td>
-      <td>Boolean</td>
-      <td>Whether Huawei DN partitioning is enabled.</td>
-    </tr>
-    <tr>
-      <td>distribution-key</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">(none)</td>
-      <td>String</td>
-      <td>Comma-separated distribution keys used for DN partitioning.</td>
-    </tr>
-    <tr>
-      <td>local-time-zone</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">systemDefault</td>
-      <td>String</td>
-      <td>Session time zone used for timestamp conversion.</td>
-    </tr>
-    <tr>
-      <td>connectionSize</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">1</td>
-      <td>Integer</td>
-      <td>Number of connections used by the DWS client.</td>
-    </tr>
-    <tr>
-      <td>connectionMaxUseTimeSeconds</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">3600</td>
-      <td>Integer</td>
-      <td>Maximum lifetime of a connection in seconds.</td>
-    </tr>
-    <tr>
-      <td>connectionMaxIdleMs</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">60000</td>
-      <td>Integer</td>
-      <td>Maximum idle time for a connection in milliseconds.</td>
-    </tr>
-    <tr>
-      <td>connectionTimeOut</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">native default</td>
-      <td>Long</td>
-      <td>Connection timeout in milliseconds.</td>
-    </tr>
-    <tr>
-      <td>connectionPoolName</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">native default</td>
-      <td>String</td>
-      <td>Connection pool name.</td>
-    </tr>
-    <tr>
-      <td>connectionPoolSize</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">native default</td>
-      <td>Integer</td>
-      <td>Connection pool size.</td>
-    </tr>
-    <tr>
-      <td>connectionPoolTimeout</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">native default</td>
-      <td>Long</td>
-      <td>Connection pool timeout in milliseconds.</td>
-    </tr>
-    <tr>
-      <td>connectionSocketTimeout</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">native default</td>
-      <td>Integer</td>
-      <td>Socket timeout in milliseconds.</td>
-    </tr>
-    <tr>
-      <td>connectionMaxUseCount</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">native default</td>
-      <td>Long</td>
-      <td>Maximum number of operations per connection.</td>
-    </tr>
-    <tr>
-      <td>needConnectionPoolMonitor</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">native default</td>
-      <td>Boolean</td>
-      <td>Whether to enable connection pool monitoring.</td>
-    </tr>
-    <tr>
-      <td>connectionPoolMonitorPeriod</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">native default</td>
-      <td>Long</td>
-      <td>Connection pool monitor interval in milliseconds.</td>
-    </tr>
-    <tr>
-      <td>dws.client.write.thread-size</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">3</td>
-      <td>Integer</td>
-      <td>Compatibility option for the native DWS client write worker thread count.</td>
-    </tr>
-    <tr>
-      <td>dws.client.write.use-copy-size</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">1000</td>
-      <td>Integer</td>
-      <td>Compatibility option for the native DWS client COPY mode switch threshold.</td>
-    </tr>
-    <tr>
-      <td>dws.client.write.force-flush-size</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">40000</td>
-      <td>Integer</td>
-      <td>Compatibility option for the native DWS client force flush threshold.</td>
-    </tr>
-    <tr>
-      <td>logSwitch</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">false</td>
-      <td>Boolean</td>
-      <td>Whether to enable DWS client logging.</td>
-    </tr>
-    </tbody>
-</table>
-</div>
+### Connection, naming, and table behavior
+
+| Option | Required | Default | Description |
+| --- | --- | --- | --- |
+| `type` | yes | — | Must be `dws`. |
+| `jdbc-url` | yes | — | `jdbc:gaussdb://` URL including the target database. Existing unrelated query parameters are preserved. Missing `connectTimeout`/`socketTimeout` are added as 10/60 seconds. |
+| `username` / `password` | yes | — | DWS credentials. They are never included in the connector's effective-configuration log. |
+| `schema` | no | `public` | Default schema for table identifiers without an explicit schema. |
+| `case-sensitive` | no | `true` | Preserve identifier case. When `false`, schema, table, column, and key identifiers are normalized to lower case. Embedded quote characters are rejected. |
+| `local-time-zone` | no | pipeline value, then system default | Time zone used for timestamp conversion. |
+| `driver` | no | `com.huawei.gauss200.jdbc.Driver` | This is the only accepted driver. |
+| `sink.enable-delete` | no | `true` | Controls independent DELETE events. Retractions generated for primary-key changes are always executed. |
+| `enable-dn-partition` | no | `false` | Adds DDL distribution semantics. This is not native-client DirectDN mode. |
+| `distribution-key` | no | — | Comma-separated existing columns. Required when DN partitioning is enabled and rejected when it is disabled. |
+
+### Write, retry, and timeout options
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `write-mode` | `auto` | `auto`, `upsert`, `copy_upsert`, or `copy_merge` (case-insensitive). Alias: `dws.client.write.mode`. `auto` is recommended. |
+| `enable-auto-flush` | `true` | Enables normal native batch/time triggers. `false` still retains finite force, connector budget, checkpoint, and schema flushes. |
+| `auto-batch-flush-size` | `30000` | Positive native auto-flush batch size. Alias: `dws.client.write.auto-flush-size`. |
+| `auto-flush-max-interval` | `3s` | Positive native auto-flush interval. Alias: `dws.client.write.auto-flush-max-interval`. |
+| `dws.client.write.thread-size` | `1` | Positive official-client worker count. Raising it only enables client-side cross-table concurrency. |
+| `dws.client.write.use-copy-size` | `1000` | Positive AUTO-to-COPY threshold for compatible same-column batches; it does not guarantee COPY for every type. |
+| `dws.client.write.force-flush-size` | `40000` | Finite safety flush threshold; must be at least the auto batch size when auto flush is enabled. |
+| `sink.max-retries` | `3` | Total attempts, at least 1. Alias: `dws.client.retry.max-times`. |
+| `dws.client.retry.sleep-base-time` | `1s` | Non-negative retry base delay. |
+| `dws.client.retry.sleep-random-time` | `300ms` | Positive retry jitter. |
+| `dws.client.timeout.task` | `10min` | Positive native task timeout; not a hard deadline for the whole flush. |
+| `dws.client.timeout.statement` | `5min` | Positive DWS statement timeout. |
+
+If a primary option and its alias are both present, their normalized values must be equal. Conflicts fail during connector creation instead of being silently overwritten.
+
+### Buffer budgets
+
+| Option | Default | Scope |
+| --- | --- | --- |
+| `dws.client.write.buffer.all-max-bytes` | `128MiB` | Estimated total buffered bytes per sink writer/client. |
+| `dws.client.write.buffer.table-max-bytes` | `64MiB` | Estimated bytes per table and writer; must not exceed the all-table budget. |
+| `dws.client.write.buffer.partition-max-bytes` | `32MiB` | Estimated bytes for the connector-fixed native partition; must not exceed the table budget. |
+
+These are conservative accounting budgets, not JVM heap limits. The estimate includes binary values, keys, and container overhead because the native record-size metric omits `byte[]`. A single estimated record above the effective per-table/partition or all-table budget is rejected before native commit. When the next legal record would exceed an accumulated budget, the writer synchronously flushes first and clears counters only after success. The writer does not keep a second copy of records.
+
+### Connection lifetime compatibility
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `connectionMaxUseTimeSeconds` | `3600` | Legacy seconds form. `connectionMaxUseTimeThreshold` is a compatibility synonym; native alias: `dws.client.jdbc.max.use-time` (Duration). |
+| `connectionMaxIdleMs` | `60000` | Legacy milliseconds form; native alias: `dws.client.jdbc.max.idle` (Duration). |
+| `connectionTimeOut` | URL default 10s | Legacy milliseconds form for JDBC `connectTimeout`; an explicit value must be positive and divisible by 1000. |
+| `connectionSocketTimeout` | URL default 60s | Legacy milliseconds form for JDBC `socketTimeout`; an explicit value must be positive and divisible by 1000. |
+
+An existing URL timeout and a legacy option may be supplied together only when they are equal after unit conversion. JDBC connect/socket timeouts do not constitute a global flush deadline.
+
+### Explicitly rejected options
+
+The connector rejects `sink-table` (use pipeline routing), `sink.parallelism` (use `pipeline.parallelism`), `connectionSize` (use `dws.client.write.thread-size`), `logSwitch=true`, all `connectionPool*`/pool-monitor options, `connectionMaxUseCount`, and native partition-policy/min/max overrides. Arbitrary `dws.client.*` pass-through, DirectDN, compare-field, partial-update, and conflict-ignore settings are not supported.
+
+## Delivery, ordering, schema, and observability
+
+- A complete distribution must contain the updated common event model, serializer, runtime partition operators, composer, and DWS connector. Deploying only the connector JAR is unsafe because primary-key-changing UPDATE events use a typed retraction event.
+- The DWS sink opts into primary-key update splitting. The retraction is partitioned by the old key and the insertion by the new key, retaining multiple writers per table and per-key ordering. Other sinks keep their prior event stream. This does not create global ordering across unrelated keys.
+- CREATE and schema-evolution events refresh the official client's table-schema cache before the connector publishes its new converter. DROP removes both caches; TRUNCATE retains schema. Unsupported schema changes fail the pipeline.
+- Mixed-case identifiers are supported according to `case-sensitive`; this is not a promise that every quoted or otherwise illegal identifier is accepted.
+- Flink metrics expose `dws.acceptedRecords`, `dws.flushCount`, `dws.conservativeBufferedBytes`, `dws.lastFlushDurationMillis`, and `dws.firstAsyncFailure`; standard sink metrics expose flush-confirmed sent records/bytes and definite synchronous send errors. “Written” means the synchronous native flush returned, not transactional checkpoint visibility. Native buffer metrics that are unavailable are not synthesized.
 
 ## Data Type Mapping
 
-<div class="wy-table-responsive">
-<table class="colwidths-auto docutils">
-    <thead>
-      <tr>
-        <th class="text-left" style="width:30%;">Flink CDC Type</th>
-        <th class="text-left" style="width:30%;">GaussDB DWS Type</th>
-        <th class="text-left" style="width:40%;">Note</th>
-      </tr>
-    </thead>
-    <tbody>
-    <tr><td>BOOLEAN</td><td>BOOLEAN</td><td></td></tr>
-    <tr><td>TINYINT, SMALLINT</td><td>SMALLINT</td><td></td></tr>
-    <tr><td>INTEGER</td><td>INTEGER</td><td></td></tr>
-    <tr><td>BIGINT</td><td>BIGINT</td><td></td></tr>
-    <tr><td>FLOAT</td><td>REAL</td><td></td></tr>
-    <tr><td>DOUBLE</td><td>DOUBLE PRECISION</td><td></td></tr>
-    <tr><td>DECIMAL</td><td>DECIMAL(p, s)</td><td>Uses the source precision and scale.</td></tr>
-    <tr><td>CHAR</td><td>CHAR(n)</td><td></td></tr>
-    <tr><td>VARCHAR</td><td>VARCHAR(n) or TEXT</td><td>Very large VARCHAR columns are mapped to TEXT.</td></tr>
-    <tr><td>BINARY, VARBINARY</td><td>BYTEA</td><td></td></tr>
-    <tr><td>DATE</td><td>DATE</td><td></td></tr>
-    <tr><td>TIME</td><td>TIME(p)</td><td>Precision is capped at 6.</td></tr>
-    <tr><td>TIMESTAMP</td><td>TIMESTAMP(p)</td><td>Precision is capped at 6.</td></tr>
-    <tr><td>TIMESTAMP_LTZ, TIMESTAMP_TZ</td><td>TIMESTAMPTZ(p)</td><td>Precision is capped at 6.</td></tr>
-    <tr><td>ARRAY</td><td>TEXT</td><td></td></tr>
-    <tr><td>MAP, ROW</td><td>JSON</td><td></td></tr>
-    </tbody>
-</table>
-</div>
+| Flink CDC type | GaussDB DWS type | Notes |
+| --- | --- | --- |
+| BOOLEAN | BOOLEAN | |
+| TINYINT, SMALLINT | SMALLINT | |
+| INTEGER | INTEGER | |
+| BIGINT | BIGINT | |
+| FLOAT | REAL | |
+| DOUBLE | DOUBLE PRECISION | |
+| DECIMAL | DECIMAL(p, s) | Source precision and scale are preserved. |
+| CHAR | CHAR(n) | |
+| VARCHAR | VARCHAR(n) or TEXT | Very large VARCHAR maps to TEXT. |
+| BINARY, VARBINARY | BYTEA | Included in conservative buffer accounting. |
+| DATE | DATE | |
+| TIME | TIME(p) | Maximum precision 6. |
+| TIMESTAMP | TIMESTAMP(p) | Maximum precision 6. |
+| TIMESTAMP_LTZ, TIMESTAMP_TZ | TIMESTAMPTZ(p) | Maximum precision 6. |
+| ARRAY | TEXT | |
+| MAP, ROW | JSON | |
+
+## Migrating from the staging/committer writer
+
+The native-client writer uses a new state protocol and cannot restore a savepoint created by the old staging-table committer. Do not bypass this check with `allowNonRestoredState` or a changed sink operator UID: either can discard unapplied committables.
+
+1. Drain and stop the old job. Retain its artifact, checkpoint/savepoint, source offsets, old target, staging tables, and resource-ownership inventory.
+2. Create an empty target dedicated to the migration.
+3. Run a consistent full snapshot with the new connector, then resume incremental replay while retaining source logs.
+4. Compare every primary key and field, including deletes and primary-key changes, with an independent query.
+5. Switch consumers only after explicit authorization. Retain the old target and replay boundary through the rollback window.
+
+To roll back, stop the new job while preserving diagnostics, then restore the old artifact against the old target and retained source boundary. Neither job may delete resources it does not own; cleanup needs separate authorization.
+
+The native-client route offers at-least-once recovery and convergence on replayable sources. It does not provide checkpoint-transaction visibility or direct state interchange with the old committer.
 
 {{< top >}}

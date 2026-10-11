@@ -30,6 +30,7 @@ import org.apache.flink.api.connector.sink2.WriterInitContext;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.metrics.groups.SinkWriterMetricGroup;
+import org.apache.flink.metrics.groups.UnregisteredMetricsGroup;
 
 import org.junit.jupiter.api.Test;
 
@@ -50,36 +51,41 @@ class DwsSinkTest {
         try {
             assertThat(((DwsWriter) writer).snapshotState(1L))
                     .singleElement()
-                    .satisfies(state -> assertThat(state.getJobId()).startsWith("dws-"));
+                    .isEqualTo(DwsWriterState.nativeClientMarker());
         } finally {
             writer.close();
         }
     }
 
     @Test
-    void testRestoreWriterUsesRestoredJobId() throws Exception {
+    void testRestoreWriterAcceptsEmptyAndMultipleConsistentMarkers() throws Exception {
         DwsSink sink = createSink();
 
         StatefulSinkWriter<Event, DwsWriterState> writer =
                 sink.restoreWriter(
                         new MockWriterInitContext(2, OptionalLong.of(100L)),
-                        Collections.singletonList(new DwsWriterState("restored-job")));
+                        java.util.Arrays.asList(
+                                DwsWriterState.nativeClientMarker(),
+                                DwsWriterState.nativeClientMarker()));
         try {
             assertThat(writer.snapshotState(101L))
                     .singleElement()
-                    .satisfies(state -> assertThat(state.getJobId()).isEqualTo("restored-job"));
+                    .isEqualTo(DwsWriterState.nativeClientMarker());
         } finally {
             writer.close();
         }
+
+        StatefulSinkWriter<Event, DwsWriterState> emptyRestore =
+                sink.restoreWriter(
+                        new MockWriterInitContext(3, OptionalLong.of(102L)),
+                        Collections.emptyList());
+        emptyRestore.close();
     }
 
     @Test
-    void testCreateCommitterAndSerializers() {
+    void testExposesOnlyWriterStateSerializer() {
         DwsSink sink = createSink();
 
-        assertThat(sink.createCommitter()).isInstanceOf(DwsCommitter.class);
-        assertThat(sink.getCommittableSerializer()).isInstanceOf(DwsCommittableSerializer.class);
-        assertThat(sink.getWriteResultSerializer()).isInstanceOf(DwsCommittableSerializer.class);
         assertThat(sink.getWriterStateSerializer()).isInstanceOf(DwsWriterStateSerializer.class);
     }
 
@@ -126,7 +132,7 @@ class DwsSinkTest {
 
         @Override
         public SinkWriterMetricGroup metricGroup() {
-            return null;
+            return UnregisteredMetricsGroup.createSinkWriterMetricGroup();
         }
 
         @Override

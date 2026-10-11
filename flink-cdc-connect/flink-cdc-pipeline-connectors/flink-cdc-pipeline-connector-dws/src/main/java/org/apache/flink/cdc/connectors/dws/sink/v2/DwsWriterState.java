@@ -20,18 +20,29 @@ package org.apache.flink.cdc.connectors.dws.sink.v2;
 
 import java.io.Serializable;
 
-/** Writer state used to keep a stable DWS staging job id across recovery. */
-public class DwsWriterState implements Serializable {
+/** Fixed marker identifying checkpoints written by the official-client sink protocol. */
+public final class DwsWriterState implements Serializable {
 
     private static final long serialVersionUID = 1L;
+    private static final DwsWriterState NATIVE_CLIENT_MARKER = new DwsWriterState();
 
-    private final String jobId;
+    private DwsWriterState() {}
 
-    public DwsWriterState(String jobId) {
-        this.jobId = jobId;
+    public static DwsWriterState nativeClientMarker() {
+        return NATIVE_CLIENT_MARKER;
     }
 
-    public String getJobId() {
-        return jobId;
+    @Override
+    public boolean equals(Object other) {
+        return other instanceof DwsWriterState;
+    }
+
+    @Override
+    public int hashCode() {
+        return DwsWriterState.class.hashCode();
+    }
+
+    private Object readResolve() {
+        return NATIVE_CLIENT_MARKER;
     }
 }

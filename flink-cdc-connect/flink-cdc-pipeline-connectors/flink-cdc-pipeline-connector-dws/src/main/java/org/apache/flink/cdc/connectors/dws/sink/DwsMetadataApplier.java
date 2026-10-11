@@ -44,7 +44,6 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.EnumSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -59,6 +58,7 @@ import static org.apache.flink.cdc.common.event.SchemaChangeEventType.TRUNCATE_T
 import static org.apache.flink.cdc.common.types.DataTypeChecks.getLength;
 import static org.apache.flink.cdc.common.types.DataTypeChecks.getPrecision;
 import static org.apache.flink.cdc.common.types.DataTypeChecks.getScale;
+import static org.apache.flink.cdc.connectors.dws.utils.DwsUtils.normalizeIdentifier;
 
 /** Applies schema evolution events to GaussDB DWS through JDBC DDL statements. */
 public class DwsMetadataApplier implements MetadataApplier, Serializable {
@@ -182,7 +182,7 @@ public class DwsMetadataApplier implements MetadataApplier, Serializable {
                                 "CREATE TABLE IF NOT EXISTS %s (%s)",
                                 formatTableIdentifier(tableId),
                                 String.join(", ", columnDefinitions)));
-        String distributionClause = buildDistributionClause();
+        String distributionClause = buildDistributionClause(schema);
         if (distributionClause != null) {
             sql.append(' ').append(distributionClause);
         }
@@ -306,31 +306,37 @@ public class DwsMetadataApplier implements MetadataApplier, Serializable {
         return quoteIdentifier(schemaName) + "." + quoteIdentifier(tableId.getTableName());
     }
 
-    private String buildDistributionClause() {
+    private String buildDistributionClause(Schema schema) {
         if (!enableDnPartition || distributionKey == null || distributionKey.trim().isEmpty()) {
             return null;
         }
 
-        String quotedDistributionKeys =
-                java.util.Arrays.stream(distributionKey.split(","))
+        List<String> normalizedColumns =
+                schema.getColumnNames().stream()
+                        .map(name -> normalizeIdentifier(name, caseSensitive))
+                        .collect(Collectors.toList());
+        List<String> distributionKeys =
+                java.util.Arrays.stream(distributionKey.split(",", -1))
                         .map(String::trim)
-                        .filter(key -> !key.isEmpty())
-                        .map(this::quoteIdentifier)
-                        .collect(Collectors.joining(", "));
-        if (quotedDistributionKeys.isEmpty()) {
-            return null;
+                        .collect(Collectors.toList());
+        if (distributionKeys.stream().anyMatch(String::isEmpty)) {
+            throw new IllegalArgumentException("distribution-key contains an empty column name.");
         }
-        return "DISTRIBUTE BY HASH (" + quotedDistributionKeys + ")";
+        for (String key : distributionKeys) {
+            if (!normalizedColumns.contains(normalizeIdentifier(key, caseSensitive))) {
+                throw new IllegalArgumentException(
+                        "Distribution key column does not exist in the target schema: " + key);
+            }
+        }
+        return "DISTRIBUTE BY HASH ("
+                + distributionKeys.stream()
+                        .map(this::quoteIdentifier)
+                        .collect(Collectors.joining(", "))
+                + ")";
     }
 
     private String quoteIdentifier(String identifier) {
-        String normalized = normalizeIdentifier(identifier);
-        return '"' + normalized.replace("\"", "\"\"") + '"';
-    }
-
-    private String normalizeIdentifier(String identifier) {
-        String value = identifier.trim();
-        return caseSensitive ? value : value.toLowerCase(Locale.ROOT);
+        return '"' + normalizeIdentifier(identifier, caseSensitive) + '"';
     }
 
     private String toDwsType(DataType type) {

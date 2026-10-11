@@ -23,61 +23,36 @@ import org.apache.flink.cdc.common.sink.FlinkSinkProvider;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.connectors.dws.sink.v2.DwsSink;
 
-import com.huaweicloud.dws.connectors.flink.config.DwsConnectionOptions;
-
 import java.io.Serializable;
-import java.time.ZoneId;
 
 /** A {@link DataSink} for the GaussDB DWS pipeline connector. */
 public class DwsDataSink implements DataSink, Serializable {
 
-    private final DwsConnectionOptions connectorOptions;
-    private final ZoneId zoneId;
-    private final boolean caseSensitive;
-    private final String defaultSchema;
-    private final boolean enableDelete;
-    private final boolean enableDnPartition;
-    private final String distributionKey;
+    private final DwsDataSinkConfig sinkConfig;
 
-    public DwsDataSink(
-            DwsConnectionOptions connectorOptions,
-            ZoneId zoneId,
-            boolean caseSensitive,
-            String defaultSchema,
-            boolean enableDelete,
-            boolean enableDnPartition,
-            String distributionKey) {
-        this.connectorOptions = connectorOptions;
-        this.zoneId = zoneId;
-        this.caseSensitive = caseSensitive;
-        this.defaultSchema = defaultSchema;
-        this.enableDelete = enableDelete;
-        this.enableDnPartition = enableDnPartition;
-        this.distributionKey = distributionKey;
+    public DwsDataSink(DwsDataSinkConfig sinkConfig) {
+        this.sinkConfig = sinkConfig;
     }
 
     @Override
     public EventSinkProvider getEventSinkProvider() {
-        return FlinkSinkProvider.of(
-                new DwsSink(
-                        connectorOptions.getUrl(),
-                        connectorOptions.getUsername(),
-                        connectorOptions.getPassword(),
-                        zoneId,
-                        caseSensitive,
-                        defaultSchema,
-                        enableDelete));
+        return FlinkSinkProvider.of(new DwsSink(sinkConfig));
     }
 
     @Override
     public MetadataApplier getMetadataApplier() {
         return new DwsMetadataApplier(
-                connectorOptions.getUrl(),
-                connectorOptions.getUsername(),
-                connectorOptions.getPassword(),
-                caseSensitive,
-                defaultSchema,
-                enableDnPartition,
-                distributionKey);
+                sinkConfig.getUrl(),
+                sinkConfig.getUsername(),
+                sinkConfig.getPassword(),
+                sinkConfig.isCaseSensitive(),
+                sinkConfig.getDefaultSchema(),
+                sinkConfig.isEnableDnPartition(),
+                sinkConfig.getDistributionKey());
+    }
+
+    @Override
+    public boolean requiresPrimaryKeyUpdateSplit() {
+        return true;
     }
 }

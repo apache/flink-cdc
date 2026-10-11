@@ -35,7 +35,9 @@ import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 
 import java.io.Serializable;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /** Operator for processing events from upstream before flowing to {@link SchemaOperator}. */
@@ -47,18 +49,28 @@ public class DistributedPrePartitionOperator
 
     private final int downstreamParallelism;
     private final HashFunctionProvider<DataChangeEvent> hashFunctionProvider;
+    private final boolean requiresPrimaryKeyUpdateSplit;
 
     // Schema and HashFunctionMap used in schema inferencing mode.
     private transient Map<TableId, Schema> schemaMap;
     private transient Map<TableId, HashFunction<DataChangeEvent>> hashFunctionMap;
+    private transient Map<TableId, PrimaryKeyUpdateSplitter> primaryKeyUpdateSplitterMap;
 
     private transient int subTaskId;
 
     public DistributedPrePartitionOperator(
             int downstreamParallelism, HashFunctionProvider<DataChangeEvent> hashFunctionProvider) {
+        this(downstreamParallelism, hashFunctionProvider, false);
+    }
+
+    public DistributedPrePartitionOperator(
+            int downstreamParallelism,
+            HashFunctionProvider<DataChangeEvent> hashFunctionProvider,
+            boolean requiresPrimaryKeyUpdateSplit) {
         this.chainingStrategy = ChainingStrategy.ALWAYS;
         this.downstreamParallelism = downstreamParallelism;
         this.hashFunctionProvider = hashFunctionProvider;
+        this.requiresPrimaryKeyUpdateSplit = requiresPrimaryKeyUpdateSplit;
     }
 
     @Override
@@ -67,6 +79,7 @@ public class DistributedPrePartitionOperator
         subTaskId = getRuntimeContext().getTaskInfo().getIndexOfThisSubtask();
         schemaMap = new HashMap<>();
         hashFunctionMap = new HashMap<>();
+        primaryKeyUpdateSplitterMap = new HashMap<>();
     }
 
     @Override
@@ -84,6 +97,10 @@ public class DistributedPrePartitionOperator
 
             // Update hash function
             hashFunctionMap.put(tableId, recreateHashFunction(tableId));
+            if (requiresPrimaryKeyUpdateSplit) {
+                primaryKeyUpdateSplitterMap.put(
+                        tableId, new PrimaryKeyUpdateSplitter(schemaMap.get(tableId)));
+            }
 
             // Broadcast SchemaChangeEvent
             broadcastEvent(event);
@@ -97,15 +114,21 @@ public class DistributedPrePartitionOperator
     }
 
     private void partitionBy(DataChangeEvent dataChangeEvent) {
-        output.collect(
-                new StreamRecord<>(
-                        PartitioningEvent.ofDistributed(
-                                dataChangeEvent,
-                                subTaskId,
-                                hashFunctionMap
-                                                .get(dataChangeEvent.tableId())
-                                                .hashcode(dataChangeEvent)
-                                        % downstreamParallelism)));
+        List<DataChangeEvent> events =
+                requiresPrimaryKeyUpdateSplit
+                        ? primaryKeyUpdateSplitterMap
+                                .get(dataChangeEvent.tableId())
+                                .split(dataChangeEvent)
+                        : Collections.singletonList(dataChangeEvent);
+        for (DataChangeEvent event : events) {
+            output.collect(
+                    new StreamRecord<>(
+                            PartitioningEvent.ofDistributed(
+                                    event,
+                                    subTaskId,
+                                    hashFunctionMap.get(event.tableId()).hashcode(event)
+                                            % downstreamParallelism)));
+        }
     }
 
     private void broadcastEvent(Event toBroadcast) {

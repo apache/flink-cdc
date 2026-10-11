@@ -115,9 +115,7 @@ public class DwsSinkTestBase extends TestLogger {
     public static void createDatabase(String databaseName) {
         try {
             LOG.info("Attempting to create database: {}", databaseName);
-            LOG.info("Container JDBC URL: {}", DWS_CONTAINER.getJdbcUrl(databaseName));
-            LOG.info("Container Username: {}", DWS_CONTAINER.getUsername());
-            LOG.info("Container Password: {}", DWS_CONTAINER.getPassword());
+            LOG.info("Using isolated DWS test container connection");
 
             try (Connection conn = createDatabaseConnection(DwsContainer.DWS_DATABASE);
                     java.sql.Statement stmt = conn.createStatement()) {

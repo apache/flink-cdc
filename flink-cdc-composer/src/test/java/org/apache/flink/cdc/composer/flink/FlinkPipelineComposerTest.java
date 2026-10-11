@@ -50,11 +50,30 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Stream;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** A test for the {@link FlinkPipelineComposer}. */
 class FlinkPipelineComposerTest {
+
+    @Test
+    void testDataSinksOptOutOfPrimaryKeyUpdateSplittingByDefault() {
+        DataSink sink =
+                new DataSink() {
+                    @Override
+                    public EventSinkProvider getEventSinkProvider() {
+                        return null;
+                    }
+
+                    @Override
+                    public MetadataApplier getMetadataApplier() {
+                        return schemaChangeEvent -> {};
+                    }
+                };
+
+        assertThat(sink.requiresPrimaryKeyUpdateSplit()).isFalse();
+    }
 
     @Test
     void testCreateDataSinkFromSinkDef() {

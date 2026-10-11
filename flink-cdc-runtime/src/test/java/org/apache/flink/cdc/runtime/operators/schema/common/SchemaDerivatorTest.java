@@ -20,6 +20,7 @@ package org.apache.flink.cdc.runtime.operators.schema.common;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
+import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
@@ -130,6 +131,33 @@ public class SchemaDerivatorTest extends SchemaTestBase {
                 Arrays.stream(events).collect(Collectors.toList()),
                 behavior,
                 MOCKED_METADATA_APPLIER);
+    }
+
+    @Test
+    void testCoerceUpdateBeforePreservesOperationAndMetadata() {
+        Schema upstreamSchema = Schema.newBuilder().physicalColumn("id", DataTypes.INT()).build();
+        Schema evolvedSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.BIGINT())
+                        .physicalColumn("note", DataTypes.STRING())
+                        .build();
+        DataChangeEvent updateBefore =
+                DataChangeEvent.updateBeforeEvent(
+                        NORMALIZE_TEST_TABLE_ID,
+                        genBinRec("i", 7),
+                        Collections.singletonMap("trace-id", "split-1"));
+
+        DataChangeEvent coerced =
+                new SchemaDerivator()
+                        .coerceDataRecord("UTC", updateBefore, upstreamSchema, evolvedSchema)
+                        .orElseThrow(AssertionError::new);
+
+        assertThat(coerced)
+                .isEqualTo(
+                        DataChangeEvent.updateBeforeEvent(
+                                NORMALIZE_TEST_TABLE_ID,
+                                genBinRec("ls", 7L, null),
+                                Collections.singletonMap("trace-id", "split-1")));
     }
 
     @Test

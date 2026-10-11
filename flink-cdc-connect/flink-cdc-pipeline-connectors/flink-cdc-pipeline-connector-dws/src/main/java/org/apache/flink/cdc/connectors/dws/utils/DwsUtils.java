@@ -26,6 +26,7 @@ import org.apache.flink.cdc.common.data.StringData;
 import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.ZonedTimestampData;
+import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.ZonedTimestampType;
 
@@ -41,6 +42,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import static org.apache.flink.cdc.common.types.DataTypeChecks.getFieldCount;
@@ -60,6 +62,33 @@ public final class DwsUtils {
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private DwsUtils() {}
+
+    public static String normalizeIdentifier(String identifier, boolean caseSensitive) {
+        if (identifier == null) {
+            throw new IllegalArgumentException("DWS identifier must not be null.");
+        }
+        String normalized = identifier.trim();
+        if (normalized.isEmpty()) {
+            throw new IllegalArgumentException("DWS identifier must not be empty.");
+        }
+        if (normalized.indexOf('"') >= 0) {
+            throw new IllegalArgumentException(
+                    "DWS identifiers containing an embedded quote are not supported: "
+                            + identifier);
+        }
+        return caseSensitive ? normalized : normalized.toLowerCase(Locale.ROOT);
+    }
+
+    public static String formatNativeTableName(
+            TableId tableId, String defaultSchema, boolean caseSensitive) {
+        String schema = tableId.getSchemaName();
+        if (schema == null || schema.trim().isEmpty()) {
+            schema = defaultSchema;
+        }
+        return normalizeIdentifier(schema, caseSensitive)
+                + "."
+                + normalizeIdentifier(tableId.getTableName(), caseSensitive);
+    }
 
     public static RecordData.FieldGetter createFieldGetter(
             DataType fieldType, int fieldPos, ZoneId zoneId) {

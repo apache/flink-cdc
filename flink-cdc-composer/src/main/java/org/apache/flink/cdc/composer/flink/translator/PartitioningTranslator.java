@@ -54,6 +54,7 @@ public class PartitioningTranslator {
                 upstreamParallelism,
                 downstreamParallelism,
                 false,
+                false,
                 schemaOperatorID,
                 hashFunctionProvider,
                 operatorUidGenerator);
@@ -67,17 +68,40 @@ public class PartitioningTranslator {
             OperatorID schemaOperatorID,
             HashFunctionProvider<DataChangeEvent> hashFunctionProvider,
             OperatorUidGenerator operatorUidGenerator) {
+        return translateRegular(
+                input,
+                upstreamParallelism,
+                downstreamParallelism,
+                isBatchMode,
+                false,
+                schemaOperatorID,
+                hashFunctionProvider,
+                operatorUidGenerator);
+    }
+
+    public DataStream<Event> translateRegular(
+            DataStream<Event> input,
+            int upstreamParallelism,
+            int downstreamParallelism,
+            boolean isBatchMode,
+            boolean requiresPrimaryKeyUpdateSplit,
+            OperatorID schemaOperatorID,
+            HashFunctionProvider<DataChangeEvent> hashFunctionProvider,
+            OperatorUidGenerator operatorUidGenerator) {
         SingleOutputStreamOperator<Event> singleOutputStreamOperator =
                 input.transform(
                                 isBatchMode ? "BatchPrePartition" : "PrePartition",
                                 new PartitioningEventTypeInfo(),
                                 isBatchMode
                                         ? new BatchRegularPrePartitionOperator(
-                                                downstreamParallelism, hashFunctionProvider)
+                                                downstreamParallelism,
+                                                hashFunctionProvider,
+                                                requiresPrimaryKeyUpdateSplit)
                                         : new RegularPrePartitionOperator(
                                                 schemaOperatorID,
                                                 downstreamParallelism,
-                                                hashFunctionProvider))
+                                                hashFunctionProvider,
+                                                requiresPrimaryKeyUpdateSplit))
                         .uid(operatorUidGenerator.generateUid("pre-partition"))
                         .setParallelism(upstreamParallelism)
                         .partitionCustom(new EventPartitioner(), new PartitioningEventKeySelector())
@@ -94,11 +118,23 @@ public class PartitioningTranslator {
             int upstreamParallelism,
             int downstreamParallelism,
             HashFunctionProvider<DataChangeEvent> hashFunctionProvider) {
+        return translateDistributed(
+                input, upstreamParallelism, downstreamParallelism, hashFunctionProvider, false);
+    }
+
+    public DataStream<PartitioningEvent> translateDistributed(
+            DataStream<Event> input,
+            int upstreamParallelism,
+            int downstreamParallelism,
+            HashFunctionProvider<DataChangeEvent> hashFunctionProvider,
+            boolean requiresPrimaryKeyUpdateSplit) {
         return input.transform(
                         "Partitioning",
                         new PartitioningEventTypeInfo(),
                         new DistributedPrePartitionOperator(
-                                downstreamParallelism, hashFunctionProvider))
+                                downstreamParallelism,
+                                hashFunctionProvider,
+                                requiresPrimaryKeyUpdateSplit))
                 .setParallelism(upstreamParallelism)
                 .partitionCustom(new EventPartitioner(), new PartitioningEventKeySelector());
     }

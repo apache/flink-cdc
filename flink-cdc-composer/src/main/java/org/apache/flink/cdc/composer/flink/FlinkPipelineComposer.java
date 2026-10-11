@@ -208,7 +208,8 @@ public class FlinkPipelineComposer implements PipelineComposer {
                             stream,
                             parallelism,
                             parallelism,
-                            dataSink.getDataChangeEventHashFunctionProvider(parallelism));
+                            dataSink.getDataChangeEventHashFunctionProvider(parallelism),
+                            dataSink.requiresPrimaryKeyUpdateSplit());
 
             // Partitioning -> Schema Operator
             stream =
@@ -246,6 +247,7 @@ public class FlinkPipelineComposer implements PipelineComposer {
                             parallelism,
                             parallelism,
                             isBatchMode,
+                            dataSink.requiresPrimaryKeyUpdateSplit(),
                             schemaOperatorIDGenerator.generate(),
                             dataSink.getDataChangeEventHashFunctionProvider(parallelism),
                             operatorUidGenerator);
