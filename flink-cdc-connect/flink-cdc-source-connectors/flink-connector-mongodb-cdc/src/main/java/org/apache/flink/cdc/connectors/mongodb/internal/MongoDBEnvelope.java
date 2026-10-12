@@ -148,7 +148,8 @@ public class MongoDBEnvelope {
 
     public static String encodeValue(String value) {
         try {
-            return URLEncoder.encode(value, StandardCharsets.UTF_8.name());
+            return URLEncoder.encode(value, StandardCharsets.UTF_8.name())
+                    .replace("+", "%20");
         } catch (UnsupportedEncodingException e) {
             throw new IllegalArgumentException(e);
         }
