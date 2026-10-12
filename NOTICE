@@ -19,6 +19,7 @@ See bundled license files for details.
 The Flink CDC binary distributions bundle the following dependencies under the MIT license.
 See bundled license files for details.
 
+- Argparse4j
 - Microsoft JDBC Driver for SQL Server
 - SLF4J
 - Uber Tally
@@ -30,6 +31,8 @@ See bundled license files for details.
 - Janino and Commons Compiler
 - Kryo and MinLog
 - Protocol Buffers
+- Reflections
+- ThreeTen-Extra
 - TreeLayout
 - zstd-jni
 
@@ -75,6 +78,7 @@ See bundled license files for details.
 - JCommander
 - Javalin
 - Javassist
+- Joda-Time
 - JSqlParser
 - Kotlin standard library and reflection
 - LMAX Disruptor
@@ -103,6 +107,7 @@ See bundled license files for details.
 The Flink CDC binary distributions bundle the following dependencies under the Eclipse Distribution License, Version 1.0.
 See bundled license files for details.
 
+- Eclipse Collections
 - Jakarta XML Binding
 - JTS Topology Suite
 
