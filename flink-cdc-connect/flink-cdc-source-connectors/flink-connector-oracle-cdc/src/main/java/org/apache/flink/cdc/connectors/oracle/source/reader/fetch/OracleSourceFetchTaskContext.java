@@ -21,7 +21,7 @@ import org.apache.flink.cdc.connectors.base.WatermarkDispatcher;
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
 import org.apache.flink.cdc.connectors.base.dialect.JdbcDataSourceDialect;
 import org.apache.flink.cdc.connectors.base.relational.JdbcSourceEventDispatcher;
-import org.apache.flink.cdc.connectors.base.source.EmbeddedFlinkDatabaseHistory;
+import org.apache.flink.cdc.connectors.base.source.EmbeddedFlinkSchemaHistory;
 import org.apache.flink.cdc.connectors.base.source.meta.offset.Offset;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.reader.external.JdbcSourceFetchTaskContext;
@@ -36,20 +36,21 @@ import org.apache.flink.cdc.connectors.oracle.util.ChunkUtils;
 import org.apache.flink.table.types.logical.RowType;
 
 import io.debezium.connector.base.ChangeEventQueue;
+import io.debezium.connector.oracle.AbstractOracleStreamingChangeEventSourceMetrics;
 import io.debezium.connector.oracle.OracleChangeEventSourceMetricsFactory;
 import io.debezium.connector.oracle.OracleConnectorConfig;
 import io.debezium.connector.oracle.OracleDatabaseSchema;
 import io.debezium.connector.oracle.OracleErrorHandler;
 import io.debezium.connector.oracle.OracleOffsetContext;
 import io.debezium.connector.oracle.OraclePartition;
-import io.debezium.connector.oracle.OracleStreamingChangeEventSourceMetrics;
 import io.debezium.connector.oracle.OracleTaskContext;
-import io.debezium.connector.oracle.OracleTopicSelector;
 import io.debezium.connector.oracle.SourceInfo;
-import io.debezium.connector.oracle.logminer.LogMinerOracleOffsetContextLoader;
+import io.debezium.connector.oracle.logminer.LogMinerStreamingChangeEventSourceMetrics;
+import io.debezium.connector.oracle.logminer.buffered.BufferedLogMinerOracleOffsetContextLoader;
 import io.debezium.data.Envelope;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.ErrorHandler;
+import io.debezium.pipeline.metrics.CapturedTablesSupplier;
 import io.debezium.pipeline.metrics.SnapshotChangeEventSourceMetrics;
 import io.debezium.pipeline.source.spi.EventMetadataProvider;
 import io.debezium.pipeline.spi.OffsetContext;
@@ -57,8 +58,9 @@ import io.debezium.pipeline.spi.Offsets;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
-import io.debezium.schema.DataCollectionId;
-import io.debezium.schema.TopicSelector;
+import io.debezium.schema.DefaultTopicNamingStrategy;
+import io.debezium.spi.schema.DataCollectionId;
+import io.debezium.spi.topic.TopicNamingStrategy;
 import io.debezium.util.Collect;
 import oracle.sql.ROWID;
 import org.apache.kafka.connect.data.Struct;
@@ -69,6 +71,7 @@ import org.slf4j.LoggerFactory;
 
 import java.sql.SQLException;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.Map;
 
 import static org.apache.flink.cdc.connectors.oracle.source.utils.OracleConnectionUtils.createOracleConnection;
@@ -88,8 +91,11 @@ public class OracleSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
     private OraclePartition partition;
 
     private SnapshotChangeEventSourceMetrics<OraclePartition> snapshotChangeEventSourceMetrics;
-    private OracleStreamingChangeEventSourceMetrics streamingChangeEventSourceMetrics;
-    private TopicSelector<TableId> topicSelector;
+    private AbstractOracleStreamingChangeEventSourceMetrics streamingChangeEventSourceMetrics;
+
+    @SuppressWarnings("unchecked")
+    private TopicNamingStrategy<TableId> topicNamingStrategy;
+
     private JdbcSourceEventDispatcher<OraclePartition> dispatcher;
     private ChangeEventQueue<DataChangeEvent> queue;
     private OracleErrorHandler errorHandler;
@@ -105,21 +111,32 @@ public class OracleSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
     public void configure(SourceSplitBase sourceSplitBase) {
         // initial stateful objects
         final OracleConnectorConfig connectorConfig = getDbzConnectorConfig();
-        this.topicSelector = OracleTopicSelector.defaultSelector(connectorConfig);
-        EmbeddedFlinkDatabaseHistory.registerHistory(
+        @SuppressWarnings({"unchecked", "rawtypes"})
+        TopicNamingStrategy<TableId> namingStrategy =
+                (TopicNamingStrategy<TableId>)
+                        (TopicNamingStrategy) DefaultTopicNamingStrategy.create(connectorConfig);
+        this.topicNamingStrategy = namingStrategy;
+        EmbeddedFlinkSchemaHistory.registerHistory(
                 sourceConfig
                         .getDbzConfiguration()
-                        .getString(EmbeddedFlinkDatabaseHistory.DATABASE_HISTORY_INSTANCE_NAME),
+                        .getString(EmbeddedFlinkSchemaHistory.DATABASE_HISTORY_INSTANCE_NAME),
                 sourceSplitBase.getTableSchemas().values());
-        this.databaseSchema = OracleUtils.createOracleDatabaseSchema(connectorConfig, connection);
+        // taskContext must be created before createOracleDatabaseSchema because
+        // RelationalDatabaseSchema.buildAndRegisterSchema() calls taskContext.getRawConfig()
+        // during schema recovery (Debezium 3.4.2 API change).
+        this.taskContext = new OracleTaskContext(connectorConfig.getConfig(), connectorConfig);
+        this.databaseSchema =
+                OracleUtils.createOracleDatabaseSchema(
+                        connectorConfig, connection, this.taskContext);
         // todo logMiner or xStream
         this.offsetContext =
                 loadStartingOffsetState(
-                        new LogMinerOracleOffsetContextLoader(connectorConfig), sourceSplitBase);
-        this.partition = new OraclePartition(connectorConfig.getLogicalName());
-        validateAndLoadDatabaseHistory(offsetContext, databaseSchema);
-
-        this.taskContext = new OracleTaskContext(connectorConfig, databaseSchema);
+                        new BufferedLogMinerOracleOffsetContextLoader(connectorConfig),
+                        sourceSplitBase);
+        this.partition =
+                new OraclePartition(
+                        connectorConfig.getLogicalName(), connectorConfig.getDatabaseName());
+        validateAndLoadSchemaHistory(offsetContext, databaseSchema);
         final int queueSize =
                 sourceSplitBase.isSnapshotSplit()
                         ? getSourceConfig().getSplitSize()
@@ -140,7 +157,7 @@ public class OracleSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
         this.dispatcher =
                 new JdbcSourceEventDispatcher<>(
                         connectorConfig,
-                        topicSelector,
+                        topicNamingStrategy,
                         databaseSchema,
                         queue,
                         connectorConfig.getTableFilters().dataCollectionFilter(),
@@ -149,18 +166,23 @@ public class OracleSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                         schemaNameAdjuster,
                         new OracleSchemaChangeEventHandler());
 
+        final CapturedTablesSupplier capturedTablesSupplier = Collections::emptyList;
         final OracleChangeEventSourceMetricsFactory changeEventSourceMetricsFactory =
                 new OracleChangeEventSourceMetricsFactory(
-                        new OracleStreamingChangeEventSourceMetrics(
-                                taskContext, queue, metadataProvider, connectorConfig));
+                        new LogMinerStreamingChangeEventSourceMetrics(
+                                taskContext,
+                                queue,
+                                metadataProvider,
+                                connectorConfig,
+                                capturedTablesSupplier));
         this.snapshotChangeEventSourceMetrics =
                 changeEventSourceMetricsFactory.getSnapshotMetrics(
                         taskContext, queue, metadataProvider);
         this.streamingChangeEventSourceMetrics =
-                (OracleStreamingChangeEventSourceMetrics)
+                (AbstractOracleStreamingChangeEventSourceMetrics)
                         changeEventSourceMetricsFactory.getStreamingMetrics(
-                                taskContext, queue, metadataProvider);
-        this.errorHandler = new OracleErrorHandler(connectorConfig, queue);
+                                taskContext, queue, metadataProvider, capturedTablesSupplier);
+        this.errorHandler = new OracleErrorHandler(connectorConfig, queue, null);
     }
 
     @Override
@@ -186,7 +208,7 @@ public class OracleSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
         return snapshotChangeEventSourceMetrics;
     }
 
-    public OracleStreamingChangeEventSourceMetrics getStreamingChangeEventSourceMetrics() {
+    public AbstractOracleStreamingChangeEventSourceMetrics getStreamingChangeEventSourceMetrics() {
         return streamingChangeEventSourceMetrics;
     }
 
@@ -215,6 +237,14 @@ public class OracleSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
         // RowId is chunk key column by default, compare RowId
         if (splitKeyType.getFieldNames().contains(ROWID.class.getSimpleName())) {
             ConnectHeaders headers = (ConnectHeaders) record.headers();
+            // Debezium 3.4.2+ no longer injects a ROWID Connect header. When absent,
+            // fall back to SCN-range inclusion: the backfill reader already constrains
+            // events to the split's SCN window, so accepting all events is safe for
+            // single-chunk (null-bounded) splits. For multi-chunk tables without a PK,
+            // configure scan.incremental.snapshot.chunk.key-column explicitly.
+            if (!headers.iterator().hasNext()) {
+                return true;
+            }
             ROWID rowId = null;
             try {
                 rowId = new ROWID(headers.iterator().next().value().toString());
@@ -280,10 +310,15 @@ public class OracleSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
         return loader.load(offset.getOffset());
     }
 
-    private void validateAndLoadDatabaseHistory(
+    private void validateAndLoadSchemaHistory(
             OracleOffsetContext offset, OracleDatabaseSchema schema) {
         schema.initializeStorage();
-        schema.recover(Offsets.of(partition, offset));
+        try {
+            schema.recover(Offsets.of(partition, offset));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Interrupted while recovering schema history", e);
+        }
     }
 
     /** Copied from debezium for accessing here. */

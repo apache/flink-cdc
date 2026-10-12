@@ -20,7 +20,7 @@ import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.Column;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
-import io.debezium.relational.history.DatabaseHistory;
+import io.debezium.relational.history.SchemaHistory;
 import io.debezium.schema.DatabaseSchema;
 import io.debezium.util.Strings;
 import org.slf4j.Logger;
@@ -604,7 +604,7 @@ public class MySqlConnection extends JdbcConnection {
                     config.filter(
                                     x ->
                                             !(x.startsWith(
-                                                            DatabaseHistory
+                                                            SchemaHistory
                                                                     .CONFIGURATION_FIELD_PREFIX_STRING)
                                                     || x.equals(
                                                             MySqlConnectorConfig.DATABASE_HISTORY

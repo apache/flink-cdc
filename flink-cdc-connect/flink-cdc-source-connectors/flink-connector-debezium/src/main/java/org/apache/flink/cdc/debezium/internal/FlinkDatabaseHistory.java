@@ -18,11 +18,11 @@
 package org.apache.flink.cdc.debezium.internal;
 
 import io.debezium.config.Configuration;
-import io.debezium.relational.history.AbstractDatabaseHistory;
-import io.debezium.relational.history.DatabaseHistoryException;
-import io.debezium.relational.history.DatabaseHistoryListener;
+import io.debezium.relational.history.AbstractSchemaHistory;
 import io.debezium.relational.history.HistoryRecord;
 import io.debezium.relational.history.HistoryRecordComparator;
+import io.debezium.relational.history.SchemaHistoryException;
+import io.debezium.relational.history.SchemaHistoryListener;
 
 import java.util.Collection;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -40,7 +40,7 @@ import static org.apache.flink.cdc.debezium.utils.DatabaseHistoryUtil.retrieveHi
  * records will be stored in state (grow infinitely). We may need to come up with a
  * FileSystemDatabaseHistory in the future to store history in HDFS.
  */
-public class FlinkDatabaseHistory extends AbstractDatabaseHistory {
+public class FlinkDatabaseHistory extends AbstractSchemaHistory {
 
     public static final String DATABASE_HISTORY_INSTANCE_NAME = "database.history.instance.name";
 
@@ -57,7 +57,7 @@ public class FlinkDatabaseHistory extends AbstractDatabaseHistory {
     public void configure(
             Configuration config,
             HistoryRecordComparator comparator,
-            DatabaseHistoryListener listener,
+            SchemaHistoryListener listener,
             boolean useCatalogBeforeSchema) {
         super.configure(config, comparator, listener, useCatalogBeforeSchema);
         this.instanceName = config.getString(DATABASE_HISTORY_INSTANCE_NAME);
@@ -75,7 +75,7 @@ public class FlinkDatabaseHistory extends AbstractDatabaseHistory {
     }
 
     @Override
-    protected void storeRecord(HistoryRecord record) throws DatabaseHistoryException {
+    protected void storeRecord(HistoryRecord record) throws SchemaHistoryException {
         this.schemaRecords.add(new SchemaRecord(record));
     }
 

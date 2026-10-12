@@ -8,7 +8,6 @@ package io.debezium.relational;
 
 import io.debezium.data.Envelope.Operation;
 import io.debezium.pipeline.AbstractChangeRecordEmitter;
-import io.debezium.pipeline.spi.ChangeRecordEmitter;
 import io.debezium.pipeline.spi.OffsetContext;
 import io.debezium.pipeline.spi.Partition;
 import io.debezium.schema.DataCollectionSchema;
@@ -22,13 +21,9 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Copied from Debezium 1.9.8.Final.
- *
- * <p>Base class for {@link ChangeRecordEmitter} implementations based on a relational database.
- *
- * <p>This class overrides the emit methods to put some values in the header.
- *
- * <p>Line 59 ~ 257: add other headers and emit.
+ * Vendored from Debezium. Constructor updated to use RelationalDatabaseConnectorConfig (Debezium
+ * 3.4.2 API). Retains getEmitConnectHeaders() hook used by LogMinerChangeRecordEmitter to attach
+ * ROWID headers.
  */
 public abstract class RelationalChangeRecordEmitter<P extends Partition>
         extends AbstractChangeRecordEmitter<P, TableSchema> {
@@ -39,8 +34,12 @@ public abstract class RelationalChangeRecordEmitter<P extends Partition>
     public static final String PK_UPDATE_OLDKEY_FIELD = "__debezium.oldkey";
     public static final String PK_UPDATE_NEWKEY_FIELD = "__debezium.newkey";
 
-    public RelationalChangeRecordEmitter(P partition, OffsetContext offsetContext, Clock clock) {
-        super(partition, offsetContext, clock);
+    public RelationalChangeRecordEmitter(
+            P partition,
+            OffsetContext offsetContext,
+            Clock clock,
+            RelationalDatabaseConnectorConfig connectorConfig) {
+        super(partition, offsetContext, clock, connectorConfig);
     }
 
     @Override
@@ -85,8 +84,6 @@ public abstract class RelationalChangeRecordEmitter<P extends Partition>
                                 getClock().currentTimeAsInstant());
 
         if (skipEmptyMessages() && (newColumnValues == null || newColumnValues.length == 0)) {
-            // This case can be hit on UPDATE / DELETE when there's no primary key defined while
-            // using certain decoders
             LOGGER.warn(
                     "no new values found for table '{}' from create message at '{}'; skipping record",
                     tableSchema,
@@ -146,8 +143,6 @@ public abstract class RelationalChangeRecordEmitter<P extends Partition>
                     getOffset().getSourceInfo());
             return;
         }
-        // some configurations does not provide old values in case of updates
-        // in this case we handle all updates as regular ones
         if (oldKey == null || Objects.equals(oldKey, newKey)) {
             Struct envelope =
                     tableSchema
@@ -165,9 +160,7 @@ public abstract class RelationalChangeRecordEmitter<P extends Partition>
                     envelope,
                     getOffset(),
                     getEmitConnectHeaders().orElse(null));
-        }
-        // PK update -> emit as delete and re-insert with new key
-        else {
+        } else {
             emitUpdateAsPrimaryKeyChangeRecord(
                     receiver, tableSchema, oldKey, newKey, oldValue, newValue);
         }
@@ -210,18 +203,10 @@ public abstract class RelationalChangeRecordEmitter<P extends Partition>
         throw new UnsupportedOperationException("TRUNCATE not supported");
     }
 
-    /** Returns the old row state in case of an UPDATE or DELETE. */
     protected abstract Object[] getOldColumnValues();
 
-    /** Returns the new row state in case of a CREATE or READ. */
     protected abstract Object[] getNewColumnValues();
 
-    /**
-     * Whether empty data messages should be ignored.
-     *
-     * @return true if empty data messages coming from data source should be ignored. Typical use
-     *     case are PostgreSQL changes without FULL replica identity.
-     */
     protected boolean skipEmptyMessages() {
         return false;
     }

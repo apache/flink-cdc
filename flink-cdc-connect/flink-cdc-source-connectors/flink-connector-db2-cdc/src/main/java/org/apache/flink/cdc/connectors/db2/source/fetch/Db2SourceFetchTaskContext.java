@@ -20,7 +20,7 @@ package org.apache.flink.cdc.connectors.db2.source.fetch;
 import org.apache.flink.cdc.connectors.base.WatermarkDispatcher;
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
 import org.apache.flink.cdc.connectors.base.relational.JdbcSourceEventDispatcher;
-import org.apache.flink.cdc.connectors.base.source.EmbeddedFlinkDatabaseHistory;
+import org.apache.flink.cdc.connectors.base.source.EmbeddedFlinkSchemaHistory;
 import org.apache.flink.cdc.connectors.base.source.meta.offset.Offset;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.reader.external.JdbcSourceFetchTaskContext;
@@ -59,7 +59,7 @@ import io.debezium.relational.Tables.TableFilter;
 import io.debezium.schema.DataCollectionId;
 import io.debezium.schema.TopicSelector;
 import io.debezium.util.Collect;
-import io.debezium.util.SchemaNameAdjuster;
+import io.debezium.spi.schema.SchemaNameAdjuster;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 
@@ -103,10 +103,10 @@ public class Db2SourceFetchTaskContext extends JdbcSourceFetchTaskContext {
         // initial stateful objects
         final Db2ConnectorConfig connectorConfig = getDbzConnectorConfig();
         this.topicSelector = Db2TopicSelector.defaultSelector(connectorConfig);
-        EmbeddedFlinkDatabaseHistory.registerHistory(
+        EmbeddedFlinkSchemaHistory.registerHistory(
                 sourceConfig
                         .getDbzConfiguration()
-                        .getString(EmbeddedFlinkDatabaseHistory.DATABASE_HISTORY_INSTANCE_NAME),
+                        .getString(EmbeddedFlinkSchemaHistory.DATABASE_HISTORY_INSTANCE_NAME),
                 sourceSplitBase.getTableSchemas().values());
 
         this.databaseSchema = Db2Utils.createDb2DatabaseSchema(connectorConfig, connection);
@@ -115,7 +115,7 @@ public class Db2SourceFetchTaskContext extends JdbcSourceFetchTaskContext {
         String serverName = connectorConfig.getLogicalName();
         this.partition = new Db2Partition(serverName);
 
-        validateAndLoadDatabaseHistory(offsetContext, databaseSchema);
+        validateAndLoadSchemaHistory(offsetContext, databaseSchema);
 
         this.taskContext = new Db2TaskContext(connectorConfig, databaseSchema);
 
@@ -170,7 +170,7 @@ public class Db2SourceFetchTaskContext extends JdbcSourceFetchTaskContext {
         return loader.load(offset.getOffset());
     }
 
-    private void validateAndLoadDatabaseHistory(Db2OffsetContext offset, Db2DatabaseSchema schema) {
+    private void validateAndLoadSchemaHistory(Db2OffsetContext offset, Db2DatabaseSchema schema) {
         schema.initializeStorage();
         schema.recover(partition, offset);
     }

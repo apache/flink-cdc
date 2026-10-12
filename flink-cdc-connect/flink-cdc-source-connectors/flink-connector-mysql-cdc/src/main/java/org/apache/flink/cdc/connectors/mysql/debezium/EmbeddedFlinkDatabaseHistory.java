@@ -24,9 +24,9 @@ import io.debezium.pipeline.spi.Offsets;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
 import io.debezium.relational.ddl.DdlParser;
-import io.debezium.relational.history.DatabaseHistory;
-import io.debezium.relational.history.DatabaseHistoryException;
-import io.debezium.relational.history.DatabaseHistoryListener;
+import io.debezium.relational.history.SchemaHistory;
+import io.debezium.relational.history.SchemaHistoryException;
+import io.debezium.relational.history.SchemaHistoryListener;
 import io.debezium.relational.history.HistoryRecord;
 import io.debezium.relational.history.HistoryRecordComparator;
 import io.debezium.relational.history.TableChanges;
@@ -40,11 +40,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 /**
- * A {@link DatabaseHistory} implementation which store the latest table schema in Flink state.
+ * A {@link SchemaHistory} implementation which store the latest table schema in Flink state.
  *
  * <p>It stores/recovers history using data offered by {@link MySqlSplitState}.
  */
-public class EmbeddedFlinkDatabaseHistory implements DatabaseHistory {
+public class EmbeddedFlinkSchemaHistory implements SchemaHistory {
 
     public static final String DATABASE_HISTORY_INSTANCE_NAME = "database.history.instance.name";
 
@@ -52,7 +52,7 @@ public class EmbeddedFlinkDatabaseHistory implements DatabaseHistory {
             new ConcurrentHashMap<>();
 
     private Map<TableId, TableChange> tableSchemas;
-    private DatabaseHistoryListener listener;
+    private SchemaHistoryListener listener;
     private boolean storeOnlyMonitoredTablesDdl;
     private boolean skipUnparseableDDL;
 
@@ -60,7 +60,7 @@ public class EmbeddedFlinkDatabaseHistory implements DatabaseHistory {
     public void configure(
             Configuration config,
             HistoryRecordComparator comparator,
-            DatabaseHistoryListener listener,
+            SchemaHistoryListener listener,
             boolean useCatalogBeforeSchema) {
         this.listener = listener;
         this.storeOnlyMonitoredTablesDdl = config.getBoolean(STORE_ONLY_MONITORED_TABLES_DDL);
@@ -82,7 +82,7 @@ public class EmbeddedFlinkDatabaseHistory implements DatabaseHistory {
     @Override
     public void record(
             Map<String, ?> source, Map<String, ?> position, String databaseName, String ddl)
-            throws DatabaseHistoryException {
+            throws SchemaHistoryException {
         throw new UnsupportedOperationException("should not call here, error");
     }
 
@@ -94,9 +94,9 @@ public class EmbeddedFlinkDatabaseHistory implements DatabaseHistory {
             String schemaName,
             String ddl,
             TableChanges changes)
-            throws DatabaseHistoryException {
+            throws SchemaHistoryException {
         final HistoryRecord record =
-                new HistoryRecord(source, position, databaseName, schemaName, ddl, changes);
+                new HistoryRecord(source, position, databaseName, schemaName, ddl, changes, java.time.Instant.now());
         listener.onChangeApplied(record);
     }
 

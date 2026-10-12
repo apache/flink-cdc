@@ -59,8 +59,9 @@ public class OracleConnectionUtils {
             JdbcConfiguration dbzConfiguration) {
         Configuration configuration = dbzConfiguration.subset(DATABASE_CONFIG_PREFIX, true);
         return new OracleSourceConnection(
-                configuration.isEmpty() ? dbzConfiguration : JdbcConfiguration.adapt(configuration),
-                OracleConnectionUtils.class::getClassLoader);
+                configuration.isEmpty()
+                        ? dbzConfiguration
+                        : JdbcConfiguration.adapt(configuration));
     }
 
     /** Fetch current redoLog offsets in Oracle Server. */
@@ -104,8 +105,10 @@ public class OracleConnectionUtils {
                         while (rs.next()) {
                             String schemaName = rs.getString(1);
                             String tableName = rs.getString(2);
-                            TableId tableId =
-                                    new TableId(jdbcConnection.database(), schemaName, tableName);
+                            // Use null catalog so the TableId matches the 2-part
+                            // schema.table filter pattern and aligns with what Oracle
+                            // JDBC metadata returns (TABLE_CAT is null for Oracle).
+                            TableId tableId = new TableId(null, schemaName, tableName);
                             tableIdSet.add(tableId);
                         }
                     });

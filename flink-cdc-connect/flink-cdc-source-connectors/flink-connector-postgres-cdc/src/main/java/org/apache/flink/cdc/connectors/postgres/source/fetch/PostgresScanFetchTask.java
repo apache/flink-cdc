@@ -289,7 +289,7 @@ public class PostgresScanFetchTask extends AbstractScanFetchTask {
 
             List<String> columnNames =
                     table.columns().stream()
-                            .map(column -> jdbcConnection.quotedColumnIdString(column.name()))
+                            .map(column -> jdbcConnection.quoteIdentifier(column.name()))
                             .collect(Collectors.toList());
             final String selectSql =
                     PostgresQueryUtils.buildSplitScanQuery(
