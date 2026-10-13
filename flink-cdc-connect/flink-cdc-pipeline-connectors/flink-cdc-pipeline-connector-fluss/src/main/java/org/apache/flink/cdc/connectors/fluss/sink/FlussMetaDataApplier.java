@@ -246,6 +246,12 @@ public class FlussMetaDataApplier implements MetadataApplier, ExistingTableSchem
                             .isPresent()) {
                         throw e;
                     }
+                    Set<String> columnNames = new HashSet<>();
+                    for (TableChange change : tableChanges) {
+                        if (!columnNames.add(((TableChange.AddColumn) change).getName())) {
+                            throw e;
+                        }
+                    }
                     List<TableChange> missingColumns =
                             getMissingColumns(admin.getTableInfo(tablePath).get(), tableChanges);
                     // Schema reads may lag behind ADD when served by another ZooKeeper session.

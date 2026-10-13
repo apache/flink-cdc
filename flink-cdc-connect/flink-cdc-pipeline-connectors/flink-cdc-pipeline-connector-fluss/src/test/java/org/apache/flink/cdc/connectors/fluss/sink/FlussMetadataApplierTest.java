@@ -52,6 +52,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -991,9 +992,11 @@ public class FlussMetadataApplierTest {
         }
     }
 
-    @Test
+    @ParameterizedTest
+    @CsvSource({"false, false", "true, false", "true, true"})
     @Timeout(30)
-    void testAddColumnFailsWithoutRetryProgress() throws Exception {
+    void testDuplicateAddColumnsAreRejected(boolean columnExists, boolean addMissingColumn)
+            throws Exception {
         TableId tableId = TableId.tableId(DATABASE_NAME, "duplicate_additions");
         TablePath tablePath = new TablePath(DATABASE_NAME, "duplicate_additions");
         try (FlussMetaDataApplier applier =
@@ -1002,18 +1005,22 @@ public class FlussMetadataApplierTest {
                         Collections.emptyMap(),
                         Collections.emptyMap(),
                         Collections.emptyMap())) {
-            applier.applySchemaChange(
-                    new CreateTableEvent(
-                            tableId,
-                            Schema.newBuilder().physicalColumn("id", DataTypes.INT()).build()));
+            Schema.Builder schema = Schema.newBuilder().physicalColumn("id", DataTypes.INT());
+            if (columnExists) {
+                schema.physicalColumn("name", DataTypes.STRING());
+            }
+            applier.applySchemaChange(new CreateTableEvent(tableId, schema.build()));
             TableInfo beforeAddition = admin.getTableInfo(tablePath).get();
-            AddColumnEvent event =
-                    new AddColumnEvent(
-                            tableId,
+            List<AddColumnEvent.ColumnWithPosition> additions =
+                    new ArrayList<>(
                             Collections.nCopies(
                                     2,
                                     AddColumnEvent.last(
                                             Column.physicalColumn("name", DataTypes.STRING()))));
+            if (addMissingColumn) {
+                additions.add(AddColumnEvent.last(Column.physicalColumn("age", DataTypes.INT())));
+            }
+            AddColumnEvent event = new AddColumnEvent(tableId, additions);
             assertThatThrownBy(() -> applier.applySchemaChange(event))
                     .rootCause()
                     .isInstanceOf(InvalidAlterTableException.class)
