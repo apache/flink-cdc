@@ -86,6 +86,8 @@ tar $TAR_OPTIONS -czf ${RELEASE_DIR}/flink-cdc-${RELEASE_VERSION}-src.tgz flink-
 # Verify that the bundled documentation assets and their licenses are in the archive.
 tar -tzf "${RELEASE_DIR}/flink-cdc-${RELEASE_VERSION}-src.tgz" > "${RELEASE_DIR}/source-archive-contents"
 for bundled_file in \
+    LICENSE \
+    NOTICE \
     docs/static/js/anchor.min.js \
     docs/static/font-awesome/css/font-awesome.css \
     docs/static/font-awesome/fonts/FontAwesome.otf \

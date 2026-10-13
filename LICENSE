@@ -199,3 +199,15 @@
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    See the License for the specific language governing permissions and
    limitations under the License.
+
+THIRD-PARTY LICENSES FOR SOURCE-BUNDLED ASSETS
+
+The source distribution includes the following third-party assets. Their
+license terms are provided in the indicated files:
+
+- AnchorJS v3.1.0 in docs/static/js/anchor.min.js: licenses/LICENSE.anchorjs (MIT).
+- Font Awesome 4.6.3 CSS in docs/static/font-awesome/css/:
+  licenses/LICENSE.font-awesome (MIT).
+- Font Awesome 4.6.3 fonts in docs/static/font-awesome/fonts/:
+  licenses/LICENSE.font-awesome (SIL OFL 1.1).
+- Chroma-generated CSS in docs/assets/github.css: licenses/LICENSE.chroma (MIT).
