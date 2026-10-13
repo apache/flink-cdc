@@ -196,7 +196,8 @@ class PostgresSourceITCase extends PostgresTestBase {
                 PostgresTestUtils.FailoverType.NONE,
                 PostgresTestUtils.FailoverPhase.NEVER,
                 new String[] {"Customers", "customers_1", "customers_2"},
-                RestartStrategies.fixedDelayRestart(1, 0),
+                1,
+                0,
                 options,
                 this::checkStreamDataForFilteredPublication,
                 false);
@@ -928,7 +929,8 @@ class PostgresSourceITCase extends PostgresTestBase {
                 failoverType,
                 failoverPhase,
                 captureCustomerTables,
-                restartStrategyConfiguration,
+                restartAttempts,
+                delayBetweenAttempts,
                 otherOptions,
                 streamDataChecker,
                 true);
@@ -940,7 +942,8 @@ class PostgresSourceITCase extends PostgresTestBase {
             PostgresTestUtils.FailoverType failoverType,
             PostgresTestUtils.FailoverPhase failoverPhase,
             String[] captureCustomerTables,
-            RestartStrategies.RestartStrategyConfiguration restartStrategyConfiguration,
+            int restartAttempts,
+            long delayBetweenAttempts,
             Map<String, String> otherOptions,
             StreamDataChecker streamDataChecker,
             boolean checkSnapshot)
