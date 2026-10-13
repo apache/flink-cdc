@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.fluss.sink;
 
+import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropTableEvent;
@@ -66,6 +67,8 @@ import static org.apache.flink.cdc.connectors.fluss.utils.FlussConversions.toFlu
 /** {@link MetadataApplier} for fluss. */
 public class FlussMetaDataApplier implements MetadataApplier, ExistingTableSchemaExpansionSupport {
     private static final Logger LOG = LoggerFactory.getLogger(FlussMetaDataApplier.class);
+    private static final int MAX_SCHEMA_READ_RETRIES = 3;
+    private static final long SCHEMA_READ_RETRY_DELAY_MILLIS = 100L;
     private final Configuration flussClientConfig;
     private final Map<String, String> tableProperties;
     private final Map<String, List<String>> bucketKeysMap;
@@ -222,6 +225,17 @@ public class FlussMetaDataApplier implements MetadataApplier, ExistingTableSchem
                 Admin admin = connection.getAdmin()) {
             TableId tableId = event.tableId();
             TablePath tablePath = new TablePath(tableId.getSchemaName(), tableId.getTableName());
+            applyAddColumnChanges(admin, tablePath, tableChanges);
+        } catch (Exception e) {
+            LOG.error("Failed to apply schema change {}", event, e);
+            throw new RuntimeException(e);
+        }
+    }
+
+    @VisibleForTesting
+    void applyAddColumnChanges(Admin admin, TablePath tablePath, List<TableChange> tableChanges)
+            throws ExecutionException, InterruptedException {
+        try {
             List<TableChange> pendingChanges = tableChanges;
             while (!pendingChanges.isEmpty()) {
                 try {
@@ -234,6 +248,16 @@ public class FlussMetaDataApplier implements MetadataApplier, ExistingTableSchem
                     }
                     List<TableChange> missingColumns =
                             getMissingColumns(admin.getTableInfo(tablePath).get(), tableChanges);
+                    // Schema reads may lag behind ADD when served by another ZooKeeper session.
+                    for (int retry = 0;
+                            missingColumns.size() >= pendingChanges.size()
+                                    && retry < MAX_SCHEMA_READ_RETRIES;
+                            retry++) {
+                        Thread.sleep(SCHEMA_READ_RETRY_DELAY_MILLIS);
+                        missingColumns =
+                                getMissingColumns(
+                                        admin.getTableInfo(tablePath).get(), tableChanges);
+                    }
                     // Retry only when matching existing columns reduce the pending additions.
                     if (missingColumns.size() >= pendingChanges.size()) {
                         throw e;
@@ -241,9 +265,9 @@ public class FlussMetaDataApplier implements MetadataApplier, ExistingTableSchem
                     pendingChanges = missingColumns;
                 }
             }
-        } catch (Exception e) {
-            LOG.error("Failed to apply schema change {}", event, e);
-            throw new RuntimeException(e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw e;
         }
     }
 
