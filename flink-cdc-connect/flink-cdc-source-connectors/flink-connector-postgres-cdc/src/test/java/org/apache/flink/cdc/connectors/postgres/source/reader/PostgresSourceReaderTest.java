@@ -61,6 +61,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+import static io.debezium.connector.postgresql.connection.ReplicationConnection.Builder.DEFAULT_PUBLICATION_NAME;
 import static org.apache.flink.core.io.InputStatus.END_OF_INPUT;
 import static org.apache.flink.core.io.InputStatus.MORE_AVAILABLE;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -81,6 +82,7 @@ public class PostgresSourceReaderTest extends PostgresTestBase {
     @BeforeEach
     public void before() throws SQLException {
         customDatabase.createAndInitialize();
+        customDatabase.createPublication(DEFAULT_PUBLICATION_NAME);
 
         this.slotName = getSlotName();
     }
