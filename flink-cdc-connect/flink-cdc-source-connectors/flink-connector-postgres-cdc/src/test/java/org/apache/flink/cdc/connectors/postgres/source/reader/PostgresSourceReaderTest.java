@@ -56,6 +56,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -64,6 +65,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
 
 import static org.apache.flink.core.io.InputStatus.END_OF_INPUT;
 import static org.apache.flink.core.io.InputStatus.MORE_AVAILABLE;
@@ -213,8 +215,9 @@ public class PostgresSourceReaderTest extends PostgresTestBase {
             Lsn checkpointLsn =
                     streamOffsetLsn(completeCheckpointsAcrossStreamStart(reader, dialect));
 
-            // checkpoint 4 is committed by now, watch the slot for a while
-            Lsn confirmedFlushLsn = watchConfirmedFlushLsn(checkpointLsn, 15_000L);
+            // checkpoint 4 is committed by now, wait until the slot reaches it
+            Lsn confirmedFlushLsn =
+                    waitForConfirmedFlushLsn(lsn -> lsn.compareTo(checkpointLsn) >= 0, 15_000L);
             assertThat(confirmedFlushLsn)
                     .as(
                             "confirmed_flush_lsn %s must not pass the offset %s of the latest"
@@ -232,24 +235,21 @@ public class PostgresSourceReaderTest extends PostgresTestBase {
         try (PostgresDialect dialect = new PostgresDialect(sourceConfig);
                 PostgresSourceReader reader = createStreamReader(3)) {
             checkpointState = completeCheckpointsAcrossStreamStart(reader, dialect);
-            // give the slot time to receive what was committed
-            Thread.sleep(15_000L);
+            // wait until the slot receives what was committed
+            Lsn checkpointLsn = streamOffsetLsn(checkpointState);
+            waitForConfirmedFlushLsn(lsn -> lsn.compareTo(checkpointLsn) >= 0, 15_000L);
         }
 
         // restore from checkpoint 4, the latest completed one
         try (PostgresSourceReader reader = createStreamReader(3)) {
             reader.start();
             reader.addSplits(checkpointState);
-            Thread.sleep(1000L);
+            waitForSlotActive(30_000L);
             insertCustomer(3003);
 
-            List<String> records = new ArrayList<>();
-            long deadline = System.currentTimeMillis() + 30_000L;
-            while (!records.contains(customerRecord(3003))
-                    && System.currentTimeMillis() < deadline) {
-                records.addAll(pollStreamRecords(reader, CUSTOMER_TYPE, 1_000L));
-            }
-            assertThat(records).contains(customerRecord(3003)).contains(customerRecord(3002));
+            assertThat(pollStreamRecords(reader, CUSTOMER_TYPE, 2, 30_000L))
+                    .contains(customerRecord(3003))
+                    .contains(customerRecord(3002));
         }
     }
 
@@ -268,10 +268,10 @@ public class PostgresSourceReaderTest extends PostgresTestBase {
             reader.start();
             reader.handleSourceEvents(new OffsetCommitEvent(true));
             reader.addSplits(Collections.singletonList(createStreamSplit(dialect)));
-            Thread.sleep(1000L);
+            waitForSlotActive(30_000L);
 
             insertCustomer(3001);
-            assertThat(pollStreamRecords(reader, CUSTOMER_TYPE, 5_000L))
+            assertThat(pollStreamRecords(reader, CUSTOMER_TYPE, 1, 5_000L))
                     .containsExactly(customerRecord(3001));
             long checkpointId = 1L;
             for (; checkpointId <= 3L; checkpointId++) {
@@ -292,10 +292,14 @@ public class PostgresSourceReaderTest extends PostgresTestBase {
 
             // a change after the latest checkpoint, which must be replayed when restoring from it
             insertCustomer(3002);
-            pollStreamRecords(reader, CUSTOMER_TYPE, 5_000L);
+            pollStreamRecords(reader, CUSTOMER_TYPE, 1, 5_000L);
             reader.notifyCheckpointComplete(checkpointId);
 
-            Lsn confirmedFlushLsn = watchConfirmedFlushLsn(checkpointLsn, 15_000L);
+            // the slot may already be at the offset of checkpoint 1, which equals that of
+            // checkpoint
+            // 7, so watch it for a while in case it passes the offset
+            Lsn confirmedFlushLsn =
+                    waitForConfirmedFlushLsn(lsn -> lsn.compareTo(checkpointLsn) > 0, 15_000L);
             assertThat(confirmedFlushLsn)
                     .as(
                             "confirmed_flush_lsn %s must not pass the offset %s of the latest"
@@ -320,17 +324,17 @@ public class PostgresSourceReaderTest extends PostgresTestBase {
         reader.snapshotState(3L);
 
         reader.addSplits(Collections.singletonList(createStreamSplit(dialect)));
-        Thread.sleep(1000L);
+        waitForSlotActive(30_000L);
 
         insertCustomer(3001);
-        assertThat(pollStreamRecords(reader, CUSTOMER_TYPE, 5_000L))
+        assertThat(pollStreamRecords(reader, CUSTOMER_TYPE, 1, 5_000L))
                 .containsExactly(customerRecord(3001));
         List<SourceSplitBase> checkpointState = reader.snapshotState(4L);
 
         // a change after checkpoint 4, which must be replayed when restoring from it. Keep
         // polling so that the stream reader reads it and moves its offset context forward.
         insertCustomer(3002);
-        pollStreamRecords(reader, CUSTOMER_TYPE, 5_000L);
+        pollStreamRecords(reader, CUSTOMER_TYPE, 1, 5_000L);
 
         for (long checkpointId = 1L; checkpointId <= 7L; checkpointId++) {
             if (checkpointId > 4L) {
@@ -375,31 +379,55 @@ public class PostgresSourceReaderTest extends PostgresTestBase {
                 .orElseThrow(() -> new IllegalStateException("No stream split in state"));
     }
 
-    /** Returns the first confirmed_flush_lsn beyond the limit, or the last one seen. */
-    private Lsn watchConfirmedFlushLsn(Lsn limit, long timeoutMillis) throws Exception {
+    /**
+     * Returns the first confirmed_flush_lsn that matches the condition, or the last one seen when
+     * the timeout elapses.
+     */
+    private Lsn waitForConfirmedFlushLsn(Predicate<Lsn> condition, long timeoutMillis)
+            throws Exception {
         long deadline = System.currentTimeMillis() + timeoutMillis;
         Lsn lsn = null;
-        while (System.currentTimeMillis() < deadline) {
-            try (Connection conn =
-                            getJdbcConnection(
-                                    POSTGRES_CONTAINER, customDatabase.getDatabaseName());
-                    Statement stmt = conn.createStatement();
-                    ResultSet rs =
-                            stmt.executeQuery(
-                                    String.format(
-                                            "SELECT confirmed_flush_lsn FROM pg_replication_slots"
-                                                    + " WHERE slot_name = '%s'",
-                                            slotName))) {
-                if (rs.next() && rs.getString(1) != null) {
-                    lsn = Lsn.valueOf(rs.getString(1));
-                    if (lsn.compareTo(limit) > 0) {
-                        return lsn;
+        try (Connection conn =
+                        getJdbcConnection(POSTGRES_CONTAINER, customDatabase.getDatabaseName());
+                PreparedStatement stmt =
+                        conn.prepareStatement(
+                                "SELECT confirmed_flush_lsn FROM pg_replication_slots"
+                                        + " WHERE slot_name = ?")) {
+            stmt.setString(1, slotName);
+            while (System.currentTimeMillis() < deadline) {
+                try (ResultSet rs = stmt.executeQuery()) {
+                    if (rs.next() && rs.getString(1) != null) {
+                        lsn = Lsn.valueOf(rs.getString(1));
+                        if (condition.test(lsn)) {
+                            return lsn;
+                        }
                     }
                 }
+                Thread.sleep(200L);
             }
-            Thread.sleep(500L);
         }
         return lsn;
+    }
+
+    /** Waits until the stream reader is connected to the replication slot. */
+    private void waitForSlotActive(long timeoutMillis) throws Exception {
+        long deadline = System.currentTimeMillis() + timeoutMillis;
+        try (Connection conn =
+                        getJdbcConnection(POSTGRES_CONTAINER, customDatabase.getDatabaseName());
+                PreparedStatement stmt =
+                        conn.prepareStatement(
+                                "SELECT active FROM pg_replication_slots WHERE slot_name = ?")) {
+            stmt.setString(1, slotName);
+            while (System.currentTimeMillis() < deadline) {
+                try (ResultSet rs = stmt.executeQuery()) {
+                    if (rs.next() && rs.getBoolean(1)) {
+                        return;
+                    }
+                }
+                Thread.sleep(200L);
+            }
+        }
+        throw new IllegalStateException("Replication slot " + slotName + " is not active");
     }
 
     @ParameterizedTest
@@ -603,12 +631,17 @@ public class PostgresSourceReaderTest extends PostgresTestBase {
         return formatter.format(output.getResults());
     }
 
+    /** Polls until at least {@code expectedCount} records are read or the timeout elapses. */
     private List<String> pollStreamRecords(
-            PostgresSourceReader sourceReader, DataType recordType, long timeoutMillis)
+            PostgresSourceReader sourceReader,
+            DataType recordType,
+            int expectedCount,
+            long timeoutMillis)
             throws Exception {
         final SimpleReaderOutput output = new SimpleReaderOutput();
         long deadline = System.currentTimeMillis() + timeoutMillis;
-        while (System.currentTimeMillis() < deadline) {
+        while (output.getResults().size() < expectedCount
+                && System.currentTimeMillis() < deadline) {
             if (sourceReader.pollNext(output) != MORE_AVAILABLE) {
                 Thread.sleep(100L);
             }
