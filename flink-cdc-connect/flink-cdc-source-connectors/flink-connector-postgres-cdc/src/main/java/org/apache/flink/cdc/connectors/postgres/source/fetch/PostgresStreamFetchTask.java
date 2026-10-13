@@ -132,7 +132,7 @@ public class PostgresStreamFetchTask implements FetchTask<SourceSplitBase> {
             LOG.debug("Skip committing offset as the checkpoint has no stream offset.");
             return;
         }
-        if (streamSplitReadTask != null && streamSplitReadTask.offsetContext != null) {
+        if (streamSplitReadTask != null) {
             // We should commit the checkpoint's LSN instead of postgresOffsetContext's LSN to
             // the slot.
             // If the checkpoint succeeds and a table UPDATE message arrives before the
