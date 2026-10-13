@@ -74,7 +74,8 @@ class DwsRecordConverterTest {
                 .containsEntry("name", "中文\u0000name")
                 .containsEntry("amount", new BigDecimal("123456.70"))
                 .containsEntry("created_at", Timestamp.valueOf("2026-10-10 01:02:03.456"))
-                .containsEntry("observed_at", Timestamp.valueOf("2026-10-10 09:02:03.456"))
+                .containsEntry(
+                        "observed_at", Timestamp.from(Instant.parse("2026-10-10T01:02:03.456Z")))
                 .containsEntry("optional_note", null);
         assertThat((byte[]) converted.get("id")).containsExactly(id);
         assertThat(converted).hasSize(SCHEMA.getColumns().size());

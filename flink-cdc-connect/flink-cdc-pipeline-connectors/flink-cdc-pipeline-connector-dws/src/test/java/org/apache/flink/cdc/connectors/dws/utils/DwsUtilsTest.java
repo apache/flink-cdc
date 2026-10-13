@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.dws.utils;
 
 import org.apache.flink.cdc.common.data.DateData;
+import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.GenericArrayData;
 import org.apache.flink.cdc.common.data.GenericMapData;
 import org.apache.flink.cdc.common.data.GenericRecordData;
@@ -27,10 +28,14 @@ import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.ZonedTimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
+import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
+import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -43,6 +48,67 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /** Tests for {@link DwsUtils}. */
 class DwsUtilsTest {
+
+    @ParameterizedTest
+    @ValueSource(strings = {"UTC", "Asia/Shanghai", "America/New_York"})
+    void preservesLocalZonedTimestampInstant(String zone) {
+        Instant instant = Instant.parse("2026-10-10T01:02:03.123456789Z");
+        Object converted =
+                DwsUtils.createFieldGetter(DataTypes.TIMESTAMP_LTZ(9), 0, ZoneId.of(zone))
+                        .getFieldOrNull(
+                                GenericRecordData.of(LocalZonedTimestampData.fromInstant(instant)));
+        assertThat(((Timestamp) converted).toInstant()).isEqualTo(instant);
+    }
+
+    @Test
+    void preservesNestedDecimalsInAllContainers() {
+        assertNestedJson(
+                DataTypes.DECIMAL(12, 2),
+                DecimalData.fromBigDecimal(new BigDecimal("123456.70"), 12, 2),
+                "123456.70");
+        assertNestedJson(
+                DataTypes.DECIMAL(20, 2),
+                DecimalData.fromBigDecimal(new BigDecimal("123456789012345678.70"), 20, 2),
+                "123456789012345678.70");
+        assertNestedJson(DataTypes.DECIMAL(20, 2), null, "null");
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {0, 3, 6, 9})
+    void preservesNestedTimestampPrecisionInAllContainers(int precision) {
+        String fraction = precision == 0 ? "" : "." + "123456789".substring(0, precision);
+        LocalDateTime timestamp = LocalDateTime.parse("2026-10-10T01:02:03" + fraction);
+        assertNestedJson(
+                DataTypes.TIMESTAMP(precision),
+                TimestampData.fromLocalDateTime(timestamp),
+                "\"2026-10-10 01:02:03" + fraction + "\"");
+        assertNestedJson(
+                DataTypes.TIMESTAMP_LTZ(precision),
+                LocalZonedTimestampData.fromInstant(
+                        Instant.parse("2026-10-10T01:02:03" + fraction + "Z")),
+                "\"2026-10-10 09:02:03" + fraction + "\"");
+    }
+
+    private void assertNestedJson(DataType type, Object value, String expected) {
+        Map<Object, Object> map = new LinkedHashMap<>();
+        map.put(BinaryStringData.fromString("value"), value);
+        assertThat(
+                        convertComplex(
+                                DataTypes.ROW(DataTypes.FIELD("value", type)),
+                                GenericRecordData.of(value)))
+                .isEqualTo("{\"value\":" + expected + "}");
+        assertThat(
+                        convertComplex(
+                                DataTypes.ARRAY(type), new GenericArrayData(new Object[] {value})))
+                .isEqualTo("[" + expected + "]");
+        assertThat(convertComplex(DataTypes.MAP(DataTypes.STRING(), type), new GenericMapData(map)))
+                .isEqualTo("{\"value\":" + expected + "}");
+    }
+
+    private Object convertComplex(DataType type, Object value) {
+        return DwsUtils.createFieldGetter(type, 0, ZoneId.of("Asia/Shanghai"))
+                .getFieldOrNull(GenericRecordData.of(value));
+    }
 
     @Test
     void testCreateFieldGetterSerializesComplexTypesAsJson() {
@@ -110,7 +176,7 @@ class DwsUtilsTest {
         assertThat(timestampGetter.getFieldOrNull(record))
                 .isEqualTo(Timestamp.valueOf("2024-01-02 03:04:05.123"));
         assertThat(localZonedGetter.getFieldOrNull(record))
-                .isEqualTo(Timestamp.valueOf("2024-01-02 03:04:05.123"));
+                .isEqualTo(Timestamp.from(Instant.parse("2024-01-02T03:04:05.123Z")));
         assertThat(zonedGetter.getFieldOrNull(record))
                 .isEqualTo(Timestamp.from(Instant.parse("2024-01-02T03:04:05.123Z")));
     }

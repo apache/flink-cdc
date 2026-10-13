@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.dws.utils;
 
 import org.apache.flink.cdc.common.data.ArrayData;
 import org.apache.flink.cdc.common.data.DateData;
+import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.MapData;
 import org.apache.flink.cdc.common.data.RecordData;
@@ -39,6 +40,8 @@ import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
+import java.time.temporal.ChronoField;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -144,14 +147,10 @@ public final class DwsUtils {
             case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
                 fieldGetter =
                         record ->
-                                Timestamp.valueOf(
-                                        ZonedDateTime.ofInstant(
-                                                        record.getLocalZonedTimestampData(
-                                                                        fieldPos,
-                                                                        getPrecision(fieldType))
-                                                                .toInstant(),
-                                                        zoneId)
-                                                .toLocalDateTime());
+                                Timestamp.from(
+                                        record.getLocalZonedTimestampData(
+                                                        fieldPos, getPrecision(fieldType))
+                                                .toInstant());
                 break;
             case TIMESTAMP_WITH_TIME_ZONE:
                 int zonedPrecision = ((ZonedTimestampType) fieldType).getPrecision();
@@ -252,6 +251,8 @@ public final class DwsUtils {
             return null;
         }
         switch (dataType.getTypeRoot()) {
+            case DECIMAL:
+                return ((DecimalData) value).toBigDecimal();
             case CHAR:
             case VARCHAR:
                 return value instanceof StringData ? ((StringData) value).toString() : value;
@@ -266,12 +267,14 @@ public final class DwsUtils {
                 }
                 return LocalTime.ofNanoOfDay(((Number) value).longValue() * 1_000_000L).toString();
             case TIMESTAMP_WITHOUT_TIME_ZONE:
-                return ((TimestampData) value).toLocalDateTime().format(DATETIME_FORMATTER);
+                return ((TimestampData) value)
+                        .toLocalDateTime()
+                        .format(timestampFormatter(dataType));
             case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
                 return ZonedDateTime.ofInstant(
                                 ((LocalZonedTimestampData) value).toInstant(), zoneId)
                         .toLocalDateTime()
-                        .format(DATETIME_FORMATTER);
+                        .format(timestampFormatter(dataType));
             case TIMESTAMP_WITH_TIME_ZONE:
                 return ((ZonedTimestampData) value).toString();
             case ARRAY:
@@ -291,6 +294,17 @@ public final class DwsUtils {
             default:
                 return value;
         }
+    }
+
+    private static DateTimeFormatter timestampFormatter(DataType dataType) {
+        int precision = getPrecision(dataType);
+        if (precision == 0) {
+            return DATETIME_FORMATTER;
+        }
+        return new DateTimeFormatterBuilder()
+                .append(DATETIME_FORMATTER)
+                .appendFraction(ChronoField.NANO_OF_SECOND, precision, precision, true)
+                .toFormatter(Locale.ROOT);
     }
 
     private static String writeValueAsString(Object value) {
