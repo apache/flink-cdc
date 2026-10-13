@@ -35,11 +35,14 @@ import org.apache.fluss.client.Connection;
 import org.apache.fluss.client.ConnectionFactory;
 import org.apache.fluss.client.admin.Admin;
 import org.apache.fluss.config.Configuration;
+import org.apache.fluss.exception.InvalidAlterTableException;
 import org.apache.fluss.metadata.DatabaseDescriptor;
 import org.apache.fluss.metadata.TableChange;
 import org.apache.fluss.metadata.TableDescriptor;
 import org.apache.fluss.metadata.TableInfo;
 import org.apache.fluss.metadata.TablePath;
+import org.apache.fluss.types.RowType;
+import org.apache.fluss.utils.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,6 +53,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.CREATE_TABLE;
@@ -218,11 +222,53 @@ public class FlussMetaDataApplier implements MetadataApplier, ExistingTableSchem
                 Admin admin = connection.getAdmin()) {
             TableId tableId = event.tableId();
             TablePath tablePath = new TablePath(tableId.getSchemaName(), tableId.getTableName());
-            admin.alterTable(tablePath, tableChanges, true).get();
+            List<TableChange> pendingChanges = tableChanges;
+            while (!pendingChanges.isEmpty()) {
+                try {
+                    admin.alterTable(tablePath, pendingChanges, false).get();
+                    return;
+                } catch (ExecutionException e) {
+                    if (!ExceptionUtils.findThrowable(e, InvalidAlterTableException.class)
+                            .isPresent()) {
+                        throw e;
+                    }
+                    List<TableChange> missingColumns =
+                            getMissingColumns(admin.getTableInfo(tablePath).get(), tableChanges);
+                    // Retry only when matching existing columns reduce the pending additions.
+                    if (missingColumns.size() >= pendingChanges.size()) {
+                        throw e;
+                    }
+                    pendingChanges = missingColumns;
+                }
+            }
         } catch (Exception e) {
             LOG.error("Failed to apply schema change {}", event, e);
             throw new RuntimeException(e);
         }
+    }
+
+    private List<TableChange> getMissingColumns(
+            TableInfo tableInfo, List<TableChange> tableChanges) {
+        RowType rowType = tableInfo.getRowType();
+        List<TableChange> missingColumns = new ArrayList<>();
+        for (TableChange change : tableChanges) {
+            TableChange.AddColumn addition = (TableChange.AddColumn) change;
+            int index = rowType.getFieldIndex(addition.getName());
+            if (index < 0) {
+                missingColumns.add(change);
+            } else if (!rowType.getTypeAt(index).equals(addition.getDataType())) {
+                throw new IllegalArgumentException(
+                        "Column "
+                                + addition.getName()
+                                + " already exists in table "
+                                + tableInfo.getTablePath()
+                                + " with type "
+                                + rowType.getTypeAt(index)
+                                + ", but ADD COLUMN requests "
+                                + addition.getDataType());
+            }
+        }
+        return missingColumns;
     }
 
     private void sanityCheck(
