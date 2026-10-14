@@ -57,7 +57,7 @@ under the License.
         <slf4j.version>1.7.15</slf4j.version>
         <log4j.version>2.17.1</log4j.version>
         <debezium.version>1.9.7.Final</debezium.version>
-        <flink.cdc.version>3.6.0-1.20</flink.cdc.version>
+        <flink.cdc.version>3.7.0-1.20</flink.cdc.version>
     </properties>
     <dependencies>
         <dependency>
@@ -266,7 +266,7 @@ under the License.
         <slf4j.version>1.7.15</slf4j.version>
         <log4j.version>2.17.1</log4j.version>
         <debezium.version>1.9.7.Final</debezium.version>
-        <flink.cdc.version>3.6.0-2.2</flink.cdc.version>
+        <flink.cdc.version>3.7.0-2.2</flink.cdc.version>
     </properties>
     <dependencies>
         <dependency>
