@@ -65,13 +65,6 @@ public class PostgresSourceReader extends IncrementalSourceReaderWithCommit {
     private final PriorityQueue<Long> minHeap;
     private final int lsnCommitCheckpointsDelay;
 
-    /**
-     * Kept locally because {@link IncrementalSourceReader} holds its copy privately, and {@link
-     * #onSplitFinished} needs it to tell a suspended stream split apart from one that reached its
-     * ending offset.
-     */
-    private final IncrementalSourceReaderContext incrementalSourceReaderContext;
-
     public PostgresSourceReader(
             FutureCompletingBlockingQueue elementQueue,
             Supplier supplier,
@@ -93,7 +86,6 @@ public class PostgresSourceReader extends IncrementalSourceReaderWithCommit {
         this.lsnCommitCheckpointsDelay =
                 ((PostgresSourceConfig) sourceConfig).getLsnCommitCheckpointsDelay();
         this.minHeap = new PriorityQueue<>();
-        this.incrementalSourceReaderContext = incrementalSourceReaderContext;
     }
 
     @Override
