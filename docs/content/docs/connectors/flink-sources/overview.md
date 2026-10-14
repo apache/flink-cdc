@@ -53,6 +53,7 @@ The following table shows the version mapping between Flink CDC Connectors and F
 
 | Flink CDC Version |                Flink Version                |
 |:-----------------:|:-------------------------------------------:|
+|      3.7.\*       |               1.20.\*, 2.2.\*               |
 |      3.6.\*       |               1.20.\*, 2.2.\*               |
 |      3.5.\*       |              1.19.\*, 1.20.\*               |
 |      3.4.\*       |              1.19.\*, 1.20.\*               |
