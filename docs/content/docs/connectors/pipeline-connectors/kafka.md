@@ -149,6 +149,13 @@ Pipeline Connector Options
       <td>Custom table mappings for each table from upstream tableId to downstream Kafka topic. Each mapping is separated by `;`, separate upstream tableId and downstream Kafka topic by `:`, For example, we can set `sink.tableId-to-topic.mapping` like `mydb.mytable1:topic1;mydb.mytable2:topic2`. </td>
     </tr>
     <tr>
+      <td>sink.delivery-guarantee</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">at-least-once</td>
+      <td>String</td>
+      <td>Delivery guarantee when committing. Available options are `exactly-once`, `at-least-once` and `none`. Default is `at-least-once`.</td>
+    </tr>
+    <tr>
       <td>debezium-json.include-schema.enabled</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>
