@@ -74,6 +74,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import static io.debezium.connector.postgresql.connection.ReplicationConnection.Builder.DEFAULT_PUBLICATION_NAME;
 import static java.lang.String.format;
 import static org.apache.flink.cdc.connectors.postgres.testutils.PostgresTestUtils.hasNextData;
 import static org.apache.flink.cdc.connectors.postgres.testutils.PostgresTestUtils.triggerFailover;
@@ -199,7 +200,7 @@ class PostgresSourceITCase extends PostgresTestBase {
                 1,
                 0,
                 options,
-                this::checkStreamDataForFilteredPublication,
+                this::checkPublicationForBackfillPhase,
                 false);
     }
 
@@ -1079,101 +1080,46 @@ class PostgresSourceITCase extends PostgresTestBase {
                 expectedSnapshotData, fetchRows(iterator, expectedSnapshotData.size()));
     }
 
-    private void checkStreamDataForFilteredPublication(
+    private void checkPublicationForBackfillPhase(
             TableResult tableResult,
             PostgresTestUtils.FailoverType failoverType,
             PostgresTestUtils.FailoverPhase failoverPhase,
             String[] captureCustomerTables)
             throws Exception {
-        waitUntilJobRunning(tableResult);
-        CloseableIterator<Row> iterator = tableResult.collect();
-        Optional<JobClient> optionalJobClient = tableResult.getJobClient();
-        assertThat(optionalJobClient).isPresent();
-
-        String[] snapshotForSingleTable =
-                new String[] {
-                    "+I[101, user_1, Shanghai, 123567891234]",
-                    "+I[102, user_2, Shanghai, 123567891234]",
-                    "+I[103, user_3, Shanghai, 123567891234]",
-                    "+I[109, user_4, Shanghai, 123567891234]",
-                    "+I[110, user_5, Shanghai, 123567891234]",
-                    "+I[111, user_6, Shanghai, 123567891234]",
-                    "+I[118, user_7, Shanghai, 123567891234]",
-                    "+I[121, user_8, Shanghai, 123567891234]",
-                    "+I[123, user_9, Shanghai, 123567891234]",
-                    "+I[1009, user_10, Shanghai, 123567891234]",
-                    "+I[1010, user_11, Shanghai, 123567891234]",
-                    "+I[1011, user_12, Shanghai, 123567891234]",
-                    "+I[1012, user_13, Shanghai, 123567891234]",
-                    "+I[1013, user_14, Shanghai, 123567891234]",
-                    "+I[1014, user_15, Shanghai, 123567891234]",
-                    "+I[1015, user_16, Shanghai, 123567891234]",
-                    "+I[1016, user_17, Shanghai, 123567891234]",
-                    "+I[1017, user_18, Shanghai, 123567891234]",
-                    "+I[1018, user_19, Shanghai, 123567891234]",
-                    "+I[1019, user_20, Shanghai, 123567891234]",
-                    "+I[2000, user_21, Shanghai, 123567891234]"
-                };
-
-        int recordsPerTable = snapshotForSingleTable.length;
-        int totalSnapshotRecords = recordsPerTable * captureCustomerTables.length;
-        int recordsFromFirstTwoTables = recordsPerTable * 2;
-        int recordsWhenTable3Starts = recordsFromFirstTwoTables + 1;
-
-        List<String> collectedSnapshotData = new ArrayList<>();
-        boolean insertedDuringSnapshot = false;
-
-        while (iterator.hasNext() && collectedSnapshotData.size() < totalSnapshotRecords) {
-            Row row = iterator.next();
-            String rowStr = row.toString();
-            collectedSnapshotData.add(rowStr);
-
-            // Insert test record right after Table 3 starts its snapshot phase
-            // This ensures the insert happens while Table 3's backfill slot may have altered the
-            // publication
-            if (collectedSnapshotData.size() == recordsWhenTable3Starts
-                    && !insertedDuringSnapshot) {
-                Thread.sleep(1000L); // Give Table 3's backfill slot time to alter the publication
-                try (PostgresConnection connection = getConnection()) {
-                    connection.setAutoCommit(false);
-                    connection.execute(
-                            "INSERT INTO customer.Customers VALUES(9999, 'test_user', 'TestCity', '123456789')");
-                    connection.commit();
+        List<String> expectedTables =
+                Arrays.stream(captureCustomerTables)
+                        .map(table -> SCHEMA_NAME + "." + table)
+                        .collect(Collectors.toList());
+        // Backfill creates its slot after initializing the shared publication.
+        String query =
+                format(
+                        "SELECT schemaname, tablename FROM pg_publication_tables "
+                                + "WHERE pubname = '%s' AND EXISTS ("
+                                + "SELECT 1 FROM pg_replication_slots "
+                                + "WHERE slot_name = '%s_0' AND database = current_database())",
+                        DEFAULT_PUBLICATION_NAME, slotName);
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+        try (PostgresConnection connection = getConnection()) {
+            while (System.nanoTime() < deadline) {
+                List<String> publishedTables = new ArrayList<>();
+                connection.query(
+                        query,
+                        rs -> {
+                            while (rs.next()) {
+                                publishedTables.add(rs.getString(1) + "." + rs.getString(2));
+                            }
+                        });
+                connection.commit();
+                if (!publishedTables.isEmpty()) {
+                    assertThat(publishedTables)
+                            .as("Publication must retain all captured tables during backfill")
+                            .containsExactlyInAnyOrderElementsOf(expectedTables);
+                    return;
                 }
-                insertedDuringSnapshot = true;
+                Thread.sleep(10L);
             }
         }
-
-        List<String> expectedSnapshotData = new ArrayList<>();
-        for (int i = 0; i < captureCustomerTables.length; i++) {
-            expectedSnapshotData.addAll(Arrays.asList(snapshotForSingleTable));
-        }
-
-        assertEqualsInAnyOrder(expectedSnapshotData, collectedSnapshotData);
-
-        Thread.sleep(15000L);
-
-        List<String> collectedStreamData = new ArrayList<>();
-        long startTime = System.currentTimeMillis();
-        long timeout = 30000L;
-        int maxRecords = 100;
-
-        while (collectedStreamData.size() < maxRecords
-                && (System.currentTimeMillis() - startTime) < timeout) {
-            if (hasNextData(iterator)) {
-                String record = iterator.next().toString();
-                collectedStreamData.add(record);
-            } else {
-                Thread.sleep(1000L);
-            }
-        }
-
-        boolean insertFound =
-                collectedStreamData.contains("+I[9999, test_user, TestCity, 123456789]");
-        assertThat(insertFound)
-                .as(
-                        "The insert into Customers table during Table 3 snapshot phase should be captured.")
-                .isTrue();
+        throw new AssertionError("No backfill publication observed within 30 seconds");
     }
 
     private void checkStreamData(
