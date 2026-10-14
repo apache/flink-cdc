@@ -794,7 +794,7 @@ public class FlussMetadataApplierTest {
     }
 
     @Test
-    void testReplayAddColumnsWithConcurrentAdditionAndOlderSchema() throws Exception {
+    void testReplayAddColumnsPropagatesConcurrentAdditionFailure() throws Exception {
         TableId tableId = TableId.tableId(DATABASE_NAME, "concurrent_addition");
         TablePath tablePath = new TablePath(DATABASE_NAME, "concurrent_addition");
         try (FlussMetaDataApplier applier =
@@ -807,7 +807,6 @@ public class FlussMetadataApplierTest {
                     new CreateTableEvent(
                             tableId,
                             Schema.newBuilder().physicalColumn("id", DataTypes.INT()).build()));
-            TableInfo staleTableInfo = admin.getTableInfo(tablePath).get();
             admin.alterTable(tablePath, addIntColumns("a"), false).get();
             AtomicInteger schemaReads = new AtomicInteger();
             AtomicInteger alterCalls = new AtomicInteger();
@@ -823,15 +822,19 @@ public class FlussMetadataApplierTest {
                                             admin.alterTable(tablePath, addIntColumns("b"), false)
                                                     .get();
                                         }
-                                        if (method.getName().equals("getTableInfo")
-                                                && schemaReads.incrementAndGet() == 2) {
-                                            return CompletableFuture.completedFuture(
-                                                    staleTableInfo);
+                                        if (method.getName().equals("getTableInfo")) {
+                                            schemaReads.incrementAndGet();
                                         }
                                         return method.invoke(admin, args);
                                     });
 
-            applier.applyAddColumnChanges(racingAdmin, tablePath, addIntColumns("a", "b"));
+            assertThatThrownBy(
+                            () ->
+                                    applier.applyAddColumnChanges(
+                                            racingAdmin, tablePath, addIntColumns("a", "b")))
+                    .rootCause()
+                    .isInstanceOf(InvalidAlterTableException.class)
+                    .hasMessageContaining("Column b already exists");
 
             TableInfo afterReplay = admin.getTableInfo(tablePath).get();
             assertThat(afterReplay.getSchema())
@@ -843,7 +846,7 @@ public class FlussMetadataApplierTest {
                                             .physicalColumn("b", DataTypes.INT())
                                             .build()));
             assertThat(alterCalls.get()).isEqualTo(2);
-            assertThat(schemaReads.get()).isEqualTo(3);
+            assertThat(schemaReads.get()).isEqualTo(1);
             applier.applyAddColumnChanges(admin, tablePath, addIntColumns("a", "b"));
             assertThat(admin.getTableInfo(tablePath).get().getSchemaId())
                     .isEqualTo(afterReplay.getSchemaId());

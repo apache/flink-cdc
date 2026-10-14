@@ -235,40 +235,40 @@ public class FlussMetaDataApplier implements MetadataApplier, ExistingTableSchem
     @VisibleForTesting
     void applyAddColumnChanges(Admin admin, TablePath tablePath, List<TableChange> tableChanges)
             throws ExecutionException, InterruptedException {
+        if (tableChanges.isEmpty()) {
+            return;
+        }
         try {
-            List<TableChange> pendingChanges = tableChanges;
-            while (!pendingChanges.isEmpty()) {
-                try {
-                    admin.alterTable(tablePath, pendingChanges, false).get();
-                    return;
-                } catch (ExecutionException e) {
-                    if (!ExceptionUtils.findThrowable(e, InvalidAlterTableException.class)
-                            .isPresent()) {
+            try {
+                admin.alterTable(tablePath, tableChanges, false).get();
+            } catch (ExecutionException e) {
+                if (!ExceptionUtils.findThrowable(e, InvalidAlterTableException.class)
+                        .isPresent()) {
+                    throw e;
+                }
+                Set<String> columnNames = new HashSet<>();
+                for (TableChange change : tableChanges) {
+                    if (!columnNames.add(((TableChange.AddColumn) change).getName())) {
                         throw e;
                     }
-                    Set<String> columnNames = new HashSet<>();
-                    for (TableChange change : tableChanges) {
-                        if (!columnNames.add(((TableChange.AddColumn) change).getName())) {
-                            throw e;
-                        }
-                    }
-                    List<TableChange> missingColumns =
+                }
+                List<TableChange> missingColumns =
+                        getMissingColumns(admin.getTableInfo(tablePath).get(), tableChanges);
+                // Schema reads may lag behind ADD when served by another ZooKeeper session.
+                for (int retry = 0;
+                        missingColumns.size() == tableChanges.size()
+                                && retry < MAX_SCHEMA_READ_RETRIES;
+                        retry++) {
+                    Thread.sleep(SCHEMA_READ_RETRY_DELAY_MILLIS);
+                    missingColumns =
                             getMissingColumns(admin.getTableInfo(tablePath).get(), tableChanges);
-                    // Schema reads may lag behind ADD when served by another ZooKeeper session.
-                    for (int retry = 0;
-                            missingColumns.size() >= pendingChanges.size()
-                                    && retry < MAX_SCHEMA_READ_RETRIES;
-                            retry++) {
-                        Thread.sleep(SCHEMA_READ_RETRY_DELAY_MILLIS);
-                        missingColumns =
-                                getMissingColumns(
-                                        admin.getTableInfo(tablePath).get(), tableChanges);
-                    }
-                    // Retry only when matching existing columns reduce the pending additions.
-                    if (missingColumns.size() >= pendingChanges.size()) {
-                        throw e;
-                    }
-                    pendingChanges = missingColumns;
+                }
+                if (missingColumns.size() == tableChanges.size()) {
+                    throw e;
+                }
+                if (!missingColumns.isEmpty()) {
+                    // Reconcile once; concurrent changes or further stale reads must fail normally.
+                    admin.alterTable(tablePath, missingColumns, false).get();
                 }
             }
         } catch (InterruptedException e) {
