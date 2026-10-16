@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.fluss.sink;
 
+import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropTableEvent;
@@ -35,11 +36,14 @@ import org.apache.fluss.client.Connection;
 import org.apache.fluss.client.ConnectionFactory;
 import org.apache.fluss.client.admin.Admin;
 import org.apache.fluss.config.Configuration;
+import org.apache.fluss.exception.InvalidAlterTableException;
 import org.apache.fluss.metadata.DatabaseDescriptor;
 import org.apache.fluss.metadata.TableChange;
 import org.apache.fluss.metadata.TableDescriptor;
 import org.apache.fluss.metadata.TableInfo;
 import org.apache.fluss.metadata.TablePath;
+import org.apache.fluss.types.RowType;
+import org.apache.fluss.utils.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,6 +54,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.CREATE_TABLE;
@@ -62,6 +67,8 @@ import static org.apache.flink.cdc.connectors.fluss.utils.FlussConversions.toFlu
 /** {@link MetadataApplier} for fluss. */
 public class FlussMetaDataApplier implements MetadataApplier, ExistingTableSchemaExpansionSupport {
     private static final Logger LOG = LoggerFactory.getLogger(FlussMetaDataApplier.class);
+    private static final int MAX_SCHEMA_READ_RETRIES = 3;
+    private static final long SCHEMA_READ_RETRY_DELAY_MILLIS = 100L;
     private final Configuration flussClientConfig;
     private final Map<String, String> tableProperties;
     private final Map<String, List<String>> bucketKeysMap;
@@ -218,11 +225,80 @@ public class FlussMetaDataApplier implements MetadataApplier, ExistingTableSchem
                 Admin admin = connection.getAdmin()) {
             TableId tableId = event.tableId();
             TablePath tablePath = new TablePath(tableId.getSchemaName(), tableId.getTableName());
-            admin.alterTable(tablePath, tableChanges, true).get();
+            applyAddColumnChanges(admin, tablePath, tableChanges);
         } catch (Exception e) {
             LOG.error("Failed to apply schema change {}", event, e);
             throw new RuntimeException(e);
         }
+    }
+
+    @VisibleForTesting
+    void applyAddColumnChanges(Admin admin, TablePath tablePath, List<TableChange> tableChanges)
+            throws ExecutionException, InterruptedException {
+        if (tableChanges.isEmpty()) {
+            return;
+        }
+        try {
+            try {
+                admin.alterTable(tablePath, tableChanges, false).get();
+            } catch (ExecutionException e) {
+                if (!ExceptionUtils.findThrowable(e, InvalidAlterTableException.class)
+                        .isPresent()) {
+                    throw e;
+                }
+                Set<String> columnNames = new HashSet<>();
+                for (TableChange change : tableChanges) {
+                    if (!columnNames.add(((TableChange.AddColumn) change).getName())) {
+                        throw e;
+                    }
+                }
+                List<TableChange> missingColumns =
+                        getMissingColumns(admin.getTableInfo(tablePath).get(), tableChanges);
+                // Schema reads may lag behind ADD when served by another ZooKeeper session.
+                for (int retry = 0;
+                        missingColumns.size() == tableChanges.size()
+                                && retry < MAX_SCHEMA_READ_RETRIES;
+                        retry++) {
+                    Thread.sleep(SCHEMA_READ_RETRY_DELAY_MILLIS);
+                    missingColumns =
+                            getMissingColumns(admin.getTableInfo(tablePath).get(), tableChanges);
+                }
+                if (missingColumns.size() == tableChanges.size()) {
+                    throw e;
+                }
+                if (!missingColumns.isEmpty()) {
+                    // Reconcile once; concurrent changes or further stale reads must fail normally.
+                    admin.alterTable(tablePath, missingColumns, false).get();
+                }
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw e;
+        }
+    }
+
+    private List<TableChange> getMissingColumns(
+            TableInfo tableInfo, List<TableChange> tableChanges) {
+        RowType rowType = tableInfo.getRowType();
+        List<TableChange> missingColumns = new ArrayList<>();
+        for (TableChange change : tableChanges) {
+            TableChange.AddColumn addition = (TableChange.AddColumn) change;
+            int index = rowType.getFieldIndex(addition.getName());
+            if (index < 0) {
+                missingColumns.add(change);
+            } else if (!rowType.getTypeAt(index).equals(addition.getDataType())) {
+                throw new IllegalArgumentException(
+                        "Column "
+                                + addition.getName()
+                                + " already exists in table "
+                                + tableInfo.getTablePath()
+                                + " with type "
+                                + rowType.getTypeAt(index)
+                                + ", but ADD COLUMN requests "
+                                + addition.getDataType());
+            }
+        }
+        return missingColumns;
     }
 
     private void sanityCheck(
