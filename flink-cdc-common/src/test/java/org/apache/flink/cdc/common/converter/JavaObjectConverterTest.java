@@ -253,6 +253,12 @@ class JavaObjectConverterTest {
         assertThat(convertToJava(TimeData.fromNanoOfDay(14419123456789L), DataTypes.TIME(3)))
                 .isInstanceOf(LocalTime.class)
                 .hasToString("04:00:19.123");
+        assertThat(convertToJava(TimeData.fromNanoOfDay(14419123456789L), DataTypes.TIME(6)))
+                .isInstanceOf(LocalTime.class)
+                .hasToString("04:00:19.123456");
+        assertThat(convertToJava(TimeData.fromNanoOfDay(14419123456789L), DataTypes.TIME(9)))
+                .isInstanceOf(LocalTime.class)
+                .hasToString("04:00:19.123456789");
         assertThat(convertToJava(null, DataTypes.TIME())).isNull();
     }
 
