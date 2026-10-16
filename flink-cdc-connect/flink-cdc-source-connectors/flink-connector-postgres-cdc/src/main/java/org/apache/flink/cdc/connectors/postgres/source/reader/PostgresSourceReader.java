@@ -157,14 +157,35 @@ public class PostgresSourceReader extends IncrementalSourceReaderWithCommit {
         for (Object splitState : finishedSplitIds.values()) {
             SourceSplitBase sourceSplit = ((SourceSplitState) splitState).toSourceSplit();
             if (sourceSplit.isStreamSplit()) {
-                StreamSplit streamSplit = sourceSplit.asStreamSplit();
+                // A stream split finishes for one of two reasons, see
+                // IncrementalSourceReader#onSplitFinished: it was suspended by the enumerator so
+                // that newly added tables can be snapshotted, or it reached its ending offset.
+                // Only the latter means the bounded snapshot-only read is over and the slot is no
+                // longer needed.
+                //
+                // Comparing the split's starting and ending offsets cannot answer that question.
+                // For snapshot-only, HybridSplitAssigner#createStreamSplit seeds them with the
+                // lowest and highest high watermark of the finished snapshot splits, and afterwards
+                // only IncrementalSourceRecordEmitter#updateStreamSplitState advances the starting
+                // offset, for data-change records and heartbeats. A split that reaches its ending
+                // offset without emitting such a record — a captured publication with no traffic
+                // emits none — therefore left the slot behind on every run.
                 if (this.sourceConfig.getStartupOptions().isSnapshotOnly()
-                        && streamSplit
-                                .getStartingOffset()
-                                .isAtOrAfter(streamSplit.getEndingOffset())) {
+                        && !incrementalSourceReaderContext.isStreamSplitReaderSuspended()) {
                     PostgresDialect dialect = (PostgresDialect) this.dialect;
-                    boolean removed = dialect.removeSlot(dialect.getSlotName());
-                    LOG.info("Remove slot '{}' result is {}.", dialect.getSlotName(), removed);
+                    String slotName = dialect.getSlotName();
+                    boolean removed = dialect.removeSlot(slotName);
+                    if (removed) {
+                        LOG.info("Removed replication slot '{}'.", slotName);
+                    } else {
+                        // removeSlot swallows the failure, so without this the only trace of a
+                        // slot that keeps pinning WAL would be an INFO line reading "false".
+                        LOG.warn(
+                                "Failed to remove replication slot '{}'. It will keep retaining WAL "
+                                        + "until it is dropped, e.g. with pg_drop_replication_slot('{}').",
+                                slotName,
+                                slotName);
+                    }
                 }
             }
         }

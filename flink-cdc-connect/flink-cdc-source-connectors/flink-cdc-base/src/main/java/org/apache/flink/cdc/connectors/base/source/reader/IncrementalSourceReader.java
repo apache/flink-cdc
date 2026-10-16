@@ -119,7 +119,7 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
     protected final C sourceConfig;
     protected final DataSourceDialect<C> dialect;
 
-    private final IncrementalSourceReaderContext incrementalSourceReaderContext;
+    protected final IncrementalSourceReaderContext incrementalSourceReaderContext;
 
     public IncrementalSourceReader(
             FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecords>> elementQueue,
