@@ -379,4 +379,57 @@ class StarRocksMetadataApplierTest {
             }
         }
     }
+
+    @Test
+    void testMultiTableTransactionRejectsCrossDatabaseWrites() throws Exception {
+        StarRocksMetadataApplier multiTableApplier =
+                new StarRocksMetadataApplier(
+                        catalog, tableCreateConfig(), schemaChangeConfig(), true);
+
+        // tables in the same database are accepted
+        multiTableApplier.applySchemaChange(createTableEvent("db1.tbl1"));
+        multiTableApplier.applySchemaChange(createTableEvent("db1.tbl2"));
+
+        // a table in another database must fail fast
+        Assertions.assertThatThrownBy(
+                        () -> multiTableApplier.applySchemaChange(createTableEvent("db2.tbl3")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("same database");
+    }
+
+    @Test
+    void testCrossDatabaseAllowedWhenMultiTableTransactionDisabled() throws Exception {
+        // default applier has multi-table transaction disabled, cross-database writes are allowed
+        metadataApplier.applySchemaChange(createTableEvent("db1.tbl1"));
+        metadataApplier.applySchemaChange(createTableEvent("db2.tbl2"));
+    }
+
+    private TableCreateConfig tableCreateConfig() {
+        Configuration configuration =
+                Configuration.fromMap(
+                        ImmutableMap.<String, String>builder()
+                                .put(TABLE_CREATE_NUM_BUCKETS.key(), "10")
+                                .put("table.create.properties.replication_num", "5")
+                                .build());
+        return TableCreateConfig.from(configuration);
+    }
+
+    private SchemaChangeConfig schemaChangeConfig() {
+        Configuration configuration =
+                Configuration.fromMap(
+                        ImmutableMap.<String, String>builder()
+                                .put(TABLE_SCHEMA_CHANGE_TIMEOUT.key(), "100s")
+                                .build());
+        return SchemaChangeConfig.from(configuration);
+    }
+
+    private CreateTableEvent createTableEvent(String tableIdStr) {
+        TableId tableId = TableId.parse(tableIdStr);
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("col1", new IntType())
+                        .primaryKey("col1")
+                        .build();
+        return new CreateTableEvent(tableId, schema);
+    }
 }
