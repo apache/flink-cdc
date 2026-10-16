@@ -184,10 +184,9 @@ public class SchemaCoordinator extends SchemaRegistry {
     }
 
     @Override
-    protected void shutdown() throws Exception {
+    protected void shutdown(long timeoutMillis) throws Exception {
         schemaChangeThreadPool.shutdownNow();
-        if (!schemaChangeThreadPool.awaitTermination(
-                rpcTimeout.toMillis(), TimeUnit.MILLISECONDS)) {
+        if (!schemaChangeThreadPool.awaitTermination(timeoutMillis, TimeUnit.MILLISECONDS)) {
             throw new TimeoutException("Schema change executor did not terminate during reset.");
         }
     }
@@ -199,14 +198,6 @@ public class SchemaCoordinator extends SchemaRegistry {
             pendingRequests.forEach((index, tuple) -> tuple.f1.completeExceptionally(t));
         }
         LOG.info("Current upstream table state: {}", upstreamSchemaTable);
-    }
-
-    @Override
-    public void close() throws Exception {
-        super.close();
-        if (schemaChangeThreadPool != null && !schemaChangeThreadPool.isShutdown()) {
-            schemaChangeThreadPool.shutdownNow();
-        }
     }
 
     @Override
