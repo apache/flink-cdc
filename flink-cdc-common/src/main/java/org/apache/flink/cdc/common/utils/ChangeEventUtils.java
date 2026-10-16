@@ -43,6 +43,9 @@ public class ChangeEventUtils {
                         dataChangeEvent.before(),
                         dataChangeEvent.after(),
                         dataChangeEvent.meta());
+            case UPDATE_BEFORE:
+                return DataChangeEvent.updateBeforeEvent(
+                        tableId, dataChangeEvent.before(), dataChangeEvent.meta());
             case REPLACE:
                 return DataChangeEvent.replaceEvent(
                         tableId, dataChangeEvent.after(), dataChangeEvent.meta());

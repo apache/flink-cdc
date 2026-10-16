@@ -247,7 +247,11 @@ public class FlinkPipelineComposer implements PipelineComposer {
             // PostTransform -> Partitioning
             DataStream<PartitioningEvent> partitionedStream =
                     partitioningTranslator.translateDistributed(
-                            stream, parallelism, parallelism, hashFunctionProvider);
+                            stream,
+                            parallelism,
+                            parallelism,
+                            hashFunctionProvider,
+                            dataSink.requiresPrimaryKeyUpdateSplit());
 
             // Partitioning -> Schema Operator
             stream =
@@ -285,6 +289,7 @@ public class FlinkPipelineComposer implements PipelineComposer {
                             parallelism,
                             parallelism,
                             isBatchMode,
+                            dataSink.requiresPrimaryKeyUpdateSplit(),
                             schemaOperatorIDGenerator.generate(),
                             hashFunctionProvider,
                             operatorUidGenerator);
