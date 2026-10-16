@@ -123,7 +123,9 @@ public class BatchRegularPrePartitionOperator
                     new StreamRecord<>(
                             PartitioningEvent.ofRegular(
                                     event,
-                                    cachedHashFunctions.get(event.tableId()).hashcode(hashContext, event)
+                                    cachedHashFunctions
+                                                    .get(event.tableId())
+                                                    .hashcode(hashContext, event)
                                             % downstreamParallelism)));
         }
     }

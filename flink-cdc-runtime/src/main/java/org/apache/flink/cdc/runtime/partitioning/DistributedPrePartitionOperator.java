@@ -133,7 +133,9 @@ public class DistributedPrePartitionOperator
                             PartitioningEvent.ofDistributed(
                                     event,
                                     hashContext.getSourceSubtaskIndex(),
-                                    hashFunctionMap.get(event.tableId()).hashcode(hashContext, event)
+                                    hashFunctionMap
+                                                    .get(event.tableId())
+                                                    .hashcode(hashContext, event)
                                             % downstreamParallelism)));
         }
     }
