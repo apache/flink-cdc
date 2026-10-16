@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.fluss.source.enumerator;
 
 import org.apache.flink.api.connector.source.ReaderInfo;
+import org.apache.flink.api.connector.source.SourceEvent;
 import org.apache.flink.api.connector.source.SplitsAssignment;
 import org.apache.flink.api.connector.source.mocks.MockSplitEnumeratorContext;
 import org.apache.flink.cdc.common.configuration.Configuration;
@@ -43,7 +44,9 @@ import org.apache.fluss.client.table.Table;
 import org.apache.fluss.client.table.scanner.batch.BatchScanUtils;
 import org.apache.fluss.client.table.scanner.batch.BatchScanner;
 import org.apache.fluss.config.ConfigOptions;
+import org.apache.fluss.exception.NetworkException;
 import org.apache.fluss.metadata.PartitionSpec;
+import org.apache.fluss.metadata.PhysicalTablePath;
 import org.apache.fluss.metadata.TableDescriptor;
 import org.apache.fluss.metadata.TablePath;
 import org.apache.fluss.row.InternalRow;
@@ -53,6 +56,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -62,6 +67,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -635,6 +642,159 @@ class FlussSourceEnumeratorTest {
             } finally {
                 enumerator.close();
             }
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void testRetriableDiscoveryPreservesStateAndRecovers(boolean readersRegistered)
+            throws Throwable {
+        createPkTable("kept", 3);
+        createPkTable("removed", 3);
+        createPkTable("added", 3);
+        TableId kept = TableId.tableId(DATABASE_NAME, "kept");
+        TableId removed = TableId.tableId(DATABASE_NAME, "removed");
+        TableId added = TableId.tableId(DATABASE_NAME, "added");
+        TablePath removedPath = TablePath.of(DATABASE_NAME, "removed");
+        AtomicInteger round = new AtomicInteger();
+        TableDiscoverer discoverer =
+                discovererWith(
+                        () -> {
+                            switch (round.getAndIncrement()) {
+                                case 0:
+                                    return Set.of(kept, removed);
+                                case 1:
+                                    return Set.of(kept);
+                                case 2:
+                                    throw new ExecutionException(
+                                            new NetworkException("Temporary network failure"));
+                                default:
+                                    return Set.of(kept, added);
+                            }
+                        });
+
+        try (MockSplitEnumeratorContext<FlussSplitBase> context =
+                        new MockSplitEnumeratorContext<>(NUM_READERS);
+                FlussSourceEnumerator enumerator = newEnumerator(context, discoverer, null)) {
+            enumerator.start();
+            if (readersRegistered) {
+                registerAllReaders(context, enumerator);
+            }
+            runDiscoveryCycle(context);
+            runDiscoveryCycle(context);
+            FlussSourceEnumState before = enumerator.snapshotState(1L);
+            assertThat(before.getPendingRemovalTablePaths()).containsExactly(removedPath);
+            Set<PhysicalTablePath> assignedBefore =
+                    new HashSet<>(before.getAssignedPhysicalTablePaths());
+            int assignmentsBefore = context.getSplitsAssignmentSequence().size();
+            List<SourceEvent> eventsBefore =
+                    new ArrayList<>(
+                            context.getSentSourceEvent().getOrDefault(0, Collections.emptyList()));
+
+            runDiscoveryCycle(context);
+
+            FlussSourceEnumState after = enumerator.snapshotState(2L);
+            assertThat(after.getAssignedPhysicalTablePaths())
+                    .containsExactlyInAnyOrderElementsOf(assignedBefore);
+            assertThat(after.getRemainingSplits())
+                    .containsExactlyInAnyOrderElementsOf(before.getRemainingSplits());
+            assertThat(after.getPendingRemovalTablePaths()).containsExactly(removedPath);
+            assertThat(context.getSplitsAssignmentSequence()).hasSize(assignmentsBefore);
+            assertThat(context.getSentSourceEvent().getOrDefault(0, Collections.emptyList()))
+                    .containsExactlyElementsOf(eventsBefore);
+            assertThat(context.getOneTimeCallables()).isEmpty();
+
+            runDiscoveryCycle(context);
+            if (!readersRegistered) {
+                registerAllReaders(context, enumerator);
+            }
+            TableSubscriptionEvent subscription = latestSubscriptionEvent(context, 0);
+            assertThat(subscription.getSubscribedTablePaths())
+                    .containsExactlyInAnyOrder(
+                            TablePath.of(DATABASE_NAME, "kept"),
+                            TablePath.of(DATABASE_NAME, "added"));
+            assertThat(assignedSplitIds(context, "kept")).hasSize(3).doesNotHaveDuplicates();
+            assertThat(assignedSplitIds(context, "added")).hasSize(3).doesNotHaveDuplicates();
+            acknowledgeRemoval(
+                    enumerator,
+                    removedPath,
+                    subscription.getPendingRemovalRequests().get(removedPath));
+            assertThat(enumerator.snapshotState(3L).getPendingRemovalTablePaths()).isEmpty();
+        }
+    }
+
+    @Test
+    void testInitialPeriodicDiscoveryRetriesWrappedNetworkFailure() throws Throwable {
+        AtomicInteger round = new AtomicInteger();
+        TableDiscoverer discoverer =
+                discovererWith(
+                        () -> {
+                            if (round.getAndIncrement() == 0) {
+                                throw new ExecutionException(
+                                        new NetworkException("Temporary network failure"));
+                            }
+                            return Collections.emptySet();
+                        });
+        try (MockSplitEnumeratorContext<FlussSplitBase> context =
+                        new MockSplitEnumeratorContext<>(NUM_READERS);
+                FlussSourceEnumerator enumerator = newEnumerator(context, discoverer, null)) {
+            enumerator.start();
+            registerAllReaders(context, enumerator);
+            runDiscoveryCycle(context);
+            assertThat(context.getSentSourceEvent()).isEmpty();
+            runDiscoveryCycle(context);
+            assertThat(latestSubscriptionEvent(context, 0).getSubscribedTablePaths()).isEmpty();
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(longs = {0L, 10000L})
+    void testNonRetriableDiscoveryStillFails(long interval) throws Throwable {
+        TableDiscoverer discoverer =
+                discovererWith(
+                        () -> {
+                            throw new IllegalStateException("Invalid discovery");
+                        });
+        try (MockSplitEnumeratorContext<FlussSplitBase> context =
+                        new MockSplitEnumeratorContext<>(NUM_READERS);
+                FlussSourceEnumerator enumerator =
+                        newEnumerator(
+                                context,
+                                discoverer,
+                                null,
+                                OffsetsInitializer.earliest(),
+                                interval)) {
+            enumerator.start();
+            assertThatThrownBy(
+                            () -> {
+                                if (interval > 0) {
+                                    context.runPeriodicCallable(DISCOVERY_CALLABLE_INDEX);
+                                } else {
+                                    context.runNextOneTimeCallable();
+                                }
+                            })
+                    .isInstanceOf(FlinkRuntimeException.class)
+                    .hasRootCauseMessage("Invalid discovery");
+        }
+    }
+
+    @Test
+    void testOneTimeDiscoveryStillFailsOnWrappedNetworkFailure() throws Throwable {
+        TableDiscoverer discoverer =
+                discovererWith(
+                        () -> {
+                            throw new ExecutionException(
+                                    new NetworkException("Temporary network failure"));
+                        });
+        try (MockSplitEnumeratorContext<FlussSplitBase> context =
+                        new MockSplitEnumeratorContext<>(NUM_READERS);
+                FlussSourceEnumerator enumerator =
+                        newEnumerator(
+                                context, discoverer, null, OffsetsInitializer.earliest(), 0L)) {
+            enumerator.start();
+            assertThatThrownBy(context::runNextOneTimeCallable)
+                    .isInstanceOf(FlinkRuntimeException.class)
+                    .hasRootCauseMessage("Temporary network failure");
         }
     }
 
@@ -1756,6 +1916,21 @@ class FlussSourceEnumeratorTest {
     // =====================================================================
     //  Helpers
     // =====================================================================
+
+    private static TableDiscoverer discovererWith(Callable<Set<TableId>> discovery) {
+        return new TableDiscoverer() {
+            @Override
+            public void open(Context context) {}
+
+            @Override
+            public Set<TableId> discover() throws Exception {
+                return discovery.call();
+            }
+
+            @Override
+            public void close() {}
+        };
+    }
 
     private FlussSourceEnumerator newEnumerator(
             MockSplitEnumeratorContext<FlussSplitBase> context,
