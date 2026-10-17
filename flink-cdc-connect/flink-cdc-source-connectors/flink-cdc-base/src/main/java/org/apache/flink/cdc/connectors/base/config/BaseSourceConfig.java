@@ -40,6 +40,7 @@ public abstract class BaseSourceConfig implements SourceConfig {
     protected final boolean isScanNewlyAddedTableEnabled;
     protected final boolean assignUnboundedChunkFirst;
     protected final boolean releaseSnapshotMetadataEnabled;
+    protected final double recordsPerSecond;
 
     // --------------------------------------------------------------------------------------------
     // Debezium Configurations
@@ -60,7 +61,8 @@ public abstract class BaseSourceConfig implements SourceConfig {
             Properties dbzProperties,
             Configuration dbzConfiguration,
             boolean assignUnboundedChunkFirst,
-            boolean releaseSnapshotMetadataEnabled) {
+            boolean releaseSnapshotMetadataEnabled,
+            double recordsPerSecond) {
         this.startupOptions = startupOptions;
         this.splitSize = splitSize;
         this.splitMetaGroupSize = splitMetaGroupSize;
@@ -74,6 +76,7 @@ public abstract class BaseSourceConfig implements SourceConfig {
         this.dbzConfiguration = dbzConfiguration;
         this.assignUnboundedChunkFirst = assignUnboundedChunkFirst;
         this.releaseSnapshotMetadataEnabled = releaseSnapshotMetadataEnabled;
+        this.recordsPerSecond = recordsPerSecond;
     }
 
     @Override
@@ -130,5 +133,10 @@ public abstract class BaseSourceConfig implements SourceConfig {
     @Override
     public boolean isReleaseSnapshotMetadataEnabled() {
         return releaseSnapshotMetadataEnabled;
+    }
+
+    @Override
+    public double getRecordsPerSecond() {
+        return recordsPerSecond;
     }
 }

@@ -51,6 +51,8 @@ public interface SourceConfig extends Serializable {
         return false;
     }
 
+    double getRecordsPerSecond();
+
     /** Factory for the {@code SourceConfig}. */
     @FunctionalInterface
     interface Factory<C extends SourceConfig> extends Serializable {

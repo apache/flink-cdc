@@ -310,6 +310,16 @@ SELECT * FROM shipments;
         使用 DataStream API 时，可以通过在 Debezium 参数中添加 "scan.pre-epoch-timestamp.wall-clock-conversion.enabled" 来开启该行为。
       </td>
     </tr>
+    <tr>
+      <td>records.per.second</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">true</td>
+      <td>Double</td>
+      <td>
+        每秒发出的最大记录数，默认值为 -1，表示不进行速率限制。（仅适用于 flink 2.x）<br>
+        警告：增量/二进制日志阶段：速率限制可能导致连接器落后于上游变更流，在连接器赶上之前，二进制日志/WAL 可能会被清除（MySQL 数据丢失，PostgreSQL 复制槽问题）。
+      </td>
+    </tr>
     </tbody>
     </table>
 </div>
