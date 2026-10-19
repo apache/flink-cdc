@@ -153,6 +153,13 @@ Pipeline Connector Options
       <td>Pass options of Fluss table to pipeline，See <a href="https://fluss.apache.org/docs/engine-flink/options/#storage-options">Fluss table options</a>. </td>
     </tr>
     <tr>
+      <td>properties.&lt;data-lake-format&gt;.*</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>Pass data lake table properties to Fluss when creating tables. Supported prefixes follow the Fluss client's data lake formats, currently <code>properties.paimon.*</code>, <code>properties.iceberg.*</code>, <code>properties.hudi.*</code>, and <code>properties.lance.*</code>. Only the outer <code>properties.</code> prefix is removed. Individual options are not validated by Flink CDC.</td>
+    </tr>
+    <tr>
       <td>properties.client.*</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
@@ -166,6 +173,32 @@ Pipeline Connector Options
 ## Usage Notes
 
 * Support Fluss primary key table and log table.
+
+### Data lake table properties
+
+To create Fluss tables with lakehouse storage enabled, configure the Fluss sink as follows:
+
+```yaml
+sink:
+  type: fluss
+  bootstrap.servers: localhost:9123
+  properties.table.datalake.enabled: 'true'
+  properties.table.datalake.freshness: 30s
+  properties.paimon.file.format: orc
+  properties.paimon.deletion-vectors.enabled: 'true'
+```
+
+The connector removes only `properties.`, so `properties.paimon.file.format` becomes
+`paimon.file.format` in the Fluss table properties. For Iceberg, use `properties.iceberg.*`,
+for example `properties.iceberg.write.format.default: parquet`.
+The lake format and tiering service must be configured in Fluss; see the
+[Fluss lakehouse documentation](https://fluss.apache.org/docs/streaming-lakehouse/datalake-formats/paimon/).
+
+These properties apply to all tables created by this sink. They do not alter properties of
+existing tables. Flink CDC accepts arbitrary option names and values under supported data lake
+prefixes and delegates their interpretation and validation to Fluss and the lake integration;
+an unrecognized option may be ignored if the downstream implementation does not reject it.
+Unsupported prefixes, such as `properties.icerberg.*`, are still rejected by Flink CDC.
 
 ### Dynamic source subscriptions
 
