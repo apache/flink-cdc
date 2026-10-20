@@ -74,21 +74,39 @@ public class BatchAppendWriter implements MaxComputeWriter {
 
         try {
             if (StringUtils.isNullOrWhitespaceOnly(identifier.getSessionId())) {
-                this.uploadSession =
-                        tunnel.createUploadSession(
-                                identifier.getProject(),
-                                identifier.getSchema(),
-                                identifier.getTable(),
-                                new PartitionSpec(partitionSpec),
-                                false);
+                if (StringUtils.isNullOrWhitespaceOnly(partitionSpec)) {
+                    this.uploadSession =
+                            tunnel.createUploadSession(
+                                    identifier.getProject(),
+                                    identifier.getSchema(),
+                                    identifier.getTable(),
+                                    false);
+                } else {
+                    this.uploadSession =
+                            tunnel.createUploadSession(
+                                    identifier.getProject(),
+                                    identifier.getSchema(),
+                                    identifier.getTable(),
+                                    new PartitionSpec(partitionSpec),
+                                    false);
+                }
             } else {
-                this.uploadSession =
-                        tunnel.getUploadSession(
-                                identifier.getProject(),
-                                identifier.getSchema(),
-                                identifier.getTable(),
-                                new PartitionSpec(partitionSpec),
-                                sessionId);
+                if (StringUtils.isNullOrWhitespaceOnly(partitionSpec)) {
+                    this.uploadSession =
+                            tunnel.getUploadSession(
+                                    identifier.getProject(),
+                                    identifier.getSchema(),
+                                    identifier.getTable(),
+                                    sessionId);
+                } else {
+                    this.uploadSession =
+                            tunnel.getUploadSession(
+                                    identifier.getProject(),
+                                    identifier.getSchema(),
+                                    identifier.getTable(),
+                                    new PartitionSpec(partitionSpec),
+                                    sessionId);
+                }
             }
             this.recordWriter =
                     uploadSession.openBufferedWriter(

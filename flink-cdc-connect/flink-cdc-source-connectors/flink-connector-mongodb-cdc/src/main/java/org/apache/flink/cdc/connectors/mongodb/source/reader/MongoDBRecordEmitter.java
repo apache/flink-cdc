@@ -40,7 +40,6 @@ import static org.apache.flink.cdc.connectors.base.source.meta.wartermark.Waterm
 import static org.apache.flink.cdc.connectors.mongodb.source.utils.MongoRecordUtils.getFetchTimestamp;
 import static org.apache.flink.cdc.connectors.mongodb.source.utils.MongoRecordUtils.getMessageTimestamp;
 import static org.apache.flink.cdc.connectors.mongodb.source.utils.MongoRecordUtils.getResumeToken;
-import static org.apache.flink.cdc.connectors.mongodb.source.utils.MongoRecordUtils.isDataChangeRecord;
 import static org.apache.flink.cdc.connectors.mongodb.source.utils.MongoRecordUtils.isHeartbeatEvent;
 
 /**
@@ -121,5 +120,10 @@ public final class MongoDBRecordEmitter<T> extends IncrementalSourceRecordEmitte
                 sourceReaderMetrics.recordFetchDelay(fetchTimestamp - messageTimestamp);
             }
         }
+    }
+
+    @Override
+    protected boolean isDataChangeRecord(SourceRecord record) {
+        return MongoRecordUtils.isDataChangeRecord(record);
     }
 }

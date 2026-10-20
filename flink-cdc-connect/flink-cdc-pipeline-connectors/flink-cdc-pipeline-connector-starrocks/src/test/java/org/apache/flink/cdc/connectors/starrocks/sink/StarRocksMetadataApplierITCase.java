@@ -101,7 +101,12 @@ class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
                 Schema.newBuilder()
                         .column(new PhysicalColumn("id", DataTypes.INT().notNull(), null))
                         .column(new PhysicalColumn("number", DataTypes.DOUBLE(), null))
-                        .column(new PhysicalColumn("name", DataTypes.VARCHAR(17), null))
+                        .column(
+                                new PhysicalColumn(
+                                        "name",
+                                        DataTypes.VARCHAR(17),
+                                        "\"name\"",
+                                        "\"name\\\\default\""))
                         .primaryKey("id")
                         .build();
 
@@ -123,9 +128,16 @@ class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
                         Collections.singletonList(
                                 new AddColumnEvent.ColumnWithPosition(
                                         new PhysicalColumn(
-                                                "extra_decimal",
-                                                DataTypes.DECIMAL(17, 0),
-                                                null)))));
+                                                "extra_decimal", DataTypes.DECIMAL(17, 0), null)))),
+                new AddColumnEvent(
+                        tableId,
+                        Collections.singletonList(
+                                new AddColumnEvent.ColumnWithPosition(
+                                        new PhysicalColumn(
+                                                "extra_string",
+                                                DataTypes.VARCHAR(17),
+                                                "\"extra_string\"",
+                                                "\"extra\\\\string\"")))));
     }
 
     private List<Event> generateDropColumnEvents(TableId tableId) {
@@ -271,6 +283,35 @@ class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
     }
 
     @Test
+    void testStarRocksDataTypeWithUnicodeCharMaxBytes() throws Exception {
+        TableId tableId =
+                TableId.tableId(
+                        StarRocksContainer.STARROCKS_DATABASE_NAME,
+                        StarRocksContainer.STARROCKS_TABLE_NAME);
+        Schema schema =
+                Schema.newBuilder()
+                        .column(new PhysicalColumn("id", DataTypes.INT().notNull(), "ID"))
+                        .column(new PhysicalColumn("char", DataTypes.CHAR(17), "Char"))
+                        .column(new PhysicalColumn("varchar", DataTypes.VARCHAR(17), "Var Char"))
+                        .primaryKey("id")
+                        .build();
+
+        runJobWithEvents(
+                Collections.singletonList(new CreateTableEvent(tableId, schema)),
+                new Configuration().set(StarRocksDataSinkOptions.UNICODE_CHAR_MAX_BYTES, 4));
+
+        List<String> actual = inspectTableSchema(tableId);
+        List<String> expected =
+                Arrays.asList(
+                        "id | int | NO | true | null",
+                        // 4 bytes per character instead of the default 3
+                        "char | char(68) | YES | false | null",
+                        "varchar | varchar(68) | YES | false | null");
+
+        assertEqualsInOrder(expected, actual);
+    }
+
+    @Test
     void testStarRocksAddColumn() throws Exception {
         TableId tableId =
                 TableId.tableId(
@@ -285,10 +326,11 @@ class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
                 Arrays.asList(
                         "id | int | NO | true | null",
                         "number | double | YES | false | null",
-                        "name | varchar(51) | YES | false | null",
+                        "name | varchar(51) | YES | false | \"name\\\\default\"",
                         "extra_date | date | YES | false | null",
                         "extra_bool | boolean | YES | false | null",
-                        "extra_decimal | decimal(17,0) | YES | false | null");
+                        "extra_decimal | decimal(17,0) | YES | false | null",
+                        "extra_string | varchar(51) | YES | false | \"extra\\\\string\"");
 
         assertEqualsInOrder(expected, actual);
     }
@@ -426,6 +468,10 @@ class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
     }
 
     private void runJobWithEvents(List<Event> events) throws Exception {
+        runJobWithEvents(events, new Configuration());
+    }
+
+    private void runJobWithEvents(List<Event> events, Configuration extraConfig) throws Exception {
         DataStream<Event> stream = env.fromData(events, new EventTypeInfo()).setParallelism(1);
 
         Configuration config =
@@ -434,6 +480,7 @@ class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
                         .set(JDBC_URL, STARROCKS_CONTAINER.getJdbcUrl())
                         .set(USERNAME, StarRocksContainer.STARROCKS_USERNAME)
                         .set(PASSWORD, StarRocksContainer.STARROCKS_PASSWORD);
+        config.addAll(extraConfig);
 
         DataSink starRocksSink = createStarRocksDataSink(config);
 

@@ -111,6 +111,20 @@ public class TransformSqlReturnTypes {
             ReturnTypes.cascade(
                     ReturnTypes.explicit(SqlTypeName.VARCHAR), SqlTypeTransforms.FORCE_NULLABLE);
 
+    public static final SqlReturnTypeInference VARCHAR_ARRAY_FORCE_NULLABLE =
+            opBinding -> {
+                RelDataType elementType =
+                        opBinding
+                                .getTypeFactory()
+                                .createTypeWithNullability(
+                                        opBinding
+                                                .getTypeFactory()
+                                                .createSqlType(SqlTypeName.VARCHAR),
+                                        true);
+                RelDataType arrayType = opBinding.getTypeFactory().createArrayType(elementType, -1);
+                return opBinding.getTypeFactory().createTypeWithNullability(arrayType, true);
+            };
+
     public static final SqlReturnTypeInference VARCHAR_NOT_NULL =
             ReturnTypes.cascade(
                     ReturnTypes.explicit(SqlTypeName.VARCHAR), SqlTypeTransforms.TO_NOT_NULLABLE);
@@ -148,6 +162,27 @@ public class TransformSqlReturnTypes {
                         }
                     },
                     SqlTypeTransforms.TO_NULLABLE);
+
+    /** Return type inference matching Flink SQL's IFNULL function. */
+    public static final SqlReturnTypeInference IF_NULL =
+            opBinding -> {
+                RelDataType inputType = opBinding.getOperandType(0);
+                if (!inputType.isNullable()) {
+                    return inputType;
+                }
+
+                RelDataType replacementType = opBinding.getOperandType(1);
+                RelDataType commonType =
+                        opBinding
+                                .getTypeFactory()
+                                .leastRestrictive(List.of(inputType, replacementType));
+                if (commonType == null) {
+                    return null;
+                }
+                return opBinding
+                        .getTypeFactory()
+                        .createTypeWithNullability(commonType, replacementType.isNullable());
+            };
 
     public static final SqlReturnTypeInference NUMERIC_FROM_ARG1_DEFAULT1 =
             new NumericOrDefaultReturnTypeInference(1, 1);

@@ -53,7 +53,11 @@ import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.json.JsonConverter;
 import org.apache.kafka.connect.storage.ConverterConfig;
 import org.apache.kafka.connect.storage.ConverterType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.List;
@@ -79,6 +83,9 @@ import static org.apache.flink.table.types.utils.TypeConversions.fromLogicalToDa
  */
 public class DebeziumJsonSerializationSchema implements SerializationSchema<Event> {
     private static final long serialVersionUID = 1L;
+
+    private static final Logger LOG =
+            LoggerFactory.getLogger(DebeziumJsonSerializationSchema.class);
 
     private static final StringData OP_INSERT = StringData.fromString("c"); // insert
     private static final StringData OP_DELETE = StringData.fromString("d"); // delete
@@ -260,12 +267,64 @@ public class DebeziumJsonSerializationSchema implements SerializationSchema<Even
             field.required();
         }
         if (column.getDefaultValueExpression() != null) {
-            field.defaultValue(column.getDefaultValueExpression());
+            Object convertedDefault =
+                    convertDefaultValue(column.getDefaultValueExpression(), columnType);
+            if (convertedDefault != null) {
+                field.defaultValue(convertedDefault);
+            }
         }
         if (column.getComment() != null) {
             field.doc(column.getComment());
         }
         return field;
+    }
+
+    /**
+     * Convert a default value expression string to the Java object matching the Debezium schema
+     * type.
+     */
+    private static Object convertDefaultValue(
+            String defaultValueExpression, org.apache.flink.cdc.common.types.DataType columnType) {
+        try {
+            switch (columnType.getTypeRoot()) {
+                case BOOLEAN:
+                    return Boolean.parseBoolean(defaultValueExpression);
+                case TINYINT:
+                case SMALLINT:
+                    return Short.parseShort(defaultValueExpression);
+                case INTEGER:
+                case DATE:
+                    return Integer.parseInt(defaultValueExpression);
+                case BIGINT:
+                case TIME_WITHOUT_TIME_ZONE:
+                case TIMESTAMP_WITHOUT_TIME_ZONE:
+                case TIMESTAMP_WITH_TIME_ZONE:
+                    return Long.parseLong(defaultValueExpression);
+                case FLOAT:
+                    return Float.parseFloat(defaultValueExpression);
+                case DOUBLE:
+                    return Double.parseDouble(defaultValueExpression);
+                case DECIMAL:
+                    DecimalType decimalType = (DecimalType) columnType;
+                    return new BigDecimal(defaultValueExpression)
+                            .setScale(decimalType.getScale(), RoundingMode.HALF_UP);
+                case BINARY:
+                case VARBINARY:
+                    return defaultValueExpression.getBytes();
+                case CHAR:
+                case VARCHAR:
+                case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
+                default:
+                    return defaultValueExpression;
+            }
+        } catch (NumberFormatException e) {
+            LOG.warn(
+                    "Failed to convert default value '{}' for type {}, skipping default value.",
+                    defaultValueExpression,
+                    columnType.getTypeRoot(),
+                    e);
+            return null;
+        }
     }
 
     private static SchemaBuilder convertCDCDataTypeToDebeziumDataType(

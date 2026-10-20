@@ -211,6 +211,17 @@ public class MySqlSourceBuilder<T> {
         return this;
     }
 
+    /**
+     * Whether the source coordinator should release the snapshot split metadata after entering the
+     * binlog phase to reduce JobManager memory. Incompatible with {@link
+     * #scanNewlyAddedTableEnabled(boolean)}; disabled by default.
+     */
+    public MySqlSourceBuilder<T> releaseSnapshotMetadataEnabled(
+            boolean releaseSnapshotMetadataEnabled) {
+        this.configFactory.releaseSnapshotMetadataEnabled(releaseSnapshotMetadataEnabled);
+        return this;
+    }
+
     /** Specifies the startup options. */
     public MySqlSourceBuilder<T> startupOptions(StartupOptions startupOptions) {
         this.configFactory.startupOptions(startupOptions);

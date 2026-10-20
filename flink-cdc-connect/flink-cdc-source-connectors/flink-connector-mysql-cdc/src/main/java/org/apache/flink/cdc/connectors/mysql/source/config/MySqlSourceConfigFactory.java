@@ -38,6 +38,7 @@ import java.util.UUID;
 
 import static org.apache.flink.cdc.connectors.mysql.source.utils.EnvironmentUtils.checkSupportCheckpointsAfterTasksFinished;
 import static org.apache.flink.util.Preconditions.checkNotNull;
+import static org.apache.flink.util.Preconditions.checkState;
 
 /** A factory to construct {@link MySqlSourceConfig}. */
 @Internal
@@ -69,6 +70,7 @@ public class MySqlSourceConfigFactory implements Serializable {
     private boolean includeHeartbeatEvents = false;
     private boolean includeTransactionMetadataEvents = false;
     private boolean scanNewlyAddedTableEnabled = false;
+    private boolean releaseSnapshotMetadataEnabled = false;
     private boolean closeIdleReaders = false;
     private Properties jdbcProperties;
     private Duration heartbeatInterval = MySqlSourceOptions.HEARTBEAT_INTERVAL.defaultValue();
@@ -260,6 +262,17 @@ public class MySqlSourceConfigFactory implements Serializable {
         return this;
     }
 
+    /**
+     * Whether the source coordinator should release the snapshot split metadata after entering the
+     * binlog phase to reduce JobManager memory. Incompatible with {@link
+     * #scanNewlyAddedTableEnabled(boolean)}; disabled by default.
+     */
+    public MySqlSourceConfigFactory releaseSnapshotMetadataEnabled(
+            boolean releaseSnapshotMetadataEnabled) {
+        this.releaseSnapshotMetadataEnabled = releaseSnapshotMetadataEnabled;
+        return this;
+    }
+
     /** Custom properties that will overwrite the default JDBC connection URL. */
     public MySqlSourceConfigFactory jdbcProperties(Properties jdbcProperties) {
         this.jdbcProperties = jdbcProperties;
@@ -382,6 +395,12 @@ public class MySqlSourceConfigFactory implements Serializable {
     /** Creates a new {@link MySqlSourceConfig} for the given subtask {@code subtaskId}. */
     public MySqlSourceConfig createConfig(int subtaskId, String serverName) {
         checkSupportCheckpointsAfterTasksFinished(closeIdleReaders);
+        checkState(
+                !(scanNewlyAddedTableEnabled && releaseSnapshotMetadataEnabled),
+                "scan.incremental.snapshot.metadata.release.enabled and "
+                        + "scan.newly-added-table.enabled cannot both be enabled: releasing the "
+                        + "snapshot split metadata would drop the assigned splits, finished offsets "
+                        + "and table schemas that newly-added-table scanning needs.");
         Properties props = new Properties();
         props.setProperty("database.server.name", serverName);
         props.setProperty("database.hostname", checkNotNull(hostname));
@@ -472,6 +491,7 @@ public class MySqlSourceConfigFactory implements Serializable {
                 treatTinyInt1AsBoolean,
                 useLegacyJsonFormat,
                 assignUnboundedChunkFirst,
+                releaseSnapshotMetadataEnabled,
                 snapshotFilters);
     }
 }

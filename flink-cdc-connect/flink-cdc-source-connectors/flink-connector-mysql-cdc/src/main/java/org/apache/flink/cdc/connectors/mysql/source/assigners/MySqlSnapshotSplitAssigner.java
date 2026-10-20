@@ -108,6 +108,9 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
 
     @Nullable private Long checkpointIdToFinish;
 
+    /** Whether the snapshot split metadata has been released. */
+    private boolean snapshotMetaReleased;
+
     public MySqlSnapshotSplitAssigner(
             MySqlSourceConfig sourceConfig,
             int currentParallelism,
@@ -127,6 +130,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                 isTableIdCaseSensitive,
                 true,
                 ChunkSplitterState.NO_SPLITTING_TABLE_STATE,
+                false,
                 enumeratorContext);
     }
 
@@ -148,6 +152,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                 checkpoint.isTableIdCaseSensitive(),
                 checkpoint.isRemainingTablesCheckpointed(),
                 checkpoint.getChunkSplitterState(),
+                checkpoint.isSnapshotMetaReleased(),
                 enumeratorContext);
     }
 
@@ -164,6 +169,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
             boolean isTableIdCaseSensitive,
             boolean isRemainingTablesCheckpointed,
             ChunkSplitterState chunkSplitterState,
+            boolean snapshotMetaReleased,
             SplitEnumeratorContext<MySqlSplit> enumeratorContext) {
         this.sourceConfig = sourceConfig;
         this.currentParallelism = currentParallelism;
@@ -181,6 +187,9 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
         this.partition =
                 new MySqlPartition(sourceConfig.getMySqlConnectorConfig().getLogicalName());
         this.enumeratorContext = enumeratorContext;
+        // The released flag is persisted in the checkpoint (PendingSplitsStateSerializer v6), so
+        // restore it directly rather than inferring it from the state shape.
+        this.snapshotMetaReleased = snapshotMetaReleased;
     }
 
     @Override
@@ -462,7 +471,8 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                         remainingTables,
                         isTableIdCaseSensitive,
                         true,
-                        chunkSplitter.snapshotState(checkpointId));
+                        chunkSplitter.snapshotState(checkpointId),
+                        snapshotMetaReleased);
         // we need a complete checkpoint before mark this assigner to be finished, to wait for
         // all records of snapshot splits are completely processed
         if (checkpointIdToFinish == null
@@ -569,6 +579,28 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
 
     public Map<String, BinlogOffset> getSplitFinishedOffsets() {
         return splitFinishedOffsets;
+    }
+
+    /**
+     * Releases the heavyweight snapshot split metadata (assigned splits, finished offsets, table
+     * schemas) after the binlog phase begins, so it is no longer held in the coordinator nor
+     * checkpointed. Keeps {@link #alreadyProcessedTables} and the assigner status so a restore does
+     * not re-discover tables. Only called once the binlog split is assigned and checkpoint-covered.
+     */
+    public void releaseSnapshotMetadata() {
+        if (snapshotMetaReleased) {
+            return;
+        }
+        assignedSplits.clear();
+        splitFinishedOffsets.clear();
+        tableSchemas.clear();
+        snapshotMetaReleased = true;
+        LOG.info("Released snapshot split metadata after entering the binlog phase.");
+    }
+
+    /** Returns whether {@link #releaseSnapshotMetadata()} has already been performed. */
+    public boolean isSnapshotMetaReleased() {
+        return snapshotMetaReleased;
     }
 
     // -------------------------------------------------------------------------------------------

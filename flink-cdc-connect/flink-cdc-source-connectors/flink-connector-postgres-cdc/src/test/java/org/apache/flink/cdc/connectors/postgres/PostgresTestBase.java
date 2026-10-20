@@ -53,7 +53,7 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -125,15 +125,14 @@ public abstract class PostgresTestBase extends AbstractTestBase {
                         PostgresConnectionPoolFactory.JDBC_URL_PATTERN,
                         container.getHost(),
                         container.getMappedPort(PostgreSQLContainer.POSTGRESQL_PORT),
-                        databaseName);
+                        databaseName,
+                        "test-driver");
         return DriverManager.getConnection(
                 jdbcUrl, container.getUsername(), container.getPassword());
     }
 
     public static String getSlotName() {
-        final Random random = new Random();
-        int id = random.nextInt(10000);
-        return "flink_" + id;
+        return "flink_" + UUID.randomUUID().toString().replace("-", "");
     }
 
     /**

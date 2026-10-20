@@ -25,14 +25,12 @@ import java.util.List;
 public class FlussEvent {
     private final TablePath tablePath;
     private final List<FlussRowWithOp> rowWithOps;
-    // if true, means that table schema has changed right before this genericRow.
-    boolean shouldRefreshSchema;
+    private final int schemaId;
 
-    public FlussEvent(
-            TablePath tablePath, List<FlussRowWithOp> rowWithOps, boolean shouldRefreshSchema) {
+    public FlussEvent(TablePath tablePath, List<FlussRowWithOp> rowWithOps, int schemaId) {
         this.tablePath = tablePath;
         this.rowWithOps = rowWithOps;
-        this.shouldRefreshSchema = shouldRefreshSchema;
+        this.schemaId = schemaId;
     }
 
     public TablePath getTablePath() {
@@ -43,7 +41,7 @@ public class FlussEvent {
         return rowWithOps;
     }
 
-    public boolean isShouldRefreshSchema() {
-        return shouldRefreshSchema;
+    public int getSchemaId() {
+        return schemaId;
     }
 }

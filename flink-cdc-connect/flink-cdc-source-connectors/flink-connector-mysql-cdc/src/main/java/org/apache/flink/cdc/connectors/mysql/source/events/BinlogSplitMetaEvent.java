@@ -48,15 +48,24 @@ public class BinlogSplitMetaEvent implements SourceEvent {
 
     private final int totalFinishedSplitSize;
 
+    /**
+     * The binlog assignment generation current at the coordinator when this meta group was served.
+     * The reader echoes it back in {@link BinlogSplitMetaAssembledEvent} so the coordinator can
+     * tell a fresh assembled signal from a stale one left by a failed reader attempt.
+     */
+    private final long binlogAssignmentGeneration;
+
     public BinlogSplitMetaEvent(
             String splitId,
             int metaGroupId,
             @Nullable List<byte[]> metaGroup,
-            int totalFinishedSplitSize) {
+            int totalFinishedSplitSize,
+            long binlogAssignmentGeneration) {
         this.splitId = splitId;
         this.metaGroupId = metaGroupId;
         this.metaGroup = metaGroup;
         this.totalFinishedSplitSize = totalFinishedSplitSize;
+        this.binlogAssignmentGeneration = binlogAssignmentGeneration;
     }
 
     public String getSplitId() {
@@ -73,5 +82,9 @@ public class BinlogSplitMetaEvent implements SourceEvent {
 
     public int getTotalFinishedSplitSize() {
         return totalFinishedSplitSize;
+    }
+
+    public long getBinlogAssignmentGeneration() {
+        return binlogAssignmentGeneration;
     }
 }

@@ -21,15 +21,19 @@ import org.apache.flink.api.connector.source.SplitEnumeratorContext;
 import org.apache.flink.cdc.connectors.mysql.source.assigners.state.HybridPendingSplitsState;
 import org.apache.flink.cdc.connectors.mysql.source.assigners.state.PendingSplitsState;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
+import org.apache.flink.cdc.connectors.mysql.source.events.BinlogSplitMetaAssembledEvent;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
 import org.apache.flink.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSchemalessSnapshotSplit;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplit;
+import org.apache.flink.util.Preconditions;
 
 import io.debezium.relational.TableId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.annotation.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -51,6 +55,20 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
     private final MySqlSourceConfig sourceConfig;
 
     private boolean isBinlogSplitAssigned;
+
+    /** Whether the reader has reported holding the complete binlog split. */
+    private boolean binlogSplitMetaAssembled;
+
+    /** Checkpoint at which the metadata release was scheduled; released once it completes. */
+    @Nullable private Long checkpointIdToReleaseMeta;
+
+    /**
+     * Generation of the current binlog split assignment, bumped on every add-back. It rides on the
+     * meta groups served to the reader and comes back in the assembled event, so a stale event from
+     * a failed attempt (older generation) can't arm the release for a fresh reader. Not
+     * checkpointed: it resets to 0 on restore, which is fine because the reader re-learns it.
+     */
+    private long binlogAssignmentGeneration;
 
     private final MySqlSnapshotSplitAssigner snapshotSplitAssigner;
 
@@ -97,6 +115,32 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
         this.snapshotSplitAssigner = snapshotSplitAssigner;
         this.isBinlogSplitAssigned = isBinlogSplitAssigned;
         this.splitMetaGroupSize = splitMetaGroupSize;
+        // Fail fast on an incompatible restore. A job that released its snapshot metadata cannot
+        // later enable scan.newly-added-table, because the splits and schemas that flow needs are
+        // gone. Reject it loudly instead of silently building an inconsistent binlog split.
+        if (sourceConfig.isScanNewlyAddedTableEnabled()
+                && isBinlogSplitAssigned
+                && snapshotSplitAssigner.isSnapshotMetaReleased()) {
+            throw new IllegalStateException(
+                    "scan.newly-added-table.enabled cannot be turned on for a job that previously "
+                            + "released its snapshot split metadata "
+                            + "(scan.incremental.snapshot.metadata.release.enabled=true). The "
+                            + "assigned splits, finished offsets and table schemas needed to capture "
+                            + "newly added tables are no longer in state. Start the job from a fresh "
+                            + "state, or keep metadata release disabled if newly-added-table scanning "
+                            + "is required.");
+        }
+        // Fail fast if a job that already released its snapshot metadata is restarted with the
+        // release option off. The metadata is gone from state, so falling back to the v5 format
+        // would drop the released marker. Keep the option enabled or start from a fresh state.
+        if (!sourceConfig.isReleaseSnapshotMetadataEnabled()
+                && snapshotSplitAssigner.isSnapshotMetaReleased()) {
+            throw new IllegalStateException(
+                    "scan.incremental.snapshot.metadata.release.enabled cannot be turned off for a "
+                            + "job that already released its snapshot split metadata. The assigned "
+                            + "splits, finished offsets and table schemas are no longer in state. "
+                            + "Keep the option enabled, or start the job from a fresh state.");
+        }
     }
 
     @Override
@@ -159,15 +203,39 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
             if (split.isSnapshotSplit()) {
                 snapshotSplits.add(split);
             } else {
-                // we don't store the split, but will re-create binlog split later
+                // The binlog split is handed back for re-assignment; we don't store it, but will
+                // re-create it later. Mark it unassigned and invalidate any in-flight assembly.
                 isBinlogSplitAssigned = false;
+                onBinlogReaderReset();
             }
         }
         snapshotSplitAssigner.addSplits(snapshotSplits);
     }
 
+    /**
+     * Invalidates any in-flight binlog split assembly when the binlog reader resets, so a stale
+     * assembled event from the failed attempt cannot arm a release. Also runs when the split is not
+     * handed back, since a checkpoint-covered reset produces an empty add-back.
+     */
+    public void onBinlogReaderReset() {
+        binlogSplitMetaAssembled = false;
+        checkpointIdToReleaseMeta = null;
+        binlogAssignmentGeneration++;
+    }
+
     @Override
     public PendingSplitsState snapshotState(long checkpointId) {
+        // Schedule the metadata release once the binlog split is assigned and the reader has
+        // assembled it; it happens in notifyCheckpointComplete. Gated behind the opt-in; the
+        // newly-added-table term is defensive, since createConfig already rejects enabling both.
+        if (isBinlogSplitAssigned
+                && binlogSplitMetaAssembled
+                && checkpointIdToReleaseMeta == null
+                && !snapshotSplitAssigner.isSnapshotMetaReleased()
+                && sourceConfig.isReleaseSnapshotMetadataEnabled()
+                && !sourceConfig.isScanNewlyAddedTableEnabled()) {
+            checkpointIdToReleaseMeta = checkpointId;
+        }
         return new HybridPendingSplitsState(
                 snapshotSplitAssigner.snapshotState(checkpointId), isBinlogSplitAssigned);
     }
@@ -175,6 +243,45 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
     @Override
     public void notifyCheckpointComplete(long checkpointId) {
         snapshotSplitAssigner.notifyCheckpointComplete(checkpointId);
+        // Release the snapshot metadata only after the checkpoint covering the binlog split
+        // assignment completes. Doing it here (not in snapshotState) keeps the assignment
+        // checkpoint-covered, so addSplitsBack can never return the split to an emptied assigner.
+        if (checkpointIdToReleaseMeta != null
+                && checkpointId >= checkpointIdToReleaseMeta
+                && !snapshotSplitAssigner.isSnapshotMetaReleased()) {
+            snapshotSplitAssigner.releaseSnapshotMetadata();
+        }
+    }
+
+    /**
+     * Marks that the reader holds the complete binlog split, arming the metadata release. A
+     * reported generation that is neither the current one nor the inline sentinel is ignored, which
+     * drops a stale event from a reader attempt that an add-back has already superseded.
+     */
+    public void onBinlogSplitMetaAssembled(long reportedGeneration) {
+        // An inline reader requests no meta groups, so it reports COMPLETE_WITHOUT_META_GENERATION;
+        // honor that regardless, since it never needs the coordinator's metadata. Otherwise require
+        // an exact match, which drops a stale event from a failed attempt superseded by an
+        // add-back.
+        if (reportedGeneration != BinlogSplitMetaAssembledEvent.COMPLETE_WITHOUT_META_GENERATION
+                && reportedGeneration != binlogAssignmentGeneration) {
+            LOG.info(
+                    "Ignoring binlog split assembled event for generation {}; current generation is {}.",
+                    reportedGeneration,
+                    binlogAssignmentGeneration);
+            return;
+        }
+        this.binlogSplitMetaAssembled = true;
+    }
+
+    /** Returns the current binlog split assignment generation. */
+    public long getBinlogAssignmentGeneration() {
+        return binlogAssignmentGeneration;
+    }
+
+    /** Returns whether the snapshot split metadata has been released. */
+    public boolean isSnapshotMetaReleased() {
+        return snapshotSplitAssigner.isSnapshotMetaReleased();
     }
 
     @Override
@@ -205,6 +312,10 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
     // --------------------------------------------------------------------------------------------
 
     private MySqlBinlogSplit createBinlogSplit() {
+        Preconditions.checkState(
+                !snapshotSplitAssigner.isSnapshotMetaReleased(),
+                "Snapshot metadata was already released; the binlog split must not be re-created "
+                        + "after that.");
         final List<MySqlSchemalessSnapshotSplit> assignedSnapshotSplit =
                 new ArrayList<>(snapshotSplitAssigner.getAssignedSplits().values());
 

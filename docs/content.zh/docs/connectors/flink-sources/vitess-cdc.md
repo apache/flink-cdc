@@ -24,15 +24,15 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-# Vitess CDC Connector
+# Vitess CDC 连接器
 
-The Vitess CDC connector allows for reading of incremental data from Vitess cluster. The connector does not support snapshot feature at the moment. This document describes how to setup the Vitess CDC connector to run SQL queries against Vitess databases.
-[Vitess debezium documentation](https://debezium.io/documentation/reference/connectors/vitess.html)
+Vitess CDC 连接器允许从 Vitess 集群读取增量数据。该连接器目前不支持快照功能。本文描述了如何设置 Vitess CDC 连接器来对 Vitess 数据库运行 SQL 查询。
+[Vitess debezium 文档](https://debezium.io/documentation/reference/connectors/vitess.html)
 
-Dependencies
+依赖
 ------------
 
-In order to setup the Vitess CDC connector, the following table provides dependency information for both projects using a build automation tool (such as Maven or SBT) and SQL Client with SQL JAR bundles.
+为了设置 Vitess CDC 连接器，下表提供了使用构建自动化工具（如 Maven 或 SBT ）和带有 SQL JAR 包的 SQL 客户端的两个项目的依赖关系信息。
 
 ### Maven dependency
 
@@ -40,28 +40,26 @@ In order to setup the Vitess CDC connector, the following table provides depende
 
 ### SQL Client JAR
 
-Download [flink-sql-connector-vitess-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-vitess-cdc) and put it under `<FLINK_HOME>/lib/`.
+下载 [flink-sql-connector-vitess-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-vitess-cdc) 到 `<FLINK_HOME>/lib/` 目录下。
 
-**Note:** Refer to
-[flink-sql-connector-vitess-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-vitess-cdc),
-more released versions will be available in the Maven central warehouse.
+**注意:** 参考 [flink-sql-connector-vitess-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-vitess-cdc) 当前已发布的所有版本都可以在 Maven 中央仓库获取。
 
-Setup Vitess server
+设置 Vitess 服务器
 ----------------
 
-You can follow the Local Install via [Docker guide](https://vitess.io/docs/get-started/vttestserver-docker-image/), or the Vitess Operator for [Kubernetes guide](https://vitess.io/docs/get-started/operator/) to install Vitess. No special setup is needed to support Vitess connector.
+你可以按照 [Docker 指南](https://vitess.io/docs/get-started/vttestserver-docker-image/) 中的本地安装方式，或者按照 [Kubernetes 指南](https://vitess.io/docs/get-started/operator/) 使用 Vitess Operator 来安装 Vitess。支持 Vitess 连接器不需要任何特殊的设置。
 
-### Checklist
-* Make sure that the VTGate host and its gRPC port (default is 15991) is accessible from the machine where the Vitess connector is installed
+### 检查清单
+* 确保在安装 Vitess 连接器的机器上可以访问 VTGate 主机及其 gRPC 端口（默认为 15991）
 
-### gRPC authentication
-Because Vitess connector reads change events from the VTGate VStream gRPC server, it does not need to connect directly to MySQL instances.
-Therefore, no special database user and permissions are needed. At the moment, Vitess connector only supports unauthenticated access to the VTGate gRPC server.
+### gRPC 认证
+由于 Vitess 连接器从 VTGate VStream gRPC 服务器读取变更事件，因此它不需要直接连接到 MySQL 实例。
+所以，不需要特殊的数据库用户和权限。目前，Vitess 连接器仅支持以未经认证的方式访问 VTGate gRPC 服务器。
 
-How to create a Vitess CDC table
+如何创建 Vitess CDC 表
 ----------------
 
-The Vitess CDC table can be defined as following:
+Vitess CDC 表可以定义如下：
 
 ```sql
 -- checkpoint every 3000 milliseconds
@@ -87,7 +85,7 @@ Flink SQL> CREATE TABLE orders (
 Flink SQL> SELECT * FROM orders;
 ```
 
-Connector Options
+连接器配置项
 ----------------
 
 
@@ -108,123 +106,123 @@ Connector Options
                 <td>required</td>
                 <td>(none)</td>
                 <td>String</td>
-                <td>Specify what connector to use, here should be <code>&lsquo;vitess-cdc&rsquo;</code>.</td>
+                <td>指定要使用的连接器，这里应该是 <code>&lsquo;vitess-cdc&rsquo;</code>。</td>
             </tr>
             <tr>
                 <td>hostname</td>
                 <td>required</td>
                 <td>(none)</td>
                 <td>String</td>
-                <td>IP address or hostname of the Vitess database server (VTGate).</td>
+                <td>Vitess 数据库服务器（VTGate）的 IP 地址或主机名。</td>
             </tr>
             <tr>
                 <td>keyspace</td>
                 <td>required</td>
                 <td>(none)</td>
                 <td>String</td>
-                <td>The name of the keyspace from which to stream the changes.</td>
+                <td>要从中流式读取变更的 keyspace 的名称。</td>
             </tr>
             <tr>
                 <td>username</td>
                 <td>optional</td>
                 <td>(none)</td>
                 <td>String</td>
-                <td>An optional username of the Vitess database server (VTGate). If not configured, unauthenticated VTGate gRPC is used.</td>
+                <td>Vitess 数据库服务器（VTGate）的可选用户名。如果未配置，则使用未经认证的 VTGate gRPC。</td>
             </tr>
             <tr>
                 <td>password</td>
                 <td>optional</td>
                 <td>(none)</td>
                 <td>String</td>
-                <td>An optional password of the Vitess database server (VTGate). If not configured, unauthenticated VTGate gRPC is used.</td>
+                <td>Vitess 数据库服务器（VTGate）的可选密码。如果未配置，则使用未经认证的 VTGate gRPC。</td>
             </tr>
             <tr>
                 <td>shard</td>
                 <td>optional</td>
                 <td>(none)</td>
                 <td>String</td>
-                <td>An optional name of the shard from which to stream the changes. If not configured, in case of unsharded keyspace, the connector streams changes from the only shard, in case of sharded keyspace, the connector streams changes from all shards in the keyspace.</td>
+                <td>要从中流式读取变更的 shard 的可选名称。如果未配置，对于未分片的 keyspace，连接器会从唯一的 shard 流式读取变更；对于已分片的 keyspace，连接器会从该 keyspace 中的所有 shard 流式读取变更。</td>
             </tr>
             <tr>
                 <td>gtid</td>
                 <td>optional</td>
                 <td>current</td>
                 <td>String</td>
-                <td>An optional GTID position for a shard to stream from.</td>
+                <td>可选的 GTID 位点，shard 将从该位点开始流式读取。</td>
             </tr>
             <tr>
                 <td>stopOnReshard</td>
                 <td>optional</td>
                 <td>false</td>
                 <td>Boolean</td>
-                <td>Controls Vitess flag stop_on_reshard.</td>
+                <td>控制 Vitess 标志 stop_on_reshard。</td>
             </tr>
             <tr>
                 <td>tombstonesOnDelete</td>
                 <td>optional</td>
                 <td>true</td>
                 <td>Boolean</td>
-                <td>Controls whether a delete event is followed by a tombstone event.</td>
+                <td>控制删除事件之后是否跟随 tombstone 事件。</td>
             </tr>
             <tr>
                 <td>tombstonesOnDelete</td>
                 <td>optional</td>
                 <td>true</td>
                 <td>Boolean</td>
-                <td>Controls whether a delete event is followed by a tombstone event.</td>
+                <td>控制删除事件之后是否跟随 tombstone 事件。</td>
             </tr>
             <tr>
                 <td>schemaNameAdjustmentMode</td>
                 <td>optional</td>
                 <td>avro</td>
                 <td>String</td>
-                <td>Specifies how schema names should be adjusted for compatibility with the message converter used by the connector.</td>
+                <td>指定应如何调整 schema 名称，以便与连接器所使用的消息转换器兼容。</td>
             </tr>
             <tr>
                 <td>table-name</td>
                 <td>required</td>
                 <td>(none)</td>
                 <td>String</td>
-                <td>Table name of the MySQL database to monitor.</td>
+                <td>需要监视的 MySQL 数据库的表名。</td>
             </tr>
             <tr>
                 <td>tablet.type</td>
                 <td>optional</td>
                 <td>RDONLY</td>
                 <td>String</td>
-                <td>The type of Tablet (hence MySQL) from which to stream the changes: MASTER represents streaming from the master MySQL instance REPLICA represents streaming from the replica slave MySQL instance RDONLY represents streaming from the read-only slave MySQL instance.</td>
+                <td>要从中流式读取变更的 Tablet（即 MySQL）的类型：MASTER 表示从主 MySQL 实例流式读取，REPLICA 表示从 replica 从属 MySQL 实例流式读取，RDONLY 表示从只读从属 MySQL 实例流式读取。</td>
             </tr>
         </tbody>
     </table>
 </div>
 
-Features
+特性
 --------
 
-### Incremental Reading
+### 增量读取
 
-The Vitess connector spends all its time streaming changes from the VTGate’s VStream gRPC service to which it is subscribed. The client receives changes from VStream as they are committed in the underlying MySQL server’s binlog at certain positions, which are referred to as VGTID.
+Vitess 连接器将其全部时间用于从其订阅的 VTGate 的 VStream gRPC 服务中流式读取变更。客户端从 VStream 接收变更，这些变更是在底层 MySQL 服务器的 binlog 中的特定位置提交的，这些位置被称为 VGTID。
 
-The VGTID in Vitess is the equivalent of GTID in MySQL, it describes the position in the VStream in which a change event happens. Typically, A VGTID has multiple shard GTIDs, each shard GTID is a tuple of (Keyspace, Shard, GTID), which describes the GTID position of a given shard.
+Vitess 中的 VGTID 等价于 MySQL 中的 GTID，它描述了变更事件在 VStream 中发生的位置。通常，一个 VGTID 包含多个 shard GTID，每个 shard GTID 是一个 (Keyspace, Shard, GTID) 三元组，用于描述给定 shard 的 GTID 位点。
 
-When subscribing to a VStream service, the connector needs to provide a VGTID and a Tablet Type (e.g. MASTER, REPLICA). The VGTID describes the position from which VStream should starts sending change events; the Tablet type describes which underlying MySQL instance (master or replica) in each shard do we read change events from.
+订阅 VStream 服务时，连接器需要提供一个 VGTID 和一个 Tablet 类型（例如 MASTER、REPLICA）。VGTID 描述了 VStream 应从哪个位置开始发送变更事件；Tablet 类型描述了从每个 shard 中的哪个底层 MySQL 实例（master 或 replica）读取变更事件。
 
-The first time the connector connects to a Vitess cluster, it gets and provides the current VGTID to VStream.
+连接器第一次连接到 Vitess 集群时，会获取当前的 VGTID 并将其提供给 VStream。
 
-The Debezium Vitess connector acts as a gRPC client of VStream. When the connector receives changes it transforms the events into Debezium create, update, or delete events that include the VGTID of the event. The Vitess connector forwards these change events in records to the Kafka Connect framework, which is running in the same process. The Kafka Connect process asynchronously writes the change event records in the same order in which they were generated to the appropriate Kafka topic.
+Debezium Vitess 连接器充当 VStream 的 gRPC 客户端。当连接器接收到变更时，会将这些事件转换为 Debezium 的 create、update 或 delete 事件，其中包含该事件的 VGTID。Vitess 连接器以记录的形式将这些变更事件转发到运行在同一进程中的 Kafka Connect 框架。Kafka Connect 进程会按照变更事件记录生成时的相同顺序，异步地将它们写入相应的 Kafka topic。
 
-#### Checkpoint
+#### 全量阶段支持 checkpoint
 
-Incremental snapshot reading provides the ability to perform checkpoint in chunk level. It resolves the checkpoint timeout problem in previous version with old snapshot reading mechanism.
+增量快照读取提供了在 chunk 级别执行 checkpoint 的能力。它解决了以前版本中使用旧快照读取机制时的 checkpoint 超时问题。
 
-### Exactly-Once Processing
+### Exactly-Once 处理
 
-The Vitess CDC connector is a Flink Source connector which will read table snapshot chunks first and then continues to read binlog,
-both snapshot phase and binlog phase, Vitess CDC connector read with **exactly-once processing** even failures happen.
+Vitess CDC 连接器是一个 Flink Source 连接器，它将首先读取表快照分片，然后继续读取 binlog，
+无论是在快照阶段还是读取 binlog 阶段，Vitess CDC 连接器都会在处理时**准确读取数据**，即使任务出现了故障。
 
 ### DataStream Source
 
-The Incremental Reading feature of Vitess CDC Source only exposes in SQL currently, if you're using DataStream, please use Vitess Source:
+Vitess CDC Source 的增量读取特性目前仅在 SQL 中提供，如果你使用的是 DataStream，请使用 Vitess Source：
 
 ```java
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -254,7 +252,7 @@ public class VitessSourceExample {
 }
 ```
 
-Data Type Mapping
+数据类型映射
 ----------------
 
 <div class="wy-table-responsive">

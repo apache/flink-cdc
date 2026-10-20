@@ -53,6 +53,7 @@ The following table shows the version mapping between Flink CDC Connectors and F
 
 | Flink CDC Version |                Flink Version                |
 |:-----------------:|:-------------------------------------------:|
+|      3.7.\*       |               1.20.\*, 2.2.\*               |
 |      3.6.\*       |               1.20.\*, 2.2.\*               |
 |      3.5.\*       |              1.19.\*, 1.20.\*               |
 |      3.4.\*       |              1.19.\*, 1.20.\*               |
@@ -86,7 +87,7 @@ The following table shows the current features of the connector:
 | [oracle-cdc]({{< ref "docs/connectors/flink-sources/oracle-cdc" >}})       | ✅            | ✅             | ✅ | ✅                         |
 | [postgres-cdc]({{< ref "docs/connectors/flink-sources/postgres-cdc" >}})   | ✅            | ✅             | ✅ | ✅                         |
 | [sqlserver-cdc]({{< ref "docs/connectors/flink-sources/sqlserver-cdc" >}}) | ✅            | ✅             | ✅ | ✅                         |
-| [oceanbase-cdc]({{< ref "docs/connectors/flink-sources/oceanbase-cdc" >}}) | ❌            | ❌             | ❌ | ❌                         |
+| [oceanbase-cdc]({{< ref "docs/connectors/flink-sources/oceanbase-cdc" >}}) | ✅            | ✅             | ✅ | ✅                         |
 | [tidb-cdc]({{< ref "docs/connectors/flink-sources/tidb-cdc" >}})           | ✅            | ❌             | ❌ | ❌                         |
 | [db2-cdc]({{< ref "docs/connectors/flink-sources/db2-cdc" >}})             | ✅            | ✅             | ✅ | ✅                         |
 | [vitess-cdc]({{< ref "docs/connectors/flink-sources/vitess-cdc" >}})       | ✅            | ❌             | ❌ | ❌                         |

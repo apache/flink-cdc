@@ -45,18 +45,20 @@ import org.apache.flink.table.types.DataType;
 
 import io.debezium.connector.postgresql.connection.PostgresConnection;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
-import java.util.Properties;
 
+import static io.debezium.connector.postgresql.connection.ReplicationConnection.Builder.DEFAULT_PUBLICATION_NAME;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Tests for {@link PostgresScanFetchTask}. */
@@ -76,10 +78,14 @@ class PostgresScanFetchTaskTest extends PostgresTestBase {
                     POSTGRES_CONTAINER.getUsername(),
                     POSTGRES_CONTAINER.getPassword());
 
+    @BeforeEach
+    void before() throws SQLException {
+        customDatabase.createAndInitialize();
+        customDatabase.createPublication(DEFAULT_PUBLICATION_NAME);
+    }
+
     @Test
     void testChangingDataInSnapshotScan() throws Exception {
-        customDatabase.createAndInitialize();
-
         TestTableId tableId = new TestTableId(schemaName, tableName);
         String[] changingDataSql =
                 new String[] {
@@ -113,7 +119,6 @@ class PostgresScanFetchTaskTest extends PostgresTestBase {
 
     @Test
     void testInsertDataInSnapshotScan() throws Exception {
-        customDatabase.createAndInitialize();
         TestTableId tableId = new TestTableId(schemaName, tableName);
         String[] insertDataSql =
                 new String[] {
@@ -146,7 +151,6 @@ class PostgresScanFetchTaskTest extends PostgresTestBase {
 
     @Test
     void testDeleteDataInSnapshotScan() throws Exception {
-        customDatabase.createAndInitialize();
         TestTableId tableId = new TestTableId(schemaName, tableName);
         String[] deleteDataSql =
                 new String[] {
@@ -171,8 +175,6 @@ class PostgresScanFetchTaskTest extends PostgresTestBase {
 
     @Test
     void testSnapshotScanSkipBackfillWithPostLowWatermark() throws Exception {
-        customDatabase.createAndInitialize();
-
         TestTableId tableId = new TestTableId(schemaName, tableName);
         String[] changingDataSql =
                 new String[] {
@@ -208,8 +210,6 @@ class PostgresScanFetchTaskTest extends PostgresTestBase {
 
     @Test
     void testSnapshotScanSkipBackfillWithPreHighWatermark() throws Exception {
-        customDatabase.createAndInitialize();
-
         TestTableId tableId = new TestTableId(schemaName, tableName);
         String[] changingDataSql =
                 new String[] {
@@ -244,19 +244,63 @@ class PostgresScanFetchTaskTest extends PostgresTestBase {
     }
 
     @Test
+    void testMultipleSplitsWithBackfill() throws Exception {
+        TestTableId tableId = new TestTableId(schemaName, tableName);
+        PostgresSourceConfigFactory sourceConfigFactory =
+                getMockPostgresSourceConfigFactory(
+                        customDatabase, schemaName, tableName, null, 4, false);
+        PostgresSourceConfig sourceConfig = sourceConfigFactory.create(0);
+        PostgresDialect postgresDialect = new PostgresDialect(sourceConfigFactory.create(0));
+
+        SnapshotPhaseHooks snapshotHooks = new SnapshotPhaseHooks();
+        snapshotHooks.setPreHighWatermarkAction(
+                (postgresSourceConfig, split) -> {
+                    try (PostgresConnection conn = postgresDialect.openJdbcConnection()) {
+                        conn.execute(
+                                "UPDATE "
+                                        + tableId.toSql()
+                                        + " SET address = 'Beijing' WHERE \"Id\" = 103");
+                        conn.commit();
+                    }
+                });
+
+        final DataType dataType =
+                DataTypes.ROW(
+                        DataTypes.FIELD("Id", DataTypes.BIGINT()),
+                        DataTypes.FIELD("Name", DataTypes.STRING()),
+                        DataTypes.FIELD("address", DataTypes.STRING()),
+                        DataTypes.FIELD("phone_number", DataTypes.STRING()));
+
+        PostgresSourceFetchTaskContext postgresSourceFetchTaskContext =
+                new PostgresSourceFetchTaskContext(sourceConfig, postgresDialect);
+        List<SnapshotSplit> snapshotSplits = getSnapshotSplits(sourceConfig, postgresDialect);
+
+        List<String> actual =
+                readTableSnapshotSplits(
+                        reOrderSnapshotSplits(snapshotSplits),
+                        postgresSourceFetchTaskContext,
+                        snapshotSplits.size(),
+                        dataType,
+                        snapshotHooks);
+
+        // Verify the ScanFetcher can successfully process all splits without getting stuck
+        // (the FLINK-39207 bug would cause the reader to appear finished/stuck
+        // when reusing a stopped ScanFetcher for the next split).
+        // The preHighWatermark hook forces backfill phase for each split by making
+        // highWatermark > lowWatermark.
+        assertThat(actual).hasSize(21);
+        assertThat(actual).contains("+I[103, user_3, Beijing, 123567891234]");
+    }
+
+    @Test
     void testSnapshotFetchSize() throws Exception {
-        customDatabase.createAndInitialize();
         PostgresSourceConfigFactory sourceConfigFactory =
                 getMockPostgresSourceConfigFactory(
                         customDatabase, schemaName, tableName, null, 10, true);
-        Properties properties = new Properties();
-        properties.setProperty("snapshot.fetch.size", "2");
-        sourceConfigFactory.debeziumProperties(properties);
+        sourceConfigFactory.fetchSize(2);
         PostgresSourceConfig sourceConfig = sourceConfigFactory.create(0);
         PostgresDialect postgresDialect = new PostgresDialect(sourceConfigFactory.create(0));
         SnapshotSplit snapshotSplit = getSnapshotSplits(sourceConfig, postgresDialect).get(0);
-        PostgresSourceFetchTaskContext postgresSourceFetchTaskContext =
-                new PostgresSourceFetchTaskContext(sourceConfig, postgresDialect);
         final String selectSql =
                 PostgresQueryUtils.buildSplitScanQuery(
                         snapshotSplit.getTableId(),
@@ -275,9 +319,7 @@ class PostgresScanFetchTaskTest extends PostgresTestBase {
                                 snapshotSplit.getSplitStart(),
                                 snapshotSplit.getSplitEnd(),
                                 snapshotSplit.getSplitKeyType().getFieldCount(),
-                                postgresSourceFetchTaskContext
-                                        .getDbzConnectorConfig()
-                                        .getSnapshotFetchSize());
+                                sourceConfig.getFetchSize());
                 ResultSet rs = selectStatement.executeQuery()) {
             assertThat(rs.getFetchSize()).isEqualTo(2);
         }

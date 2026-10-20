@@ -186,6 +186,33 @@ class TypeConvertUtilsTest {
     }
 
     @Test
+    void testRecordConvertWithInterleavedPartitionColumn() {
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("pt", DataTypes.STRING())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .partitionKey("pt")
+                        .build();
+        BinaryRecordDataGenerator dataGenerator =
+                new BinaryRecordDataGenerator((RowType) schema.toRowDataType());
+        BinaryRecordData record =
+                dataGenerator.generate(
+                        new Object[] {
+                            7,
+                            BinaryStringData.fromString("20260728"),
+                            BinaryStringData.fromString("Alice")
+                        });
+
+        ArrayRecord arrayRecord = new ArrayRecord(TypeConvertUtils.toMaxCompute(schema));
+        TypeConvertUtils.toMaxComputeRecord(schema, record, arrayRecord);
+
+        assertThat(arrayRecord.getColumnCount()).isEqualTo(2);
+        assertThat(arrayRecord.get(0)).isEqualTo(7);
+        assertThat(arrayRecord.get(1)).isEqualTo("Alice");
+    }
+
+    @Test
     void testColumnCommentConversion() {
         // Test column with comment
         org.apache.flink.cdc.common.schema.Column columnWithComment =

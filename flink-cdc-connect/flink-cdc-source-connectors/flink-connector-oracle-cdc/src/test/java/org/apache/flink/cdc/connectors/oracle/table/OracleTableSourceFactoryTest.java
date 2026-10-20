@@ -117,6 +117,8 @@ class OracleTableSourceFactoryTest {
                         JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
                         JdbcSourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue(),
                         JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED
+                                .defaultValue(),
+                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED
                                 .defaultValue());
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
@@ -156,6 +158,8 @@ class OracleTableSourceFactoryTest {
                         SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
                         SourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue(),
                         JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED
+                                .defaultValue(),
+                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED
                                 .defaultValue());
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
@@ -200,6 +204,8 @@ class OracleTableSourceFactoryTest {
                         SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
                         true,
                         JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED
+                                .defaultValue(),
+                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED
                                 .defaultValue());
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
@@ -272,7 +278,9 @@ class OracleTableSourceFactoryTest {
                         true,
                         true,
                         true,
-                        true);
+                        true,
+                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED
+                                .defaultValue());
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
@@ -312,6 +320,8 @@ class OracleTableSourceFactoryTest {
                         SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
                         SourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue(),
                         JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED
+                                .defaultValue(),
+                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED
                                 .defaultValue());
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
@@ -352,6 +362,8 @@ class OracleTableSourceFactoryTest {
                         SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
                         SourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue(),
                         JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED
+                                .defaultValue(),
+                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED
                                 .defaultValue());
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
@@ -396,6 +408,8 @@ class OracleTableSourceFactoryTest {
                         SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
                         SourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue(),
                         JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED
+                                .defaultValue(),
+                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED
                                 .defaultValue());
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys =

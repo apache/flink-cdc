@@ -216,6 +216,13 @@ pipeline:
       <td>StarRocks 侧执行 schema change 的超时时间，必须是秒的整数倍。超时后 StarRocks 将会取消 schema change，从而导致作业失败。</td>
     </tr>
     <tr>
+      <td>unicode-char.max-bytes</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">3</td>
+      <td>Integer</td>
+      <td>将上游 CHAR 和 VARCHAR 类型映射到 StarRocks 时，为每个字符分配的最大字节数。由于 StarRocks 的长度以字节为单位，如果上游使用 utf8mb4，建议将该选项设置为 4，以避免低估目标列长度。默认值仍为 3，以保持向后兼容。</td>
+    </tr>
+    <tr>
       <td>sink.socket.timeout-ms</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">-1</td>
@@ -320,22 +327,19 @@ pipeline:
       <td></td>
     </tr>
     <tr>
-      <td>CHAR(n) where n <= 85</td>
-      <td>CHAR(n * 3)</td>
-      <td>CDC 中长度表示字符数，而 StarRocks 中长度表示字节数。根据 UTF-8 编码，一个中文字符占用三个字节，因此 CDC 中的长度对应到 StarRocks
-          中为 n * 3。由于 StarRocks CHAR 类型的最大长度为255，所以只有当 CDC 中长度不超过85时，才将 CDC CHAR 映射到 StarRocks CHAR。</td>
+      <td>CHAR(n)，且 n * unicode-char.max-bytes <= 255，并且不是主键列</td>
+      <td>CHAR(n * unicode-char.max-bytes)</td>
+      <td>CDC 中长度表示字符数，而 StarRocks 中长度表示字节数。StarRocks 的长度按 n * unicode-char.max-bytes 计算。由于 StarRocks CHAR 类型的最大长度为 255，只有当计算后的长度不超过 255 时，才将 CDC CHAR 映射到 StarRocks CHAR。如果该列是主键列，则会映射为 VARCHAR。</td>
     </tr>
     <tr>
-      <td>CHAR(n) where n > 85</td>
-      <td>VARCHAR(n * 3)</td>
-      <td>CDC 中长度表示字符数，而 StarRocks 中长度表示字节数。根据 UTF-8 编码，一个中文字符占用三个字节，因此 CDC 中的长度对应到 StarRocks
-          中为 n * 3。由于 StarRocks CHAR 类型的最大长度为255，所以当 CDC 中长度超过85时，才将 CDC CHAR 映射到 StarRocks VARCHAR。</td>
+      <td>CHAR(n)，且 n * unicode-char.max-bytes > 255，或主键列</td>
+      <td>VARCHAR(min(n * unicode-char.max-bytes, 1048576))</td>
+      <td>CDC 中长度表示字符数，而 StarRocks 中长度表示字节数。StarRocks 的长度按 n * unicode-char.max-bytes 计算。由于 StarRocks CHAR 类型的最大长度为 255，当计算后的长度超过 255 时，会将 CDC CHAR 映射到 StarRocks VARCHAR。主键 CHAR 列也会映射为 VARCHAR。</td>
     </tr>
     <tr>
       <td>VARCHAR(n)</td>
-      <td>VARCHAR(n * 3)</td>
-      <td>CDC 中长度表示字符数，而 StarRocks 中长度表示字节数。根据 UTF-8 编码，一个中文字符占用三个字节，因此 CDC 中的长度对应到 StarRocks
-          中为 n * 3。</td>
+      <td>VARCHAR(min(n * unicode-char.max-bytes, 1048576))</td>
+      <td>CDC 中长度表示字符数，而 StarRocks 中长度表示字节数。StarRocks 的长度按 n * unicode-char.max-bytes 计算，并且最大不会超过 1048576。</td>
     </tr>
     <tr>
       <td>BINARY(n)</td>

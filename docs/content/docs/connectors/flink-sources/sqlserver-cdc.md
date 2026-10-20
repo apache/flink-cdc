@@ -231,6 +231,13 @@ Connector Options
       </td>
     </tr>
     <tr>
+      <td>scan.incremental.snapshot.metadata.release.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>Whether to release the snapshot split metadata (assigned splits, finished offsets and table schemas) held by the source coordinator once the source has entered the stream phase, to reduce JobManager memory on jobs with a very large number of snapshot splits. Disabled by default. Incompatible with scan.newly-added-table.enabled: enabling both fails at startup, and a job that has released the metadata cannot later enable newly-added-table scanning. Release happens only after a successful checkpoint; if checkpointing is disabled or no checkpoint completes, the metadata is retained, so this option has no effect without checkpointing. A checkpoint or savepoint taken with this option enabled cannot be used to restore the job after downgrading to Flink CDC 3.6.0 or an earlier version.</td>
+    </tr>
+    <tr>
           <td>scan.incremental.snapshot.chunk.key-column</td>
           <td>optional</td>
           <td style="word-wrap: break-word;">(none)</td>
@@ -308,6 +315,9 @@ Limitation
 --------
 
 ### Can't perform checkpoint during scanning snapshot of tables
+
+*Note: This limitation only applies when the incremental snapshot framework is not enabled (i.e., `scan.incremental.snapshot.enabled` is set to `false`).*
+
 During scanning snapshot of database tables, since there is no recoverable position, we can't perform checkpoints. In order to not perform checkpoints, SqlServer CDC source will keep the checkpoint waiting to timeout. The timeout checkpoint will be recognized as failed checkpoint, by default, this will trigger a failover for the Flink job. So if the database table is large, it is recommended to add following Flink configurations to avoid failover because of the timeout checkpoints:
 
 ```
@@ -529,8 +539,8 @@ Data Type Mapping
       <td>DECIMAL(p, s)</td>
     </tr>
     <tr>
-      <td>numeric</td>
-      <td>NUMERIC</td>
+      <td>numeric(p, s)</td>
+      <td>DECIMAL(p, s)</td>
     </tr>
     <tr>
       <td>

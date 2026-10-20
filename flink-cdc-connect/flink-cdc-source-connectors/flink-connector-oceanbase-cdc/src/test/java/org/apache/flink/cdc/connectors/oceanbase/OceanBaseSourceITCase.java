@@ -27,7 +27,6 @@ import org.apache.flink.util.CloseableIterator;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.sql.Connection;
@@ -39,8 +38,6 @@ import java.util.List;
 import static java.lang.String.format;
 
 /** OceanBase CDC source connector integration test. */
-@Disabled(
-        "Temporarily disabled for GitHub CI due to unavailability of OceanBase Binlog Service docker image. These tests are currently only supported for local execution.")
 public class OceanBaseSourceITCase extends OceanBaseSourceTestBase {
     private static final String DDL_FILE = "oceanbase_ddl_test";
     private static final String DATABASE_NAME = "cdc_s_" + getRandomSuffix();
@@ -89,7 +86,7 @@ public class OceanBaseSourceITCase extends OceanBaseSourceTestBase {
                                 + " 'server-id' = '%s'"
                                 + ")",
                         getHost(),
-                        PORT,
+                        getPort(),
                         USER_NAME,
                         PASSWORD,
                         DATABASE_NAME,
@@ -241,7 +238,7 @@ public class OceanBaseSourceITCase extends OceanBaseSourceTestBase {
                                 + " 'server-id' = '%s'"
                                 + ")",
                         getHost(),
-                        PORT,
+                        getPort(),
                         USER_NAME,
                         PASSWORD,
                         DATABASE_NAME,
@@ -295,7 +292,7 @@ public class OceanBaseSourceITCase extends OceanBaseSourceTestBase {
                                 + " 'server-id' = '%s'"
                                 + ")",
                         getHost(),
-                        PORT,
+                        getPort(),
                         USER_NAME,
                         PASSWORD,
                         DATABASE_NAME,

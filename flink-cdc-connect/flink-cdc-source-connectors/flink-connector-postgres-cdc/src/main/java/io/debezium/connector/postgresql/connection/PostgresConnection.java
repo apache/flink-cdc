@@ -10,6 +10,7 @@ import com.zaxxer.hikari.pool.HikariProxyConnection;
 import io.debezium.DebeziumException;
 import io.debezium.annotation.VisibleForTesting;
 import io.debezium.config.Configuration;
+import io.debezium.connector.postgresql.CustomPostgresValueConverter;
 import io.debezium.connector.postgresql.PgOid;
 import io.debezium.connector.postgresql.PostgresConnectorConfig;
 import io.debezium.connector.postgresql.PostgresSchema;
@@ -195,7 +196,8 @@ public class PostgresConnection extends JdbcConnection {
         } else {
             this.typeRegistry = typeRegistry;
             final PostgresValueConverter valueConverter =
-                    PostgresValueConverter.of(config, this.getDatabaseCharset(), typeRegistry);
+                    CustomPostgresValueConverter.of(
+                            config, this.getDatabaseCharset(), typeRegistry);
             this.defaultValueConverter =
                     new PostgresDefaultValueConverter(valueConverter, this.getTimestampUtils());
         }

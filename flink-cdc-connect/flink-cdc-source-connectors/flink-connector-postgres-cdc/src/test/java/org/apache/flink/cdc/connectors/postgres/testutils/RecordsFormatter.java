@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.postgres.testutils;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils;
+import org.apache.flink.cdc.connectors.postgres.source.utils.PostgresSourceRecordUtils;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
 import org.apache.flink.table.data.RowData;
@@ -26,15 +27,15 @@ import org.apache.flink.table.data.conversion.RowRowConverter;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.utils.TypeConversions;
-import org.apache.flink.types.Row;
 import org.apache.flink.util.Collector;
 
+import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 
+import java.nio.ByteBuffer;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /** Formatter that formats the {@link org.apache.kafka.connect.source.SourceRecord} to String. */
 public class RecordsFormatter {
@@ -66,22 +67,42 @@ public class RecordsFormatter {
         rowRowConverter.open(Thread.currentThread().getContextClassLoader());
     }
 
+    /**
+     * Formats records preserving the original order of both data change records and logical
+     * messages.
+     */
     public List<String> format(List<SourceRecord> records) {
-        records.stream()
-                // Keep DataChangeEvent only
-                .filter(SourceRecordUtils::isDataChangeRecord)
-                .forEach(
-                        r -> {
-                            try {
-                                deserializationSchema.deserialize(r, collector);
-                            } catch (Exception e) {
-                                throw new RuntimeException(e);
-                            }
-                        });
-        return collector.list.stream()
-                .map(rowRowConverter::toExternal)
-                .map(Row::toString)
-                .collect(Collectors.toList());
+        List<String> result = new ArrayList<>();
+        for (SourceRecord r : records) {
+            if (PostgresSourceRecordUtils.isLogicalMessage(r)) {
+                result.add(formatLogicalMessage(r));
+            } else if (SourceRecordUtils.isDataChangeRecord(r)) {
+                try {
+                    collector.list.clear();
+                    deserializationSchema.deserialize(r, collector);
+                    for (RowData rowData : collector.list) {
+                        result.add(rowRowConverter.toExternal(rowData).toString());
+                    }
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        }
+        return result;
+    }
+
+    private String formatLogicalMessage(SourceRecord record) {
+        Struct message = ((Struct) record.value()).getStruct("message");
+        String prefix = message.getString("prefix");
+        Object contentObj = message.get("content");
+        String content;
+        if (contentObj instanceof ByteBuffer) {
+            content = new String(((ByteBuffer) contentObj).array());
+        } else {
+            content = String.valueOf(contentObj);
+        }
+
+        return "M[" + prefix + ", " + content + "]";
     }
 
     private static class SimpleCollector implements Collector<RowData> {

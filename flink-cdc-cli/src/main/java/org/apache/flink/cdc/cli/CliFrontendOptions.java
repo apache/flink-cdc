@@ -51,9 +51,12 @@ public class CliFrontendOptions {
                     .longOpt("target")
                     .hasArg()
                     .desc(
-                            "The deployment target for the execution. This can take one of the following values "
-                                    + "local/remote/yarn-session/yarn-application/kubernetes-session/kubernetes"
-                                    + "-application")
+                            "The deployment target for the execution. This can take one of the following values:\n"
+                                    + "- local\n"
+                                    + "- remote\n"
+                                    + "- yarn-session\n"
+                                    + "- yarn-application\n"
+                                    + "- kubernetes-application")
                     .build();
 
     public static final Option USE_MINI_CLUSTER =

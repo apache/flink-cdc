@@ -157,4 +157,14 @@ public class StarRocksDataSinkOptions {
                             "Timeout for a schema change on StarRocks side, and must be an integral multiple of "
                                     + "seconds. StarRocks will cancel the schema change after timeout which will "
                                     + "cause the sink failure.");
+
+    public static final ConfigOption<Integer> UNICODE_CHAR_MAX_BYTES =
+            ConfigOptions.key("unicode-char.max-bytes")
+                    .intType()
+                    .defaultValue(3)
+                    .withDescription(
+                            "Specifies how many bytes are allocated for each upstream character when mapping "
+                                    + "CHAR and VARCHAR types to StarRocks, whose length is measured in bytes. "
+                                    + "Valid values are within [1, 4]. If the upstream source uses utf8mb4, "
+                                    + "set this option to 4 to avoid underestimating column lengths.");
 }

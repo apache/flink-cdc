@@ -274,7 +274,11 @@ public class MySqlSource<T>
 
     @Override
     public SimpleVersionedSerializer<PendingSplitsState> getEnumeratorCheckpointSerializer() {
-        return new PendingSplitsStateSerializer(getSplitSerializer());
+        // Only write the v6 released flag when release is enabled. A default-off job keeps the v5
+        // checkpoint format and stays restorable by an older connector build.
+        return new PendingSplitsStateSerializer(
+                getSplitSerializer(),
+                configFactory.createConfig(0).isReleaseSnapshotMetadataEnabled());
     }
 
     @Override

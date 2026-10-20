@@ -296,6 +296,45 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
 
     @ParameterizedTest
     @MethodSource("parameters")
+    void testTaskManagerFailoverInBinlogPhaseWithMetadataRelease(
+            String tableName, String chunkColumnName, String assignEndingFirst) throws Exception {
+        // Releasing the snapshot metadata after entering the binlog phase must not lose or
+        // duplicate binlog data across a reader (TaskManager) failover. The released metadata is
+        // checkpoint-covered, so the binlog split is recovered from the reader's own state rather
+        // than re-created from the emptied assigner.
+        Map<String, String> options = new HashMap<>();
+        options.put("scan.incremental.snapshot.unbounded-chunk-first.enabled", assignEndingFirst);
+        options.put("scan.incremental.snapshot.metadata.release.enabled", "true");
+        testMySqlParallelSource(
+                FailoverType.TM,
+                FailoverPhase.BINLOG,
+                new String[] {tableName, "customers_1"},
+                tableName,
+                chunkColumnName,
+                options);
+    }
+
+    @ParameterizedTest
+    @MethodSource("parameters")
+    void testJobManagerFailoverInBinlogPhaseWithMetadataRelease(
+            String tableName, String chunkColumnName, String assignEndingFirst) throws Exception {
+        // Same as above but across a JobManager (coordinator) failover, which restores the
+        // enumerator from a released "light" checkpoint and must not re-discover tables or rebuild
+        // the binlog split from empty metadata.
+        Map<String, String> options = new HashMap<>();
+        options.put("scan.incremental.snapshot.unbounded-chunk-first.enabled", assignEndingFirst);
+        options.put("scan.incremental.snapshot.metadata.release.enabled", "true");
+        testMySqlParallelSource(
+                FailoverType.JM,
+                FailoverPhase.BINLOG,
+                new String[] {tableName, "customers_1"},
+                tableName,
+                chunkColumnName,
+                options);
+    }
+
+    @ParameterizedTest
+    @MethodSource("parameters")
     void testTaskManagerFailoverFromLatestOffset(
             String tableName, String chunkColumnName, String assignEndingFirst) throws Exception {
         testMySqlParallelSource(
@@ -529,22 +568,7 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
                     "+I[1019, user_20, Shanghai, 123567891234]",
                     "+I[2000, user_21, Shanghai, 123567891234]"
                 };
-        TypeSerializer<RowData> serializer =
-                source.getTransformation().getOutputType().createSerializer(env.getConfig());
-        String accumulatorName = "dataStreamCollect_" + UUID.randomUUID();
-        CollectSinkOperatorFactory<RowData> factory =
-                new CollectSinkOperatorFactory(serializer, accumulatorName);
-        CollectSinkOperator<RowData> operator = (CollectSinkOperator) factory.getOperator();
-        CollectResultIterator<RowData> iterator =
-                new CollectResultIterator(
-                        operator.getOperatorIdFuture(),
-                        serializer,
-                        accumulatorName,
-                        env.getCheckpointConfig(),
-                        10000L);
-        CollectStreamSink<RowData> sink = new CollectStreamSink(source, factory);
-        sink.name("Data stream collect sink");
-        env.addOperator(sink.getTransformation());
+        CollectResultIterator<RowData> iterator = addCollector(env, source);
         JobClient jobClient = env.executeAsync("snapshotSplitTest");
         iterator.setJobClient(jobClient);
         JobID jobId = jobClient.getJobID();
@@ -698,22 +722,7 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
         // customers_1 with id < 200: 101, 102, 103, 109, 110, 111, 118, 121, 123 (9 rows)
         int expectedCount = 12 + 9;
 
-        TypeSerializer<RowData> serializer =
-                stream.getTransformation().getOutputType().createSerializer(env.getConfig());
-        String accumulatorName = "dataStreamCollect_" + UUID.randomUUID();
-        CollectSinkOperatorFactory<RowData> factory =
-                new CollectSinkOperatorFactory(serializer, accumulatorName);
-        CollectSinkOperator<RowData> operator = (CollectSinkOperator) factory.getOperator();
-        CollectResultIterator<RowData> iterator =
-                new CollectResultIterator(
-                        operator.getOperatorIdFuture(),
-                        serializer,
-                        accumulatorName,
-                        env.getCheckpointConfig(),
-                        10000L);
-        CollectStreamSink<RowData> sink = new CollectStreamSink(stream, factory);
-        sink.name("Data stream collect sink");
-        env.addOperator(sink.getTransformation());
+        CollectResultIterator<RowData> iterator = addCollector(env, stream);
         JobClient jobClient = env.executeAsync("snapshotFiltersMultiTableTest");
         iterator.setJobClient(jobClient);
 

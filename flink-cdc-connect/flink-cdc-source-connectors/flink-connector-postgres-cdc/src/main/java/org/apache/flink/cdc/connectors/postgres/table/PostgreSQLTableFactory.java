@@ -33,6 +33,7 @@ import org.apache.flink.table.factories.FactoryUtil;
 
 import java.time.Duration;
 import java.util.HashSet;
+import java.util.Properties;
 import java.util.Set;
 
 import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.DATABASE_NAME;
@@ -43,6 +44,7 @@ import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.TAB
 import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.USERNAME;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP;
+import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED;
@@ -60,6 +62,7 @@ import static org.apache.flink.cdc.connectors.postgres.source.config.PostgresSou
 import static org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
 import static org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED;
 import static org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceOptions.SCAN_LSN_COMMIT_CHECKPOINTS_DELAY;
+import static org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceOptions.SCAN_PRE_EPOCH_TIMESTAMP_WALL_CLOCK_CONVERSION_ENABLED;
 import static org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
 import static org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceOptions.SCAN_STARTUP_MODE;
 import static org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceOptions.SLOT_NAME;
@@ -122,6 +125,22 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
         boolean assignUnboundedChunkFirst =
                 config.get(SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED);
         boolean appendOnly = config.get(SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED);
+        boolean releaseSnapshotMetadataEnabled =
+                config.get(SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED);
+
+        Properties dbzProperties = getDebeziumProperties(context.getCatalogTable().getOptions());
+        // The timestamp conversion is done by the Debezium value converter, so the option is
+        // forwarded as a Debezium property. It is only set when it's configured explicitly to keep
+        // a property configured via
+        // 'debezium.scan.pre-epoch-timestamp.wall-clock-conversion.enabled'
+        // effective.
+        config.getOptional(SCAN_PRE_EPOCH_TIMESTAMP_WALL_CLOCK_CONVERSION_ENABLED)
+                .ifPresent(
+                        enabled ->
+                                dbzProperties.setProperty(
+                                        SCAN_PRE_EPOCH_TIMESTAMP_WALL_CLOCK_CONVERSION_ENABLED
+                                                .key(),
+                                        String.valueOf(enabled)));
 
         if (enableParallelRead) {
             validateIntegerOption(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE, splitSize, 1);
@@ -151,7 +170,7 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
                 pluginName,
                 slotName,
                 changelogMode,
-                getDebeziumProperties(context.getCatalogTable().getOptions()),
+                dbzProperties,
                 enableParallelRead,
                 splitSize,
                 splitMetaGroupSize,
@@ -170,7 +189,8 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
                 lsnCommitCheckpointsDelay,
                 assignUnboundedChunkFirst,
                 appendOnly,
-                includePartitionedTables);
+                includePartitionedTables,
+                releaseSnapshotMetadataEnabled);
     }
 
     @Override
@@ -216,6 +236,8 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
         options.add(SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED);
         options.add(SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED);
         options.add(SCAN_INCLUDE_PARTITIONED_TABLES_ENABLED);
+        options.add(SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED);
+        options.add(SCAN_PRE_EPOCH_TIMESTAMP_WALL_CLOCK_CONVERSION_ENABLED);
         return options;
     }
 

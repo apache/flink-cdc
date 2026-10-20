@@ -17,40 +17,35 @@
 
 package org.apache.flink.cdc.connectors.fluss;
 
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.cdc.common.configuration.Configuration;
-import org.apache.flink.cdc.common.data.binary.BinaryStringData;
-import org.apache.flink.cdc.common.event.AddColumnEvent;
-import org.apache.flink.cdc.common.event.CreateTableEvent;
-import org.apache.flink.cdc.common.event.DataChangeEvent;
-import org.apache.flink.cdc.common.event.Event;
-import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
-import org.apache.flink.cdc.common.schema.Column;
-import org.apache.flink.cdc.common.schema.Schema;
-import org.apache.flink.cdc.common.types.DataTypes;
-import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.composer.PipelineExecution;
 import org.apache.flink.cdc.composer.definition.PipelineDef;
+import org.apache.flink.cdc.composer.definition.RouteDef;
 import org.apache.flink.cdc.composer.definition.SinkDef;
 import org.apache.flink.cdc.composer.definition.SourceDef;
 import org.apache.flink.cdc.composer.flink.FlinkPipelineComposer;
-import org.apache.flink.cdc.connectors.values.factory.ValuesDataFactory;
-import org.apache.flink.cdc.connectors.values.source.ValuesDataSourceHelper;
-import org.apache.flink.cdc.connectors.values.source.ValuesDataSourceOptions;
-import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
+import org.apache.flink.runtime.minicluster.MiniCluster;
 import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableEnvironment;
+import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.api.config.ExecutionConfigOptions;
+import org.apache.flink.test.junit5.InjectMiniCluster;
 import org.apache.flink.test.junit5.MiniClusterExtension;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 
 import org.apache.fluss.client.Connection;
 import org.apache.fluss.client.ConnectionFactory;
+import org.apache.fluss.client.admin.Admin;
 import org.apache.fluss.config.ConfigOptions;
 import org.apache.fluss.config.MemorySize;
 import org.apache.fluss.metadata.DataLakeFormat;
+import org.apache.fluss.metadata.TableInfo;
+import org.apache.fluss.metadata.TablePath;
 import org.apache.fluss.server.testutils.FlussClusterExtension;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -58,45 +53,53 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.common.pipeline.PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR;
-import static org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior.EVOLVE;
 import static org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior.IGNORE;
 import static org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior.LENIENT;
-import static org.apache.flink.cdc.connectors.values.source.ValuesDataSourceHelper.TABLE_1;
-import static org.apache.flink.cdc.connectors.values.source.ValuesDataSourceHelper.TABLE_2;
 import static org.apache.flink.configuration.CoreOptions.ALWAYS_PARENT_FIRST_LOADER_PATTERNS_ADDITIONAL;
 import static org.apache.fluss.config.ConfigOptions.BOOTSTRAP_SERVERS;
-import static org.apache.fluss.flink.source.testutils.FlinkRowAssertionsUtils.assertResultsIgnoreOrder;
+import static org.apache.fluss.flink.source.testutils.FlinkRowAssertionsUtils.collectBatchRows;
 import static org.apache.fluss.server.testutils.FlussClusterExtension.BUILTIN_DATABASE;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /** ITCase for Fluss Pipeline. */
 public class FlussPipelineITCase {
     private static final int MAX_PARALLELISM = 4;
+    private static final Duration RESULT_TIMEOUT = Duration.ofMinutes(5);
 
     // Always use parent-first classloader for CDC classes.
-    // The reason is that ValuesDatabase uses static field for holding data, we need to make sure
-    // the class is loaded by AppClassloader so that we can verify data in the test case.
     private static final org.apache.flink.configuration.Configuration MINI_CLUSTER_CONFIG =
             new org.apache.flink.configuration.Configuration();
+
+    static {
+        MINI_CLUSTER_CONFIG.set(
+                ALWAYS_PARENT_FIRST_LOADER_PATTERNS_ADDITIONAL,
+                Collections.singletonList("org.apache.flink.cdc"));
+    }
 
     /**
      * Use {@link MiniClusterExtension} to reduce the overhead of restarting the MiniCluster for
      * every test case.
      */
+    // The pipeline job keeps running (unbounded streaming) and permanently occupies
+    // MAX_PARALLELISM slots, so reserve extra slots (matching the batch query's default
+    // parallelism) so that checkResult's LIMIT query jobs can still be scheduled concurrently.
+    private static final int QUERY_PARALLELISM = 2;
+
     @RegisterExtension
     static final MiniClusterExtension MINI_CLUSTER_RESOURCE =
             new MiniClusterExtension(
                     new MiniClusterResourceConfiguration.Builder()
                             .setNumberTaskManagers(1)
-                            .setNumberSlotsPerTaskManager(MAX_PARALLELISM)
+                            .setNumberSlotsPerTaskManager(MAX_PARALLELISM + QUERY_PARALLELISM)
+                            .setConfiguration(MINI_CLUSTER_CONFIG)
                             .build());
 
     /**
@@ -112,26 +115,22 @@ public class FlussPipelineITCase {
                     .setNumOfTabletServers(3)
                     .build();
 
-    static {
-        MINI_CLUSTER_CONFIG.set(
-                ALWAYS_PARENT_FIRST_LOADER_PATTERNS_ADDITIONAL,
-                Collections.singletonList("org.apache.flink.cdc"));
-    }
-
     static final String CATALOG_NAME = "test_catalog";
-    static final String DEFAULT_DB = "default_schema";
+    static final String SOURCE_DB = "source_db";
+    static final String SINK_DB = "sink_db";
+    static final String TABLE_1 = "table1";
+    static final String TABLE_2 = "table2";
 
     protected TableEnvironment tBatchEnv;
+    private MiniCluster miniCluster;
 
     @BeforeEach
-    void before() throws Exception {
+    void before(@InjectMiniCluster MiniCluster miniCluster) throws Exception {
+        this.miniCluster = miniCluster;
         waitForFlussClusterReady();
-        // open a catalog so that we can get table from the catalog
         String bootstrapServers = FLUSS_CLUSTER_EXTENSION.getBootstrapServers();
-
-        // create batch table environment
-        tBatchEnv =
-                TableEnvironment.create(EnvironmentSettings.newInstance().inBatchMode().build());
+        StreamExecutionEnvironment execEnv = StreamExecutionEnvironment.getExecutionEnvironment();
+        tBatchEnv = StreamTableEnvironment.create(execEnv, EnvironmentSettings.inBatchMode());
         tBatchEnv.executeSql(
                 String.format(
                         "create catalog %s with ('type' = 'fluss', '%s' = '%s')",
@@ -139,10 +138,11 @@ public class FlussPipelineITCase {
         tBatchEnv.executeSql("use catalog " + CATALOG_NAME);
         tBatchEnv
                 .getConfig()
-                .set(ExecutionConfigOptions.TABLE_EXEC_RESOURCE_DEFAULT_PARALLELISM, 2);
-        // create database
-        tBatchEnv.executeSql("create database " + DEFAULT_DB);
-        tBatchEnv.useDatabase(DEFAULT_DB);
+                .set(
+                        ExecutionConfigOptions.TABLE_EXEC_RESOURCE_DEFAULT_PARALLELISM,
+                        QUERY_PARALLELISM);
+        tBatchEnv.executeSql("create database " + SOURCE_DB).await();
+        tBatchEnv.executeSql("create database " + SINK_DB).await();
     }
 
     private void waitForFlussClusterReady() throws Exception {
@@ -153,7 +153,6 @@ public class FlussPipelineITCase {
         for (int i = 0; i < maxRetries; i++) {
             try (Connection connection =
                     ConnectionFactory.createConnection(FLUSS_CLUSTER_EXTENSION.getClientConfig())) {
-                // Connection successful, cluster is ready
                 return;
             } catch (Exception e) {
                 lastException = e;
@@ -169,566 +168,312 @@ public class FlussPipelineITCase {
     @AfterEach
     void after() {
         tBatchEnv.useDatabase(BUILTIN_DATABASE);
-        tBatchEnv.executeSql(String.format("drop database %s cascade", DEFAULT_DB));
+        tBatchEnv.executeSql(String.format("drop database %s cascade", SOURCE_DB));
+        tBatchEnv.executeSql(String.format("drop database %s cascade", SINK_DB));
     }
 
     @Test
     void testSinglePrimaryTable() throws Exception {
-        List<List<Event>> eventOfSplits = new ArrayList<>();
-        List<Event> split1 = new ArrayList<>();
-        Schema schema =
-                Schema.newBuilder()
-                        .physicalColumn("col1", DataTypes.STRING())
-                        .physicalColumn("col2", DataTypes.STRING())
-                        .primaryKey("col1")
-                        .build();
-        CreateTableEvent createTableEvent = new CreateTableEvent(TABLE_1, schema);
-        split1.add(createTableEvent);
-        BinaryRecordDataGenerator generator =
-                new BinaryRecordDataGenerator(RowType.of(DataTypes.STRING(), DataTypes.STRING()));
-        DataChangeEvent insertEvent1 =
-                DataChangeEvent.insertEvent(
-                        TABLE_1,
-                        generator.generate(
-                                new Object[] {
-                                    BinaryStringData.fromString("1"),
-                                    BinaryStringData.fromString("a")
-                                }));
-        split1.add(insertEvent1);
-        DataChangeEvent insertEvent2 =
-                DataChangeEvent.insertEvent(
-                        TABLE_1,
-                        generator.generate(
-                                new Object[] {
-                                    BinaryStringData.fromString("2"),
-                                    BinaryStringData.fromString("b")
-                                }));
-        split1.add(insertEvent2);
-        DataChangeEvent insertEvent3 =
-                DataChangeEvent.insertEvent(
-                        TABLE_1,
-                        generator.generate(
-                                new Object[] {
-                                    BinaryStringData.fromString("3"),
-                                    BinaryStringData.fromString("c")
-                                }));
-        split1.add(insertEvent3);
-        eventOfSplits.add(split1);
-        DataChangeEvent updateEvent =
-                DataChangeEvent.updateEvent(
-                        TABLE_1,
-                        generator.generate(
-                                new Object[] {
-                                    BinaryStringData.fromString("2"),
-                                    BinaryStringData.fromString("b")
-                                }),
-                        generator.generate(
-                                new Object[] {
-                                    BinaryStringData.fromString("2"),
-                                    BinaryStringData.fromString("b2")
-                                }));
-        DataChangeEvent deleteEvent =
-                DataChangeEvent.deleteEvent(
-                        TABLE_1,
-                        generator.generate(
-                                new Object[] {
-                                    BinaryStringData.fromString("1"),
-                                    BinaryStringData.fromString("a")
-                                }));
-        eventOfSplits.add(Collections.singletonList(updateEvent));
-        eventOfSplits.add(Collections.singletonList(deleteEvent));
+        createSourceTable(TABLE_1, "col1 STRING, col2 STRING, PRIMARY KEY (col1) NOT ENFORCED");
+        insertSourceRows(TABLE_1, "('1', 'a'), ('2', 'b'), ('3', 'c')");
+        insertSourceRows(TABLE_1, "('2', 'b2')");
+        deleteSourceRows(TABLE_1, "col1 = '1'");
+        Thread.sleep(3000L);
 
-        composeAndExecuteInEvolveMode(eventOfSplits);
-        checkResult(TABLE_1, Arrays.asList("+I[2, b2]", "+I[3, c]"));
+        composeAndCheckInLenientMode(TABLE_1, Arrays.asList("+I[2, b2]", "+I[3, c]"));
     }
 
     @Test
     void testSingleLogTable() throws Exception {
-        List<List<Event>> eventOfSplits = new ArrayList<>();
-        List<Event> split1 = new ArrayList<>();
-        Schema schema =
-                Schema.newBuilder()
-                        .physicalColumn("col1", DataTypes.STRING())
-                        .physicalColumn("col2", DataTypes.STRING())
-                        .build();
-        CreateTableEvent createTableEvent = new CreateTableEvent(TABLE_1, schema);
-        split1.add(createTableEvent);
-        BinaryRecordDataGenerator generator =
-                new BinaryRecordDataGenerator(RowType.of(DataTypes.STRING(), DataTypes.STRING()));
-        DataChangeEvent insertEvent1 =
-                DataChangeEvent.insertEvent(
-                        TABLE_1,
-                        generator.generate(
-                                new Object[] {
-                                    BinaryStringData.fromString("1"),
-                                    BinaryStringData.fromString("a")
-                                }));
-        split1.add(insertEvent1);
-        DataChangeEvent insertEvent2 =
-                DataChangeEvent.insertEvent(
-                        TABLE_1,
-                        generator.generate(
-                                new Object[] {
-                                    BinaryStringData.fromString("2"),
-                                    BinaryStringData.fromString("b")
-                                }));
-        split1.add(insertEvent2);
-        DataChangeEvent insertEvent3 =
-                DataChangeEvent.insertEvent(
-                        TABLE_1,
-                        generator.generate(
-                                new Object[] {
-                                    BinaryStringData.fromString("3"),
-                                    BinaryStringData.fromString("c")
-                                }));
-        split1.add(insertEvent3);
-        eventOfSplits.add(split1);
+        createSourceTable(TABLE_1, "col1 STRING, col2 STRING");
+        insertSourceRows(TABLE_1, "('1', 'a'), ('2', 'b'), ('3', 'c')");
 
-        composeAndExecuteInEvolveMode(eventOfSplits);
-        checkResult(TABLE_1, Arrays.asList("+I[1, a]", "+I[2, b]", "+I[3, c]"));
-    }
-
-    @Test
-    void testSingleLogTableWithNotSupportedSchemaChange() throws Exception {
-        assertThatThrownBy(
-                        () ->
-                                composeAndExecuteInEvolveMode(
-                                        ValuesDataSourceHelper.singleSplitSingleTable()))
-                .rootCause()
-                .hasMessageContaining(
-                        "fluss metadata applier only supports CreateTableEvent and AddColumnEvent now but receives RenameColumnEvent");
-    }
-
-    @Test
-    void testSingleLogTableInLenientMode() throws Exception {
-        // test add/drop/rename column in lenient mode
-        composeAndExecute(
-                ValuesDataSourceHelper.singleSplitSingleTable(),
-                new Configuration().set(PIPELINE_SCHEMA_CHANGE_BEHAVIOR, LENIENT));
-        checkResult(
-                TABLE_1, Arrays.asList("+I[2, null, null, null, x]", "+I[3, 3, null, null, null]"));
-    }
-
-    @Test
-    void testSingleLogTableInIgnoreMode() throws Exception {
-        // test add/drop/rename column in ignore mode
-        composeAndExecute(
-                ValuesDataSourceHelper.singleSplitSingleTable(),
-                new Configuration().set(PIPELINE_SCHEMA_CHANGE_BEHAVIOR, IGNORE));
-        checkResult(TABLE_1, Arrays.asList("+I[2, null]", "+I[3, 3]"));
+        composeAndCheckInLenientMode(TABLE_1, Arrays.asList("+I[1, a]", "+I[2, b]", "+I[3, c]"));
     }
 
     @Test
     void testSingleLogTableWithAddColumn() throws Exception {
-        List<List<Event>> eventOfSplits = new ArrayList<>();
-        List<Event> split1 = new ArrayList<>();
-        Schema schema =
-                Schema.newBuilder()
-                        .physicalColumn("col1", DataTypes.STRING())
-                        .physicalColumn("col2", DataTypes.STRING())
-                        .build();
-        CreateTableEvent createTableEvent = new CreateTableEvent(TABLE_1, schema);
-        split1.add(createTableEvent);
-        DataChangeEvent insertEvent1 =
-                DataChangeEvent.insertEvent(
-                        TABLE_1,
-                        new BinaryRecordDataGenerator(
-                                        RowType.of(DataTypes.STRING(), DataTypes.STRING()))
-                                .generate(
-                                        new Object[] {
-                                            BinaryStringData.fromString("1"),
-                                            BinaryStringData.fromString("a")
-                                        }));
-        split1.add(insertEvent1);
+        createSourceTable(TABLE_1, "col1 STRING, col2 STRING");
+        insertSourceRows(TABLE_1, "('1', 'a')");
 
-        // add column at last.
-        split1.add(
-                new AddColumnEvent(
-                        TABLE_1,
-                        Collections.singletonList(
-                                AddColumnEvent.last(
-                                        Column.physicalColumn("newColumn", DataTypes.STRING())))));
-        DataChangeEvent insertEvent2 =
-                DataChangeEvent.insertEvent(
-                        TABLE_1,
-                        new BinaryRecordDataGenerator(
-                                        RowType.of(
-                                                DataTypes.STRING(),
-                                                DataTypes.STRING(),
-                                                DataTypes.STRING()))
-                                .generate(
-                                        new Object[] {
-                                            BinaryStringData.fromString("2"),
-                                            BinaryStringData.fromString("b"),
-                                            BinaryStringData.fromString("bb")
-                                        }));
-        split1.add(insertEvent2);
-        split1.add(
-                new AddColumnEvent(
-                        TABLE_1,
-                        Collections.singletonList(
-                                AddColumnEvent.last(
-                                        Column.physicalColumn("newColumn2", DataTypes.STRING())))));
-        DataChangeEvent insertEvent3 =
-                DataChangeEvent.insertEvent(
-                        TABLE_1,
-                        new BinaryRecordDataGenerator(
-                                        RowType.of(
-                                                DataTypes.STRING(),
-                                                DataTypes.STRING(),
-                                                DataTypes.STRING(),
-                                                DataTypes.STRING()))
-                                .generate(
-                                        new Object[] {
-                                            BinaryStringData.fromString("3"),
-                                            BinaryStringData.fromString("c"),
-                                            BinaryStringData.fromString("cc"),
-                                            BinaryStringData.fromString("ccc")
-                                        }));
-        split1.add(insertEvent3);
-        eventOfSplits.add(split1);
+        PipelineExecution.ExecutionInfo executionInfo = composeAndExecuteInLenientMode(TABLE_1);
+        try {
+            checkResult(TABLE_1, Collections.singletonList("+I[1, a]"));
+            alterSourceTable(TABLE_1, "ADD newColumn STRING");
+            insertSourceRows(TABLE_1, "('2', 'b', 'bb')");
+            alterSourceTable(TABLE_1, "ADD newColumn2 STRING");
+            insertSourceRows(TABLE_1, "('3', 'c', 'cc', 'ccc')");
+            checkResult(
+                    TABLE_1,
+                    Arrays.asList(
+                            "+I[1, a, null, null]", "+I[2, b, bb, null]", "+I[3, c, cc, ccc]"));
+        } finally {
+            cancelJob(executionInfo);
+        }
+    }
 
-        composeAndExecuteInEvolveMode(eventOfSplits);
-        checkResult(
+    @Test
+    void testSingleLogTableInLenientMode() throws Exception {
+        createSourceTable(TABLE_1, "col1 STRING, col2 STRING");
+        insertSourceRows(TABLE_1, "('2', CAST(NULL AS STRING)), ('3', '3')");
+
+        composeAndCheck(
                 TABLE_1,
-                Arrays.asList("+I[1, a, null, null]", "+I[2, b, bb, null]", "+I[3, c, cc, ccc]"));
+                Arrays.asList("+I[2, null]", "+I[3, 3]"),
+                new Configuration().set(PIPELINE_SCHEMA_CHANGE_BEHAVIOR, LENIENT));
     }
 
     @Test
-    void testLackUsernameAndPassword() {
-        assertThatThrownBy(
-                        () ->
-                                composeAndExecute(
-                                        ValuesDataSourceHelper.singleSplitSingleTable(),
-                                        Collections.singletonMap(
-                                                BOOTSTRAP_SERVERS.key(), getBootstrapServers()),
-                                        new Configuration()))
-                .rootCause()
-                .hasMessageContaining(
-                        "The connection has not completed authentication yet. This may be caused by a missing or incorrect configuration of 'client.security.protocol' on the client side.");
-    }
+    void testSingleLogTableInIgnoreMode() throws Exception {
+        createSourceTable(TABLE_1, "col1 STRING, col2 STRING");
+        insertSourceRows(TABLE_1, "('2', CAST(NULL AS STRING)), ('3', '3')");
 
-    @Test
-    void testWrongTableOptions() {
-        Map<String, String> sinkOption = new HashMap<>();
-        sinkOption.put(BOOTSTRAP_SERVERS.key(), getBootstrapServers());
-        sinkOption.put(BOOTSTRAP_SERVERS.key(), getBootstrapServers());
-        sinkOption.put("properties.client.security.protocol", "sasl");
-        sinkOption.put("properties.client.security.sasl.mechanism", "PLAIN");
-        sinkOption.put("properties.client.security.sasl.username", "guest");
-        sinkOption.put("properties.client.security.sasl.password", "password2");
-        sinkOption.put("properties.table.non-key", "non-key-value");
-        assertThatThrownBy(
-                        () ->
-                                composeAndExecute(
-                                        ValuesDataSourceHelper.singleSplitSingleTable(),
-                                        sinkOption,
-                                        new Configuration()))
-                .rootCause()
-                .hasMessageContaining("'table.non-key' is not a recognized Fluss table property");
+        composeAndCheck(
+                TABLE_1,
+                Arrays.asList("+I[2, null]", "+I[3, 3]"),
+                new Configuration().set(PIPELINE_SCHEMA_CHANGE_BEHAVIOR, IGNORE));
     }
 
     @Test
     void testMultiTables() throws Exception {
-        List<List<Event>> eventOfSplits = new ArrayList<>();
-        List<Event> split1 = new ArrayList<>();
-        BinaryRecordDataGenerator generator =
-                new BinaryRecordDataGenerator(RowType.of(DataTypes.STRING(), DataTypes.STRING()));
+        createSourceTable(TABLE_1, "col1 STRING, col2 STRING, PRIMARY KEY (col1) NOT ENFORCED");
+        createSourceTable(TABLE_2, "col1 STRING, col2 STRING, PRIMARY KEY (col1) NOT ENFORCED");
+        insertSourceRows(TABLE_1, "('1', '1'), ('2', '2'), ('3', '3')");
+        insertSourceRows(TABLE_2, "('1', '1'), ('2', '2'), ('3', '3')");
 
-        // create table
-        Schema schema =
-                Schema.newBuilder()
-                        .physicalColumn("col1", DataTypes.STRING())
-                        .physicalColumn("col2", DataTypes.STRING())
-                        .primaryKey("col1")
-                        .build();
-        CreateTableEvent createTableEvent = new CreateTableEvent(TABLE_1, schema);
-        split1.add(createTableEvent);
-        DataChangeEvent insertTable1Event1 =
-                DataChangeEvent.insertEvent(
-                        TABLE_1,
-                        generator.generate(
-                                new Object[] {
-                                    BinaryStringData.fromString("1"),
-                                    BinaryStringData.fromString("1")
-                                }));
-        split1.add(insertTable1Event1);
-        CreateTableEvent createTableEvent2 = new CreateTableEvent(TABLE_2, schema);
-        split1.add(createTableEvent2);
-        DataChangeEvent insertTable1Event2 =
-                DataChangeEvent.insertEvent(
-                        TABLE_1,
-                        generator.generate(
-                                new Object[] {
-                                    BinaryStringData.fromString("2"),
-                                    BinaryStringData.fromString("2")
-                                }));
-        split1.add(insertTable1Event2);
-        DataChangeEvent insertTable2Event1 =
-                DataChangeEvent.insertEvent(
-                        TABLE_2,
-                        generator.generate(
-                                new Object[] {
-                                    BinaryStringData.fromString("1"),
-                                    BinaryStringData.fromString("1")
-                                }));
-        split1.add(insertTable2Event1);
-        DataChangeEvent insertTable1Event3 =
-                DataChangeEvent.insertEvent(
-                        TABLE_1,
-                        generator.generate(
-                                new Object[] {
-                                    BinaryStringData.fromString("3"),
-                                    BinaryStringData.fromString("3")
-                                }));
-        split1.add(insertTable1Event3);
-
-        DataChangeEvent insertTable2Event2 =
-                DataChangeEvent.insertEvent(
-                        TABLE_2,
-                        generator.generate(
-                                new Object[] {
-                                    BinaryStringData.fromString("2"),
-                                    BinaryStringData.fromString("2")
-                                }));
-        split1.add(insertTable2Event2);
-        DataChangeEvent insertTabl2Event3 =
-                DataChangeEvent.insertEvent(
-                        TABLE_2,
-                        generator.generate(
-                                new Object[] {
-                                    BinaryStringData.fromString("3"),
-                                    BinaryStringData.fromString("3")
-                                }));
-        split1.add(insertTabl2Event3);
-        eventOfSplits.add(split1);
-
-        composeAndExecuteInEvolveMode(eventOfSplits);
-        checkResult(TABLE_1, Arrays.asList("+I[1, 1]", "+I[2, 2]", "+I[3, 3]"));
-        checkResult(TABLE_2, Arrays.asList("+I[1, 1]", "+I[2, 2]", "+I[3, 3]"));
+        PipelineExecution.ExecutionInfo executionInfo =
+                composeAndExecuteInLenientMode(TABLE_1, TABLE_2);
+        try {
+            checkResult(TABLE_1, Arrays.asList("+I[1, 1]", "+I[2, 2]", "+I[3, 3]"));
+            checkResult(TABLE_2, Arrays.asList("+I[1, 1]", "+I[2, 2]", "+I[3, 3]"));
+        } finally {
+            cancelJob(executionInfo);
+        }
     }
 
     @Test
     void testInsertExistTableWithMoreColumns() throws Exception {
-        // create a fluss table with 2 columns but then cdc read a source table with 3 columns
         tBatchEnv
                 .executeSql(
                         String.format(
-                                "CREATE TABLE %s.%s (\n"
-                                        + "    col2 STRING,\n"
-                                        + "    col1 STRING,\n"
-                                        + "   PRIMARY KEY (col1) NOT ENFORCED \n"
-                                        + ");",
-                                TABLE_1.getSchemaName(), TABLE_1.getTableName()))
+                                "CREATE TABLE %s.%s ("
+                                        + "col2 STRING, "
+                                        + "col1 STRING, "
+                                        + "PRIMARY KEY (col1) NOT ENFORCED)",
+                                SINK_DB, TABLE_1))
                 .await();
+        createSourceTable(
+                TABLE_1, "col1 STRING, col2 STRING, col3 STRING, PRIMARY KEY (col1) NOT ENFORCED");
+        insertSourceRows(TABLE_1, "('1', 'a', 'aa'), ('2', 'b', 'bb')");
 
-        List<List<Event>> eventOfSplits = new ArrayList<>();
-        List<Event> split1 = new ArrayList<>();
-        Schema schema =
-                Schema.newBuilder()
-                        .physicalColumn("col1", DataTypes.STRING())
-                        .physicalColumn("col2", DataTypes.STRING())
-                        .physicalColumn("col3", DataTypes.STRING())
-                        .primaryKey("col1")
-                        .build();
-        CreateTableEvent createTableEvent = new CreateTableEvent(TABLE_1, schema);
-        split1.add(createTableEvent);
-        BinaryRecordDataGenerator generator =
-                new BinaryRecordDataGenerator(
-                        RowType.of(DataTypes.STRING(), DataTypes.STRING(), DataTypes.STRING()));
-        DataChangeEvent insertEvent1 =
-                DataChangeEvent.insertEvent(
-                        TABLE_1,
-                        generator.generate(
-                                new Object[] {
-                                    BinaryStringData.fromString("1"),
-                                    BinaryStringData.fromString("a"),
-                                    BinaryStringData.fromString("aa")
-                                }));
-        split1.add(insertEvent1);
-        DataChangeEvent insertEvent2 =
-                DataChangeEvent.insertEvent(
-                        TABLE_1,
-                        generator.generate(
-                                new Object[] {
-                                    BinaryStringData.fromString("2"),
-                                    BinaryStringData.fromString("b"),
-                                    BinaryStringData.fromString("bb")
-                                }));
-        split1.add(insertEvent2);
-        eventOfSplits.add(split1);
-
-        // add column at last
-        split1.add(
-                new AddColumnEvent(
-                        TABLE_1,
-                        Collections.singletonList(
-                                AddColumnEvent.last(
-                                        Column.physicalColumn("newColumn", DataTypes.STRING())))));
-        DataChangeEvent insertEvent3 =
-                DataChangeEvent.insertEvent(
-                        TABLE_1,
-                        new BinaryRecordDataGenerator(
-                                        RowType.of(
-                                                DataTypes.STRING(),
-                                                DataTypes.STRING(),
-                                                DataTypes.STRING(),
-                                                DataTypes.STRING()))
-                                .generate(
-                                        new Object[] {
-                                            BinaryStringData.fromString("3"),
-                                            BinaryStringData.fromString("c"),
-                                            BinaryStringData.fromString("cc"),
-                                            BinaryStringData.fromString("ccc")
-                                        }));
-        split1.add(insertEvent3);
-
-        composeAndExecuteInEvolveMode(eventOfSplits);
-        checkResult(TABLE_1, Arrays.asList("+I[a, 1, null]", "+I[b, 2, null]", "+I[c, 3, ccc]"));
+        composeAndCheckInLenientMode(TABLE_1, Arrays.asList("+I[a, 1]", "+I[b, 2]"));
     }
 
     @Test
     void testInsertExistTableWithLessColumns() throws Exception {
-        // create a fluss table with 2 columns but then cdc read a source table with 3 columns
         tBatchEnv
                 .executeSql(
                         String.format(
-                                "CREATE TABLE %s.%s (\n"
-                                        + "    col1 STRING,\n"
-                                        + "    col2 STRING,\n"
-                                        + "    col3 STRING,\n"
-                                        + "   PRIMARY KEY (col1) NOT ENFORCED \n"
-                                        + ");",
-                                TABLE_1.getSchemaName(), TABLE_1.getTableName()))
+                                "CREATE TABLE %s.%s ("
+                                        + "col1 STRING, "
+                                        + "col2 STRING, "
+                                        + "col3 STRING, "
+                                        + "PRIMARY KEY (col1) NOT ENFORCED)",
+                                SINK_DB, TABLE_1))
                 .await();
+        createSourceTable(TABLE_1, "col1 STRING, col2 STRING, PRIMARY KEY (col1) NOT ENFORCED");
+        insertSourceRows(TABLE_1, "('1', 'a'), ('2', 'b')");
 
-        List<List<Event>> eventOfSplits = new ArrayList<>();
-        List<Event> split1 = new ArrayList<>();
-        Schema schema =
-                Schema.newBuilder()
-                        .physicalColumn("col1", DataTypes.STRING())
-                        .physicalColumn("col2", DataTypes.STRING())
-                        .primaryKey("col1")
-                        .build();
-        CreateTableEvent createTableEvent = new CreateTableEvent(TABLE_1, schema);
-        split1.add(createTableEvent);
-        BinaryRecordDataGenerator generator =
-                new BinaryRecordDataGenerator(RowType.of(DataTypes.STRING(), DataTypes.STRING()));
-        DataChangeEvent insertEvent1 =
-                DataChangeEvent.insertEvent(
-                        TABLE_1,
-                        generator.generate(
-                                new Object[] {
-                                    BinaryStringData.fromString("1"),
-                                    BinaryStringData.fromString("a")
-                                }));
-        split1.add(insertEvent1);
-        DataChangeEvent insertEvent2 =
-                DataChangeEvent.insertEvent(
-                        TABLE_1,
-                        generator.generate(
-                                new Object[] {
-                                    BinaryStringData.fromString("2"),
-                                    BinaryStringData.fromString("b")
-                                }));
-        split1.add(insertEvent2);
-        eventOfSplits.add(split1);
-
-        // add column at last
-        split1.add(
-                new AddColumnEvent(
-                        TABLE_1,
-                        Collections.singletonList(
-                                AddColumnEvent.last(
-                                        Column.physicalColumn("newColumn", DataTypes.STRING())))));
-        DataChangeEvent insertEvent3 =
-                DataChangeEvent.insertEvent(
-                        TABLE_1,
-                        new BinaryRecordDataGenerator(
-                                        RowType.of(
-                                                DataTypes.STRING(),
-                                                DataTypes.STRING(),
-                                                DataTypes.STRING()))
-                                .generate(
-                                        new Object[] {
-                                            BinaryStringData.fromString("3"),
-                                            BinaryStringData.fromString("c"),
-                                            BinaryStringData.fromString("cc")
-                                        }));
-        split1.add(insertEvent3);
-
-        composeAndExecuteInEvolveMode(eventOfSplits);
-        checkResult(
-                TABLE_1,
-                Arrays.asList(
-                        "+I[1, a, null, null]", "+I[2, b, null, null]", "+I[3, c, null, cc]"));
+        composeAndCheckInLenientMode(TABLE_1, Arrays.asList("+I[1, a, null]", "+I[2, b, null]"));
     }
 
-    private void composeAndExecuteInEvolveMode(List<List<Event>> customSourceEvents)
+    private void composeAndCheckInLenientMode(String tableName, List<String> expectedRows)
             throws Exception {
-        composeAndExecute(
-                customSourceEvents,
-                new Configuration().set(PIPELINE_SCHEMA_CHANGE_BEHAVIOR, EVOLVE));
+        composeAndCheck(
+                tableName,
+                expectedRows,
+                new Configuration().set(PIPELINE_SCHEMA_CHANGE_BEHAVIOR, LENIENT));
     }
 
-    private void composeAndExecute(
-            List<List<Event>> customSourceEvents, Configuration pipelineConfig) throws Exception {
-        Map<String, String> sinkOption = new HashMap<>();
-        sinkOption.put(BOOTSTRAP_SERVERS.key(), getBootstrapServers());
-        sinkOption.put("properties.client.security.protocol", "sasl");
-        sinkOption.put("properties.client.security.sasl.mechanism", "PLAIN");
-        sinkOption.put("properties.client.security.sasl.username", "guest");
-        sinkOption.put("properties.client.security.sasl.password", "password2");
-        composeAndExecute(customSourceEvents, sinkOption, pipelineConfig);
-    }
-
-    private void composeAndExecute(
-            List<List<Event>> customSourceEvents,
-            Map<String, String> sinkOption,
-            Configuration pipelineConfig)
+    private void composeAndCheck(String tableName, List<String> expectedRows, Configuration config)
             throws Exception {
-        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+        PipelineExecution.ExecutionInfo executionInfo =
+                composeAndExecute(Collections.singletonList(tableName), config);
+        try {
+            checkResult(tableName, expectedRows);
+        } finally {
+            cancelJob(executionInfo);
+        }
+    }
 
-        // Setup value source
-        Configuration sourceConfig = new Configuration();
-        sourceConfig.set(
-                ValuesDataSourceOptions.EVENT_SET_ID,
-                ValuesDataSourceHelper.EventSetId.CUSTOM_SOURCE_EVENTS);
+    private PipelineExecution.ExecutionInfo composeAndExecuteInLenientMode(String... tableNames)
+            throws Exception {
+        return composeAndExecute(
+                Arrays.asList(tableNames),
+                new Configuration().set(PIPELINE_SCHEMA_CHANGE_BEHAVIOR, LENIENT));
+    }
+
+    private PipelineExecution.ExecutionInfo composeAndExecute(
+            List<String> tableNames, Configuration pipelineConfig) throws Exception {
+        return composeAndExecute(tableNames, defaultFlussOptions(), pipelineConfig);
+    }
+
+    private PipelineExecution.ExecutionInfo composeAndExecute(
+            List<String> tableNames, Map<String, String> sinkOption, Configuration pipelineConfig)
+            throws Exception {
+        FlinkPipelineComposer composer =
+                FlinkPipelineComposer.ofApplicationCluster(
+                        StreamExecutionEnvironment.getExecutionEnvironment());
+        composer.getEnv().enableCheckpointing(1000L);
+
         SourceDef sourceDef =
-                new SourceDef(ValuesDataFactory.IDENTIFIER, "Value Source", sourceConfig);
-        ValuesDataSourceHelper.setSourceEvents(customSourceEvents);
-
-        // Setup value sink
+                new SourceDef(
+                        "fluss",
+                        "Fluss Source",
+                        Configuration.fromMap(defaultSourceOptions(tableNames)));
         SinkDef sinkDef = new SinkDef("fluss", "Fluss Sink", Configuration.fromMap(sinkOption));
 
-        // Setup pipeline
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 4);
-        pipelineConfig.addAll(pipelineConfig);
         PipelineDef pipelineDef =
                 new PipelineDef(
                         sourceDef,
                         sinkDef,
-                        Collections.emptyList(),
+                        Collections.singletonList(
+                                new RouteDef(sourceRoutePattern(), SINK_DB + ".<>", "<>", null)),
                         Collections.emptyList(),
                         Collections.emptyList(),
                         pipelineConfig);
 
-        // Execute the pipeline
         PipelineExecution execution = composer.compose(pipelineDef);
-        execution.execute();
+        return execution.execute();
     }
 
-    private void checkResult(TableId tableId, List<String> expectedRows) {
-        CloseableIterator<Row> rowIter =
-                tBatchEnv
-                        .executeSql(
-                                String.format(
-                                        "select * from %s.%s limit %d",
-                                        tableId.getSchemaName(),
-                                        tableId.getTableName(),
-                                        expectedRows.size()))
-                        .collect();
-        assertResultsIgnoreOrder(rowIter, expectedRows, true);
+    private Map<String, String> defaultSourceOptions(List<String> tableNames) {
+        Map<String, String> sourceOptions = defaultFlussOptions();
+        sourceOptions.put("table.discoverer.pattern", sourcePattern(tableNames));
+        sourceOptions.put("scan.startup.mode", "full");
+        sourceOptions.put("scan.discovery.interval", "1 s");
+        return sourceOptions;
+    }
+
+    private Map<String, String> defaultFlussOptions() {
+        Map<String, String> options = new HashMap<>();
+        options.put(BOOTSTRAP_SERVERS.key(), getBootstrapServers());
+        options.put("properties.client.security.protocol", "sasl");
+        options.put("properties.client.security.sasl.mechanism", "PLAIN");
+        options.put("properties.client.security.sasl.username", "guest");
+        options.put("properties.client.security.sasl.password", "password2");
+        return options;
+    }
+
+    private String sourceRoutePattern() {
+        return SOURCE_DB + ".\\.*";
+    }
+
+    private String sourcePattern(List<String> tableNames) {
+        return tableNames.stream()
+                .map(tableName -> SOURCE_DB + "\\." + tableName)
+                .collect(Collectors.joining("|"));
+    }
+
+    private String sourceTableName(String tableName) {
+        return SOURCE_DB + "." + tableName;
+    }
+
+    private String sinkTableName(String tableName) {
+        return SINK_DB + "." + tableName;
+    }
+
+    private void createSourceTable(String tableName, String columns) throws Exception {
+        tBatchEnv
+                .executeSql(
+                        String.format("CREATE TABLE %s (%s)", sourceTableName(tableName), columns))
+                .await();
+    }
+
+    private void insertSourceRows(String tableName, String rows) throws Exception {
+        tBatchEnv
+                .executeSql(
+                        String.format("INSERT INTO %s VALUES %s", sourceTableName(tableName), rows))
+                .await();
+    }
+
+    private void deleteSourceRows(String tableName, String condition) throws Exception {
+        tBatchEnv
+                .executeSql(
+                        String.format(
+                                "DELETE FROM %s WHERE %s", sourceTableName(tableName), condition))
+                .await();
+    }
+
+    private void alterSourceTable(String tableName, String alterStatement) throws Exception {
+        tBatchEnv
+                .executeSql(
+                        String.format(
+                                "ALTER TABLE %s %s", sourceTableName(tableName), alterStatement))
+                .await();
+    }
+
+    private void cancelJob(PipelineExecution.ExecutionInfo executionInfo) throws Exception {
+        miniCluster.cancelJob(JobID.fromHexString(executionInfo.getId())).get();
+    }
+
+    private void checkResult(String tableName, List<String> expectedRows) throws Exception {
+        waitUntilTableReady(SINK_DB, tableName);
+        long deadline = System.currentTimeMillis() + RESULT_TIMEOUT.toMillis();
+        Throwable lastError = null;
+        String limitSql =
+                String.format(
+                        "select * from %s.%s limit %d",
+                        CATALOG_NAME, sinkTableName(tableName), expectedRows.size());
+        while (System.currentTimeMillis() < deadline) {
+            try (CloseableIterator<Row> rowIter = tBatchEnv.executeSql(limitSql).collect()) {
+                List<String> result = collectBatchRows(rowIter);
+                assertThat(result).containsExactlyInAnyOrderElementsOf(expectedRows);
+                return;
+            } catch (AssertionError | Exception e) {
+                lastError = e;
+                Thread.sleep(500L);
+            }
+        }
+        if (lastError instanceof Exception) {
+            throw (Exception) lastError;
+        }
+        if (lastError instanceof AssertionError) {
+            throw (AssertionError) lastError;
+        }
+        throw new AssertionError("Timed out waiting for Fluss sink result: " + expectedRows);
+    }
+
+    /**
+     * Waits until the given table has been created by the sink and its bucket assignments have an
+     * elected leader, so that subsequent limit-pushdown queries against it won't block on leader
+     * election or fail because the table doesn't exist yet.
+     */
+    private void waitUntilTableReady(String databaseName, String tableName) throws Exception {
+        TablePath tablePath = TablePath.of(databaseName, tableName);
+        long deadline = System.currentTimeMillis() + RESULT_TIMEOUT.toMillis();
+        try (Connection connection =
+                        ConnectionFactory.createConnection(
+                                FLUSS_CLUSTER_EXTENSION.getClientConfig());
+                Admin admin = connection.getAdmin()) {
+            TableInfo tableInfo = null;
+            Exception lastError = null;
+            while (System.currentTimeMillis() < deadline) {
+                try {
+                    tableInfo = admin.getTableInfo(tablePath).get();
+                    break;
+                } catch (Exception e) {
+                    lastError = e;
+                    Thread.sleep(500L);
+                }
+            }
+            if (tableInfo == null) {
+                throw new IllegalStateException(
+                        "Sink table " + tablePath + " was not created in time", lastError);
+            }
+            FLUSS_CLUSTER_EXTENSION.waitUntilTableReady(tableInfo.getTableId());
+        }
     }
 
     private static org.apache.fluss.config.Configuration initConfig() {
@@ -743,8 +488,8 @@ public class FlussPipelineITCase {
 
         conf.set(ConfigOptions.CLIENT_WRITER_BUFFER_MEMORY_SIZE, MemorySize.parse("1mb"));
         conf.set(ConfigOptions.CLIENT_WRITER_BATCH_SIZE, MemorySize.parse("1kb"));
+        conf.set(ConfigOptions.SERVER_DATA_DISK_WRITE_LIMIT_RATIO, 1.0);
 
-        // set security information.
         conf.setString(ConfigOptions.SERVER_SECURITY_PROTOCOL_MAP.key(), "CLIENT:sasl");
         conf.setString("security.sasl.enabled.mechanisms", "plain");
         conf.setString(

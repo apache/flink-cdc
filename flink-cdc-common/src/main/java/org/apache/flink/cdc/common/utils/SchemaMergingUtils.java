@@ -20,9 +20,13 @@ package org.apache.flink.cdc.common.utils;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.annotation.PublicEvolving;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
+import org.apache.flink.cdc.common.converter.JavaObjectConverter;
+import org.apache.flink.cdc.common.data.ArrayData;
 import org.apache.flink.cdc.common.data.DateData;
 import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
+import org.apache.flink.cdc.common.data.MapData;
+import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.StringData;
 import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
@@ -323,8 +327,12 @@ public class SchemaMergingUtils {
         return coercedRow;
     }
 
-    @VisibleForTesting
-    static boolean isDataTypeCompatible(@Nullable DataType currentType, DataType upcomingType) {
+    /**
+     * Checks whether the upcoming data type can fit into the current data type. A missing current
+     * type is treated as incompatible.
+     */
+    public static boolean isDataTypeCompatible(
+            @Nullable DataType currentType, DataType upcomingType) {
         // If two types are identical, they're compatible of course.
         if (Objects.equals(currentType, upcomingType)) {
             return true;
@@ -431,15 +439,7 @@ public class SchemaMergingUtils {
                             lhsDecimal.getPrecision() - lhsDecimal.getScale(),
                             rhsDecimal.getPrecision() - rhsDecimal.getScale());
             int resultScale = Math.max(lhsDecimal.getScale(), rhsDecimal.getScale());
-            Preconditions.checkArgument(
-                    resultIntDigits + resultScale <= DecimalType.MAX_PRECISION,
-                    String.format(
-                            "Failed to merge %s and %s type into DECIMAL. %d precision digits required, %d available",
-                            lType,
-                            rType,
-                            resultIntDigits + resultScale,
-                            DecimalType.MAX_PRECISION));
-            return DataTypes.DECIMAL(resultIntDigits + resultScale, resultScale);
+            return createDecimalBounded(resultIntDigits + resultScale, resultScale);
         } else if (lType instanceof DecimalType && rType.is(DataTypeFamily.EXACT_NUMERIC)) {
             // Merge decimal and int
             return mergeExactNumericsIntoDecimal((DecimalType) lType, rType);
@@ -457,11 +457,7 @@ public class SchemaMergingUtils {
                 Math.max(
                         decimalType.getPrecision(),
                         decimalType.getScale() + getNumericPrecision(otherType));
-        if (resultPrecision <= DecimalType.MAX_PRECISION) {
-            return DataTypes.DECIMAL(resultPrecision, decimalType.getScale());
-        } else {
-            return DataTypes.STRING();
-        }
+        return createDecimalBounded(resultPrecision, decimalType.getScale());
     }
 
     @VisibleForTesting
@@ -609,6 +605,12 @@ public class SchemaMergingUtils {
             return BinaryStringData.fromString(((Variant) originalField).toJson());
         }
 
+        if (originalField instanceof MapData
+                || originalField instanceof ArrayData
+                || originalField instanceof RecordData) {
+            Object javaObject = JavaObjectConverter.convertToJava(originalField, originalType);
+            return BinaryStringData.fromString(javaObject.toString());
+        }
         return BinaryStringData.fromString(originalField.toString());
     }
 
@@ -924,5 +926,14 @@ public class SchemaMergingUtils {
         mergingTree.put(MapType.class, ImmutableList.of(stringType));
         mergingTree.put(VariantType.class, ImmutableList.of(stringType));
         return mergingTree;
+    }
+
+    static DecimalType createDecimalBounded(int precision, int scale) {
+        if (precision > DecimalType.MAX_PRECISION) {
+            int lossDigits = precision - DecimalType.MAX_PRECISION;
+            return DataTypes.DECIMAL(precision - lossDigits, scale - lossDigits);
+        } else {
+            return DataTypes.DECIMAL(precision, scale);
+        }
     }
 }

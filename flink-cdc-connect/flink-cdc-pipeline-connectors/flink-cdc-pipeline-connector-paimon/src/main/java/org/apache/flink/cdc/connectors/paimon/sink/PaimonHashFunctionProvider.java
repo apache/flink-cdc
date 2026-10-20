@@ -23,8 +23,6 @@ import org.apache.flink.cdc.common.function.HashFunction;
 import org.apache.flink.cdc.common.function.HashFunctionProvider;
 import org.apache.flink.cdc.common.schema.Schema;
 
-import org.apache.paimon.options.Options;
-
 import javax.annotation.Nullable;
 
 import java.time.ZoneId;
@@ -32,20 +30,17 @@ import java.time.ZoneId;
 /** A {@link HashFunctionProvider} implementation for {@link PaimonDataSink}. */
 public class PaimonHashFunctionProvider implements HashFunctionProvider<DataChangeEvent> {
 
-    private final Options options;
-
     private final ZoneId zoneId;
 
     private final int parallelism;
 
-    public PaimonHashFunctionProvider(Options options, ZoneId zoneId, int parallelism) {
-        this.options = options;
+    public PaimonHashFunctionProvider(ZoneId zoneId, int parallelism) {
         this.zoneId = zoneId;
         this.parallelism = parallelism;
     }
 
     @Override
     public HashFunction<DataChangeEvent> getHashFunction(@Nullable TableId tableId, Schema schema) {
-        return new PaimonHashFunction(options, tableId, schema, zoneId, parallelism);
+        return new PaimonHashFunction(schema, zoneId, parallelism);
     }
 }

@@ -100,3 +100,18 @@
     DataChangeEvent{tableId=foo.bar.baz, before=[-1, 非正, 短], after=[], op=DELETE, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, 非正, 短], op=INSERT, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[0, 非正, 短], after=[], op=DELETE, meta=()}
+- do: IfNull and NullIf Clauses
+  projection: |-
+    id_, int_
+    IFNULL(int_, 17) AS int_fallback
+    NULLIF(int_, 4) AS int_nullif
+    NULLIF(CAST(int_ AS BIGINT), CAST(4 AS INT)) AS bigint_nullif
+  filter: IFNULL(NULLIF(id_, -999), 0) IS NOT NULL
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`int_` INT,`int_fallback` INT NOT NULL,`int_nullif` INT,`bigint_nullif` BIGINT}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, 4, 4, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, 4, 4, null, null], after=[-1, -4, -4, -4, -4], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, -4, -4, -4, -4], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, 17, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, 17, null, null], after=[], op=DELETE, meta=()}

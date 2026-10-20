@@ -22,6 +22,7 @@ import org.apache.flink.cdc.common.types.BigIntType;
 import org.apache.flink.cdc.common.types.BinaryType;
 import org.apache.flink.cdc.common.types.BooleanType;
 import org.apache.flink.cdc.common.types.CharType;
+import org.apache.flink.cdc.common.types.DataField;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DateType;
 import org.apache.flink.cdc.common.types.DecimalType;
@@ -52,9 +53,108 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-/** Converter from Flink's type to Fluss's type. */
+/** Converter between Flink CDC types and Fluss types. */
 public class FlussConversions {
     private static final CdcTypeToFlussType TO_FLUSS_TYPE_INSTANCE = new CdcTypeToFlussType();
+
+    // ======================== Fluss -> CDC Conversions ========================
+
+    /** Converts a Fluss schema to a Flink CDC schema. */
+    public static org.apache.flink.cdc.common.schema.Schema toCdcSchema(
+            org.apache.fluss.metadata.Schema flussSchema) {
+        return toCdcSchema(flussSchema, Collections.emptyList());
+    }
+
+    /** Converts a Fluss schema to a Flink CDC schema with table partition keys. */
+    public static org.apache.flink.cdc.common.schema.Schema toCdcSchema(
+            org.apache.fluss.metadata.Schema flussSchema, List<String> partitionKeys) {
+        org.apache.flink.cdc.common.schema.Schema.Builder builder =
+                org.apache.flink.cdc.common.schema.Schema.newBuilder();
+
+        for (org.apache.fluss.metadata.Schema.Column column : flussSchema.getColumns()) {
+            DataType cdcType = toCdcType(column.getDataType());
+            builder.physicalColumn(column.getName(), cdcType);
+        }
+
+        List<String> primaryKeys = flussSchema.getPrimaryKeyColumnNames();
+        if (primaryKeys != null && !primaryKeys.isEmpty()) {
+            builder.primaryKey(primaryKeys);
+        }
+        if (partitionKeys != null && !partitionKeys.isEmpty()) {
+            builder.partitionKey(partitionKeys);
+        }
+
+        return builder.build();
+    }
+
+    /** Converts a Fluss data type to a Flink CDC data type. */
+    public static DataType toCdcType(org.apache.fluss.types.DataType flussType) {
+        boolean nullable = flussType.isNullable();
+        if (flussType instanceof org.apache.fluss.types.CharType) {
+            return new CharType(
+                    nullable, ((org.apache.fluss.types.CharType) flussType).getLength());
+        } else if (flussType instanceof org.apache.fluss.types.StringType) {
+            return new VarCharType(nullable, VarCharType.MAX_LENGTH);
+        } else if (flussType instanceof org.apache.fluss.types.BooleanType) {
+            return new BooleanType(nullable);
+        } else if (flussType instanceof org.apache.fluss.types.BinaryType) {
+            return new BinaryType(
+                    nullable, ((org.apache.fluss.types.BinaryType) flussType).getLength());
+        } else if (flussType instanceof org.apache.fluss.types.BytesType) {
+            return new VarBinaryType(nullable, VarBinaryType.MAX_LENGTH);
+        } else if (flussType instanceof org.apache.fluss.types.DecimalType) {
+            org.apache.fluss.types.DecimalType decimalType =
+                    (org.apache.fluss.types.DecimalType) flussType;
+            return new DecimalType(nullable, decimalType.getPrecision(), decimalType.getScale());
+        } else if (flussType instanceof org.apache.fluss.types.TinyIntType) {
+            return new TinyIntType(nullable);
+        } else if (flussType instanceof org.apache.fluss.types.SmallIntType) {
+            return new SmallIntType(nullable);
+        } else if (flussType instanceof org.apache.fluss.types.IntType) {
+            return new IntType(nullable);
+        } else if (flussType instanceof org.apache.fluss.types.BigIntType) {
+            return new BigIntType(nullable);
+        } else if (flussType instanceof org.apache.fluss.types.FloatType) {
+            return new FloatType(nullable);
+        } else if (flussType instanceof org.apache.fluss.types.DoubleType) {
+            return new DoubleType(nullable);
+        } else if (flussType instanceof org.apache.fluss.types.DateType) {
+            return new DateType(nullable);
+        } else if (flussType instanceof org.apache.fluss.types.TimeType) {
+            return new TimeType(
+                    nullable, ((org.apache.fluss.types.TimeType) flussType).getPrecision());
+        } else if (flussType instanceof org.apache.fluss.types.TimestampType) {
+            return new TimestampType(
+                    nullable, ((org.apache.fluss.types.TimestampType) flussType).getPrecision());
+        } else if (flussType instanceof org.apache.fluss.types.LocalZonedTimestampType) {
+            return new LocalZonedTimestampType(
+                    nullable,
+                    ((org.apache.fluss.types.LocalZonedTimestampType) flussType).getPrecision());
+        } else if (flussType instanceof org.apache.fluss.types.ArrayType) {
+            org.apache.fluss.types.ArrayType arrayType =
+                    (org.apache.fluss.types.ArrayType) flussType;
+            DataType elementType = toCdcType(arrayType.getElementType());
+            return new ArrayType(nullable, elementType);
+        } else if (flussType instanceof org.apache.fluss.types.MapType) {
+            org.apache.fluss.types.MapType mapType = (org.apache.fluss.types.MapType) flussType;
+            DataType keyType = toCdcType(mapType.getKeyType());
+            DataType valueType = toCdcType(mapType.getValueType());
+            return new MapType(nullable, keyType, valueType);
+        } else if (flussType instanceof org.apache.fluss.types.RowType) {
+            org.apache.fluss.types.RowType rowType = (org.apache.fluss.types.RowType) flussType;
+            List<org.apache.fluss.types.DataField> fields = rowType.getFields();
+            List<DataField> cdcFields = new ArrayList<>();
+            for (org.apache.fluss.types.DataField field : fields) {
+                cdcFields.add(new DataField(field.getName(), toCdcType(field.getType())));
+            }
+            return new RowType(nullable, cdcFields);
+        } else {
+            throw new UnsupportedOperationException(
+                    "Unsupported Fluss data type: " + flussType.getClass().getSimpleName());
+        }
+    }
+
+    // ======================== CDC -> Fluss Conversions ========================
 
     public static TableDescriptor toFlussTable(
             org.apache.flink.cdc.common.schema.Schema cdcSchema,

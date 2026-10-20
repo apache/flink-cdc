@@ -81,15 +81,26 @@ public class DistributedEventOperatorTestHarness<
     private final TestingSchemaRegistryGateway schemaRegistryGateway;
     private final LinkedList<StreamRecord<E>> outputRecords = new LinkedList<>();
     private final MockedOperatorCoordinatorContext mockedContext;
+    private final int subtaskIndex;
 
     public DistributedEventOperatorTestHarness(OP operator, int numOutputs) {
-        this(operator, numOutputs, Duration.ofSeconds(3), Duration.ofMinutes(3));
+        this(operator, numOutputs, 0, Duration.ofSeconds(3), Duration.ofMinutes(3));
     }
 
     public DistributedEventOperatorTestHarness(
             OP operator, int numOutputs, Duration applyDuration, Duration rpcTimeout) {
+        this(operator, numOutputs, 0, applyDuration, rpcTimeout);
+    }
+
+    public DistributedEventOperatorTestHarness(
+            OP operator,
+            int numOutputs,
+            int subtaskIndex,
+            Duration applyDuration,
+            Duration rpcTimeout) {
         this.operator = operator;
         this.numOutputs = numOutputs;
+        this.subtaskIndex = subtaskIndex;
         this.mockedContext =
                 new MockedOperatorCoordinatorContext(
                         SCHEMA_OPERATOR_ID, Thread.currentThread().getContextClassLoader());
@@ -160,7 +171,7 @@ public class DistributedEventOperatorTestHarness<
 
     private void initializeOperator() throws Exception {
         operator.setup(
-                new MockStreamTask(schemaRegistryGateway),
+                new MockStreamTask(schemaRegistryGateway, subtaskIndex),
                 new MockStreamConfig(new Configuration(), numOutputs),
                 new EventCollectingOutput<>(outputRecords, schemaRegistryGateway));
         schemaRegistryGateway.sendOperatorEventToCoordinator(
@@ -227,9 +238,10 @@ public class DistributedEventOperatorTestHarness<
     }
 
     private static class MockStreamTask extends StreamTask<Event, AbstractStreamOperator<Event>> {
-        protected MockStreamTask(TestingSchemaRegistryGateway schemaRegistryGateway)
+        protected MockStreamTask(
+                TestingSchemaRegistryGateway schemaRegistryGateway, int subtaskIndex)
                 throws Exception {
-            super(new SchemaRegistryCoordinatingEnvironment(schemaRegistryGateway));
+            super(new SchemaRegistryCoordinatingEnvironment(schemaRegistryGateway, subtaskIndex));
         }
 
         @Override
@@ -240,7 +252,8 @@ public class DistributedEventOperatorTestHarness<
         private final TestingSchemaRegistryGateway schemaRegistryGateway;
 
         public SchemaRegistryCoordinatingEnvironment(
-                TestingSchemaRegistryGateway schemaRegistryGateway) {
+                TestingSchemaRegistryGateway schemaRegistryGateway, int subtaskIndex) {
+            super("test-task", 2, subtaskIndex, 2);
             this.schemaRegistryGateway = schemaRegistryGateway;
         }
 

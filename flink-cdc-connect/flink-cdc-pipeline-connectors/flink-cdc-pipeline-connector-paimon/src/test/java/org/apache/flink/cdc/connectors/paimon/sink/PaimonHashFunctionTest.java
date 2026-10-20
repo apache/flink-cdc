@@ -18,67 +18,29 @@
 package org.apache.flink.cdc.connectors.paimon.sink;
 
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
-import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
-import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.variant.BinaryVariantInternalBuilder;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 
-import org.apache.paimon.catalog.Catalog;
-import org.apache.paimon.flink.FlinkCatalogFactory;
-import org.apache.paimon.options.Options;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 
-import java.io.File;
 import java.io.IOException;
-import java.nio.file.Path;
 import java.time.ZoneId;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Tests for {@link PaimonHashFunction}. */
 class PaimonHashFunctionTest {
 
-    @TempDir public static Path temporaryFolder;
-
-    private Catalog catalog;
-
-    private Options catalogOptions;
-
     private static final String TEST_DATABASE = "test";
-
-    @BeforeEach
-    public void beforeEach() throws Catalog.DatabaseAlreadyExistException {
-        catalogOptions = new Options();
-        String warehouse =
-                new File(temporaryFolder.toFile(), UUID.randomUUID().toString()).toString();
-        catalogOptions.setString("warehouse", warehouse);
-        catalog = FlinkCatalogFactory.createPaimonCatalog(catalogOptions);
-        catalog.createDatabase(TEST_DATABASE, true);
-    }
-
-    @AfterEach
-    public void afterEach() throws Exception {
-        catalog.dropDatabase(TEST_DATABASE, true, true);
-        catalog.close();
-    }
 
     @Test
     public void testHashCodeForAppendOnlyTable() throws IOException {
         TableId tableId = TableId.tableId(TEST_DATABASE, "test_table");
-        Map<String, String> tableOptions = new HashMap<>();
-        MetadataApplier metadataApplier =
-                new PaimonMetadataApplier(catalogOptions, tableOptions, new HashMap<>());
         Schema schema =
                 Schema.newBuilder()
                         .physicalColumn("col1", DataTypes.STRING().notNull())
@@ -86,12 +48,10 @@ class PaimonHashFunctionTest {
                         .physicalColumn("pt", DataTypes.STRING())
                         .physicalColumn("variantCol", DataTypes.VARIANT())
                         .build();
-        CreateTableEvent createTableEvent = new CreateTableEvent(tableId, schema);
-        metadataApplier.applySchemaChange(createTableEvent);
         BinaryRecordDataGenerator generator =
                 new BinaryRecordDataGenerator(schema.getColumnDataTypes().toArray(new DataType[0]));
-        PaimonHashFunction hashFunction =
-                new PaimonHashFunction(catalogOptions, tableId, schema, ZoneId.systemDefault(), 4);
+        // No primary keys: append-only table. No catalog access required.
+        PaimonHashFunction hashFunction = new PaimonHashFunction(schema, ZoneId.systemDefault(), 4);
         DataChangeEvent dataChangeEvent1 =
                 DataChangeEvent.insertEvent(
                         tableId,
@@ -138,10 +98,6 @@ class PaimonHashFunctionTest {
     @Test
     void testHashCodeForFixedBucketTable() {
         TableId tableId = TableId.tableId(TEST_DATABASE, "test_table");
-        Map<String, String> tableOptions = new HashMap<>();
-        tableOptions.put("bucket", "10");
-        MetadataApplier metadataApplier =
-                new PaimonMetadataApplier(catalogOptions, tableOptions, new HashMap<>());
         Schema schema =
                 Schema.newBuilder()
                         .physicalColumn("col1", DataTypes.STRING().notNull())
@@ -150,12 +106,10 @@ class PaimonHashFunctionTest {
                         .primaryKey("col1", "pt")
                         .partitionKey("pt")
                         .build();
-        CreateTableEvent createTableEvent = new CreateTableEvent(tableId, schema);
-        metadataApplier.applySchemaChange(createTableEvent);
         BinaryRecordDataGenerator generator =
                 new BinaryRecordDataGenerator(schema.getColumnDataTypes().toArray(new DataType[0]));
-        PaimonHashFunction hashFunction =
-                new PaimonHashFunction(catalogOptions, tableId, schema, ZoneId.systemDefault(), 4);
+        // Primary keys present: table-aware hashing. No catalog access required.
+        PaimonHashFunction hashFunction = new PaimonHashFunction(schema, ZoneId.systemDefault(), 4);
         DataChangeEvent dataChangeEvent1 =
                 DataChangeEvent.insertEvent(
                         tableId,

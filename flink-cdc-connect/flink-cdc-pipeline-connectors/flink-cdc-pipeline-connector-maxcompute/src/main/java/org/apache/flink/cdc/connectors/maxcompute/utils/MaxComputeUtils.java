@@ -206,33 +206,32 @@ public class MaxComputeUtils {
             MaxComputeOptions options, String schema, String table, String partitionName)
             throws OdpsException {
         Odps odps = getOdps(options);
+        Table partitionedTable;
         if (options.isSupportSchema()) {
-            if (StringUtils.isNullOrEmpty(schema)) {
-                LOG.info(
-                        "create partition {} in {}.default.{}",
-                        partitionName,
-                        options.getProject(),
-                        table);
-                odps.tables()
-                        .get(options.getProject(), "default", table)
-                        .createPartition(new PartitionSpec(partitionName), true);
-            } else {
-                LOG.info(
-                        "create partition {} in {}.{}.{}",
-                        partitionName,
-                        options.getProject(),
-                        schema,
-                        table);
-                odps.tables()
-                        .get(options.getProject(), schema, table)
-                        .createPartition(new PartitionSpec(partitionName), true);
-            }
+            String resolvedSchema = StringUtils.isNullOrEmpty(schema) ? "default" : schema;
+            partitionedTable = odps.tables().get(options.getProject(), resolvedSchema, table);
+            LOG.info(
+                    "create partition {} in {}.{}.{} if absent",
+                    partitionName,
+                    options.getProject(),
+                    resolvedSchema,
+                    table);
         } else {
-            LOG.info("create partition {} in {}.{}", partitionName, options.getProject(), table);
-            odps.tables()
-                    .get(options.getProject(), table)
-                    .createPartition(new PartitionSpec(partitionName), true);
+            partitionedTable = odps.tables().get(options.getProject(), table);
+            LOG.info(
+                    "create partition {} in {}.{} if absent",
+                    partitionName,
+                    options.getProject(),
+                    table);
         }
+        PartitionSpec partitionSpec = new PartitionSpec(partitionName);
+        if (partitionedTable.hasPartition(partitionSpec)) {
+            LOG.info("partition {} already exists, skip creating", partitionName);
+            return;
+        }
+        // ifNotExists guards against concurrent partition creation between the
+        // existence check and the creation attempt
+        partitionedTable.createPartition(partitionSpec, true);
     }
 
     public static String getSchema(MaxComputeOptions options, TableId tableId) {

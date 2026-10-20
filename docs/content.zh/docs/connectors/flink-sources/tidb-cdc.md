@@ -24,14 +24,14 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-# TiDB CDC Connector
+# TiDB CDC 连接器
 
-The TiDB CDC connector allows for reading snapshot data and incremental data from TiDB database. This document describes how to setup the TiDB CDC connector to run SQL queries against TiDB databases.
+TiDB CDC 连接器允许从 TiDB 数据库读取快照数据和增量数据。本文描述了如何设置 TiDB CDC 连接器来对 TiDB 数据库运行 SQL 查询。
 
-Dependencies
+依赖
 ------------
 
-In order to setup the TiDB CDC connector, the following table provides dependency information for both projects using a build automation tool (such as Maven or SBT) and SQL Client with SQL JAR bundles.
+为了设置 TiDB CDC 连接器，下表提供了使用构建自动化工具（如 Maven 或 SBT ）和带有 SQL JAR 包的 SQL 客户端的两个项目的依赖关系信息。
 
 ### Maven dependency
 
@@ -39,16 +39,16 @@ In order to setup the TiDB CDC connector, the following table provides dependenc
 
 ### SQL Client JAR
 
-```Download link is available only for stable releases.```
+```下载链接仅适用于稳定版本。```
 
-Download [flink-sql-connector-tidb-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-tidb-cdc) and put it under `<FLINK_HOME>/lib/`.
+下载 [flink-sql-connector-tidb-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-tidb-cdc) 到 `<FLINK_HOME>/lib/` 目录下。
 
-**Note:** Refer to [flink-sql-connector-tidb-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-tidb-cdc), more released versions will be available in the Maven central warehouse.
+**注意:** 参考 [flink-sql-connector-tidb-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-tidb-cdc) 当前已发布的所有版本都可以在 Maven 中央仓库获取。
 
-How to create a TiDB CDC table
+如何创建 TiDB CDC 表
 ----------------
 
-The TiDB CDC table can be defined as following:
+TiDB CDC 表可以定义如下：
 
 ```sql
 -- checkpoint every 3000 milliseconds                       
@@ -75,7 +75,7 @@ Flink SQL> CREATE TABLE orders (
 Flink SQL> SELECT * FROM orders;
 ```
 
-Connector Options
+连接器配置项
 ----------------
 
 <div class="highlight">
@@ -95,79 +95,79 @@ Connector Options
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Specify what connector to use, here should be <code>'tidb-cdc'</code>.</td>
+      <td>指定要使用的连接器, 这里应该是 <code>'tidb-cdc'</code>.</td>
     </tr>
     <tr>
       <td>database-name</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Database name of the TiDB server to monitor.</td>
-    </tr> 
+      <td>要监视的 TiDB 服务器的数据库名称。</td>
+    </tr>
     <tr>
       <td>table-name</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Table name of the TiDB database to monitor.</td>
+      <td>需要监视的 TiDB 数据库的表名。</td>
     </tr>
     <tr>
       <td>scan.startup.mode</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">initial</td>
       <td>String</td>
-      <td>Optional startup mode for TiDB CDC consumer, valid enumerations are "initial" and "latest-offset".</td>
+      <td>TiDB CDC 消费者可选的启动模式，合法的模式为 "initial" 和 "latest-offset"。</td>
     </tr>
     <tr>
       <td>pd-addresses</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>TiKV cluster's PD address.</td>
+      <td>TiKV 集群的 PD 地址。</td>
     </tr>
-     <tr>
+    <tr>
       <td>host-mapping</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>TiKV cluster's host-mapping used to configure public IP and intranet IP mapping. When the TiKV cluster is running on the intranet, you can map a set of intranet IPs to public IPs for an outside Flink cluster to access. The format is {Intranet IP1}:{Public IP1};{Intranet IP2}:{Public IP2}, e.g. 192.168.0.2:8.8.8.8;192.168.0.3:9.9.9.9.</td>
+      <td>TiKV 集群的 host-mapping，用于配置公网 IP 和内网 IP 的映射。当 TiKV 集群运行在内网时，你可以将一组内网 IP 映射到公网 IP，以供外部的 Flink 集群访问。格式为 {Intranet IP1}:{Public IP1};{Intranet IP2}:{Public IP2}，例如 192.168.0.2:8.8.8.8;192.168.0.3:9.9.9.9。</td>
     </tr>
     <tr>
       <td>tikv.grpc.timeout_in_ms</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>Long</td>
-      <td>TiKV GRPC timeout in ms.</td>
+      <td>TiKV GRPC 超时时间，单位为毫秒。</td>
     </tr>
     <tr>
       <td>tikv.grpc.scan_timeout_in_ms</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>Long</td>
-      <td>TiKV GRPC scan timeout in ms.</td>
+      <td>TiKV GRPC 扫描超时时间，单位为毫秒。</td>
     </tr>
     <tr>
       <td>tikv.batch_get_concurrency</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">20</td>
       <td>Integer</td>
-      <td>TiKV GRPC batch get concurrency.</td>
+      <td>TiKV GRPC batch get 的并发度。</td>
     </tr>
     <tr>
       <td>tikv.*</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Pass-through TiDB client's properties.</td> 
+      <td>透传 TiDB 客户端的属性。</td>
     </tr>
     </tbody>
 </table>
 </div>
 
-Available Metadata
+可用的元数据
 ----------------
 
-The following format metadata can be exposed as read-only (VIRTUAL) columns in a table definition.
+下表中的元数据可以在 DDL 中作为只读（虚拟）meta 列声明。
 
 <table class="colwidths-auto docutils">
   <thead>
@@ -181,22 +181,22 @@ The following format metadata can be exposed as read-only (VIRTUAL) columns in a
     <tr>
       <td>table_name</td>
       <td>STRING NOT NULL</td>
-      <td>Name of the table that contain the row.</td>
+      <td>当前记录所属的表名称。</td>
     </tr>
     <tr>
       <td>database_name</td>
       <td>STRING NOT NULL</td>
-      <td>Name of the database that contain the row.</td>
+      <td>当前记录所属的库名称。</td>
     </tr>
     <tr>
       <td>op_ts</td>
       <td>TIMESTAMP_LTZ(3) NOT NULL</td>
-      <td>It indicates the time that the change was made in the database. <br>If the record is read from snapshot of the table instead of the binlog, the value is always 0.</td>
+      <td>当前记录表在数据库中更新的时间。 <br>如果从表的快照而不是 binlog 读取记录，该值将始终为0。</td>
     </tr>
   </tbody>
 </table>
 
-The extended CREATE TABLE example demonstrates the syntax for exposing these metadata fields:
+下述创建表示例展示元数据列的用法：
 ```sql
 CREATE TABLE products (
     db_name STRING METADATA FROM 'database_name' VIRTUAL,
@@ -218,26 +218,26 @@ CREATE TABLE products (
 );
 ```
 
-Features
+特性
 --------
-### Exactly-Once Processing
+### Exactly-Once 处理
 
-The TiDB CDC connector is a Flink Source connector which will read database snapshot first and then continues to read change events with **exactly-once processing** even failures happen.
+TiDB CDC 连接器是一个 Flink Source 连接器，它将首先读取数据库快照，然后继续读取变更事件，即使在处理时出现故障，也能**准确读取数据**。
 
-### Startup Reading Position
+### 启动模式
 
-The config option `scan.startup.mode` specifies the startup mode for TiDB CDC consumer. The valid enumerations are:
+配置选项`scan.startup.mode`指定 TiDB CDC 使用者的启动模式。有效枚举包括：
 
-- `initial` (default): Takes a snapshot of structure and data of captured tables; useful if you want fetch a complete representation of the data from the captured tables.
-- `latest-offset`: Takes a snapshot of the structure of captured tables only; useful if only changes happening from now onwards should be fetched.
+- `initial` （默认）：对捕获表的结构和数据执行快照；适用于需要获取捕获表数据完整表示的场景。
+- `latest-offset`：仅对捕获表的结构执行快照；适用于只需要获取从现在开始发生的变更的场景。
 
-### Multi Thread Reading
+### 多线程读取
 
-The TiDB CDC source can work in parallel reading, because there is multiple tasks can receive change events.
+TiDB CDC source 可通过并行读取方式工作，因为有多个任务可以接收变更事件。
 
 ### DataStream Source
 
-The TiDB CDC connector can also be a DataStream source. You can create a SourceFunction as the following shows:
+TiDB CDC 连接器也可以是一个数据流源。 你可以创建 SourceFunction，如下所示：
 
 ### DataStream Source
 
@@ -309,7 +309,7 @@ public class TiDBSourceExample {
 }
 ```
 
-Data Type Mapping
+数据类型映射
 ----------------
 
 <div class="wy-table-responsive">
@@ -385,8 +385,8 @@ Data Type Mapping
         where 38 < p <= 65<br>
       </td>
       <td>STRING</td>
-      <td>The precision for DECIMAL data type is up to 65 in TiDB, but the precision for DECIMAL is limited to 38 in Flink.
-  So if you define a decimal column whose precision is greater than 38, you should map it to STRING to avoid precision loss.</td>
+      <td>在 TiDB 中，十进制数据类型的精度高达 65，但在 Flink 中，十进制数据类型的精度仅限于 38。
+  所以，如果定义精度大于 38 的十进制列，则应将其映射到字符串以避免精度损失。</td>
     </tr>
     <tr>
       <td>
@@ -464,7 +464,7 @@ Data Type Mapping
         LONGBLOB<br>
       </td>
       <td>BYTES</td>
-      <td>Currently, for BLOB data type in TiDB, only the blob whose length isn't greater than 2,147,483,647(2 ** 31 - 1) is supported. </td>
+      <td>目前，对于 TiDB 中的 BLOB 数据类型，仅支持长度不大于 2,147,483,647(2 ** 31 - 1) 的 blob。</td>
     </tr>
     <tr>
       <td>
@@ -485,15 +485,15 @@ Data Type Mapping
         JSON
       </td>
       <td>STRING</td>
-      <td>The JSON data type  will be converted into STRING with JSON format in Flink.</td>
+      <td>JSON 数据类型将在 Flink 中转换为 JSON 格式的字符串。</td>
     </tr>
     <tr>
       <td>
         SET
       </td>
       <td>ARRAY&lt;STRING&gt;</td>
-      <td>As the SET data type in TiDB is a string object that can have zero or more values, 
-          it should always be mapped to an array of string
+      <td>因为 TiDB 中的 SET 数据类型是一个字符串对象，可以有零个或多个值，
+          它应该始终映射到字符串数组。
       </td>
     </tr>
     </tbody>

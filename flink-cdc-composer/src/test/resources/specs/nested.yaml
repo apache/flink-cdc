@@ -30,6 +30,52 @@
     DataChangeEvent{tableId=foo.bar.baz, before=[-1, [2, 3, 5, 7, 11, 13, 17, 19], [二, san, 五, qi, 十一], {1 -> yi, 2 -> er, 3 -> san}, {二 -> [E, R], 三 -> [S, A, N], 一 -> [Y, I]}, {name: STRING -> Derrida, length: INT -> 7}, [{"k":1},"hello",{"k":2}]], after=[], op=DELETE, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null, null, null, null, null], op=INSERT, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null, null, null, null, null], after=[], op=DELETE, meta=()}
+- do: Construct Nested Objects
+  projection: |-
+    id_
+    ARRAY[1, id_] AS constructed_array
+    MAP['id', id_, 'size', CARDINALITY(array_int_)] AS constructed_map
+    ROW(id_, ARRAY[string_, varchar_]) AS constructed_row
+    MAP['nested', ARRAY[id_, bigint_]] AS nested_map
+    ARRAY[ARRAY[1], ARRAY[id_]] AS nested_array
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`constructed_array` ARRAY<BIGINT>,`constructed_map` MAP<STRING, BIGINT>,`constructed_row` ROW<`f0` BIGINT, `f1` ARRAY<STRING>>,`nested_map` MAP<STRING, ARRAY<BIGINT>>,`nested_array` ARRAY<ARRAY<BIGINT>>}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, [1, 1], {id -> 1, size -> 7}, {f0: BIGINT -> 1, f1: ARRAY<STRING> -> [From A to Z is Lie, Zorro]}, {nested -> [1, 5]}, [[1], [1]]], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, [1, 1], {id -> 1, size -> 7}, {f0: BIGINT -> 1, f1: ARRAY<STRING> -> [From A to Z is Lie, Zorro]}, {nested -> [1, 5]}, [[1], [1]]], after=[-1, [1, -1], {id -> -1, size -> 8}, {f0: BIGINT -> -1, f1: ARRAY<STRING> -> [天地玄黄宇宙洪荒, 疯帽子]}, {nested -> [-1, -5]}, [[1], [-1]]], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, [1, -1], {id -> -1, size -> 8}, {f0: BIGINT -> -1, f1: ARRAY<STRING> -> [天地玄黄宇宙洪荒, 疯帽子]}, {nested -> [-1, -5]}, [[1], [-1]]], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, [1, 0], {id -> 0, size -> null}, {f0: BIGINT -> 0, f1: ARRAY<STRING> -> [null, null]}, {nested -> [0, null]}, [[1], [0]]], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, [1, 0], {id -> 0, size -> null}, {f0: BIGINT -> 0, f1: ARRAY<STRING> -> [null, null]}, {nested -> [0, null]}, [[1], [0]]], after=[], op=DELETE, meta=()}
+- do: Collection Functions
+  projection: |-
+    id_
+    CARDINALITY(array_int_) AS array_size
+    CARDINALITY(map_int_string_) AS map_size
+    ARRAY_CONTAINS(array_int_, 5) AS contains_five
+    ARRAY_POSITION(array_int_, 5) AS position_five
+    ELEMENT(ARRAY[id_]) AS only_element
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`array_size` INT,`map_size` INT,`contains_five` BOOLEAN,`position_five` INT,`only_element` BIGINT}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, 7, 3, true, 5, 1], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, 7, 3, true, 5, 1], after=[-1, 8, 3, true, 3, -1], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, 8, 3, true, 3, -1], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null, null, null, 0], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null, null, null, 0], after=[], op=DELETE, meta=()}
+- do: Filter by Collection Functions
+  projection: id_, array_int_, array_string_
+  filter: ARRAY_CONTAINS(array_string_, '五') AND ARRAY_POSITION(array_int_, 5) = 3
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`array_int_` ARRAY<INT>,`array_string_` ARRAY<STRING>}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[-1, [2, 3, 5, 7, 11, 13, 17, 19], [二, san, 五, qi, 十一]], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, [2, 3, 5, 7, 11, 13, 17, 19], [二, san, 五, qi, 十一]], after=[], op=DELETE, meta=()}
+- do: Element with Multiple Values
+  projection: |-
+    id_
+    ELEMENT(array_int_) AS invalid_element
+  primary-key: id_
+  expect-error: 'Array has more than one element.'
 - do: Parse Variant from JSON
   projection: |-
     id_

@@ -121,26 +121,38 @@ Flink CDC uses [Calcite](https://calcite.apache.org/) to parse expressions and [
 | value1 >= value2                     | greaterThanOrEqual(value1, value2)           | Returns TRUE if value1 is greater than or equal to value2; returns FALSE if value1 or value2 is NULL. |
 | value1 < value2                      | lessThan(value1, value2)                     | Returns TRUE if value1 is less than value2; returns FALSE if value1 or value2 is NULL.                |
 | value1 <= value2                     | lessThanOrEqual(value1, value2)              | Returns TRUE if value1 is less than or equal to value2; returns FALSE if value1 or value2 is NULL.    |
-| value IS NULL                        | null == value                                | Returns TRUE if value is NULL.                                                                        |
-| value IS NOT NULL                    | null != value                                | Returns TRUE if value is not NULL.                                                                    |
+| value IS NULL                        | isNull(value)                                | Returns TRUE if value is NULL.                                                                        |
+| value IS NOT NULL                    | isNotNull(value)                             | Returns TRUE if value is not NULL.                                                                    |
+| value1 IS DISTINCT FROM value2       | isDistinctFrom(value1, value2)               | Returns TRUE if value1 and value2 are distinct. NULL values are compared as values and never return NULL. |
+| value1 IS NOT DISTINCT FROM value2   | isNotDistinctFrom(value1, value2)            | Returns TRUE if value1 and value2 are not distinct. NULL values are compared as values and never return NULL. |
 | value1 BETWEEN value2 AND value3     | betweenAsymmetric(value1, value2, value3)    | Returns TRUE if value1 is greater than or equal to value2 and less than or equal to value3.           |
 | value1 NOT BETWEEN value2 AND value3 | notBetweenAsymmetric(value1, value2, value3) | Returns TRUE if value1 is less than value2 or greater than value3.                                    |
-| string1 LIKE string2                 | like(string1, string2)                       | Returns TRUE if string1 matches pattern string2.                                                      |
-| string1 NOT LIKE string2             | notLike(string1, string2)                    | Returns TRUE if string1 does not match pattern string2.                                               |
+| string1 LIKE string2                 | like(string1, string2)                       | Returns TRUE if string1 matches Java regular expression string2 using substring matching.             |
+| string1 NOT LIKE string2             | notLike(string1, string2)                    | Returns TRUE if string1 does not match Java regular expression string2 using substring matching.      |
+| string1 LIKE string2 ESCAPE string3  | like(string1, string2, string3)              | Returns TRUE if string1 matches SQL LIKE pattern string2. `%` matches zero or more characters, `_` matches one character, and string3 escapes wildcard characters. Returns NULL if any argument is NULL. |
+| string1 NOT LIKE string2 ESCAPE string3 | notLike(string1, string2, string3)        | Returns TRUE if string1 does not match SQL LIKE pattern string2. Returns NULL if any argument is NULL. |
+| string1 SIMILAR TO string2           | similarTo(string1, string2)                  | Returns TRUE if string1 matches SQL SIMILAR TO pattern string2. Returns NULL if any argument is NULL. |
+| string1 NOT SIMILAR TO string2       | notSimilarTo(string1, string2)               | Returns TRUE if string1 does not match SQL SIMILAR TO pattern string2. Returns NULL if any argument is NULL. |
+| string1 SIMILAR TO string2 ESCAPE string3 | similarTo(string1, string2, string3)    | Returns TRUE if string1 matches SQL SIMILAR TO pattern string2 using string3 as the escape character. Returns NULL if any argument is NULL. |
+| string1 NOT SIMILAR TO string2 ESCAPE string3 | notSimilarTo(string1, string2, string3) | Returns TRUE if string1 does not match SQL SIMILAR TO pattern string2 using string3 as the escape character. Returns NULL if any argument is NULL. |
 | value1 IN (value2 [, value3]* )      | in(value1, value2 [, value3]*)               | Returns TRUE if value1 exists in the given list (value2, value3, …).                                  |
 | value1 NOT IN (value2 [, value3]* )  | notIn(value1, value2 [, value3]*)            | Returns TRUE if value1 does not exist in the given list (value2, value3, …).                          |
 
 ## Logical Functions
 
-| Function              | Janino Code                    | Description                                                         |
-|-----------------------|--------------------------------|---------------------------------------------------------------------|
-| boolean1 OR boolean2  | boolean1 &#124;&#124; boolean2 | Returns TRUE if BOOLEAN1 is TRUE or BOOLEAN2 is TRUE.               |
-| boolean1 AND boolean2 | boolean1 && boolean2           | Returns TRUE if BOOLEAN1 and BOOLEAN2 are both TRUE.                |
-| NOT boolean           | !boolean                       | Returns TRUE if boolean is FALSE; returns FALSE if boolean is TRUE. |
-| boolean IS FALSE      | false == boolean               | Returns TRUE if boolean is FALSE; returns FALSE if boolean is TRUE. |
-| boolean IS NOT FALSE  | true == boolean                | Returns TRUE if BOOLEAN is TRUE; returns FALSE if BOOLEAN is FALSE. |
-| boolean IS TRUE       | true == boolean                | Returns TRUE if BOOLEAN is TRUE; returns FALSE if BOOLEAN is FALSE. |
-| boolean IS NOT TRUE   | false == boolean               | Returns TRUE if boolean is FALSE; returns FALSE if boolean is TRUE. |
+Logical functions follow SQL three-valued logic for nullable BOOLEAN values. `AND` and `OR` short-circuit the right operand when the left operand determines the result. Generated Janino code may use native operators, conditional expressions, or lazy function calls depending on operand nullability.
+
+| Function               | Janino Code           | Description                                                                                                      |
+|------------------------|-----------------------|------------------------------------------------------------------------------------------------------------------|
+| boolean1 OR boolean2   | short-circuit OR expression | Returns TRUE if either value is TRUE; returns NULL if neither value is TRUE and at least one value is NULL.       |
+| boolean1 AND boolean2  | short-circuit AND expression | Returns FALSE if either value is FALSE; returns NULL if neither value is FALSE and at least one value is NULL.    |
+| NOT boolean            | not(boolean)           | Returns TRUE if boolean is FALSE; returns FALSE if boolean is TRUE; returns NULL if boolean is NULL.              |
+| boolean IS FALSE       | isFalse(boolean)       | Returns TRUE if boolean is FALSE; returns FALSE if boolean is TRUE or NULL.                                       |
+| boolean IS NOT FALSE   | isNotFalse(boolean)    | Returns TRUE if boolean is TRUE or NULL; returns FALSE if boolean is FALSE.                                       |
+| boolean IS TRUE        | isTrue(boolean)        | Returns TRUE if boolean is TRUE; returns FALSE if boolean is FALSE or NULL.                                       |
+| boolean IS NOT TRUE    | isNotTrue(boolean)     | Returns TRUE if boolean is FALSE or NULL; returns FALSE if boolean is TRUE.                                       |
+| boolean IS UNKNOWN     | isNull(boolean)        | Returns TRUE if boolean is NULL.                                                                                 |
+| boolean IS NOT UNKNOWN | isNotNull(boolean)     | Returns TRUE if boolean is not NULL.                                                                             |
 
 ## Arithmetic Functions
 
@@ -166,10 +178,34 @@ Flink CDC uses [Calcite](https://calcite.apache.org/) to parse expressions and [
 | UPPER(string)                                    | upper(string)                            | Returns string in uppercase.                                                                                                                                                                      |
 | LOWER(string)                                    | lower(string)                            | Returns string in lowercase.                                                                                                                                                                      |
 | TRIM(string1)                                    | trim('BOTH',string1)                     | Returns a string that removes whitespaces at both sides.                                                                                                                                          |
+| LTRIM(string[, trimString])                                 | ltrim(string[, trimString])                      | Returns a string with leading characters in trimString removed. Whitespace is removed by default.                                                                                                  |
+| RTRIM(string[, trimString])                                 | rtrim(string[, trimString])                      | Returns a string with trailing characters in trimString removed. Whitespace is removed by default.                                                                                                 |
+| BTRIM(string[, trimString])                                 | btrim(string[, trimString])                      | Returns a string with leading and trailing characters in trimString removed. Whitespace is removed by default.                                                                                     |
 | REGEXP_REPLACE(string1, string2, string3)        | regexpReplace(string1, string2, string3) | Returns a string from STRING1 with all the substrings that match a regular expression STRING2 consecutively being replaced with STRING3. E.g., 'foobar'.regexpReplace('oo\|ar', '') returns "fb". |
+| REGEXP_EXTRACT(string, regex[, extractIndex])    | regexpExtract(string, regex[, extractIndex]) | Returns the substring captured by the regular expression group extractIndex. extractIndex defaults to 0, where 0 means the whole match. Returns NULL for NULL input, no match, invalid regex, or invalid group index. |
+| REGEXP_EXTRACT_ALL(string, regex[, extractIndex]) | regexpExtractAll(string, regex[, extractIndex]) | Returns ARRAY&lt;STRING&gt; with all substrings captured by group extractIndex. extractIndex defaults to 1, and 0 means the whole match. Returns an empty array if there is no match, and NULL for NULL input, invalid regex, or invalid group index. |
+| REGEXP_COUNT(string, regex)                      | regexpCount(string, regex)                | Returns the number of non-overlapping substrings that match regex. Returns 0 if there is no match, and NULL for NULL input or invalid regex. |
+| REGEXP_INSTR(string, regex)                      | regexpInstr(string, regex)                | Returns the 1-based position of the first substring that matches regex. Returns 0 if there is no match, and NULL for NULL input or invalid regex. |
+| REGEXP_SUBSTR(string, regex)                     | regexpSubstr(string, regex)               | Returns the first substring that matches regex. Returns NULL for NULL input, no match, or invalid regex. |
 | SUBSTR(string, integer1[, integer2])             | substr(string,integer1,integer2)         | Returns a substring of STRING starting from position integer1 with length integer2 (to the end by default).                                                                                       |
 | SUBSTRING(string FROM integer1 [ FOR integer2 ]) | substring(string,integer1,integer2)      | Returns a substring of STRING starting from position integer1 with length integer2 (to the end by default).                                                                                       |
+| OVERLAY(string1 PLACING string2 FROM integer1 [FOR integer2]) | overlay(string1, string2, integer1[, integer2])  | Replaces a substring of STRING1 with STRING2 from position integer1. The replaced length defaults to the length of STRING2. Character and binary strings are supported.                           |
+| POSITION(string1 IN string2 [ FROM integer ])                | position(string1, string2[, integer])            | Returns the position of the first occurrence of STRING1 in STRING2, optionally starting from integer. The first position is 1. Returns 0 if not found. Character and binary strings are supported.  |
+| LOCATE(string1, string2[, integer])                         | locate(string1, string2[, integer])              | Returns the position of the first occurrence of STRING1 in STRING2, optionally starting from integer. The first position is 1. Returns 0 if not found.                                             |
+| INSTR(string1, string2)                                     | instr(string1, string2)                          | Returns the position of the first occurrence of STRING2 in STRING1. The first position is 1. Returns 0 if not found.                                                                               |
 | CONCAT(string1, string2,…)                       | concat(string1, string2,…)               | Returns a string that concatenates string1, string2, …. E.g., CONCAT('AA', 'BB', 'CC') returns 'AABBCC'.                                                                                          |
+| CONCAT_WS(separator, string1, string2,...)                  | concatWs(separator, string1, string2,...)        | Returns a string that concatenates string1, string2, ... with a separator. Null string arguments are skipped.                                                                                      |
+| LPAD(string1, integer, string2)                             | lpad(string1, integer, string2)                  | Returns STRING1 left-padded with STRING2 to a length of integer characters. If STRING1 is longer, it is shortened to integer characters.                                                           |
+| RPAD(string1, integer, string2)                             | rpad(string1, integer, string2)                  | Returns STRING1 right-padded with STRING2 to a length of integer characters. If STRING1 is longer, it is shortened to integer characters.                                                          |
+| REPLACE(string1, string2, string3)                          | replace(string1, string2, string3)               | Returns STRING1 with all occurrences of STRING2 replaced by STRING3.                                                                                                                              |
+| REPEAT(string, integer)                                     | repeat(string, integer)                          | Returns a string that repeats STRING integer times.                                                                                                                                               |
+| LEFT(string, integer)                                       | left(string, integer)                            | Returns the leftmost integer characters from STRING.                                                                                                                                              |
+| RIGHT(string, integer)                                      | right(string, integer)                           | Returns the rightmost integer characters from STRING.                                                                                                                                             |
+| STARTSWITH(string1, string2)                                | startswith(string1, string2)                     | Returns whether STRING1 starts with STRING2. Character and binary strings are supported.                                                                                                          |
+| ENDSWITH(string1, string2)                                  | endswith(string1, string2)                       | Returns whether STRING1 ends with STRING2. Character and binary strings are supported.                                                                                                            |
+| TO_BASE64(string \| binary)                                 | toBase64(string \| binary)                       | Encodes a character or binary string to a base64 string.                                                                                                                                          |
+| FROM_BASE64(string)                                         | fromBase64(string)                               | Decodes a base64 string as UTF-8 and assumes the decoded bytes are valid UTF-8. Use FROM_BASE64_BINARY for arbitrary binary content.                                                              |
+| FROM_BASE64_BINARY(string)                                  | fromBase64Binary(string)                        | Decodes a base64 string to VARBINARY and preserves the original bytes.                                                                                                                           |
 
 ## Temporal Functions
 
@@ -181,13 +217,19 @@ Flink CDC uses [Calcite](https://calcite.apache.org/) to parse expressions and [
 | CURRENT_DATE                                         | currentDate()                                        | Returns the current SQL date in the local time zone.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | CURRENT_TIMESTAMP                                    | currentTimestamp()                                   | Returns the current SQL timestamp in the local time zone, the return type is TIMESTAMP_LTZ(3).                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | NOW()                                                | now()                                                | Returns the current SQL timestamp in the local time zone, this is a synonym of CURRENT_TIMESTAMP.                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| EXTRACT(timeintervalunit FROM temporal)              | extract(timeintervalunit, temporal)                  | Extracts a time interval unit from a temporal value. Supported units are YEAR, QUARTER, MONTH, WEEK, DAY, DOY, DOW, HOUR, MINUTE, and SECOND.                                                                                                                                                                                                                                                                                                                                                                                                         |
+| YEAR / QUARTER / MONTH / WEEK(temporal)              | extract(timeintervalunit, temporal)                  | Extracts the year, quarter, month, or ISO week from a temporal value.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| DAYOFYEAR / DAYOFMONTH / DAYOFWEEK(temporal)         | extract(timeintervalunit, temporal)                  | Extracts the day of year, day of month, or day of week from a temporal value. DAYOFWEEK uses Sunday as 1.                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| HOUR / MINUTE / SECOND(temporal)                     | extract(timeintervalunit, temporal)                  | Extracts the hour, minute, or second from a temporal value.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| temporal +/- INTERVAL 'value' unit                   | temporalPlusMonths / temporalPlusMillis              | Adds or subtracts a year-month or day-time interval literal for DATE, TIME, TIMESTAMP, and TIMESTAMP_LTZ values. `INTERVAL + temporal` and compound intervals such as `INTERVAL '1-2' YEAR TO MONTH` and `INTERVAL '1 02:03:04' DAY TO SECOND` are supported.                                                                                                                                                                                                                                                                                                |
 | DATE_FORMAT(timestamp, string)                       | dateFormat(timestamp, string)                        | Converts timestamp to a value of string in the format specified by the format string. The format string is compatible with Java's SimpleDateFormat.                                                                                                                                                                                                                                                                                                                                                                                                 |
 | DATE_FORMAT(date, string)                            | dateFormat(date, string)                             | Converts given date to a value of string in the format specified by the format string. The format string is compatible with Java's SimpleDateFormat.                                                                                                                                                                                                                                                                                                                                                                                                |
 | DATE_FORMAT(time, string)                            | dateFormat(time, string)                             | Converts given time to a value of string in the format specified by the format string. The format string is compatible with Java's SimpleDateFormat.                                                                                                                                                                                                                                                                                                                                                                                                |
 | DATE_FORMAT_TZ(timestamp, format, timezone)          | dateFormatTz(timestamp, format, timezone)            | Formats a timestamp or datetime value as a string using the given pattern and the specified time zone. The timezone argument can be a time zone ID (for example, 'UTC', 'Asia/Shanghai') or an offset such as '+08:00'.                                                                                                                                                                                                                                                                                                                             |
 | TIMESTAMPADD(timeintervalunit, interval, timepoint)  | timestampadd(timeintervalunit, interval, timepoint)  | Returns the timestamp of timepoint2 after timepoint added interval. The unit for the interval is given by the first argument, which should be one of the following values: SECOND, MINUTE, HOUR, DAY, MONTH, or YEAR.                                                                                                                                                                                                                                                                                                                               |
 | TIMESTAMPDIFF(timepointunit, timepoint1, timepoint2) | timestampDiff(timepointunit, timepoint1, timepoint2) | Returns the (signed) number of timepointunit between timepoint1 and timepoint2. The unit for the interval is given by the first argument, which should be one of the following values: SECOND, MINUTE, HOUR, DAY, MONTH, or YEAR.                                                                                                                                                                                                                                                                                                                   |
-| TO_DATE(string1[, string2])                          | toDate(string1[, string2])                           | Converts a date string string1 with format string2 (by default 'yyyy-MM-dd') to a date.                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| TO_DATE(string1[, string2])                          | toDate(string1[, string2])                           | Converts a date string string1 with format string2 (by default 'yyyy-MM-dd') to a date. The format argument applies only to this string overload.                                                                                                                                                                                                                                                                                                                                                                                                   |
+| TO_DATE(timestamp)                                   | toDate(timestamp)                                    | Converts a TIMESTAMP, TIMESTAMP WITH TIME ZONE (TIMESTAMP_TZ), or TIMESTAMP_LTZ value to a DATE using that value's calendar date. A format pattern is not supported for this overload; use `TO_DATE(string1[, string2])` to parse formatted strings.                                                                                                                                                                                                                                                                                                |
 | TO_TIMESTAMP(string1[, string2])                     | toTimestamp(string1[, string2])                      | Converts date time string string1 with format string2 (by default: 'yyyy-MM-dd HH:mm:ss') to a timestamp, without time zone.                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | TO_TIMESTAMP_LTZ(string1[, string2])                 | toTimestampLtz(string1[, string2])                   | Converts date time string string1 with format string2 (by default: 'yyyy-MM-dd HH:mm:ss') to a timestamp, with local time zone.                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | FROM_UNIXTIME(numeric[, string])                     | fromUnixtime(NUMERIC[, STRING])                      | Returns a representation of the numeric argument as a value in string format (default is ‘yyyy-MM-dd HH:mm:ss’). numeric is an internal timestamp value representing seconds since ‘1970-01-01 00:00:00’ UTC, such as produced by the UNIX_TIMESTAMP() function. The return value is expressed in the session time zone (specified in TableConfig). E.g., FROM_UNIXTIME(44) returns ‘1970-01-01 00:00:44’ if in UTC time zone, but returns ‘1970-01-01 09:00:44’ if in ‘Asia/Tokyo’ time zone.                                                      |
@@ -203,10 +245,16 @@ Flink CDC uses [Calcite](https://calcite.apache.org/) to parse expressions and [
 | CASE WHEN condition1 THEN result1 (WHEN condition2 THEN result2)* (ELSE result_z) END                                 | Nested ternary expression            | Returns resultX when the first conditionX is met. When no condition is met, returns result_z if it is provided and returns NULL otherwise.                                                                                                        |
 | COALESCE(value1 [, value2]*)                                                                                          | coalesce(Object... objects)          | Returns the first argument that is not NULL.If all arguments are NULL, it returns NULL as well. The return type is the least restrictive, common type of all of its arguments. The return type is nullable if all arguments are nullable as well. |
 | IF(condition, true_value, false_value)                                                                                | condition ? true_value : false_value | Returns the true_value if condition is met, otherwise false_value. E.g., IF(5 > 3, 5, 3) returns 5.                                                                                                                                               |
+| IFNULL(value, replacement)                                                                                            | ifNull(value, replacement)           | Returns `replacement` when `value` is NULL; otherwise, returns `value`. The arguments must have a common type. The result can be NULL only when `replacement` can be NULL.                                                                        |
+| NULLIF(value1, value2)                                                                                                | nullIf(value1, value2)               | Returns NULL when `value1` equals `value2`; otherwise, returns `value1`. Its return type is the nullable type of `value1`.                                                                                                                         |
+
+`NULLIF` compares numeric operands across numeric types. For example, `NULLIF(CAST(1 AS INT), CAST(1 AS BIGINT))` returns NULL. This differs from the current type-sensitive equality behavior of the Transform `=` operator, which returns FALSE for the same mixed-type comparison.
 
 ## Casting Functions
 
 You can use `CAST( <EXPR> AS <T> )` syntax to convert any valid expression `<EXPR>` to a specific type `<T>`. Possible conversion paths are:
+
+`TRY_CAST( <EXPR> AS <T> )` supports the same conversion paths as `CAST`. It returns NULL when a value cannot be converted. An unsupported source-to-target type path is rejected during pipeline validation or initialization. Configuration errors, UDF failures, and internal errors are not converted to NULL.
 
 | Source Type                         | Target Type | Notes                                                                                      |
 |-------------------------------------|-------------|--------------------------------------------------------------------------------------------|
@@ -234,6 +282,13 @@ Struct functions are used to access elements in ARRAY, MAP, ROW, and VARIANT typ
 
 | Function | Janino Code | Description |
 | -------- | ----------- | ----------- |
+| ARRAY[value, ...] | array(value, ...) | Creates an array from the given values. The values must have a common type. |
+| MAP[key, value, ...] | map(key, value, ...) | Creates a map from key-value pairs. Keys and values must have common types respectively. |
+| ROW(value, ...) | row(value, ...) | Creates a row from the given values. Field names are generated as `f0`, `f1`, and so on. |
+| CARDINALITY(arrayOrMap) | cardinality(arrayOrMap) | Returns the number of elements in an array or map. Returns NULL if the input is NULL. |
+| ARRAY_CONTAINS(array, value) | arrayContains(array, value) | Returns whether the array contains the given value. |
+| ARRAY_POSITION(array, value) | arrayPosition(array, value) | Returns the 1-based position of the first matching value, or 0 if it is not found. |
+| ELEMENT(array) | element(array) | Returns the element of a single-element array. Returns NULL for an empty array and throws an exception if the array has more than one element. |
 | array[index] | itemAccess(array, index) | Returns the element at position `index` in the array. Index is 1-based (SQL standard). Returns NULL if the index is out of bounds or if the array is NULL. |
 | map[key] | itemAccess(map, key) | Returns the value associated with `key` in the map. Returns NULL if the key does not exist or if the map is NULL. |
 | row[index] | itemAccess(row, index) | Returns the field at position `index` in the row. Index is 1-based. The index must be a constant (not a computed expression) since the return type must be statically determined. |
@@ -476,6 +531,49 @@ transform:
     projection: "*, inc(inc(inc(id))) as inc_id, format(id, 'id -> %d') as formatted_id"
     filter: inc(id) < 100
 ```
+
+For AI model functions and configuration, see [AI Model]({{< ref "docs/core-concept/ai-model" >}}).
+
+### Python UDFs
+
+Flink CDC supports defining Python UDFs inline in the pipeline YAML. The distribution includes the
+`flink-cdc-python` module, which embeds Python on each TaskManager through
+[Pemja](https://pypi.org/project/pemja/).
+
+```yaml
+transform:
+  - source-table: db.users
+    projection: ID, py_normalize(EMAIL) AS EMAIL_NORM, py_double(AGE) AS DOUBLED
+
+pipeline:
+  user-defined-function:
+    - name: py_normalize
+      python-code: |
+        def eval(s: str) -> str:
+            return None if s is None else s.strip().lower()
+      python-executable: /usr/bin/python3
+    - name: py_double
+      python-code: |
+        def eval(x: int) -> int:
+            return None if x is None else x * 2
+      python-files:
+        - /opt/flink/python-deps
+        - /opt/flink/python-deps.zip
+```
+
+Each entry must contain one top-level function named `eval` with a return type annotation. Supported
+annotations are `bool`, `bytes`, `float`, `int`, and `str`, mapped to Flink CDC `BOOLEAN`, `BYTES`,
+`DOUBLE`, `BIGINT`, and `STRING`, respectively.
+
+The following runtime requirements apply:
+
+* Every TaskManager must have Python and `pemja==0.5.7` installed. `python-executable` defaults to
+  the first `python3` on `PATH`.
+* `python-files` is optional and accepts a YAML list of existing directories or `.zip` archives.
+  These paths must be available on every TaskManager. Zip archives are extracted before being added
+  to Python's import path.
+* `python-code` cannot be combined with `classpath` or `options`. Use one UDF entry for each Python
+  function.
 
 ## Embedding AI Model
 

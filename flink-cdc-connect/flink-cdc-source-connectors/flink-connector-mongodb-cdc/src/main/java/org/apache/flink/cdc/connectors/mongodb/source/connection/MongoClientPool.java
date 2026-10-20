@@ -18,12 +18,17 @@
 package org.apache.flink.cdc.connectors.mongodb.source.connection;
 
 import org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceConfig;
+import org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions;
+import org.apache.flink.cdc.connectors.mongodb.source.utils.MongoDBSslUtils;
 
 import com.mongodb.ConnectionString;
+import com.mongodb.MongoClientSettings;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.net.ssl.SSLContext;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -34,7 +39,7 @@ public class MongoClientPool {
     private static final Logger LOG = LoggerFactory.getLogger(MongoClientPool.class);
 
     private static final MongoClientPool INSTANCE = new MongoClientPool();
-    private final Map<String, MongoClient> pools = new ConcurrentHashMap<>();
+    private final Map<MongoDBSourceConfig, MongoClient> pools = new ConcurrentHashMap<>();
 
     private MongoClientPool() {}
 
@@ -43,15 +48,44 @@ public class MongoClientPool {
     }
 
     public MongoClient getOrCreateMongoClient(MongoDBSourceConfig sourceConfig) {
+        if (!sourceConfig.isSslEnabled()
+                && (sourceConfig.getSslKeyStore() != null
+                        || sourceConfig.getSslTrustStore() != null)) {
+            LOG.warn(
+                    "{} or {} is configured, but {} is false. "
+                            + "The keystore and truststore settings will be ignored and the connection will be established without SSL.",
+                    MongoDBSourceOptions.SSL_KEYSTORE.key(),
+                    MongoDBSourceOptions.SSL_TRUSTSTORE.key(),
+                    MongoDBSourceOptions.SSL_ENABLED.key());
+        }
+
         return pools.computeIfAbsent(
-                sourceConfig.getConnectionString(),
-                rawConnectionString -> {
-                    ConnectionString connectionString = new ConnectionString(rawConnectionString);
+                sourceConfig,
+                config -> {
+                    ConnectionString connectionString =
+                            new ConnectionString(config.getConnectionString());
                     LOG.info(
                             "Create and register mongo client {}@{}",
                             connectionString.getUsername(),
                             connectionString.getHosts());
-                    return MongoClients.create(connectionString);
+
+                    MongoClientSettings.Builder settingsBuilder =
+                            MongoClientSettings.builder().applyConnectionString(connectionString);
+
+                    if (config.isSslEnabled()) {
+                        SSLContext sslContext = MongoDBSslUtils.createSSLContext(config);
+                        settingsBuilder.applyToSslSettings(
+                                builder -> {
+                                    builder.enabled(true);
+                                    builder.invalidHostNameAllowed(
+                                            config.isSslInvalidHostnameAllowed());
+                                    if (sslContext != null) {
+                                        builder.context(sslContext);
+                                    }
+                                });
+                    }
+
+                    return MongoClients.create(settingsBuilder.build());
                 });
     }
 }

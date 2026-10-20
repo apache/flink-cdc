@@ -17,8 +17,10 @@
 
 package org.apache.flink.cdc.runtime.operators.transform;
 
+import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.cdc.common.data.DateData;
 import org.apache.flink.cdc.common.data.DecimalData;
+import org.apache.flink.cdc.common.data.GenericArrayData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
@@ -44,6 +46,8 @@ import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.util.Collections;
+import java.util.List;
 
 /** Unit tests for the {@link PostTransformOperator}. */
 class PostTransformOperatorTest {
@@ -469,6 +473,135 @@ class PostTransformOperatorTest {
     }
 
     @Test
+    void testUdfTakesPrecedenceOverBuiltInFunction() throws Exception {
+        Schema expectedSchema =
+                Schema.newBuilder()
+                        .physicalColumn("col1", DataTypes.STRING().notNull())
+                        .physicalColumn("col2", DataTypes.STRING())
+                        .physicalColumn("col12", DataTypes.STRING())
+                        .physicalColumn("udf_ifnull", DataTypes.STRING())
+                        .physicalColumn("udf_try_cast", DataTypes.STRING())
+                        .physicalColumn("udf_nullif", DataTypes.STRING())
+                        .primaryKey("col1")
+                        .build();
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
+                        .addTransform(
+                                CUSTOMERS_TABLEID.identifier(),
+                                "*, IFNULL(1, 0) AS udf_ifnull, "
+                                        + "TRY_CAST(col1) AS udf_try_cast, "
+                                        + "NULLIF('%s', col1) AS udf_nullif",
+                                null)
+                        .addUdfFunctions(
+                                List.of(
+                                        Tuple3.of(
+                                                "ifnull",
+                                                "org.apache.flink.cdc.udf.examples.java.ThrottlerFunctionClass",
+                                                Collections.emptyMap()),
+                                        Tuple3.of(
+                                                "try_cast",
+                                                "org.apache.flink.cdc.udf.examples.java.TypeOfFunctionClass",
+                                                Collections.emptyMap()),
+                                        Tuple3.of(
+                                                "nullif",
+                                                "org.apache.flink.cdc.udf.examples.java.FormatFunctionClass",
+                                                Collections.emptyMap())))
+                        .build();
+        RegularEventOperatorTestHarness<PostTransformOperator, Event> harness =
+                RegularEventOperatorTestHarness.with(transform, 1);
+        BinaryRecordDataGenerator inputGenerator =
+                new BinaryRecordDataGenerator((RowType) CUSTOMERS_SCHEMA.toRowDataType());
+        BinaryRecordDataGenerator outputGenerator =
+                new BinaryRecordDataGenerator((RowType) expectedSchema.toRowDataType());
+
+        harness.open();
+        harness.getOperator()
+                .processElement(
+                        new StreamRecord<>(
+                                new CreateTableEvent(CUSTOMERS_TABLEID, CUSTOMERS_SCHEMA)));
+        Assertions.assertThat(harness.getOutputRecords().poll())
+                .isEqualTo(
+                        new StreamRecord<>(
+                                new CreateTableEvent(CUSTOMERS_TABLEID, expectedSchema)));
+
+        DataChangeEvent inputEvent =
+                DataChangeEvent.insertEvent(
+                        CUSTOMERS_TABLEID,
+                        inputGenerator.generate(
+                                new Object[] {
+                                    new BinaryStringData("1"), new BinaryStringData("2"), null
+                                }));
+        DataChangeEvent expectedEvent =
+                DataChangeEvent.insertEvent(
+                        CUSTOMERS_TABLEID,
+                        outputGenerator.generate(
+                                new Object[] {
+                                    new BinaryStringData("1"),
+                                    new BinaryStringData("2"),
+                                    null,
+                                    new BinaryStringData("throttled_1"),
+                                    new BinaryStringData("String: 1"),
+                                    new BinaryStringData("1")
+                                }));
+        harness.getOperator().processElement(new StreamRecord<>(inputEvent));
+        Assertions.assertThat(harness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(expectedEvent));
+        harness.close();
+    }
+
+    @Test
+    void testRegexpExtractAllProjection() throws Exception {
+        TableId tableId = TableId.tableId("my_company", "my_branch", "regexp_table");
+        Schema inputSchema =
+                Schema.newBuilder().physicalColumn("text_value", DataTypes.STRING()).build();
+        Schema outputSchema =
+                Schema.newBuilder()
+                        .physicalColumn("regexp_values", DataTypes.ARRAY(DataTypes.STRING()))
+                        .build();
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
+                        .addTransform(
+                                tableId.identifier(),
+                                "REGEXP_EXTRACT_ALL(text_value, '([0-9]+)-([0-9]+)') AS regexp_values",
+                                null)
+                        .build();
+        RegularEventOperatorTestHarness<PostTransformOperator, Event> harness =
+                RegularEventOperatorTestHarness.with(transform, 1);
+
+        harness.open();
+        harness.getOperator()
+                .processElement(new StreamRecord<>(new CreateTableEvent(tableId, inputSchema)));
+        Assertions.assertThat(harness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(new CreateTableEvent(tableId, outputSchema)));
+
+        BinaryRecordDataGenerator inputGenerator =
+                new BinaryRecordDataGenerator((RowType) inputSchema.toRowDataType());
+        BinaryRecordDataGenerator outputGenerator =
+                new BinaryRecordDataGenerator((RowType) outputSchema.toRowDataType());
+        DataChangeEvent inputEvent =
+                DataChangeEvent.insertEvent(
+                        tableId,
+                        inputGenerator.generate(
+                                new Object[] {BinaryStringData.fromString("100-200, 300-400")}));
+        DataChangeEvent expectedEvent =
+                DataChangeEvent.insertEvent(
+                        tableId,
+                        outputGenerator.generate(
+                                new Object[] {
+                                    new GenericArrayData(
+                                            new Object[] {
+                                                BinaryStringData.fromString("100"),
+                                                BinaryStringData.fromString("300")
+                                            })
+                                }));
+
+        harness.getOperator().processElement(new StreamRecord<>(inputEvent));
+        Assertions.assertThat(harness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(expectedEvent));
+        harness.close();
+    }
+
+    @Test
     void testDataChangeEventTransformProjectionDataTypeConvert() throws Exception {
         PostTransformOperator transform =
                 PostTransformOperator.newBuilder()
@@ -569,6 +702,56 @@ class PostTransformOperatorTest {
         Assertions.assertThat(
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
                 .isEqualTo(new StreamRecord<>(insertEventExpect));
+        transformFunctionEventEventOperatorTestHarness.close();
+    }
+
+    @Test
+    void testReplaceEventMetadataTransform() throws Exception {
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
+                        .addTransform(
+                                METADATA_TABLEID.identifier(),
+                                "*, __data_event_type__",
+                                " __table_name__ = 'metadata_table' ")
+                        .build();
+        RegularEventOperatorTestHarness<PostTransformOperator, Event>
+                transformFunctionEventEventOperatorTestHarness =
+                        RegularEventOperatorTestHarness.with(transform, 1);
+        Schema expectedSchema =
+                Schema.newBuilder()
+                        .physicalColumn("col1", DataTypes.STRING().notNull())
+                        .physicalColumn("__data_event_type__", DataTypes.STRING().notNull())
+                        .primaryKey("col1")
+                        .build();
+
+        transformFunctionEventEventOperatorTestHarness.open();
+
+        CreateTableEvent createTableEvent = new CreateTableEvent(METADATA_TABLEID, METADATA_SCHEMA);
+        BinaryRecordDataGenerator recordDataGenerator =
+                new BinaryRecordDataGenerator(((RowType) METADATA_SCHEMA.toRowDataType()));
+        BinaryRecordDataGenerator expectedRecordDataGenerator =
+                new BinaryRecordDataGenerator(((RowType) expectedSchema.toRowDataType()));
+        DataChangeEvent replaceEvent =
+                DataChangeEvent.replaceEvent(
+                        METADATA_TABLEID,
+                        recordDataGenerator.generate(new Object[] {new BinaryStringData("1")}));
+        DataChangeEvent replaceEventExpect =
+                DataChangeEvent.replaceEvent(
+                        METADATA_TABLEID,
+                        expectedRecordDataGenerator.generate(
+                                new Object[] {
+                                    new BinaryStringData("1"), new BinaryStringData("+U")
+                                }));
+
+        transform.processElement(new StreamRecord<>(createTableEvent));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(
+                        new StreamRecord<>(new CreateTableEvent(METADATA_TABLEID, expectedSchema)));
+        transform.processElement(new StreamRecord<>(replaceEvent));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(replaceEventExpect));
         transformFunctionEventEventOperatorTestHarness.close();
     }
 
@@ -2859,6 +3042,36 @@ class PostTransformOperatorTest {
         testExpressionConditionTransform("concat('123', 'abc') = '123abc'");
         testExpressionConditionTransform("upper('abc') = 'ABC'");
         testExpressionConditionTransform("lower('ABC') = 'abc'");
+        testExpressionConditionTransform("OVERLAY('abcdef' PLACING 'ZZ' FROM 3) = 'abZZef'");
+        testExpressionConditionTransform("OVERLAY('abcdef' PLACING 'ZZ' FROM 3 FOR 2) = 'abZZef'");
+        testExpressionConditionTransform("POSITION('cd' IN 'abcdef') = 3");
+        testExpressionConditionTransform("POSITION('x' IN '\uD83D\uDE00x') = 2");
+        testExpressionConditionTransform("LOCATE('cd', 'abcdef') = 3");
+        testExpressionConditionTransform("LOCATE('cd', 'abcdef', 4) = 0");
+        testExpressionConditionTransform("LOCATE('', 'abcdef', 4) = 1");
+        testExpressionConditionTransform("INSTR('abcabc', 'bc') = 2");
+        testExpressionConditionTransform("LTRIM('  abc  ') = 'abc  '");
+        testExpressionConditionTransform("RTRIM('  abc  ') = '  abc'");
+        testExpressionConditionTransform("BTRIM('  abc  ') = 'abc'");
+        testExpressionConditionTransform(
+                "LTRIM('\uD83D\uDE01x', '\uD83D\uDE00') = '\uD83D\uDE01x'");
+        testExpressionConditionTransform(
+                "RTRIM('x\uD87D\uDE00', '\uD83D\uDE00') = 'x\uD87D\uDE00'");
+        testExpressionConditionTransform("BTRIM('xyabcxy', 'xy') = 'abc'");
+        testExpressionConditionTransform("CONCAT_WS(',', 'a', null, 'b') = 'a,b'");
+        testExpressionConditionTransform("LPAD('hi', 5, '?') = '???hi'");
+        testExpressionConditionTransform("RPAD('hi', 5, '?') = 'hi???'");
+        testExpressionConditionTransform("REPLACE('hello', 'l', 'x') = 'hexxo'");
+        testExpressionConditionTransform("REPEAT('ab', 3) = 'ababab'");
+        testExpressionConditionTransform("LEFT('abcdef', 2) = 'ab'");
+        testExpressionConditionTransform("RIGHT('abcdef', 2) = 'ef'");
+        testExpressionConditionTransform("LEFT('\uD83D\uDE00x', 1) = '\uD83D\uDE00'");
+        testExpressionConditionTransform("RIGHT('x\uD83D\uDE00', 1) = '\uD83D\uDE00'");
+        testExpressionConditionTransform("STARTSWITH('abcdef', 'abc')");
+        testExpressionConditionTransform("ENDSWITH('abcdef', 'def')");
+        testExpressionConditionTransform("TO_BASE64('hello') = 'aGVsbG8='");
+        testExpressionConditionTransform("FROM_BASE64('aGVsbG8=') = 'hello'");
+        testExpressionConditionTransform("TO_BASE64(FROM_BASE64('wyg=')) = '77+9KA=='");
         testExpressionConditionTransform("SUBSTR('ABC', -1) = 'C'");
         testExpressionConditionTransform("SUBSTR('ABC', -2, 2) = 'BC'");
         testExpressionConditionTransform("SUBSTR('ABC', 0) = 'ABC'");
@@ -2886,6 +3099,26 @@ class PostTransformOperatorTest {
         testExpressionConditionTransform("round(3.1415926, 2) = 3.14");
         testExpressionConditionTransform("IF(2>0,1,0) = 1");
         testExpressionConditionTransform("COALESCE(null,1,2) = 1");
+        testExpressionConditionTransform("TRY_CAST('invalid' AS INT) IS NULL");
+        testExpressionConditionTransform("TRY_CAST('invalid' AS BOOLEAN) IS NULL");
+        testExpressionConditionTransform("TRY_CAST('128' AS TINYINT) IS NULL");
+        testExpressionConditionTransform("TRY_CAST('1.5' AS INT) IS NULL");
+        testExpressionConditionTransform("TRY_CAST('invalid-timestamp' AS TIMESTAMP) IS NULL");
+        testExpressionConditionTransform("IFNULL(TRY_CAST('invalid' AS INT), 42) = 42");
+        testExpressionConditionTransform("NULLIF(1, 1) IS NULL");
+        testExpressionConditionTransform("NULLIF(1, 2) = 1");
+        testExpressionConditionTransform("NULLIF(CAST(1 AS INT), CAST(1 AS BIGINT)) IS NULL");
+        testExpressionConditionTransform("NULLIF(NULL, 1) IS NULL");
+        testExpressionConditionTransform("NULLIF(1, NULL) = 1");
+        testExpressionConditionTransform(
+                "NULLIF(CAST(16777217 AS BIGINT), CAST(16777217 AS FLOAT)) "
+                        + "= CAST(16777217 AS BIGINT)");
+        testExpressionConditionTransform(
+                "NULLIF(CAST('-0.0' AS DOUBLE), CAST('0.0' AS DOUBLE)) IS NULL");
+        testExpressionConditionTransform(
+                "NULLIF(CAST('NaN' AS DOUBLE), CAST('NaN' AS DOUBLE)) IS NOT NULL");
+        testExpressionConditionTransform(
+                "NULLIF(CAST('Infinity' AS DOUBLE), CAST('Infinity' AS DOUBLE)) IS NULL");
         testExpressionConditionTransform("1 + 1 = 2");
         testExpressionConditionTransform("1 - 1 = 0");
         testExpressionConditionTransform("1 * 1 = 1");
@@ -2919,6 +3152,115 @@ class PostTransformOperatorTest {
         testExpressionConditionTransform("cast(null as varchar) is null");
         testExpressionConditionTransform("cast(null as DECIMAL(4,2)) is null");
         testExpressionConditionTransform("cast(null as TIMESTAMP(3)) is null");
+    }
+
+    @Test
+    void testBinaryStartsWithAndEndsWithTransform() throws Exception {
+        TableId tableId = TableId.tableId("binary_string_functions");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("value_", DataTypes.VARBINARY(16))
+                        .physicalColumn("prefix_", DataTypes.VARBINARY(4))
+                        .physicalColumn("suffix_", DataTypes.VARBINARY(4))
+                        .build();
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
+                        .addTransform(
+                                tableId.identifier(),
+                                null,
+                                "STARTSWITH(value_, prefix_) AND ENDSWITH(value_, suffix_)")
+                        .addTimezone("UTC")
+                        .build();
+        RegularEventOperatorTestHarness<PostTransformOperator, Event> testHarness =
+                RegularEventOperatorTestHarness.with(transform, 1);
+        testHarness.open();
+
+        CreateTableEvent createTableEvent = new CreateTableEvent(tableId, schema);
+        BinaryRecordDataGenerator recordDataGenerator =
+                new BinaryRecordDataGenerator(((RowType) schema.toRowDataType()));
+        DataChangeEvent insertEvent =
+                DataChangeEvent.insertEvent(
+                        tableId,
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    new byte[] {1, 2, 3, 4},
+                                    new byte[] {1, 2},
+                                    new byte[] {3, 4}
+                                }));
+
+        transform.processElement(new StreamRecord<>(createTableEvent));
+        Assertions.assertThat(testHarness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(createTableEvent));
+        transform.processElement(new StreamRecord<>(insertEvent));
+        Assertions.assertThat(testHarness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(insertEvent));
+        testHarness.close();
+    }
+
+    @Test
+    void testBinaryOverlayPositionAndBase64Transform() throws Exception {
+        TableId tableId = TableId.tableId("binary_overlay_position_base64");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("value_", DataTypes.VARBINARY(16))
+                        .physicalColumn("replacement_", DataTypes.VARBINARY(4))
+                        .physicalColumn("needle_", DataTypes.VARBINARY(4))
+                        .physicalColumn("encoded_", DataTypes.STRING())
+                        .build();
+        Schema expectedSchema =
+                Schema.newBuilder()
+                        .physicalColumn("overlaid_", DataTypes.VARBINARY(20))
+                        .physicalColumn("position_", DataTypes.INT())
+                        .physicalColumn("encoded_value_", DataTypes.STRING())
+                        .physicalColumn("decoded_", DataTypes.VARBINARY(65536))
+                        .build();
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
+                        .addTransform(
+                                tableId.identifier(),
+                                "OVERLAY(value_ PLACING replacement_ FROM 2 FOR 2) AS overlaid_, "
+                                        + "POSITION(needle_ IN value_) AS position_, "
+                                        + "TO_BASE64(value_) AS encoded_value_, "
+                                        + "FROM_BASE64_BINARY(encoded_) AS decoded_",
+                                null)
+                        .addTimezone("UTC")
+                        .build();
+        RegularEventOperatorTestHarness<PostTransformOperator, Event> testHarness =
+                RegularEventOperatorTestHarness.with(transform, 1);
+        testHarness.open();
+
+        BinaryRecordDataGenerator recordDataGenerator =
+                new BinaryRecordDataGenerator(((RowType) schema.toRowDataType()));
+        BinaryRecordDataGenerator expectedRecordDataGenerator =
+                new BinaryRecordDataGenerator(((RowType) expectedSchema.toRowDataType()));
+        DataChangeEvent insertEvent =
+                DataChangeEvent.insertEvent(
+                        tableId,
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    new byte[] {1, 2, 3, 4},
+                                    new byte[] {8, 9},
+                                    new byte[] {2, 3},
+                                    new BinaryStringData("wyg=")
+                                }));
+        DataChangeEvent expectedInsertEvent =
+                DataChangeEvent.insertEvent(
+                        tableId,
+                        expectedRecordDataGenerator.generate(
+                                new Object[] {
+                                    new byte[] {1, 8, 9, 4},
+                                    2,
+                                    new BinaryStringData("AQIDBA=="),
+                                    new byte[] {(byte) 0xC3, 0x28}
+                                }));
+
+        transform.processElement(new StreamRecord<>(new CreateTableEvent(tableId, schema)));
+        Assertions.assertThat(testHarness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(new CreateTableEvent(tableId, expectedSchema)));
+        transform.processElement(new StreamRecord<>(insertEvent));
+        Assertions.assertThat(testHarness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(expectedInsertEvent));
+        testHarness.close();
     }
 
     private void testExpressionConditionTransform(String expression) throws Exception {

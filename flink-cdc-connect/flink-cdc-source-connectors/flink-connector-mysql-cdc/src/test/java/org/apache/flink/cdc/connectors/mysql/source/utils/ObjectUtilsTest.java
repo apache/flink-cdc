@@ -41,4 +41,22 @@ class ObjectUtilsTest {
                         ObjectUtils.minus(new BigDecimal("100.12345"), new BigDecimal("1.00001")))
                 .isEqualTo(new BigDecimal("99.12344"));
     }
+
+    @Test
+    void testCompareByteArraysByValue() {
+        Assertions.assertThat(ObjectUtils.compare(new byte[] {4, 4, 4, 5}, new byte[] {4, 4, 4, 6}))
+                .isLessThan(0);
+        Assertions.assertThat(ObjectUtils.compare(new byte[] {4, 4, 4, 6}, new byte[] {4, 4, 4, 5}))
+                .isGreaterThan(0);
+        Assertions.assertThat(ObjectUtils.compare(new byte[] {1, 2, 3}, new byte[] {1, 2, 3}))
+                .isZero();
+    }
+
+    @Test
+    void testCompareByteArraysAsUnsignedValues() {
+        Assertions.assertThat(ObjectUtils.compare(new byte[] {0x7f}, new byte[] {(byte) 0x80}))
+                .isLessThan(0);
+        Assertions.assertThat(ObjectUtils.compare(new byte[] {(byte) 0x80}, new byte[] {0x7f}))
+                .isGreaterThan(0);
+    }
 }

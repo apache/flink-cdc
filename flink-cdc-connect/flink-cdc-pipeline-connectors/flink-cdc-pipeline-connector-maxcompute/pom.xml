@@ -26,6 +26,10 @@ limitations under the License.
     <artifactId>flink-cdc-pipeline-connector-maxcompute</artifactId>
     <name>flink-cdc-pipeline-connector-maxcompute</name>
 
+    <properties>
+        <mockito.version>3.12.4</mockito.version>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>org.apache.flink</groupId>
@@ -79,6 +83,30 @@ limitations under the License.
             <groupId>org.testcontainers</groupId>
             <artifactId>testcontainers</artifactId>
             <version>1.19.8</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-inline</artifactId>
+            <version>${mockito.version}</version>
+            <type>jar</type>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <version>${mockito.version}</version>
+            <type>jar</type>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-junit-jupiter</artifactId>
+            <version>${mockito.version}</version>
+            <type>jar</type>
             <scope>test</scope>
         </dependency>
     </dependencies>

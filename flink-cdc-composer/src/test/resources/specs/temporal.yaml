@@ -276,3 +276,47 @@
     DataChangeEvent{tableId=foo.bar.baz, before=[1970-01-26, 1970-01-27, 1970-01-28, 1970-01-26, 1970-01-27, 1970-01-28, 2001-01-18, 2015-08-09, 2015-08-09], after=[], op=DELETE, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[], after=[null, null, null, null, null, null, null, 2015-08-09, 2015-08-09], op=INSERT, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[null, null, null, null, null, null, null, 2015-08-09, 2015-08-09], after=[], op=DELETE, meta=()}
+- do: EXTRACT and Date Part Functions
+  projection: |-
+    id_
+    YEAR(date_) AS year_
+    QUARTER(date_) AS quarter_
+    MONTH(timestamp_9_) AS month_
+    WEEK(date_) AS week_
+    DAYOFYEAR(date_) AS day_of_year_
+    DAYOFMONTH(date_) AS day_of_month_
+    DAYOFWEEK(date_) AS day_of_week_
+    HOUR(time_0_) AS hour_
+    MINUTE(time_0_) AS minute_
+    SECOND(time_0_) AS second_
+    EXTRACT(DAY FROM timestamp_0_) AS extract_day_
+    EXTRACT(HOUR FROM timestamp_ltz_0_) AS extract_ltz_hour_
+    EXTRACT(YEAR FROM TO_TIMESTAMP_LTZ('2023-12-31 16:30:00.000')) AS extract_ltz_year_
+  filter: YEAR(date_) >= 2000 OR date_ IS NULL
+  time-zone: Asia/Shanghai
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`year_` BIGINT,`quarter_` BIGINT,`month_` BIGINT,`week_` BIGINT,`day_of_year_` BIGINT,`day_of_month_` BIGINT,`day_of_week_` BIGINT,`hour_` BIGINT,`minute_` BIGINT,`second_` BIGINT,`extract_day_` BIGINT,`extract_ltz_hour_` BIGINT,`extract_ltz_year_` BIGINT}, primaryKeys=, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, 2000, 4, 1, 52, 366, 31, 1, 19, 43, 17, 2, 18, 2024], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, 2000, 4, 1, 52, 366, 31, 1, 19, 43, 17, 2, 18, 2024], after=[-1, 2001, 1, 1, 1, 1, 1, 2, 12, 34, 45, 9, 16, 2024], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, 2001, 1, 1, 1, 1, 1, 2, 12, 34, 45, 9, 16, 2024], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null, null, null, null, null, null, null, null, null, null, null, 2024], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null, null, null, null, null, null, null, null, null, null, null, 2024], after=[], op=DELETE, meta=()}
+- do: Interval Literal Arithmetic
+  projection: |-
+    id_
+    date_ + INTERVAL '1' DAY AS date_plus_day_
+    date_ - INTERVAL '1' MONTH AS date_minus_month_
+    time_0_ + INTERVAL '6' HOUR AS time_plus_hour_
+    timestamp_0_ + INTERVAL '1 02:03:04' DAY TO SECOND AS timestamp_plus_day_time_
+    timestamp_0_ - INTERVAL '1-2' YEAR TO MONTH AS timestamp_minus_year_month_
+    INTERVAL '3' DAY + timestamp_ltz_0_ AS ltz_plus_day_
+    timestamp_ltz_0_ + INTERVAL '1' MONTH AS ltz_plus_month_
+    timestamp_0_ + INTERVAL '1' DAY - INTERVAL '2' HOUR AS nested_interval_
+  filter: timestamp_0_ + INTERVAL '1' DAY > timestamp_0_ OR timestamp_0_ IS NULL
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`date_plus_day_` DATE,`date_minus_month_` DATE,`time_plus_hour_` TIME(0),`timestamp_plus_day_time_` TIMESTAMP(0),`timestamp_minus_year_month_` TIMESTAMP(0),`ltz_plus_day_` TIMESTAMP_LTZ(0),`ltz_plus_month_` TIMESTAMP_LTZ(0),`nested_interval_` TIMESTAMP(0)}, primaryKeys=, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, 2001-01-01, 2000-11-30, 01:43:17, 1970-01-03T12:20:40.789123456, 1968-11-02T10:17:36.789123456, 1970-01-05T10:17:36.789123456, 1970-02-02T10:17:36.789123456, 1970-01-03T08:17:36.789123456], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, 2001-01-01, 2000-11-30, 01:43:17, 1970-01-03T12:20:40.789123456, 1968-11-02T10:17:36.789123456, 1970-01-05T10:17:36.789123456, 1970-02-02T10:17:36.789123456, 1970-01-03T08:17:36.789123456], after=[-1, 2001-01-02, 2000-12-01, 18:34:45, 1970-01-10T11:00:40.789723456, 1968-11-09T08:57:36.789723456, 1970-01-12T08:57:36.789723456, 1970-02-09T08:57:36.789723456, 1970-01-10T06:57:36.789723456], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, 2001-01-02, 2000-12-01, 18:34:45, 1970-01-10T11:00:40.789723456, 1968-11-09T08:57:36.789723456, 1970-01-12T08:57:36.789723456, 1970-02-09T08:57:36.789723456, 1970-01-10T06:57:36.789723456], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null, null, null, null, null, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null, null, null, null, null, null, null], after=[], op=DELETE, meta=()}

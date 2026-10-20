@@ -25,11 +25,11 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-# DataStream API Package Guidance
+# DataStream API 打包指南
 
-This guide provides a simple `pom.xml` example for packaging DataStream job JARs with MySQL CDC source.
+本指南提供一个简单的 `pom.xml` 示例，用于打包带有 MySQL CDC source 的 DataStream 作业 JAR。
 
-## Example for `pom.xml` with Flink 1.20.x
+## Flink 1.20.x 的 `pom.xml` 示例
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -57,7 +57,7 @@ This guide provides a simple `pom.xml` example for packaging DataStream job JARs
         <slf4j.version>1.7.15</slf4j.version>
         <log4j.version>2.17.1</log4j.version>
         <debezium.version>1.9.7.Final</debezium.version>
-        <flink.cdc.version>3.6.0-1.20</flink.cdc.version>
+        <flink.cdc.version>3.7.0-1.20</flink.cdc.version>
     </properties>
     <dependencies>
         <dependency>
@@ -238,7 +238,7 @@ This guide provides a simple `pom.xml` example for packaging DataStream job JARs
 </project>
 ```
 
-## Example for `pom.xml` with Flink 2.2.x
+## Flink 2.2.x 的 `pom.xml` 示例
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -266,7 +266,7 @@ This guide provides a simple `pom.xml` example for packaging DataStream job JARs
         <slf4j.version>1.7.15</slf4j.version>
         <log4j.version>2.17.1</log4j.version>
         <debezium.version>1.9.7.Final</debezium.version>
-        <flink.cdc.version>3.6.0-2.2</flink.cdc.version>
+        <flink.cdc.version>3.7.0-2.2</flink.cdc.version>
     </properties>
     <dependencies>
         <dependency>
@@ -445,7 +445,7 @@ This guide provides a simple `pom.xml` example for packaging DataStream job JARs
 </project>
 ```
 
-## Example for Code
+## 代码示例
 
 ```java
 package org.apache.flink.flink.cdc;

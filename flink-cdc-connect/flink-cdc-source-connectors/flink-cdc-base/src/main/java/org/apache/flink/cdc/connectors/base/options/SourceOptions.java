@@ -138,6 +138,20 @@ public class SourceOptions {
                     .withDescription(
                             "Whether capture the newly added tables when restoring from a savepoint/checkpoint or not, by default is false.");
 
+    public static final ConfigOption<Boolean> SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED =
+            ConfigOptions.key("scan.incremental.snapshot.metadata.release.enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Whether to release the snapshot split metadata (assigned splits, finished"
+                                    + " offsets and table schemas) held by the source coordinator once the"
+                                    + " source has entered the stream (incremental) phase, to reduce"
+                                    + " JobManager memory pressure on jobs with a very large number of"
+                                    + " snapshot splits. Disabled by default. The release happens only after a"
+                                    + " checkpoint completes, so it has no effect without checkpointing. Cannot"
+                                    + " be enabled together with scan.newly-added-table.enabled (the job fails"
+                                    + " to start), since that flow needs the metadata that would be released.");
+
     public static final ConfigOption<Boolean>
             SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED =
                     ConfigOptions.key("scan.incremental.snapshot.unbounded-chunk-first.enabled")

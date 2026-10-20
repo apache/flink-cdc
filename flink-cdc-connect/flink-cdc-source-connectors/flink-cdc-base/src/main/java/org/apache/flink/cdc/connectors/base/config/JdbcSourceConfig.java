@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.base.config;
 
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.connectors.base.source.IncrementalSource;
+import org.apache.flink.util.Preconditions;
 
 import io.debezium.config.Configuration;
 import io.debezium.relational.RelationalDatabaseConnectorConfig;
@@ -74,7 +75,8 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
             String chunkKeyColumn,
             boolean skipSnapshotBackfill,
             boolean isScanNewlyAddedTableEnabled,
-            boolean assignUnboundedChunkFirst) {
+            boolean assignUnboundedChunkFirst,
+            boolean releaseSnapshotMetadataEnabled) {
         super(
                 startupOptions,
                 splitSize,
@@ -87,7 +89,14 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
                 isScanNewlyAddedTableEnabled,
                 dbzProperties,
                 dbzConfiguration,
-                assignUnboundedChunkFirst);
+                assignUnboundedChunkFirst,
+                releaseSnapshotMetadataEnabled);
+        Preconditions.checkState(
+                !(isScanNewlyAddedTableEnabled && releaseSnapshotMetadataEnabled),
+                "scan.incremental.snapshot.metadata.release.enabled and "
+                        + "scan.newly-added-table.enabled cannot both be enabled: releasing the "
+                        + "snapshot split metadata would drop the assigned splits, finished offsets "
+                        + "and table schemas that newly-added-table scanning needs.");
         this.driverClassName = driverClassName;
         this.hostname = hostname;
         this.port = port;

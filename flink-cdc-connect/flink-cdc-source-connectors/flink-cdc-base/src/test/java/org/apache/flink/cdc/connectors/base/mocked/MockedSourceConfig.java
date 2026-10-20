@@ -86,6 +86,7 @@ public class MockedSourceConfig extends JdbcSourceConfig {
                 null,
                 true,
                 isScanNewlyAddedTableEnabled,
+                false,
                 false);
     }
 

@@ -143,6 +143,7 @@ class PreTransformOperatorTest {
                     .physicalColumn("age", DataTypes.INT())
                     .physicalColumn("name", DataTypes.STRING())
                     .primaryKey("id")
+                    .comment("metadata table comment")
                     .options(ImmutableMap.of("key1", "value1", "key2", "value2"))
                     .build();
 
@@ -152,6 +153,7 @@ class PreTransformOperatorTest {
                     .physicalColumn("age", DataTypes.INT())
                     .physicalColumn("name", DataTypes.STRING())
                     .primaryKey("id")
+                    .comment("metadata table comment")
                     .options(ImmutableMap.of("key1", "value1", "key2", "value2"))
                     .build();
 

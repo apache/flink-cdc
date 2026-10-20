@@ -20,7 +20,8 @@ package org.apache.flink.cdc.connectors.mysql.source.config;
 import org.apache.flink.cdc.connectors.mysql.source.utils.SnapshotFilterUtils;
 
 import io.debezium.relational.TableId;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -31,15 +32,20 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 /** Tests for {@link MySqlSourceConfigFactory}. */
 class MySqlSourceConfigFactoryTest {
 
-    @Test
-    void testSnapshotFilterOrder() {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void testSnapshotFilterOrder(boolean releaseSnapshotMetadataEnabled) {
         Map<String, String> filters = new LinkedHashMap<>();
         filters.put("db.order_[0-9]+", "id > 100");
         filters.put("db.order_1", "id > 200");
-        MySqlSourceConfigFactory factory = createFactory().snapshotFilters(filters);
+        MySqlSourceConfigFactory factory =
+                createFactory()
+                        .releaseSnapshotMetadataEnabled(releaseSnapshotMetadataEnabled)
+                        .snapshotFilters(filters);
         MySqlSourceConfig broadFirst = factory.createConfig(0);
         MySqlSourceConfig specificFirst =
                 createFactory()
+                        .releaseSnapshotMetadataEnabled(releaseSnapshotMetadataEnabled)
                         .snapshotFilters("db.order_1", "id > 200")
                         .snapshotFilters("db.order_[0-9]+", "id > 100")
                         .createConfig(0);
@@ -48,6 +54,10 @@ class MySqlSourceConfigFactoryTest {
                 .containsExactly("db.order_[0-9]+", "db.order_1");
         assertThat(specificFirst.getSnapshotFilters().keySet())
                 .containsExactly("db.order_1", "db.order_[0-9]+");
+        assertThat(broadFirst.isReleaseSnapshotMetadataEnabled())
+                .isEqualTo(releaseSnapshotMetadataEnabled);
+        assertThat(specificFirst.isReleaseSnapshotMetadataEnabled())
+                .isEqualTo(releaseSnapshotMetadataEnabled);
         TableId tableId = TableId.parse("db.order_1");
         assertThat(SnapshotFilterUtils.getSnapshotFilter(broadFirst.getSnapshotFilters(), tableId))
                 .isEqualTo("id > 100");

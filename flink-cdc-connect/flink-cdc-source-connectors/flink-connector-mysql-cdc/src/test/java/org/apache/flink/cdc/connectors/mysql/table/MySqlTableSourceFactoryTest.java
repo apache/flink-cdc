@@ -122,6 +122,7 @@ class MySqlTableSourceFactoryTest {
                         StartupOptions.initial(),
                         false,
                         false,
+                        false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
                         null,
@@ -173,6 +174,7 @@ class MySqlTableSourceFactoryTest {
                         StartupOptions.initial(),
                         false,
                         false,
+                        false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
                         "testCol",
@@ -220,6 +222,7 @@ class MySqlTableSourceFactoryTest {
                         StartupOptions.initial(),
                         false,
                         false,
+                        false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
                         null,
@@ -263,6 +266,7 @@ class MySqlTableSourceFactoryTest {
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         StartupOptions.latest(),
+                        false,
                         false,
                         false,
                         new Properties(),
@@ -328,6 +332,7 @@ class MySqlTableSourceFactoryTest {
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         StartupOptions.initial(),
                         true,
+                        false,
                         true,
                         jdbcProperties,
                         Duration.ofMillis(15213),
@@ -389,6 +394,7 @@ class MySqlTableSourceFactoryTest {
                         StartupOptions.specificOffset(offsetFile, offsetPos),
                         false,
                         false,
+                        false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
                         null,
@@ -430,6 +436,7 @@ class MySqlTableSourceFactoryTest {
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         StartupOptions.initial(),
+                        false,
                         false,
                         false,
                         new Properties(),
@@ -474,6 +481,7 @@ class MySqlTableSourceFactoryTest {
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         StartupOptions.earliest(),
+                        false,
                         false,
                         false,
                         new Properties(),
@@ -521,6 +529,7 @@ class MySqlTableSourceFactoryTest {
                         StartupOptions.timestamp(0L),
                         false,
                         false,
+                        false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
                         null,
@@ -562,6 +571,7 @@ class MySqlTableSourceFactoryTest {
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         StartupOptions.latest(),
+                        false,
                         false,
                         false,
                         new Properties(),
@@ -610,6 +620,7 @@ class MySqlTableSourceFactoryTest {
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         StartupOptions.initial(),
+                        false,
                         false,
                         false,
                         new Properties(),
@@ -827,6 +838,7 @@ class MySqlTableSourceFactoryTest {
                         StartupOptions.initial(),
                         false,
                         false,
+                        false,
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
                         null,
@@ -837,6 +849,19 @@ class MySqlTableSourceFactoryTest {
                         false,
                         null);
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
+    }
+
+    @Test
+    void testReleaseSnapshotMetadataOption() {
+        // Setting the option must be accepted (it is registered in optionalOptions, so there is no
+        // "unsupported options" validation error) and must change the produced source.
+        Map<String, String> withRelease = getAllOptions();
+        withRelease.put("scan.incremental.snapshot.metadata.release.enabled", "true");
+        DynamicTableSource sourceWithRelease = createTableSource(withRelease);
+
+        Assertions.assertThat(sourceWithRelease)
+                .isInstanceOf(MySqlTableSource.class)
+                .isNotEqualTo(createTableSource(getAllOptions()));
     }
 
     private Map<String, String> getAllOptions() {
