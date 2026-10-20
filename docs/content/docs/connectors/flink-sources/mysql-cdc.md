@@ -473,7 +473,7 @@ Only valid for cdc 1.x version. During a snapshot operation, the connector will 
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>When reading a table snapshot, the rows of captured tables will be filtered using the specified filter expression (AKA a SQL WHERE clause). By default, no filter is applied, meaning the entire table will be synchronized. e.g. `id > 100`.</td> 
+      <td>SQL WHERE clause applied to the snapshot SELECT query, e.g. `id > 100`. It does not filter binlog events or snapshot backfill. The final snapshot may contain rows that do not satisfy the condition. By default, no filter is applied. See <a href="#snapshot-filter">Snapshot Filter</a> for details.</td>
     </tr>
     </tbody>
 </table>
@@ -938,7 +938,13 @@ By adding this parameter, we can map the binary field type to 'STRING' in Flink 
 
 ### Snapshot Filter
 
-The `scan.snapshot.filter` option allows you to apply a SQL WHERE clause during snapshot reading, so that only matching rows are synchronized. This is useful for partial initial loads (e.g. migrating only recent data) without modifying the source tables. Binlog events are still captured for all rows after the snapshot phase, regardless of the filter.
+The `scan.snapshot.filter` option applies a SQL WHERE clause to the snapshot SELECT query. This is useful for partial initial loads (e.g. migrating only recent data) without modifying the source tables.
+
+The filter does not apply to binlog events, including events between the low and high watermarks during snapshot reading. With snapshot backfill enabled (the default), these events are merged into the snapshot without evaluating the filter again. A row that enters the condition can therefore be added, and a row that leaves the condition can still appear with its updated values in the final snapshot. The final snapshot is not guaranteed to satisfy the filter.
+
+When `scan.incremental.snapshot.backfill.skip` is `true`, the snapshot contains the rows matched by the SELECT query, and changes made during the snapshot are emitted later as unfiltered binlog events. Subsequent binlog events are always captured for all rows, regardless of the filter.
+
+For the DataStream API, filters are evaluated in the order of `snapshotFilters` calls. The first matching table pattern wins.
 
 **SQL DDL Example**
 

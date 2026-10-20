@@ -30,6 +30,7 @@ import java.time.Duration;
 import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -78,7 +79,7 @@ public class MySqlSourceConfigFactory implements Serializable {
     private boolean treatTinyInt1AsBoolean = true;
     private boolean useLegacyJsonFormat = true;
     private boolean assignUnboundedChunkFirst = false;
-    private Map<String, String> snapshotFilters = new HashMap<>();
+    private final Map<String, String> snapshotFilters = new LinkedHashMap<>();
 
     public MySqlSourceConfigFactory hostname(String hostname) {
         this.hostname = hostname;
@@ -344,7 +345,8 @@ public class MySqlSourceConfigFactory implements Serializable {
 
     /**
      * When reading a table snapshot, the rows of captured tables will be filtered using the
-     * specified filter expression (AKA a SQL WHERE clause).
+     * specified SQL WHERE clause during the snapshot query. Binlog events, including snapshot
+     * backfill, are not filtered. The first matching table pattern in insertion order wins.
      */
     public MySqlSourceConfigFactory snapshotFilters(String table, String filter) {
         this.snapshotFilters.put(table, filter);
@@ -353,7 +355,13 @@ public class MySqlSourceConfigFactory implements Serializable {
 
     /**
      * When reading a table snapshot, the rows of captured tables will be filtered using the
-     * specified filter expression (AKA a SQL WHERE clause).
+     * specified SQL WHERE clause during the snapshot query. Binlog events, including snapshot
+     * backfill, are not filtered. The first matching table pattern in insertion order wins.
+     *
+     * <p>New table patterns are appended in the iteration order of the supplied map. Use an
+     * insertion-ordered map, such as {@link LinkedHashMap}, to specify matching precedence. A
+     * {@link HashMap} does not guarantee insertion order. Replacing the filter for an existing
+     * pattern does not change its position.
      */
     public MySqlSourceConfigFactory snapshotFilters(Map<String, String> snapshotFilters) {
         this.snapshotFilters.putAll(snapshotFilters);

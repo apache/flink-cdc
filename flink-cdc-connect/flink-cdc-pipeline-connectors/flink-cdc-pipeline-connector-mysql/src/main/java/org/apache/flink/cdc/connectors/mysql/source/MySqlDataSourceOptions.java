@@ -340,7 +340,7 @@ public class MySqlDataSourceOptions {
                     .asList()
                     .noDefaultValue()
                     .withDescription(
-                            "When reading a table snapshot, the rows of captured tables will be filtered using the specified filter expressions (AKA SQL WHERE clauses). "
+                            "SQL WHERE clauses applied to snapshot SELECT queries. Binlog events, including snapshot backfill, are not filtered. The first matching table pattern in configuration order wins. "
                                     + "By default, no filter is applied, meaning the entire table will be synchronized. "
                                     + "This option expects a list of maps, where each map specifies a table pattern and its filter expression. "
                                     + "The configuration format in YAML looks like:\n"

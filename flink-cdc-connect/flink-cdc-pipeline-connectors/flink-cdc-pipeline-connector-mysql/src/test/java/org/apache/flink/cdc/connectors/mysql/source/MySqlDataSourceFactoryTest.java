@@ -21,17 +21,22 @@ import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.factories.Factory;
 import org.apache.flink.cdc.connectors.mysql.factory.MySqlDataSourceFactory;
+import org.apache.flink.cdc.connectors.mysql.source.utils.SnapshotFilterUtils;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.ObjectPath;
 
+import io.debezium.relational.TableId;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -362,6 +367,49 @@ class MySqlDataSourceFactoryTest extends MySqlSourceTestBase {
                                         "city != 'China:beijing'");
                             }
                         });
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void testSnapshotFilterOrder(boolean specificFirst) {
+        inventoryDatabase.createAndInitialize();
+        String database = inventoryDatabase.getDatabaseName();
+        String broadPattern = database + ".product[a-z]+";
+        String specificPattern = database + ".products";
+        List<Map<String, String>> filters = new ArrayList<>();
+        Map<String, String> broadFilter = new HashMap<>();
+        broadFilter.put("table", broadPattern);
+        broadFilter.put("filter", "id > 100");
+        filters.add(broadFilter);
+        Map<String, String> specificFilter = new HashMap<>();
+        specificFilter.put("table", specificPattern);
+        specificFilter.put("filter", "id > 200");
+        filters.add(specificFilter);
+        if (specificFirst) {
+            Collections.reverse(filters);
+        }
+        Map<String, Object> options = new HashMap<>();
+        options.put(HOSTNAME.key(), MYSQL_CONTAINER.getHost());
+        options.put(PORT.key(), String.valueOf(MYSQL_CONTAINER.getDatabasePort()));
+        options.put(USERNAME.key(), TEST_USER);
+        options.put(PASSWORD.key(), TEST_PASSWORD);
+        options.put(TABLES.key(), specificPattern);
+        options.put(SCAN_SNAPSHOT_FILTERS.key(), filters);
+        MySqlDataSource source =
+                (MySqlDataSource)
+                        new MySqlDataSourceFactory()
+                                .createDataSource(new MockContext(Configuration.fromMap(options)));
+
+        Map<String, String> configuredFilters = source.getSourceConfig().getSnapshotFilters();
+        assertThat(configuredFilters.keySet())
+                .containsExactlyElementsOf(
+                        filters.stream()
+                                .map(filter -> filter.get("table"))
+                                .collect(Collectors.toList()));
+        assertThat(
+                        SnapshotFilterUtils.getSnapshotFilter(
+                                configuredFilters, TableId.parse(specificPattern)))
+                .isEqualTo(specificFirst ? "id > 200" : "id > 100");
     }
 
     @Test

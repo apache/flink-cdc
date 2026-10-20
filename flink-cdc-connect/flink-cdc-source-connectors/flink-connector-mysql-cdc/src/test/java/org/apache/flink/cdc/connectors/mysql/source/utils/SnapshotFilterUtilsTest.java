@@ -26,10 +26,10 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /** Unit test for {@link org.apache.flink.cdc.connectors.mysql.source.utils.SnapshotFilterUtils}. */
-public class SnapshotFilterUtilsTest {
+class SnapshotFilterUtilsTest {
 
     @Test
-    public void testGetSnapshotFilter() {
+    void testGetSnapshotFilter() {
         Map<String, String> map = new HashMap<>();
         map.put("db.user", "id > 100");
         map.put("db.order_[0-9]+", "id > 200");
@@ -46,7 +46,7 @@ public class SnapshotFilterUtilsTest {
     }
 
     @Test
-    public void testGetSnapshotFilterPreservesOrder() {
+    void testGetSnapshotFilterPreservesOrder() {
         // Use LinkedHashMap to ensure deterministic order
         Map<String, String> map = new LinkedHashMap<>();
         map.put("db.table_a", "id > 100");
@@ -103,5 +103,23 @@ public class SnapshotFilterUtilsTest {
                                     overlappingMap, TableId.parse("db.order_1")))
                     .isEqualTo("id > 100");
         }
+    }
+
+    @Test
+    void testOverlappingFiltersInOppositeOrders() {
+        Map<String, String> broadFirst = new LinkedHashMap<>();
+        broadFirst.put("db.order_[0-9]+", "id > 100");
+        broadFirst.put("db.order_1", "id > 200");
+        Map<String, String> specificFirst = new LinkedHashMap<>();
+        specificFirst.put("db.order_1", "id > 200");
+        specificFirst.put("db.order_[0-9]+", "id > 100");
+        TableId tableId = TableId.parse("db.order_1");
+
+        Assertions.assertThat(SnapshotFilterUtils.getSnapshotFilter(broadFirst, tableId))
+                .isEqualTo("id > 100");
+        Assertions.assertThat(SnapshotFilterUtils.getSnapshotFilter(specificFirst, tableId))
+                .isEqualTo("id > 200");
+        Assertions.assertThat(SnapshotFilterUtils.getSnapshotFilter(broadFirst, tableId))
+                .isEqualTo("id > 100");
     }
 }

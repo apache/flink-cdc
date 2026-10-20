@@ -79,6 +79,7 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.sql.SQLException;
 import java.time.Duration;
@@ -563,6 +564,75 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
                 fetchRowData(iterator, expectedSnapshotData.length));
         Assertions.assertThat(hasNextData(iterator)).isFalse();
         jobClient.cancel().get();
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void testSnapshotFiltersWithDMLPreHighWatermark(boolean skipSnapshotBackfill) throws Exception {
+        customDatabase.createAndInitialize();
+        TestTable customerTable =
+                new TestTable(customDatabase, "customers", TestTableSchemas.CUSTOMERS);
+        String tableId = customerTable.getTableId();
+        try (MySqlConnection connection = getConnection()) {
+            connection.execute("DELETE FROM " + tableId + " WHERE id NOT IN (101, 102, 103, 109)");
+        }
+
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.setParallelism(1);
+        MySqlSource<RowData> source =
+                MySqlSource.<RowData>builder()
+                        .hostname(customDatabase.getHost())
+                        .port(customDatabase.getDatabasePort())
+                        .username(customDatabase.getUsername())
+                        .password(customDatabase.getPassword())
+                        .serverTimeZone("UTC")
+                        .databaseList(customDatabase.getDatabaseName())
+                        .tableList(tableId)
+                        .deserializer(customerTable.getDeserializer())
+                        .snapshotFilters(tableId, "address = 'Shanghai'")
+                        .skipSnapshotBackfill(skipSnapshotBackfill)
+                        .startupOptions(StartupOptions.initial())
+                        .build();
+
+        SnapshotPhaseHooks hooks = new SnapshotPhaseHooks();
+        hooks.setPreLowWatermarkAction(
+                (connection, split) -> {
+                    connection.execute(
+                            "UPDATE "
+                                    + tableId
+                                    + " SET address = 'Pittsburgh' WHERE id IN (102, 109)");
+                });
+        hooks.setPreHighWatermarkAction(
+                (connection, split) -> {
+                    connection.setAutoCommit(false);
+                    // Row 101 leaves the predicate; row 102 enters it. Row 109 remains excluded.
+                    connection.execute(
+                            "UPDATE " + tableId + " SET address = 'Pittsburgh' WHERE id = 101",
+                            "UPDATE " + tableId + " SET address = 'Shanghai' WHERE id = 102");
+                    connection.commit();
+                });
+        source.setSnapshotHooks(hooks);
+
+        List<String> expected =
+                skipSnapshotBackfill
+                        ? Arrays.asList(
+                                "+I[101, user_1, Shanghai, 123567891234]",
+                                "+I[103, user_3, Shanghai, 123567891234]",
+                                "-U[101, user_1, Shanghai, 123567891234]",
+                                "+U[101, user_1, Pittsburgh, 123567891234]",
+                                "-U[102, user_2, Pittsburgh, 123567891234]",
+                                "+U[102, user_2, Shanghai, 123567891234]")
+                        : Arrays.asList(
+                                "+I[101, user_1, Pittsburgh, 123567891234]",
+                                "+I[102, user_2, Shanghai, 123567891234]",
+                                "+I[103, user_3, Shanghai, 123567891234]");
+        try (CloseableIterator<RowData> iterator =
+                env.fromSource(source, WatermarkStrategy.noWatermarks(), "Filtered snapshot source")
+                        .executeAndCollect()) {
+            assertThat(fetchRowData(iterator, expected.size(), customerTable::stringify))
+                    .containsExactlyInAnyOrderElementsOf(expected);
+            assertThat(hasNextData(iterator)).isFalse();
+        }
     }
 
     @Test

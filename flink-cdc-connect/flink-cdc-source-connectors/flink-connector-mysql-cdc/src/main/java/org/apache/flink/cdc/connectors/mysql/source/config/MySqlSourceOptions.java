@@ -299,6 +299,6 @@ public class MySqlSourceOptions {
                     .stringType()
                     .noDefaultValue()
                     .withDescription(
-                            "When reading a table snapshot, the rows of captured tables will be filtered using the specified filter expression (AKA a SQL WHERE clause). "
+                            "SQL WHERE clause applied to the snapshot SELECT query. Binlog events, including snapshot backfill, are not filtered. "
                                     + "By default, no filter is applied, meaning the entire table will be synchronized. e.g. `id > 100`");
 }

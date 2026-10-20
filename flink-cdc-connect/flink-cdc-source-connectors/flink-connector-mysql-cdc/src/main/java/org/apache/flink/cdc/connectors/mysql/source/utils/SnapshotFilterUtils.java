@@ -21,34 +21,34 @@ import org.apache.flink.cdc.common.schema.Selectors;
 
 import io.debezium.relational.TableId;
 
+import java.util.AbstractMap;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 /** Utilities to filter snapshot of table. */
 public class SnapshotFilterUtils {
 
     private SnapshotFilterUtils() {}
 
-    private static final Map<Map<String, String>, Map<Selectors, String>> cache =
+    private static final Map<List<Map.Entry<String, String>>, Map<Selectors, String>> cache =
             new ConcurrentHashMap<>();
 
     /**
      * Converts the given filters to a map keyed by {@link Selectors}, caching the result.
      *
-     * <p>The cache is backed by a {@link ConcurrentHashMap} to be safe under concurrent access. To
-     * avoid using a mutable {@link Map} as the cache key, an immutable copy of the input filters is
-     * created and used as the key.
-     *
-     * <p>Uses {@link LinkedHashMap} to preserve insertion order, ensuring deterministic matching
-     * when multiple patterns could match the same table.
+     * <p>The immutable list of entries is an order-sensitive cache key, so configurations with the
+     * same rules in different orders retain their own matching precedence.
      */
     private static Map<Selectors, String> toSelector(Map<String, String> filters) {
-        // Create an immutable copy of the filters to avoid using a mutable map as the cache key.
-        // Use LinkedHashMap to preserve the user-defined order.
-        Map<String, String> immutableFilters =
-                Collections.unmodifiableMap(new LinkedHashMap<>(filters));
+        List<Map.Entry<String, String>> immutableFilters =
+                Collections.unmodifiableList(
+                        filters.entrySet().stream()
+                                .map(AbstractMap.SimpleImmutableEntry::new)
+                                .collect(Collectors.toList()));
 
         return cache.computeIfAbsent(
                 immutableFilters,
@@ -56,12 +56,12 @@ public class SnapshotFilterUtils {
                     // Use LinkedHashMap to preserve insertion order for deterministic matching
                     Map<Selectors, String> snapshotFilters = new LinkedHashMap<>();
                     key.forEach(
-                            (table, filter) -> {
+                            entry -> {
                                 Selectors selector =
                                         new Selectors.SelectorsBuilder()
-                                                .includeTables(table)
+                                                .includeTables(entry.getKey())
                                                 .build();
-                                snapshotFilters.put(selector, filter);
+                                snapshotFilters.put(selector, entry.getValue());
                             });
                     return snapshotFilters;
                 });

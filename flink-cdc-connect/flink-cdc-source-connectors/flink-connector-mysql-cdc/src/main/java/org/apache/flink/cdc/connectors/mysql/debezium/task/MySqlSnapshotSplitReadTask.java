@@ -255,6 +255,8 @@ public class MySqlSnapshotSplitReadTask
                     snapshotFilter);
         }
 
+        // The filter applies only to this SELECT. Concurrent binlog changes are backfilled
+        // without evaluating the predicate, so the final snapshot may include nonmatching rows.
         final String selectSql =
                 StatementUtils.buildSplitScanQuery(
                         snapshotSplit.getTableId(),

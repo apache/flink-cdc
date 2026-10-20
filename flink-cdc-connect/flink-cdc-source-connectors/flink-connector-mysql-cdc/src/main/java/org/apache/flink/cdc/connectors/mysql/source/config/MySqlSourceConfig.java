@@ -32,6 +32,8 @@ import javax.annotation.Nullable;
 
 import java.io.Serializable;
 import java.time.Duration;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -160,7 +162,7 @@ public class MySqlSourceConfig implements Serializable {
         this.treatTinyInt1AsBoolean = treatTinyInt1AsBoolean;
         this.useLegacyJsonFormat = useLegacyJsonFormat;
         this.assignUnboundedChunkFirst = assignUnboundedChunkFirst;
-        this.snapshotFilters = snapshotFilters;
+        this.snapshotFilters = Collections.unmodifiableMap(new LinkedHashMap<>(snapshotFilters));
     }
 
     public String getHostname() {
