@@ -855,7 +855,7 @@ public class FlussMetadataApplierTest {
 
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
-    void testSchemaReadRetryPreservesInterruption(boolean pendingRead) throws Exception {
+    void testSchemaReadRetryPropagatesInterruption(boolean pendingRead) throws Exception {
         TableId tableId = TableId.tableId(DATABASE_NAME, "interrupted_schema_read");
         TablePath tablePath = new TablePath(DATABASE_NAME, "interrupted_schema_read");
         try (FlussMetaDataApplier applier =
@@ -893,7 +893,6 @@ public class FlussMetadataApplierTest {
                                         applier.applyAddColumnChanges(
                                                 interruptedAdmin, tablePath, addIntColumns("a")))
                         .isInstanceOf(InterruptedException.class);
-                assertThat(Thread.currentThread().isInterrupted()).isTrue();
                 assertThat(schemaReads.get()).isEqualTo(1);
             } finally {
                 Thread.interrupted();

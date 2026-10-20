@@ -44,6 +44,7 @@ import org.apache.fluss.metadata.TableInfo;
 import org.apache.fluss.metadata.TablePath;
 import org.apache.fluss.types.RowType;
 import org.apache.fluss.utils.ExceptionUtils;
+import org.apache.fluss.utils.ExponentialBackoff;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,7 +55,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.CREATE_TABLE;
@@ -68,7 +68,10 @@ import static org.apache.flink.cdc.connectors.fluss.utils.FlussConversions.toFlu
 public class FlussMetaDataApplier implements MetadataApplier, ExistingTableSchemaExpansionSupport {
     private static final Logger LOG = LoggerFactory.getLogger(FlussMetaDataApplier.class);
     private static final int MAX_SCHEMA_READ_RETRIES = 3;
-    private static final long SCHEMA_READ_RETRY_DELAY_MILLIS = 100L;
+
+    // Zero jitter keeps the backoff sequence deterministic for tests.
+    private static final ExponentialBackoff SCHEMA_READ_BACKOFF =
+            new ExponentialBackoff(100L, 2, 400L, 0.0);
     private final Configuration flussClientConfig;
     private final Map<String, String> tableProperties;
     private final Map<String, List<String>> bucketKeysMap;
@@ -226,6 +229,10 @@ public class FlussMetaDataApplier implements MetadataApplier, ExistingTableSchem
             TableId tableId = event.tableId();
             TablePath tablePath = new TablePath(tableId.getSchemaName(), tableId.getTableName());
             applyAddColumnChanges(admin, tablePath, tableChanges);
+        } catch (InterruptedException e) {
+            // Wrapping loses the exception type, so keep the cancellation signal alive.
+            Thread.currentThread().interrupt();
+            throw new RuntimeException(e);
         } catch (Exception e) {
             LOG.error("Failed to apply schema change {}", event, e);
             throw new RuntimeException(e);
@@ -234,58 +241,71 @@ public class FlussMetaDataApplier implements MetadataApplier, ExistingTableSchem
 
     @VisibleForTesting
     void applyAddColumnChanges(Admin admin, TablePath tablePath, List<TableChange> tableChanges)
-            throws ExecutionException, InterruptedException {
+            throws Exception {
         if (tableChanges.isEmpty()) {
             return;
         }
         try {
-            try {
-                admin.alterTable(tablePath, tableChanges, false).get();
-            } catch (ExecutionException e) {
-                if (!ExceptionUtils.findThrowable(e, InvalidAlterTableException.class)
-                        .isPresent()) {
-                    throw e;
-                }
-                Set<String> columnNames = new HashSet<>();
-                for (TableChange change : tableChanges) {
-                    if (!columnNames.add(((TableChange.AddColumn) change).getName())) {
-                        throw e;
-                    }
-                }
-                List<TableChange> missingColumns =
-                        getMissingColumns(admin.getTableInfo(tablePath).get(), tableChanges);
-                // Schema reads may lag behind ADD when served by another ZooKeeper session.
-                for (int retry = 0;
-                        missingColumns.size() == tableChanges.size()
-                                && retry < MAX_SCHEMA_READ_RETRIES;
-                        retry++) {
-                    Thread.sleep(SCHEMA_READ_RETRY_DELAY_MILLIS);
-                    missingColumns =
-                            getMissingColumns(admin.getTableInfo(tablePath).get(), tableChanges);
-                }
-                if (missingColumns.size() == tableChanges.size()) {
-                    throw e;
-                }
-                if (!missingColumns.isEmpty()) {
-                    // Reconcile once; concurrent changes or further stale reads must fail normally.
-                    admin.alterTable(tablePath, missingColumns, false).get();
-                }
+            admin.alterTable(tablePath, tableChanges, false).get();
+        } catch (Exception e) {
+            List<TableChange> remainingChanges =
+                    reconcileWithTargetSchema(admin, tablePath, tableChanges, e);
+            if (!remainingChanges.isEmpty()) {
+                // Reconcile once; concurrent changes or further stale reads must fail normally.
+                admin.alterTable(tablePath, remainingChanges, false).get();
             }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw e;
         }
     }
 
-    private List<TableChange> getMissingColumns(
+    /**
+     * Returns the changes the target schema still needs, or rethrows {@code cause} when the failed
+     * ADD is not a replay of an already applied one.
+     */
+    private List<TableChange> reconcileWithTargetSchema(
+            Admin admin, TablePath tablePath, List<TableChange> tableChanges, Exception cause)
+            throws Exception {
+        if (!(ExceptionUtils.stripExecutionException(cause)
+                instanceof InvalidAlterTableException)) {
+            throw cause;
+        }
+        Set<String> requestedNames = new HashSet<>();
+        for (TableChange change : tableChanges) {
+            if (!requestedNames.add(((TableChange.AddColumn) change).getName())) {
+                throw cause;
+            }
+        }
+        List<TableChange> remainingChanges =
+                getRemainingChanges(admin.getTableInfo(tablePath).get(), tableChanges);
+        // alterTable is served by the CoordinatorServer while getTableInfo is served by a random
+        // TabletServer reading ZooKeeper without sync(), so the read can lag behind the write that
+        // made this ADD fail. Retry before concluding the failure is unrelated to a replay.
+        for (int attempt = 0;
+                remainingChanges.size() == tableChanges.size() && attempt < MAX_SCHEMA_READ_RETRIES;
+                attempt++) {
+            Thread.sleep(SCHEMA_READ_BACKOFF.backoff(attempt));
+            remainingChanges =
+                    getRemainingChanges(admin.getTableInfo(tablePath).get(), tableChanges);
+        }
+        if (remainingChanges.size() == tableChanges.size()) {
+            // Nothing was already applied, so the failure cannot be a replay.
+            throw cause;
+        }
+        return remainingChanges;
+    }
+
+    /**
+     * Filters out the changes already reflected in {@code tableInfo}. Field ids are deliberately
+     * ignored: {@code toFlussType} derives them as -1 while the server assigns real ones.
+     */
+    private List<TableChange> getRemainingChanges(
             TableInfo tableInfo, List<TableChange> tableChanges) {
         RowType rowType = tableInfo.getRowType();
-        List<TableChange> missingColumns = new ArrayList<>();
+        List<TableChange> remainingChanges = new ArrayList<>();
         for (TableChange change : tableChanges) {
             TableChange.AddColumn addition = (TableChange.AddColumn) change;
             int index = rowType.getFieldIndex(addition.getName());
             if (index < 0) {
-                missingColumns.add(change);
+                remainingChanges.add(change);
             } else if (!rowType.getTypeAt(index).equals(addition.getDataType())) {
                 throw new IllegalArgumentException(
                         "Column "
@@ -298,7 +318,7 @@ public class FlussMetaDataApplier implements MetadataApplier, ExistingTableSchem
                                 + addition.getDataType());
             }
         }
-        return missingColumns;
+        return remainingChanges;
     }
 
     private void sanityCheck(
