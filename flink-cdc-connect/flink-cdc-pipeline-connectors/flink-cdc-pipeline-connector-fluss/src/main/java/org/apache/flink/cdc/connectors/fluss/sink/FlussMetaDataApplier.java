@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.fluss.sink;
 
+import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropTableEvent;
@@ -35,11 +36,15 @@ import org.apache.fluss.client.Connection;
 import org.apache.fluss.client.ConnectionFactory;
 import org.apache.fluss.client.admin.Admin;
 import org.apache.fluss.config.Configuration;
+import org.apache.fluss.exception.InvalidAlterTableException;
 import org.apache.fluss.metadata.DatabaseDescriptor;
 import org.apache.fluss.metadata.TableChange;
 import org.apache.fluss.metadata.TableDescriptor;
 import org.apache.fluss.metadata.TableInfo;
 import org.apache.fluss.metadata.TablePath;
+import org.apache.fluss.types.RowType;
+import org.apache.fluss.utils.ExceptionUtils;
+import org.apache.fluss.utils.ExponentialBackoff;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,6 +67,11 @@ import static org.apache.flink.cdc.connectors.fluss.utils.FlussConversions.toFlu
 /** {@link MetadataApplier} for fluss. */
 public class FlussMetaDataApplier implements MetadataApplier, ExistingTableSchemaExpansionSupport {
     private static final Logger LOG = LoggerFactory.getLogger(FlussMetaDataApplier.class);
+    private static final int MAX_SCHEMA_READ_RETRIES = 3;
+
+    // Zero jitter keeps the backoff sequence deterministic for tests.
+    private static final ExponentialBackoff SCHEMA_READ_BACKOFF =
+            new ExponentialBackoff(100L, 2, 400L, 0.0);
     private final Configuration flussClientConfig;
     private final Map<String, String> tableProperties;
     private final Map<String, List<String>> bucketKeysMap;
@@ -218,11 +228,97 @@ public class FlussMetaDataApplier implements MetadataApplier, ExistingTableSchem
                 Admin admin = connection.getAdmin()) {
             TableId tableId = event.tableId();
             TablePath tablePath = new TablePath(tableId.getSchemaName(), tableId.getTableName());
-            admin.alterTable(tablePath, tableChanges, true).get();
+            applyAddColumnChanges(admin, tablePath, tableChanges);
+        } catch (InterruptedException e) {
+            // Wrapping loses the exception type, so keep the cancellation signal alive.
+            Thread.currentThread().interrupt();
+            throw new RuntimeException(e);
         } catch (Exception e) {
             LOG.error("Failed to apply schema change {}", event, e);
             throw new RuntimeException(e);
         }
+    }
+
+    @VisibleForTesting
+    void applyAddColumnChanges(Admin admin, TablePath tablePath, List<TableChange> tableChanges)
+            throws Exception {
+        if (tableChanges.isEmpty()) {
+            return;
+        }
+        try {
+            admin.alterTable(tablePath, tableChanges, false).get();
+        } catch (Exception e) {
+            List<TableChange> remainingChanges =
+                    reconcileWithTargetSchema(admin, tablePath, tableChanges, e);
+            if (!remainingChanges.isEmpty()) {
+                // Reconcile once; concurrent changes or further stale reads must fail normally.
+                admin.alterTable(tablePath, remainingChanges, false).get();
+            }
+        }
+    }
+
+    /**
+     * Returns the changes the target schema still needs, or rethrows {@code cause} when the failed
+     * ADD is not a replay of an already applied one.
+     */
+    private List<TableChange> reconcileWithTargetSchema(
+            Admin admin, TablePath tablePath, List<TableChange> tableChanges, Exception cause)
+            throws Exception {
+        if (!(ExceptionUtils.stripExecutionException(cause)
+                instanceof InvalidAlterTableException)) {
+            throw cause;
+        }
+        Set<String> requestedNames = new HashSet<>();
+        for (TableChange change : tableChanges) {
+            if (!requestedNames.add(((TableChange.AddColumn) change).getName())) {
+                throw cause;
+            }
+        }
+        List<TableChange> remainingChanges =
+                getRemainingChanges(admin.getTableInfo(tablePath).get(), tableChanges);
+        // alterTable is served by the CoordinatorServer while getTableInfo is served by a random
+        // TabletServer reading ZooKeeper without sync(), so the read can lag behind the write that
+        // made this ADD fail. Retry before concluding the failure is unrelated to a replay.
+        for (int attempt = 0;
+                remainingChanges.size() == tableChanges.size() && attempt < MAX_SCHEMA_READ_RETRIES;
+                attempt++) {
+            Thread.sleep(SCHEMA_READ_BACKOFF.backoff(attempt));
+            remainingChanges =
+                    getRemainingChanges(admin.getTableInfo(tablePath).get(), tableChanges);
+        }
+        if (remainingChanges.size() == tableChanges.size()) {
+            // Nothing was already applied, so the failure cannot be a replay.
+            throw cause;
+        }
+        return remainingChanges;
+    }
+
+    /**
+     * Filters out the changes already reflected in {@code tableInfo}. Field ids are deliberately
+     * ignored: {@code toFlussType} derives them as -1 while the server assigns real ones.
+     */
+    private List<TableChange> getRemainingChanges(
+            TableInfo tableInfo, List<TableChange> tableChanges) {
+        RowType rowType = tableInfo.getRowType();
+        List<TableChange> remainingChanges = new ArrayList<>();
+        for (TableChange change : tableChanges) {
+            TableChange.AddColumn addition = (TableChange.AddColumn) change;
+            int index = rowType.getFieldIndex(addition.getName());
+            if (index < 0) {
+                remainingChanges.add(change);
+            } else if (!rowType.getTypeAt(index).equals(addition.getDataType())) {
+                throw new IllegalArgumentException(
+                        "Column "
+                                + addition.getName()
+                                + " already exists in table "
+                                + tableInfo.getTablePath()
+                                + " with type "
+                                + rowType.getTypeAt(index)
+                                + ", but ADD COLUMN requests "
+                                + addition.getDataType());
+            }
+        }
+        return remainingChanges;
     }
 
     private void sanityCheck(
