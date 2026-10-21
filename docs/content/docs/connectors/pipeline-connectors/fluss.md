@@ -163,6 +163,30 @@ Pipeline Connector Options
 </table>    
 </div>
 
+### Table options in transform rules
+
+Use `table-options` in a transform rule to configure Fluss table properties for the matched table.
+Use Fluss property names such as `table.replication.factor`, without the `properties.` prefix used
+in the sink configuration. These options override matching `sink.properties.table.*` options;
+other sink table properties still apply.
+
+```yaml
+transform:
+  - source-table: inventory.products
+    projection: "*"
+    table-options: table.replication.factor=2,table.log.ttl=7d
+
+sink:
+  type: fluss
+  bootstrap.servers: localhost:9123
+  properties.table.replication.factor: 3
+```
+
+In this example, the Fluss table created for `inventory.products` has a replication factor of 2
+and a log retention time of 7 days. Other tables use a replication factor of 3.
+These options apply when creating tables and do not update the properties of existing tables.
+Continue to configure bucket keys and bucket counts with the sink options `bucket.key` and `bucket.num`.
+
 ## Usage Notes
 
 * Support Fluss primary key table and log table.

@@ -57,6 +57,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.lang.reflect.Proxy;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -71,13 +72,15 @@ import java.util.stream.Stream;
 
 import static org.apache.flink.cdc.connectors.fluss.utils.FlussConversions.toFlussSchema;
 import static org.apache.flink.cdc.connectors.fluss.utils.FlussConversions.toFlussType;
+import static org.apache.fluss.config.ConfigOptions.DEFAULT_REPLICATION_FACTOR;
+import static org.apache.fluss.config.ConfigOptions.TABLE_LOG_TTL;
 import static org.apache.fluss.config.ConfigOptions.TABLE_REPLICATION_FACTOR;
 import static org.apache.fluss.types.DataTypeChecks.equalsWithFieldId;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Test for {@link FlussMetaDataApplier}. */
-public class FlussMetadataApplierTest {
+class FlussMetadataApplierTest {
     @RegisterExtension
     private static final FlussClusterExtension FLUSS_CLUSTER_EXTENSION =
             FlussClusterExtension.builder().setNumOfTabletServers(3).build();
@@ -1202,6 +1205,80 @@ public class FlussMetadataApplierTest {
             applier.applySchemaChange(createTableEvent);
             TableInfo tableInfo = admin.getTableInfo(new TablePath(DATABASE_NAME, "table1")).get();
             assertThat(tableInfo.getProperties().get(TABLE_REPLICATION_FACTOR)).isEqualTo(5);
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void testCreateTableWithSchemaOptions(boolean hasSinkOptions) throws Exception {
+        Map<String, String> tableProperties =
+                hasSinkOptions
+                        ? Map.of(TABLE_REPLICATION_FACTOR.key(), "3", TABLE_LOG_TTL.key(), "7 d")
+                        : Collections.emptyMap();
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT().notNull())
+                        .primaryKey("id")
+                        .option(TABLE_REPLICATION_FACTOR.key(), "2")
+                        .build();
+        TableId tableId = TableId.tableId(DATABASE_NAME, "table1");
+        try (FlussMetaDataApplier applier =
+                new FlussMetaDataApplier(
+                        FLUSS_CLUSTER_EXTENSION.getClientConfig(),
+                        tableProperties,
+                        Collections.emptyMap(),
+                        Collections.emptyMap())) {
+            applier.applySchemaChange(new CreateTableEvent(tableId, schema));
+            TableInfo tableInfo = admin.getTableInfo(new TablePath(DATABASE_NAME, "table1")).get();
+            assertThat(tableInfo.getProperties().get(TABLE_REPLICATION_FACTOR)).isEqualTo(2);
+            if (hasSinkOptions) {
+                assertThat(tableInfo.getProperties().get(TABLE_LOG_TTL))
+                        .isEqualTo(Duration.ofDays(7));
+            }
+            assertThat(schema.options())
+                    .containsExactlyEntriesOf(
+                            Collections.singletonMap(TABLE_REPLICATION_FACTOR.key(), "2"));
+
+            Schema schemaWithoutOptions =
+                    Schema.newBuilder()
+                            .physicalColumn("id", DataTypes.INT().notNull())
+                            .primaryKey("id")
+                            .build();
+            applier.applySchemaChange(
+                    new CreateTableEvent(
+                            TableId.tableId(DATABASE_NAME, "table2"), schemaWithoutOptions));
+            TableInfo otherTableInfo =
+                    admin.getTableInfo(new TablePath(DATABASE_NAME, "table2")).get();
+            assertThat(otherTableInfo.getProperties().get(TABLE_REPLICATION_FACTOR))
+                    .isEqualTo(hasSinkOptions ? 3 : DEFAULT_REPLICATION_FACTOR.defaultValue());
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"key", "properties.table.replication.factor"})
+    void testCreateTableWithInvalidSchemaOptions(String optionKey) throws Exception {
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT().notNull())
+                        .primaryKey("id")
+                        .option(optionKey, "2")
+                        .build();
+        try (FlussMetaDataApplier applier =
+                new FlussMetaDataApplier(
+                        FLUSS_CLUSTER_EXTENSION.getClientConfig(),
+                        Collections.emptyMap(),
+                        Collections.emptyMap(),
+                        Collections.emptyMap())) {
+            assertThatThrownBy(
+                            () ->
+                                    applier.applySchemaChange(
+                                            new CreateTableEvent(
+                                                    TableId.tableId(DATABASE_NAME, "table1"),
+                                                    schema)))
+                    .rootCause()
+                    .isExactlyInstanceOf(InvalidConfigException.class)
+                    .hasMessageContaining("'" + optionKey + "' is not a Fluss table property");
+            assertThat(admin.tableExists(new TablePath(DATABASE_NAME, "table1")).get()).isFalse();
         }
     }
 }

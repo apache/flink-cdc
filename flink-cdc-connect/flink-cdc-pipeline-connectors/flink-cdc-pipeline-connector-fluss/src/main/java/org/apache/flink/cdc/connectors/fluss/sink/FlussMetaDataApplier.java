@@ -50,6 +50,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -171,8 +172,10 @@ public class FlussMetaDataApplier implements MetadataApplier, ExistingTableSchem
             String tableIdentifier = tablePath.getDatabaseName() + "." + tablePath.getTableName();
             List<String> bucketKeys = bucketKeysMap.get(tableIdentifier);
             Integer bucketNum = bucketNumMap.get(tableIdentifier);
+            Map<String, String> fullTableProperties = new HashMap<>(tableProperties);
+            fullTableProperties.putAll(event.getSchema().options());
             TableDescriptor inferredFlussTable =
-                    toFlussTable(event.getSchema(), bucketKeys, bucketNum, tableProperties);
+                    toFlussTable(event.getSchema(), bucketKeys, bucketNum, fullTableProperties);
             admin.createDatabase(tablePath.getDatabaseName(), DatabaseDescriptor.EMPTY, true);
             if (!admin.tableExists(tablePath).get()) {
                 admin.createTable(tablePath, inferredFlussTable, false).get();
