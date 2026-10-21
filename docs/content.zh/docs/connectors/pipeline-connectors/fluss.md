@@ -160,6 +160,28 @@ Pipeline Connector Options
 </table>    
 </div>
 
+### 在 transform 规则中配置表参数
+
+可以通过 transform 规则中的 `table-options` 为匹配的表配置 Fluss 表参数。
+参数名直接使用 `table.replication.factor` 等 Fluss 表属性名称，无需添加 sink 配置中的 `properties.` 前缀。
+这些参数会覆盖同名的 `sink.properties.table.*` 配置，未覆盖的 sink 表参数仍然生效。
+
+```yaml
+transform:
+  - source-table: inventory.products
+    projection: "*"
+    table-options: table.replication.factor=2,table.log.ttl=7d
+
+sink:
+  type: fluss
+  bootstrap.servers: localhost:9123
+  properties.table.replication.factor: 3
+```
+
+在此示例中，为 `inventory.products` 创建的 Fluss 表副本数为 2，日志保留时间为 7 天，其他表的副本数为 3。
+这些参数仅在建表时生效，不会修改已有表的属性。
+分桶键和桶数量仍通过 sink 的 `bucket.key` 和 `bucket.num` 配置。
+
 ## 使用说明
 
 * 支持 Fluss 主键表和日志表。
