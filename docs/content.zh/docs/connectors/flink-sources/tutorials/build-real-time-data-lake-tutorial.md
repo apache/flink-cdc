@@ -70,7 +70,7 @@ services:
   sql-client:
     user: flink:flink
     build: .
-    command: bin/sql-client.sh
+    command: tail -f /dev/null
     depends_on:
       - jobmanager
       - mysql
@@ -193,7 +193,7 @@ docker-compose up -d
 ## 在 Flink SQL CLI 中使用 Flink DDL 创建表
 首先，使用如下的命令进入 Flink SQL CLI 容器中：
 ```shell
-docker-compose exec sql-client ./sql-client
+docker-compose exec sql-client /opt/flink/bin/sql-client.sh
 ```
 我们可以看到如下界面：
 

@@ -70,7 +70,7 @@ The components required in this tutorial are all managed in containers, so we wi
       sql-client:
          user: flink:flink
          build: .
-         command: bin/sql-client.sh
+         command: tail -f /dev/null
          depends_on:
             - jobmanager
             - mysql
@@ -197,7 +197,7 @@ The components required in this tutorial are all managed in containers, so we wi
 ## Creating tables using Flink DDL in Flink SQL CLI
 First, use the following command to enter the Flink SQL CLI Container:
 ```shell
-docker-compose run sql-client
+docker-compose exec sql-client /opt/flink/bin/sql-client.sh
 ```
 
 We should see the welcome screen of the CLI client:
