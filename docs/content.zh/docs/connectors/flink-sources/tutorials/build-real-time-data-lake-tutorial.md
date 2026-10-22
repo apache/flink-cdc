@@ -55,7 +55,7 @@ under the License.
 1. 使用以下内容创建 `Dockerfile`：
 
 ```dockerfile
-FROM flink:1.20.3-scala_2.12
+FROM flink:1.20.5-scala_2.12
 # 将下载的 JAR 包放入同级的 lib 目录。
 COPY ./lib /opt/flink/lib
 RUN apt-get update && apt-get install tree

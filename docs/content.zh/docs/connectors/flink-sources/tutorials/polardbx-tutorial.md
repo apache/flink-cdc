@@ -131,8 +131,8 @@ VALUES (default, '2020-07-30 10:08:22', 'Jark', 50.50, 102, false),
 ```
 
 ### 下载 Flink 和所需要的依赖包
-1. 下载 [Flink 1.20.3](https://archive.apache.org/dist/flink/flink-1.20.3/flink-1.20.3-bin-scala_2.12.tgz) 并将其解压至目录 `flink-1.20.3`
-2. 下载下面列出的依赖包，并将它们放到目录 `flink-1.20.3/lib/` 下
+1. 下载 [Flink 1.20.5](https://archive.apache.org/dist/flink/flink-1.20.5/flink-1.20.5-bin-scala_2.12.tgz) 并将其解压至目录 `flink-1.20.5`
+2. 下载下面列出的依赖包，并将它们放到目录 `flink-1.20.5/lib/` 下
 
 ```下载链接只对已发布的版本有效, SNAPSHOT 版本需要本地编译```
 - 用于订阅 PolarDB-X Binlog: [flink-sql-connector-mysql-cdc-3.7.0-1.20.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-mysql-cdc/3.7.0-1.20/flink-sql-connector-mysql-cdc-3.7.0-1.20.jar)

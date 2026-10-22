@@ -56,7 +56,7 @@ The components required in this tutorial are all managed in containers, so we wi
 
 1. Create `Dockerfile` file using following contents:
    ```dockerfile
-   FROM flink:1.20.3-scala_2.12
+   FROM flink:1.20.5-scala_2.12
    # Place the downloaded jar packages in the lib directory at the same level.
    COPY ./lib /opt/flink/lib
    RUN apt-get update && apt-get install tree

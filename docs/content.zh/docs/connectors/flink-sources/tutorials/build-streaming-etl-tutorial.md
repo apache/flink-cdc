@@ -95,8 +95,8 @@ docker-compose up -d
 该命令将以 detached 模式自动启动 Docker Compose 配置中定义的所有容器。你可以通过 docker ps 来观察上述的容器是否正常启动了，也可以通过访问 [http://localhost:5601/](http://localhost:5601/) 来查看 Kibana 是否运行正常。
 
 ### 下载 Flink 和所需要的依赖包
-1. 下载 [Flink 1.20.3](https://archive.apache.org/dist/flink/flink-1.20.3/flink-1.20.3-bin-scala_2.12.tgz) 并将其解压至目录 `flink-1.20.3`
-2. 下载下面列出的依赖包，并将它们放到目录 `flink-1.20.3/lib/` 下：
+1. 下载 [Flink 1.20.5](https://archive.apache.org/dist/flink/flink-1.20.5/flink-1.20.5-bin-scala_2.12.tgz) 并将其解压至目录 `flink-1.20.5`
+2. 下载下面列出的依赖包，并将它们放到目录 `flink-1.20.5/lib/` 下：
 
    **下载链接只对已发布的版本有效，SNAPSHOT 版本需要本地编译**
    - [flink-sql-connector-elasticsearch7-3.1.0-1.20.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7/3.1.0-1.20/flink-sql-connector-elasticsearch7-3.1.0-1.20.jar)
@@ -173,7 +173,7 @@ docker-compose up -d
 
 1. 使用下面的命令跳转至 Flink 目录下
     ```
-    cd flink-1.20.3
+    cd flink-1.20.5
     ```
 
 2. 使用下面的命令启动 Flink 集群
@@ -335,7 +335,7 @@ Flink SQL> INSERT INTO enriched_orders
 ```shell
 docker-compose down
 ```
-在 Flink 所在目录 `flink-1.20.3` 下执行如下命令停止 Flink 集群：
+在 Flink 所在目录 `flink-1.20.5` 下执行如下命令停止 Flink 集群：
 ```shell
 ./bin/stop-cluster.sh
 ```

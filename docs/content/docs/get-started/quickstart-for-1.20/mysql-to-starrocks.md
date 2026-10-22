@@ -33,11 +33,11 @@ without a single line of Java/Scala code or IDE installation.
 Prepare a Linux or macOS computer with Docker installed.
 
 ### Prepare Flink Standalone cluster
-1. Download [Flink 1.20.3](https://archive.apache.org/dist/flink/flink-1.20.3/flink-1.20.3-bin-scala_2.12.tgz), unzip and get flink-1.20.3 directory.
-   Use the following command to navigate to the Flink directory and set FLINK_HOME to the directory where flink-1.20.3 is located.
+1. Download [Flink 1.20.5](https://archive.apache.org/dist/flink/flink-1.20.5/flink-1.20.5-bin-scala_2.12.tgz), unzip and get flink-1.20.5 directory.
+   Use the following command to navigate to the Flink directory and set FLINK_HOME to the directory where flink-1.20.5 is located.
 
    ```shell
-   cd flink-1.20.3
+   cd flink-1.20.5
    ```
 
 2. Enable checkpointing by appending the following parameters to the conf/config.yaml configuration file to perform a checkpoint every 3 seconds.

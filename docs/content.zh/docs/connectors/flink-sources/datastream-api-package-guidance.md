@@ -53,7 +53,7 @@ under the License.
         <flink.reuseForks>true</flink.reuseForks>
 
         <!-- dependencies versions -->
-        <flink.version>1.20.3</flink.version>
+        <flink.version>1.20.5</flink.version>
         <slf4j.version>1.7.15</slf4j.version>
         <log4j.version>2.17.1</log4j.version>
         <debezium.version>1.9.7.Final</debezium.version>
@@ -262,7 +262,7 @@ under the License.
         <flink.reuseForks>true</flink.reuseForks>
 
         <!-- dependencies versions -->
-        <flink.version>2.2.0</flink.version>
+        <flink.version>2.2.1</flink.version>
         <slf4j.version>1.7.15</slf4j.version>
         <log4j.version>2.17.1</log4j.version>
         <debezium.version>1.9.7.Final</debezium.version>

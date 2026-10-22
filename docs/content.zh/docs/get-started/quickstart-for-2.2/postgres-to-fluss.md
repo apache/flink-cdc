@@ -33,11 +33,11 @@ under the License.
 准备一台已经安装了 Docker 的 Linux 或者 macOS 电脑。
 
 ### 准备 Flink Standalone 集群
-1. 下载 [Flink 2.2.0](https://archive.apache.org/dist/flink/flink-2.2.0/flink-2.2.0-bin-scala_2.12.tgz)，解压后得到 flink-2.2.0 目录。
-   使用下面的命令跳转至 Flink 目录下，并且设置 FLINK_HOME 为 flink-2.2.0 所在目录。
+1. 下载 [Flink 2.2.1](https://archive.apache.org/dist/flink/flink-2.2.1/flink-2.2.1-bin-scala_2.12.tgz)，解压后得到 flink-2.2.1 目录。
+   使用下面的命令跳转至 Flink 目录下，并且设置 FLINK_HOME 为 flink-2.2.1 所在目录。
 
    ```shell
-   cd flink-2.2.0
+   cd flink-2.2.1
    ```
 
 2. 通过在 conf/config.yaml 配置文件追加下列参数开启 checkpoint，每隔 3 秒做一次 checkpoint。
@@ -397,7 +397,7 @@ PostgreSQL 的表结构变更是**数据驱动**的 — DDL 变更不会立即�
    ```shell
    docker-compose down -v
    ```
-在 Flink 所在目录 `flink-2.2.0` 下执行如下命令停止 Flink 集群：
+在 Flink 所在目录 `flink-2.2.1` 下执行如下命令停止 Flink 集群：
 
    ```shell
    ./bin/stop-cluster.sh

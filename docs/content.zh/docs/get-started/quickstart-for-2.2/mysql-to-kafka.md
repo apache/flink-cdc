@@ -34,13 +34,13 @@ under the License.
 准备一台已经安装了 Docker 的 Linux 或者 macOS 电脑。
 
 ### 准备 Flink Standalone 集群
-1. 下载 [Flink 2.2.0](https://archive.apache.org/dist/flink/flink-2.2.0/flink-2.2.0-bin-scala_2.12.tgz)，解压后得到 flink-2.2.0 目录。
-   使用下面的命令跳转至 Flink 目录下，并且设置 `FLINK_HOME` 为 flink-2.2.0 所在目录。
+1. 下载 [Flink 2.2.1](https://archive.apache.org/dist/flink/flink-2.2.1/flink-2.2.1-bin-scala_2.12.tgz)，解压后得到 flink-2.2.1 目录。
+   使用下面的命令跳转至 Flink 目录下，并且设置 `FLINK_HOME` 为 flink-2.2.1 所在目录。
 
     ```shell
-    tar -zxvf flink-2.2.0-bin-scala_2.12.tgz
-    export FLINK_HOME=$(pwd)/flink-2.2.0
-    cd flink-2.2.0
+    tar -zxvf flink-2.2.1-bin-scala_2.12.tgz
+    export FLINK_HOME=$(pwd)/flink-2.2.1
+    cd flink-2.2.1
     ```
 
 2. 在 `conf/config.yaml` 配置文件追加下列参数开启检查点，每隔 3 秒进行一次 checkpoint。

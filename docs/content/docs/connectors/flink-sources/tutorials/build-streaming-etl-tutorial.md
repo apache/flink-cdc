@@ -99,8 +99,8 @@ This command automatically starts all the containers defined in the Docker Compo
 We can also visit [http://localhost:5601/](http://localhost:5601/) to see if Kibana is running normally.
 
 ### Preparing Flink and JAR package required
-1. Download [Flink 1.20.3](https://archive.apache.org/dist/flink/flink-1.20.3/flink-1.20.3-bin-scala_2.12.tgz) and unzip it to the directory `flink-1.20.3`
-2. Download following JAR package required and put them under `flink-1.20.3/lib/`:
+1. Download [Flink 1.20.5](https://archive.apache.org/dist/flink/flink-1.20.5/flink-1.20.5-bin-scala_2.12.tgz) and unzip it to the directory `flink-1.20.5`
+2. Download following JAR package required and put them under `flink-1.20.5/lib/`:
 
    **Download links are available only for stable releases, SNAPSHOT dependencies need to be built based on master or release branches by yourself.**
     - [flink-sql-connector-elasticsearch7-3.1.0-1.20.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7/3.1.0-1.20/flink-sql-connector-elasticsearch7-3.1.0-1.20.jar)
@@ -177,7 +177,7 @@ We can also visit [http://localhost:5601/](http://localhost:5601/) to see if Kib
 
 1. Use the following command to change to the Flink directory:
     ```
-    cd flink-1.20.3
+    cd flink-1.20.5
     ```
    
 2. Use the following command to start a Flink cluster:
@@ -338,7 +338,7 @@ After finishing the tutorial, run the following command to stop all containers i
 ```shell
 docker-compose down
 ```
-Run the following command to stop the Flink cluster in the directory of Flink `flink-1.20.3`:
+Run the following command to stop the Flink cluster in the directory of Flink `flink-1.20.5`:
 ```shell
 ./bin/stop-cluster.sh
 ```
