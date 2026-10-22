@@ -94,9 +94,9 @@ The following table shows the current features of the connector:
 
 ## Usage for Table/SQL API
 
-We need several steps to setup a Flink cluster with the provided connector.
+We need several steps to set up a Flink cluster with the provided connector.
 
-1. Setup a Flink cluster with version 1.12+ and Java 8+ installed.
+1. Set up a Flink cluster with version 1.12+ and Java 8+ installed.
 2. Download the connector SQL jars from the [Downloads](https://github.com/apache/flink-cdc/releases) page (or [build yourself](#building-from-source)).
 3. Put the downloaded jars under `FLINK_HOME/lib/`.
 4. Restart the Flink cluster.

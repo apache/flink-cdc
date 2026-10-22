@@ -159,11 +159,11 @@ mysql> set global expire_logs_days=7;
 
 In another case, the binlog consumption of the Flink CDC job is too slow. Generally, sufficient resources can be allocated.
 
-### Q10: The job reports an error ConnectException: A slave with the same server_uuid/server_id as this slave has connected to the master,What should I do?
+### Q10: The job reports an error ConnectException: A slave with the same server_uuid/server_id as this slave has connected to the master. What should I do? {#q10-the-job-reports-an-error-connectexception-a-slave-with-the-same-server_uuidserver_id-as-this-slave-has-connected-to-the-masterwhat-should-i-do}
 
 This error occurs because the server ID used in the job conflicts with the server ID used by other jobs or other synchronization tools. The server ID needs to be globally unique. The server ID is an int type integer. In CDC 2.x In version, each concurrency of the source requires a server ID. it is recommended to reasonably plan the server ID. for example, if the source of the job is set to four concurrency, you can configure 'server ID' = '5001-5004', so that each source task will not conflict.
 
-### Q11: The job reports an error ConnectException: Received DML ‘…’ for processing, binlog probably contains events generated with statement or mixed based replication format,What should I do?
+### Q11: The job reports an error ConnectException: Received DML ‘…’ for processing, binlog probably contains events generated with statement or mixed based replication format. What should I do? {#q11-the-job-reports-an-error-connectexception-received-dml--for-processing-binlog-probably-contains-events-generated-with-statement-or-mixed-based-replication-formatwhat-should-i-do}
 
 This error occurs because the MySQL server is not configured correctly. You need to check the binlog is format row? You can view it through the following command
 
@@ -180,7 +180,7 @@ mysql> ALTER USER 'username'@'localhost' IDENTIFIED WITH mysql_native_password B
 mysql> FLUSH PRIVILEGES; 
 ```
 
-### Q13: The job reports an error EventDataDeserializationException: Failed to deserialize data of EventHeaderV4 .... Caused by: java.net.SocketException: Connection reset,What should I do?
+### Q13: The job reports an error EventDataDeserializationException: Failed to deserialize data of EventHeaderV4 .... Caused by: java.net.SocketException: Connection reset. What should I do? {#q13-the-job-reports-an-error-eventdatadeserializationexception-failed-to-deserialize-data-of-eventheaderv4--caused-by-javanetsocketexception-connection-resetwhat-should-i-do}
 
 This problem is generally caused by the network. First, check the network between the Flink cluster and the database, and then increase the network parameters of the MySQL server.
 
@@ -201,7 +201,7 @@ restart-strategy.fixed-delay.delay= 30s
 
 If there is bad back pressure in the job, this problem may happen too. Then you need to handle the back pressure in the job first.
 
-### Q14: The job reports an error The slave is connecting using CHANGE MASTER TO MASTER_AUTO_POSITION = 1, but the master has purged binary logs containing GTIDs that the slave requires,What should I do?
+### Q14: The job reports an error The slave is connecting using CHANGE MASTER TO MASTER_AUTO_POSITION = 1, but the master has purged binary logs containing GTIDs that the slave requires. What should I do? {#q14-the-job-reports-an-error-the-slave-is-connecting-using-change-master-to-master_auto_position--1-but-the-master-has-purged-binary-logs-containing-gtids-that-the-slave-requireswhat-should-i-do}
 
 The reason for this problem is that the reading of the full volume phase of the job is too slow. After reading the full volume phase, the previously recorded gtid site at the beginning of the full volume phase has been cleared by mysql. This can increase the save time of binlog files on the MySQL server, or increase the concurrency of source to make the full volume phase read faster.
 

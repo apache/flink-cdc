@@ -320,7 +320,7 @@ Then do the following steps in Flink SQL CLI:
    {{< img src="/fig/real-time-data-lake-tutorial/final-data-in-iceberg.png" alt="Final Data in Iceberg" >}}
 
    From the latest result in Iceberg, we can see that there is a new record of `(db_1, user_1, 111)`, and the address of `(db_1, user_2, 120)` has been updated to `Beijing`.
-   Besides, the record of `(db_2, user_2, 220)` has been deleted. The result is exactly the same with the changes we did in MySQL.
+   Besides, the record `(db_2, user_2, 220)` has been deleted. The result exactly matches the changes we made in MySQL.
    
 ## Clean up
 After finishing the tutorial, run the following command in the directory of `docker-compose.yml` to stop all containers:

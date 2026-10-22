@@ -27,7 +27,7 @@ under the License.
 # Oracle Connector
 
 Oracle connector allows reading snapshot data and incremental data from Oracle database and provides end-to-end full-database data synchronization capabilities.
-This document describes how to setup the Oracle connector.
+This document describes how to set up the Oracle connector.
 
 
 ## Example

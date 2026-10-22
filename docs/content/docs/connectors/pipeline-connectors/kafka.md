@@ -171,7 +171,7 @@ Usage Notes
 
 * The written topic of Kafka will be `namespace.schemaName.tableName` string of TableId, this can be changed using route function of pipeline.
 
-* If the written topic of Kafka is not existed, we will create one automatically.
+* If the target Kafka topic does not exist, it will be created automatically.
 
 ### Output Format
 For different built-in `value.format` options, the output format is different:

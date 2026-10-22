@@ -26,12 +26,12 @@ under the License.
 
 # SQLServer CDC Connector
 
-The SQLServer CDC connector allows for reading snapshot data and incremental data from SQLServer database. This document describes how to setup the SQLServer CDC connector to run SQL queries against SQLServer databases.
+The SQLServer CDC connector allows for reading snapshot data and incremental data from SQLServer database. This document describes how to set up the SQLServer CDC connector to run SQL queries against SQLServer databases.
 
 Dependencies
 ------------
 
-In order to setup the SQLServer CDC connector, the following table provides dependency information for both projects using a build automation tool (such as Maven or SBT) and SQL Client with SQL JAR bundles.
+To set up the SQLServer CDC connector, the following table provides dependency information for both projects using a build automation tool (such as Maven or SBT) and SQL Client with SQL JAR bundles.
 
 ### Maven dependency
 

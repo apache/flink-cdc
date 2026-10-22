@@ -86,8 +86,8 @@ services:
       - "5601:5601"
 ```
 The Docker Compose environment consists of the following containers:
-- MySQL: the `products`,`orders` tables will be store in the database. They will be joined with data in Postgres to enrich the orders.
-- Postgres: the `shipments` table will be store in the database.
+- MySQL: the `products` and `orders` tables are stored in this database. They are joined with data in Postgres to enrich the orders.
+- Postgres: the `shipments` table is stored in this database.
 - Elasticsearch: mainly used as a data sink to store enriched orders.
 - Kibana: used to visualize the data in Elasticsearch.
 

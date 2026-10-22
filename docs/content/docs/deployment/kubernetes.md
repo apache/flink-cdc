@@ -43,7 +43,7 @@ The doc assumes a running Kubernetes cluster fulfilling the following requiremen
 - Enabled Kubernetes DNS.
 - `default` service account with [RBAC](https://nightlies.apache.org/flink/flink-docs-master/docs/deployment/resource-providers/native_kubernetes/#rbac) permissions to create, delete pods.
 
-If you have problems setting up a Kubernetes cluster, please take a look at [how to setup a Kubernetes cluster](https://kubernetes.io/docs/setup/).
+If you have problems setting up a Kubernetes cluster, please take a look at [how to set up a Kubernetes cluster](https://kubernetes.io/docs/setup/).
 
 ## Session Mode
 
@@ -133,7 +133,7 @@ pipeline:
 
 ```
 
-You need to modify the configuration file according to your needs, refer to connectors more information.   
+Modify the configuration file as needed. For more information, refer to the connector documentation.
 - [MySQL pipeline connector]({{< ref "docs/connectors/pipeline-connectors/mysql.md" >}})
 - [Apache Doris pipeline connector]({{< ref "docs/connectors/pipeline-connectors/doris.md" >}})       
 

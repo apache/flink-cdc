@@ -77,7 +77,7 @@ services:
       - '/var/run/docker.sock:/var/run/docker.sock'
 ```
 The Docker Compose environment consists of the following containers:
-- PolarDB-X: the `products`,`orders` tables will be store in the database. They will be joined enrich the orders.
+- PolarDB-X: the `products` and `orders` tables are stored in this database and joined to enrich the orders.
 - Elasticsearch: mainly used as a data sink to store enriched orders.
 - Kibana: used to visualize the data in Elasticsearch.
 

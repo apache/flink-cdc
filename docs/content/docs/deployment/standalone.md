@@ -110,7 +110,7 @@ pipeline:
  parallelism: 2
 ```
 
-You need to modify the configuration file according to your needs, refer to connectors more information.
+Modify the configuration file as needed. For more information, refer to the connector documentation.
 - [MySQL pipeline connector]({{< ref "docs/connectors/pipeline-connectors/mysql.md" >}})
 - [Apache Doris pipeline connector]({{< ref "docs/connectors/pipeline-connectors/doris.md" >}})
 
@@ -129,4 +129,4 @@ Job ID: ae30f4580f1918bebf16752d4963dc54
 Job Description: Sync MySQL Database to Doris
 ```
 
-Then you can find a job named `Sync MySQL Database to Doris` running through Flink Web UI. 
+Then you can find a job named `Sync MySQL Database to Doris` running through Flink Web UI.

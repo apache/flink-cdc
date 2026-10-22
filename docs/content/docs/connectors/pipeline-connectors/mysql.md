@@ -27,7 +27,7 @@ under the License.
 # MySQL Connector
 
 MySQL connector allows reading snapshot data and incremental data from MySQL database and provides end-to-end full-database data synchronization capabilities.
-This document describes how to setup the MySQL connector.
+This document describes how to set up the MySQL connector.
 
 ## Dependencies
 

@@ -62,7 +62,7 @@ env.enableCheckpointing(3000);
 
 在解析 binlog 数据中的 timestamp 字段时，cdc 会使用到作业里配置的 server-time-zone 信息，也就是 MySQL 服务器的时区，如果这个时区没有和你的 MySQL 服务器时区一致，就会出现这个问题。
 
-此外，如果是在 DataStream 作业中自定义反序列化器如 MyDeserializer implements DebeziumDeserializationSchema, 自定义的序列化器在解析 timestamp 类型数据时，需要参考下 RowDataDebeziumDeserializeSchema 中对 timestamp 类型的解析，使用给定的时区信息。
+此外，如果在 DataStream 作业中自定义反序列化器（如 MyDeserializer implements DebeziumDeserializationSchema），解析 timestamp 类型数据时需要参考 RowDataDebeziumDeserializeSchema 的实现，并使用指定的时区信息。
 
 ```
 private TimestampData convertToTimestamp(Object dbzObj, Schema schema) {
@@ -136,7 +136,7 @@ Flink CDC 支持的。
 
 ### Q8：同一个实例下，某个库的表无法同步增量数据，其他库都可以，这是为啥？ {#q8-同一个实例下某个库的表无法同步增量数据其他库都可以这是为啥}
 
-这个问题是因为 mysql 服务器 可以配置 binlog 过滤器，忽略了某些库的 binlog。用户可以通过 show master status 命令查看 Binlog_Ignore_DB 和 Binlog_Do_DB。
+这是因为 MySQL 服务器可能配置了 binlog 过滤器，忽略了某些库的 binlog。用户可以通过 show master status 命令查看 Binlog_Ignore_DB 和 Binlog_Do_DB。
 
 ```mysql
 mysql> show master status;
@@ -200,7 +200,7 @@ restart-strategy.fixed-delay.delay= 30s
 
 ### Q14：作业报错 The slave is connecting using CHANGE MASTER TO MASTER_AUTO_POSITION = 1, but the master has purged binary logs containing GTIDs that the slave requires. 怎么办呢？ {#q14-作业报错-the-slave-is-connecting-using-change-master-to-master_auto_position--1-but-the-master-has-purged-binary-logs-containing-gtids-that-the-slave-requires-怎么办呢-}
 
-出现这个问题的原因是作业全量阶段读取太慢，在全量阶段读完后，之前记录的全量阶段开始时的 gtid 位点已经被 mysql 清理掉了。这种可以增大 mysql 服务器上 binlog 文件的保存时间，也可以调大 source 的并发，让全量阶段读取更快。
+出现这个问题是因为作业全量阶段读取太慢。全量阶段结束后，先前记录的起始 GTID 位点已经被 MySQL 清理。可以延长 MySQL 服务器上 binlog 文件的保留时间，也可以提高 source 并发度，加快全量读取。
 
 ### Q15：在 DataStream API 中构建 MySQL CDC 源时如何配置 tableList 选项？ {#q15-在-datastream-api中构建mysql-cdc源时如何配置tablelist选项}
 
@@ -226,7 +226,7 @@ sink:
 
 Flink Postgres CDC 只会在 checkpoint 完成的时候更新 Postgres slot 中的 LSN。因此如果发现磁盘使用率高的情况下，请先确认 checkpoint 是否开启。
 
-### Q2：Flink Postgres CDC 同步 Postgres 中将 超过最大精度（38，18）的 DECIMAL 类型返回 NULL {#q2-flink-postgres-cdc-同步-postgres-中将-超过最大精度3818的-decimal-类型返回-null}
+### Q2：Flink Postgres CDC 为什么会将超过最大精度（38，18）的 DECIMAL 值返回为 NULL？ {#q2-flink-postgres-cdc-同步-postgres-中将-超过最大精度3818的-decimal-类型返回-null}
 
 Flink 中如果收到数据的 precision 大于在 Flink 中声明的类型的 precision 时，会将数据处理成 NULL。此时可以配置相应 'debezium.decimal.handling.mode' = 'string' 将读取的数据用 STRING 类型 来处理。
 
@@ -244,9 +244,9 @@ select pg_drop_replication_slot('rep_slot');
 select pg_terminate_backend(162564); select pg_drop_replication_slot('rep_slot');
 ```
 
-### Q5：作业有脏数据，比如非法的日期，有参数可以配置可以过滤吗？ {#q5-作业有脏数据比如非法的日期有参数可以配置可以过滤吗}
+### Q5：作业中有非法日期等脏数据，可以通过参数过滤吗？ {#q5-作业有脏数据比如非法的日期有参数可以配置可以过滤吗}
 
-可以的，可以在 Flink CDC 表的 with 参数里 加下 'debezium.event.deserialization.failure.handling.mode'='warn' 参数，跳过脏数据，将脏数据打印到 WARN 日志里。也可以配置 'debezium.event.deserialization.failure.handling.mode'='ignore'，直接跳过脏数据，不打印脏数据到日志。
+可以。在 Flink CDC 表的 with 参数中添加 'debezium.event.deserialization.failure.handling.mode'='warn'，可以跳过脏数据并将其打印到 WARN 日志中。也可以将该参数配置为 'ignore'，直接跳过脏数据且不打印日志。
 
 
 ### Q6：在 DataStream API 中构建 Postgres CDC 源时如何配置 tableList 选项？ {#q6-在datastream-api中构建postgres-cdc源时如何配置tablelist选项}
@@ -298,17 +298,17 @@ ChangeStream 需要 MongoDB 以副本集或者分片模式运行，本地测试�
 
 ### Q7：MongoDB CDC 报错用户名密码错误，但其他组件使用该用户名密码都能正常连接，这是什么原因？ {#q7-mongodb-cdc-报错用户名密码错误-但其他组件使用该用户名密码都能正常连接这是什么原因}
 
-如果用户不是在默认的 admin 数据库下创建的，需要在 with 参数里加下 'connection.options' = 'authSource=用户所在的 db'。
+如果用户不是在默认的 admin 数据库中创建的，需要在 with 参数中添加 'connection.options' = 'authSource=用户所在的 db'。
 
 ### Q8：MongoDB CDC 是否支持 debezium 相关的参数？ {#q8--mongodb-cdc-是否支持-debezium-相关的参数}
 
-不支持的，因为 MongoDB CDC 连接器是在 Flink CDC 项目中独立开发，并不依赖 Debezium 项目，所以不支持。
+不支持。MongoDB CDC 连接器由 Flink CDC 项目独立开发，不依赖 Debezium。
 
 ## Oracle CDC FAQ
 
 ### Q1：Oracle CDC 的归档日志增长很快，且读取 log 慢？ {#q1-oracle-cdc-的归档日志增长很快且读取-log-慢}
 
-可以使用在线挖掘的模式，不写入数据字典到 redo log 中，但是这样无法处理 DDL 语句。生产环境默认策略读取 log 较慢，且默认策略会写入数据字典信息到 redo log 中导致日志量增加较多，可以添加如下 debezium 的配置项。'log.mining.strategy' = 'online_catalog','log.mining.continuous.mine' = 'true'。如果使用 SQL 的方式，则需要在配置项中加上前缀 `debezium.`，即：
+可以使用在线挖掘模式，避免将数据字典写入 redo log，但该模式无法处理 DDL 语句。生产环境的默认策略读取 log 较慢，并会将数据字典信息写入 redo log，导致日志量明显增加。可以添加以下 Debezium 配置项：'log.mining.strategy' = 'online_catalog'、'log.mining.continuous.mine' = 'true'。如果使用 SQL，则需要为配置项添加 `debezium.` 前缀，即：
 
 ```
 'debezium.log.mining.strategy' = 'online_catalog',
@@ -318,7 +318,7 @@ ChangeStream 需要 MongoDB 以副本集或者分片模式运行，本地测试�
 
 ### Q2：作业报错 Caused by: io.debezium.DebeziumException: Supplemental logging not configured for table xxx. Use command: ALTER TABLE xxx ADD SUPPLEMENTAL LOG DATA (ALL) COLUMNS，怎么办呢？ {#q2-作业报错-caused-by-iodebeziumdebeziumexception-supplemental-logging-not-configured-for-table-xxx-use-command-alter-table-xxx-add-supplemental-log-data-all-columns-怎么办呢}
 
-对于 Oracle 11 版本，debezium 会默认把 tableIdCaseInsensitive 设置为 true，导致表名被更新为小写，因此在 Oracle 中查询不到 这个表补全日志设置，导致误报这个 「Supplemental logging not configured for table」错误。添加 debezium 的配置项 'database.tablename.case.insensitive' = 'false'，如果使用 SQL 的方式，则在表的 option 中添加配置项 'debezium.database.tablename.case.insensitive' = 'false'
+对于 Oracle 11，Debezium 默认将 tableIdCaseInsensitive 设置为 true，导致表名转为小写。Oracle 因此无法查询该表的补充日志设置，并误报「Supplemental logging not configured for table」。可以添加 Debezium 配置项 'database.tablename.case.insensitive' = 'false'；如果使用 SQL，则在表的 option 中添加 'debezium.database.tablename.case.insensitive' = 'false'。
 
 ### Q3：Oracle CDC 如何切换成 XStream 的方式？ {#q3-oracle-cdc-如何切换成-xstream-的方式}
 
@@ -326,4 +326,4 @@ ChangeStream 需要 MongoDB 以副本集或者分片模式运行，本地测试�
 
 ### Q4：Oracle CDC 的 database-name 和 schema-name 分别是什么？ {#q4-oracle-cdc-的-database-name-和-schema-name-分别是什么}
 
-database-name 是数据库实例的名字，也就是 Oracle 的 SID；schema-name 是表对应的 schema，一般而言，一个用户就对应一个 schema，该用户的 schema 名等于用户名，并作为该用户缺省 schema。所以 schema-name 一般都是创建这个表的用户名，但是如果创建表的时候指定了 schema，则指定的 schema 则为 schema-name。比如用 CREATE TABLE aaaa.testtable(xxxx) 的方式成功创建了表 testtable，则 aaaa 为 schema-name。
+database-name 是数据库实例名，也就是 Oracle 的 SID；schema-name 是表所属的 schema。通常一个用户对应一个 schema，schema 名与用户名相同，并作为该用户的默认 schema。如果创建表时显式指定了 schema，则以指定值为准。例如，通过 CREATE TABLE aaaa.testtable(xxxx) 创建表 testtable 时，schema-name 为 aaaa。

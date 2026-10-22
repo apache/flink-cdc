@@ -27,7 +27,7 @@ under the License.
 # Db2 CDC Connector
 
 The Db2 CDC connector allows for reading snapshot data and incremental data from Db2 database. This document 
-describes how to setup the db2 CDC connector to run SQL queries against Db2 databases.
+describes how to set up the db2 CDC connector to run SQL queries against Db2 databases.
 
 
 ## Supported Databases

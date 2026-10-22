@@ -260,7 +260,7 @@ Connector Options
                 (1) source can be parallel during snapshot reading, 
                 (2) source can perform checkpoints in the chunk granularity during snapshot reading, 
                 (3) source doesn't need to acquire global read lock (FLUSH TABLES WITH READ LOCK) before snapshot reading.
-              If you would like the source run in parallel, each parallel reader should have an unique server id, so 
+              If you would like the source to run in parallel, each parallel reader should have a unique server id, so
               the 'server-id' must be a range like '5400-6400', and the range must be larger than the parallelism.
               Please see <a href="./mysql-cdc.md#incremental-snapshot-reading">Incremental Snapshot Reading</a>section for more detailed information.
           </td>
