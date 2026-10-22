@@ -37,6 +37,7 @@ import org.apache.iceberg.data.Record;
 import org.apache.iceberg.io.CloseableIterable;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.lang.reflect.Field;
@@ -157,7 +158,7 @@ class IcebergWriterDeleteCapabilityTest {
             }
             assertThat(loadTableCalls.get()).isEqualTo(1);
 
-            // flush invalidates factories, not active writers, and does not load eagerly.
+            // Flush keeps each active writer paired with its factory.
             context.writer.flush(false);
             assertThat(loadTableCalls.get()).isEqualTo(1);
             for (long id = 1; id <= rowCount; id++) {
@@ -166,19 +167,95 @@ class IcebergWriterDeleteCapabilityTest {
                                 tableId, record(id, "east"), record(id, "south")),
                         null);
             }
-            assertThat(loadTableCalls.get()).isEqualTo(2);
+            assertThat(loadTableCalls.get()).isEqualTo(1);
             context.commit();
-            assertThat(loadTableCalls.get()).isEqualTo(2);
+            assertThat(loadTableCalls.get()).isEqualTo(1);
 
             // Checkpoint invalidation causes exactly one new load, even for a delete-only batch.
             for (long id = 1; id <= rowCount; id++) {
                 context.writer.write(
                         DataChangeEvent.deleteEvent(tableId, record(id, "south")), null);
             }
-            assertThat(loadTableCalls.get()).isEqualTo(3);
+            assertThat(loadTableCalls.get()).isEqualTo(2);
             context.commit();
-            assertThat(loadTableCalls.get()).isEqualTo(3);
+            assertThat(loadTableCalls.get()).isEqualTo(2);
             assertThat(context.read(tableId)).hasSize(hasPrimaryKey ? 0 : rowCount * 3);
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource({"false,false", "false,true", "true,false", "true,true"})
+    void testFlushPreservesActiveWriterCapability(boolean hasPrimaryKey, boolean partitioned)
+            throws Exception {
+        TableId tableId = TableId.parse("test.active_table");
+        TableId otherTableId = TableId.parse("test.other_table");
+        RecordData north = record(1L, "north");
+        RecordData east = record(1L, "east");
+
+        try (TestContext context = new TestContext()) {
+            Schema schema = schema(hasPrimaryKey, partitioned);
+            context.createTable(tableId, schema, schema);
+            AtomicInteger loadTableCalls = countWriterCatalogLoads(context.writer);
+            context.writer.write(DataChangeEvent.insertEvent(tableId, north), null);
+
+            // A new table's FlushEvent must not detach another table's active writer.
+            context.writer.flush(false);
+            context.createTable(otherTableId, schema, schema);
+            context.catalog
+                    .loadTable(TableIdentifier.parse(tableId.identifier()))
+                    .updateSchema()
+                    .setIdentifierFields(hasPrimaryKey ? new String[0] : new String[] {"id"})
+                    .commit();
+            context.writer.write(DataChangeEvent.updateEvent(tableId, north, east), null);
+            context.commit();
+
+            if (hasPrimaryKey) {
+                assertThat(context.read(tableId)).containsExactly("1, east");
+            } else {
+                assertThat(context.read(tableId)).containsExactlyInAnyOrder("1, north", "1, east");
+            }
+            assertThat(loadTableCalls.get()).isEqualTo(1);
+
+            // After the checkpoint, both conversion and the new writer use the new capability.
+            context.writer.write(DataChangeEvent.deleteEvent(tableId, north), null);
+            context.writer.write(DataChangeEvent.deleteEvent(tableId, east), null);
+            context.commit();
+            assertThat(loadTableCalls.get()).isEqualTo(2);
+            if (hasPrimaryKey) {
+                assertThat(context.read(tableId)).containsExactly("1, east");
+            } else {
+                assertThat(context.read(tableId)).isEmpty();
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void testFlushInvalidatesFactoryWithoutWriter(boolean partitioned) throws Exception {
+        TableId tableId = TableId.parse("test.idle_table");
+        RecordData north = record(1L, "north");
+        RecordData east = record(1L, "east");
+
+        try (TestContext context = new TestContext()) {
+            Schema schema = schema(false, partitioned);
+            context.createTable(tableId, schema, schema);
+            context.writer.write(DataChangeEvent.insertEvent(tableId, north), null);
+            context.commit();
+            AtomicInteger loadTableCalls = countWriterCatalogLoads(context.writer);
+
+            context.writer.write(DataChangeEvent.deleteEvent(tableId, north), null);
+            assertThat(loadTableCalls.get()).isEqualTo(1);
+            context.writer.flush(false);
+            context.catalog
+                    .loadTable(TableIdentifier.parse(tableId.identifier()))
+                    .updateSchema()
+                    .setIdentifierFields("id")
+                    .commit();
+            context.writer.write(DataChangeEvent.updateEvent(tableId, north, east), null);
+            context.commit();
+
+            assertThat(loadTableCalls.get()).isEqualTo(2);
+            assertThat(context.read(tableId)).containsExactly("1, east");
         }
     }
 

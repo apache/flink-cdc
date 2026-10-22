@@ -651,15 +651,13 @@ public class IcebergWriterTest {
                 generator.generate(new Object[] {1L, BinaryStringData.fromString("b")});
 
         icebergWriter.write(DataChangeEvent.insertEvent(tableId, recordA), null);
-        // flush resets the factory cache but keeps the writer running, so the update
-        // lands in the same writer as the insert and uses a position delete.
+        // Flush keeps the active writer and its factory, so the update uses a position delete.
         icebergWriter.flush(false);
         icebergWriter.write(DataChangeEvent.updateEvent(tableId, recordA, recordB), null);
 
         Collection<WriteResultWrapper> writeResults = icebergWriter.prepareCommit();
 
-        // Both writes went through the same writer (batchIndex 0) since flush only
-        // cleared the factory. Position delete handles dedup within the snapshot.
+        // Both writes use the same writer (batchIndex 0) and deduplicate within the snapshot.
         List<Integer> batchIndexes =
                 writeResults.stream()
                         .map(WriteResultWrapper::getBatchIndex)

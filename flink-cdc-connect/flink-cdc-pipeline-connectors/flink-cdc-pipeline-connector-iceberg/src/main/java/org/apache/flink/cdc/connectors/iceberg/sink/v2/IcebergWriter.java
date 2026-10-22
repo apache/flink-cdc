@@ -202,9 +202,9 @@ public class IcebergWriter
 
     @Override
     public void flush(boolean flush) throws IOException {
-        // Clear the factory cache so the next write picks up the latest catalog schema.
-        // Writers keep running; schema-change splits are handled in flushTableWriter.
-        writerFactoryMap.clear();
+        // Keep each active writer paired with the factory that defines its delete capability.
+        // Factories without writers can reload the latest catalog schema on the next write.
+        writerFactoryMap.keySet().retainAll(writerMap.keySet());
     }
 
     private void flushTableWriter(TableId tableId) throws IOException {
