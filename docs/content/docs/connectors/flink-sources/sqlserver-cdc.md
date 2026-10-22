@@ -24,14 +24,14 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-# SQLServer CDC Connector
+# SQL Server CDC Connector {#sqlserver-cdc-connector}
 
-The SQLServer CDC connector allows for reading snapshot data and incremental data from SQLServer database. This document describes how to set up the SQLServer CDC connector to run SQL queries against SQLServer databases.
+The SQL Server CDC connector allows for reading snapshot data and incremental data from SQL Server database. This document describes how to set up the SQL Server CDC connector to run SQL queries against SQL Server databases.
 
 Dependencies
 ------------
 
-To set up the SQLServer CDC connector, the following table provides dependency information for both projects using a build automation tool (such as Maven or SBT) and SQL Client with SQL JAR bundles.
+To set up the SQL Server CDC connector, the following table provides dependency information for both projects using a build automation tool (such as Maven or SBT) and SQL Client with SQL JAR bundles.
 
 ### Maven dependency
 
@@ -45,7 +45,7 @@ Download [flink-sql-connector-sqlserver-cdc](https://mvnrepository.com/artifact/
 
 **Note:** Refer to [flink-sql-connector-sqlserver-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-sqlserver-cdc), more released versions will be available in the Maven central warehouse.
 
-Setup SQLServer Database
+Setup SQL Server Database {#setup-sqlserver-database}
 ----------------
 A SQL Server administrator must enable change data capture on the source tables that you want to capture. The database must already be enabled for CDC. To enable CDC on a table, a SQL Server administrator runs the stored procedure ```sys.sp_cdc_enable_table``` for the table.
 
@@ -79,10 +79,10 @@ GO
 ```
 The query returns configuration information for each table in the database that is enabled for CDC and that contains change data that the caller is authorized to access. If the result is empty, verify that the user has privileges to access both the capture instance and the CDC tables.
 
-How to create a SQLServer CDC table
+How to create a SQL Server CDC table {#how-to-create-a-sqlserver-cdc-table}
 ----------------
 
-The SqlServer CDC table can be defined as following:
+The SQL Server CDC table can be defined as follows:
 
 ```sql
 -- register a SqlServer table 'orders' in Flink SQL
@@ -134,42 +134,42 @@ Connector Options
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>IP address or hostname of the SQLServer database.</td>
+      <td>IP address or hostname of the SQL Server database.</td>
     </tr>
     <tr>
       <td>username</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Username to use when connecting to the SQLServer database.</td>
+      <td>Username to use when connecting to the SQL Server database.</td>
     </tr>
     <tr>
       <td>password</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Password to use when connecting to the SQLServer database.</td>
+      <td>Password to use when connecting to the SQL Server database.</td>
     </tr>
     <tr>
       <td>database-name</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Database name of the SQLServer database to monitor.</td>
+      <td>Database name of the SQL Server database to monitor.</td>
     </tr> 
     <tr>
       <td>table-name</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Table name of the SQLServer database to monitor, e.g.: "db1.table1"</td>
+      <td>Table name of the SQL Server database to monitor, e.g.: "db1.table1"</td>
     </tr>
     <tr>
       <td>port</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">1433</td>
       <td>Integer</td>
-      <td>Integer port number of the SQLServer database.</td>
+      <td>Integer port number of the SQL Server database.</td>
     </tr>
     <tr>
       <td>server-time-zone</td>
@@ -215,9 +215,9 @@ Connector Options
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Pass-through Debezium's properties to Debezium Embedded Engine which is used to capture data changes from SQLServer.
+      <td>Pass-through Debezium's properties to Debezium Embedded Engine which is used to capture data changes from SQL Server.
           For example: <code>'debezium.snapshot.mode' = 'initial_only'</code>.
-          See more about the <a href="https://debezium.io/documentation/reference/1.9/connectors/sqlserver.html#sqlserver-required-connector-configuration-properties">Debezium's SQLServer Connector properties</a></td> 
+          See more about the <a href="https://debezium.io/documentation/reference/1.9/connectors/sqlserver.html#sqlserver-required-connector-configuration-properties">Debezium's SQL Server Connector properties</a></td>
     </tr>
     <tr>
       <td>scan.incremental.close-idle-reader.enabled</td>
@@ -354,11 +354,11 @@ Features
 
 ### Exactly-Once Processing
 
-The SQLServer CDC connector is a Flink Source connector which will read database snapshot first and then continues to read change events with **exactly-once processing** even failures happen. Please read [How the connector works](https://debezium.io/documentation/reference/1.9/connectors/sqlserver.html#how-the-sqlserver-connector-works).
+The SQL Server CDC connector first reads a database snapshot and then continues to read change events, providing **exactly-once processing** even if failures occur. Please read [How the connector works](https://debezium.io/documentation/reference/1.9/connectors/sqlserver.html#how-the-sqlserver-connector-works).
 
 ### Startup Reading Position
 
-The config option `scan.startup.mode` specifies the startup mode for SQLServer CDC consumer. The valid enumerations are:
+The config option `scan.startup.mode` specifies the startup mode for SQL Server CDC consumer. The valid enumerations are:
 
 - `initial` (default): Takes a snapshot of structure and data of captured tables; useful if topics should be populated with a complete representation of the data from the captured tables.
 - `latest-offset`: Takes a snapshot of the structure of captured tables only; useful if only changes happening from now onwards should be propagated to topics.
@@ -367,11 +367,11 @@ _Note: the mechanism of `scan.startup.mode` option relying on Debezium's `snapsh
 
 ### Single Thread Reading
 
-The SQLServer CDC source can't work in parallel reading, because there is only one task can receive change events.
+The SQL Server CDC source does not support parallel reading because only one task can receive change events.
 
 ### DataStream Source
 
-The SQLServer CDC connector can also be a DataStream source. You can create a SourceFunction as the following shows:
+The SQL Server CDC connector can also be a DataStream source. You can create a SourceFunction as the following shows:
 
 ```java
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -402,7 +402,7 @@ public class SqlServerSourceExample {
 }
 ```
 
-The SQLServer CDC incremental connector (after 2.4.0) can be used as the following shows:
+The SQL Server CDC incremental connector (after 2.4.0) can be used as the following shows:
 ```java
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -445,18 +445,18 @@ public class SqlServerIncrementalSourceExample {
 
 ### Tables Without primary keys
 
-Starting from version 3.4.0, SQLServer CDC support tables that do not have a primary key. To use a table without primary keys, you must configure the `scan.incremental.snapshot.chunk.key-column` option and specify one non-null field.
+Starting from version 3.4.0, SQL Server CDC supports tables that do not have a primary key. To use a table without a primary key, you must configure the `scan.incremental.snapshot.chunk.key-column` option and specify one non-null field.
 
 There are two places that need to be taken care of.
 
 1. If there is an index in the table, try to use a column which is contained in the index in `scan.incremental.snapshot.chunk.key-column`. This will increase the speed of select statement.
-2. The processing semantics of a SQLServer CDC table without primary keys is determined based on the behavior of the column that are specified by the `scan.incremental.snapshot.chunk.key-column`.
+2. The processing semantics of a SQL Server CDC table without a primary key are determined by the behavior of the column specified by `scan.incremental.snapshot.chunk.key-column`.
 * If no update operation is performed on the specified column, the exactly-once semantics is ensured.
 * If the update operation is performed on the specified column, only the at-least-once semantics is ensured. However, you can specify primary keys at downstream and perform the idempotence operation to ensure data correctness.
 
 #### Warning
 
-Using a **non-primary key column** as the `scan.incremental.snapshot.chunk.key-column` for a SQLServer table with primary keys may lead to data inconsistencies. Below is a scenario illustrating this issue and recommendations to mitigate potential problems.
+Using a **non-primary key column** as the `scan.incremental.snapshot.chunk.key-column` for a SQL Server table with primary keys may lead to data inconsistencies. Below is a scenario illustrating this issue and recommendations to mitigate potential problems.
 
 #### Problem Scenario
 
@@ -496,7 +496,7 @@ Metrics can help understand the progress of assignments, and the following are t
 
 Notice:
 1. The group name is `namespace.schema.table`, where `namespace` is the actual database name, `schema` is the actual schema name, and `table` is the actual table name.
-2. For SQLServer, the group name will be like `test_database.test_schema.test_table`.
+2. For SQL Server, the group name will be like `test_database.test_schema.test_table`.
 
 Data Type Mapping
 ----------------
@@ -505,7 +505,7 @@ Data Type Mapping
 <table class="colwidths-auto docutils">
     <thead>
       <tr>
-        <th class="text-left">SQLServer type<a href="https://docs.microsoft.com/en-us/sql/t-sql/data-types/data-types-transact-sql"></a></th>
+        <th class="text-left">SQL Server type<a href="https://docs.microsoft.com/en-us/sql/t-sql/data-types/data-types-transact-sql"></a></th>
         <th class="text-left">Flink SQL type<a href="{% link dev/table/types.md %}"></a></th>
       </tr>
     </thead>

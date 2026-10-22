@@ -39,7 +39,7 @@ Apache Flink 还提供了 Kubernetes Operator，用于管理 Kubernetes 上的 F
 - Kubernetes 版本 >= 1.9。
 - KubeConfig，作为列出、创建、删除 pods 和 services 权限的入口，可通过 `~/.kube/config` 进行配置。您可以通过运行命令：`kubectl auth can-i <list|create|edit|delete> pods` 来验证权限。
 - 已启用 Kubernetes DNS。
-- `default` 用户具有创建、删除 POD 的 [RBAC](https://nightlies.apache.org/flink/flink-docs-master/docs/deployment/resource-providers/native_kubernetes/#rbac) 权限。
+- `default` 用户具有创建、删除 pods 的 [RBAC](https://nightlies.apache.org/flink/flink-docs-master/docs/deployment/resource-providers/native_kubernetes/#rbac) 权限。
 
 如果您在配置 Kubernetes 集群时遇到问题，请参考：[如何配置 Kubernetes 集群](https://kubernetes.io/docs/setup/)。
 
@@ -152,7 +152,7 @@ Job Description: Sync MySQL Database to Doris
 通过 Flink Web UI，您可以找到一个名为 `Sync MySQL Database to Doris` 的作业正在运行。
 
 ## Kubernetes Operator 模式 {#kubernetes-operator模式}
-假设您已经在 K8S 集群上部署 [Flink Kubernetes Operator](https://nightlies.apache.org/flink/flink-kubernetes-operator-docs-main/docs/concepts/overview/)，您只需构建自定义的 Flink CDC Docker 镜像即可。
+假设您已经在 K8s 集群上部署 [Flink Kubernetes Operator](https://nightlies.apache.org/flink/flink-kubernetes-operator-docs-main/docs/concepts/overview/)，您只需构建自定义的 Flink CDC Docker 镜像即可。
 
 ### 构建自定义 Docker 镜像 {#构建自定义docker镜像}
 1. 从[发行页面](https://github.com/apache/flink-cdc/releases)下载 Flink CDC 的 tar 文件和需要的连接器，并移动到 Docker 镜像构建目录。\

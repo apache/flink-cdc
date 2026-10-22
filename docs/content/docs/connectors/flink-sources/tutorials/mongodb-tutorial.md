@@ -62,7 +62,7 @@ services:
       - "5601:5601"
 ```
 
-2. Enter Mongodb's container and initialize replica set and data:
+2. Enter MongoDB's container and initialize replica set and data:
 ```
 docker-compose exec mongo /usr/bin/mongo -u mongouser -p mongopw
 ```

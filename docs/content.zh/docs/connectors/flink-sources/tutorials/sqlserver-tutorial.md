@@ -98,7 +98,7 @@ docker-compose down
 创建数据库和表 `products`，`orders`，并插入数据：
 
  ```sql
- -- Sqlserver
+ -- SQL Server
  CREATE DATABASE inventory;
  GO
  USE inventory;

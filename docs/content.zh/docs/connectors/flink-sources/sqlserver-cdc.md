@@ -24,14 +24,14 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-# SQLServer CDC 连接器
+# SQL Server CDC 连接器 {#sqlserver-cdc-连接器}
 
-SQLServer CDC 连接器允许从 SQLServer 数据库读取快照数据和增量数据。本文描述了如何设置 SQLServer CDC 连接器来对 SQLServer 数据库运行 SQL 查询。
+SQL Server CDC 连接器允许从 SQL Server 数据库读取快照数据和增量数据。本文描述了如何设置 SQL Server CDC 连接器来对 SQL Server 数据库运行 SQL 查询。
 
 依赖
 ------------
 
-为了设置 SQLServer CDC 连接器，下表提供了使用构建自动化工具（如 Maven 或 SBT）和带有 SQL JAR 包的 SQL 客户端的两个项目的依赖关系信息。
+为了设置 SQL Server CDC 连接器，下表提供了使用构建自动化工具（如 Maven 或 SBT）和带有 SQL JAR 包的 SQL 客户端的两个项目的依赖关系信息。
 
 ### Maven dependency
 
@@ -45,7 +45,7 @@ SQLServer CDC 连接器允许从 SQLServer 数据库读取快照数据和增量�
 
 **注意：** 参考 [flink-sql-connector-sqlserver-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-sqlserver-cdc) 当前已发布的所有版本都可以在 Maven 中央仓库获取。
 
-设置 SQLServer 数据库
+设置 SQL Server 数据库 {#设置-sqlserver-数据库}
 ----------------
 SQL Server 管理员必须在你想要捕获的源表上启用变更数据捕获（CDC）。数据库必须已经启用了 CDC。要在表上启用 CDC，SQL Server 管理员需要为该表运行存储过程 ```sys.sp_cdc_enable_table```。
 
@@ -79,7 +79,7 @@ GO
 ```
 该查询会针对数据库中已启用 CDC 且包含调用者有权访问的变更数据的每个表返回配置信息。如果结果为空，请验证用户是否有权访问捕获实例和 CDC 表。
 
-如何创建 SQLServer CDC 表
+如何创建 SQL Server CDC 表 {#如何创建-sqlserver-cdc-表}
 ----------------
 
 SqlServer CDC 表可以定义如下：
@@ -134,42 +134,42 @@ SELECT * FROM orders;
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>SQLServer 数据库的 IP 地址或主机名。</td>
+      <td>SQL Server 数据库的 IP 地址或主机名。</td>
     </tr>
     <tr>
       <td>username</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>连接到 SQLServer 数据库时要使用的用户名。</td>
+      <td>连接到 SQL Server 数据库时要使用的用户名。</td>
     </tr>
     <tr>
       <td>password</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>连接 SQLServer 数据库时使用的密码。</td>
+      <td>连接 SQL Server 数据库时使用的密码。</td>
     </tr>
     <tr>
       <td>database-name</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>要监视的 SQLServer 数据库名称。</td>
+      <td>要监视的 SQL Server 数据库名称。</td>
     </tr> 
     <tr>
       <td>table-name</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>需要监视的 SQLServer 数据库的表名，例如："db1.table1"</td>
+      <td>需要监视的 SQL Server 数据库的表名，例如："db1.table1"</td>
     </tr>
     <tr>
       <td>port</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">1433</td>
       <td>Integer</td>
-      <td>SQLServer 数据库的整数端口号。</td>
+      <td>SQL Server 数据库的整数端口号。</td>
     </tr>
     <tr>
       <td>server-time-zone</td>
@@ -215,9 +215,9 @@ SELECT * FROM orders;
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>将 Debezium 的属性传递给 Debezium 嵌入式引擎，该引擎用于从 SQLServer 捕获数据更改。
+      <td>将 Debezium 的属性传递给 Debezium 嵌入式引擎，该引擎用于从 SQL Server 捕获数据更改。
           例如：<code>'debezium.snapshot.mode' = 'initial_only'</code>。
-          查看更多关于 <a href="https://debezium.io/documentation/reference/1.9/connectors/sqlserver.html#sqlserver-required-connector-configuration-properties">Debezium 的 SQLServer 连接器属性</a></td> 
+          查看更多关于 <a href="https://debezium.io/documentation/reference/1.9/connectors/sqlserver.html#sqlserver-required-connector-configuration-properties">Debezium 的 SQL Server 连接器属性</a></td>
     </tr>
     <tr>
       <td>scan.incremental.close-idle-reader.enabled</td>
@@ -354,11 +354,11 @@ CREATE TABLE products (
 
 ### Exactly-Once 处理
 
-SQLServer CDC 连接器是一个 Flink Source 连接器，它将首先读取数据库快照，然后继续读取变更事件，即使在处理时出现故障，也能**准确读取数据**。请参阅 [How the connector works](https://debezium.io/documentation/reference/1.9/connectors/sqlserver.html#how-the-sqlserver-connector-works)。
+SQL Server CDC 连接器是一个 Flink Source 连接器，它将首先读取数据库快照，然后继续读取变更事件，即使在处理时出现故障，也能**准确读取数据**。请参阅 [How the connector works](https://debezium.io/documentation/reference/1.9/connectors/sqlserver.html#how-the-sqlserver-connector-works)。
 
 ### 启动模式
 
-配置选项 `scan.startup.mode` 指定 SQLServer CDC 使用者的启动模式。有效枚举包括：
+配置选项 `scan.startup.mode` 指定 SQL Server CDC 使用者的启动模式。有效枚举包括：
 
 - `initial`（默认）：对捕获表的结构和数据执行快照；适用于需要使用捕获表数据的完整表示来填充主题的场景。
 - `latest-offset`：仅对捕获表的结构执行快照；适用于只需要将从现在开始发生的变更传播到主题的场景。
@@ -367,11 +367,11 @@ _注意：`scan.startup.mode` 选项的机制依赖于 Debezium 的 `snapshot.mo
 
 ### 单线程读取
 
-SQLServer CDC source 无法进行并行读取，因为只有一个任务可以接收变更事件。
+SQL Server CDC source 无法进行并行读取，因为只有一个任务可以接收变更事件。
 
 ### DataStream Source
 
-SQLServer CDC 连接器也可以是一个数据流源。你可以创建 SourceFunction，如下所示：
+SQL Server CDC 连接器也可以是一个数据流源。你可以创建 SourceFunction，如下所示：
 
 ```java
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -402,7 +402,7 @@ public class SqlServerSourceExample {
 }
 ```
 
-SQLServer CDC 增量连接器（2.4.0 之后）可以使用，如下所示：
+SQL Server CDC 增量连接器（2.4.0 之后）可以使用，如下所示：
 ```java
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -456,7 +456,7 @@ public class SqlServerIncrementalSourceExample {
 
 #### 警告
 
-在 SQLServer 表中，若使用 **非主键列** 作为有主键表的 `scan.incremental.snapshot.chunk.key-column`，可能导致**数据不一致**。以下为可能出现的问题及其缓解方案。
+在 SQL Server 表中，若使用 **非主键列** 作为有主键表的 `scan.incremental.snapshot.chunk.key-column`，可能导致**数据不一致**。以下为可能出现的问题及其缓解方案。
 
 #### 问题场景
 
@@ -496,7 +496,7 @@ public class SqlServerIncrementalSourceExample {
 
 注意：
 1. Group 名称是 `namespace.schema.table`，这里的 `namespace` 是实际的数据库名称，`schema` 是实际的 schema 名称，`table` 是实际的表名称。
-2. 对于 SQLServer，Group 的名称会类似于 `test_database.test_schema.test_table`。
+2. 对于 SQL Server，Group 的名称会类似于 `test_database.test_schema.test_table`。
 
 数据类型映射
 ----------------
@@ -505,7 +505,7 @@ public class SqlServerIncrementalSourceExample {
 <table class="colwidths-auto docutils">
     <thead>
       <tr>
-        <th class="text-left">SQLServer type<a href="https://docs.microsoft.com/en-us/sql/t-sql/data-types/data-types-transact-sql"></a></th>
+        <th class="text-left">SQL Server type<a href="https://docs.microsoft.com/en-us/sql/t-sql/data-types/data-types-transact-sql"></a></th>
         <th class="text-left">Flink SQL type<a href="{% link dev/table/types.md %}"></a></th>
       </tr>
     </thead>

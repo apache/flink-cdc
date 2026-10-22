@@ -98,7 +98,7 @@ docker-compose down
 Create databases/tables and populate data
 
  ```sql
- -- Sqlserver
+ -- SQL Server
  CREATE DATABASE inventory;
  GO
  USE inventory;
