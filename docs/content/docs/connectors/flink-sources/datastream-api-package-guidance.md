@@ -56,7 +56,7 @@ This guide provides a simple `pom.xml` example for packaging DataStream job JARs
         <flink.version>1.20.3</flink.version>
         <slf4j.version>1.7.15</slf4j.version>
         <log4j.version>2.17.1</log4j.version>
-        <debezium.version>1.9.7.Final</debezium.version>
+        <debezium.version>1.9.8.Final</debezium.version>
         <flink.cdc.version>3.7.0-1.20</flink.cdc.version>
     </properties>
     <dependencies>
@@ -265,7 +265,7 @@ This guide provides a simple `pom.xml` example for packaging DataStream job JARs
         <flink.version>2.2.0</flink.version>
         <slf4j.version>1.7.15</slf4j.version>
         <log4j.version>2.17.1</log4j.version>
-        <debezium.version>1.9.7.Final</debezium.version>
+        <debezium.version>1.9.8.Final</debezium.version>
         <flink.cdc.version>3.7.0-2.2</flink.cdc.version>
     </properties>
     <dependencies>
