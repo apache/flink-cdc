@@ -138,7 +138,7 @@ pipeline:
 ```
 
 You need to modify the configuration file according to your needs.
-Finally, submit job to Flink Yarn Session cluster using Cli.
+Finally, submit job to Flink Yarn Session cluster using CLI.
 
 ```bash
 cd /path/flink-cdc-*

@@ -351,8 +351,8 @@ Connector Options
       <td>optional</td>
       <td style="word-wrap: break-word;">initial</td>
       <td>String</td>
-      <td>Optional startup mode for Oracle CDC consumer, valid enumerations are "initial"
-           , "latest-offset" , specific-offset. 
+      <td>Optional startup mode for Oracle CDC consumer, valid enumerations are "initial",
+           "latest-offset", specific-offset.
            Please see <a href="#startup-reading-position">Startup Reading Position</a> section for more detailed information.</td>
     </tr>
     <tr>

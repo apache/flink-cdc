@@ -252,7 +252,7 @@ pipeline:
       <td>String</td>
       <td>Create the auto partition Properties configuration of the table.<br/>
         Currently the partition function only supports date_trunc, and the partition column supports only DATE or DATETIME types, and the version of Doris must greater than 2.1.6. See more about <a href="https://doris.apache.org/docs/table-design/data-partitioning/auto-partitioning">Doris Auto Partitioning</a><br/>
-        These properties are supported now：<br/>
+        These properties are supported now:<br/>
         <code> table.create.auto-partition.properties.include</code>A collection of tables after route to include, separated by commas, supports regular expressions;<br/>
         <code> table.create.auto-partition.properties.exclude</code>A collection of tables after route to exclude, separated by commas, supports regular expressions;<br/>
         <code> table.create.auto-partition.properties.default-partition-key</code>The default partition key;<br/>

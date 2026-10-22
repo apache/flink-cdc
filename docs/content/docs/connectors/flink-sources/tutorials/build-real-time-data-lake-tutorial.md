@@ -41,7 +41,7 @@ The following sections will take the pipeline from MySQL to [Iceberg](https://ic
 You can also use other data sources like Oracle/Postgres and sinks like Hudi to build your own pipeline.
 
 ## Preparation
-Prepare a Linux or MacOS computer with Docker installed.
+Prepare a Linux or macOS computer with Docker installed.
 
 ## Preparing JAR package required
 **Download links are available only for stable releases, SNAPSHOT dependencies need to be built based on master or release-branches by yourself.**

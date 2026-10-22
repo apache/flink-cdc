@@ -28,7 +28,7 @@ under the License.
 # Understand Flink CDC API
 
 If you are planning to build your own Flink CDC connectors, or considering
-contributing to Flink CDC, you might want to hava a deeper look at the APIs of
+contributing to Flink CDC, you might want to have a deeper look at the APIs of
 Flink CDC. This document will go through some important concepts and interfaces
 in order to help you with your development.
 

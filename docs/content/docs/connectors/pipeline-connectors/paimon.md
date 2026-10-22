@@ -128,14 +128,14 @@ Pipeline Connector Options
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Pass options of Paimon catalog to pipeline，See <a href="https://paimon.apache.org/docs/master/maintenance/configurations/#catalogoptions">Paimon catalog options</a>。 </td>
+      <td>Pass options of Paimon catalog to pipeline. See <a href="https://paimon.apache.org/docs/master/maintenance/configurations/#catalogoptions">Paimon catalog options</a>. </td>
     </tr>
     <tr>
       <td>table.properties.*</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Pass options of  Paimon table to pipeline，See <a href="https://paimon.apache.org/docs/master/maintenance/configurations/#coreoptions">Paimon table options</a>。 </td>
+      <td>Pass options of  Paimon table to pipeline. See <a href="https://paimon.apache.org/docs/master/maintenance/configurations/#coreoptions">Paimon table options</a>. </td>
     </tr>
     </tbody>
 </table>    

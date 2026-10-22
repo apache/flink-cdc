@@ -138,7 +138,7 @@ Deploy OceanBase database and Binlog service
 Usage Documentation
 ----------------
 
-**Notes**：
+**Notes**:
 - The current version of the **oceanbase-cdc connector** is built on top of the **mysql-cdc connector**, with **only minor internal implementation changes**.
    - **External interfaces** and **configuration parameters** are **fully consistent** with those of the mysql-cdc connector.
    - For detailed usage instructions, refer to the [**MySQL CDC Usage Documentation**](mysql-cdc.md).

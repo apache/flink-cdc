@@ -35,7 +35,7 @@ In the following sections, we will describe how to use Flink PolarDB-X CDC to im
 All exercises in this tutorial are performed in the Flink SQL CLI, and the entire process uses standard SQL syntax, without a single line of Java/Scala code or IDE installation.
 
 ## Preparation
-Prepare a Linux or MacOS computer with Docker installed.
+Prepare a Linux or macOS computer with Docker installed.
 
 ### Starting components required
 The components required in this demo are all managed in containers, so we will use `docker-compose` to start them.
@@ -119,7 +119,7 @@ We can also visit [http://localhost:5601/](http://localhost:5601/) to see if Kib
    (default,"hammer","14oz carpenter's hammer"),
    (default,"hammer","16oz carpenter's hammer"),
    (default,"rocks","box of assorted rocks"),
-   (default,"jacket","water resistent black wind breaker"),
+   (default,"jacket","water resistant black wind breaker"),
    (default,"spare tire","24 inch spare tire");
    
    

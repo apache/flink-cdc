@@ -32,7 +32,7 @@ All exercises in this tutorial are performed in the Flink CDC CLI, and the entir
 without a single line of Java/Scala code or IDE installation.
 
 ## Preparation
-Prepare a Linux or MacOS computer with Docker installed.
+Prepare a Linux or macOS computer with Docker installed.
 
 ### Prepare Flink Standalone cluster
 1. Download [Flink 2.2.0](https://archive.apache.org/dist/flink/flink-2.2.0/flink-2.2.0-bin-scala_2.12.tgz), unzip and get flink-2.2.0 directory.
@@ -197,7 +197,7 @@ This command automatically starts all the containers defined in the Docker Compo
     ```
 
 ## Submit job with Flink CDC CLI
-1. Download the binary compressed packages listed below and extract them to the directory `flink-cdc-{{< param Version >}}`：    
+1. Download the binary compressed packages listed below and extract them to the directory `flink-cdc-{{< param Version >}}`:\
    [flink-cdc-{{< param Version >}}-bin.tar.gz](https://www.apache.org/dyn/closer.lua/flink/flink-cdc-{{< param Version >}}/flink-cdc-{{< param Version >}}-bin.tar.gz)
    flink-cdc-{{< param Version >}} directory will contain four directories: `bin`, `lib`, `log`, and `conf`.
 
@@ -208,7 +208,7 @@ This command automatically starts all the containers defined in the Docker Compo
     - [flink-cdc-pipeline-connector-fluss](https://mvnrepository.com/artifact/org.apache.flink/flink-cdc-pipeline-connector-fluss)
 
 3. Write task configuration yaml file.
-   Here is an example file for synchronizing the entire database `postgres-to-fluss.yaml`：
+   Here is an example file for synchronizing the entire database `postgres-to-fluss.yaml`:
 
    ```yaml
    ################################################################################
@@ -249,7 +249,7 @@ This command automatically starts all the containers defined in the Docker Compo
    ```shell
    bash bin/flink-cdc.sh postgres-to-fluss.yaml
    ```
-   After successful submission, the return information is as follows：
+   After successful submission, the return information is as follows:
    ```shell
    Pipeline has been submitted to cluster.
    Job ID: ae30f4580f1918bebf16752d4963dc54

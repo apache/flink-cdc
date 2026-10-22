@@ -172,7 +172,7 @@ Run `docker ps` to check whether these containers are running properly.
 **Please note that the following download links are available only for stable releases.
 You need to build your own SNAPSHOT versions based on master or release branches by yourself.**
 
-1. Download the binary compressed packages listed below and extract them to the directory `flink cdc-{{< param Version >}}'`:
+1. Download the binary compressed packages listed below and extract them to the directory `flink-cdc-{{< param Version >}}`:
    [flink-cdc-{{< param Version >}}-bin.tar.gz](https://www.apache.org/dyn/closer.lua/flink/flink-cdc-{{< param Version >}}/flink-cdc-{{< param Version >}}-bin.tar.gz)
    flink-cdc-{{< param Version >}} directory will contain four directory: `bin`, `lib`, `log`, and `conf`.
 

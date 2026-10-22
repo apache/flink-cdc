@@ -836,7 +836,7 @@ The following operations show how to enable this feature to resolve above scenar
    // your business code
 ```
 
-If we would like to add new tables `[order, custom]` to an existing Flink job，just need to update the `tableList()` value of the job to include `[order, custom]` and restore the job from previous savepoint.
+If we would like to add new tables `[order, custom]` to an existing Flink job, just need to update the `tableList()` value of the job to include `[order, custom]` and restore the job from previous savepoint.
 
 _Step 1_: Stop the existing Flink job with savepoint.
 ```shell

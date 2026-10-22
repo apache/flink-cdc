@@ -32,10 +32,10 @@ All exercises in this tutorial are performed in the Flink CDC CLI, and the entir
 without a single line of Java/Scala code or IDE installation.
 
 ## Preparation
-Prepare a Linux or MacOS computer with Docker installed.
+Prepare a Linux or macOS computer with Docker installed.
 
 ### Prepare Flink Standalone cluster
-1. Download [Flink 2.2.0](https://archive.apache.org/dist/flink/flink-2.2.0/flink-2.2.0-bin-scala_2.12.tgz) ，unzip and get flink-2.2.0 directory.
+1. Download [Flink 2.2.0](https://archive.apache.org/dist/flink/flink-2.2.0/flink-2.2.0-bin-scala_2.12.tgz), unzip and get flink-2.2.0 directory.
    Use the following command to navigate to the Flink directory and set FLINK_HOME to the directory where flink-2.2.0 is located.
 
    ```shell
@@ -146,7 +146,7 @@ This command automatically starts all the containers defined in the Docker Compo
     ```
 
 ## Submit job with Flink CDC CLI
-1. Download the binary compressed packages listed below and extract them to the directory `flink-cdc-{{< param Version >}}`：
+1. Download the binary compressed packages listed below and extract them to the directory `flink-cdc-{{< param Version >}}`:
    [flink-cdc-{{< param Version >}}-bin.tar.gz](https://www.apache.org/dyn/closer.lua/flink/flink-cdc-{{< param Version >}}/flink-cdc-{{< param Version >}}-bin.tar.gz)
    `flink-cdc-{{< param Version >}}` directory will contain four directories: `bin`, `lib`, `log`, and `conf`.
 
@@ -160,7 +160,7 @@ This command automatically starts all the containers defined in the Docker Compo
    - [MySQL Connector Java](https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar)
 
 3. Write task configuration yaml file.
-   Here is an example file for synchronizing the entire database `mysql-to-starrocks.yaml`：
+   Here is an example file for synchronizing the entire database `mysql-to-starrocks.yaml`:
 
    ```yaml
    ################################################################################
@@ -195,13 +195,13 @@ Notice that:
 * `tables: app_db.\.*` in source synchronize all tables in `app_db` through Regular Matching.   
 * `table.create.properties.replication_num` in sink is because there is only one StarRocks BE node in the Docker image.
 
-4. Finally, submit job to Flink Standalone cluster using Cli.
+4. Finally, submit job to Flink Standalone cluster using CLI.
 
    ```shell
    bash bin/flink-cdc.sh mysql-to-starrocks.yaml
    ```
    
-After successful submission, the return information is as follows：
+After successful submission, the return information is as follows:
 
    ```shell
    Pipeline has been submitted to cluster.
@@ -224,7 +224,7 @@ Enter MySQL container
  docker-compose exec mysql mysql -uroot -p123456
  ```
 
-Then, modify schema and record in MySQL, and the tables of StarRocks will change the same in real time：
+Then, modify schema and record in MySQL, and the tables of StarRocks will change the same in real time:
 1. insert one record in `orders` from MySQL:
 
    ```sql
@@ -248,7 +248,7 @@ Then, modify schema and record in MySQL, and the tables of StarRocks will change
    DELETE FROM app_db.orders WHERE id=2;
    ```
 
-Refresh the Dbeaver every time you execute a step, and you can see that the `orders` table displayed in StarRocks will be updated in real-time, like the following：
+Refresh the Dbeaver every time you execute a step, and you can see that the `orders` table displayed in StarRocks will be updated in real-time, like the following:
 
 {{< img src="/fig/mysql-starrocks-tutorial/starrocks-display-result.png" alt="StarRocks-display-result" >}}
 
@@ -294,7 +294,7 @@ Here is an example file for using `route` feature:
    ```
 
 Using the upper `route` configuration, we can synchronize the table schema and data of `app_db.orders` to `ods_db.ods_orders`, thus achieving the function of database migration.   
-Specifically, `source-table` support regular expression matching with multiple tables to synchronize sharding databases and tables. like the following：
+Specifically, `source-table` support regular expression matching with multiple tables to synchronize sharding databases and tables. like the following:
 
    ```yaml
    route:

@@ -167,7 +167,7 @@ pipeline:
       <td>optional</td>
       <td style="word-wrap: break-word;">initial</td>
       <td>String</td>
-      <td> Optional startup mode for Postgres CDC consumer, valid enumerations are "initial"，"latest-offset"，"committed-offset"or"snapshot"。</td>
+      <td> Optional startup mode for Postgres CDC consumer, valid enumerations are "initial", "latest-offset", "committed-offset" or "snapshot".</td>
     </tr>
   <tr>
       <td>scan.incremental.close-idle-reader.enabled</td>
@@ -533,10 +533,10 @@ transform:
 </table>
 </div>
 
-Note: Since the Debezium version does not support multidimensional arrays, only PostgresSQL single-dimensional arrays are currently supported, such as :'ARRAY[1,2,3]', 'int[]'.
+Note: Since the Debezium version does not support multidimensional arrays, only PostgreSQL single-dimensional arrays are currently supported, such as :'ARRAY[1,2,3]', 'int[]'.
 
 ### Temporal types Mapping
-Other than PostgreSQL’s TIMESTAMPTZ data types, which contain time zone information, how temporal types are mapped depends on the value of <code>debezium.the time.precision.mode</code> connector configuration property. The following sections describe these mappings:
+Other than PostgreSQL’s TIMESTAMPTZ data types, which contain time zone information, how temporal types are mapped depends on the value of <code>debezium.time.precision.mode</code> connector configuration property. The following sections describe these mappings:
 - debezium.time.precision.mode=adaptive
 - debezium.time.precision.mode=adaptive_time_microseconds
 - debezium.time.precision.mode=connect 

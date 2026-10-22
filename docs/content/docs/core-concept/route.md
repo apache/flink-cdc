@@ -64,7 +64,7 @@ When using `FIRST_MATCH` mode, route rules are evaluated in the order they are d
 
 # Example
 ## Route one Data Source table to one Data Sink table
-if synchronize the table `web_order` in the database `mydb` to a Doris table `ods_web_order`, we can use this yaml file to define this route：
+if synchronize the table `web_order` in the database `mydb` to a Doris table `ods_web_order`, we can use this yaml file to define this route:
 
 ```yaml
 route:
@@ -74,7 +74,7 @@ route:
 ```
 
 ## Route multiple Data Source tables to one Data Sink table
-What's more, if you want to synchronize the sharding tables in the database `mydb` to a Doris table `ods_web_order`, we can use this yaml file to define this route：
+What's more, if you want to synchronize the sharding tables in the database `mydb` to a Doris table `ods_web_order`, we can use this yaml file to define this route:
 ```yaml
 route:
   - source-table: mydb\.*
@@ -83,7 +83,7 @@ route:
 ```
 
 ## Complex Route via combining route rules
-What's more, if you want to specify many different mapping rules, we can use this yaml file to define this route：
+What's more, if you want to specify many different mapping rules, we can use this yaml file to define this route:
 ```yaml
 route:
   - source-table: mydb.orders

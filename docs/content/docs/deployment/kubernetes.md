@@ -70,7 +70,7 @@ cd /path/flink-*
 ./bin/kubernetes-session.sh -Dkubernetes.cluster-id=my-first-flink-cluster
 ```
 
-After successful startup, the return information is as follows：
+After successful startup, the return information is as follows:
 
 ```
 org.apache.flink.kubernetes.utils.KubernetesUtils            [] - Kubernetes deployment requires a fixed port. Configuration blob.server.port will be set to 6124
@@ -105,7 +105,7 @@ Download the connector jars from [release page](https://github.com/apache/flink-
 Download links are available only for stable releases, SNAPSHOT dependencies need to be built based on specific branch by yourself.
 
 ### Submit a Flink CDC Job
-Here is an example file for synchronizing the entire database `mysql-to-doris.yaml`：
+Here is an example file for synchronizing the entire database `mysql-to-doris.yaml`:
 
 ```yaml
 ################################################################################
@@ -137,14 +137,14 @@ You need to modify the configuration file according to your needs, refer to conn
 - [MySQL pipeline connector]({{< ref "docs/connectors/pipeline-connectors/mysql.md" >}})
 - [Apache Doris pipeline connector]({{< ref "docs/connectors/pipeline-connectors/doris.md" >}})       
 
-Finally, submit job to Flink Standalone cluster using Cli.
+Finally, submit job to Flink Standalone cluster using CLI.
 
 ```bash
 cd /path/flink-cdc-*
 ./bin/flink-cdc.sh mysql-to-doris.yaml
 ```
 
-After successful submission, the return information is as follows：
+After successful submission, the return information is as follows:
 
 ```bash
 Pipeline has been submitted to cluster.
@@ -159,7 +159,7 @@ The doc assumes a [Flink Kubernetes Operator](https://nightlies.apache.org/flink
 
 ### Build a custom Docker image
 1. Download the tar file of Flink CDC and needed connectors from [release page](https://github.com/apache/flink-cdc/releases), then move them to the docker image build directory.  
-   Assume that your docker image build directory is `/opt/docker/flink-cdc`, The structure of this directory is as follow：
+   Assume that your docker image build directory is `/opt/docker/flink-cdc`, The structure of this directory is as follow:
     ```text
     /opt/docker/flink-cdc
         ├── flink-cdc-{{< param Version >}}-bin.tar.gz
@@ -175,7 +175,7 @@ The doc assumes a [Flink Kubernetes Operator](https://nightlies.apache.org/flink
     ADD flink-cdc*.tar.gz $FLINK_HOME/
     RUN mv $FLINK_HOME/flink-cdc-{{< param Version >}}/lib/flink-cdc-dist-{{< param Version >}}.jar $FLINK_HOME/lib/
     ```
-   Finally, The structure is as follow：
+   Finally, The structure is as follow:
     ```text
     /opt/docker/flink-cdc
         ├── Dockerfile
@@ -227,7 +227,7 @@ metadata:
 ```
 
 ### Create a FlinkDeployment YAML
-Here is an example file `flink-cdc-pipeline-job.yaml`：
+Here is an example file `flink-cdc-pipeline-job.yaml`:
 ```yaml
 ---
 apiVersion: flink.apache.org/v1beta1
@@ -283,16 +283,16 @@ spec:
 {{< /hint >}}
 
 ### Submit a Flink CDC Job
-After the ConfigMap and FlinkDeployment YAML are created, you can submit the Flink CDC job to the Operator through kubectl like：
+After the ConfigMap and FlinkDeployment YAML are created, you can submit the Flink CDC job to the Operator through kubectl like:
 ```bash
 kubectl apply -f flink-cdc-pipeline-job.yaml
 ```
 
-After successful submission, the return information is as follows：
+After successful submission, the return information is as follows:
 ```shell
 flinkdeployment.flink.apache.org/flink-cdc-pipeline-job created
 ```
-If you want to trace the logs or expose the Flink Web UI, please refer to: [Flink Kubernetes Operator documentation](https://nightlies.apache.org/flink/flink-kubernetes-operator-docs-main/docs/concepts/overview/)。
+If you want to trace the logs or expose the Flink Web UI, please refer to: [Flink Kubernetes Operator documentation](https://nightlies.apache.org/flink/flink-kubernetes-operator-docs-main/docs/concepts/overview/).
 
 {{< hint info >}}  
 Please note that submitting with **native application mode** is not supported for now.  

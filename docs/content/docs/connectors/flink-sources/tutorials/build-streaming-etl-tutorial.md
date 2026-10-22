@@ -31,14 +31,14 @@ This tutorial is to show how to quickly build streaming ETL for MySQL and Postgr
 Assuming we are running an e-commerce business. The product and order data stored in MySQL, the shipment data related to the order is stored in Postgres.
 We want to enrich the orders using the product and shipment table, and then load the enriched orders to ElasticSearch in real time.
 
-In the following sections, we will describe how to use Flink Mysql/Postgres CDC to implement it.
+In the following sections, we will describe how to use Flink MySQL/Postgres CDC to implement it.
 All exercises in this tutorial are performed in the Flink SQL CLI, and the entire process uses standard SQL syntax, without a single line of Java/Scala code or IDE installation.
 
 The overview of the architecture is as follows:
 {{< img src="/fig/mysql-postgres-tutorial/flink-cdc-streaming-etl.png" width="700px" alt="Flink CDC Streaming ETL" >}}
 
 ## Preparation
-Prepare a Linux or MacOS computer with Docker installed.
+Prepare a Linux or macOS computer with Docker installed.
 
 ### Starting components required
 The components required in this demo are all managed in containers, so we will use `docker-compose` to start them.
@@ -133,7 +133,7 @@ We can also visit [http://localhost:5601/](http://localhost:5601/) to see if Kib
            (default,"hammer","14oz carpenter's hammer"),
            (default,"hammer","16oz carpenter's hammer"),
            (default,"rocks","box of assorted rocks"),
-           (default,"jacket","water resistent black wind breaker"),
+           (default,"jacket","water resistant black wind breaker"),
            (default,"spare tire","24 inch spare tire");
     
     CREATE TABLE orders (
