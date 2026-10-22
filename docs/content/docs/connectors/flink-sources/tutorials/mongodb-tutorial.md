@@ -135,8 +135,8 @@ db.customers.insertMany([
 
 ```Download links are available only for stable releases, SNAPSHOT dependencies need to be built based on master or release branches by yourself. ```
 
-- [flink-sql-connector-elasticsearch7-3.0.1-1.17.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7/3.0.1-1.17/flink-sql-connector-elasticsearch7-3.0.1-1.17.jar)
-- [flink-sql-connector-mongodb-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-mongodb-cdc)
+- [flink-sql-connector-elasticsearch7-3.1.0-1.20.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7/3.1.0-1.20/flink-sql-connector-elasticsearch7-3.1.0-1.20.jar)
+- [flink-sql-connector-mongodb-cdc-3.7.0-1.20.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-mongodb-cdc/3.7.0-1.20/flink-sql-connector-mongodb-cdc-3.7.0-1.20.jar)
 
 4. Launch a Flink cluster, then start a Flink SQL CLI and execute following SQL statements inside: 
 

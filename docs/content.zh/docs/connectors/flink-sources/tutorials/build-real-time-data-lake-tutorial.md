@@ -42,27 +42,48 @@ under the License.
 ## 准备阶段
 准备一台已经安装了 Docker 的 Linux 或者 macOS 电脑。
 
-### 准备教程所需要的组件
-接下来的教程将以 `docker-compose` 的方式准备所需要的组件。
+### 准备所需的 JAR 包
+下载以下 JAR 包，并放入与 `Dockerfile` 同级的 `lib` 目录：
 
-使用下面的内容创建一个 `docker-compose.yml` 文件：
+- [flink-sql-connector-mysql-cdc-3.7.0-1.20.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-mysql-cdc/3.7.0-1.20/flink-sql-connector-mysql-cdc-3.7.0-1.20.jar)
+- [flink-shaded-hadoop-2-uber-2.7.5-10.0.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-shaded-hadoop-2-uber/2.7.5-10.0/flink-shaded-hadoop-2-uber-2.7.5-10.0.jar)
+- [iceberg-flink-runtime-1.20-1.7.2.jar](https://repo.maven.apache.org/maven2/org/apache/iceberg/iceberg-flink-runtime-1.20/1.7.2/iceberg-flink-runtime-1.20-1.7.2.jar)
+
+### 启动所需组件 {#准备教程所需要的组件}
+本教程使用 Docker Compose 管理所需组件。
+
+1. 使用以下内容创建 `Dockerfile`：
+
+```dockerfile
+FROM flink:1.20.3-scala_2.12
+# 将下载的 JAR 包放入同级的 lib 目录。
+COPY ./lib /opt/flink/lib
+RUN apt-get update && apt-get install tree
 ```
+
+2. 使用以下内容创建 `docker-compose.yml`：
+
+```yaml
 version: '2.1'
 services:
   sql-client:
     user: flink:flink
-    image: yuxialuo/flink-sql-client:1.13.2.v1 
+    build: .
+    command: bin/sql-client.sh
     depends_on:
       - jobmanager
       - mysql
     environment:
-      FLINK_JOBMANAGER_HOST: jobmanager
-      MYSQL_HOST: mysql
+      - MYSQL_HOST=mysql
+      - |
+        FLINK_PROPERTIES=
+        jobmanager.rpc.address: jobmanager
+        rest.address: jobmanager
     volumes:
       - shared-tmpfs:/tmp/iceberg
   jobmanager:
     user: flink:flink
-    image: flink:1.13.2-scala_2.11
+    build: .
     ports:
       - "8081:8081"
     command: jobmanager
@@ -74,7 +95,7 @@ services:
       - shared-tmpfs:/tmp/iceberg
   taskmanager:
     user: flink:flink
-    image: flink:1.13.2-scala_2.11
+    build: .
     depends_on:
       - jobmanager
     command: taskmanager
@@ -107,19 +128,7 @@ volumes:
 - Flink Cluster：包含 Flink JobManager 和 Flink TaskManager，用来执行 Flink SQL
 - MySQL：作为分库分表的数据源，存储本教程的 `user` 表
 
-***注意：***
-1. 为了简化整个教程，本教程需要的 jar 包都已经被打包进 SQL-Client 容器中了，镜像的构建脚本可以在 [GitHub](https://github.com/luoyuxia/flink-cdc-tutorial/tree/main/flink-cdc-iceberg-demo/sql-client) 上找到。
-   如果你想要在自己的 Flink 环境运行本教程，需要下载下面列出的包并且把它们放在 Flink 所在目录的 lib 目录下，即 `FLINK_HOME/lib/`。
-
-   **下载链接只对已发布的版本有效，SNAPSHOT 版本需要本地编译**
-
-   - [flink-sql-connector-mysql-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-mysql-cdc)
-   - [flink-shaded-hadoop-2-uber-2.7.5-10.0.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-shaded-hadoop-2-uber/2.7.5-10.0/flink-shaded-hadoop-2-uber-2.7.5-10.0.jar)
-   - [iceberg-flink-1.13-runtime-0.13.0-SNAPSHOT.jar](https://raw.githubusercontent.com/luoyuxia/flink-cdc-tutorial/main/flink-cdc-iceberg-demo/sql-client/lib/iceberg-flink-1.13-runtime-0.13.0-SNAPSHOT.jar)
-
-   目前支持 Flink 1.13 的 `iceberg-flink-runtime` jar 包还没有发布，所以我们在这里提供了一个支持 Flink 1.13 的 `iceberg-flink-runtime` jar 包，这个 jar 包是基于 Iceberg 的 master 分支打包的。
-   当 Iceberg 0.13.0 版本发布后，你也可以在 [apache official repository](https://repo.maven.apache.org/maven2/org/apache/iceberg/iceberg-flink-runtime/) 下载到支持 Flink 1.13 的 `iceberg-flink-runtime` jar 包。
-2. 本教程接下来用到的容器相关的命令都需要在 `docker-compose.yml` 所在目录下执行
+本教程接下来用到的容器相关命令都需要在 `docker-compose.yml` 所在目录下执行。
 
 在 `docker-compose.yml` 所在目录下执行下面的命令来启动本教程需要的组件：
 ```shell

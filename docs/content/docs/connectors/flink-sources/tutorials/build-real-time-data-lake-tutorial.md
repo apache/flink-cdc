@@ -45,9 +45,9 @@ Prepare a Linux or macOS computer with Docker installed.
 
 ## Preparing JAR package required
 **Download links are available only for stable releases, SNAPSHOT dependencies need to be built based on master or release-branches by yourself.**
-- flink-sql-connector-mysql-cdc-3.0-SNAPSHOT.jar
+- [flink-sql-connector-mysql-cdc-3.7.0-1.20.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-mysql-cdc/3.7.0-1.20/flink-sql-connector-mysql-cdc-3.7.0-1.20.jar)
 - [flink-shaded-hadoop-2-uber-2.7.5-10.0.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-shaded-hadoop-2-uber/2.7.5-10.0/flink-shaded-hadoop-2-uber-2.7.5-10.0.jar)
-- [iceberg-flink-runtime-1.16-1.3.1.jar](https://repo.maven.apache.org/maven2/org/apache/iceberg/iceberg-flink-runtime-1.16/1.3.1/iceberg-flink-runtime-1.16-1.3.1.jar)
+- [iceberg-flink-runtime-1.20-1.7.2.jar](https://repo.maven.apache.org/maven2/org/apache/iceberg/iceberg-flink-runtime-1.20/1.7.2/iceberg-flink-runtime-1.20-1.7.2.jar)
 
 
 
@@ -56,7 +56,7 @@ The components required in this tutorial are all managed in containers, so we wi
 
 1. Create `Dockerfile` file using following contents:
    ```dockerfile
-   FROM flink:1.16.0-scala_2.12
+   FROM flink:1.20.3-scala_2.12
    # Place the downloaded jar packages in the lib directory at the same level.
    COPY ./lib /opt/flink/lib
    RUN apt-get update && apt-get install tree
