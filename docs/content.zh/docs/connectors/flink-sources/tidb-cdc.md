@@ -31,7 +31,7 @@ TiDB CDC 连接器允许从 TiDB 数据库读取快照数据和增量数据。�
 依赖
 ------------
 
-为了设置 TiDB CDC 连接器，下表提供了使用构建自动化工具（如 Maven 或 SBT ）和带有 SQL JAR 包的 SQL 客户端的两个项目的依赖关系信息。
+为了设置 TiDB CDC 连接器，下表提供了使用构建自动化工具（如 Maven 或 SBT）和带有 SQL JAR 包的 SQL 客户端的两个项目的依赖关系信息。
 
 ### Maven dependency
 
@@ -43,7 +43,7 @@ TiDB CDC 连接器允许从 TiDB 数据库读取快照数据和增量数据。�
 
 下载 [flink-sql-connector-tidb-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-tidb-cdc) 到 `<FLINK_HOME>/lib/` 目录下。
 
-**注意:** 参考 [flink-sql-connector-tidb-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-tidb-cdc) 当前已发布的所有版本都可以在 Maven 中央仓库获取。
+**注意：** 参考 [flink-sql-connector-tidb-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-tidb-cdc) 当前已发布的所有版本都可以在 Maven 中央仓库获取。
 
 如何创建 TiDB CDC 表
 ----------------
@@ -95,7 +95,7 @@ Flink SQL> SELECT * FROM orders;
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>指定要使用的连接器, 这里应该是 <code>'tidb-cdc'</code>.</td>
+      <td>指定要使用的连接器，这里应该是 <code>'tidb-cdc'</code>。</td>
     </tr>
     <tr>
       <td>database-name</td>
@@ -191,7 +191,7 @@ Flink SQL> SELECT * FROM orders;
     <tr>
       <td>op_ts</td>
       <td>TIMESTAMP_LTZ(3) NOT NULL</td>
-      <td>当前记录表在数据库中更新的时间。 <br>如果从表的快照而不是 binlog 读取记录，该值将始终为0。</td>
+      <td>当前记录表在数据库中更新的时间。 <br>如果从表的快照而不是 binlog 读取记录，该值将始终为 0。</td>
     </tr>
   </tbody>
 </table>
@@ -226,9 +226,9 @@ TiDB CDC 连接器是一个 Flink Source 连接器，它将首先读取数据库
 
 ### 启动模式
 
-配置选项`scan.startup.mode`指定 TiDB CDC 使用者的启动模式。有效枚举包括：
+配置选项 `scan.startup.mode` 指定 TiDB CDC 使用者的启动模式。有效枚举包括：
 
-- `initial` （默认）：对捕获表的结构和数据执行快照；适用于需要获取捕获表数据完整表示的场景。
+- `initial`（默认）：对捕获表的结构和数据执行快照；适用于需要获取捕获表数据完整表示的场景。
 - `latest-offset`：仅对捕获表的结构执行快照；适用于只需要获取从现在开始发生的变更的场景。
 
 ### 多线程读取
@@ -237,7 +237,7 @@ TiDB CDC source 可通过并行读取方式工作，因为有多个任务可以�
 
 ### DataStream Source
 
-TiDB CDC 连接器也可以是一个数据流源。 你可以创建 SourceFunction，如下所示：
+TiDB CDC 连接器也可以是一个数据流源。你可以创建 SourceFunction，如下所示：
 
 ### DataStream Source
 

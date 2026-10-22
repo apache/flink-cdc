@@ -26,7 +26,7 @@ under the License.
 
 # Kafka Pipeline 连接器
 
-Kafka Pipeline 连接器可以用作 Pipeline 的 *Data Sink*，将数据写入[Kafka](https://kafka.apache.org)。 本文档介绍如何设置 Kafka Pipeline 连接器。
+Kafka Pipeline 连接器可以用作 Pipeline 的 *Data Sink*，将数据写入 [Kafka](https://kafka.apache.org)。本文档介绍如何设置 Kafka Pipeline 连接器。
 
 ## 连接器的功能
 * 自动建表
@@ -78,7 +78,7 @@ Pipeline 连接器配置项
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>指定要使用的连接器, 这里需要设置成 <code>'kafka'</code>。 </td>
+      <td>指定要使用的连接器，这里需要设置成 <code>'kafka'</code>。 </td>
     </tr>
     <tr>
       <td>name</td>
@@ -92,14 +92,14 @@ Pipeline 连接器配置项
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>定义发送数据到 Kafka 分区的策略， 可以设置的选项有 `all-to-zero`（将所有数据发送到 0 号分区） 以及 `hash-by-key`（所有数据根据主键的哈希值分发），默认值为 `all-to-zero`。 </td>
+      <td>定义发送数据到 Kafka 分区的策略，可以设置的选项有 `all-to-zero`（将所有数据发送到 0 号分区）以及 `hash-by-key`（所有数据根据主键的哈希值分发），默认值为 `all-to-zero`。 </td>
     </tr>
     <tr>
       <td>key.format</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>用于序列化 Kafka 消息的键部分数据的格式。可以设置的选项有 `csv` 以及 `json`， 默认值为 `json`。 </td>
+      <td>用于序列化 Kafka 消息的键部分数据的格式。可以设置的选项有 `csv` 以及 `json`，默认值为 `json`。 </td>
     </tr>
     <tr>
       <td>value.format</td>
@@ -141,14 +141,14 @@ Pipeline 连接器配置项
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Kafka 记录自定义的 Header。每个 Header 使用 ','分割， 键值使用 ':' 分割。举例来说，可以使用这种方式 'key1:value1,key2:value2'。 </td>
+      <td>Kafka 记录自定义的 Header。每个 Header 使用 ',' 分割，键值使用 ':' 分割。举例来说，可以使用这种方式 'key1:value1,key2:value2'。 </td>
     </tr>
     <tr>
       <td>sink.tableId-to-topic.mapping</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>自定义的上游表名到下游 Kafka Topic 名的映射关系。 每个映射关系由 `;` 分割，上游表的 TableId 和下游 Kafka 的 Topic 名由 `:` 分割。 举个例子，我们可以配置 `sink.tableId-to-topic.mapping` 的值为 `mydb.mytable1:topic1;mydb.mytable2:topic2`。 </td>
+      <td>自定义的上游表名到下游 Kafka Topic 名的映射关系。每个映射关系由 `;` 分割，上游表的 TableId 和下游 Kafka 的 Topic 名由 `:` 分割。举个例子，我们可以配置 `sink.tableId-to-topic.mapping` 的值为 `mydb.mytable1:topic1;mydb.mytable2:topic2`。 </td>
     </tr>
     <tr>
       <td>sink.delivery-guarantee</td>
@@ -162,7 +162,7 @@ Pipeline 连接器配置项
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>
       <td>Boolean</td>
-      <td>如果配置了这个参数，每条debezium记录都将包含debezium schema信息。 只有当`value.format`为`debezium-json`时才生效。 </td>
+      <td>如果配置了这个参数，每条 debezium 记录都将包含 debezium schema 信息。只有当 `value.format` 为 `debezium-json` 时才生效。 </td>
     </tr>
     </tbody>
 </table>    
@@ -176,10 +176,10 @@ Pipeline 连接器配置项
 * 写入 Kafka 的 topic 如果不存在，则会默认创建。
 
 ### 输出格式
-对于不同的内置 `value.format` 选项，输出的格式也是不同的:
+对于不同的内置 `value.format` 选项，输出的格式也是不同的：
 #### debezium-json
-参考 [Debezium docs](https://debezium.io/documentation/reference/1.9/connectors/mysql.html)， debezium-json 格式会包含 `before`,`after`,`op`,`source` 几个元素， 但是 `ts_ms` 字段并不会包含在 `source` 元素中。    
-一个输出的示例是:
+参考 [Debezium docs](https://debezium.io/documentation/reference/1.9/connectors/mysql.html)，debezium-json 格式会包含 `before`,`after`,`op`,`source` 几个元素，但是 `ts_ms` 字段并不会包含在 `source` 元素中。\
+一个输出的示例是：
 ```json
 {
   "before": null,
@@ -194,7 +194,7 @@ Pipeline 连接器配置项
   }
 }
 ```
-当`debezium-json.include-schema.enabled=true`时，输出示例如下:
+当 `debezium-json.include-schema.enabled=true` 时，输出示例如下：
 ```json
 {
   "schema":{
@@ -253,8 +253,8 @@ Pipeline 连接器配置项
 ```
 
 #### canal-json
-参考 [Canal | Apache Flink](https://nightlies.apache.org/flink/flink-docs-master/docs/connectors/table/formats/canal/#available-metadata)， canal-json 格式会包含 `old`,`data`,`type`,`database`,`table`,`pkNames` 几个元素， 但是 `ts` 并不会包含在其中。   
-一个输出的示例是:
+参考 [Canal | Apache Flink](https://nightlies.apache.org/flink/flink-docs-master/docs/connectors/table/formats/canal/#available-metadata)，canal-json 格式会包含 `old`、`data`、`type`、`database`、`table`、`pkNames` 几个元素，但是 `ts` 并不会包含在其中。\
+一个输出的示例是：
 ```json
 {
     "old": null,
@@ -275,8 +275,8 @@ Pipeline 连接器配置项
 
 数据类型映射
 ----------------
-[Literal type](https://debezium.io/documentation/reference/3.1/connectors/mysql.html#mysql-data-types): 反映数据的实际存储类型 (对应debezium schema中的type字段)<br>
-[Semantic type](https://debezium.io/documentation/reference/3.1/connectors/mysql.html#mysql-data-types): 反映数据的逻辑类型 (对应对应debezium schema中的name字段)。
+[Literal type](https://debezium.io/documentation/reference/3.1/connectors/mysql.html#mysql-data-types)： 反映数据的实际存储类型（对应 debezium schema 中的 type 字段）<br>
+[Semantic type](https://debezium.io/documentation/reference/3.1/connectors/mysql.html#mysql-data-types)： 反映数据的逻辑类型（对应对应 debezium schema 中的 name 字段）。
 <div class="wy-table-responsive">
 <table class="colwidths-auto docutils">
     <thead>

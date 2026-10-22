@@ -26,7 +26,7 @@ under the License.
 
 # Doris Connector
 
-本文介绍了Pipeline Doris Connector的使用。
+本文介绍了 Pipeline Doris Connector 的使用。
 
 ## 示例
 
@@ -68,70 +68,70 @@ pipeline:
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>指定要使用的Sink, 这里是 <code>'doris'</code>.</td>
+      <td>指定要使用的 Sink, 这里是 <code>'doris'</code>。</td>
     </tr>
     <tr>
       <td>name</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td> PipeLine的名称 </td>
+      <td> PipeLine 的名称 </td>
     </tr>
      <tr>
       <td>fenodes</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Doris集群FE的Http地址, 比如 127.0.0.1:8030 </td>
+      <td>Doris 集群 FE 的 Http 地址，比如 127.0.0.1:8030 </td>
     </tr>
      <tr>
       <td>benodes</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Doris集群BE的Http地址, 比如 127.0.0.1:8040 </td>
+      <td>Doris 集群 BE 的 Http 地址，比如 127.0.0.1:8040 </td>
     </tr>
     <tr>
       <td>jdbc-url</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Doris集群的JDBC地址，比如：jdbc:mysql://127.0.0.1:9030/db</td>
+      <td>Doris 集群的 JDBC 地址，比如：jdbc:mysql://127.0.0.1:9030/db</td>
     </tr>
     <tr>
       <td>username</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Doris集群的用户名</td>
+      <td>Doris 集群的用户名</td>
     </tr> 
     <tr>
       <td>password</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Doris集群的密码</td>
+      <td>Doris 集群的密码</td>
     </tr>
     <tr>
       <td>auto-redirect</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>
       <td>Boolean</td>
-      <td> 是否通过FE重定向写入，直连BE写入 </td>
+      <td> 是否通过 FE 重定向写入，直连 BE 写入 </td>
     </tr>
     <tr>
       <td>charset-encoding</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">UTF-8</td>
       <td>String</td>
-      <td> Doris Http客户端字符集编码，默认UTF-8 </td>
+      <td> Doris Http 客户端字符集编码，默认 UTF-8 </td>
     </tr>
     <tr>
       <td>sink.enable.batch-mode</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">true</td>
       <td>Boolean</td>
-      <td> 是否使用攒批方式写入Doris </td>
+      <td> 是否使用攒批方式写入 Doris </td>
     </tr>
     <tr>
        <td>sink.enable-delete</td>
@@ -160,28 +160,28 @@ pipeline:
       <td>optional</td>
       <td style="word-wrap: break-word;">50000</td>
       <td>Integer</td>
-      <td>单个批次最大Flush的记录数</td>
+      <td>单个批次最大 Flush 的记录数</td>
     </tr>
     <tr>
       <td>sink.buffer-flush.max-bytes</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">10485760(10MB)</td>
       <td>Integer</td>
-      <td>单个批次最大Flush的字节数</td>
+      <td>单个批次最大 Flush 的字节数</td>
     </tr>
     <tr>
       <td>sink.buffer-flush.interval</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">10s</td>
       <td>String</td>
-      <td>Flush的间隔时长，超过这个时间，将异步Flush数据</td>
+      <td>Flush 的间隔时长，超过这个时间，将异步 Flush 数据</td>
     </tr>
     <tr>
        <td>sink.ignore.update-before</td>
        <td>optional</td>
        <td style="word-wrap: break-word;">true</td>
        <td>Boolean</td>
-       <td>在CDC场景中，当上游的主键与下游的主键不一致时，需要将 update-before 数据作为已删除数据传递给下游，否则数据将无法被删除。默认设置为忽略，即执行 upsert 语义 </td>
+       <td>在 CDC 场景中，当上游的主键与下游的主键不一致时，需要将 update-before 数据作为已删除数据传递给下游，否则数据将无法被删除。默认设置为忽略，即执行 upsert 语义 </td>
      </tr>
     <tr>
       <td>sink.enable-2pc</td>
@@ -230,7 +230,7 @@ pipeline:
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>StreamLoad的参数。
+      <td>StreamLoad 的参数。
         For example: <code> sink.properties.strict_mode: true</code>.
         查看更多关于 <a href="https://doris.apache.org/zh-CN/docs/dev/data-operate/import/import-way/stream-load-manual"> StreamLoad 的属性</a></td> 
       </td>
@@ -240,7 +240,7 @@ pipeline:
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>创建表的Properties配置。
+      <td>创建表的 Properties 配置。
         For example: <code> table.create.properties.replication_num: 1</code>.
         查看更多关于 <a href="https://doris.apache.org/zh-CN/docs/dev/sql-manual/sql-statements/table-and-view/table/CREATE-TABLE"> Doris Table 的属性</a></td> 
       </td>
@@ -251,17 +251,17 @@ pipeline:
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>创建自动分区表的配置。<br/>
-        当前仅支持DATE/DATETIME类型列的AUTO RANGE PARTITION，分区函数为<code>date_trunc</code>，且Doris版本必须大于2.1.6，查看更多关于 <a href="https://doris.apache.org/docs/table-design/data-partitioning/auto-partitioning">Doris自动分区</a><br/>
+        当前仅支持 DATE/DATETIME 类型列的 AUTO RANGE PARTITION，分区函数为 <code>date_trunc</code>，且 Doris 版本必须大于 2.1.6，查看更多关于 <a href="https://doris.apache.org/docs/table-design/data-partitioning/auto-partitioning">Doris 自动分区</a><br/>
         支持的属性有：<br/>
-        <code> table.create.auto-partition.properties.include</code>包含的经过route后的表集合，用逗号分隔，支持正则表达式；<br/>
-        <code> table.create.auto-partition.properties.exclude</code>排除的经过route后的表集合，用逗号分隔，支持正则表达式；<br/>
-        <code> table.create.auto-partition.properties.default-partition-key</code>默认分区键；<br/>
-        <code> table.create.auto-partition.properties.default-partition-unit</code>默认分区单位；<br/>
-        <code> table.create.auto-partition.properties.DB.TABLE.partition-key</code>特定表的分区键，如未配置取默认分区键；<br/>
-        <code> table.create.auto-partition.properties.DB.TABLE.partition-unit</code>特定表的分区单位，如未配置取默认分区单位。<br/>
+        <code> table.create.auto-partition.properties.include</code> 包含的经过 route 后的表集合，用逗号分隔，支持正则表达式；<br/>
+        <code> table.create.auto-partition.properties.exclude</code> 排除的经过 route 后的表集合，用逗号分隔，支持正则表达式；<br/>
+        <code> table.create.auto-partition.properties.default-partition-key</code> 默认分区键；<br/>
+        <code> table.create.auto-partition.properties.default-partition-unit</code> 默认分区单位；<br/>
+        <code> table.create.auto-partition.properties.DB.TABLE.partition-key</code> 特定表的分区键，如未配置取默认分区键；<br/>
+        <code> table.create.auto-partition.properties.DB.TABLE.partition-unit</code> 特定表的分区单位，如未配置取默认分区单位。<br/>
         注意：<br/>
-        1: 如果分区键不为DATE/DATETIME类型，则不会创建分区表。<br/>
-        2: Doris AUTO RANGE PARTITION不支持NULLABLE列作为分区列，如果您配置的分区键的值为空或者表创建完成后新增了NULLABLE分区列，系统将自动填充默认值（DATE类型为<code>1970-01-01</code>，DATETIME类型为<code>1970-01-01 00:00:00</code>），请选择合适的分区键。
+        1: 如果分区键不为 DATE/DATETIME 类型，则不会创建分区表。<br/>
+        2: Doris AUTO RANGE PARTITION 不支持 NULLABLE 列作为分区列，如果您配置的分区键的值为空或者表创建完成后新增了 NULLABLE 分区列，系统将自动填充默认值（DATE 类型为 <code>1970-01-01</code>，DATETIME 类型为 <code>1970-01-01 00:00:00</code>），请选择合适的分区键。
       </td> 
     </tr>
     </tbody>
@@ -340,12 +340,12 @@ pipeline:
     <tr>
       <td>CHAR(n)</td>
       <td>CHAR(n*3)</td>
-      <td>在Doris中，字符串是以UTF-8编码存储的，所以英文字符占1个字节，中文字符占3个字节。这里的长度统一乘3，CHAR最大的长度是255，超过后会自动转为VARCHAR类型</td>
+      <td>在 Doris 中，字符串是以 UTF-8 编码存储的，所以英文字符占 1 个字节，中文字符占 3 个字节。这里的长度统一乘 3，CHAR 最大的长度是 255，超过后会自动转为 VARCHAR 类型</td>
     </tr>
     <tr>
       <td>VARCHAR(n)</td>
       <td>VARCHAR(n*3)</td>
-      <td>同上，这里的长度统一乘3，VARCHAR最大的长度是65533，超过后会自动转为STRING类型</td>
+      <td>同上，这里的长度统一乘 3，VARCHAR 最大的长度是 65533，超过后会自动转为 STRING 类型</td>
     </tr>
     <tr>
       <td>

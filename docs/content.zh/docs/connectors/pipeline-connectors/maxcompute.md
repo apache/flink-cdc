@@ -27,7 +27,7 @@ under the License.
 
 # MaxCompute Connector
 
-MaxCompute Pipeline 连接器可以用作 Pipeline 的 *Data Sink*，将数据写入[MaxCompute](https://www.aliyun.com/product/odps)。
+MaxCompute Pipeline 连接器可以用作 Pipeline 的 *Data Sink*，将数据写入 [MaxCompute](https://www.aliyun.com/product/odps)。
 本文档介绍如何设置 MaxCompute Pipeline 连接器。
 
 ## 连接器的功能
@@ -84,37 +84,37 @@ pipeline:
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>指定要使用的连接器, 这里需要设置成 <code>'maxcompute'</code>.</td>
+      <td>指定要使用的连接器，这里需要设置成 <code>'maxcompute'</code>。</td>
     </tr>
     <tr>
       <td>name</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Sink 的名称.</td>
+      <td>Sink 的名称。</td>
     </tr>
     <tr>
       <td>access-id</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>阿里云账号或RAM用户的AccessKey ID。您可以进入<a href="https://ram.console.aliyun.com/manage/ak">
-            AccessKey管理页面</a> 获取AccessKey ID。</td>
+      <td>阿里云账号或 RAM 用户的 AccessKey ID。您可以进入<a href="https://ram.console.aliyun.com/manage/ak">
+            AccessKey 管理页面</a> 获取 AccessKey ID。</td>
     </tr>
     <tr>
       <td>access-key</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>AccessKey ID对应的AccessKey Secret。您可以进入<a href="https://ram.console.aliyun.com/manage/ak">
-            AccessKey管理页面</a> 获取AccessKey Secret。</td>
+      <td>AccessKey ID 对应的 AccessKey Secret。您可以进入<a href="https://ram.console.aliyun.com/manage/ak">
+            AccessKey 管理页面</a> 获取 AccessKey Secret。</td>
     </tr>
     <tr>
       <td>endpoint</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>MaxCompute服务的连接地址。您需要根据创建MaxCompute项目时选择的地域以及网络连接方式配置Endpoint。各地域及网络对应的Endpoint值，请参见<a href="https://help.aliyun.com/zh/maxcompute/user-guide/endpoints">
+      <td>MaxCompute 服务的连接地址。您需要根据创建 MaxCompute 项目时选择的地域以及网络连接方式配置 Endpoint。各地域及网络对应的 Endpoint 值，请参见<a href="https://help.aliyun.com/zh/maxcompute/user-guide/endpoints">
            Endpoint</a>。</td>
     </tr>
     <tr>
@@ -122,15 +122,15 @@ pipeline:
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>MaxCompute项目名称。您可以登录<a href="https://maxcompute.console.aliyun.com/">
-           MaxCompute控制台</a>，在 工作区 > 项目管理 页面获取MaxCompute项目名称。</td>
+      <td>MaxCompute 项目名称。您可以登录<a href="https://maxcompute.console.aliyun.com/">
+           MaxCompute 控制台</a>，在 工作区 > 项目管理 页面获取 MaxCompute 项目名称。</td>
     </tr>
     <tr>
       <td>tunnel.endpoint</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>MaxCompute Tunnel服务的连接地址，通常这项配置可以根据指定的project所在的region进行自动路由。仅在使用代理等特殊网络环境下使用该配置。</td>
+      <td>MaxCompute Tunnel 服务的连接地址，通常这项配置可以根据指定的 project 所在的 region 进行自动路由。仅在使用代理等特殊网络环境下使用该配置。</td>
     </tr>
     <tr>
       <td>quota.name</td>
@@ -145,7 +145,7 @@ pipeline:
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>当使用RAM角色颁发的短时有效的访问令牌（STS Token）进行鉴权时，需要指定该参数。</td>
+      <td>当使用 RAM 角色颁发的短时有效的访问令牌（STS Token）进行鉴权时，需要指定该参数。</td>
     </tr>
     <tr>
       <td>buckets-num</td>
@@ -160,35 +160,35 @@ pipeline:
       <td>optional</td>
       <td style="word-wrap: break-word;">zlib</td>
       <td>String</td>
-      <td>写入MaxCompute时使用的数据压缩算法，当前支持<code>raw</code>（不进行压缩），<code>zlib</code>, <code>lz4</code>和<code>snappy</code>。</td>
+      <td>写入 MaxCompute 时使用的数据压缩算法，当前支持 <code>raw</code>（不进行压缩），<code>zlib</code>, <code>lz4</code> 和 <code>snappy</code>。</td>
     </tr>
     <tr>
       <td>total.buffer-size</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">64MB</td>
       <td>String</td>
-      <td>内存中缓冲的数据量大小，单位为分区级（非分区表单位为表级），不同分区（表）的缓冲区相互独立，达到阈值后数据写入到MaxCompute。</td>
+      <td>内存中缓冲的数据量大小，单位为分区级（非分区表单位为表级），不同分区（表）的缓冲区相互独立，达到阈值后数据写入到 MaxCompute。</td>
     </tr>
     <tr>
       <td>bucket.buffer-size</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">4MB</td>
       <td>String</td>
-      <td>内存中缓冲的数据量大小，单位为桶级，仅写入 Delta 表时生效。不同数据桶的缓冲区相互独立，达到阈值后将该桶数据写入到MaxCompute。</td>
+      <td>内存中缓冲的数据量大小，单位为桶级，仅写入 Delta 表时生效。不同数据桶的缓冲区相互独立，达到阈值后将该桶数据写入到 MaxCompute。</td>
     </tr>
     <tr>
       <td>commit.thread-num</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">16</td>
       <td>Integer</td>
-      <td>checkpoint阶段，能够同时处理的分区（表）数量。</td>
+      <td>checkpoint 阶段，能够同时处理的分区（表）数量。</td>
     </tr>
     <tr>
       <td>flush.concurrent-num</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">4</td>
       <td>Integer</td>
-      <td>写入数据到MaxCompute时，能够同时写入的桶数量。仅写入 Delta 表时生效。</td>
+      <td>写入数据到 MaxCompute 时，能够同时写入的桶数量。仅写入 Delta 表时生效。</td>
     </tr>
     </tbody>
 </table>    
@@ -196,18 +196,18 @@ pipeline:
 
 ## 使用说明
 
-* 链接器 支持自动建表，将MaxCompute表与源表的位置关系、数据类型进行自动映射（参见下文映射表），当源表有主键时，自动创建
-  MaxCompute Delta 表，否则创建普通 MaxCompute 表（Append表）
-* 当写入普通 MaxCompute 表（Append表）时，会忽略`delete`操作，`update`操作会被视为`insert`操作
+* 连接器支持自动建表，将 MaxCompute 表与源表的位置关系、数据类型进行自动映射（参见下文映射表），当源表有主键时，自动创建
+  MaxCompute Delta 表，否则创建普通 MaxCompute 表（Append 表）
+* 当写入普通 MaxCompute 表（Append 表）时，会忽略 `delete` 操作，`update` 操作会被视为 `insert` 操作
 * 目前仅支持 at-least-once，Delta 表由于主键特性能够实现幂等写
 * 对于表结构变更同步
     * 新增列只能添加到最后一列
-    * 修改列类型，只能修改为兼容的类型。兼容表可以参考[ALTER TABLE](https://help.aliyun.com/zh/maxcompute/user-guide/alter-table)
+    * 修改列类型，只能修改为兼容的类型。兼容表可以参考 [ALTER TABLE](https://help.aliyun.com/zh/maxcompute/user-guide/alter-table)
 
 ## 表位置映射
 
-链接器自动建表时，使用如下映射关系，将源表的位置信息映射到MaxCompute表的位置。注意，当MaxCompute项目不支持Schema模型时，每个同步任务仅能同步一个Mysql
-Database。（其他Datasource同理，链接器会忽略TableId.namespace信息）
+连接器自动建表时，使用如下映射关系，将源表的位置信息映射到 MaxCompute 表的位置。注意，当 MaxCompute 项目不支持 Schema 模型时，每个同步任务仅能同步一个 MySQL
+Database。（其他 Datasource 同理，连接器会忽略 TableId.namespace 信息）
 
 <div class="wy-table-responsive">
 <table class="colwidths-auto docutils">
@@ -215,18 +215,18 @@ Database。（其他Datasource同理，链接器会忽略TableId.namespace信息
       <tr>
         <th class="text-left">Flink CDC 中抽象</th>
         <th class="text-left">MaxCompute 位置</th>
-        <th class="text-left" style="width:60%;">Mysql 位置</th>
+        <th class="text-left" style="width:60%;">MySQL 位置</th>
       </tr>
     </thead>
     <tbody>
     <tr>
-      <td>配置文件中project</td>
+      <td>配置文件中 project</td>
       <td>project</td>
       <td>(none)</td>
     </tr>
     <tr>
       <td>TableId.namespace</td>
-      <td>schema（仅当MaxCompute项目支持Schema模型时，如不支持，将忽略该配置）</td>
+      <td>schema（仅当 MaxCompute 项目支持 Schema 模型时，如不支持，将忽略该配置）</td>
       <td>database</td>
     </tr>
     <tr>

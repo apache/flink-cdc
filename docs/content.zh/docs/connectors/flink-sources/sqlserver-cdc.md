@@ -31,7 +31,7 @@ SQLServer CDC 连接器允许从 SQLServer 数据库读取快照数据和增量�
 依赖
 ------------
 
-为了设置 SQLServer CDC 连接器，下表提供了使用构建自动化工具（如 Maven 或 SBT ）和带有 SQL JAR 包的 SQL 客户端的两个项目的依赖关系信息。
+为了设置 SQLServer CDC 连接器，下表提供了使用构建自动化工具（如 Maven 或 SBT）和带有 SQL JAR 包的 SQL 客户端的两个项目的依赖关系信息。
 
 ### Maven dependency
 
@@ -43,7 +43,7 @@ SQLServer CDC 连接器允许从 SQLServer 数据库读取快照数据和增量�
 
 下载 [flink-sql-connector-sqlserver-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-sqlserver-cdc) 到 `<FLINK_HOME>/lib/` 目录下。
 
-**注意:** 参考 [flink-sql-connector-sqlserver-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-sqlserver-cdc) 当前已发布的所有版本都可以在 Maven 中央仓库获取。
+**注意：** 参考 [flink-sql-connector-sqlserver-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-sqlserver-cdc) 当前已发布的所有版本都可以在 Maven 中央仓库获取。
 
 设置 SQLServer 数据库
 ----------------
@@ -127,7 +127,7 @@ SELECT * FROM orders;
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>指定要使用的连接器, 这里应该是 <code>'sqlserver-cdc'</code>.</td>
+      <td>指定要使用的连接器，这里应该是 <code>'sqlserver-cdc'</code>。</td>
     </tr>
     <tr>
       <td>hostname</td>
@@ -162,7 +162,7 @@ SELECT * FROM orders;
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>需要监视的 SQLServer 数据库的表名，例如: "db1.table1"</td>
+      <td>需要监视的 SQLServer 数据库的表名，例如："db1.table1"</td>
     </tr>
     <tr>
       <td>port</td>
@@ -176,7 +176,7 @@ SELECT * FROM orders;
       <td>optional</td>
       <td style="word-wrap: break-word;">UTC</td>
       <td>String</td>
-      <td>数据库服务器中的会话时区， 例如： "Asia/Shanghai"。</td>
+      <td>数据库服务器中的会话时区，例如："Asia/Shanghai"。</td>
     </tr>
     <tr>
       <td>scan.incremental.snapshot.enabled</td>
@@ -216,7 +216,7 @@ SELECT * FROM orders;
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>将 Debezium 的属性传递给 Debezium 嵌入式引擎，该引擎用于从 SQLServer 捕获数据更改。
-          例如: <code>'debezium.snapshot.mode' = 'initial_only'</code>.
+          例如：<code>'debezium.snapshot.mode' = 'initial_only'</code>。
           查看更多关于 <a href="https://debezium.io/documentation/reference/1.9/connectors/sqlserver.html#sqlserver-required-connector-configuration-properties">Debezium 的 SQLServer 连接器属性</a></td> 
     </tr>
     <tr>
@@ -255,7 +255,7 @@ SELECT * FROM orders;
       <td>Boolean</td>
       <td>
         快照读取阶段是否先分配 UnboundedChunk。<br>
-        这可能有助于降低 TaskManager 在对最大的 UnboundedChunk 执行快照时出现内存溢出 (OOM) 错误的风险。<br> 
+        这可能有助于降低 TaskManager 在对最大的 UnboundedChunk 执行快照时出现内存溢出（OOM）错误的风险。<br>
       </td>
     </tr>
     <tr>
@@ -264,9 +264,9 @@ SELECT * FROM orders;
       <td style="word-wrap: break-word;">false</td>
       <td>Boolean</td>
       <td>
-        是否在快照读取阶段跳过 backfill 。<br> 
-        如果跳过 backfill ，快照阶段捕获表的更改将在稍后的 change log 读取阶段被回放，而不是合并到快照中。<br>
-        警告：跳过 backfill 可能会导致数据不一致，因为快照阶段发生的某些 change log 事件可能会被重放（仅保证 at-least-once ）。
+        是否在快照读取阶段跳过 backfill。<br>
+        如果跳过 backfill，快照阶段捕获表的更改将在稍后的 change log 读取阶段被回放，而不是合并到快照中。<br>
+        警告：跳过 backfill 可能会导致数据不一致，因为快照阶段发生的某些 change log 事件可能会被重放（仅保证 at-least-once）。
         例如，更新快照阶段已更新的值，或删除快照阶段已删除的数据。这些重放的 change log 事件应进行特殊处理。
       </td>
     </tr>
@@ -306,7 +306,7 @@ SELECT * FROM orders;
     <tr>
       <td>op_ts</td>
       <td>TIMESTAMP_LTZ(3) NOT NULL</td>
-      <td>当前记录表在数据库中更新的时间。 <br>如果从表的快照而不是更改流读取记录，该值将始终为0。</td>
+      <td>当前记录表在数据库中更新的时间。 <br>如果从表的快照而不是更改流读取记录，该值将始终为 0。</td>
     </tr>
   </tbody>
 </table>
@@ -358,9 +358,9 @@ SQLServer CDC 连接器是一个 Flink Source 连接器，它将首先读取数�
 
 ### 启动模式
 
-配置选项`scan.startup.mode`指定 SQLServer CDC 使用者的启动模式。有效枚举包括：
+配置选项 `scan.startup.mode` 指定 SQLServer CDC 使用者的启动模式。有效枚举包括：
 
-- `initial` （默认）：对捕获表的结构和数据执行快照；适用于需要使用捕获表数据的完整表示来填充主题的场景。
+- `initial`（默认）：对捕获表的结构和数据执行快照；适用于需要使用捕获表数据的完整表示来填充主题的场景。
 - `latest-offset`：仅对捕获表的结构执行快照；适用于只需要将从现在开始发生的变更传播到主题的场景。
 
 _注意：`scan.startup.mode` 选项的机制依赖于 Debezium 的 `snapshot.mode` 配置，因此请不要同时使用它们。如果在表 DDL 中同时指定 `scan.startup.mode` 和 `debezium.snapshot.mode` 选项，可能会导致 `scan.startup.mode` 失效。_
@@ -371,7 +371,7 @@ SQLServer CDC source 无法进行并行读取，因为只有一个任务可以�
 
 ### DataStream Source
 
-SQLServer CDC 连接器也可以是一个数据流源。 你可以创建 SourceFunction，如下所示：
+SQLServer CDC 连接器也可以是一个数据流源。你可以创建 SourceFunction，如下所示：
 
 ```java
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -445,7 +445,7 @@ public class SqlServerIncrementalSourceExample {
 
 ### 关于无主键表
 
-从3.4.0 版本开始支持无主键表，使用无主键表必须设置 `scan.incremental.snapshot.chunk.key-column`，且只能选择非空类型的一个字段。
+从 3.4.0 版本开始支持无主键表，使用无主键表必须设置 `scan.incremental.snapshot.chunk.key-column`，且只能选择非空类型的一个字段。
 
 在使用无主键表时，需要注意以下两种情况。
 
@@ -462,25 +462,25 @@ public class SqlServerIncrementalSourceExample {
 
 - **表结构：**
     - **主键：** `id`
-    - **分片键列 ：** `pid`（非主键）
+    - **分片键列：** `pid`（非主键）
 
-- **快照分片 ：**
-    - **分片 0:** `1 < pid <= 3`
-    - **分片 1:** `3 < pid <= 5`
+- **快照分片：**
+    - **分片 0：** `1 < pid <= 3`
+    - **分片 1：** `3 < pid <= 5`
 
-- **操作 ：**
+- **操作：**
     - 两个子任务并行读取 **分片 0** 和 **分片 1**。
     - 在读取过程中，发生了一次 **更新** 操作，使 `id=0` 的 `pid` 从 `2` 变为 `4`，在两个分片的**高低水位**间都包含此次变更，导致该更新操作在增量阶段不会被处理。
 
-- **结果 ：**
-    - **分片 0:** 记录 `[id=0, pid=2]`
-    - **分片 1:** 记录 `[id=0, pid=4]`
+- **结果：**
+    - **分片 0：** 记录 `[id=0, pid=2]`
+    - **分片 1：** 记录 `[id=0, pid=4]`
 
 由于**处理顺序**无法保证，最终 `id=0` 的 `pid` 可能为 `2` 或 `4`，从而导致数据不一致。
 
 ### 可用的指标
 
-指标系统能够帮助了解分片分发的进展， 下面列举出了支持的 Flink 指标 [Flink metrics](https://nightlies.apache.org/flink/flink-docs-master/docs/ops/metrics/):
+指标系统能够帮助了解分片分发的进展，下面列举出了支持的 Flink 指标 [Flink metrics](https://nightlies.apache.org/flink/flink-docs-master/docs/ops/metrics/)：
 
 | Group                  | Name                       | Type  | Description    |
 |------------------------|----------------------------|-------|----------------|
@@ -494,8 +494,8 @@ public class SqlServerIncrementalSourceExample {
 | namespace.schema.table | snapshotStartTime          | Gauge | 快照读取阶段开始的时间    |
 | namespace.schema.table | snapshotEndTime            | Gauge | 快照读取阶段结束的时间    |
 
-注意:
-1. Group 名称是 `namespace.schema.table`，这里的 `namespace` 是实际的数据库名称， `schema` 是实际的 schema 名称， `table` 是实际的表名称。
+注意：
+1. Group 名称是 `namespace.schema.table`，这里的 `namespace` 是实际的数据库名称，`schema` 是实际的 schema 名称，`table` 是实际的表名称。
 2. 对于 SQLServer，Group 的名称会类似于 `test_database.test_schema.test_table`。
 
 数据类型映射

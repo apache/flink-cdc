@@ -26,7 +26,7 @@ under the License.
 
 # Hudi Pipeline 连接器
 
-Hudi Pipeline 连接器可以用作 Pipeline 的 *Data Sink*，将数据写入[Apache Hudi](https://hudi.apache.org)。 本文档介绍如何设置 Hudi Pipeline 连接器。
+Hudi Pipeline 连接器可以用作 Pipeline 的 *Data Sink*，将数据写入 [Apache Hudi](https://hudi.apache.org)。本文档介绍如何设置 Hudi Pipeline 连接器。
 
 ## 连接器的功能
 * 自动创建 Hudi 表
@@ -85,7 +85,7 @@ Pipeline 连接器配置项
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>指定要使用的连接器, 这里需要设置成 <code>'hudi'</code></td>
+      <td>指定要使用的连接器，这里需要设置成 <code>'hudi'</code></td>
     </tr>
     <tr>
       <td>path</td>
@@ -106,14 +106,14 @@ Pipeline 连接器配置项
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>目标 <code>hudi</code> 表的类型, 目前仅支持 <code>MERGE_ON_READ</code></td>
+      <td>目标 <code>hudi</code> 表的类型，目前仅支持 <code>MERGE_ON_READ</code></td>
     </tr>
     <tr>
       <td>index.type</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>目标 <code>hudi</code> 表的索引类型, 目前仅支持 <code>BUCKET</code></td>
+      <td>目标 <code>hudi</code> 表的索引类型，目前仅支持 <code>BUCKET</code></td>
     </tr>
     <tr>
       <td>table.properties.*</td>

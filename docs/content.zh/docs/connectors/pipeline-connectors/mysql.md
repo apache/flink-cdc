@@ -26,7 +26,7 @@ under the License.
 
 # MySQL Connector
 
-MySQL CDC Pipeline 连接器允许从 MySQL 数据库读取快照数据和增量数据，并提供端到端的整库数据同步能力。 本文描述了如何设置 MySQL CDC Pipeline 连接器。
+MySQL CDC Pipeline 连接器允许从 MySQL 数据库读取快照数据和增量数据，并提供端到端的整库数据同步能力。本文描述了如何设置 MySQL CDC Pipeline 连接器。
 
 ## 依赖配置
 
@@ -125,7 +125,7 @@ pipeline:
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>需要监视的 MySQL 数据库的表名。表名支持正则表达式，以监视满足正则表达式的多个表。<br>
-          需要注意的是，点号（.）被视为数据库和表名的分隔符。 如果需要在正则表达式中使用点（.）来匹配任何字符，必须使用反斜杠对点进行转义。<br>
+          需要注意的是，点号（.）被视为数据库和表名的分隔符。如果需要在正则表达式中使用点（.）来匹配任何字符，必须使用反斜杠对点进行转义。<br>
           例如，db0.\.*, db1.user_table_[0-9]+, db[1-2].[app|web]order_\.*</td>
     </tr>
     <tr>
@@ -133,15 +133,15 @@ pipeline:
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>需要排除的 MySQL 数据库的表名，参数会在tables参数后发生排除作用。表名支持正则表达式，以排除满足正则表达式的多个表。<br>
-          用法和tables参数相同</td>
+      <td>需要排除的 MySQL 数据库的表名，参数会在 tables 参数后发生排除作用。表名支持正则表达式，以排除满足正则表达式的多个表。<br>
+          用法和 tables 参数相同</td>
     </tr>
     <tr>
       <td>schema-change.enabled</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">true</td>
       <td>Boolean</td>
-      <td>是否发送模式更改事件，下游 sink 可以响应模式变更事件实现表结构同步，默认为true。</td>
+      <td>是否发送模式更改事件，下游 sink 可以响应模式变更事件实现表结构同步，默认为 true。</td>
     </tr>
     <tr>
       <td>server-time-zone</td>
@@ -156,7 +156,7 @@ pipeline:
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>读取数据使用的 server id，server id 可以是个整数或者一个整数范围，比如 '5400' 或 '5400-5408', 
-      建议在 'scan.incremental.snapshot.enabled' 参数为启用时，配置成整数范围。因为在当前 MySQL 集群中运行的所有 slave 节点，标记每个 salve 节点的 id 都必须是唯一的。 所以当连接器加入 MySQL 集群作为另一个 slave 节点（并且具有唯一 id 的情况下），它就可以读取 binlog。 默认情况下，连接器会在 5400 和 6400 之间生成一个随机数，但是我们建议用户明确指定 Server id。
+      建议在 'scan.incremental.snapshot.enabled' 参数为启用时，配置成整数范围。因为在当前 MySQL 集群中运行的所有 slave 节点，标记每个 salve 节点的 id 都必须是唯一的。所以当连接器加入 MySQL 集群作为另一个 slave 节点（并且具有唯一 id 的情况下），它就可以读取 binlog。默认情况下，连接器会在 5400 和 6400 之间生成一个随机数，但是我们建议用户明确指定 Server id。
       </td>
     </tr>
     <tr>
@@ -228,7 +228,7 @@ pipeline:
       <td>optional</td>
       <td style="word-wrap: break-word;">30s</td>
       <td>Duration</td>
-      <td>连接器在尝试连接到 MySQL 数据库服务器后超时前应等待的最长时间。该时长不能少于250毫秒。</td>
+      <td>连接器在尝试连接到 MySQL 数据库服务器后超时前应等待的最长时间。该时长不能少于 250 毫秒。</td>
     </tr>    
     <tr>
       <td>connect.max-retries</td>
@@ -249,7 +249,7 @@ pipeline:
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>传递自定义 JDBC URL 属性的选项。用户可以传递自定义属性，如 'jdbc.properties.useSSL' = 'false'.</td>
+      <td>传递自定义 JDBC URL 属性的选项。用户可以传递自定义属性，如 'jdbc.properties.useSSL' = 'false'。</td>
     </tr>
     <tr>
       <td>heartbeat.interval</td>
@@ -264,7 +264,7 @@ pipeline:
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>将 Debezium 的属性传递给 Debezium 嵌入式引擎，该引擎用于从 MySQL 服务器捕获数据更改。
-          例如: <code>'debezium.snapshot.mode' = 'never'</code>.
+          例如：<code>'debezium.snapshot.mode' = 'never'</code>。
           查看更多关于 <a href="https://debezium.io/documentation/reference/1.9/connectors/mysql.html#mysql-connector-properties"> Debezium 的  MySQL 连接器属性</a></td> 
     </tr>
     <tr>
@@ -272,7 +272,7 @@ pipeline:
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>
       <td>Boolean</td>
-      <td>是否在快照结束后关闭空闲的 Reader。 此特性需要 flink 版本大于等于 1.14 并且 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' 需要设置为 true。<br>
+      <td>是否在快照结束后关闭空闲的 Reader。此特性需要 flink 版本大于等于 1.14 并且 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' 需要设置为 true。<br>
           若 flink 版本大于等于 1.15，'execution.checkpointing.checkpoints-after-tasks-finish.enabled' 默认值变更为 true，可以不用显式配置 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' = true。</td>
     </tr>
     <tr>
@@ -280,7 +280,7 @@ pipeline:
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>
       <td>Boolean</td>
-      <td>是否启用动态加表特性，默认关闭。 此配置项只有作业从savepoint/checkpoint启动时才生效。</td>
+      <td>是否启用动态加表特性，默认关闭。此配置项只有作业从 savepoint/checkpoint 启动时才生效。</td>
     </tr>
     <tr>
       <td>scan.incremental.snapshot.metadata.release.enabled</td>
@@ -295,7 +295,7 @@ pipeline:
       <td style="word-wrap: break-word;">false</td>
       <td>Boolean</td>
       <td>在 binlog 读取阶段，是否读取新增表的表结构变更和数据变更，默认值是 false。 <br>
-          scan.newly-added-table.enabled 和 scan.binlog.newly-added-table.enabled 参数的不同在于: <br>
+          scan.newly-added-table.enabled 和 scan.binlog.newly-added-table.enabled 参数的不同在于：<br>
           scan.newly-added-table.enabled: 在作业重启后，对新增表的全量和增量数据进行读取; <br>
           scan.binlog.newly-added-table.enabled: 只在 binlog 读取阶段读取新增表的增量数据。
       </td>
@@ -307,7 +307,7 @@ pipeline:
       <td>Boolean</td>
       <td>
         是否尝试解析由 <a href="https://github.com/github/gh-ost">gh-ost</a> 或 <a href="https://docs.percona.com/percona-toolkit/pt-online-schema-change.html">pt-osc</a> 工具生成的表结构变更事件。
-        这些工具会在变更表结构时，将变更语句应用到“影子表”之上，并稍后将其与主表进行交换，以达到表结构变更的目的。
+        这些工具会在变更表结构时，将变更语句应用到 “影子表” 之上，并稍后将其与主表进行交换，以达到表结构变更的目的。
         <br>
         这是一项实验性功能。
       </td>
@@ -324,7 +324,7 @@ pipeline:
       <td>optional</td>
       <td style="word-wrap: break-word;">true</td>
       <td>Boolean</td>
-      <td>是否将TINYINT(1)类型当做Boolean类型处理，默认true。</td>
+      <td>是否将 TINYINT(1) 类型当做 Boolean 类型处理，默认 true。</td>
     </tr>
     <tr>
       <td>scan.incremental.snapshot.unbounded-chunk-first.enabled</td>
@@ -333,7 +333,7 @@ pipeline:
       <td>Boolean</td>
       <td>
         快照读取阶段是否先分配 UnboundedChunk。<br>
-        这有助于降低 TaskManager 在快照阶段同步最后一个chunk时遇到内存溢出 (OOM) 的风险。<br> 
+        这有助于降低 TaskManager 在快照阶段同步最后一个 chunk 时遇到内存溢出（OOM）的风险。<br>
         这是一项实验特性，默认为 false。
       </td>
     </tr>
@@ -343,9 +343,9 @@ pipeline:
       <td style="word-wrap: break-word;">false</td>
       <td>Boolean</td>
       <td>
-        是否在快照读取阶段跳过 backfill 。<br>
-        如果跳过 backfill ，快照阶段捕获表的更改将在稍后的 binlog 读取阶段被回放，而不是合并到快照中。<br>
-        警告：跳过 backfill 可能会导致数据不一致，因为快照阶段发生的某些 binlog 事件可能会被重放（仅保证 at-least-once ）。
+        是否在快照读取阶段跳过 backfill。<br>
+        如果跳过 backfill，快照阶段捕获表的更改将在稍后的 binlog 读取阶段被回放，而不是合并到快照中。<br>
+        警告：跳过 backfill 可能会导致数据不一致，因为快照阶段发生的某些 binlog 事件可能会被重放（仅保证 at-least-once）。
         例如，更新快照阶段已更新的值，或删除快照阶段已删除的数据。这些重放的 binlog 事件应进行特殊处理。
     </tr>
     <tr>
@@ -354,7 +354,7 @@ pipeline:
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>
-        可额外读取的SourceRecord中元数据的列表，后续可直接使用在transform模块，英文逗号 `,` 分割。目前可用值包含：op_ts。
+        可额外读取的 SourceRecord 中元数据的列表，后续可直接使用在 transform 模块，英文逗号 `,` 分割。目前可用值包含：op_ts。
       </td>
     </tr>
     <tr>
@@ -366,7 +366,7 @@ pipeline:
           这代表着是否使用 legacy JSON 格式来转换 Binlog 中的 JSON 类型的数据。
           如果用户配置 'use.legacy.json.format' = 'true'，则从 Binlog 中转换 JSON 类型的数据时，会移除值之前的空格和逗号之后的空格。例如，
           Binlog 中 JSON 类型的数据 {"key1": "value1", "key2": "value2"} 会被转换为 {"key1":"value1","key2":"value2"}。
-          如果设置 'use.legacy.json.format' = 'false'， 这条数据会被转换为 {"key1": "value1", "key2": "value2"}， 也就是 key 和 value 前的空格都会被保留。
+          如果设置 'use.legacy.json.format' = 'false'，这条数据会被转换为 {"key1": "value1", "key2": "value2"}，也就是 key 和 value 前的空格都会被保留。
       </td>
     </tr>
     </tbody>
@@ -375,10 +375,10 @@ pipeline:
 
 ## 启动模式
 
-配置选项`scan.startup.mode`指定 MySQL CDC 使用者的启动模式。有效枚举包括：
-- `initial` （默认）：在第一次启动时对受监视的数据库表执行初始快照，并继续读取最新的 binlog。
+配置选项 `scan.startup.mode` 指定 MySQL CDC 使用者的启动模式。有效枚举包括：
+- `initial`（默认）：在第一次启动时对受监视的数据库表执行初始快照，并继续读取最新的 binlog。
 - `earliest-offset`：跳过快照阶段，从可读取的最早 binlog 位点开始读取
-- `latest-offset`：首次启动时，从不对受监视的数据库表执行快照， 连接器仅从 binlog 的结尾处开始读取，这意味着连接器只能读取在连接器启动之后的数据更改。
+- `latest-offset`：首次启动时，从不对受监视的数据库表执行快照，连接器仅从 binlog 的结尾处开始读取，这意味着连接器只能读取在连接器启动之后的数据更改。
 - `specific-offset`：跳过快照阶段，从指定的 binlog 位点开始读取。位点可通过 binlog 文件名和位置指定，或者在 GTID 在集群上启用时通过 GTID 集合指定。
 - `timestamp`：跳过快照阶段，从指定的时间戳开始读取 binlog 事件。
 - `snapshot`: 只进行快照阶段，跳过增量阶段，快照阶段读取结束后退出。
@@ -402,7 +402,7 @@ source:
 
 ### 可用的指标
 
-指标系统能够帮助了解分片分发的进展， 下面列举出了支持的 Flink 指标 [Flink metrics](https://nightlies.apache.org/flink/flink-docs-master/docs/ops/metrics/):
+指标系统能够帮助了解分片分发的进展，下面列举出了支持的 Flink 指标 [Flink metrics](https://nightlies.apache.org/flink/flink-docs-master/docs/ops/metrics/)：
 
 | Group                  | Name                       | Type  | Description    |
 |------------------------|----------------------------|-------|----------------|
@@ -416,8 +416,8 @@ source:
 | namespace.schema.table | snapshotStartTime          | Gauge | 快照读取阶段开始的时间    |
 | namespace.schema.table | snapshotEndTime            | Gauge | 快照读取阶段结束的时间    |
 
-注意:
-1. Group 名称是 `namespace.schema.table`，这里的 `namespace` 是实际的数据库名称， `schema` 是实际的 schema 名称， `table` 是实际的表名称。
+注意：
+1. Group 名称是 `namespace.schema.table`，这里的 `namespace` 是实际的数据库名称，`schema` 是实际的 schema 名称，`table` 是实际的表名称。
 2. 对于 MySQL，这里的 `namespace` 会被设置成默认值 ""，也就是一个空字符串，Group 名称的格式会类似于 `test_database.test_table`。
 
 ## 数据类型映射
@@ -671,23 +671,23 @@ source:
 </div>
 
 ### 空间数据类型映射
-MySQL中除`GEOMETRYCOLLECTION`之外的空间数据类型都会转换为 Json 字符串，格式固定，如：<br>
+MySQL 中除 `GEOMETRYCOLLECTION` 之外的空间数据类型都会转换为 Json 字符串，格式固定，如：<br>
 ```json
 {"srid": 0 , "type": "xxx", "coordinates": [0, 0]}
 ```
-字段`srid`标识定义几何体的 SRS，如果未指定 SRID，则 SRID 0 是新几何体值的默认值。
-由于 MySQL 8+ 在定义空间数据类型时只支持特定的 SRID，因此在版本较低的MySQL中，字段`srid`将始终为 0。
+字段 `srid` 标识定义几何体的 SRS，如果未指定 SRID，则 SRID 0 是新几何体值的默认值。
+由于 MySQL 8+ 在定义空间数据类型时只支持特定的 SRID，因此在版本较低的 MySQL 中，字段 `srid` 将始终为 0。
 
-字段`type`标识空间数据类型，例如`POINT`/`LINESTRING`/`POLYGON`。
+字段 `type` 标识空间数据类型，例如 `POINT`/`LINESTRING`/`POLYGON`。
 
-字段`coordinates`表示空间数据的`坐标`。
+字段 `coordinates` 表示空间数据的 `坐标`。
 
-对于`GEOMETRYCOLLECTION`，它将转换为 Json 字符串，格式固定，如：<br>
+对于 `GEOMETRYCOLLECTION`，它将转换为 Json 字符串，格式固定，如：<br>
 ```json
 {"srid": 0 , "type": "GeometryCollection", "geometries": [{"type":"Point","coordinates":[10,10]}]}
 ```
 
-`Geometrics`字段是一个包含所有空间数据的数组。
+`Geometrics` 字段是一个包含所有空间数据的数组。
 
 不同空间数据类型映射的示例如下：
 <div class="wy-table-responsive">

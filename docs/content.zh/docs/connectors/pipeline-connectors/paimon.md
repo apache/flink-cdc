@@ -26,7 +26,7 @@ under the License.
 
 # Paimon Pipeline 连接器
 
-Paimon Pipeline 连接器可以用作 Pipeline 的 *Data Sink*，将数据写入[Paimon](https://paimon.apache.org)。 本文档介绍如何设置 Paimon Pipeline 连接器。
+Paimon Pipeline 连接器可以用作 Pipeline 的 *Data Sink*，将数据写入 [Paimon](https://paimon.apache.org)。本文档介绍如何设置 Paimon Pipeline 连接器。
 
 ## 连接器的功能
 * 自动建表
@@ -79,14 +79,14 @@ Pipeline 连接器配置项
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>指定要使用的连接器, 这里需要设置成 <code>'paimon'</code>.</td>
+      <td>指定要使用的连接器，这里需要设置成 <code>'paimon'</code>。</td>
     </tr>
     <tr>
       <td>name</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Sink 的名称.</td>
+      <td>Sink 的名称。</td>
     </tr>
     <tr>
       <td>catalog.properties.metastore</td>
@@ -121,7 +121,7 @@ Pipeline 连接器配置项
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>设置每个分区表的分区字段，允许填写成多个分区表的多个分区字段。 不同的表使用 ';'分割， 而不同的字段则使用 ','分割。举个例子， 我们可以为两张表的不同分区字段作如下的设置 'testdb.table1:id1,id2;testdb.table2:name'。</td>
+      <td>设置每个分区表的分区字段，允许填写成多个分区表的多个分区字段。不同的表使用 ';' 分割，而不同的字段则使用 ',' 分割。举个例子，我们可以为两张表的不同分区字段作如下的设置 'testdb.table1:id1,id2;testdb.table2:name'。</td>
     </tr>
     <tr>
       <td>catalog.properties.*</td>

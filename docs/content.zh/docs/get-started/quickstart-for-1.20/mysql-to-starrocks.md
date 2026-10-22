@@ -28,7 +28,7 @@ under the License.
 本教程的演示都将在 Flink CDC CLI 中进行，无需一行 Java/Scala 代码，也无需安装 IDE。
 
 ## 准备阶段
-准备一台已经安装了 Docker 的 Linux 或者 MacOS 电脑。
+准备一台已经安装了 Docker 的 Linux 或者 macOS 电脑。
 
 ### 准备 Flink Standalone 集群
 1. 下载 [Flink 1.20.3](https://archive.apache.org/dist/flink/flink-1.20.3/flink-1.20.3-bin-scala_2.12.tgz) ，解压后得到 flink-1.20.3 目录。
@@ -146,7 +146,7 @@ under the License.
    flink-cdc-{{< param Version >}} 下会包含 `bin`、`lib`、`log`、`conf` 四个目录。
 
 2. 下载下面列出的 connector 包，并且移动到 lib 目录下；
-   **下载链接只对已发布的版本有效, SNAPSHOT 版本需要本地基于 master 或 release- 分支编译。**
+   **下载链接只对已发布的版本有效，SNAPSHOT 版本需要本地基于 master 或 release- 分支编译。**
    **请注意，您需要将 jar 移动到 Flink CDC Home 的 lib 目录，而非 Flink Home 的 lib 目录下。**
    - [flink-cdc-pipeline-connector-mysql](https://mvnrepository.com/artifact/org.apache.flink/flink-cdc-pipeline-connector-mysql)
    - [flink-cdc-pipeline-connector-starrocks](https://mvnrepository.com/artifact/org.apache.flink/flink-cdc-pipeline-connector-starrocks)
@@ -208,12 +208,12 @@ under the License.
 
 {{< img src="/fig/mysql-starrocks-tutorial/mysql-to-starrocks.png" alt="MySQL-to-StarRocks" >}}
 
-通过数据库连接工具例如 Dbeaver 等连接到 jdbc:mysql://127.0.0.1:9030， 可以查看 StarRocks 中写入了三张表的数据。
+通过数据库连接工具例如 Dbeaver 等连接到 jdbc:mysql://127.0.0.1:9030，可以查看 StarRocks 中写入了三张表的数据。
 
 {{< img src="/fig/mysql-starrocks-tutorial/starrocks-display-data.png" alt="StarRocks-display-data" >}}
 
 ### 同步变更
-进入 MySQL 容器:
+进入 MySQL 容器：
 
 ```shell
  docker-compose exec mysql mysql -uroot -p123456

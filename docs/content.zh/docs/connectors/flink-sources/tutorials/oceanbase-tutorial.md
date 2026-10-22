@@ -24,7 +24,7 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-# 演示: OceanBase CDC 导入 Elasticsearch
+# 演示：OceanBase CDC 导入 Elasticsearch {#演示-oceanbase-cdc-导入-elasticsearch}
 
 ## 视频教程
 
@@ -94,7 +94,7 @@ docker-compose up -d
 
 ### 查询 Root Service List
 
-登陆 sys 租户的 root 用户：
+登录 sys 租户的 root 用户：
 
 ```shell
 docker-compose exec observer obclient -h127.0.0.1 -P2881 -uroot@sys -p123456
@@ -108,7 +108,7 @@ SHOW PARAMETERS LIKE 'rootservice_list';
 
 ### 准备数据
 
-使用测试用的 test 租户的 root 用户登陆。
+使用测试用的 test 租户的 root 用户登录。
 
 ```shell
 docker-compose exec observer obclient -h127.0.0.1 -P2881 -uroot@test -p654321
@@ -133,7 +133,7 @@ VALUES (default,"scooter","Small 2-wheel scooter"),
        (default,"hammer","14oz carpenter's hammer"),
        (default,"hammer","16oz carpenter's hammer"),
        (default,"rocks","box of assorted rocks"),
-       (default,"jacket","water resistent black wind breaker"),
+       (default,"jacket","water resistant black wind breaker"),
        (default,"spare tire","24 inch spare tire");
 
 CREATE TABLE orders (
@@ -163,7 +163,7 @@ VALUES (default, '2020-07-30 10:08:22', 'Jark', 50.50, 102, false),
 注意在 OceanBase 源表的 SQL 中替换 root_service_list 为真实值。
 
 ```sql
--- 设置间隔时间为3秒                       
+-- 设置间隔时间为 3 秒
 Flink SQL> SET execution.checkpointing.interval = 3s;
 
 -- 设置本地时区为 Asia/Shanghai
@@ -252,7 +252,7 @@ Flink SQL> INSERT INTO enriched_orders
 
 ### 修改监听表数据，查看增量数据变动
 
-在OceanBase中依次执行如下修改操作，每执行一步就刷新一次 Kibana，可以看到 Kibana 中显示的订单数据将实时更新。
+在 OceanBase 中依次执行如下修改操作，每执行一步就刷新一次 Kibana，可以看到 Kibana 中显示的订单数据将实时更新。
 
 ```sql
 INSERT INTO orders VALUES (default, '2020-07-30 15:22:00', 'Jark', 29.71, 104, false);
@@ -268,7 +268,7 @@ DELETE FROM orders WHERE order_id = 10004;
 docker-compose down
 ```
 
-进入Flink的部署目录，停止 Flink 集群：
+进入 Flink 的部署目录，停止 Flink 集群：
 
 ```shell
 ./bin/stop-cluster.sh

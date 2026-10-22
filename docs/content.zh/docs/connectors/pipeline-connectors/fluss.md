@@ -103,7 +103,7 @@ Pipeline Connector Options
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>指定要使用的连接器, 这里需要设置成 <code>'fluss'</code>。 </td>
+      <td>指定要使用的连接器，这里需要设置成 <code>'fluss'</code>。 </td>
     </tr>
     <tr>
       <td>name</td>
@@ -147,14 +147,14 @@ Pipeline Connector Options
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>将 Fluss table 支持的参数传递给 pipeline，参考，See <a href="https://fluss.apache.org/docs/engine-flink/options/#storage-options">Fluss table options</a>. </td>
+      <td>将 Fluss table 支持的参数传递给 pipeline，参考，See <a href="https://fluss.apache.org/docs/engine-flink/options/#storage-options">Fluss table options</a>。</td>
     </tr>
     <tr>
       <td>properties.client.*</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>将 Fluss client 支持的参数传递给 pipeline，See <a href="https://fluss.apache.org/docs/engine-flink/options/#write-options">Fluss client options</a>. </td>
+      <td>将 Fluss client 支持的参数传递给 pipeline，See <a href="https://fluss.apache.org/docs/engine-flink/options/#write-options">Fluss client options</a>。</td>
     </tr>
     </tbody>
 </table>    
@@ -213,7 +213,7 @@ sink:
 
   要启用 Schema 变更同步，请在 pipeline 中配置 `schema.change.behavior: lenient`。如果想要忽略所有 Schema 变更，使用 `schema.change.behavior: IGNORE`。
 
-* 关于数据同步， Pipeline 连接器使用 [Fluss Java Client](https://fluss.apache.org/docs/apis/java-client/) 向 Fluss 写入数据.
+* 关于数据同步，Pipeline 连接器使用 [Fluss Java Client](https://fluss.apache.org/docs/apis/java-client/) 向 Fluss 写入数据。
 
 Data Type Mapping
 ----------------

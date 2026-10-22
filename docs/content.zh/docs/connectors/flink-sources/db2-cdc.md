@@ -38,7 +38,7 @@ Db2 CDC 连接器允许从 Db2 数据库读取快照数据和增量数据。本�
 依赖
 ------------
 
-为了设置 Db2 CDC 连接器，下表提供了使用构建自动化工具（如 Maven 或 SBT ）和带有 SQL JAR 包的 SQL 客户端的两个项目的依赖关系信息。
+为了设置 Db2 CDC 连接器，下表提供了使用构建自动化工具（如 Maven 或 SBT）和带有 SQL JAR 包的 SQL 客户端的两个项目的依赖关系信息。
 
 ### Maven dependency
 
@@ -48,7 +48,7 @@ Db2 CDC 连接器允许从 Db2 数据库读取快照数据和增量数据。本�
 
 下载 [flink-sql-connector-db2-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-db2-cdc) 到 `<FLINK_HOME>/lib/` 目录下。
 
-**注意:** 参考 [flink-sql-connector-db2-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-db2-cdc) 当前已发布的所有版本都可以在 Maven 中央仓库获取。
+**注意：** 参考 [flink-sql-connector-db2-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-db2-cdc) 当前已发布的所有版本都可以在 Maven 中央仓库获取。
 
 由于 Db2 Connector 采用的 IPLA 协议与 Flink CDC 项目不兼容，我们无法在 jar 包中提供 Db2 连接器。
 您可能需要手动配置以下依赖：
@@ -134,7 +134,7 @@ Flink SQL> SELECT * FROM products;
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>指定要使用的连接器, 这里应该是 <code>'db2-cdc'</code>.</td>
+      <td>指定要使用的连接器，这里应该是 <code>'db2-cdc'</code>。</td>
     </tr>
     <tr>
       <td>hostname</td>
@@ -191,10 +191,10 @@ Flink SQL> SELECT * FROM products;
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>数据库服务器中的会话时区， 例如： "Asia/Shanghai".
+      <td>数据库服务器中的会话时区，例如："Asia/Shanghai"。
           它控制 Db2 中的 TIMESTAMP 类型如何转换为 STRING。
-          更多请参考 <a href="https://debezium.io/documentation/reference/1.9/connectors/db2.html#db2-temporal-types"> 这里</a>.
-          如果没有设置，则使用ZoneId.systemDefault()来确定服务器时区。
+          更多请参考 <a href="https://debezium.io/documentation/reference/1.9/connectors/db2.html#db2-temporal-types"> 这里</a>。
+          如果没有设置，则使用 ZoneId.systemDefault() 来确定服务器时区。
       </td>
     </tr>
     <tr>
@@ -243,7 +243,7 @@ Flink SQL> SELECT * FROM products;
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>将 Debezium 的属性传递给 Debezium 嵌入式引擎，该引擎用于从 Db2 服务器捕获数据更改。
-          例如：<code>'debezium.snapshot.mode' = 'never'</code>.
+          例如：<code>'debezium.snapshot.mode' = 'never'</code>。
           查看更多关于 <a href="https://debezium.io/documentation/reference/1.9/connectors/db2.html#db2-connector-properties"> Debezium 的 Db2 连接器属性</a></td>
     </tr>
     <tr>
@@ -271,7 +271,7 @@ Flink SQL> SELECT * FROM products;
       <td>Boolean</td>
       <td>
         快照读取阶段是否先分配 UnboundedChunk。<br>
-        这可能有助于降低 TaskManager 在对最大的 UnboundedChunk 执行快照时出现内存溢出 (OOM) 错误的风险。<br> 
+        这可能有助于降低 TaskManager 在对最大的 UnboundedChunk 执行快照时出现内存溢出（OOM）错误的风险。<br>
       </td>
     </tr>
     </tbody>
@@ -310,7 +310,7 @@ Flink SQL> SELECT * FROM products;
     <tr>
       <td>op_ts</td>
       <td>TIMESTAMP_LTZ(3) NOT NULL</td>
-      <td>当前记录表在数据库中更新的时间。 <br>如果从表的快照而不是更改流读取记录，该值将始终为0。</td>
+      <td>当前记录表在数据库中更新的时间。 <br>如果从表的快照而不是更改流读取记录，该值将始终为 0。</td>
     </tr>
   </tbody>
 </table>
@@ -319,10 +319,10 @@ Flink SQL> SELECT * FROM products;
 --------
 ### 启动模式
 
-配置选项`scan.startup.mode`指定 DB2 CDC 使用者的启动模式。有效枚举包括：
+配置选项 `scan.startup.mode` 指定 DB2 CDC 使用者的启动模式。有效枚举包括：
 
-- `initial` （默认）：在第一次启动时对受监视的数据库表执行初始快照，并继续读取最新的 redo logs。
-- `latest-offset`：首次启动时，从不对受监视的数据库表执行快照， 连接器仅从 redo logs 的结尾处开始读取，这意味着连接器只能读取在连接器启动之后的数据更改。
+- `initial`（默认）：在第一次启动时对受监视的数据库表执行初始快照，并继续读取最新的 redo logs。
+- `latest-offset`：首次启动时，从不对受监视的数据库表执行快照，连接器仅从 redo logs 的结尾处开始读取，这意味着连接器只能读取在连接器启动之后的数据更改。
 
 _注意：`scan.startup.mode` 选项的机制依赖于 Debezium 的 `snapshot.mode` 配置，因此请不要同时使用它们。如果在表 DDL 中同时指定 `scan.startup.mode` 和 `debezium.snapshot.mode` 选项，可能会导致 `scan.startup.mode` 失效。_
 
@@ -405,7 +405,7 @@ public class Db2ParallelSourceExample {
 
 ### 可用的指标
 
-指标系统能够帮助了解分片分发的进展， 下面列举出了支持的 Flink 指标 [Flink metrics](https://nightlies.apache.org/flink/flink-docs-master/docs/ops/metrics/):
+指标系统能够帮助了解分片分发的进展，下面列举出了支持的 Flink 指标 [Flink metrics](https://nightlies.apache.org/flink/flink-docs-master/docs/ops/metrics/)：
 
 | Group                  | Name                       | Type  | Description    |
 |------------------------|----------------------------|-------|----------------|
@@ -419,13 +419,13 @@ public class Db2ParallelSourceExample {
 | namespace.schema.table | snapshotStartTime          | Gauge | 快照读取阶段开始的时间    |
 | namespace.schema.table | snapshotEndTime            | Gauge | 快照读取阶段结束的时间    |
 
-注意:
-1. Group 名称是 `namespace.schema.table`，这里的 `namespace` 是实际的数据库名称， `schema` 是实际的 schema 名称， `table` 是实际的表名称。
+注意：
+1. Group 名称是 `namespace.schema.table`，这里的 `namespace` 是实际的数据库名称，`schema` 是实际的 schema 名称，`table` 是实际的表名称。
 2. 对于 DB2，Group 的名称会类似于 `test_database.test_schema.test_table`。
 
 ### 关于无主键表
 
-从3.4.0 版本开始支持无主键表，使用无主键表必须设置 `scan.incremental.snapshot.chunk.key-column`，且只能选择非空类型的一个字段。
+从 3.4.0 版本开始支持无主键表，使用无主键表必须设置 `scan.incremental.snapshot.chunk.key-column`，且只能选择非空类型的一个字段。
 
 在使用无主键表时，需要注意以下两种情况。
 
@@ -442,19 +442,19 @@ public class Db2ParallelSourceExample {
 
 - **表结构：**
   - **主键：** `id`
-  - **分片键列 ：** `pid`（非主键）
+  - **分片键列：** `pid`（非主键）
 
-- **快照分片 ：**
-  - **分片 0:** `1 < pid <= 3`
-  - **分片 1:** `3 < pid <= 5`
+- **快照分片：**
+  - **分片 0：** `1 < pid <= 3`
+  - **分片 1：** `3 < pid <= 5`
 
-- **操作 ：**
+- **操作：**
   - 两个子任务并行读取 **分片 0** 和 **分片 1**。
   - 在读取过程中，发生了一次 **更新** 操作，使 `id=0` 的 `pid` 从 `2` 变为 `4`，在两个分片的**高低水位**间都包含此次变更，导致该更新操作在增量阶段不会被处理。
 
-- **结果 ：**
-  - **分片 0:** 记录 `[id=0, pid=2]`
-  - **分片 1:** 记录 `[id=0, pid=4]`
+- **结果：**
+  - **分片 0：** 记录 `[id=0, pid=2]`
+  - **分片 1：** 记录 `[id=0, pid=4]`
 
 由于**处理顺序**无法保证，最终 `id=0` 的 `pid` 可能为 `2` 或 `4`，从而导致数据不一致。
 

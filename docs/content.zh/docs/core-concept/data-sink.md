@@ -34,7 +34,7 @@ under the License.
 | 参数                          | 含义                              | optional/required |
 |-----------------------------|---------------------------------|-------------------|
 | type                        | sink 的类型，例如 doris 或者 starrocks。 | required          |
-| name                        | sink 的名称，允许用户配置 (提供了一个默认值)。     | optional          |
+| name                        | sink 的名称，允许用户配置（提供了一个默认值）。     | optional          |
 | configurations of Data Sink | 用于构建 sink 组件的配置，例如连接参数或者表属性的配置。 | optional          |
 
 # 示例

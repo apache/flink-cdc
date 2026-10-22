@@ -77,7 +77,7 @@ Flink CDC 提供了丰富的连接器生态系统，用于与各种外部系统�
 
 ## 如何使用 Flink CDC
 
-Flink CDC 提供了基于 `YAML` 格式的用户 API，更适合于数据集成场景。以下是一个 `YAML` 文件的示例，它定义了一个数据管道(Pipeline)，该Pipeline从 MySQL 捕获实时变更，并将它们同步到 Apache Doris：
+Flink CDC 提供了基于 `YAML` 格式的用户 API，更适合于数据集成场景。以下是一个 `YAML` 文件的示例，它定义了一个数据管道（Pipeline），该 Pipeline 从 MySQL 捕获实时变更，并将它们同步到 Apache Doris：
 
 
 ```yaml
@@ -109,7 +109,7 @@ pipeline:
 
 ## 编写你的第一个 Flink CDC Pipeline
 
-浏览 Flink CDC 文档，开始创建您的第一个实时数据集成管道(Pipeline)。
+浏览 Flink CDC 文档，开始创建您的第一个实时数据集成管道（Pipeline）。
 
 ### 快速开始
 
@@ -124,7 +124,7 @@ pipeline:
 
 ### 理解核心概念
 
-熟悉我们在 Flink CDC 中引入的核心概念，并尝试构建更复杂的数据Pipeline：
+熟悉我们在 Flink CDC 中引入的核心概念，并尝试构建更复杂的数据 Pipeline：
 
 - [Data Pipeline]({{< ref "docs/core-concept/data-pipeline" >}})
 - [Data Source]({{< ref "docs/core-concept/data-source" >}})
@@ -145,7 +145,7 @@ pipeline:
 
 如果您想要将 Flink CDC 连接到您定制化的外部系统，或者想要为框架本身做出贡献，以下这些部分可能会有所帮助：
 
-- [理解 Flink CDC API]({{< ref "docs/developer-guide/understand-flink-cdc-api" >}})，开发您自己的Flink CDC 连接器。
-- 了解如何[向 Flink CDC 提交贡献]({{< ref "docs/developer-guide/contribute-to-flink-cdc" >}})
+- [理解 Flink CDC API]({{< ref "docs/developer-guide/understand-flink-cdc-api" >}})，开发您自己的 Flink CDC 连接器。
+- 了解如何 [向 Flink CDC 提交贡献]({{< ref "docs/developer-guide/contribute-to-flink-cdc" >}})
 - 查看 Flink CDC 使用的[许可证]({{< ref "docs/developer-guide/licenses" >}})
 

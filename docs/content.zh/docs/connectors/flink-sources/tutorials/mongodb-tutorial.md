@@ -24,7 +24,7 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-# 演示: MongoDB CDC 导入 Elasticsearch
+# 演示：MongoDB CDC 导入 Elasticsearch {#演示-mongodb-cdc-导入-elasticsearch}
 
 1. 下载 `docker-compose.yml`
 
@@ -62,7 +62,7 @@ services:
       - "5601:5601"
 ```
 
-2. 进入 MongoDB 容器，初始化副本集和数据:
+2. 进入 MongoDB 容器，初始化副本集和数据：
 ```
 docker-compose exec mongo /usr/bin/mongo -u mongouser -p mongopw
 ```
@@ -138,11 +138,11 @@ db.customers.insertMany([
 - [flink-sql-connector-elasticsearch7-3.0.1-1.17.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7/3.0.1-1.17/flink-sql-connector-elasticsearch7-3.0.1-1.17.jar)
 - [flink-sql-connector-mongodb-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-mongodb-cdc)
 
-4. 然后启动 Flink 集群，再启动 SQL CLI.
+4. 然后启动 Flink 集群，再启动 SQL CLI。
 
 ```sql
 -- Flink SQL
--- 设置间隔时间为3秒                       
+-- 设置间隔时间为 3 秒
 Flink SQL> SET execution.checkpointing.interval = 3s;
 
 -- 设置本地时区为 Asia/Shanghai

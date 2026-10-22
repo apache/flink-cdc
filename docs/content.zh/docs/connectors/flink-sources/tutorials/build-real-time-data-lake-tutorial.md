@@ -40,7 +40,7 @@ under the License.
 你也可以使用不同的 source 比如 Oracle/Postgres 和 sink 比如 Hudi 来构建自己的 ETL 流程。
 
 ## 准备阶段
-准备一台已经安装了 Docker 的 Linux 或者 MacOS 电脑。
+准备一台已经安装了 Docker 的 Linux 或者 macOS 电脑。
 
 ### 准备教程所需要的组件
 接下来的教程将以 `docker-compose` 的方式准备所需要的组件。
@@ -111,7 +111,7 @@ volumes:
 1. 为了简化整个教程，本教程需要的 jar 包都已经被打包进 SQL-Client 容器中了，镜像的构建脚本可以在 [GitHub](https://github.com/luoyuxia/flink-cdc-tutorial/tree/main/flink-cdc-iceberg-demo/sql-client) 上找到。
    如果你想要在自己的 Flink 环境运行本教程，需要下载下面列出的包并且把它们放在 Flink 所在目录的 lib 目录下，即 `FLINK_HOME/lib/`。
 
-   **下载链接只对已发布的版本有效, SNAPSHOT 版本需要本地编译**
+   **下载链接只对已发布的版本有效，SNAPSHOT 版本需要本地编译**
 
    - [flink-sql-connector-mysql-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-mysql-cdc)
    - [flink-shaded-hadoop-2-uber-2.7.5-10.0.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-shaded-hadoop-2-uber/2.7.5-10.0/flink-shaded-hadoop-2-uber-2.7.5-10.0.jar)
@@ -190,7 +190,7 @@ docker-compose exec sql-client ./sql-client
 {{< img src="/fig/real-time-data-lake-tutorial/flink-sql-client.png" alt="Flink SQL Client" >}}
 
 然后，进行如下步骤：
-1. 开启 checkpoint，每隔3秒做一次 checkpoint
+1. 开启 checkpoint，每隔 3 秒做一次 checkpoint
 
    Checkpoint 默认是不开启的，我们需要开启 Checkpoint 来让 Iceberg 可以提交事务。
    并且，mysql-cdc 在 binlog 读取阶段开始前，需要等待一个完整的 checkpoint 来避免 binlog 记录乱序的情况。
@@ -200,7 +200,7 @@ docker-compose exec sql-client ./sql-client
    ```
 2. 创建 MySQL 分库分表 source 表
 
-   创建 source 表 `user_source` 来捕获MySQL中所有 `user` 表的数据，在表的配置项 `database-name` , `table-name` 使用正则表达式来匹配这些表。
+   创建 source 表 `user_source` 来捕获 MySQL 中所有 `user` 表的数据，在表的配置项 `database-name` , `table-name` 使用正则表达式来匹配这些表。
    并且，`user_source` 表也定义了 metadata 列来区分数据是来自哪个数据库和表。
    ```sql
    -- Flink SQL
@@ -226,7 +226,7 @@ docker-compose exec sql-client ./sql-client
 3. 创建 Iceberg sink 表
 
    创建 sink 表 `all_users_sink`，用来将数据加载至 Iceberg 中。
-   在这个 sink 表，考虑到不同的 MySQL 数据库表的 `id` 字段的值可能相同，我们定义了复合主键 (`database_name`, `table_name`, `id`)。
+   在这个 sink 表，考虑到不同的 MySQL 数据库表的 `id` 字段的值可能相同，我们定义了复合主键（`database_name`, `table_name`, `id`）。
    ```sql
    -- Flink SQL
    Flink SQL> CREATE TABLE all_users_sink (
@@ -303,7 +303,7 @@ docker-compose exec sql-client ./sql-client
 
    {{< img src="/fig/real-time-data-lake-tutorial/final-data-in-iceberg.png" alt="Final Data in Iceberg" >}}
 
-   从 Iceberg 的最新结果中可以看到新增了`(db_1, user_1, 111)`的记录，`(db_1, user_2, 120)`的地址更新成了 `Beijing`，且`(db_2, user_2, 220)`的记录被删除了，与我们在 MySQL 做的数据更新完全一致。
+   从 Iceberg 的最新结果中可以看到新增了 `(db_1, user_1, 111)` 的记录，`(db_1, user_2, 120)` 的地址更新成了 `Beijing`，且 `(db_2, user_2, 220)` 的记录被删除了，与我们在 MySQL 做的数据更新完全一致。
 
 ## 环境清理
 本教程结束后，在 `docker-compose.yml` 文件所在的目录下执行如下命令停止所有容器：

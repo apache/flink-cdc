@@ -24,7 +24,7 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-# 演示: SqlServer CDC 导入 Elasticsearch
+# 演示：SqlServer CDC 导入 Elasticsearch {#演示-sqlserver-cdc-导入-elasticsearch}
 
 **创建 `docker-compose.yml` 文件，内容如下所示：**
 
@@ -77,7 +77,7 @@ services:
 docker-compose up -d
 ```
 该命令会以 detached 模式自动启动 Docker Compose 配置中定义的所有容器。
-你可以通过 docker ps 来观察上述的容器是否正常启动了。 也可以访问 http://localhost:5601/ 来查看 Kibana 是否运行正常。
+你可以通过 docker ps 来观察上述的容器是否正常启动了。也可以访问 http://localhost:5601/ 来查看 Kibana 是否运行正常。
 
 另外可以通过如下命令停止并删除所有的容器：
 
@@ -126,7 +126,7 @@ docker-compose down
  INSERT INTO products(name,description,weight)
  VALUES ('rocks','box of assorted rocks',5.3);
  INSERT INTO products(name,description,weight)
- VALUES ('jacket','water resistent black wind breaker',0.1);
+ VALUES ('jacket','water resistant black wind breaker',0.1);
  INSERT INTO products(name,description,weight)
  VALUES ('spare tire','24 inch spare tire',22.2);
  EXEC sys.sp_cdc_enable_table @source_schema = 'dbo', @source_name = 'products', @role_name = NULL, @supports_net_changes = 0;

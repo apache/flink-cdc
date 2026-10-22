@@ -26,7 +26,7 @@ under the License.
 
 # StarRocks Connector
 
-StarRocks Pipeline 连接器可以用作 Pipeline 的 *Data Sink*，将数据写入[StarRocks](https://github.com/StarRocks/starrocks)。 本文档介绍如何设置 StarRocks Pipeline 连接器。
+StarRocks Pipeline 连接器可以用作 Pipeline 的 *Data Sink*，将数据写入 [StarRocks](https://github.com/StarRocks/starrocks)。本文档介绍如何设置 StarRocks Pipeline 连接器。
 
 ## 连接器的功能
 * 自动建表
@@ -80,14 +80,14 @@ pipeline:
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>指定要使用的连接器, 这里需要设置成 <code>'starrocks'</code>.</td>
+      <td>指定要使用的连接器，这里需要设置成 <code>'starrocks'</code>。</td>
     </tr>
     <tr>
       <td>name</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Sink 的名称.</td>
+      <td>Sink 的名称。</td>
     </tr>
     <tr>
       <td>jdbc-url</td>
@@ -143,7 +143,7 @@ pipeline:
       <td>optional</td>
       <td style="word-wrap: break-word;">157286400</td>
       <td>Long</td>
-      <td>内存中缓冲的数据量大小，缓冲区由所有导入的表共享，达到阈值后将选择一个或多个表的数据写入到StarRocks。
+      <td>内存中缓冲的数据量大小，缓冲区由所有导入的表共享，达到阈值后将选择一个或多个表的数据写入到 StarRocks。
           达到阈值后取值范围：[64MB, 10GB]。</td>
     </tr>
     <tr>
@@ -204,8 +204,8 @@ pipeline:
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>自动创建 StarRocks 表时使用的属性。比如: 如果使用 StarRocks 3.2 及之后的版本，<code>'table.create.properties.fast_schema_evolution' = 'true'</code>
-          将会打开 fast schema evolution 功能。 更多信息请参考 
+      <td>自动创建 StarRocks 表时使用的属性。比如：如果使用 StarRocks 3.2 及之后的版本，<code>'table.create.properties.fast_schema_evolution' = 'true'</code>
+          将会打开 fast schema evolution 功能。更多信息请参考
           <a href="https://docs.starrocks.io/zh/docs/table_design/table_types/primary_key_table/">主键模型</a>。</td> 
     </tr>
     <tr>
@@ -249,7 +249,7 @@ pipeline:
 * 对于表结构变更同步
   * 支持创建/删除/清空表，增加/删除/重命名列，修改列类型
   * 新增列只能添加到最后一列
-  * 如果使用 StarRocks 3.2 及之后版本，并且通过连接器来自动建表, 可以通过配置 `table.create.properties.fast_schema_evolution` 为 `true`
+  * 如果使用 StarRocks 3.2 及之后版本，并且通过连接器来自动建表，可以通过配置 `table.create.properties.fast_schema_evolution` 为 `true`
     来加速 StarRocks 执行变更。
 
 * 对于数据同步，pipeline 连接器使用 [StarRocks Sink 连接器](https://github.com/StarRocks/starrocks-connector-for-apache-flink)

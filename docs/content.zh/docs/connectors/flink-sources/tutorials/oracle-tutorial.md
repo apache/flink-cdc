@@ -24,9 +24,9 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-# 演示: Oracle CDC 导入 Elasticsearch
+# 演示：Oracle CDC 导入 Elasticsearch {#演示-oracle-cdc-导入-elasticsearch}
 
-**创建`docker-compose.yml`文件，内容如下所示:**
+**创建 `docker-compose.yml` 文件，内容如下所示：**
 
 ```
 version: '2.1'
@@ -59,9 +59,9 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
 ``` 
-该 Docker Compose 中包含的容器有:
+该 Docker Compose 中包含的容器有：
 - Oracle: Oracle 19c 数据库
-- Elasticsearch: `orders` 表将和 `products` 表进行join，join的结果写入Elasticsearch中
+- Elasticsearch: `orders` 表将和 `products` 表进行 join，join 的结果写入 Elasticsearch 中
 - Kibana: 可视化 Elasticsearch 中的数据
 
 在 docker-compose.yml 所在目录下运行如下命令以启动所有容器：
@@ -69,7 +69,7 @@ services:
 docker-compose up -d
 ```
 该命令会以 detached 模式自动启动 Docker Compose 配置中定义的所有容器。
-你可以通过 docker ps 来观察上述的容器是否正常启动了。 也可以访问 http://localhost:5601/ 来查看 Kibana 是否运行正常。
+你可以通过 docker ps 来观察上述的容器是否正常启动了。也可以访问 http://localhost:5601/ 来查看 Kibana 是否运行正常。
 另外可以通过如下命令停止所有的容器：
 
 ```shell
@@ -78,7 +78,7 @@ docker-compose down
 
 **下载以下 jar 包到 `<FLINK_HOME>/lib/`:**
 
-*下载链接只对已发布的版本有效, SNAPSHOT 版本需要本地编译*
+*下载链接只对已发布的版本有效，SNAPSHOT 版本需要本地编译*
 
 - [flink-sql-connector-elasticsearch7-3.0.1-1.17.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7/3.0.1-1.17/flink-sql-connector-elasticsearch7-3.0.1-1.17.jar)
 - [flink-sql-connector-oracle-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-oracle-cdc)
@@ -139,7 +139,7 @@ INSERT INTO DEBEZIUM.PRODUCTS VALUES (104, 'hammer', '12oz carpenter''s hammer',
 INSERT INTO DEBEZIUM.PRODUCTS VALUES (105, 'hammer', '14oz carpenter''s hammer', 0.875);
 INSERT INTO DEBEZIUM.PRODUCTS VALUES (106, 'hammer', '16oz carpenter''s hammer', 1.0);
 INSERT INTO DEBEZIUM.PRODUCTS VALUES (107, 'rocks', 'box of assorted rocks', 5.3);
-INSERT INTO DEBEZIUM.PRODUCTS VALUES (108, 'jacket', 'water resistent black wind breaker', 0.1);
+INSERT INTO DEBEZIUM.PRODUCTS VALUES (108, 'jacket', 'water resistant black wind breaker', 0.1);
 INSERT INTO DEBEZIUM.PRODUCTS VALUES (109, 'spare tire', '24 inch spare tire', 22.2);
 
 INSERT INTO DEBEZIUM.ORDERS VALUES (1001, TO_TIMESTAMP('2020-07-30 10:08:22.001000', 'YYYY-MM-DD HH24:MI:SS.FF'), 'Jark', 1, 101);
@@ -211,11 +211,11 @@ Flink SQL> INSERT INTO enriched_orders
 
 **检查 ElasticSearch 中的结果**
 
-检查最终的结果是否写入ElasticSearch中, 可以在[Kibana](http://localhost:5601/)看到ElasticSearch中的数据
+检查最终的结果是否写入 ElasticSearch 中，可以在 [Kibana](http://localhost:5601/)看到 ElasticSearch 中的数据
 
 **在 Oracle 制造一些变更，观察 ElasticSearch 中的结果**
 
-进入Oracle容器中并通过如下的SQL语句对Oracle数据库进行一些修改, 然后就可以看到每执行一条SQL语句，Elasticsearch中的数据都会实时更新。
+进入 Oracle 容器中并通过如下的 SQL 语句对 Oracle 数据库进行一些修改，然后就可以看到每执行一条 SQL 语句，Elasticsearch 中的数据都会实时更新。
 
 ```shell
 docker-compose exec oracle sqlplus debezium/dbz@localhost:1521/ORCLCDB

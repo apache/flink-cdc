@@ -32,7 +32,7 @@ Vitess CDC 连接器允许从 Vitess 集群读取增量数据。该连接器目�
 依赖
 ------------
 
-为了设置 Vitess CDC 连接器，下表提供了使用构建自动化工具（如 Maven 或 SBT ）和带有 SQL JAR 包的 SQL 客户端的两个项目的依赖关系信息。
+为了设置 Vitess CDC 连接器，下表提供了使用构建自动化工具（如 Maven 或 SBT）和带有 SQL JAR 包的 SQL 客户端的两个项目的依赖关系信息。
 
 ### Maven dependency
 
@@ -42,7 +42,7 @@ Vitess CDC 连接器允许从 Vitess 集群读取增量数据。该连接器目�
 
 下载 [flink-sql-connector-vitess-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-vitess-cdc) 到 `<FLINK_HOME>/lib/` 目录下。
 
-**注意:** 参考 [flink-sql-connector-vitess-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-vitess-cdc) 当前已发布的所有版本都可以在 Maven 中央仓库获取。
+**注意：** 参考 [flink-sql-connector-vitess-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-vitess-cdc) 当前已发布的所有版本都可以在 Maven 中央仓库获取。
 
 设置 Vitess 服务器
 ----------------
@@ -203,7 +203,7 @@ Flink SQL> SELECT * FROM orders;
 
 Vitess 连接器将其全部时间用于从其订阅的 VTGate 的 VStream gRPC 服务中流式读取变更。客户端从 VStream 接收变更，这些变更是在底层 MySQL 服务器的 binlog 中的特定位置提交的，这些位置被称为 VGTID。
 
-Vitess 中的 VGTID 等价于 MySQL 中的 GTID，它描述了变更事件在 VStream 中发生的位置。通常，一个 VGTID 包含多个 shard GTID，每个 shard GTID 是一个 (Keyspace, Shard, GTID) 三元组，用于描述给定 shard 的 GTID 位点。
+Vitess 中的 VGTID 等价于 MySQL 中的 GTID，它描述了变更事件在 VStream 中发生的位置。通常，一个 VGTID 包含多个 shard GTID，每个 shard GTID 是一个（Keyspace, Shard, GTID）三元组，用于描述给定 shard 的 GTID 位点。
 
 订阅 VStream 服务时，连接器需要提供一个 VGTID 和一个 Tablet 类型（例如 MASTER、REPLICA）。VGTID 描述了 VStream 应从哪个位置开始发送变更事件；Tablet 类型描述了从每个 shard 中的哪个底层 MySQL 实例（master 或 replica）读取变更事件。
 

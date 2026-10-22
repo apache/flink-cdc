@@ -26,7 +26,7 @@ under the License.
 
 # Postgres Connector
 
-Postgres CDC Pipeline 连接器允许从 Postgres 数据库读取快照数据和增量数据，并提供端到端的整库数据同步能力。 本文描述了如何设置 Postgres CDC Pipeline 连接器。
+Postgres CDC Pipeline 连接器允许从 Postgres 数据库读取快照数据和增量数据，并提供端到端的整库数据同步能力。本文描述了如何设置 Postgres CDC Pipeline 连接器。
 
 ## 示例
 
@@ -111,7 +111,7 @@ pipeline:
       <td>String</td>
       <td>需要监视的 Postgres 数据库的表名。表名支持正则表达式，以监视满足正则表达式的多个表。<br>
           需要确保所有的表来自同一个数据库。<br>
-          需要注意的是，点号（.）被视为数据库、模式和表名的分隔符。 如果需要在正则表达式中使用点（.）来匹配任何字符，必须使用反斜杠对点进行转义。<br>
+          需要注意的是，点号（.）被视为数据库、模式和表名的分隔符。如果需要在正则表达式中使用点（.）来匹配任何字符，必须使用反斜杠对点进行转义。<br>
           例如，bdb.user_schema_[0-9].user_table_[0-9]+, bdb.schema_\.*.order_\.*</td>
     </tr>
     <tr>
@@ -120,7 +120,7 @@ pipeline:
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>为从特定插件以流式传输方式获取某个数据库/模式的变更数据，所创建的 Postgre 逻辑解码槽（logical decoding slot）的名称。服务器使用这个槽（slot）将事件流式传输给你要配置的连接器（connector）。
-          <br/>复制槽名称必须符合 <a href="https://www.postgresql.org/docs/current/static/warm-standby.html#STREAMING-REPLICATION-SLOTS-MANIPULATION">PostgreSQL 复制插槽的命名规则</a>, 其规则如下: "Each replication slot has a name, which can contain lower-case letters, numbers, and the underscore character."</td>
+          <br/>复制槽名称必须符合 <a href="https://www.postgresql.org/docs/current/static/warm-standby.html#STREAMING-REPLICATION-SLOTS-MANIPULATION">PostgreSQL 复制插槽的命名规则</a>, 其规则如下："Each replication slot has a name, which can contain lower-case letters, numbers, and the underscore character."</td>
     </tr>
     <tr>
       <td>decoding.plugin.name</td>
@@ -134,18 +134,18 @@ pipeline:
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>需要排除的 Postgres 数据库的表名，参数会在tables参数后发生排除作用。表名支持正则表达式，以排除满足正则表达式的多个表。<br>
-          用法和tables参数相同</td>
+      <td>需要排除的 Postgres 数据库的表名，参数会在 tables 参数后发生排除作用。表名支持正则表达式，以排除满足正则表达式的多个表。<br>
+          用法和 tables 参数相同</td>
     </tr>
      <tr>
       <td>server-time-zone</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>数据库服务器中的会话时区， 例如： "Asia/Shanghai". 
+      <td>数据库服务器中的会话时区，例如："Asia/Shanghai"。
           它控制 Postgres 中的时间戳类型如何转换为字符串。
-          更多请参考 <a href="https://debezium.io/documentation/reference/1.9/connectors/postgresql.html#postgresql-data-types"> 这里</a>.
-          如果没有设置，则使用ZoneId.systemDefault()来确定服务器时区。
+          更多请参考 <a href="https://debezium.io/documentation/reference/1.9/connectors/postgresql.html#postgresql-data-types"> 这里</a>。
+          如果没有设置，则使用 ZoneId.systemDefault() 来确定服务器时区。
       </td>
     </tr>
     <tr>
@@ -168,7 +168,7 @@ pipeline:
       <td style="word-wrap: break-word;">initial</td>
       <td>String</td>
       <td> Postgres CDC 消费者可选的启动模式，
-         合法的模式为 "initial"，"latest-offset"，"committed-offset"和 ""snapshot"。</td>
+         合法的模式为 "initial"，"latest-offset"，"committed-offset" 和 ""snapshot"。</td>
     </tr>
     <tr>
       <td>scan.incremental.snapshot.backfill.skip</td>
@@ -176,17 +176,17 @@ pipeline:
       <td style="word-wrap: break-word;">false</td>
       <td>Boolean</td>
       <td>
-        是否在快照读取阶段跳过 backfill 。<br>
-        如果跳过 backfill ，快照阶段捕获表的更改将在稍后的 wal log 读取阶段被回放，而不是合并到快照中。<br>
-        警告：跳过 backfill 可能会导致数据不一致，因为快照阶段发生的某些wal log事件可能会被重放（仅保证 at-least-once ）。
-        例如，更新快照阶段已更新的值，或删除快照阶段已删除的数据。这些重放的wal log事件应进行特殊处理。
+        是否在快照读取阶段跳过 backfill。<br>
+        如果跳过 backfill，快照阶段捕获表的更改将在稍后的 wal log 读取阶段被回放，而不是合并到快照中。<br>
+        警告：跳过 backfill 可能会导致数据不一致，因为快照阶段发生的某些 wal log 事件可能会被重放（仅保证 at-least-once）。
+        例如，更新快照阶段已更新的值，或删除快照阶段已删除的数据。这些重放的 wal log 事件应进行特殊处理。
     </tr>
     <tr>
       <td>scan.lsn-commit.checkpoints-num-delay</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">3</td>
       <td>Integer</td>
-      <td>在开始提交LSN偏移量之前，允许的检查点延迟次数。 <br>
+      <td>在开始提交 LSN 偏移量之前，允许的检查点延迟次数。 <br>
           检查点的 LSN 偏移量将以滚动方式提交，最早的那个检查点标识符将首先从延迟的检查点中提交。
       </td>
     </tr>
@@ -195,7 +195,7 @@ pipeline:
       <td>optional</td>
       <td style="word-wrap: break-word;">30s</td>
       <td>Duration</td>
-      <td>连接器在尝试连接到 Postgres 数据库服务器后超时前应等待的最长时间。该时长不能少于250毫秒。</td>
+      <td>连接器在尝试连接到 Postgres 数据库服务器后超时前应等待的最长时间。该时长不能少于 250 毫秒。</td>
     </tr>    
     <tr>
       <td>connect.max-retries</td>
@@ -216,14 +216,14 @@ pipeline:
       <td>optional</td>
       <td style="word-wrap: break-word;">20</td>
       <td>String</td>
-      <td>传递自定义 JDBC URL 属性的选项。用户可以传递自定义属性，如 'jdbc.properties.useSSL' = 'false'.</td>
+      <td>传递自定义 JDBC URL 属性的选项。用户可以传递自定义属性，如 'jdbc.properties.useSSL' = 'false'。</td>
     </tr>
     <tr>
       <td>heartbeat.interval</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">30s</td>
       <td>Duration</td>
-      <td>用于跟踪最新可用wal commited offset 偏移的发送心跳事件的间隔。</td>
+      <td>用于跟踪最新可用 wal committed offset 偏移的发送心跳事件的间隔。</td>
     </tr>
     <tr>
       <td>debezium.*</td>
@@ -231,7 +231,7 @@ pipeline:
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>将 Debezium 的属性传递给 Debezium 嵌入式引擎，该引擎用于从 Postgres 服务器捕获数据更改。
-          例如: <code>'debezium.snapshot.mode' = 'never'</code>.
+          例如：<code>'debezium.snapshot.mode' = 'never'</code>。
           查看更多关于 <a href="https://debezium.io/documentation/reference/1.9/connectors/postgresql.html"> Debezium 的  Postgres 连接器属性</a></td> 
     </tr>
     <tr>
@@ -239,7 +239,7 @@ pipeline:
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>
       <td>Boolean</td>
-      <td>是否在快照结束后关闭空闲的 Reader。 此特性需要 flink 版本大于等于 1.14 并且 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' 需要设置为 true。<br>
+      <td>是否在快照结束后关闭空闲的 Reader。此特性需要 flink 版本大于等于 1.14 并且 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' 需要设置为 true。<br>
           若 flink 版本大于等于 1.15，'execution.checkpointing.checkpoints-after-tasks-finish.enabled' 默认值变更为 true，可以不用显式配置 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' = true。</td>
     </tr>
     <tr>
@@ -278,8 +278,8 @@ pipeline:
       <td>Boolean</td>
       <td>
         是否在生成的 Table ID 中包含数据库名称。<br>
-        如果设置为 true，Table ID 的格式为 (数据库, 模式, 表)。<br>
-        如果设置为 false，Table ID 的格式为 (模式, 表)。<br>
+        如果设置为 true，Table ID 的格式为（数据库，模式，表）。<br>
+        如果设置为 false，Table ID 的格式为（模式，表）。<br>
         默认值为 false。
       </td>
     </tr>
@@ -324,19 +324,19 @@ pipeline:
 </div>
 
 注意：
-1. 配置选项`tables`指定 Postgres CDC 需要采集的表，格式为`db.schema1.tabe1,db.schema2.table2`,其中所有的db需要为同一个db，这是因为postgres链接url中需要指定dbname，目前cdc只支持链接一个db。
+1. 配置选项 `tables` 指定 Postgres CDC 需要采集的表，格式为 `db.schema1.tabe1,db.schema2.table2`，其中所有的 db 需要为同一个 db，这是因为 postgres 链接 url 中需要指定 dbname，目前 cdc 只支持链接一个 db。
 
 ## 启动模式
 
-配置选项`scan.startup.mode`指定 Postgres CDC 使用者的启动模式。有效枚举包括：
-- `initial` （默认）：在连接器首次启动时，会对被监控的数据库表执行一次初始快照（snapshot），然后继续读取复制插槽中的变更事件。。
+配置选项 `scan.startup.mode` 指定 Postgres CDC 使用者的启动模式。有效枚举包括：
+- `initial`（默认）：在连接器首次启动时，会对被监控的数据库表执行一次初始快照（snapshot），然后继续读取复制插槽中的变更事件。。
 - `latest-offset`：在首次启动时不执行快照操作，而是直接从复制插槽的末尾开始读取，即只获取连接器启动之后发生的变更。
 - `committed-offset`：跳过快照阶段，从复制插槽中已确认的 confirmed_flush_lsn 偏移量开始读取事件，即从上次提交的位置继续读取变更。
 - `snapshot`: 只进行快照阶段，跳过增量阶段，快照阶段读取结束后退出。
 
 ### 可用的指标
 
-指标系统能够帮助了解分片分发的进展， 下面列举出了支持的 Flink 指标 [Flink metrics](https://nightlies.apache.org/flink/flink-docs-master/docs/ops/metrics/):
+指标系统能够帮助了解分片分发的进展，下面列举出了支持的 Flink 指标 [Flink metrics](https://nightlies.apache.org/flink/flink-docs-master/docs/ops/metrics/)：
 
 | Group                  | Name                       | Type  | Description    |
 |------------------------|----------------------------|-------|----------------|
@@ -350,8 +350,8 @@ pipeline:
 | namespace.schema.table | snapshotStartTime          | Gauge | 快照读取阶段开始的时间    |
 | namespace.schema.table | snapshotEndTime            | Gauge | 快照读取阶段结束的时间    |
 
-注意:
-1. Group 名称是 `namespace.schema.table`，这里的 `namespace` 是实际的数据库名称， `schema` 是实际的 schema 名称， `table` 是实际的表名称。
+注意：
+1. Group 名称是 `namespace.schema.table`，这里的 `namespace` 是实际的数据库名称，`schema` 是实际的 schema 名称，`table` 是实际的表名称。
 
 ## 支持的元数据列
 
@@ -535,7 +535,7 @@ transform:
 </table>
 </div>
 
-注意：由于Debezium版本不支持多维数组，目前只支持PostgresSQL的单维数组，如:'ARRAY[1,2,3]'，'int[]'。
+注意：由于 Debezium 版本不支持多维数组，目前只支持 PostgreSQL 的单维数组，如：'ARRAY[1,2,3]'，'int[]'。
 
 ### Temporal types Mapping
 除了包含时区信息的 PostgreSQL 的 TIMESTAMPTZ 数据类型之外，其他时间类型如何映射取决于连接器配置属性 <code>debezium.time.precision.mode</code> 的值。以下各节将描述这些映射关系：
@@ -543,11 +543,11 @@ transform:
 - debezium.time.precision.mode=adaptive_time_microseconds
 - debezium.time.precision.mode=connect
 
-注意： 受限当前CDC对时间类型Time的精度为3，<code>debezium.time.precision.mode</code>为adaptive或adaptive_time_microseconds或connect Time类型都转化为Time(3)类型。
+注意：受限当前 CDC 对时间类型 Time 的精度为 3，<code>debezium.time.precision.mode</code> 为 adaptive 或 adaptive_time_microseconds 或 connect Time 类型都转化为 Time(3) 类型。
 
 <u>debezium.time.precision.mode=adaptive</u>
 
-当<code>debezium.time.precision.mode</code>属性设置为默认的 adaptive（自适应）时，TIME的精度为3，TIMESTAMP的精度为6。
+当 <code>debezium.time.precision.mode</code> 属性设置为默认的 adaptive（自适应）时，TIME 的精度为 3，TIMESTAMP 的精度为 6。
 <div class="wy-table-responsive">
 <table class="colwidths-auto docutils">
     <thead>
@@ -580,7 +580,7 @@ transform:
 
 <u>debezium.time.precision.mode=adaptive_time_microseconds</u>
 
-当<code>debezium.time.precision.mode</code>属性设置为默认的 adaptive_time_microseconds时，TIME的精度为3，TIMESTAMP的精度为6。
+当 <code>debezium.time.precision.mode</code> 属性设置为默认的 adaptive_time_microseconds 时，TIME 的精度为 3，TIMESTAMP 的精度为 6。
 <div class="wy-table-responsive">
 <table class="colwidths-auto docutils">
     <thead>
@@ -613,7 +613,7 @@ transform:
 
 <u>debezium.time.precision.mode=connect</u>
 
-当<code>debezium.time.precision.mode</code>属性设置为默认的 connect时，TIME和TIMESTAMP的精度都为3。
+当 <code>debezium.time.precision.mode</code> 属性设置为默认的 connect 时，TIME 和 TIMESTAMP 的精度都为 3。
 <div class="wy-table-responsive">
 <table class="colwidths-auto docutils">
     <thead>
@@ -680,7 +680,7 @@ PostgreSQL 连接器配置属性 <code>debezium.decimal.handling.mode</code> 的
       <tr>
         <td>
           MONEY[(M[,D])]
-        <td>DECIMAL(38,digits)(schema 参数 scale 包含一个整数，表示小数点移动了多少位。scale schema 参数由 money.fraction.digits 连接器配置属性决定。)</td>
+        <td>DECIMAL(38,digits)（schema 参数 scale 包含一个整数，表示小数点移动了多少位。scale schema 参数由 money.fraction.digits 连接器配置属性决定。）</td>
       </tr>
     </tbody>
 </table>

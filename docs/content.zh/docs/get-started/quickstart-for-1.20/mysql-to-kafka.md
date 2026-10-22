@@ -166,7 +166,7 @@ under the License.
 
 ## 通过 Flink CDC CLI 提交任务
 
-**下载链接只对已发布的版本有效, SNAPSHOT 版本需要本地基于 master 或 release- 分支编译。**
+**下载链接只对已发布的版本有效，SNAPSHOT 版本需要本地基于 master 或 release- 分支编译。**
 
 1. 下载下面列出的二进制压缩包，并解压得到目录 `flink-cdc-{{< param Version >}}`；  
    [flink-cdc-{{< param Version >}}-bin.tar.gz](https://www.apache.org/dyn/closer.lua/flink/flink-cdc-{{< param Version >}}/flink-cdc-{{< param Version >}}-bin.tar.gz)
@@ -281,7 +281,7 @@ under the License.
 
 ### 同步变更
 
-我们使用以下命令进入 MySQL 容器:
+我们使用以下命令进入 MySQL 容器：
 
 ```shell
  docker compose exec mysql mysql -uroot -p123456
