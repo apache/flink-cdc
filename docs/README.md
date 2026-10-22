@@ -67,7 +67,7 @@ In addition to Markdown, every page contains a Jekyll front matter, which specif
     ---
     
     ---
-    title: "Title of the Page" <-- Title rendered in the side nave
+    title: "Title of the Page" <-- Title rendered in the side nav
     weight: 1 <-- Weight controls the ordering of pages in the side nav. 
     type: docs <-- required
     aliases:  <-- Alias to setup redirect from removed page to this one
@@ -238,13 +238,13 @@ Will render a warning the current SQL feature may have unbounded state requireme
 Prints the content in tabs. IMPORTANT: The label in the outermost "tabs" shortcode must
 be unique for the page. 
 
-#### Github Repo
+#### GitHub Repo
 
     {{< github_repo >}}
 
 Renders a link to the apache flink repo. 
 
-#### Github Link
+#### GitHub Link
 
     {{< gh_link file="/some/file.java" name="Some file" >}}
 
