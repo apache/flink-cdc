@@ -230,7 +230,7 @@ class SnapshotSplitAssignerReleaseTest {
 
     /** A snapshot-finished state carrying bulk metadata for two assigned, finished splits. */
     private SnapshotPendingSplitsState heavySnapshotFinishedState() {
-        LinkedHashMap<String, SchemalessSnapshotSplit> assignedSplits = new LinkedHashMap<>();
+        Map<String, SchemalessSnapshotSplit> assignedSplits = new LinkedHashMap<>();
         assignedSplits.put("customers:0", schemalessSplit("customers:0"));
         assignedSplits.put("customers:1", schemalessSplit("customers:1"));
 

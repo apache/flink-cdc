@@ -171,7 +171,7 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
             int currentParallelism,
             List<TableId> alreadyProcessedTables,
             List<SchemalessSnapshotSplit> remainingSplits,
-            LinkedHashMap<String, SchemalessSnapshotSplit> assignedSplits,
+            Map<String, SchemalessSnapshotSplit> assignedSplits,
             Map<TableId, TableChanges.TableChange> tableSchemas,
             Map<String, Offset> splitFinishedOffsets,
             AssignerStatus assignerStatus,
@@ -186,7 +186,7 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
         this.currentParallelism = currentParallelism;
         this.alreadyProcessedTables = alreadyProcessedTables;
         this.remainingSplits = remainingSplits;
-        this.assignedSplits = assignedSplits;
+        this.assignedSplits = new LinkedHashMap<>(assignedSplits);
         this.tableSchemas = tableSchemas;
         this.splitFinishedOffsets = splitFinishedOffsets;
         this.assignerStatus = assignerStatus;

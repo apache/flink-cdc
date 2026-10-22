@@ -96,7 +96,7 @@ class PendingSplitsStateSerializerTest {
                 new SnapshotPendingSplitsState(
                         Collections.emptyList(),
                         Collections.emptyList(),
-                        new LinkedHashMap<>(),
+                        Collections.emptyMap(),
                         constructTableSchema(),
                         Collections.emptyMap(),
                         AssignerStatus.INITIAL_ASSIGNING,
