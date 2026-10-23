@@ -35,7 +35,7 @@ concurrency:
 jobs:
   check-doc:
     if: github.repository == 'apache/flink-cdc'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
       - name: Build doc
@@ -45,7 +45,7 @@ jobs:
   build-documentation:
     if: github.event_name != 'pull_request' && github.repository == 'apache/flink-cdc'
     name: "Check and build doc"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       max-parallel: 1
