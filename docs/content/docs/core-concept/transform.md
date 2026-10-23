@@ -1,9 +1,9 @@
 ---
 title: "Transform"
-weight: 5
-type: docs
-aliases:
-  - /core-concept/transform/
+slug: "/docs/core-concept/transform"
+sidebar_position: 5
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -532,7 +532,7 @@ transform:
     filter: inc(id) < 100
 ```
 
-For AI model functions and configuration, see [AI Model]({{< ref "docs/core-concept/ai-model" >}}).
+For AI model functions and configuration, see [AI Model](ai-model.md).
 
 ### Python UDFs
 

@@ -1,9 +1,9 @@
 ---
 title: "Frequently Asked Questions"
-weight: 1
-type: docs
-aliases:
-- /faq/faq
+slug: "/docs/faq/faq"
+sidebar_position: 1
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -29,17 +29,17 @@ under the License.
 
 Like the mainstream Maven project version management, XXX snapshot version is the code corresponding to the development branch. Users need to download the source code and compile the corresponding jar. Users should use the released version, such as flink-sql-connector-mysql-cdc-2.1.0.jar, the released version will be available in the Maven central warehouse.
 
-### Q2: When should I use Flink SQL connector XXX Jar? When should I use Flink connector XXX jar? What's the difference between the two? {#q2-when-should-i-use-flink-sql-connector-xxx-jar-when-should-i--flink-connector-xxx-jar-whats-the-difference-between-the-two}
+### Q2: When should I use Flink SQL connector XXX Jar? When should I use Flink connector XXX jar? What's the difference between the two?
 
 The dependency management of each connector in Flink CDC project is consistent with that in Flink project. Flink SQL connector XX is a fat jar. In addition to the code of connector, it also enters all the third-party packages that connector depends on into the shade and provides them to SQL jobs. Users only need to add the fat jar in the flink/lib directory. The Flink connector XX has only the code of the connector and does not contain the required dependencies. It is used by DataStream jobs. Users need to manage the required three-party package dependencies. Conflicting dependencies need to be excluded and shaded by themselves.
 
-### Q3: Why change the package name from com.alibaba.ververica to org.apache.flink? Why can't the 2.x version be found in Maven warehouse? {#q3-why-change-the-package-name-from-comalibabaververica-changed-to-orgapacheflink--why-cant-the-2-x-version-be-found-in-maven-warehouse}
+### Q3: Why change the package name from com.alibaba.ververica to org.apache.flink? Why can't the 2.x version be found in Maven warehouse?
 
 Flink CDC changed the group ID from com.alibaba.ververica to com.ververica in version 2.0.0, and from com.ververica to org.apache.flink in version 3.1. This is to make the project more community neutral and more convenient for developers of various companies to build. So look for 2.x in Maven warehouse package, the path is /com/ververica, while the path of 3.1+ is /org/apache/flink.
 
 ## MySQL CDC FAQ
 
-### Q1: I use CDC 2.x version, only full data can be read, but binlog data cannot be read. What's the matter? {#q1-i-use-cdc-2x-version--only-full-data-can-be-read-but-binlog-data-cannot-be-read-whats-the-matter}
+### Q1: I use CDC 2.x version, only full data can be read, but binlog data cannot be read. What's the matter?
 
 CDC 2.0 supports lock free algorithm and concurrent reading. In order to ensure the order of full data + incremental data, it relies on Flink's checkpoint mechanism, so the job needs to be configured with checkpoint.
 
@@ -159,11 +159,11 @@ mysql> set global expire_logs_days=7;
 
 In another case, the binlog consumption of the Flink CDC job is too slow. Generally, sufficient resources can be allocated.
 
-### Q10: The job reports an error ConnectException: A slave with the same server_uuid/server_id as this slave has connected to the master. What should I do? {#q10-the-job-reports-an-error-connectexception-a-slave-with-the-same-server_uuidserver_id-as-this-slave-has-connected-to-the-masterwhat-should-i-do}
+### Q10: The job reports an error ConnectException: A slave with the same server_uuid/server_id as this slave has connected to the master. What should I do?
 
 This error occurs because the server ID used in the job conflicts with the server ID used by other jobs or other synchronization tools. The server ID needs to be globally unique. The server ID is an int type integer. In CDC 2.x In version, each concurrency of the source requires a server ID. it is recommended to reasonably plan the server ID. for example, if the source of the job is set to four concurrency, you can configure 'server ID' = '5001-5004', so that each source task will not conflict.
 
-### Q11: The job reports an error ConnectException: Received DML ‘…’ for processing, binlog probably contains events generated with statement or mixed based replication format. What should I do? {#q11-the-job-reports-an-error-connectexception-received-dml--for-processing-binlog-probably-contains-events-generated-with-statement-or-mixed-based-replication-formatwhat-should-i-do}
+### Q11: The job reports an error ConnectException: Received DML ‘…’ for processing, binlog probably contains events generated with statement or mixed based replication format. What should I do?
 
 This error occurs because the MySQL server is not configured correctly. You need to check the binlog is format row? You can view it through the following command
 
@@ -171,7 +171,7 @@ This error occurs because the MySQL server is not configured correctly. You need
 mysql> show variables like '%binlog_format%'; 
 ```
 
-### Q12: The job reports an error MySQL 8.0 Public Key Retrieval is not allowed. What should I do? {#q12-the-job-reports-an-error-mysql80-public-key-retrieval-is-not-allowedwhat-should-i-do}
+### Q12: The job reports an error MySQL 8.0 Public Key Retrieval is not allowed. What should I do?
 
 This is because the MySQL user configured by the user uses sha256 password authentication and requires TLS and other protocols to transmit passwords. A simple method is to allow MySQL users to support original password access.
 
@@ -180,7 +180,7 @@ mysql> ALTER USER 'username'@'localhost' IDENTIFIED WITH mysql_native_password B
 mysql> FLUSH PRIVILEGES; 
 ```
 
-### Q13: The job reports an error EventDataDeserializationException: Failed to deserialize data of EventHeaderV4 .... Caused by: java.net.SocketException: Connection reset. What should I do? {#q13-the-job-reports-an-error-eventdatadeserializationexception-failed-to-deserialize-data-of-eventheaderv4--caused-by-javanetsocketexception-connection-resetwhat-should-i-do}
+### Q13: The job reports an error EventDataDeserializationException: Failed to deserialize data of EventHeaderV4 .... Caused by: java.net.SocketException: Connection reset. What should I do?
 
 This problem is generally caused by the network. First, check the network between the Flink cluster and the database, and then increase the network parameters of the MySQL server.
 
@@ -201,7 +201,7 @@ restart-strategy.fixed-delay.delay= 30s
 
 If there is bad back pressure in the job, this problem may happen too. Then you need to handle the back pressure in the job first.
 
-### Q14: The job reports an error The slave is connecting using CHANGE MASTER TO MASTER_AUTO_POSITION = 1, but the master has purged binary logs containing GTIDs that the slave requires. What should I do? {#q14-the-job-reports-an-error-the-slave-is-connecting-using-change-master-to-master_auto_position--1-but-the-master-has-purged-binary-logs-containing-gtids-that-the-slave-requireswhat-should-i-do}
+### Q14: The job reports an error The slave is connecting using CHANGE MASTER TO MASTER_AUTO_POSITION = 1, but the master has purged binary logs containing GTIDs that the slave requires. What should I do?
 
 The reason for this problem is that the reading of the full volume phase of the job is too slow. After reading the full volume phase, the previously recorded gtid site at the beginning of the full volume phase has been cleared by mysql. This can increase the save time of binlog files on the MySQL server, or increase the concurrency of source to make the full volume phase read faster.
 

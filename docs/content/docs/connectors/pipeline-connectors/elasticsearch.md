@@ -1,9 +1,9 @@
 ---
 title: "Elasticsearch"
-weight: 7
-type: docs
-aliases:
-- /connectors/pipeline-connectors/elasticsearch
+slug: "/docs/connectors/pipeline-connectors/elasticsearch"
+sidebar_position: 7
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -285,5 +285,3 @@ Elasticsearch stores document in a JSON string. So the data type mapping is betw
     </tbody>
 </table>
 </div>
-
-{{< top >}}

@@ -1,10 +1,9 @@
 ---
 title: "Building a Real-time Data Lake with Flink CDC"
-weight: 998
-type: docs
-aliases:
-- /connectors/flink-sources/tutorials/build-real-time-data-lake-tutorial.html
-
+slug: "/docs/connectors/flink-sources/tutorials/build-real-time-data-lake-tutorial"
+sidebar_position: 998
+hide_title: true
+displayed_sidebar: docs
 ---
 
 <!--
@@ -36,7 +35,7 @@ You can walk through the tutorial easily in the docker environment. The entire p
 
 The following sections will take the pipeline from MySQL to [Iceberg](https://iceberg.apache.org/) as an example. The overview of the architecture is as follows:
 
-{{< img src="/fig/real-time-data-lake-tutorial/real-time-data-lake-tutorial.png" alt="Real-time data lake with Flink CDC" >}}
+<img src="@@BASE_URL@@fig/real-time-data-lake-tutorial/real-time-data-lake-tutorial.png" alt="Real-time data lake with Flink CDC" class="doc-image">
 
 You can also use other data sources like Oracle/Postgres and sinks like Hudi to build your own pipeline.
 
@@ -141,7 +140,7 @@ The components required in this tutorial are all managed in containers, so we wi
 * If you want to run with your own Flink environment, remember to download the jar packages and then put them to `FLINK_HOME/lib/`.
 * All the following commands involving `docker-compose` should be executed in the directory of the `docker-compose.yml` file.
 
-{{< img src="/fig/real-time-data-lake-tutorial/flink-ui.png" alt="Flink UI" >}}
+<img src="@@BASE_URL@@fig/real-time-data-lake-tutorial/flink-ui.png" alt="Flink UI" class="doc-image">
 
 ### Preparing data in databases
 1. Enter mysql's container:
@@ -202,7 +201,7 @@ docker-compose exec sql-client /opt/flink/bin/sql-client.sh
 
 We should see the welcome screen of the CLI client:
 
-{{< img src="/fig/real-time-data-lake-tutorial/flink-sql-client.png" alt="Flink SQL Client" >}}
+<img src="@@BASE_URL@@fig/real-time-data-lake-tutorial/flink-sql-client.png" alt="Flink SQL Client" class="doc-image">
 
 Then do the following steps in Flink SQL CLI:
 
@@ -273,7 +272,7 @@ Then do the following steps in Flink SQL CLI:
    The running job can be found in [Flink UI](http://localhost:8081/#/job/running), and it looks like:
    
    
-   {{< img src="/fig/real-time-data-lake-tutorial/flink-cdc-iceberg-running-job.png" alt="CDC to Iceberg Running Job" >}}
+   <img src="@@BASE_URL@@fig/real-time-data-lake-tutorial/flink-cdc-iceberg-running-job.png" alt="CDC to Iceberg Running Job" class="doc-image">
    
    Then, we can use the following command to see the files written to Iceberg: 
    ```shell
@@ -281,7 +280,7 @@ Then do the following steps in Flink SQL CLI:
    ```
    It should look like:
 
-   {{< img src="/fig/real-time-data-lake-tutorial/files-in-iceberg.png" alt="Files in Iceberg" >}}
+   <img src="@@BASE_URL@@fig/real-time-data-lake-tutorial/files-in-iceberg.png" alt="Files in Iceberg" class="doc-image">
 
    The actual files may differ in your environment, but the structure of the directory should be similar.
 
@@ -292,7 +291,7 @@ Then do the following steps in Flink SQL CLI:
    ```
    We can see the data queried in the Flink SQL CLI:
    
-   {{< img src="/fig/real-time-data-lake-tutorial/data_in_iceberg.png" alt="Data in Iceberg" >}}
+   <img src="@@BASE_URL@@fig/real-time-data-lake-tutorial/data_in_iceberg.png" alt="Data in Iceberg" class="doc-image">
    
 3. Make some changes in the MySQL databases, and then the data in Iceberg table `all_users_sink` will also change in real time.
    
@@ -318,7 +317,7 @@ Then do the following steps in Flink SQL CLI:
    
    The final query result is as follows:
    
-   {{< img src="/fig/real-time-data-lake-tutorial/final-data-in-iceberg.png" alt="Final Data in Iceberg" >}}
+   <img src="@@BASE_URL@@fig/real-time-data-lake-tutorial/final-data-in-iceberg.png" alt="Final Data in Iceberg" class="doc-image">
 
    From the latest result in Iceberg, we can see that there is a new record of `(db_1, user_1, 111)`, and the address of `(db_1, user_2, 120)` has been updated to `Beijing`.
    Besides, the record `(db_2, user_2, 220)` has been deleted. The result exactly matches the changes we made in MySQL.
@@ -328,5 +327,3 @@ After finishing the tutorial, run the following command in the directory of `doc
 ```shell
 docker-compose down
 ```
-
-{{< top >}}

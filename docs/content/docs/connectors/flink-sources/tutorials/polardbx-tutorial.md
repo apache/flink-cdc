@@ -1,9 +1,9 @@
 ---
 title: "PolarDB-X Tutorial"
-weight: 5
-type: docs
-aliases:
-- /connectors/flink-sources/tutorials/mongodb-tutorial.html
+slug: "/docs/connectors/flink-sources/tutorials/polardbx-tutorial"
+sidebar_position: 5
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -152,7 +152,7 @@ We can also visit [http://localhost:5601/](http://localhost:5601/) to see if Kib
 
    Then we can visit [http://localhost:8081/](http://localhost:8081/) to see if Flink is running normally, and the web page looks like:
 
-   {{< img src="/fig/mysql-postgres-tutorial/flink-ui.png" alt="Flink UI" >}}
+   <img src="@@BASE_URL@@fig/mysql-postgres-tutorial/flink-ui.png" alt="Flink UI" class="doc-image">
 
 3. Use the following command to start a Flink SQL CLI:
     ```shell
@@ -160,7 +160,7 @@ We can also visit [http://localhost:5601/](http://localhost:5601/) to see if Kib
     ```
    We should see the welcome screen of the CLI client.
 
-   {{< img src="/fig/mysql-postgres-tutorial/flink-sql-client.png" alt="Flink SQL Client" >}}
+   <img src="@@BASE_URL@@fig/mysql-postgres-tutorial/flink-sql-client.png" alt="Flink SQL Client" class="doc-image">
 
 ## Creating tables using Flink DDL in Flink SQL CLI
 First, enable checkpoints every 3 seconds
@@ -250,11 +250,11 @@ Flink SQL> INSERT INTO enriched_orders
 Now, the enriched orders should be shown in Kibana.
 Visit [http://localhost:5601/app/kibana#/management/kibana/index_pattern](http://localhost:5601/app/kibana#/management/kibana/index_pattern) to create an index pattern `enriched_orders`.
 
-{{< img src="/fig/mysql-postgres-tutorial/kibana-create-index-pattern.png" alt="Create Index Pattern" >}}
+<img src="@@BASE_URL@@fig/mysql-postgres-tutorial/kibana-create-index-pattern.png" alt="Create Index Pattern" class="doc-image">
 
 Visit [http://localhost:5601/app/kibana#/discover](http://localhost:5601/app/kibana#/discover) to find the enriched orders.
 
-{{< img src="/fig/mysql-postgres-tutorial/kibana-detailed-orders.png" alt="Find enriched Orders" >}}
+<img src="@@BASE_URL@@fig/mysql-postgres-tutorial/kibana-detailed-orders.png" alt="Find enriched Orders" class="doc-image">
 
 Next, do some change in the databases, and then the enriched orders shown in Kibana will be updated after each step in real time.
 1. Insert a new order in PolarDB-X
@@ -274,8 +274,8 @@ Next, do some change in the databases, and then the enriched orders shown in Kib
    DELETE FROM orders WHERE order_id = 10004;
    ```
    The changes of enriched orders in Kibana are as follows:
-   {{< img src="/fig/mysql-postgres-tutorial/kibana-detailed-orders-changes.gif" alt="Enriched Orders Changes" >}}
-   
+   <img src="@@BASE_URL@@fig/mysql-postgres-tutorial/kibana-detailed-orders-changes.gif" alt="Enriched Orders Changes" class="doc-image">
+
 ## Clean up
 After finishing the tutorial, run the following command to stop all containers in the directory of `docker-compose.yml`:
 ```shell
@@ -285,5 +285,3 @@ Run the following command to stop the Flink cluster in the directory of Flink `f
 ```shell
 ./bin/stop-cluster.sh
 ```
-
-{{< top >}}

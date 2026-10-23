@@ -1,9 +1,9 @@
 ---
 title: "CdcUp Quickstart Guide"
-weight: 3
-type: docs
-aliases:
-- /get-started/quickstart/cdc-up-quickstart-guide
+slug: "/docs/get-started/quickstart-for-1.20/cdc-up-quickstart-guide"
+sidebar_position: 3
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one

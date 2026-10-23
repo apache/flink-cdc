@@ -1,9 +1,9 @@
 ---
 title: "Data Pipeline"
-weight: 1
-type: docs
-aliases:
-  - /core-concept/data-pipeline/
+slug: "/docs/core-concept/data-pipeline"
+sidebar_position: 1
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -30,13 +30,13 @@ Since events in Flink CDC flow from the upstream to the downstream in a pipeline
 # Parameters
 A pipeline corresponds to a chain of operators in Flink.   
 To describe a Data Pipeline, the following parts are required:
-- [source]({{< ref "docs/core-concept/data-source" >}})
-- [sink]({{< ref "docs/core-concept/data-sink" >}})
+- [source](data-source.md)
+- [sink](data-sink.md)
 - [pipeline](#pipeline-configurations)
 
 the following parts are optional:
-- [route]({{< ref "docs/core-concept/route" >}})
-- [transform]({{< ref "docs/core-concept/transform" >}})
+- [route](route.md)
+- [transform](transform.md)
 
 # Example
 ## Only required
@@ -110,7 +110,7 @@ We could use following yaml file to define a complicated Data Pipeline describin
        execution.checkpointing.interval: 2min
 ```
 
-# Pipeline Configurations
+## Pipeline Configurations
 
 The following config options of Data Pipeline level are supported. 
 Note that whilst the parameters are each individually optional, at least one of them must be specified. That is to say, The `pipeline` section is mandatory and cannot be empty.
@@ -122,8 +122,8 @@ Note that whilst the parameters are each individually optional, at least one of 
 | `parallelism`                              | The global parallelism of the pipeline. Defaults to 1.                                                                                                                                                                                                                                                                                                                                                                                                                                                    | optional          |
 | `local-time-zone`                          | The local time zone defines current session time zone id.                                                                                                                                                                                                                                                                                                                                                                                                                                                 | optional          |
 | `execution.runtime-mode`                   | The runtime mode of the pipeline includes STREAMING and BATCH, with the default value being STREAMING.                                                                                                                                                                                                                                                                                                                                                                                                    | optional          |
-| `route-mode`                               | The matching mode for [route]({{< ref "docs/core-concept/route" >}}#route-mode) rules. One of: `ALL_MATCH` (default, apply all matching rules) or `FIRST_MATCH` (apply only the first matching rule).                                                                                                                                                                                                                                                                                                     | optional          |
-| `schema.change.behavior`                   | How to handle [changes in schema]({{< ref "docs/core-concept/schema-evolution" >}}). One of: [`exception`]({{< ref "docs/core-concept/schema-evolution" >}}#exception-mode), [`evolve`]({{< ref "docs/core-concept/schema-evolution" >}}#evolve-mode), [`try_evolve`]({{< ref "docs/core-concept/schema-evolution" >}}#tryevolve-mode), [`lenient`]({{< ref "docs/core-concept/schema-evolution" >}}#lenient-mode) (default) or [`ignore`]({{< ref "docs/core-concept/schema-evolution" >}}#ignore-mode). | optional          |
+| `route-mode`                               | The matching mode for [route](route.md#route-mode) rules. One of: `ALL_MATCH` (default, apply all matching rules) or `FIRST_MATCH` (apply only the first matching rule).                                                                                                                                                                                                                                                                                                     | optional          |
+| `schema.change.behavior`                   | How to handle [changes in schema](schema-evolution.md). One of: [`exception`](schema-evolution.md#exception-mode), [`evolve`](schema-evolution.md#evolve-mode), [`try_evolve`](schema-evolution.md#tryevolve-mode), [`lenient`](schema-evolution.md#lenient-mode) (default) or [`ignore`](schema-evolution.md#ignore-mode). | optional          |
 | `schema.operator.uid`                      | The unique ID for schema operator. This ID will be used for inter-operator communications and must be unique across operators. **Deprecated**: use `operator.uid.prefix` instead.                                                                                                                                                                                                                                                                                                                         | optional          |
 | `schema-operator.rpc-timeout`              | The timeout time for SchemaOperator to wait downstream SchemaChangeEvent applying finished, the default value is 3 minutes.                                                                                                                                                                                                                                                                                                                                                                               | optional          |
 | `operator.uid.prefix`                      | The prefix to use for all pipeline operator UIDs. If not set, all pipeline operator UIDs will be generated by Flink. It is recommended to set this parameter to ensure stable and recognizable operator UIDs, which can help with stateful upgrades, troubleshooting, and Flink UI diagnostics.                                                                                                                                                                                                           | optional          |

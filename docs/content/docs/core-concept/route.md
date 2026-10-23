@@ -1,9 +1,9 @@
 ---
 title: "Route"
-weight: 6
-type: docs
-aliases:
-  - /core-concept/route/
+slug: "/docs/core-concept/route"
+sidebar_position: 6
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -39,7 +39,7 @@ To describe a route, the follows are required:
 
 A route module can contain a list of source-table/sink-table rules.
 
-# Route Mode
+## Route Mode
 By default, all matching route rules are applied to a table. You can configure the `route-mode` option in the pipeline configuration to change this behavior:
 
 | Value        | Description                                                            |
@@ -56,11 +56,13 @@ pipeline:
   route-mode: FIRST_MATCH
 ```
 
-{{< hint info >}}
+:::info
+
 
 When using `FIRST_MATCH` mode, route rules are evaluated in the order they are defined. The first rule that matches the source table will be applied, and subsequent rules will be skipped.
 
-{{< /hint >}}
+
+:::
 
 # Example
 ## Route one Data Source table to one Data Sink table
@@ -126,11 +128,13 @@ Here we create two capturing groups matching database suffix and table prefix.
 For upstream table `db_foo.bar_tbl`, capturing group `(foo, bar)` will be extracted and bound to `$1` and `$2`.
 As a result, such table will be routed to downstream table `sink_db_foo.sink_table_bar`.
 
-{{< hint info >}}
+:::info
+
 
 Standard RegExp capturing could not be used with `replace-symbol` options.
 
-{{< /hint >}}
+
+:::
 
 # Compatibility Notes — Sink-Table Suffix Leak from Prefix Matches
 

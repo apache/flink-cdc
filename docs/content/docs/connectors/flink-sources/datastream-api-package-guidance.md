@@ -1,9 +1,9 @@
 ---
 title: "DataStream API Package Guidance"
-weight: 998
-type: docs
-aliases:
-- /connectors/flink-sources/datastream-api-package-guidance
+slug: "/docs/connectors/flink-sources/datastream-api-package-guidance"
+sidebar_position: 998
+hide_title: true
+displayed_sidebar: docs
 ---
 
 <!--
@@ -484,5 +484,3 @@ public class CdcTest {
 }
 
 ```
-
-{{< top >}}

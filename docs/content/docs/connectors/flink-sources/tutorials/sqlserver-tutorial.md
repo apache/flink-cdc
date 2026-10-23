@@ -1,9 +1,9 @@
 ---
 title: "SqlServer Tutorial"
-weight: 6
-type: docs
-aliases:
-- /connectors/flink-sources/tutorials/sqlserver-tutorial.html
+slug: "/docs/connectors/flink-sources/tutorials/sqlserver-tutorial"
+sidebar_position: 6
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -227,5 +227,3 @@ GO
 DELETE FROM orders WHERE id = 10004;
 GO
 ```
-
-{{< top >}}

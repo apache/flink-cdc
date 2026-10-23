@@ -1,9 +1,9 @@
 ---
 title: "Db2 Tutorial"
-weight: 2
-type: docs
-aliases:
-- /connectors/flink-sources/tutorials/db2-tutorial.html
+slug: "/docs/connectors/flink-sources/tutorials/db2-tutorial"
+sidebar_position: 2
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -158,5 +158,3 @@ INSERT INTO DB2INST1.PRODUCTS VALUES (default,'scooter','Big 2-wheel scooter ',5
 
 DELETE FROM DB2INST1.PRODUCTS WHERE ID=111;
 ```
-
-{{< top >}}

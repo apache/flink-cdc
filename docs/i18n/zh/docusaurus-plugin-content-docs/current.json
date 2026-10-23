@@ -1,0 +1,35 @@
+{
+  "sidebar.docs.category.Connectors": {
+    "message": "连接器"
+  },
+  "sidebar.docs.category.Flink Sources": {
+    "message": "Flink Source 连接器"
+  },
+  "sidebar.docs.category.Tutorials": {
+    "message": "Flink CDC Sources 教程"
+  },
+  "sidebar.docs.category.Pipeline Connectors": {
+    "message": "Pipeline 连接器"
+  },
+  "sidebar.docs.category.Core Concept": {
+    "message": "核心概念"
+  },
+  "sidebar.docs.category.Deployment": {
+    "message": "部署模式"
+  },
+  "sidebar.docs.category.Developer Guide": {
+    "message": "开发者指南"
+  },
+  "sidebar.docs.category.FAQ": {
+    "message": "常见问题"
+  },
+  "sidebar.docs.category.Get Started": {
+    "message": "入门指南"
+  },
+  "sidebar.docs.category.Quickstart for Flink 1.20": {
+    "message": "在 Flink 1.20 上快速开始"
+  },
+  "sidebar.docs.category.Quickstart for Flink 2.2": {
+    "message": "在 Flink 2.2 上快速开始"
+  }
+}
