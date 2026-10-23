@@ -20,8 +20,10 @@ set -e
 
 # override env to use Java 11 to for build instead default Java 8
 # path to JDK is taken from https://github.com/apache/flink-connector-shared-utils/blob/ci_utils/docker/base/Dockerfile#L37-L40
-export JAVA_HOME=$JAVA_HOME_11_X64
-export PATH=$JAVA_HOME_11_X64/bin:$PATH
+if [ -n "${JAVA_HOME_11_X64:-}" ]; then
+    export JAVA_HOME=$JAVA_HOME_11_X64
+    export PATH=$JAVA_HOME_11_X64/bin:$PATH
+fi
 
 mvn --version
 java -version
@@ -29,24 +31,11 @@ javadoc -J-version
 
 # workaround for a git security patch
 git config --global --add safe.directory /root/flink-cdc
-git submodule update --init --recursive
 
-HUGO_REPO=https://github.com/gohugoio/hugo/releases/download/v0.80.0/hugo_extended_0.80.0_Linux-64bit.tar.gz
-HUGO_ARTIFACT=hugo_extended_0.80.0_Linux-64bit.tar.gz
-if ! curl --fail -OL $HUGO_REPO ; then
-	echo "Failed to download Hugo binary"
-	exit 1
-fi
-tar -zxvf $HUGO_ARTIFACT
-
-# Build the docs
-hugo --source docs
-
-# generate docs into docs/target
-hugo -v --source docs --destination target
-if [ $? -ne 0 ]; then
-	echo "Error building the docs"
-	exit 1
+# CI builds the site on the host before generating Javadoc in the Java container.
+if [ "${DOCS_SKIP_SITE_BUILD:-false}" != "true" ]; then
+    npm --prefix docs install --package-lock=false
+    npm --prefix docs run build
 fi
 
 # build Flink; required for Javadoc step

@@ -38,9 +38,20 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
+      - name: Set up Node.js
+        if: hashFiles('docs/package.json') != ''
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - name: Build Docusaurus site
+        if: hashFiles('docs/package.json') != ''
+        run: |
+          npm --prefix docs install --package-lock=false
+          npm --prefix docs test
+          npm --prefix docs run build
       - name: Build doc
         run: |
-          docker run --rm --volume "$PWD:/root/flink-cdc" chesnay/flink-ci:java_8_11_17_21_maven_386 bash -c "cd /root/flink-cdc && chmod +x ./.github/workflows/docs.sh && ./.github/workflows/docs.sh"
+          docker run --rm --env DOCS_SKIP_SITE_BUILD=true --volume "$PWD:/root/flink-cdc" chesnay/flink-ci:java_8_11_17_21_maven_386 bash -c "cd /root/flink-cdc && chmod +x ./.github/workflows/docs.sh && ./.github/workflows/docs.sh"
 
   build-documentation:
     if: github.event_name != 'pull_request' && github.repository == 'apache/flink-cdc'
@@ -60,6 +71,12 @@ jobs:
         with:
           ref: ${{ matrix.branch }}
 
+      - name: Set up Node.js
+        if: hashFiles('docs/package.json') != ''
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
       - name: Set branch environment variable
         run: |
           currentBranch=$(git branch --show-current)
@@ -72,9 +89,24 @@ jobs:
           echo "flink_alias=stable" >> ${GITHUB_ENV}
           fi
 
+      - name: Build Docusaurus site
+        if: hashFiles('docs/package.json') != ''
+        run: |
+          npm --prefix docs install --package-lock=false
+          npm --prefix docs test
+          npm --prefix docs run build
+
       - name: Build documentation
         run: |
-          docker run --rm --volume "$PWD:/root/flink-cdc" chesnay/flink-ci:java_8_11_17_21_maven_386 bash -c "cd /root/flink-cdc && chmod +x ./.github/workflows/docs.sh && ./.github/workflows/docs.sh"
+          docker run --rm --env DOCS_SKIP_SITE_BUILD=true --volume "$PWD:/root/flink-cdc" chesnay/flink-ci:java_8_11_17_21_maven_386 bash -c "cd /root/flink-cdc && chmod +x ./.github/workflows/docs.sh && ./.github/workflows/docs.sh"
+
+      - name: Build Docusaurus alias
+        if: hashFiles('docs/package.json') != '' && env.flink_alias != ''
+        env:
+          DOCS_BASE_URL: /flink/flink-cdc-docs-${{ env.flink_alias }}/
+        run: |
+          npm --prefix docs run build -- --out-dir target-alias
+          cp -R docs/target/api docs/target-alias/api
 
       - name: Upload documentation
         uses: ./.github/actions/rsync-deployments
@@ -92,7 +124,7 @@ jobs:
         uses: ./.github/actions/rsync-deployments
         with:
           switches: --archive --compress --delete
-          path: docs/target/
+          path: ${{ hashFiles('docs/package.json') != '' && 'docs/target-alias/' || 'docs/target/' }}
           remote_path: ${{ secrets.NIGHTLIES_RSYNC_PATH }}/flink/flink-cdc-docs-${{ env.flink_alias }}/
           remote_host: ${{ secrets.NIGHTLIES_RSYNC_HOST }}
           remote_port: ${{ secrets.NIGHTLIES_RSYNC_PORT }}
