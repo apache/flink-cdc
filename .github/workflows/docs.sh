@@ -47,7 +47,7 @@ mkdir -p docs/target/api
 mvn javadoc:aggregate -B \
     -pl '!flink-cdc-flink1-compat,!flink-cdc-flink2-compat' \
     -DadditionalJOption="-Xdoclint:none --allow-script-in-comments" \
-    -Dmaven.javadoc.failOnError=false \
+    -Dmaven.javadoc.failOnError=true \
     -Dcheckstyle.skip=true \
     -Dspotless.check.skip=true \
     -Denforcer.skip=true \
