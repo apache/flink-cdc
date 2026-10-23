@@ -24,12 +24,12 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-# 演示: PolarDB-X CDC 导入 Elasticsearch
+# 演示：PolarDB-X CDC 导入 Elasticsearch {#演示-polardb-x-cdc-导入-elasticsearch}
 
-本示例我们通过演示 PolarDB-X 借助 Flink-CDC 将数据导入至 Elasticsearch 来介绍 PolarDB-X 的增量订阅能力，你可以前往:[PolarDB-X](https://github.com/ApsaraDB/galaxysql) 了解更多细节。
+本示例我们通过演示 PolarDB-X 借助 Flink-CDC 将数据导入至 Elasticsearch 来介绍 PolarDB-X 的增量订阅能力，你可以前往：[PolarDB-X](https://github.com/ApsaraDB/galaxysql) 了解更多细节。
 
 ### 准备教程所需要的组件
-我们假设你运行在一台 MacOS 或者 Linux 机器上，并且已经安装 docker.
+我们假设你运行在一台 macOS 或者 Linux 机器上，并且已经安装 docker。
 
 #### 配置并启动容器
 
@@ -71,7 +71,7 @@ services:
       - '/var/run/docker.sock:/var/run/docker.sock'
 ```
 该 Docker Compose 中包含的容器有：
-- PolarDB-X: 商品表 `products` 和 订单表 `orders` 将存储在该数据库中， 这两张表将进行关联，得到一张包含更多信息的订单表 `enriched_orders`
+- PolarDB-X: 商品表 `products` 和 订单表 `orders` 将存储在该数据库中，这两张表将进行关联，得到一张包含更多信息的订单表 `enriched_orders`
 - Elasticsearch: 最终的订单表 `enriched_orders` 将写到 Elasticsearch
 - Kibana: 用来可视化 ElasticSearch 的数据
 
@@ -85,7 +85,7 @@ docker-compose up -d
 
 ### 准备数据：
 
-使用已创建的用户名和密码进行登陆PolarDB-X。
+使用已创建的用户名和密码进行登录 PolarDB-X。
 
 ```shell
 mysql -h127.0.0.1 -P8527 -upolardbx_root -p"123456"
@@ -110,7 +110,7 @@ VALUES (default,"scooter","Small 2-wheel scooter"),
        (default,"hammer","14oz carpenter's hammer"),
        (default,"hammer","16oz carpenter's hammer"),
        (default,"rocks","box of assorted rocks"),
-       (default,"jacket","water resistent black wind breaker"),
+       (default,"jacket","water resistant black wind breaker"),
        (default,"spare tire","24 inch spare tire");
 
 
@@ -131,23 +131,23 @@ VALUES (default, '2020-07-30 10:08:22', 'Jark', 50.50, 102, false),
 ```
 
 ### 下载 Flink 和所需要的依赖包
-1. 下载 [Flink 1.17.0](https://archive.apache.org/dist/flink/flink-1.17.0/flink-1.17.0-bin-scala_2.12.tgz) 并将其解压至目录 `flink-1.17.0`
-2. 下载下面列出的依赖包，并将它们放到目录 `flink-1.17.0/lib/` 下
+1. 下载 [Flink 1.20.5](https://archive.apache.org/dist/flink/flink-1.20.5/flink-1.20.5-bin-scala_2.12.tgz) 并将其解压至目录 `flink-1.20.5`
+2. 下载下面列出的依赖包，并将它们放到目录 `flink-1.20.5/lib/` 下
 
 ```下载链接只对已发布的版本有效, SNAPSHOT 版本需要本地编译```
-- 用于订阅PolarDB-X Binlog: [flink-sql-connector-mysql-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-mysql-cdc)
-- 用于写入Elasticsearch: [flink-sql-connector-elasticsearch7-3.0.1-1.17.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7/3.0.1-1.17/flink-sql-connector-elasticsearch7-3.0.1-1.17.jar)
-3. 启动flink服务:
+- 用于订阅 PolarDB-X Binlog: [flink-sql-connector-mysql-cdc-3.7.0-1.20.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-mysql-cdc/3.7.0-1.20/flink-sql-connector-mysql-cdc-3.7.0-1.20.jar)
+- 用于写入 Elasticsearch: [flink-sql-connector-elasticsearch7-3.1.0-1.20.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7/3.1.0-1.20/flink-sql-connector-elasticsearch7-3.1.0-1.20.jar)
+3. 启动 flink 服务：
 ```shell
 ./bin/start-cluster.sh
 ```
 
-我们可以访问 [http://localhost:8081/](http://localhost:8081/) 看到Flink正常运行:
+我们可以访问 [http://localhost:8081/](http://localhost:8081/) 看到 Flink 正常运行：
 
 {{< img src="/fig/mysql-postgres-tutorial/flink-ui.png" alt="Flink UI" >}}
 
 
-4. 启动Flink SQL CLI:
+4. 启动 Flink SQL CLI:
 ```shell
 ./bin/sql-client.sh
 ```
@@ -156,7 +156,7 @@ VALUES (default, '2020-07-30 10:08:22', 'Jark', 50.50, 102, false),
 
 
 ```sql
--- 设置间隔时间为3秒                       
+-- 设置间隔时间为 3 秒
 Flink SQL> SET execution.checkpointing.interval = 3s;
 
 -- 创建source1 -订单表
@@ -233,7 +233,7 @@ Flink SQL> INSERT INTO enriched_orders
 
 ### 修改监听表数据，查看增量数据变动
 
-在PolarDB-X中依次执行如下修改操作，每执行一步就刷新一次 Kibana，可以看到 Kibana 中显示的订单数据将实时更新。
+在 PolarDB-X 中依次执行如下修改操作，每执行一步就刷新一次 Kibana，可以看到 Kibana 中显示的订单数据将实时更新。
 
 ```sql
 INSERT INTO orders VALUES (default, '2020-07-30 15:22:00', 'Jark', 29.71, 104, false);
@@ -251,7 +251,7 @@ DELETE FROM orders WHERE order_id = 10004;
 docker-compose down
 ```
 
-进入Flink的部署目录，停止 Flink 集群：
+进入 Flink 的部署目录，停止 Flink 集群：
 
 ```shell
 ./bin/stop-cluster.sh

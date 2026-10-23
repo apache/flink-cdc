@@ -31,15 +31,15 @@ OceanBase CDC 连接器允许从 OceanBase 读取快照数据和增量数据。�
 
 ### OceanBase CDC 方案
 
-名词解释:
+名词解释：
 
-- *OceanBase CE*: OceanBase 社区版。OceanBase 的开源版本，兼容 MySQL https://github.com/oceanbase/oceanbase 。
-- *OceanBase EE*: OceanBase 企业版。OceanBase 的商业版本，支持 MySQL 和 Oracle 两种兼容模式 https://www.oceanbase.com 。
-- *OceanBase Cloud*: OceanBase 云数据库 https://www.oceanbase.com/product/cloud 。
+- *OceanBase CE*: OceanBase 社区版。OceanBase 的开源版本，兼容 MySQL https://github.com/oceanbase/oceanbase。
+- *OceanBase EE*: OceanBase 企业版。OceanBase 的商业版本，支持 MySQL 和 Oracle 两种兼容模式 https://www.oceanbase.com。
+- *OceanBase Cloud*: OceanBase 云数据库 https://www.oceanbase.com/product/cloud。
 - *Binlog Service CE*: OceanBase Binlog 服务社区版。OceanBase 社区版的一个兼容 MySQL 复制协议的解决方案，详情见[文档](https://www.oceanbase.com/docs/oblogproxy-doc)。
 - *Binlog Service EE*: OceanBase Binlog 服务企业版。OceanBase 企业版 MySQL 模式的一个兼容 MySQL 复制协议的解决方案，仅可在阿里云使用，详情见[操作指南](https://www.alibabacloud.com/help/zh/apsaradb-for-oceanbase/latest/binlog-overview)。
 - *MySQL Driver*: `mysql-connector-java`，可用于 OceanBase 社区版和 OceanBase 企业版 MySQL 模式。
-- *OceanBase Driver*: OceanBase JDBC 驱动，支持所有版本的 MySQL 和 Oracle 兼容模式 https://github.com/oceanbase/obconnector-j 。
+- *OceanBase Driver*: OceanBase JDBC 驱动，支持所有版本的 MySQL 和 Oracle 兼容模式 https://github.com/oceanbase/obconnector-j。
 
 OceanBase CDC 源端读取方案：
 
@@ -68,7 +68,7 @@ OceanBase CDC 源端读取方案：
                 <td>Binlog Service CE</td>
             </tr>
             <tr>
-                <td rowspan="2">OceanBase EE (MySQL 模式)</td>
+                <td rowspan="2">OceanBase EE（MySQL 模式）</td>
                 <td>
                     MySQL Driver: 8.0.x <br>
                 </td>
@@ -81,7 +81,7 @@ OceanBase CDC 源端读取方案：
                 <td>Binlog Service EE</td>
             </tr>
             <tr>
-                <td>OceanBase EE (Oracle 模式)</td>
+                <td>OceanBase EE（Oracle 模式）</td>
                 <td></td>
                 <td>暂不支持 OceanBase Oracle 兼容模式下的增量订阅服务，请联系企业技术支持。</td>
                 <td></td>
@@ -100,7 +100,7 @@ OceanBase CDC 源端读取方案：
 依赖
 ------------
 
-为了设置 OceanBase CDC 连接器，下表提供了使用构建自动化工具（如 Maven 或 SBT ）和带有 SQL JAR 包的 SQL 客户端的两个项目的依赖关系信息。
+为了设置 OceanBase CDC 连接器，下表提供了使用构建自动化工具（如 Maven 或 SBT）和带有 SQL JAR 包的 SQL 客户端的两个项目的依赖关系信息。
 
 ### Maven dependency
 
@@ -108,11 +108,11 @@ OceanBase CDC 源端读取方案：
 
 ### SQL Client JAR
 
-下载[flink-sql-connector-oceanbase-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-oceanbase-cdc)  到 `<FLINK_HOME>/lib/` 目录下。
+下载 [flink-sql-connector-oceanbase-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-oceanbase-cdc)  到 `<FLINK_HOME>/lib/` 目录下。
 
-**注意:** 参考 [flink-sql-connector-oceanbase-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-oceanbase-cdc) 当前已发布的所有版本都可以在 Maven 中央仓库获取。
+**注意：** 参考 [flink-sql-connector-oceanbase-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-oceanbase-cdc) 当前已发布的所有版本都可以在 Maven 中央仓库获取。
 
-由于 MySQL Driver 和 OceanBase Driver 使用的开源协议都与 Flink CDC 项目不兼容，我们无法在 jar 包中提供驱动。 您可能需要手动配置以下依赖：
+由于 MySQL Driver 和 OceanBase Driver 使用的开源协议都与 Flink CDC 项目不兼容，我们无法在 jar 包中提供驱动。您可能需要手动配置以下依赖：
 
 <div class="wy-table-responsive">
 <table class="colwidths-auto docutils">
@@ -150,10 +150,10 @@ OceanBase CDC 源端读取方案：
 ----------------
 
 ```sql
--- 每 3 秒做一次 checkpoint，用于测试，生产配置建议5到10分钟                      
+-- 每 3 秒做一次 checkpoint，用于测试，生产配置建议 5 到 10 分钟
 Flink SQL> SET 'execution.checkpointing.interval' = '3s';   
 
--- 在 Flink SQL中注册 OceanBase 表 'orders'
+-- 在 Flink SQL 中注册 OceanBase 表 'orders'
 Flink SQL> CREATE TABLE orders (
      order_id INT,
      order_date TIMESTAMP(0),
@@ -195,7 +195,7 @@ Flink SQL> SELECT * FROM orders;
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>指定要使用的连接器, 这里应该是 <code>'oceanbase-cdc'</code>.</td>
+      <td>指定要使用的连接器，这里应该是 <code>'oceanbase-cdc'</code>。</td>
     </tr>
     <tr>
       <td>hostname</td>
@@ -230,7 +230,7 @@ Flink SQL> SELECT * FROM orders;
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>需要监视的 OceanBase 数据库的表名。表名支持正则表达式，以监视满足正则表达式的多个表。注意：OceanBase CDC 连接器在正则匹配表名时，会把用户填写的 database-name， table-name 通过字符串 `\\.` 连接成一个全路径的正则表达式，然后使用该正则表达式和 OceanBase 数据库中表的全限定名进行正则匹配。</td>
+      <td>需要监视的 OceanBase 数据库的表名。表名支持正则表达式，以监视满足正则表达式的多个表。注意：OceanBase CDC 连接器在正则匹配表名时，会把用户填写的 database-name，table-name 通过字符串 `\\.` 连接成一个全路径的正则表达式，然后使用该正则表达式和 OceanBase 数据库中表的全限定名进行正则匹配。</td>
     </tr>
     <tr>
       <td>port</td>
@@ -245,7 +245,7 @@ Flink SQL> SELECT * FROM orders;
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>读取数据使用的 server id，server id 可以是个整数或者一个整数范围，比如 '5400' 或 '5400-5408', 
-      建议在 'scan.incremental.snapshot.enabled' 参数为启用时，配置成整数范围。每个 id 在 OceanBase 集群中当前运行的所有数据库进程之间必须是唯一的。该连接器以另一个 server 的身份（具有此唯一 id）加入 OceanBase 集群，从而可以读取 binlog。 默认情况下，连接器会在 5400 和 6400 之间生成一个随机数，但是我们建议用户明确指定 Server id。
+      建议在 'scan.incremental.snapshot.enabled' 参数为启用时，配置成整数范围。每个 id 在 OceanBase 集群中当前运行的所有数据库进程之间必须是唯一的。该连接器以另一个 server 的身份（具有此唯一 id）加入 OceanBase 集群，从而可以读取 binlog。默认情况下，连接器会在 5400 和 6400 之间生成一个随机数，但是我们建议用户明确指定 Server id。
       </td>
     </tr>
     <tr>
@@ -255,9 +255,9 @@ Flink SQL> SELECT * FROM orders;
           <td>Boolean</td>
           <td>增量快照是一种读取表快照的新机制，与旧的快照机制相比，
               增量快照有许多优点，包括：
-              （1）在快照读取期间，Source 支持并发读取，
-              （2）在快照读取期间，Source 支持进行 chunk 粒度的 checkpoint，
-              （3）在快照读取之前，Source 不需要数据库锁权限。
+（1）在快照读取期间，Source 支持并发读取，
+（2）在快照读取期间，Source 支持进行 chunk 粒度的 checkpoint，
+（3）在快照读取之前，Source 不需要数据库锁权限。
               如果希望 Source 并行运行，则每个并行 Readers 都应该具有唯一的 Server id，所以
               Server id 必须是类似 `5400-6400` 的范围，并且该范围必须大于并行度。
               请查阅 <a href="./mysql-cdc.md#增量快照读取">增量快照读取</a> 章节了解更多详细信息。
@@ -344,10 +344,10 @@ Flink SQL> SELECT * FROM orders;
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>数据库服务器中的会话时区， 例如： "Asia/Shanghai". 
+      <td>数据库服务器中的会话时区，例如："Asia/Shanghai"。
           它控制 OceanBase 中的时间戳类型如何转换为字符串。
-          更多请参考 <a href="https://debezium.io/documentation/reference/1.9/connectors/mysql.html#mysql-temporal-types"> 这里</a>.
-          如果没有设置，则使用ZoneId.systemDefault()来确定服务器时区。
+          更多请参考 <a href="https://debezium.io/documentation/reference/1.9/connectors/mysql.html#mysql-temporal-types"> 这里</a>。
+          如果没有设置，则使用 ZoneId.systemDefault() 来确定服务器时区。
       </td>
     </tr>
     <tr>
@@ -356,14 +356,14 @@ Flink SQL> SELECT * FROM orders;
       <td style="word-wrap: break-word;">1000</td>
       <td>Integer</td>
       <td>	
-       在快照操作期间，连接器将查询每个包含的表，以生成该表中所有行的读取事件。 此参数确定 OceanBase 连接是否将表的所有结果拉入内存（速度很快，但需要大量内存）， 或者结果是否需要流式传输（传输速度可能较慢，但适用于非常大的表）。 该值指定了在连接器对结果进行流式处理之前，表必须包含的最小行数，默认值为1000。将此参数设置为`0`以跳过所有表大小检查，并始终在快照期间对所有结果进行流式处理。</td>
+       在快照操作期间，连接器将查询每个包含的表，以生成该表中所有行的读取事件。此参数确定 OceanBase 连接是否将表的所有结果拉入内存（速度很快，但需要大量内存），或者结果是否需要流式传输（传输速度可能较慢，但适用于非常大的表）。该值指定了在连接器对结果进行流式处理之前，表必须包含的最小行数，默认值为 1000。将此参数设置为 `0` 以跳过所有表大小检查，并始终在快照期间对所有结果进行流式处理。</td>
     </tr>
     <tr>
           <td>connect.timeout</td>
           <td>optional</td>
           <td style="word-wrap: break-word;">30s</td>
           <td>Duration</td>
-          <td>连接器在尝试连接到 OceanBase 数据库服务器后超时前应等待的最长时间。该时长不能少于250毫秒。</td>
+          <td>连接器在尝试连接到 OceanBase 数据库服务器后超时前应等待的最长时间。该时长不能少于 250 毫秒。</td>
     </tr>    
     <tr>
           <td>connect.max-retries</td>
@@ -384,7 +384,7 @@ Flink SQL> SELECT * FROM orders;
           <td>optional</td>
           <td style="word-wrap: break-word;">20</td>
           <td>String</td>
-          <td>传递自定义 JDBC URL 属性的选项。用户可以传递自定义属性，如 'jdbc.properties.useSSL' = 'false'.</td>
+          <td>传递自定义 JDBC URL 属性的选项。用户可以传递自定义属性，如 'jdbc.properties.useSSL' = 'false'。</td>
     </tr>
     <tr>
           <td>heartbeat.interval</td>
@@ -399,7 +399,7 @@ Flink SQL> SELECT * FROM orders;
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>将 Debezium 的属性传递给 Debezium 嵌入式引擎，该引擎用于从 OceanBase 服务器捕获数据更改。
-          例如：<code>'debezium.snapshot.mode' = 'never'</code>.
+          例如：<code>'debezium.snapshot.mode' = 'never'</code>。
           查看更多关于 <a href="https://debezium.io/documentation/reference/1.9/connectors/mysql.html#mysql-connector-properties"> Debezium 的  MySQL 连接器属性</a></td> 
     </tr>
     <tr>
@@ -431,7 +431,7 @@ Flink SQL> SELECT * FROM orders;
       <td>Boolean</td>
       <td>
         是否尝试解析由 <a href="https://github.com/github/gh-ost">gh-ost</a> 或 <a href="https://docs.percona.com/percona-toolkit/pt-online-schema-change.html">pt-osc</a> 工具生成的表结构变更事件。
-        这些工具会在变更表结构时，将变更语句应用到“影子表”之上，并稍后将其与主表进行交换，以达到表结构变更的目的。
+        这些工具会在变更表结构时，将变更语句应用到 “影子表” 之上，并稍后将其与主表进行交换，以达到表结构变更的目的。
         <br>
         这是一项实验性功能，未来可能会发生变化。
       </td>
@@ -445,7 +445,7 @@ Flink SQL> SELECT * FROM orders;
           这代表着是否使用 legacy JSON 格式来转换 Binlog 中的 JSON 类型的数据。
           如果用户配置 'use.legacy.json.format' = 'true'，则从 Binlog 中转换 JSON 类型的数据时，会移除值之前的空格和逗号之后的空格。例如，
           Binlog 中 JSON 类型的数据 {"key1": "value1", "key2": "value2"} 会被转换为 {"key1":"value1","key2":"value2"}。
-          如果设置 'use.legacy.json.format' = 'false'， 这条数据会被转换为 {"key1": "value1", "key2": "value2"}， 也就是 key 和 value 前的空格都会被保留。
+          如果设置 'use.legacy.json.format' = 'false'，这条数据会被转换为 {"key1": "value1", "key2": "value2"}，也就是 key 和 value 前的空格都会被保留。
       </td>
     </tr>
     <tr>
@@ -455,7 +455,7 @@ Flink SQL> SELECT * FROM orders;
       <td>Boolean</td>
       <td>
         快照读取阶段是否先分配 UnboundedChunk。<br>
-        这可能有助于降低 TaskManager 在对最大的 UnboundedChunk 执行快照时出现内存溢出 (OOM) 错误的风险。<br> 
+        这可能有助于降低 TaskManager 在对最大的 UnboundedChunk 执行快照时出现内存溢出（OOM）错误的风险。<br>
         实验性配置项，默认为 false。
       </td>
     </tr>
@@ -468,7 +468,7 @@ Flink SQL> SELECT * FROM orders;
         是否将 changelog 数据流转换为 append-only 数据流。<br>
         仅在需要保存上游表删除消息等特殊场景下开启使用，比如在逻辑删除场景下，用户不允许物理删除下游消息，此时使用该特性，并配合 row_kind 元数据字段，下游可以先保存所有明细数据，再通过 row_kind 字段判断是否进行逻辑删除。<br>
         参数取值如下：<br>
-          <li>true：所有类型的消息（包括INSERT、DELETE、UPDATE_BEFORE、UPDATE_AFTER）都会转换成 INSERT 类型的消息。</li>
+          <li>true：所有类型的消息（包括 INSERT、DELETE、UPDATE_BEFORE、UPDATE_AFTER）都会转换成 INSERT 类型的消息。</li>
           <li>false（默认）：所有类型的消息都保持原样下发。</li>
       </td>
     </tr>
@@ -478,9 +478,9 @@ Flink SQL> SELECT * FROM orders;
       <td style="word-wrap: break-word;">false</td>
       <td>Boolean</td>
       <td>
-        是否在快照读取阶段跳过 backfill 。<br>
-        如果跳过 backfill ，快照阶段捕获表的更改将在稍后的 binlog 读取阶段被回放，而不是合并到快照中。<br>
-        警告：跳过 backfill 可能会导致数据不一致，因为快照阶段发生的某些 binlog 事件可能会被重放（仅保证 at-least-once ）。
+        是否在快照读取阶段跳过 backfill。<br>
+        如果跳过 backfill，快照阶段捕获表的更改将在稍后的 binlog 读取阶段被回放，而不是合并到快照中。<br>
+        警告：跳过 backfill 可能会导致数据不一致，因为快照阶段发生的某些 binlog 事件可能会被重放（仅保证 at-least-once）。
         例如，更新快照阶段已更新的值，或删除快照阶段已删除的数据。这些重放的 binlog 事件应进行特殊处理。
       </td>
     </tr>
@@ -515,7 +515,7 @@ Flink SQL> SELECT * FROM orders;
     <tr>
       <td>op_ts</td>
       <td>TIMESTAMP_LTZ(3) NOT NULL</td>
-      <td>当前记录表在数据库中更新的时间。 <br>如果从表的快照而不是 binlog 读取记录，该值将始终为0。</td>
+      <td>当前记录表在数据库中更新的时间。 <br>如果从表的快照而不是 binlog 读取记录，该值将始终为 0。</td>
     </tr>
     <tr>
       <td>row_kind</td>
@@ -592,12 +592,12 @@ CREATE TABLE products
     <tr>
       <td>前缀匹配</td>
       <td>^(test).*</td>
-      <td>匹配前缀为test的数据库名或表名，例如test1、test2等。</td>
+      <td>匹配前缀为 test 的数据库名或表名，例如 test1、test2 等。</td>
     </tr>
     <tr>
       <td>后缀匹配</td>
       <td>.*[p$]</td>
-      <td>匹配后缀为p的数据库名或表名，例如cdcp、edcp等。</td>
+      <td>匹配后缀为 p 的数据库名或表名，例如 cdcp、edcp 等。</td>
     </tr>
     <tr>
       <td>特定匹配</td>
@@ -607,7 +607,7 @@ CREATE TABLE products
   </tbody>
 </table>
 
-进行库表匹配时，会使用正则表达式 `database-name\\.table-name` 来与OceanBase表的全限定名做匹配，所以该例子使用 `(^(test).*|^(tpc).*|txc|.*[p$]|t{2})\\.(t[5-8]|tt)`，可以匹配到表 txc.tt、test2.test5。
+进行库表匹配时，会使用正则表达式 `database-name\\.table-name` 来与 OceanBase 表的全限定名做匹配，所以该例子使用 `(^(test).*|^(tpc).*|txc|.*[p$]|t{2})\\.(t[5-8]|tt)`，可以匹配到表 txc.tt、test2.test5。
 
 
 数据类型映射
@@ -860,22 +860,22 @@ CREATE TABLE products
 
 ### 空间数据类型映射
 
-除`GEOMETRYCOLLECTION`之外的空间数据类型都会转换为 Json 字符串，格式固定，如：<br>
+除 `GEOMETRYCOLLECTION` 之外的空间数据类型都会转换为 Json 字符串，格式固定，如：<br>
 ```json
 {"srid": 0 , "type": "xxx", "coordinates": [0, 0]}
 ```
-字段`srid`标识定义几何体的 SRS，如果未指定 SRID，则 SRID 0 是新几何体值的默认值。
+字段 `srid` 标识定义几何体的 SRS，如果未指定 SRID，则 SRID 0 是新几何体值的默认值。
 
-字段`type`标识空间数据类型，例如`POINT`/`LINESTRING`/`POLYGON`。
+字段 `type` 标识空间数据类型，例如 `POINT`/`LINESTRING`/`POLYGON`。
 
-字段`coordinates`表示空间数据的`坐标`。
+字段 `coordinates` 表示空间数据的 `坐标`。
 
-对于`GEOMETRYCOLLECTION`，它将转换为 Json 字符串，格式固定，如：<br>
+对于 `GEOMETRYCOLLECTION`，它将转换为 Json 字符串，格式固定，如：<br>
 ```json
 {"srid": 0 , "type": "GeometryCollection", "geometries": [{"type":"Point","coordinates":[10,10]}]}
 ```
 
-`geometries`字段是一个包含所有空间数据的数组。
+`geometries` 字段是一个包含所有空间数据的数组。
 
 不同空间数据类型映射的示例如下：
 <div class="wy-table-responsive">

@@ -80,8 +80,8 @@ docker-compose down
 
 **Download links are available only for stable releases, SNAPSHOT dependencies need to be built based on master or release-branches by yourself.**
 
-- [flink-sql-connector-elasticsearch7-3.0.1-1.17.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7/3.0.1-1.17/flink-sql-connector-elasticsearch7-3.0.1-1.17.jar)
-- [flink-sql-connector-oracle-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-oracle-cdc)
+- [flink-sql-connector-elasticsearch7-3.1.0-1.20.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7/3.1.0-1.20/flink-sql-connector-elasticsearch7-3.1.0-1.20.jar)
+- [flink-sql-connector-oracle-cdc-3.7.0-1.20.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-oracle-cdc/3.7.0-1.20/flink-sql-connector-oracle-cdc-3.7.0-1.20.jar)
 
 
 **Preparing data in Oracle database**
@@ -138,7 +138,7 @@ INSERT INTO DEBEZIUM.PRODUCTS VALUES (104, 'hammer', '12oz carpenter''s hammer',
 INSERT INTO DEBEZIUM.PRODUCTS VALUES (105, 'hammer', '14oz carpenter''s hammer', 0.875);
 INSERT INTO DEBEZIUM.PRODUCTS VALUES (106, 'hammer', '16oz carpenter''s hammer', 1.0);
 INSERT INTO DEBEZIUM.PRODUCTS VALUES (107, 'rocks', 'box of assorted rocks', 5.3);
-INSERT INTO DEBEZIUM.PRODUCTS VALUES (108, 'jacket', 'water resistent black wind breaker', 0.1);
+INSERT INTO DEBEZIUM.PRODUCTS VALUES (108, 'jacket', 'water resistant black wind breaker', 0.1);
 INSERT INTO DEBEZIUM.PRODUCTS VALUES (109, 'spare tire', '24 inch spare tire', 22.2);
 
 INSERT INTO DEBEZIUM.ORDERS VALUES (1001, TO_TIMESTAMP('2020-07-30 10:08:22.001000', 'YYYY-MM-DD HH24:MI:SS.FF'), 'Jark', 1, 101);

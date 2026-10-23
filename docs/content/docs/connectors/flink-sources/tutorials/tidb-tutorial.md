@@ -142,8 +142,8 @@ docker-compose down
 
 **Download links are available only for stable releases, SNAPSHOT dependencies need to be built based on master or release branches by yourself.**
 
-- [flink-sql-connector-elasticsearch7-3.0.1-1.17.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7/3.0.1-1.17/flink-sql-connector-elasticsearch7-3.0.1-1.17.jar)
-- [flink-sql-connector-tidb-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-tidb-cdc)
+- [flink-sql-connector-elasticsearch7-3.1.0-1.20.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7/3.1.0-1.20/flink-sql-connector-elasticsearch7-3.1.0-1.20.jar)
+- [flink-sql-connector-tidb-cdc-3.7.0-1.20.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-tidb-cdc/3.7.0-1.20/flink-sql-connector-tidb-cdc-3.7.0-1.20.jar)
 
 
 **Preparing data in TiDB database**
@@ -168,7 +168,7 @@ VALUES (default,"scooter","Small 2-wheel scooter"),
        (default,"hammer","14oz carpenter's hammer"),
        (default,"hammer","16oz carpenter's hammer"),
        (default,"rocks","box of assorted rocks"),
-       (default,"jacket","water resistent black wind breaker"),
+       (default,"jacket","water resistant black wind breaker"),
        (default,"spare tire","24 inch spare tire");
 
 CREATE TABLE orders (

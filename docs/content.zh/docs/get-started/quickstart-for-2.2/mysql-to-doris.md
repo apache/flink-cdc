@@ -30,14 +30,14 @@ under the License.
 本教程的演示都将在 Flink CDC CLI 中进行，无需一行 Java/Scala 代码，也无需安装 IDE。
 
 ## 准备阶段
-准备一台已经安装了 Docker 的 Linux 或者 MacOS 电脑。
+准备一台已经安装了 Docker 的 Linux 或者 macOS 电脑。
 
 ### 准备 Flink Standalone 集群
-1. 下载 [Flink 2.2.0](https://archive.apache.org/dist/flink/flink-2.2.0/flink-2.2.0-bin-scala_2.12.tgz)，解压后得到 flink-2.2.0 目录。
-   使用下面的命令跳转至 Flink 目录下，并且设置 FLINK_HOME 为 flink-2.2.0 所在目录。
+1. 下载 [Flink 2.2.1](https://archive.apache.org/dist/flink/flink-2.2.1/flink-2.2.1-bin-scala_2.12.tgz)，解压后得到 flink-2.2.1 目录。
+   使用下面的命令跳转至 Flink 目录下，并且设置 FLINK_HOME 为 flink-2.2.1 所在目录。
 
    ```shell
-   cd flink-2.2.0
+   cd flink-2.2.1
    ```
 
 2. 通过在 conf/config.yaml 配置文件追加下列参数开启 checkpoint，每隔 3 秒做一次 checkpoint。
@@ -64,12 +64,12 @@ under the License.
 接下来的教程将以 `docker-compose` 的方式准备所需要的组件。
 
 1. 宿主机配置
-   由于 Doris 的运行需要内存映射支持，需在宿主机执行如下命令:
+   由于 Doris 的运行需要内存映射支持，需在宿主机执行如下命令：
 
    ```shell
    sysctl -w vm.max_map_count=2000000
    ```
-MacOS 由于内部实现容器的方式不同，在部署时宿主机直接修改max_map_count值可能无法成功，需要先创建以下容器：
+macOS 由于内部实现容器的方式不同，在部署时宿主机直接修改 max_map_count 值可能无法成功，需要先创建以下容器：
    ```shell
    docker run -it --privileged --pid=host --name=change_count debian nsenter -t 1 -m -u -n -i sh
    ```
@@ -113,7 +113,7 @@ MacOS 由于内部实现容器的方式不同，在部署时宿主机直接修�
    docker-compose up -d
    ```
 
-该命令将以 detached 模式自动启动 Docker Compose 配置中定义的所有容器。你可以通过 docker ps 来观察上述的容器是否正常启动了，也可以通过访问[http://localhost:8030/](http://localhost:8030/) 来查看 Doris 是否运行正常。
+该命令将以 detached 模式自动启动 Docker Compose 配置中定义的所有容器。你可以通过 docker ps 来观察上述的容器是否正常启动了，也可以通过访问 [http://localhost:8030/](http://localhost:8030/) 来查看 Doris 是否运行正常。
 
 #### 在 MySQL 数据库中准备数据
 1. 进入 MySQL 容器
@@ -187,7 +187,7 @@ MacOS 由于内部实现容器的方式不同，在部署时宿主机直接修�
    flink-cdc-{{< param Version >}} 下会包含 `bin`、`lib`、`log`、`conf` 四个目录。
 
 2. 下载下面列出的 connector 包，并且移动到 `lib` 目录下；
-   **下载链接只对已发布的版本有效, SNAPSHOT 版本需要本地基于 master 或 release- 分支编译.**
+   **下载链接只对已发布的版本有效，SNAPSHOT 版本需要本地基于 master 或 release- 分支编译。**
    **请注意，您需要将 jar 移动到 Flink CDC Home 的 lib 目录，而非 Flink Home 的 lib 目录下。**
    - [flink-cdc-pipeline-connector-mysql](https://mvnrepository.com/artifact/org.apache.flink/flink-cdc-pipeline-connector-mysql)
    - [flink-cdc-pipeline-connector-doris](https://mvnrepository.com/artifact/org.apache.flink/flink-cdc-pipeline-connector-doris)
@@ -340,7 +340,7 @@ Flink CDC 提供了将源表的表结构/数据路由到其他表名的配置，
    ```shell
    docker-compose down
    ```
-在 Flink 所在目录 `flink-2.2.0` 下执行如下命令停止 Flink 集群：
+在 Flink 所在目录 `flink-2.2.1` 下执行如下命令停止 Flink 集群：
 
    ```shell
    ./bin/stop-cluster.sh

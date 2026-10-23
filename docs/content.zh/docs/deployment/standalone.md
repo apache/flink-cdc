@@ -114,7 +114,7 @@ You need to modify the configuration file according to your needs, refer to conn
 - [MySQL pipeline connector]({{< ref "docs/connectors/pipeline-connectors/mysql.md" >}})
 - [Apache Doris pipeline connector]({{< ref "docs/connectors/pipeline-connectors/doris.md" >}})
 
-Finally, submit job to Flink Standalone cluster using Cli.
+Finally, submit job to Flink Standalone cluster using CLI.
 
 ```bash
 cd /path/flink-cdc-*

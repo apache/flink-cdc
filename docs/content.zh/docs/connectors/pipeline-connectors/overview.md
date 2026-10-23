@@ -53,7 +53,7 @@ Flink CDC 提供了可用于 YAML 作业的 Pipeline Source 和 Sink 连接器�
 
 | Flink CDC 版本 |         Flink 版本          |      Pipeline Source      |                                        Pipeline Sink                                        |               备注                |
 |:------------:|:-------------------------:|:-------------------------:|:-------------------------------------------------------------------------------------------:|:-------------------------------:|
-|  **3.7.x**   |      1.20.\*, 2.2.\*      | MySQL, PostgreSQL, Oracle, Sqlserver, Fluss | StarRocks, Doris, Paimon, Kafka, Elasticsearch, OceanBase, MaxCompute, Iceberg, Fluss, Hudi |                                 |
+|  **3.7.x**   |      1.20.\*, 2.2.\*      | MySQL, PostgreSQL, Oracle, SQL Server, Fluss | StarRocks, Doris, Paimon, Kafka, Elasticsearch, OceanBase, MaxCompute, Iceberg, Fluss, Hudi |                                 |
 |  **3.6.x**   |      1.20.\*, 2.2.\*      | MySQL, PostgreSQL, Oracle | StarRocks, Doris, Paimon, Kafka, Elasticsearch, OceanBase, MaxCompute, Iceberg, Fluss, Hudi |                                 |
 |  **3.5.x**   |     1.19.\*, 1.20.\*      |     MySQL, PostgreSQL     |    StarRocks, Doris, Paimon, Kafka, Elasticsearch, OceanBase, MaxCompute, Iceberg, Fluss    |                                 |
 |  **3.4.x**   |     1.19.\*, 1.20.\*      |           MySQL           |       StarRocks, Doris, Paimon, Kafka, Elasticsearch, OceanBase, MaxCompute, Iceberg        |                                 |

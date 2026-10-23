@@ -39,7 +39,7 @@ under the License.
 | primary-keys              | 目标表主键，以逗号分隔                               | 可选   |
 | partition-keys            | 目标表分区键，以逗号分隔                              | 可选   |
 | table-options             | 用于配置自动建表时的建表语句                            | 可选   |
-| table-options.delimiter   | 多个表属性的分隔符, 默认值为 `,`       | 可选   |
+| table-options.delimiter   | 多个表属性的分隔符，默认值为 `,`       | 可选   |
 | converter-after-transform | 用于在 transform 处理后添加转换器来修改 DataChangeEvent | 可选   |
 | description               | Transform 规则描述                            | 可选   |
 
@@ -72,7 +72,7 @@ transform:
 | __data_event_type__ | String | 数据变更事件的操作类型。        |
 
 除了以上的元数据字段，连接器也可以解析额外的元数据并放入 DataChangeEvent 的 meta map 中，这些元数据也可以在 transform 中使用。
-例如如下的作业，MySQL 连接器可以解析 `op_ts` 元数据并在transform中使用。
+例如如下的作业，MySQL 连接器可以解析 `op_ts` 元数据并在 transform 中使用。
 
 ```yaml
 source:
@@ -134,8 +134,8 @@ Flink CDC 使用 [Calcite](https://calcite.apache.org/) 来解析表达式并且
 | string1 NOT SIMILAR TO string2       | notSimilarTo(string1, string2)               | 如果 string1 不匹配 SQL SIMILAR TO 模式 string2，返回 TRUE。如果任一参数为 NULL，返回 NULL。 |
 | string1 SIMILAR TO string2 ESCAPE string3 | similarTo(string1, string2, string3)    | 如果 string1 使用 string3 作为转义字符匹配 SQL SIMILAR TO 模式 string2，返回 TRUE。如果任一参数为 NULL，返回 NULL。 |
 | string1 NOT SIMILAR TO string2 ESCAPE string3 | notSimilarTo(string1, string2, string3) | 如果 string1 使用 string3 作为转义字符不匹配 SQL SIMILAR TO 模式 string2，返回 TRUE。如果任一参数为 NULL，返回 NULL。 |
-| value1 IN (value2 [, value3]* )      | in(value1, value2 [, value3]*)               | 如果 value1 存在于给定列表 (value2, value3, …) 中，返回 TRUE。              |
-| value1 NOT IN (value2 [, value3]* )  | notIn(value1, value2 [, value3]*)            | 如果 value1 不存在于给定列表 (value2, value3, …) 中，返回 TRUE。             |
+| value1 IN (value2 [, value3]* )      | in(value1, value2 [, value3]*)               | 如果 value1 存在于给定列表（value2, value3, …）中，返回 TRUE。              |
+| value1 NOT IN (value2 [, value3]* )  | notIn(value1, value2 [, value3]*)            | 如果 value1 不存在于给定列表（value2, value3, …）中，返回 TRUE。             |
 
 ## 逻辑函数
 
@@ -220,7 +220,7 @@ Flink CDC 使用 [Calcite](https://calcite.apache.org/) 来解析表达式并且
 | YEAR / QUARTER / MONTH / WEEK(temporal)              | extract(timeintervalunit, temporal)                  | 从时间值中提取年、季度、月或 ISO 周。                                                                                                                                                                                                                                                     |
 | DAYOFYEAR / DAYOFMONTH / DAYOFWEEK(temporal)         | extract(timeintervalunit, temporal)                  | 从时间值中提取一年中的第几天、一月中的第几天或一周中的第几天。DAYOFWEEK 以星期日为 1。                                                                                                                                                                                                    |
 | HOUR / MINUTE / SECOND(temporal)                     | extract(timeintervalunit, temporal)                  | 从时间值中提取小时、分钟或秒。                                                                                                                                                                                                                                                            |
-| temporal +/- INTERVAL 'value' unit                   | temporalPlusMonths / temporalPlusMillis              | 对 DATE、TIME、TIMESTAMP 和 TIMESTAMP_LTZ 值加减年-月或日-时间隔字面量。支持 `INTERVAL + temporal`，以及 `INTERVAL '1-2' YEAR TO MONTH` 和 `INTERVAL '1 02:03:04' DAY TO SECOND` 等复合间隔。                                                                                                    |
+| temporal +/- INTERVAL 'value' unit                   | temporalPlusMonths / temporalPlusMillis              | 对 DATE、TIME、TIMESTAMP 和 TIMESTAMP_LTZ 值加减年 - 月或日 - 时间隔字面量。支持 `INTERVAL + temporal`，以及 `INTERVAL '1-2' YEAR TO MONTH` 和 `INTERVAL '1 02:03:04' DAY TO SECOND` 等复合间隔。                                                                                                    |
 | DATE_FORMAT(timestamp, string)                       | dateFormat(timestamp, string)                        | 将时间戳转换为指定日期格式字符串的值。格式字符串与 Java 的 SimpleDateFormat 兼容。                                                                                                                                                                                                                 |
 | DATE_FORMAT(date, string)                            | dateFormat(date, string)                             | 将给定日期转换为指定格式字符串的值。格式字符串与 Java 的 SimpleDateFormat 兼容。                                                                                                                                                                                                                  |
 | DATE_FORMAT(time, string)                            | dateFormat(time, string)                             | 将给定时间转换为指定格式字符串的值。格式字符串与 Java 的 SimpleDateFormat 兼容。                                                                                                                                                                                                                  |
@@ -240,7 +240,7 @@ Flink CDC 使用 [Calcite](https://calcite.apache.org/) 来解析表达式并且
 
 | 函数                                                                                                                    | Janino 代码                        | 描述                                                                                                         |
 |-----------------------------------------------------------------------------------------------------------------------|----------------------------------|------------------------------------------------------------------------------------------------------------|
-| CASE value WHEN value1_1 [, value1_2]* THEN RESULT1 (WHEN value2_1 [, value2_2 ]* THEN result_2)* (ELSE result_z) END | 嵌套三元表达式                          | 当 value 第一次匹配到 (valueX_1, valueX_2, …) 中的值时，返回 resultX。如果没有匹配的值，如果提供了 result_z 则返回 result_z，否则返回 NULL。     |
+| CASE value WHEN value1_1 [, value1_2]* THEN RESULT1 (WHEN value2_1 [, value2_2 ]* THEN result_2)* (ELSE result_z) END | 嵌套三元表达式                          | 当 value 第一次匹配到（valueX_1, valueX_2, …）中的值时，返回 resultX。如果没有匹配的值，如果提供了 result_z 则返回 result_z，否则返回 NULL。     |
 | CASE WHEN condition1 THEN result1 (WHEN condition2 THEN result2)* (ELSE result_z) END                                 | 嵌套三元表达式                          | 当第一个 conditionX 满足时，返回 resultX。如果没有条件满足，如果提供了 result_z 则返回 result_z，否则返回 NULL。                              |
 | COALESCE(value1 [, value2]*)                                                                                          | coalesce(Object... objects)      | 返回第一个不为 NULL 的参数。如果所有参数都为 NULL，则返回 NULL。返回类型是所有参数中限制最少的公共类型。如果所有参数都可为空，则返回类型也可为空。                          |
 | IF(condition, true_value, false_value)                                                                                | condition ? true_value : false_value | 如果条件满足，返回 true_value，否则返回 false_value。例如，IF(5 > 3, 5, 3) 返回 5。                                              |
@@ -259,12 +259,12 @@ Flink CDC 使用 [Calcite](https://calcite.apache.org/) 来解析表达式并且
 |-------------------------------------|-----------|--------------------------------------------------|
 | ANY                                 | STRING    | 所有类型都可以转换为 STRING。                               |
 | NUMERIC, STRING                     | BOOLEAN   | 任何非零数字将被计算为 `TRUE`。                              |
-| NUMERIC                             | BYTE      | 值必须在 Byte 范围内 (-128 ~ 127)。                      |
-| NUMERIC                             | SHORT     | 值必须在 Short 范围内 (-32768 ~ 32767)。                 |
-| NUMERIC                             | INTEGER   | 值必须在 Integer 范围内 (-2147483648 ~ 2147483647)。     |
-| NUMERIC                             | LONG      | 值必须在 Long 范围内 (-9223372036854775808 ~ 9223372036854775807)。 |
-| NUMERIC                             | FLOAT     | 值必须在 Float 范围内 (1.40239846e-45f ~ 3.40282347e+38f)。 |
-| NUMERIC                             | DOUBLE    | 值必须在 Double 范围内 (4.94065645841246544e-324 ~ 1.79769313486231570e+308)。 |
+| NUMERIC                             | BYTE      | 值必须在 Byte 范围内（-128 ~ 127）。                      |
+| NUMERIC                             | SHORT     | 值必须在 Short 范围内（-32768 ~ 32767）。                 |
+| NUMERIC                             | INTEGER   | 值必须在 Integer 范围内（-2147483648 ~ 2147483647）。     |
+| NUMERIC                             | LONG      | 值必须在 Long 范围内（-9223372036854775808 ~ 9223372036854775807）。 |
+| NUMERIC                             | FLOAT     | 值必须在 Float 范围内（1.40239846e-45f ~ 3.40282347e+38f）。 |
+| NUMERIC                             | DOUBLE    | 值必须在 Double 范围内（4.94065645841246544e-324 ~ 1.79769313486231570e+308）。 |
 | NUMERIC                             | DECIMAL   | 值必须在 BigDecimal(10, 0) 范围内。                      |
 | STRING, TIMESTAMP_TZ, TIMESTAMP_LTZ | TIMESTAMP | 字符串类型的值必须是有效的 `ISO_LOCAL_DATE_TIME` 格式字符串。       |
 
@@ -315,7 +315,7 @@ transform:
 ```
 
 ## 使用通配符来包含所有字段
-通配符(`*`)可以用来引用表中的所有字段。例如，给定表 `web_order` 在数据库 `mydb` 中，我们可以定义一个转换规则如下：
+通配符（`*`）可以用来引用表中的所有字段。例如，给定表 `web_order` 在数据库 `mydb` 中，我们可以定义一个转换规则如下：
 
 ```yaml
 transform:
@@ -423,12 +423,12 @@ transform:
 * 有一个 public 的无参构造函数
 * 有至少一个 public 方法命名为 `eval`
 
-也可以:
+也可以：
 
 * 重载 `getReturnType` 方法来指示它的返回 CDC 类型
 * 重载 `open` 和 `close` 方法来执行一些初始化和清理工作
 
-举个例子，这是一个有效的 UDF 类:
+举个例子，这是一个有效的 UDF 类：
 
 ```java
 public class AddOneFunctionClass implements UserDefinedFunction {
@@ -454,7 +454,7 @@ public class AddOneFunctionClass implements UserDefinedFunction {
 }
 ```
 
-为了兼容 Flink SQL，UDF 类也可以是 Flink `ScalarFunction`，但有一些限制:
+为了兼容 Flink SQL，UDF 类也可以是 Flink `ScalarFunction`，但有一些限制：
 
 * 包含有参构造方法的 `ScalarFunction` 是不支持的。
 * Flink 的 `DataType` 提示在 `ScalarFunction` 中将被忽略。
@@ -571,7 +571,7 @@ pipeline:
 ## Embedding AI 模型
 
 内置 AI 模型可以在 transform 规则中使用。
-为了使用内置 AI 模型，你需要下载内置模型的 jar ，然后在 `flink-cdc.sh` 命令中添加 `--jar {$BUILT_IN_MODEL_PATH}`。
+为了使用内置 AI 模型，你需要下载内置模型的 jar，然后在 `flink-cdc.sh` 命令中添加 `--jar {$BUILT_IN_MODEL_PATH}`。
 
 如何定义一个 Embedding AI 模型：
 

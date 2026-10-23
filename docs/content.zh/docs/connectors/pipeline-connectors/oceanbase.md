@@ -26,7 +26,7 @@ under the License.
 
 # OceanBase Connector
 
-OceanBase Pipeline 连接器可以用作 Pipeline 的 *Data Sink*，将数据写入[OceanBase](https://github.com/oceanbase/oceanbase)。 本文档介绍如何设置 OceanBase Pipeline 连接器。
+OceanBase Pipeline 连接器可以用作 Pipeline 的 *Data Sink*，将数据写入 [OceanBase](https://github.com/oceanbase/oceanbase)。本文档介绍如何设置 OceanBase Pipeline 连接器。
 
 ## 连接器的功能
 * 自动建表
@@ -78,7 +78,7 @@ pipeline:
               <td>是</td>
               <td></td>
               <td>String</td>
-              <td>指定要使用的连接器, 这里需要设置成 <code>'oceanbase'</code>.</td>
+              <td>指定要使用的连接器，这里需要设置成 <code>'oceanbase'</code>。</td>
             </tr>
             <tr>
                 <td>url</td>
@@ -120,7 +120,7 @@ pipeline:
                 <td>否</td>
                 <td>com.mysql.cj.jdbc.Driver</td>
                 <td>String</td>
-                <td>驱动类名，默认为 'com.mysql.cj.jdbc.Driver'。同时该connector并不包含对应驱动，需手动引入。</td>
+                <td>驱动类名，默认为 'com.mysql.cj.jdbc.Driver'。同时该 connector 并不包含对应驱动，需手动引入。</td>
             </tr>
             <tr>
                 <td>druid-properties</td>
@@ -190,7 +190,7 @@ pipeline:
                 <td>否</td>
                 <td>false</td>
                 <td>Boolean</td>
-                <td>是否开启旁路导入。需要注意旁路导入需要将 sink 的并发度设置为1。</td>
+                <td>是否开启旁路导入。需要注意旁路导入需要将 sink 的并发度设置为 1。</td>
             </tr>
             <tr>
                 <td>direct-load.host</td>
@@ -247,9 +247,9 @@ pipeline:
 
 ## 使用说明
 
-* 暂仅支持OceanBase的MySQL租户
+* 暂仅支持 OceanBase 的 MySQL 租户
 
-* at-least-once语义保证，暂不支持 exactly-once
+* at-least-once 语义保证，暂不支持 exactly-once
 
 * 对于自动建表
   * 没有分区键

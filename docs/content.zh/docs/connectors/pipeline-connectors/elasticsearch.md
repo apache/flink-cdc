@@ -26,7 +26,7 @@ under the License.
 
 # Elasticsearch Pipeline Connector
 
-Elasticsearch Pipeline 连接器可以用作 Pipeline 的 Data Sink, 将数据写入 Elasticsearch。 本文档介绍如何设置 Elasticsearch Pipeline 连接器。
+Elasticsearch Pipeline 连接器可以用作 Pipeline 的 Data Sink, 将数据写入 Elasticsearch。本文档介绍如何设置 Elasticsearch Pipeline 连接器。
 
 
 How to create Pipeline
@@ -79,7 +79,7 @@ Pipeline Connector Options
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>指定要使用的连接器, 这里需要设置成 <code>'elasticsearch'</code>.</td>
+      <td>指定要使用的连接器，这里需要设置成 <code>'elasticsearch'</code>。</td>
     </tr>
     <tr>
       <td>name</td>
@@ -93,7 +93,7 @@ Pipeline Connector Options
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>要连接到的一台或多台 Elasticsearch 主机，例如: 'http://host_name:9092,http://host_name:9093'.</td>
+      <td>要连接到的一台或多台 Elasticsearch 主机，例如：'http://host_name:9092,http://host_name:9093'.</td>
     </tr>
     <tr>
       <td>version</td>
@@ -127,7 +127,7 @@ Pipeline Connector Options
       <td>optional</td>
       <td style="word-wrap: break-word;">500</td>
       <td>Integer</td>
-      <td>每个批量请求的最大缓冲操作数。 可以设置为'0'来禁用它。</td>
+      <td>每个批量请求的最大缓冲操作数。可以设置为 '0' 来禁用它。</td>
     </tr>
     <tr>
       <td>inflight.requests.max</td>
@@ -148,28 +148,28 @@ Pipeline Connector Options
       <td>optional</td>
       <td style="word-wrap: break-word;">5242880</td>
       <td>Long</td>
-      <td>每个批量请求的缓冲操作在内存中的最大值(以byte为单位)。</td>
+      <td>每个批量请求的缓冲操作在内存中的最大值（以 byte 为单位）。</td>
     </tr>
     <tr>
       <td>buffer.time.max.ms</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">5000</td>
       <td>Long</td>
-      <td>每个批量请求的缓冲 flush 操作的间隔(以ms为单位)。</td>
+      <td>每个批量请求的缓冲 flush 操作的间隔（以 ms 为单位）。</td>
     </tr>
     <tr>
       <td>record.size.max.bytes</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">5242880</td>
       <td>Long</td>
-      <td>单个记录的最大大小（以byte为单位）。</td>
+      <td>单个记录的最大大小（以 byte 为单位）。</td>
     </tr>
     <tr>
       <td>sharding.suffix.key</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>Long</td>
-      <td>每个表的分片后缀字段，允许为多个表设置分片后缀字段。默认 sink 表名为 test_table${suffix_key}。默认分片字段为第一个分区列。表之间用';'分隔。表和字段之间用':'分割。例如，我们设置 sharding.suffix.key 为'table1:col1;table2:col2'。</td>
+      <td>每个表的分片后缀字段，允许为多个表设置分片后缀字段。默认 sink 表名为 test_table${suffix_key}。默认分片字段为第一个分区列。表之间用 ';' 分隔。表和字段之间用 ':' 分割。例如，我们设置 sharding.suffix.key 为 'table1:col1;table2:col2'。</td>
     </tr>
     <tr>
       <td>sharding.suffix.separator</td>

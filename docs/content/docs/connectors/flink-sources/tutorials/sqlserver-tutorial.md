@@ -89,8 +89,8 @@ docker-compose down
 
 **Download links are available only for stable releases, SNAPSHOT dependencies need to be built based on master or release branches by yourself.**
 
-- [flink-sql-connector-elasticsearch7-3.0.1-1.17.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7/3.0.1-1.17/flink-sql-connector-elasticsearch7-3.0.1-1.17.jar)
-- [flink-sql-connector-sqlserver-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-sqlserver-cdc)
+- [flink-sql-connector-elasticsearch7-3.1.0-1.20.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7/3.1.0-1.20/flink-sql-connector-elasticsearch7-3.1.0-1.20.jar)
+- [flink-sql-connector-sqlserver-cdc-3.7.0-1.20.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-sqlserver-cdc/3.7.0-1.20/flink-sql-connector-sqlserver-cdc-3.7.0-1.20.jar)
 
 
 **Preparing data in SqlServer database**
@@ -98,7 +98,7 @@ docker-compose down
 Create databases/tables and populate data
 
  ```sql
- -- Sqlserver
+ -- SQL Server
  CREATE DATABASE inventory;
  GO
  USE inventory;
@@ -126,7 +126,7 @@ Create databases/tables and populate data
  INSERT INTO products(name,description,weight)
  VALUES ('rocks','box of assorted rocks',5.3);
  INSERT INTO products(name,description,weight)
- VALUES ('jacket','water resistent black wind breaker',0.1);
+ VALUES ('jacket','water resistant black wind breaker',0.1);
  INSERT INTO products(name,description,weight)
  VALUES ('spare tire','24 inch spare tire',22.2);
  EXEC sys.sp_cdc_enable_table @source_schema = 'dbo', @source_name = 'products', @role_name = NULL, @supports_net_changes = 0;

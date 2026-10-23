@@ -26,13 +26,13 @@ under the License.
 
 # Vitess CDC Connector
 
-The Vitess CDC connector allows for reading of incremental data from Vitess cluster. The connector does not support snapshot feature at the moment. This document describes how to setup the Vitess CDC connector to run SQL queries against Vitess databases.
+The Vitess CDC connector allows for reading of incremental data from Vitess cluster. The connector does not support snapshot feature at the moment. This document describes how to set up the Vitess CDC connector to run SQL queries against Vitess databases.
 [Vitess debezium documentation](https://debezium.io/documentation/reference/connectors/vitess.html)
 
 Dependencies
 ------------
 
-In order to setup the Vitess CDC connector, the following table provides dependency information for both projects using a build automation tool (such as Maven or SBT) and SQL Client with SQL JAR bundles.
+To set up the Vitess CDC connector, the following table provides dependency information for both projects using a build automation tool (such as Maven or SBT) and SQL Client with SQL JAR bundles.
 
 ### Maven dependency
 

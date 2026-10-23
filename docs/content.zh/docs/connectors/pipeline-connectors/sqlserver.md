@@ -135,7 +135,7 @@ pipeline:
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>需要监控的 SQL Server 表名。database只支持单个固定库名，schema 和 table 支持正则表达式匹配多个；不支持数据库级别正则表达式或跨数据库匹配。点号（.）会被视为 database、schema 和 table 名的分隔符。如果需要在正则表达式中使用点号（.）匹配任意字符，必须使用反斜杠转义。<br>
+      <td>需要监控的 SQL Server 表名。database 只支持单个固定库名，schema 和 table 支持正则表达式匹配多个；不支持数据库级别正则表达式或跨数据库匹配。点号（.）会被视为 database、schema 和 table 名的分隔符。如果需要在正则表达式中使用点号（.）匹配任意字符，必须使用反斜杠转义。<br>
           示例：inventory.dbo.\.*、inventory.dbo.user_table_[0-9]+、inventory.dbo.(app|web)_order_\.*</td>
     </tr>
     <tr>

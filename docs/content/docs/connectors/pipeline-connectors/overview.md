@@ -57,7 +57,7 @@ The following table shows the version mapping between Flink CDC Pipeline Connect
 
 | Flink CDC Version |       Flink Version       |      Pipeline Source      |                                        Pipeline Sink                                        |                  Notes                   |
 |:-----------------:|:-------------------------:|:-------------------------:|:-------------------------------------------------------------------------------------------:|:----------------------------------------:|
-|     **3.7.x**     |      1.20.\*, 2.2.\*      | MySQL, PostgreSQL, Oracle, Sqlserver, Fluss | StarRocks, Doris, Paimon, Kafka, Elasticsearch, OceanBase, MaxCompute, Iceberg, Fluss, Hudi |                        |
+|     **3.7.x**     |      1.20.\*, 2.2.\*      | MySQL, PostgreSQL, Oracle, SQL Server, Fluss | StarRocks, Doris, Paimon, Kafka, Elasticsearch, OceanBase, MaxCompute, Iceberg, Fluss, Hudi |                        |
 |     **3.6.x**     |      1.20.\*, 2.2.\*      | MySQL, PostgreSQL, Oracle | StarRocks, Doris, Paimon, Kafka, Elasticsearch, OceanBase, MaxCompute, Iceberg, Fluss, Hudi |                                          |
 |     **3.5.x**     |     1.19.\*, 1.20.\*      |     MySQL, PostgreSQL     |    StarRocks, Doris, Paimon, Kafka, Elasticsearch, OceanBase, MaxCompute, Iceberg, Fluss    |                                          |
 |     **3.4.x**     |     1.19.\*, 1.20.\*      |           MySQL           |       StarRocks, Doris, Paimon, Kafka, Elasticsearch, OceanBase, MaxCompute, Iceberg        |                                          |

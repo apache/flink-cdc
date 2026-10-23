@@ -26,7 +26,7 @@ under the License.
 
 # MySQL CDC Connector
 
-The MySQL CDC connector allows for reading snapshot data and incremental data from MySQL database. This document describes how to setup the MySQL CDC connector to run SQL queries against MySQL databases.
+The MySQL CDC connector allows for reading snapshot data and incremental data from MySQL database. This document describes how to set up the MySQL CDC connector to run SQL queries against MySQL databases.
 
 
 ## Supported Databases
@@ -38,7 +38,7 @@ The MySQL CDC connector allows for reading snapshot data and incremental data fr
 Dependencies
 ------------
 
-In order to setup the MySQL CDC connector, the following table provides dependency information for both projects using a build automation tool (such as Maven or SBT) and SQL Client with SQL JAR bundles.
+To set up the MySQL CDC connector, the following table provides dependency information for both projects using a build automation tool (such as Maven or SBT) and SQL Client with SQL JAR bundles.
 
 ### Maven dependency
 
@@ -243,7 +243,7 @@ Connector Options
                 (1) source can be parallel during snapshot reading, 
                 (2) source can perform checkpoints in the chunk granularity during snapshot reading, 
                 (3) source doesn't need to acquire global read lock (FLUSH TABLES WITH READ LOCK) before snapshot reading.
-              If you would like the source run in parallel, each parallel reader should have an unique server id, so 
+              If you would like the source to run in parallel, each parallel reader should have a unique server id, so
               the 'server-id' must be a range like '5400-6400', and the range must be larger than the parallelism.
               Please see <a href="#incremental-snapshot-reading ">Incremental Snapshot Reading</a>section for more detailed information.
           </td>
@@ -611,7 +611,7 @@ Incremental snapshot reading is a new mechanism to read snapshot of a table. Com
 * (2) MySQL CDC Source can perform checkpoints in the chunk granularity during snapshot reading
 * (3) MySQL CDC Source doesn't need to acquire global read lock (FLUSH TABLES WITH READ LOCK) before snapshot reading
 
-If you would like the source run in parallel, each parallel reader should have an unique server id, so the 'server-id' must be a range like '5400-6400', 
+If you would like the source to run in parallel, each parallel reader should have a unique server id, so the 'server-id' must be a range like '5400-6400',
 and the range must be larger than the parallelism.
 
 During the incremental snapshot reading, the MySQL CDC Source firstly splits snapshot chunks (splits) by user specified chunk key of table,
@@ -719,7 +719,7 @@ get a final consistent output of the snapshot chunk. The **Offset Signal Algorit
  * (5) Upsert the read binlog records into the buffered chunk records, and emit all records in the buffer as final output (all as INSERT records) of the snapshot chunk
  * (6) Continue to read and emit binlog records belong to the chunk after the `HIGH` offset in *single binlog reader*.
 
-The algorithm is inspired by [DBLog Paper](https://arxiv.org/pdf/2010.12597v1.pdf), please refer it for more detail.
+The algorithm is inspired by the [DBLog paper](https://arxiv.org/pdf/2010.12597v1.pdf). Please refer to it for more details.
  
 **Note:** If the actual values for the primary key are not uniformly distributed across its range, this may lead to unbalanced tasks when incremental snapshot read.
 
@@ -836,7 +836,7 @@ The following operations show how to enable this feature to resolve above scenar
    // your business code
 ```
 
-If we would like to add new tables `[order, custom]` to an existing Flink job，just need to update the `tableList()` value of the job to include `[order, custom]` and restore the job from previous savepoint.
+If we would like to add new tables `[order, custom]` to an existing Flink job, just need to update the `tableList()` value of the job to include `[order, custom]` and restore the job from previous savepoint.
 
 _Step 1_: Stop the existing Flink job with savepoint.
 ```shell
@@ -869,7 +869,7 @@ $ ./bin/flink run \
       --from-savepoint /tmp/flink-savepoints/savepoint-cca7bc-bb1e257f0dab \
       ./FlinkCDCExample.jar
 ```
-**Note:** Please refer the doc [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.20/docs/deployment/cli/#command-line-interface) for more details.
+**Note:** Please refer to [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.20/docs/deployment/cli/#command-line-interface) for more details.
 
 ### Tables Without primary keys
 

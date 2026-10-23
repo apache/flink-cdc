@@ -83,7 +83,7 @@ Download links are available only for stable releases, SNAPSHOT dependencies nee
 
 
 ## Submit a Flink CDC Job
-Here is an example file for synchronizing the entire database `mysql-to-doris.yaml`：
+Here is an example file for synchronizing the entire database `mysql-to-doris.yaml`:
 
 ```yaml
 ################################################################################
@@ -110,18 +110,18 @@ pipeline:
  parallelism: 2
 ```
 
-You need to modify the configuration file according to your needs, refer to connectors more information.
+Modify the configuration file as needed. For more information, refer to the connector documentation.
 - [MySQL pipeline connector]({{< ref "docs/connectors/pipeline-connectors/mysql.md" >}})
 - [Apache Doris pipeline connector]({{< ref "docs/connectors/pipeline-connectors/doris.md" >}})
 
-Finally, submit job to Flink Standalone cluster using Cli.
+Finally, submit job to Flink Standalone cluster using CLI.
 
 ```bash
 cd /path/flink-cdc-*
 ./bin/flink-cdc.sh mysql-to-doris.yaml
 ```
 
-After successful submission, the return information is as follows：
+After successful submission, the return information is as follows:
 
 ```bash
 Pipeline has been submitted to cluster.
@@ -129,4 +129,4 @@ Job ID: ae30f4580f1918bebf16752d4963dc54
 Job Description: Sync MySQL Database to Doris
 ```
 
-Then you can find a job named `Sync MySQL Database to Doris` running through Flink Web UI. 
+Then you can find a job named `Sync MySQL Database to Doris` running through Flink Web UI.

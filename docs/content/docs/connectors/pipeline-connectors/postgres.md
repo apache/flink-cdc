@@ -27,7 +27,7 @@ under the License.
 # Postgres Connector
 
 Postgres connector allows reading snapshot data and incremental data from Postgres database and provides end-to-end full-database data synchronization capabilities.
-This document describes how to setup the Postgres connector.
+This document describes how to set up the Postgres connector.
 
 ## Example
 
@@ -167,7 +167,7 @@ pipeline:
       <td>optional</td>
       <td style="word-wrap: break-word;">initial</td>
       <td>String</td>
-      <td> Optional startup mode for Postgres CDC consumer, valid enumerations are "initial"，"latest-offset"，"committed-offset"or"snapshot"。</td>
+      <td> Optional startup mode for Postgres CDC consumer, valid enumerations are "initial", "latest-offset", "committed-offset" or "snapshot".</td>
     </tr>
   <tr>
       <td>scan.incremental.close-idle-reader.enabled</td>
@@ -320,7 +320,7 @@ pipeline:
 
 
 Note:
-1. The configuration option tables specifies the tables to be captured by Postgres CDC, in the format db.schema1.table1,db.schema2.table2. All db values must be the same, as the PostgreSQL connection URL requires a single database name. Currently, CDC only supports connecting to one database.
+1. The `tables` configuration option specifies the tables to be captured by Postgres CDC, in the format db.schema1.table1,db.schema2.table2. All db values must be the same, as the PostgreSQL connection URL requires a single database name. Currently, CDC only supports connecting to one database.
 
 ## Startup Reading Position
 
@@ -533,10 +533,10 @@ transform:
 </table>
 </div>
 
-Note: Since the Debezium version does not support multidimensional arrays, only PostgresSQL single-dimensional arrays are currently supported, such as :'ARRAY[1,2,3]', 'int[]'.
+Note: Since the Debezium version does not support multidimensional arrays, only PostgreSQL single-dimensional arrays are currently supported, such as :'ARRAY[1,2,3]', 'int[]'.
 
 ### Temporal types Mapping
-Other than PostgreSQL’s TIMESTAMPTZ data types, which contain time zone information, how temporal types are mapped depends on the value of <code>debezium.the time.precision.mode</code> connector configuration property. The following sections describe these mappings:
+Other than PostgreSQL’s TIMESTAMPTZ data types, which contain time zone information, how temporal types are mapped depends on the value of <code>debezium.time.precision.mode</code> connector configuration property. The following sections describe these mappings:
 - debezium.time.precision.mode=adaptive
 - debezium.time.precision.mode=adaptive_time_microseconds
 - debezium.time.precision.mode=connect 

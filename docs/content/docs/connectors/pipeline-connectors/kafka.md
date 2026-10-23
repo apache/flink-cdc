@@ -132,7 +132,7 @@ Pipeline Connector Options
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Pass options of Kafka table to pipeline，See <a href="https://kafka.apache.org/28/documentation.html#consumerconfigs">Kafka consume options</a>. </td>
+      <td>Pass options of Kafka table to pipeline. See <a href="https://kafka.apache.org/28/documentation.html#consumerconfigs">Kafka consume options</a>. </td>
     </tr>
     <tr>
       <td>sink.custom-header</td>
@@ -169,14 +169,14 @@ Pipeline Connector Options
 Usage Notes
 --------
 
-* The written topic of Kafka will be `namespace.schemaName.tableName` string of TableId，this can be changed using route function of pipeline.
+* The written topic of Kafka will be `namespace.schemaName.tableName` string of TableId, this can be changed using route function of pipeline.
 
-* If the written topic of Kafka is not existed, we will create one automatically.
+* If the target Kafka topic does not exist, it will be created automatically.
 
 ### Output Format
 For different built-in `value.format` options, the output format is different:
 #### debezium-json
-Refer to [Debezium docs](https://debezium.io/documentation/reference/1.9/connectors/mysql.html), debezium-json format will contains `before`,`after`,`op`,`source` elements, but `ts_ms` is not included in `source`.    
+Refer to [Debezium docs](https://debezium.io/documentation/reference/1.9/connectors/mysql.html), debezium-json format will contain `before`,`after`,`op`,`source` elements, but `ts_ms` is not included in `source`.\
 An output example is:
 ```json
 {
@@ -251,7 +251,7 @@ When `debezium-json.include-schema.enabled` is true, the output format will be:
 ```
 
 #### canal-json
-Refer to [Canal | Apache Flink](https://nightlies.apache.org/flink/flink-docs-master/docs/connectors/table/formats/canal/#available-metadata), canal-json format will contains `old`,`data`,`type`,`database`,`table`,`pkNames` elements, but `ts` is not included.      
+Refer to [Canal | Apache Flink](https://nightlies.apache.org/flink/flink-docs-master/docs/connectors/table/formats/canal/#available-metadata), canal-json format will contain `old`,`data`,`type`,`database`,`table`,`pkNames` elements, but `ts` is not included.\
 An output example is:
 ```json
 {

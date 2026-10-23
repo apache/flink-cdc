@@ -30,14 +30,14 @@ All exercises in this tutorial are performed in the Flink CDC CLI, and the entir
 without a single line of Java/Scala code or IDE installation.
 
 ## Preparation
-Prepare a Linux or MacOS computer with Docker installed.
+Prepare a Linux or macOS computer with Docker installed.
 
 ### Prepare Flink Standalone cluster
-1. Download [Flink 1.20.3](https://archive.apache.org/dist/flink/flink-1.20.3/flink-1.20.3-bin-scala_2.12.tgz), unzip and get flink-1.20.3 directory.
-   Use the following command to navigate to the Flink directory and set FLINK_HOME to the directory where flink-1.20.3 is located.
+1. Download [Flink 1.20.5](https://archive.apache.org/dist/flink/flink-1.20.5/flink-1.20.5-bin-scala_2.12.tgz), unzip and get flink-1.20.5 directory.
+   Use the following command to navigate to the Flink directory and set FLINK_HOME to the directory where flink-1.20.5 is located.
 
    ```shell
-   cd flink-1.20.3
+   cd flink-1.20.5
    ```
 
 2. Enable checkpointing by appending the following parameters to the conf/config.yaml configuration file to perform a checkpoint every 3 seconds.
@@ -195,7 +195,7 @@ This command automatically starts all the containers defined in the Docker Compo
     ```
 
 ## Submit job with Flink CDC CLI
-1. Download the binary compressed packages listed below and extract them to the directory `flink-cdc-{{< param Version >}}`：    
+1. Download the binary compressed packages listed below and extract them to the directory `flink-cdc-{{< param Version >}}`:\
    [flink-cdc-{{< param Version >}}-bin.tar.gz](https://www.apache.org/dyn/closer.lua/flink/flink-cdc-{{< param Version >}}/flink-cdc-{{< param Version >}}-bin.tar.gz)
    flink-cdc-{{< param Version >}} directory will contain four directories: `bin`, `lib`, `log`, and `conf`.
 
@@ -206,7 +206,7 @@ This command automatically starts all the containers defined in the Docker Compo
     - [flink-cdc-pipeline-connector-fluss](https://mvnrepository.com/artifact/org.apache.flink/flink-cdc-pipeline-connector-fluss)
 
 3. Write task configuration yaml file.
-   Here is an example file for synchronizing the entire database `postgres-to-fluss.yaml`：
+   Here is an example file for synchronizing the entire database `postgres-to-fluss.yaml`:
 
    ```yaml
    ################################################################################
@@ -247,7 +247,7 @@ This command automatically starts all the containers defined in the Docker Compo
    ```shell
    bash bin/flink-cdc.sh postgres-to-fluss.yaml
    ```
-   After successful submission, the return information is as follows：
+   After successful submission, the return information is as follows:
    ```shell
    Pipeline has been submitted to cluster.
    Job ID: ae30f4580f1918bebf16752d4963dc54
@@ -397,7 +397,7 @@ After finishing the tutorial, run the following command to stop all containers i
    ```shell
    docker-compose down -v
    ```
-Run the following command to stop the Flink cluster in the directory of Flink `flink-1.20.3`:
+Run the following command to stop the Flink cluster in the directory of Flink `flink-1.20.5`:
 
    ```shell
    ./bin/stop-cluster.sh

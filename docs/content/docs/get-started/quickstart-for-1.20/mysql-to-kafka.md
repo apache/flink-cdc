@@ -34,13 +34,13 @@ without a single line of Java/Scala code or IDE installation.
 You need a Linux or macOS computer with Docker installed before starting.
 
 ### Prepare Flink Standalone cluster
-1. Download [Flink 1.20.3](https://archive.apache.org/dist/flink/flink-1.20.3/flink-1.20.3-bin-scala_2.12.tgz), unzip it and enter `flink-1.20.3` directory.
-   Use the following command to navigate to the Flink directory and set `FLINK_HOME` to the directory where flink-1.20.3 is located.
+1. Download [Flink 1.20.5](https://archive.apache.org/dist/flink/flink-1.20.5/flink-1.20.5-bin-scala_2.12.tgz), unzip it and enter `flink-1.20.5` directory.
+   Use the following command to navigate to the Flink directory and set `FLINK_HOME` to the directory where flink-1.20.5 is located.
 
    ```shell
-   tar -zxvf flink-1.20.3-bin-scala_2.12.tgz
-   export FLINK_HOME=$(pwd)/flink-1.20.3
-   cd flink-1.20.3
+   tar -zxvf flink-1.20.5-bin-scala_2.12.tgz
+   export FLINK_HOME=$(pwd)/flink-1.20.5
+   cd flink-1.20.5
    ```
 
 2. Enable checkpointing by appending the following parameters to the `conf/config.yaml` configuration file to perform a checkpoint every 3 seconds.
@@ -172,7 +172,7 @@ Run `docker ps` to check whether these containers are running properly.
 **Please note that the following download links are available only for stable releases.
 You need to build your own SNAPSHOT versions based on master or release branches by yourself.**
 
-1. Download the binary compressed packages listed below and extract them to the directory `flink cdc-{{< param Version >}}'`:
+1. Download the binary compressed packages listed below and extract them to the directory `flink-cdc-{{< param Version >}}`:
    [flink-cdc-{{< param Version >}}-bin.tar.gz](https://www.apache.org/dyn/closer.lua/flink/flink-cdc-{{< param Version >}}/flink-cdc-{{< param Version >}}-bin.tar.gz)
    flink-cdc-{{< param Version >}} directory will contain four directory: `bin`, `lib`, `log`, and `conf`.
 

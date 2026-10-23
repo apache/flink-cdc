@@ -31,7 +31,7 @@ Oracle CDC 连接器允许从 Oracle 数据库读取快照数据和增量数据�
 依赖
 ------------
 
-为了设置 Oracle CDC 连接器，下表提供了使用构建自动化工具（如 Maven 或 SBT ）和带有 SQL JAR 包的 SQL 客户端的两个项目的依赖关系信息。
+为了设置 Oracle CDC 连接器，下表提供了使用构建自动化工具（如 Maven 或 SBT）和带有 SQL JAR 包的 SQL 客户端的两个项目的依赖关系信息。
 
 ### Maven dependency
 
@@ -43,7 +43,7 @@ Oracle CDC 连接器允许从 Oracle 数据库读取快照数据和增量数据�
 
 下载 [flink-sql-connector-oracle-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-oracle-cdc) 到 `<FLINK_HOME>/lib/` 目录下。
 
-**注意:** 参考 [flink-sql-connector-oracle-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-oracle-cdc) 当前已发布的所有版本都可以在 Maven 中央仓库获取。
+**注意：** 参考 [flink-sql-connector-oracle-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-oracle-cdc) 当前已发布的所有版本都可以在 Maven 中央仓库获取。
 
 
 由于 Oracle Connector 采用的 FUTC 协议与 Flink CDC 项目不兼容，我们无法在 jar 包中提供 Oracle 连接器。
@@ -184,7 +184,7 @@ Oracle CDC 连接器允许从 Oracle 数据库读取快照数据和增量数据�
      archive log list
      exit;
    ```
-   **注意:**
+   **注意：**
    你也可以使用以下命令来启用补充日志：
    ```sql
    -- Enable supplemental logging for a specific table:
@@ -263,10 +263,10 @@ Flink SQL> CREATE TABLE products (
 -- read snapshot and redo logs from products table
 Flink SQL> SELECT * FROM products;
 ```
-**注意:**
+**注意：**
 在使用 CDB + PDB 模型时，需要在 Flink DDL 中添加一个额外的选项 `'debezium.database.pdb.name' = 'xxx'` 来指定要连接的 PDB 的名称。
 
-**注意:**
+**注意：**
 虽然该连接器可能适用于多种 Oracle 版本和发行版，但仅对 Oracle 9i、10g、11g 和 12c 进行了测试。
 
 连接器配置项
@@ -288,7 +288,7 @@ Flink SQL> SELECT * FROM products;
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>指定要使用的连接器, 这里应该是 <code>'oracle-cdc'</code>.</td>
+      <td>指定要使用的连接器，这里应该是 <code>'oracle-cdc'</code>。</td>
     </tr>
     <tr>
       <td>hostname</td>
@@ -369,9 +369,9 @@ Flink SQL> SELECT * FROM products;
           <td>Boolean</td>
           <td>增量快照是一种读取表快照的新机制，与旧的快照机制相比，
               增量快照有许多优点，包括：
-                （1）在快照读取期间，Source 支持并发读取， 
-                （2）在快照读取期间，Source 支持进行 chunk 粒度的 checkpoint， 
-                （3）在快照读取之前，Source 不需要获取 ROW SHARE MODE 锁。
+（1）在快照读取期间，Source 支持并发读取，
+（2）在快照读取期间，Source 支持进行 chunk 粒度的 checkpoint，
+（3）在快照读取之前，Source 不需要获取 ROW SHARE MODE 锁。
           </td>
     </tr>
     <tr>
@@ -408,7 +408,7 @@ Flink SQL> SELECT * FROM products;
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>将 Debezium 的属性传递给 Debezium 嵌入式引擎，该引擎用于从 Oracle 服务器捕获数据更改。
-          例如：<code>'debezium.snapshot.mode' = 'never'</code>.
+          例如：<code>'debezium.snapshot.mode' = 'never'</code>。
           查看更多关于 <a href="https://debezium.io/documentation/reference/1.9/connectors/oracle.html#oracle-connector-properties"> Debezium 的  Oracle 连接器属性</a></td> 
     </tr>
     <tr>
@@ -447,7 +447,7 @@ Flink SQL> SELECT * FROM products;
       <td>Boolean</td>
       <td>
         快照读取阶段是否先分配 UnboundedChunk。<br>
-        这可能有助于降低 TaskManager 在对最大的 UnboundedChunk 执行快照时出现内存溢出 (OOM) 错误的风险。<br> 
+        这可能有助于降低 TaskManager 在对最大的 UnboundedChunk 执行快照时出现内存溢出（OOM）错误的风险。<br>
       </td>
     </tr>
     <tr>
@@ -456,9 +456,9 @@ Flink SQL> SELECT * FROM products;
       <td style="word-wrap: break-word;">false</td>
       <td>Boolean</td>
       <td>
-        是否在快照读取阶段跳过 backfill 。<br> 
-        如果跳过 backfill ，快照阶段捕获表的更改将在稍后的 change log 读取阶段被回放，而不是合并到快照中。<br>
-        警告：跳过 backfill 可能会导致数据不一致，因为快照阶段发生的某些 change log 事件可能会被重放（仅保证 at-least-once ）。
+        是否在快照读取阶段跳过 backfill。<br>
+        如果跳过 backfill，快照阶段捕获表的更改将在稍后的 change log 读取阶段被回放，而不是合并到快照中。<br>
+        警告：跳过 backfill 可能会导致数据不一致，因为快照阶段发生的某些 change log 事件可能会被重放（仅保证 at-least-once）。
         例如，更新快照阶段已更新的值，或删除快照阶段已删除的数据。这些重放的 change log 事件应进行特殊处理。
       </td>
     </tr>
@@ -511,7 +511,7 @@ restart-strategy.fixed-delay.attempts: 2147483647
     <tr>
       <td>op_ts</td>
       <td>TIMESTAMP_LTZ(3) NOT NULL</td>
-      <td>当前记录表在数据库中更新的时间。 <br>如果从表的快照而不是更改流读取记录，该值将始终为0。</td>
+      <td>当前记录表在数据库中更新的时间。 <br>如果从表的快照而不是更改流读取记录，该值将始终为 0。</td>
     </tr>
   </tbody>
 </table>
@@ -553,9 +553,9 @@ Oracle CDC 连接器是一个 Flink Source 连接器，它将首先读取数据�
 
 ### 启动模式
 
-配置选项`scan.startup.mode`指定 Oracle CDC 使用者的启动模式。有效枚举包括：
+配置选项 `scan.startup.mode` 指定 Oracle CDC 使用者的启动模式。有效枚举包括：
 
-- `initial` （默认）：在第一次启动时对受监视的数据库表执行初始快照，并继续读取最新的 redo log。
+- `initial`（默认）：在第一次启动时对受监视的数据库表执行初始快照，并继续读取最新的 redo log。
 - `latest-offset`：首次启动时，从不对受监视的数据库表执行快照，仅读取
   连接器启动之后的数据更改。
 - `specific-offset`：跳过快照阶段，使用 scn 从特定位点开始读取 redo log。
@@ -568,13 +568,13 @@ Oracle CDC source 无法以并行读取的方式工作，因为只有一个任�
 
 ### 动态加表
 
-**注意:** 该功能从 Flink CDC 3.1.0 版本开始支持。
+**注意：** 该功能从 Flink CDC 3.1.0 版本开始支持。
 
-动态加表功能使你可以为正在运行的作业添加新表进行监控。新添加的表将首先读取其快照数据,然后自动读取其 redo log。
+动态加表功能使你可以为正在运行的作业添加新表进行监控。新添加的表将首先读取其快照数据，然后自动读取其 redo log。
 
-想象一下这个场景:一开始,Flink 作业监控表 `[product, user, address]`,但几天后,我们希望这个作业还可以监控表 `[order, custom]`,这些表包含历史数据,我们需要作业仍然可以复用作业的已有状态。动态加表功能可以优雅地解决此问题。
+想象一下这个场景：一开始，Flink 作业监控表 `[product, user, address]`，但几天后，我们希望这个作业还可以监控表 `[order, custom]`，这些表包含历史数据，我们需要作业仍然可以复用作业的已有状态。动态加表功能可以优雅地解决此问题。
 
-以下操作显示了如何启用此功能来解决上述场景。使用现有的 Oracle CDC Source 作业,如下:
+以下操作显示了如何启用此功能来解决上述场景。使用现有的 Oracle CDC Source 作业，如下：
 
 ```java
     JdbcIncrementalSource<String> oracleSource = new OracleSourceBuilder()
@@ -591,7 +591,7 @@ Oracle CDC source 无法以并行读取的方式工作，因为只有一个任�
    // 你的业务代码
 ```
 
-如果我们想添加新表 `[INVENTORY.ORDER, INVENTORY.CUSTOM]` 到现有的 Flink 作业,只需更新作业的 `tableList()` 将新增表 `[INVENTORY.ORDER, INVENTORY.CUSTOM]` 加入并从已有的 savepoint 恢复作业。
+如果我们想添加新表 `[INVENTORY.ORDER, INVENTORY.CUSTOM]` 到现有的 Flink 作业，只需更新作业的 `tableList()` 将新增表 `[INVENTORY.ORDER, INVENTORY.CUSTOM]` 加入并从已有的 savepoint 恢复作业。
 
 _Step 1_: 使用 savepoint 停止现有的 Flink 作业。
 ```shell
@@ -603,7 +603,7 @@ Savepoint completed. Path: file:/tmp/flink-savepoints/savepoint-cca7bc-bb1e257f0
 ```
 _Step 2_: 更新现有 Flink 作业的表列表选项。
 1. 更新 `tableList()` 参数。
-2. 编译更新后的作业,示例如下:
+2. 编译更新后的作业，示例如下：
 ```java
     JdbcIncrementalSource<String> oracleSource = new OracleSourceBuilder()
         .hostname("yourHostname")
@@ -625,7 +625,7 @@ $ ./bin/flink run \
       --from-savepoint /tmp/flink-savepoints/savepoint-cca7bc-bb1e257f0dab \
       ./FlinkCDCExample.jar
 ```
-**注意:** 请参考文档 [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.20/docs/deployment/cli/#command-line-interface) 了解更多详细信息。
+**注意：** 请参考文档 [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.20/docs/deployment/cli/#command-line-interface) 了解更多详细信息。
 
 ### DataStream Source
 
@@ -718,7 +718,7 @@ public class OracleSourceExample {
 
 ### 可用的指标
 
-指标系统能够帮助了解分片分发的进展， 下面列举出了支持的 Flink 指标 [Flink metrics](https://nightlies.apache.org/flink/flink-docs-master/docs/ops/metrics/):
+指标系统能够帮助了解分片分发的进展，下面列举出了支持的 Flink 指标 [Flink metrics](https://nightlies.apache.org/flink/flink-docs-master/docs/ops/metrics/)：
 
 | Group                  | Name                       | Type  | Description    |
 |------------------------|----------------------------|-------|----------------|
@@ -732,13 +732,13 @@ public class OracleSourceExample {
 | namespace.schema.table | snapshotStartTime          | Gauge | 快照读取阶段开始的时间    |
 | namespace.schema.table | snapshotEndTime            | Gauge | 快照读取阶段结束的时间    |
 
-注意:
-1. Group 名称是 `namespace.schema.table`，这里的 `namespace` 是实际的数据库名称， `schema` 是实际的 schema 名称， `table` 是实际的表名称。
+注意：
+1. Group 名称是 `namespace.schema.table`，这里的 `namespace` 是实际的数据库名称，`schema` 是实际的 schema 名称，`table` 是实际的表名称。
 2. 对于 Oracle，Group 的名称会类似于 `test_database.test_schema.test_table`。
 
 ### 关于无主键表
 
-从3.4.0 版本开始支持无主键表，使用无主键表必须设置 `scan.incremental.snapshot.chunk.key-column`，且只能选择非空类型的一个字段。
+从 3.4.0 版本开始支持无主键表，使用无主键表必须设置 `scan.incremental.snapshot.chunk.key-column`，且只能选择非空类型的一个字段。
 
 在使用无主键表时，需要注意以下两种情况。
 
@@ -755,19 +755,19 @@ public class OracleSourceExample {
 
 - **表结构：**
    - **主键：** `id`
-   - **分片键列 ：** `pid`（非主键）
+   - **分片键列：** `pid`（非主键）
 
-- **快照分片 ：**
-   - **分片 0:** `1 < pid <= 3`
-   - **分片 1:** `3 < pid <= 5`
+- **快照分片：**
+   - **分片 0：** `1 < pid <= 3`
+   - **分片 1：** `3 < pid <= 5`
 
-- **操作 ：**
+- **操作：**
    - 两个子任务并行读取 **分片 0** 和 **分片 1**。
    - 在读取过程中，发生了一次 **更新** 操作，使 `id=0` 的 `pid` 从 `2` 变为 `4`，在两个分片的**高低水位**间都包含此次变更，导致该更新操作在增量阶段不会被处理。
 
-- **结果 ：**
-   - **分片 0:** 记录 `[id=0, pid=2]`
-   - **分片 1:** 记录 `[id=0, pid=4]`
+- **结果：**
+   - **分片 0：** 记录 `[id=0, pid=2]`
+   - **分片 1：** 记录 `[id=0, pid=4]`
 
 由于**处理顺序**无法保证，最终 `id=0` 的 `pid` 可能为 `2` 或 `4`，从而导致数据不一致。
 

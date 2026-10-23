@@ -26,7 +26,7 @@ under the License.
 
 # Oracle Connector
 
-Oracle CDC Pipeline 连接器允许从 Oracle 数据库读取快照数据和增量数据，并提供端到端的整库数据同步能力。 本文描述了如何设置 Oracle CDC Pipeline 连接器。
+Oracle CDC Pipeline 连接器允许从 Oracle 数据库读取快照数据和增量数据，并提供端到端的整库数据同步能力。本文描述了如何设置 Oracle CDC Pipeline 连接器。
 
 
 ## 示例
@@ -104,7 +104,7 @@ pipeline:
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>需要监视的 Oracle 数据库的表名。表名支持正则表达式，以监视满足正则表达式的多个表。<br>
-          需要注意的是，点号（.）被视为数据库和表名的分隔符。 如果需要在正则表达式中使用点（.）来匹配任何字符，必须使用反斜杠对点进行转义。<br>
+          需要注意的是，点号（.）被视为数据库和表名的分隔符。如果需要在正则表达式中使用点（.）来匹配任何字符，必须使用反斜杠对点进行转义。<br>
           例如，db0.\.*, db1.user_table_[0-9]+, db[1-2].[app|web]order_\.*</td>
     </tr>
     <tr>
@@ -112,7 +112,7 @@ pipeline:
       <td>optional</td>
       <td style="word-wrap: break-word;">true</td>
       <td>Boolean</td>
-      <td>是否发送模式更改事件，下游 sink 可以响应模式变更事件实现表结构同步，默认为true。</td>
+      <td>是否发送模式更改事件，下游 sink 可以响应模式变更事件实现表结构同步，默认为 true。</td>
     </tr>
     <tr>
       <td>scan.incremental.snapshot.chunk.size</td>
@@ -134,7 +134,7 @@ pipeline:
       <td style="word-wrap: break-word;">initial</td>
       <td>String</td>
       <td> Oracle CDC 消费者可选的启动模式，
-         合法的模式为 "initial"、"latest-offset"和"snapshot"。</td>
+         合法的模式为 "initial"、"latest-offset" 和 "snapshot"。</td>
     </tr>
     <tr>
       <td>debezium.*</td>
@@ -142,7 +142,7 @@ pipeline:
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>将 Debezium 的属性传递给 Debezium 嵌入式引擎，该引擎用于从 Oracle 服务器捕获数据更改。
-          例如: <code>'debezium.snapshot.mode' = 'never'</code>.
+          例如：<code>'debezium.snapshot.mode' = 'never'</code>。
           查看更多关于 <a href="https://debezium.io/documentation/reference/1.9/connectors/oracle.html#oracle-connector-properties"> Debezium 的  Oracle 连接器属性</a></td> 
     </tr>
     <tr>
@@ -150,7 +150,7 @@ pipeline:
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>
       <td>Boolean</td>
-      <td>是否在快照结束后关闭空闲的 Reader。 此特性需要 flink 版本大于等于 1.14 并且 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' 需要设置为 true。<br>
+      <td>是否在快照结束后关闭空闲的 Reader。此特性需要 flink 版本大于等于 1.14 并且 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' 需要设置为 true。<br>
           若 flink 版本大于等于 1.15，'execution.checkpointing.checkpoints-after-tasks-finish.enabled' 默认值变更为 true，可以不用显式配置 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' = true。</td>
     </tr>
     <tr>
@@ -159,7 +159,7 @@ pipeline:
       <td style="word-wrap: break-word;">false</td>
       <td>String</td>
       <td>
-        可额外读取的SourceRecord中元数据的列表，后续可直接使用在transform模块，英文逗号 `,` 分割。目前可用值包含：op_ts。
+        可额外读取的 SourceRecord 中元数据的列表，后续可直接使用在 transform 模块，英文逗号 `,` 分割。目前可用值包含：op_ts。
       </td>
     </tr>
     <tr>
@@ -167,21 +167,21 @@ pipeline:
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td> oracle jdbc的url，将优先使用url，如果没有配置url，则使用“jdbc:oracle:sinen:@localhost:1521:orcl”，但oracle 19c url是“jdbc:oracle：thin:@//localhost:1521/pdb1”，因此url属性是选项，以适应不同版本的oracle。</td>
+      <td> oracle jdbc 的 url，将优先使用 url，如果没有配置 url，则使用 “jdbc:oracle:sinen:@localhost:1521:orcl”，但 oracle 19c url 是 “jdbc:oracle：thin:@//localhost:1521/pdb1”，因此 url 属性是选项，以适应不同版本的 oracle。</td>
     </tr>
     <tr>
       <td>database</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>要监视的Oracle服务器的数据库名称。</td>
+      <td>要监视的 Oracle 服务器的数据库名称。</td>
     </tr>
     <tr>
       <td>server-time-zone</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>数据库服务器中的会话时区。如果没有设置，则使用ZoneId.systemDefault（）来确定服务器时区。</td>
+      <td>数据库服务器中的会话时区。如果没有设置，则使用 ZoneId.systemDefault（）来确定服务器时区。</td>
     </tr>
 <tr>
       <td>connection.pool.size</td>
@@ -197,7 +197,7 @@ pipeline:
       <td>optional</td>
       <td style="word-wrap: break-word;">30</td>
       <td>Integer</td>
-      <td>连接器在尝试连接到oracle数据库服务器后超时前应等待的最长时间。</td>
+      <td>连接器在尝试连接到 oracle 数据库服务器后超时前应等待的最长时间。</td>
     </tr>
     <tr>
       <td>connect.max-retries</td>
@@ -205,7 +205,7 @@ pipeline:
       <td style="word-wrap: break-word;">3</td>
       <td>Integer</td>
       <td>
-连接器应重试构建oracle数据库服务器连接的最大重试次数。
+连接器应重试构建 oracle 数据库服务器连接的最大重试次数。
       </td>
     </tr>
     <tr>
@@ -226,8 +226,8 @@ pipeline:
         块密钥分布因子的上限。分布因子用于确定“
 桌子是否均匀分布。"
 当数据分布均匀时，表块将使用均匀计算优化。”
-当查询oracle不均匀时，就会发生拆分。
-分布因子可以通过（MAX（id）-MIN（id）+1）/rowCount来计算。
+当查询 oracle 不均匀时，就会发生拆分。
+分布因子可以通过（MAX（id）-MIN（id）+1）/rowCount 来计算。
       </td>
     </tr>
     <tr>
@@ -239,8 +239,8 @@ pipeline:
         块密钥分布因子的下限。分布因子用于确定
 桌子是否均匀分布。"
 当数据分布均匀时，表块将使用均匀计算优化。”
-当查询oracle不均匀时，就会发生拆分。
-分布因子可以通过（MAX（id）-MIN（id）+1）/rowCount来计算。
+当查询 oracle 不均匀时，就会发生拆分。
+分布因子可以通过（MAX（id）-MIN（id）+1）/rowCount 来计算。
       </td>
     </tr>
     <tr>
@@ -266,7 +266,7 @@ pipeline:
       <td style="word-wrap: break-word;">false</td>
       <td>Boolean</td>
       <td>
-      是否在快照读取阶段跳过回填。如果跳过回填，则快照阶段捕获的表上的更改将在稍后的增量读取阶段被使用，而不是合并到快照中。警告：跳过回填可能会导致数据不一致，因为在快照阶段发生的一些binlog事件可能会被重放（至少只有一次语义承诺）。例如，更新快照中已更新的值，或删除快照中已删除的条目。这些重放的增量事件应该特别处理。
+      是否在快照读取阶段跳过回填。如果跳过回填，则快照阶段捕获的表上的更改将在稍后的增量读取阶段被使用，而不是合并到快照中。警告：跳过回填可能会导致数据不一致，因为在快照阶段发生的一些 binlog 事件可能会被重放（至少只有一次语义承诺）。例如，更新快照中已更新的值，或删除快照中已删除的条目。这些重放的增量事件应该特别处理。
       </td>
     </tr>
     </tbody>
@@ -275,9 +275,9 @@ pipeline:
 
 ## 启动模式
 
-配置选项`scan.startup.mode`指定 Oracle CDC 使用者的启动模式。有效枚举包括：
-- `initial` （默认）：在第一次启动时对受监视的数据库表执行初始快照，并继续读取最新的归档日志。
-- `latest-offset`：首次启动时，从不对受监视的数据库表执行快照， 连接器仅从归档日志的结尾处开始读取，这意味着连接器只能读取在连接器启动之后的数据更改。
+配置选项 `scan.startup.mode` 指定 Oracle CDC 使用者的启动模式。有效枚举包括：
+- `initial`（默认）：在第一次启动时对受监视的数据库表执行初始快照，并继续读取最新的归档日志。
+- `latest-offset`：首次启动时，从不对受监视的数据库表执行快照，连接器仅从归档日志的结尾处开始读取，这意味着连接器只能读取在连接器启动之后的数据更改。
 - `snapshot`: 只进行快照阶段，跳过增量阶段，快照阶段读取结束后退出。
 
 例如，可以在 YAML 配置文件中这样指定启动模式：
@@ -306,7 +306,7 @@ source:
     <tr>
       <td>NUMBER(p,s)</td>
       <td>DECIMAL(p, s)/BIGINT</td>
-      <td>当s 大于 0 时，使用 DECIMAL(p, s)；否则使用 BIGINT。</td>
+      <td>当 s 大于 0 时，使用 DECIMAL(p, s)；否则使用 BIGINT。</td>
     </tr>
     <tr>
       <td>

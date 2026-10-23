@@ -41,13 +41,14 @@ The following sections will take the pipeline from MySQL to [Iceberg](https://ic
 You can also use other data sources like Oracle/Postgres and sinks like Hudi to build your own pipeline.
 
 ## Preparation
-Prepare a Linux or MacOS computer with Docker installed.
+Prepare a Linux or macOS computer with Docker installed.
 
 ## Preparing JAR package required
 **Download links are available only for stable releases, SNAPSHOT dependencies need to be built based on master or release-branches by yourself.**
-- flink-sql-connector-mysql-cdc-3.0-SNAPSHOT.jar
+- [flink-sql-connector-mysql-cdc-3.7.0-1.20.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-mysql-cdc/3.7.0-1.20/flink-sql-connector-mysql-cdc-3.7.0-1.20.jar)
+- [mysql-connector-java-8.0.27.jar](https://repo.maven.apache.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar)
 - [flink-shaded-hadoop-2-uber-2.7.5-10.0.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-shaded-hadoop-2-uber/2.7.5-10.0/flink-shaded-hadoop-2-uber-2.7.5-10.0.jar)
-- [iceberg-flink-runtime-1.16-1.3.1.jar](https://repo.maven.apache.org/maven2/org/apache/iceberg/iceberg-flink-runtime-1.16/1.3.1/iceberg-flink-runtime-1.16-1.3.1.jar)
+- [iceberg-flink-runtime-1.20-1.7.2.jar](https://repo.maven.apache.org/maven2/org/apache/iceberg/iceberg-flink-runtime-1.20/1.7.2/iceberg-flink-runtime-1.20-1.7.2.jar)
 
 
 
@@ -56,7 +57,7 @@ The components required in this tutorial are all managed in containers, so we wi
 
 1. Create `Dockerfile` file using following contents:
    ```dockerfile
-   FROM flink:1.16.0-scala_2.12
+   FROM flink:1.20.5-scala_2.12
    # Place the downloaded jar packages in the lib directory at the same level.
    COPY ./lib /opt/flink/lib
    RUN apt-get update && apt-get install tree
@@ -69,7 +70,7 @@ The components required in this tutorial are all managed in containers, so we wi
       sql-client:
          user: flink:flink
          build: .
-         command: bin/sql-client.sh
+         command: tail -f /dev/null
          depends_on:
             - jobmanager
             - mysql
@@ -196,7 +197,7 @@ The components required in this tutorial are all managed in containers, so we wi
 ## Creating tables using Flink DDL in Flink SQL CLI
 First, use the following command to enter the Flink SQL CLI Container:
 ```shell
-docker-compose run sql-client
+docker-compose exec sql-client /opt/flink/bin/sql-client.sh
 ```
 
 We should see the welcome screen of the CLI client:
@@ -320,7 +321,7 @@ Then do the following steps in Flink SQL CLI:
    {{< img src="/fig/real-time-data-lake-tutorial/final-data-in-iceberg.png" alt="Final Data in Iceberg" >}}
 
    From the latest result in Iceberg, we can see that there is a new record of `(db_1, user_1, 111)`, and the address of `(db_1, user_2, 120)` has been updated to `Beijing`.
-   Besides, the record of `(db_2, user_2, 220)` has been deleted. The result is exactly the same with the changes we did in MySQL.
+   Besides, the record `(db_2, user_2, 220)` has been deleted. The result exactly matches the changes we made in MySQL.
    
 ## Clean up
 After finishing the tutorial, run the following command in the directory of `docker-compose.yml` to stop all containers:

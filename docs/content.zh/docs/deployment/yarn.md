@@ -33,7 +33,7 @@ Flink 可以根据在 JobManager 上运行的作业处理所需的 slot 数量�
 
 ## 准备工作
 
-此“入门指南”部分假定从 2.10.2 版本起具备功能可用的 YARN 环境。YARN 环境可以通过像亚马逊 EMR、谷歌云 DataProc 等服务或 Cloudera 等产品来搭建。不建议在[本地](https://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-common/SingleCluster.html)或[集群](https://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-common/ClusterSetup.html)上手动设置 YARN 环境来完成本入门教程。
+此 “入门指南” 部分假定从 2.10.2 版本起具备功能可用的 YARN 环境。YARN 环境可以通过像亚马逊 EMR、谷歌云 DataProc 等服务或 Cloudera 等产品来搭建。不建议在[本地](https://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-common/SingleCluster.html)或[集群](https://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-common/ClusterSetup.html)上手动设置 YARN 环境来完成本入门教程。
 
 - 通过运行 `yarn top` 无错误信息显示以确保你的 YARN 集群准备好接受 Flink 应用程序的提交。
 - 从[下载页面](https://flink.apache.org/downloads/)下载最新的 Flink 发行版并解压缩。
@@ -43,7 +43,7 @@ Flink 可以根据在 JobManager 上运行的作业处理所需的 slot 数量�
 export HADOOP_CLASSPATH=`hadoop classpath`
 ```
 Flink 在所有类 UNIX 的环境中运行，即在 Linux、Mac OS X 以及（针对 Windows 的）Cygwin 上运行。
-你可以参考[概览]({{< ref "docs/connectors/pipeline-connectors/overview" >}})来检查支持的版本并下载[Flink二进制版本](https://flink.apache.org/downloads/)，
+你可以参考[概览]({{< ref "docs/connectors/pipeline-connectors/overview" >}})来检查支持的版本并下载 [Flink 二进制版本](https://flink.apache.org/downloads/)，
 然后解压文件：
 ```bash
 tar -xzf flink-*.tgz
@@ -56,7 +56,7 @@ export FLINK_HOME=/path/flink-*
 
 ## Session 模式
 
-### 在 YARN 启动一个Flink Session
+### 在 YARN 启动一个 Flink Session {#在-yarn-启动一个flink-session}
 
 确保已设置 `HADOOP_CLASSPATH` 环境变量，即可在 YARN 会话启动一个 Flink 任务：
 
@@ -75,7 +75,7 @@ export HADOOP_CLASSPATH=`hadoop classpath`
 echo "stop" | ./bin/yarn-session.sh -id application_XXXXX_XXX
 ```
 
-启动 Yarn 会话之后，即可通过命令输出最后一行打印的 URL 或者 YARN ResourceManager Web UI 访问 Flink Web UI。
+启动 YARN 会话之后，即可通过命令输出最后一行打印的 URL 或者 YARN ResourceManager Web UI 访问 Flink Web UI。
 
 然后，需要向 flink-conf.yaml 添加一些配置：
 
@@ -86,7 +86,7 @@ execution.target: yarn-session
 yarn.application.id: {{YARN_APPLICATION_ID}}
 ```
 
-{{REST_PORT}} 和 {{NODE_IP}} 需要替换为 JobManager Web 接口的实际值，{{YARN_APPLICATION_ID}} 则需替换为 Flink 实际的 Yarn 应用 ID。
+{{REST_PORT}} 和 {{NODE_IP}} 需要替换为 JobManager Web 接口的实际值，{{YARN_APPLICATION_ID}} 则需替换为 Flink 实际的 YARN 应用 ID。
 
 ### 配置 Flink CDC
 从[发布页面](https://github.com/apache/flink-cdc/releases)下载 Flink CDC 的 tar 文件，然后提取该归档文件：
@@ -95,7 +95,7 @@ yarn.application.id: {{YARN_APPLICATION_ID}}
 tar -xzf flink-cdc-*.tar.gz
 ```
 
-提取后的 `flink-cdc` 包含四个目录: `bin`，`lib`，`log` 和 `conf`。
+提取后的 `flink-cdc` 包含四个目录：`bin`，`lib`，`log` 和 `conf`。
 
 从[发布页面](https://github.com/apache/flink-cdc/releases)下载连接器 jar，并将其移动至 `lib` 目录中。
 下载链接仅适用于稳定版本，SNAPSHOT 依赖项需要自己基于特定分支进行构建。
@@ -136,7 +136,7 @@ pipeline:
 ```
 
 你可以按需修改配置文件。
-最后，通过 Cli 将作业提交至 Flink Yarn Session 集群。
+最后，通过 CLI 将作业提交至 Flink YARN Session 集群。
 
 ```bash
 cd /path/flink-cdc-*
@@ -153,15 +153,15 @@ Job Description: Sync MySQL Database to Doris
 
 你可以通过 Flink Web UI 找到一个名为 `Sync MySQL Database to Doris` 的作业。
 
-# Yarn Application 模式
-Yarn Application 模式是 Yarn 集群上运行 Flink 作业的推荐模式。对资源的管理和分配更加灵活，可以更好地利用集群资源。
+# YARN Application 模式
+YARN Application 模式是 YARN 集群上运行 Flink 作业的推荐模式。对资源的管理和分配更加灵活，可以更好地利用集群资源。
 
-通过Cli将作业提交至 Flink Yarn Application 集群。
+通过 CLI 将作业提交至 Flink YARN Application 集群。
 ```bash
 cd /path/flink-cdc-*
 ./bin/flink-cdc.sh -t yarn-application -Dexecution.checkpointing.interval=2min mysql-to-doris.yaml
 ```
-或者从savepoint恢复Flink-CDC作业：
+或者从 savepoint 恢复 Flink-CDC 作业：
 ```bash
 cd /path/flink-cdc-*
 ./bin/flink-cdc.sh -t yarn-application -s hdfs:///flink/savepoint-1537 -Dexecution.checkpointing.interval=2min mysql-to-doris.yaml
@@ -172,4 +172,4 @@ Pipeline has been submitted to cluster.
 Job ID: application_1728995081590_1254
 Job Description: submit job successful
 ```
-你可以通过 Yarn Web UI 找到一个application_id为 `application_1728995081590_1254` 的作业。
+你可以通过 YARN Web UI 找到一个 application_id 为 `application_1728995081590_1254` 的作业。

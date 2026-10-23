@@ -120,7 +120,7 @@ Pipeline Connector Options
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Pass Hudi table options to the pipeline，See <a href="https://hudi.apache.org/docs/configurations/#FLINK_SQL">Hudi table options</a></td>
+      <td>Pass Hudi table options to the pipeline. See <a href="https://hudi.apache.org/docs/configurations/#FLINK_SQL">Hudi table options</a></td>
     </tr>
     </tbody>
 </table>    

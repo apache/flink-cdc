@@ -185,7 +185,7 @@ Pipeline Connector Options
 Usage Notes
 --------
 
-* The written index of Elasticsearch will be `namespace.schemaName.tableName` string of TableId，this can be changed using route function of pipeline.
+* The written index of Elasticsearch will be `namespace.schemaName.tableName` string of TableId, this can be changed using route function of pipeline.
 
 * No support for automatic Elasticsearch index creation.
 

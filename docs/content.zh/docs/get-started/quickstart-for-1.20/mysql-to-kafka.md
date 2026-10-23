@@ -32,13 +32,13 @@ under the License.
 准备一台已经安装了 Docker 的 Linux 或者 macOS 电脑。
 
 ### 准备 Flink Standalone 集群
-1. 下载 [Flink 1.20.3](https://archive.apache.org/dist/flink/flink-1.20.3/flink-1.20.3-bin-scala_2.12.tgz)，解压后得到 flink-1.20.3 目录。
-   使用下面的命令跳转至 Flink 目录下，并且设置 `FLINK_HOME` 为 flink-1.20.3 所在目录。
+1. 下载 [Flink 1.20.5](https://archive.apache.org/dist/flink/flink-1.20.5/flink-1.20.5-bin-scala_2.12.tgz)，解压后得到 flink-1.20.5 目录。
+   使用下面的命令跳转至 Flink 目录下，并且设置 `FLINK_HOME` 为 flink-1.20.5 所在目录。
 
     ```shell
-    tar -zxvf flink-1.20.3-bin-scala_2.12.tgz
-    export FLINK_HOME=$(pwd)/flink-1.20.3
-    cd flink-1.20.3
+    tar -zxvf flink-1.20.5-bin-scala_2.12.tgz
+    export FLINK_HOME=$(pwd)/flink-1.20.5
+    cd flink-1.20.5
     ```
 
 2. 在 `conf/config.yaml` 配置文件追加下列参数开启检查点，每隔 3 秒进行一次 checkpoint。
@@ -166,7 +166,7 @@ under the License.
 
 ## 通过 Flink CDC CLI 提交任务
 
-**下载链接只对已发布的版本有效, SNAPSHOT 版本需要本地基于 master 或 release- 分支编译。**
+**下载链接只对已发布的版本有效，SNAPSHOT 版本需要本地基于 master 或 release- 分支编译。**
 
 1. 下载下面列出的二进制压缩包，并解压得到目录 `flink-cdc-{{< param Version >}}`；  
    [flink-cdc-{{< param Version >}}-bin.tar.gz](https://www.apache.org/dyn/closer.lua/flink/flink-cdc-{{< param Version >}}/flink-cdc-{{< param Version >}}-bin.tar.gz)
@@ -281,7 +281,7 @@ under the License.
 
 ### 同步变更
 
-我们使用以下命令进入 MySQL 容器:
+我们使用以下命令进入 MySQL 容器：
 
 ```shell
  docker compose exec mysql mysql -uroot -p123456
@@ -621,7 +621,7 @@ pipeline:
 docker compose down
 ```
 
-在 Flink 所在目录 `flink-1.20.3` 下执行如下命令停止 Flink 集群：
+在 Flink 所在目录 `flink-1.20.5` 下执行如下命令停止 Flink 集群：
 
 ```shell
 ./bin/stop-cluster.sh

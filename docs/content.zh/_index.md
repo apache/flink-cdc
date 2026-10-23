@@ -152,7 +152,7 @@ under the License.
                     <div class="divider w-1/2 opacity-50"></div>
                 </div>
                 <p class="text-sm my-0 text-center md:text-left">
-                    Flink CDC provides a series of quick start demos without any dependencies or java code. A Linux or MacOS computer with Docker installed is enough.
+                    Flink CDC provides a series of quick start demos without any dependencies or java code. A Linux or macOS computer with Docker installed is enough.
                     Please check out our <a href="{{< ref "docs/get-started/introduction" >}}">Quick Start</a> for more information.
                 </p>
             </div>

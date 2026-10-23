@@ -34,11 +34,11 @@ under the License.
 | 参数                            | 含义                                | optional/required |
 |-------------------------------|-----------------------------------|-------------------|
 | type                          | source 的类型，例如 mysql。              | required          |
-| name                          | source 的名称，允许用户配置 (提供了一个默认值)。     | optional          |
+| name                          | source 的名称，允许用户配置（提供了一个默认值）。     | optional          |
 | configurations of Data Source | 用于构建 source 组件的配置，例如连接参数或者表属性的配置。 | optional          |
 
 # 示例
-我们可以使用yaml文件来定义一个mysql source：
+我们可以使用 yaml 文件来定义一个 mysql source：
 ```yaml
 source:
     type: mysql

@@ -24,7 +24,7 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-# 演示: TiDB CDC 导入 Elasticsearch
+# 演示：TiDB CDC 导入 Elasticsearch {#演示-tidb-cdc-导入-elasticsearch}
 
 **首先我们得通过 docker 来启动 TiDB 集群。**
 
@@ -119,7 +119,7 @@ services:
        
 ``` 
 该 Docker Compose 中包含的容器有：
-- TiDB 集群: tikv、pd、tidb。
+- TiDB 集群：tikv、pd、tidb。
 - Elasticsearch：`orders` 表将和 `products` 表进行 join，join 的结果写入 Elasticsearch 中。
 - Kibana：可视化 Elasticsearch 中的数据。
 
@@ -130,7 +130,7 @@ docker-compose up -d
 mysql -h 127.0.0.1 -P 4000 -u root # Just test tidb cluster is ready,if you have install mysql local.
 ```
 该命令会以 detached 模式自动启动 Docker Compose 配置中定义的所有容器。
-你可以通过 docker ps 来观察上述的容器是否正常启动了。 也可以访问 http://localhost:5601/ 来查看 Kibana 是否运行正常。
+你可以通过 docker ps 来观察上述的容器是否正常启动了。也可以访问 http://localhost:5601/ 来查看 Kibana 是否运行正常。
 
 另外可以通过如下命令停止并删除所有的容器：
 
@@ -142,8 +142,8 @@ docker-compose down
 
 ```下载链接只对已发布的版本有效, SNAPSHOT 版本需要本地编译```
 
-- [flink-sql-connector-elasticsearch7-3.0.1-1.17.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7/3.0.1-1.17/flink-sql-connector-elasticsearch7-3.0.1-1.17.jar)
-- [flink-sql-connector-tidb-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-tidb-cdc)
+- [flink-sql-connector-elasticsearch7-3.1.0-1.20.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7/3.1.0-1.20/flink-sql-connector-elasticsearch7-3.1.0-1.20.jar)
+- [flink-sql-connector-tidb-cdc-3.7.0-1.20.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-tidb-cdc/3.7.0-1.20/flink-sql-connector-tidb-cdc-3.7.0-1.20.jar)
 
 
 **在 TiDB 数据库中准备数据**
@@ -168,7 +168,7 @@ VALUES (default,"scooter","Small 2-wheel scooter"),
        (default,"hammer","14oz carpenter's hammer"),
        (default,"hammer","16oz carpenter's hammer"),
        (default,"rocks","box of assorted rocks"),
-       (default,"jacket","water resistent black wind breaker"),
+       (default,"jacket","water resistant black wind breaker"),
        (default,"spare tire","24 inch spare tire");
 
 CREATE TABLE orders (

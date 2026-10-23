@@ -27,7 +27,7 @@ under the License.
 # Oracle Connector
 
 Oracle connector allows reading snapshot data and incremental data from Oracle database and provides end-to-end full-database data synchronization capabilities.
-This document describes how to setup the Oracle connector.
+This document describes how to set up the Oracle connector.
 
 
 ## Example
@@ -135,7 +135,7 @@ pipeline:
       <td>optional</td>
       <td style="word-wrap: break-word;">initial</td>
       <td>String</td>
-      <td>Optional startup mode for Oracle CDC consumer, valid enumerations are "initial" ,"latest-offset" and "snapshot".</td>
+      <td>Optional startup mode for Oracle CDC consumer, valid enumerations are "initial", "latest-offset" and "snapshot".</td>
     </tr>
     <tr>
       <td>debezium.*</td>
@@ -169,7 +169,7 @@ pipeline:
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td> The url for oracle jdbc ,the url will be used preferentially,if no url is configured, then use "jdbc:oracle:thin:@localhost:1521:orcl"，but oracle 19c url is "jdbc:oracle:thin:@//localhost:1521/pdb1",so the url property is option to adapt to different versions of Oracle.</td>
+      <td> The url for Oracle JDBC, the url will be used preferentially, if no url is configured, then use "jdbc:oracle:thin:@localhost:1521:orcl", but oracle 19c url is "jdbc:oracle:thin:@//localhost:1521/pdb1", so the url property is option to adapt to different versions of Oracle.</td>
     </tr>
     <tr>
       <td>database</td>

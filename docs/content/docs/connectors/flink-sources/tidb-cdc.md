@@ -26,12 +26,12 @@ under the License.
 
 # TiDB CDC Connector
 
-The TiDB CDC connector allows for reading snapshot data and incremental data from TiDB database. This document describes how to setup the TiDB CDC connector to run SQL queries against TiDB databases.
+The TiDB CDC connector allows for reading snapshot data and incremental data from TiDB database. This document describes how to set up the TiDB CDC connector to run SQL queries against TiDB databases.
 
 Dependencies
 ------------
 
-In order to setup the TiDB CDC connector, the following table provides dependency information for both projects using a build automation tool (such as Maven or SBT) and SQL Client with SQL JAR bundles.
+To set up the TiDB CDC connector, the following table provides dependency information for both projects using a build automation tool (such as Maven or SBT) and SQL Client with SQL JAR bundles.
 
 ### Maven dependency
 

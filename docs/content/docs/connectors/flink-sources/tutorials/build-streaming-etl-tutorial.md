@@ -31,14 +31,14 @@ This tutorial is to show how to quickly build streaming ETL for MySQL and Postgr
 Assuming we are running an e-commerce business. The product and order data stored in MySQL, the shipment data related to the order is stored in Postgres.
 We want to enrich the orders using the product and shipment table, and then load the enriched orders to ElasticSearch in real time.
 
-In the following sections, we will describe how to use Flink Mysql/Postgres CDC to implement it.
+In the following sections, we will describe how to use Flink MySQL/Postgres CDC to implement it.
 All exercises in this tutorial are performed in the Flink SQL CLI, and the entire process uses standard SQL syntax, without a single line of Java/Scala code or IDE installation.
 
 The overview of the architecture is as follows:
 {{< img src="/fig/mysql-postgres-tutorial/flink-cdc-streaming-etl.png" width="700px" alt="Flink CDC Streaming ETL" >}}
 
 ## Preparation
-Prepare a Linux or MacOS computer with Docker installed.
+Prepare a Linux or macOS computer with Docker installed.
 
 ### Starting components required
 The components required in this demo are all managed in containers, so we will use `docker-compose` to start them.
@@ -86,8 +86,8 @@ services:
       - "5601:5601"
 ```
 The Docker Compose environment consists of the following containers:
-- MySQL: the `products`,`orders` tables will be store in the database. They will be joined with data in Postgres to enrich the orders.
-- Postgres: the `shipments` table will be store in the database.
+- MySQL: the `products` and `orders` tables are stored in this database. They are joined with data in Postgres to enrich the orders.
+- Postgres: the `shipments` table is stored in this database.
 - Elasticsearch: mainly used as a data sink to store enriched orders.
 - Kibana: used to visualize the data in Elasticsearch.
 
@@ -99,13 +99,13 @@ This command automatically starts all the containers defined in the Docker Compo
 We can also visit [http://localhost:5601/](http://localhost:5601/) to see if Kibana is running normally.
 
 ### Preparing Flink and JAR package required
-1. Download [Flink 1.18.0](https://archive.apache.org/dist/flink/flink-1.18.0/flink-1.18.0-bin-scala_2.12.tgz) and unzip it to the directory `flink-1.18.0`
-2. Download following JAR package required and put them under `flink-1.18.0/lib/`:
+1. Download [Flink 1.20.5](https://archive.apache.org/dist/flink/flink-1.20.5/flink-1.20.5-bin-scala_2.12.tgz) and unzip it to the directory `flink-1.20.5`
+2. Download following JAR package required and put them under `flink-1.20.5/lib/`:
 
    **Download links are available only for stable releases, SNAPSHOT dependencies need to be built based on master or release branches by yourself.**
-    - [flink-sql-connector-elasticsearch7-3.0.1-1.17.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7/3.0.1-1.17/flink-sql-connector-elasticsearch7-3.0.1-1.17.jar)
-    - flink-sql-connector-mysql-cdc-3.0-SNAPSHOT.jar
-    - flink-sql-connector-postgres-cdc-3.0-SNAPSHOT.jar
+    - [flink-sql-connector-elasticsearch7-3.1.0-1.20.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7/3.1.0-1.20/flink-sql-connector-elasticsearch7-3.1.0-1.20.jar)
+    - [flink-sql-connector-mysql-cdc-3.7.0-1.20.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-mysql-cdc/3.7.0-1.20/flink-sql-connector-mysql-cdc-3.7.0-1.20.jar)
+    - [flink-sql-connector-postgres-cdc-3.7.0-1.20.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-postgres-cdc/3.7.0-1.20/flink-sql-connector-postgres-cdc-3.7.0-1.20.jar)
 
 ### Preparing data in databases
 #### Preparing data in MySQL
@@ -133,7 +133,7 @@ We can also visit [http://localhost:5601/](http://localhost:5601/) to see if Kib
            (default,"hammer","14oz carpenter's hammer"),
            (default,"hammer","16oz carpenter's hammer"),
            (default,"rocks","box of assorted rocks"),
-           (default,"jacket","water resistent black wind breaker"),
+           (default,"jacket","water resistant black wind breaker"),
            (default,"spare tire","24 inch spare tire");
     
     CREATE TABLE orders (
@@ -177,7 +177,7 @@ We can also visit [http://localhost:5601/](http://localhost:5601/) to see if Kib
 
 1. Use the following command to change to the Flink directory:
     ```
-    cd flink-1.18.0
+    cd flink-1.20.5
     ```
    
 2. Use the following command to start a Flink cluster:
@@ -338,7 +338,7 @@ After finishing the tutorial, run the following command to stop all containers i
 ```shell
 docker-compose down
 ```
-Run the following command to stop the Flink cluster in the directory of Flink `flink-1.18.0`:
+Run the following command to stop the Flink cluster in the directory of Flink `flink-1.20.5`:
 ```shell
 ./bin/stop-cluster.sh
 ```

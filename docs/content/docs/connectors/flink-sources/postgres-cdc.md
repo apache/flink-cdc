@@ -26,11 +26,11 @@ under the License.
 
 # Postgres CDC Connector
 
-The Postgres CDC connector allows for reading snapshot data and incremental data from PostgreSQL database. This document describes how to setup the Postgres CDC connector to run SQL queries against PostgreSQL databases.
+The Postgres CDC connector allows for reading snapshot data and incremental data from PostgreSQL database. This document describes how to set up the Postgres CDC connector to run SQL queries against PostgreSQL databases.
 
 ## Dependencies
 
-In order to setup the Postgres CDC connector, the following table provides dependency information for both projects using a build automation tool (such as Maven or SBT) and SQL Client with SQL JAR bundles.
+To set up the Postgres CDC connector, the following table provides dependency information for both projects using a build automation tool (such as Maven or SBT) and SQL Client with SQL JAR bundles.
 
 ### Maven dependency
 

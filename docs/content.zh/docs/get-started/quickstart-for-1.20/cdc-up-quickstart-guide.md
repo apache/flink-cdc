@@ -74,7 +74,7 @@ Commands:
   1.17.2
   1.18.1
   1.19.3
-‣ 1.20.3
+‣ 1.20.5
 ```
 
 Use the arrow keys to navigate and press Enter to select specified Flink and CDC version, source, and sink connectors.
