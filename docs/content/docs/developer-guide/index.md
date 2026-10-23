@@ -1,8 +1,9 @@
 ---
-title: Developer Guide
-bold: true
-bookCollapseSection: true
-weight: 5
+title: "Developer Guide"
+slug: "/docs/developer-guide"
+sidebar_position: 5
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one

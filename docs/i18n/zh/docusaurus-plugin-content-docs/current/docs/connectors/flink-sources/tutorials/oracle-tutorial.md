@@ -1,9 +1,9 @@
 ---
 title: "Oracle 教程"
-weight: 4
-type: docs
-aliases:
-- /connectors/flink-sources/tutorials/oracle-tutorial.html
+slug: "/docs/connectors/flink-sources/tutorials/oracle-tutorial"
+sidebar_position: 4
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -24,7 +24,7 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-# 演示：Oracle CDC 导入 Elasticsearch {#演示-oracle-cdc-导入-elasticsearch}
+# 演示：Oracle CDC 导入 Elasticsearch
 
 **创建 `docker-compose.yml` 文件，内容如下所示：**
 
@@ -228,5 +228,3 @@ UPDATE DEBEZIUM.ORDERS SET QUANTITY = 10 WHERE ID = 1002;
 
 DELETE FROM DEBEZIUM.ORDERS WHERE ID = 1004;
 ```
-
-{{< top >}}

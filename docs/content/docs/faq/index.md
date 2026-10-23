@@ -1,8 +1,9 @@
 ---
 title: "FAQ"
-# bold: true
-bookCollapseSection: true
-weight: 6
+slug: "/docs/faq"
+sidebar_position: 6
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one

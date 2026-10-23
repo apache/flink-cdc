@@ -1,9 +1,9 @@
 ---
 title: "项目介绍"
-weight: 1
-type: docs
-aliases:
-  - /get-started/introduction/
+slug: "/docs/get-started/introduction"
+sidebar_position: 1
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -44,9 +44,11 @@ Flink CDC 有以下环境要求：
 * **JDK**：JDK 11 或更高版本（Flink CDC 从 3.6.0 版本开始基于 JDK 11 构建）
 * **Apache Flink**：Flink 1.20.x 或 Flink 2.2.x
 
-{{< hint info >}}
+:::info
+
 在运行 Flink CDC 之前，请确保已安装正确的 JDK 版本。您可以使用 `java -version` 命令验证 Java 版本。
-{{< /hint >}}
+
+:::
 
 ## 支持的连接器
 
@@ -54,26 +56,26 @@ Flink CDC 提供了丰富的连接器生态系统，用于与各种外部系统�
 
 | 连接器           | 类型                                                                                                                                                                     |
 |---------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| MySQL         | [Source Connector]({{< ref "docs/connectors/flink-sources/mysql-cdc" >}}) / [Pipeline Source Connector]({{< ref "docs/connectors/pipeline-connectors/mysql" >}})       |
-| Oracle        | [Source Connector]({{< ref "docs/connectors/flink-sources/oracle-cdc" >}}) / [Pipeline Source Connector]({{< ref "docs/connectors/pipeline-connectors/oracle" >}})     |
-| PostgreSQL    | [Source Connector]({{< ref "docs/connectors/flink-sources/postgres-cdc" >}}) / [Pipeline Source Connector]({{< ref "docs/connectors/pipeline-connectors/postgres" >}}) |
-| Db2           | [Source Connector]({{< ref "docs/connectors/flink-sources/db2-cdc" >}})                                                                                                |
-| MongoDB       | [Source Connector]({{< ref "docs/connectors/flink-sources/mongodb-cdc" >}})                                                                                            |
-| SQL Server    | [Source Connector]({{< ref "docs/connectors/flink-sources/sqlserver-cdc" >}})                                                                                          |
-| TiDB          | [Source Connector]({{< ref "docs/connectors/flink-sources/tidb-cdc" >}})                                                                                               |
-| Vitess        | [Source Connector]({{< ref "docs/connectors/flink-sources/vitess-cdc" >}})                                                                                             |
-| Apache Doris  | [Pipeline Sink Connector]({{< ref "docs/connectors/pipeline-connectors/doris" >}})                                                                                     |
-| Elasticsearch | [Pipeline Sink Connector]({{< ref "docs/connectors/pipeline-connectors/elasticsearch" >}})                                                                             |
-| Fluss         | [Pipeline Sink Connector]({{< ref "docs/connectors/pipeline-connectors/fluss" >}})                                                                                     |
-| Hudi          | [Pipeline Sink Connector]({{< ref "docs/connectors/pipeline-connectors/hudi" >}})                                                                                      |
-| Iceberg       | [Pipeline Sink Connector]({{< ref "docs/connectors/pipeline-connectors/iceberg" >}})                                                                                   |
-| Kafka         | [Pipeline Sink Connector]({{< ref "docs/connectors/pipeline-connectors/kafka" >}})                                                                                     |
-| MaxCompute    | [Pipeline Sink Connector]({{< ref "docs/connectors/pipeline-connectors/maxcompute" >}})                                                                                |
-| OceanBase     | [Pipeline Sink Connector]({{< ref "docs/connectors/pipeline-connectors/oceanbase" >}})                                                                                 |
-| Paimon        | [Pipeline Sink Connector]({{< ref "docs/connectors/pipeline-connectors/paimon" >}})                                                                                    |
-| StarRocks     | [Pipeline Sink Connector]({{< ref "docs/connectors/pipeline-connectors/starrocks" >}})                                                                                 |
+| MySQL         | [Source Connector](../connectors/flink-sources/mysql-cdc.md) / [Pipeline Source Connector](../connectors/pipeline-connectors/mysql.md)       |
+| Oracle        | [Source Connector](../connectors/flink-sources/oracle-cdc.md) / [Pipeline Source Connector](../connectors/pipeline-connectors/oracle.md)     |
+| PostgreSQL    | [Source Connector](../connectors/flink-sources/postgres-cdc.md) / [Pipeline Source Connector](../connectors/pipeline-connectors/postgres.md) |
+| Db2           | [Source Connector](../connectors/flink-sources/db2-cdc.md)                                                                                                |
+| MongoDB       | [Source Connector](../connectors/flink-sources/mongodb-cdc.md)                                                                                            |
+| SQL Server    | [Source Connector](../connectors/flink-sources/sqlserver-cdc.md)                                                                                          |
+| TiDB          | [Source Connector](../connectors/flink-sources/tidb-cdc.md)                                                                                               |
+| Vitess        | [Source Connector](../connectors/flink-sources/vitess-cdc.md)                                                                                             |
+| Apache Doris  | [Pipeline Sink Connector](../connectors/pipeline-connectors/doris.md)                                                                                     |
+| Elasticsearch | [Pipeline Sink Connector](../connectors/pipeline-connectors/elasticsearch.md)                                                                             |
+| Fluss         | [Pipeline Sink Connector](../connectors/pipeline-connectors/fluss.md)                                                                                     |
+| Hudi          | [Pipeline Sink Connector](../connectors/pipeline-connectors/hudi.md)                                                                                      |
+| Iceberg       | [Pipeline Sink Connector](../connectors/pipeline-connectors/iceberg.md)                                                                                   |
+| Kafka         | [Pipeline Sink Connector](../connectors/pipeline-connectors/kafka.md)                                                                                     |
+| MaxCompute    | [Pipeline Sink Connector](../connectors/pipeline-connectors/maxcompute.md)                                                                                |
+| OceanBase     | [Pipeline Sink Connector](../connectors/pipeline-connectors/oceanbase.md)                                                                                 |
+| Paimon        | [Pipeline Sink Connector](../connectors/pipeline-connectors/paimon.md)                                                                                    |
+| StarRocks     | [Pipeline Sink Connector](../connectors/pipeline-connectors/starrocks.md)                                                                                 |
 
-关于连接器下载链接，请访问 [Flink Source Connectors]({{< ref "docs/connectors/flink-sources/overview#supported-connectors" >}}) 和 [Pipeline Connectors]({{< ref "docs/connectors/pipeline-connectors/overview#supported-connectors" >}}) 页面。
+关于连接器下载链接，请访问 [Flink Source Connectors](../connectors/flink-sources/overview.md#支持的连接器) 和 [Pipeline Connectors](../connectors/pipeline-connectors/overview.md#supported-connectors) 页面。
 
 ## 如何使用 Flink CDC
 
@@ -104,8 +106,8 @@ pipeline:
   parallelism: 2
 ```
 
-通过使用 `flink-cdc.sh` 提交 YAML 文件，一个 Flink 作业将会被编译并部署到指定的 Flink 集群。 
-请参考 [核心概念]({{<ref "docs/core-concept/data-pipeline" >}}) 以获取 Pipeline 支持的所有功能的完整文档说明。
+通过使用 `flink-cdc.sh` 提交 YAML 文件，一个 Flink 作业将会被编译并部署到指定的 Flink 集群。
+请参考 [核心概念](../core-concept/data-pipeline.md) 以获取 Pipeline 支持的所有功能的完整文档说明。
 
 ## 编写你的第一个 Flink CDC Pipeline
 
@@ -117,35 +119,34 @@ pipeline:
 
 | 示例 | 版本 |
 |---------|---------|
-| MySQL to Apache Doris | [1.20.x]({{< ref "docs/get-started/quickstart-for-1.20/mysql-to-doris" >}}) / [2.2.x]({{< ref "docs/get-started/quickstart-for-2.2/mysql-to-doris" >}}) |
-| MySQL to StarRocks | [1.20.x]({{< ref "docs/get-started/quickstart-for-1.20/mysql-to-starrocks" >}}) / [2.2.x]({{< ref "docs/get-started/quickstart-for-2.2/mysql-to-starrocks" >}}) |
-| MySQL to Kafka | [1.20.x]({{< ref "docs/get-started/quickstart-for-1.20/mysql-to-kafka" >}}) / [2.2.x]({{< ref "docs/get-started/quickstart-for-2.2/mysql-to-kafka" >}}) |
-| PostgreSQL to Fluss | [1.20.x]({{< ref "docs/get-started/quickstart-for-1.20/postgres-to-fluss" >}}) / [2.2.x]({{< ref "docs/get-started/quickstart-for-2.2/postgres-to-fluss" >}}) |
+| MySQL to Apache Doris | [1.20.x](quickstart-for-1.20/mysql-to-doris.md) / [2.2.x](quickstart-for-2.2/mysql-to-doris.md) |
+| MySQL to StarRocks | [1.20.x](quickstart-for-1.20/mysql-to-starrocks.md) / [2.2.x](quickstart-for-2.2/mysql-to-starrocks.md) |
+| MySQL to Kafka | [1.20.x](quickstart-for-1.20/mysql-to-kafka.md) / [2.2.x](quickstart-for-2.2/mysql-to-kafka.md) |
+| PostgreSQL to Fluss | [1.20.x](quickstart-for-1.20/postgres-to-fluss.md) / [2.2.x](quickstart-for-2.2/postgres-to-fluss.md) |
 
 ### 理解核心概念
 
 熟悉我们在 Flink CDC 中引入的核心概念，并尝试构建更复杂的数据 Pipeline：
 
-- [Data Pipeline]({{< ref "docs/core-concept/data-pipeline" >}})
-- [Data Source]({{< ref "docs/core-concept/data-source" >}})
-- [Data Sink]({{< ref "docs/core-concept/data-sink" >}})
-- [Table ID]({{< ref "docs/core-concept/table-id" >}})
-- [Transform]({{< ref "docs/core-concept/transform" >}})
-- [Route]({{< ref "docs/core-concept/route" >}})
+- [Data Pipeline](../core-concept/data-pipeline.md)
+- [Data Source](../core-concept/data-source.md)
+- [Data Sink](../core-concept/data-sink.md)
+- [Table ID](../core-concept/table-id.md)
+- [Transform](../core-concept/transform.md)
+- [Route](../core-concept/route.md)
 
 ### 提交 Pipeline 到 Flink 集群
 
 了解如何将 Pipeline 提交到运行在不同部署模式下的 Flink 集群：
 
-- [standalone]({{< ref "docs/deployment/standalone" >}})
-- [Kubernetes]({{< ref "docs/deployment/kubernetes" >}})
-- [YARN]({{< ref "docs/deployment/yarn" >}})
+- [standalone](../deployment/standalone.md)
+- [Kubernetes](../deployment/kubernetes.md)
+- [YARN](../deployment/yarn.md)
 
 ## 开发与贡献
 
 如果您想要将 Flink CDC 连接到您定制化的外部系统，或者想要为框架本身做出贡献，以下这些部分可能会有所帮助：
 
-- [理解 Flink CDC API]({{< ref "docs/developer-guide/understand-flink-cdc-api" >}})，开发您自己的 Flink CDC 连接器。
-- 了解如何 [向 Flink CDC 提交贡献]({{< ref "docs/developer-guide/contribute-to-flink-cdc" >}})
-- 查看 Flink CDC 使用的[许可证]({{< ref "docs/developer-guide/licenses" >}})
-
+- [理解 Flink CDC API](../developer-guide/understand-flink-cdc-api.md)，开发您自己的 Flink CDC 连接器。
+- 了解如何 [向 Flink CDC 提交贡献](../developer-guide/contribute-to-flink-cdc.md)
+- 查看 Flink CDC 使用的[许可证](../developer-guide/licenses.md)

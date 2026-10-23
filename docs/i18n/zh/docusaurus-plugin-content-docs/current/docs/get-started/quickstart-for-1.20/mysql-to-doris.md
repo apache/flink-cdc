@@ -1,7 +1,9 @@
 ---
 title: "MySQL 同步到 Doris"
-weight: 1
-type: docs
+slug: "/docs/get-started/quickstart-for-1.20/mysql-to-doris"
+sidebar_position: 1
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -54,7 +56,7 @@ under the License.
 
 启动成功的话，可以在 [http://localhost:8081/](http://localhost:8081/)访问到 Flink Web UI，如下所示：
 
-{{< img src="/fig/mysql-doris-tutorial/flink-ui.png" alt="Flink UI" >}}
+<img src="@@BASE_URL@@fig/mysql-doris-tutorial/flink-ui.png" alt="Flink UI" class="doc-image">
 
 多次执行 `start-cluster.sh` 可以拉起多个 TaskManager。
 
@@ -169,7 +171,7 @@ macOS 由于内部实现容器的方式不同，在部署时宿主机直接修�
    [http://localhost:8030/](http://localhost:8030/)  
    默认的用户名为 `root`，默认密码为空。
 
-   {{< img src="/fig/mysql-doris-tutorial/doris-ui.png" alt="Doris UI" >}}
+   <img src="@@BASE_URL@@fig/mysql-doris-tutorial/doris-ui.png" alt="Doris UI" class="doc-image">
 
 2. 通过 Web UI 创建 `app_db` 数据库
 
@@ -177,12 +179,12 @@ macOS 由于内部实现容器的方式不同，在部署时宿主机直接修�
    create database app_db;
     ```
 
-   {{< img src="/fig/mysql-doris-tutorial/doris-create-table.png" alt="Doris create table" >}}
+   <img src="@@BASE_URL@@fig/mysql-doris-tutorial/doris-create-table.png" alt="Doris create table" class="doc-image">
 
 ## 通过 Flink CDC CLI 提交任务
-1. 下载下面列出的二进制压缩包，并解压得到目录 `flink-cdc-{{< param Version >}}`；
-   [flink-cdc-{{< param Version >}}-bin.tar.gz](https://www.apache.org/dyn/closer.lua/flink/flink-cdc-{{< param Version >}}/flink-cdc-{{< param Version >}}-bin.tar.gz)
-   flink-cdc-{{< param Version >}} 下会包含 `bin`、`lib`、`log`、`conf` 四个目录。
+1. 下载下面列出的二进制压缩包，并解压得到目录 `flink-cdc-@@VERSION@@`；
+   [flink-cdc-@@VERSION@@-bin.tar.gz](https://www.apache.org/dyn/closer.lua/flink/flink-cdc-@@VERSION@@/flink-cdc-@@VERSION@@-bin.tar.gz)
+   flink-cdc-@@VERSION@@ 下会包含 `bin`、`lib`、`log`、`conf` 四个目录。
 
 2. 下载下面列出的 connector 包，并且移动到 `lib` 目录下；
    **下载链接只对已发布的版本有效，SNAPSHOT 版本需要本地基于 master 或 release- 分支编译。**
@@ -240,11 +242,11 @@ sink 添加 `table.create.properties.replication_num` 参数是由于 Docker 镜
    ```
 在 Flink Web UI，可以看到一个名为 `Sync MySQL Database to Doris` 的任务正在运行。 
 
-{{< img src="/fig/mysql-doris-tutorial/mysql-to-doris.png" alt="MySQL-to-Doris" >}}
+<img src="@@BASE_URL@@fig/mysql-doris-tutorial/mysql-to-doris.png" alt="MySQL-to-Doris" class="doc-image">
 
 打开 Doris 的 Web UI，可以看到数据表已经被创建出来，数据能成功写入。 
 
-{{< img src="/fig/mysql-doris-tutorial/doris-display-data.png" alt="Doris display data" >}}
+<img src="@@BASE_URL@@fig/mysql-doris-tutorial/doris-display-data.png" alt="Doris display data" class="doc-image">
 
 ### 同步变更
 进入 MySQL 容器
@@ -279,7 +281,7 @@ sink 添加 `table.create.properties.replication_num` 参数是由于 Docker 镜
 
 每执行一步就刷新一次 Doris Web UI，可以看到 Doris 中显示的 orders 数据将实时更新，如下所示：
 
-{{< img src="/fig/mysql-doris-tutorial/doris-display-result.png" alt="Doris display result" >}}
+<img src="@@BASE_URL@@fig/mysql-doris-tutorial/doris-display-result.png" alt="Doris display result" class="doc-image">
 
 同样的，去修改 `shipments`, `products` 表，也能在 Doris 中实时看到同步变更的结果。
 
@@ -343,5 +345,3 @@ Flink CDC 提供了将源表的表结构/数据路由到其他表名的配置，
    ```shell
    ./bin/stop-cluster.sh
    ```
-
-{{< top >}}

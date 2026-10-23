@@ -1,9 +1,9 @@
 ---
 title: "理解 Flink CDC API"
-weight: 1
-type: docs
-aliases:
-  - /developer-guide/understand-flink-cdc-api
+slug: "/docs/developer-guide/understand-flink-cdc-api"
+sidebar_position: 1
+hide_title: true
+displayed_sidebar: docs
 ---
 
 <!--
@@ -81,7 +81,7 @@ under the License.
 新的 `DataChangeEvent` 前发送一个 `SchemaChangeEvent`。
 这种事件顺序确保框架在处理数据变更前已经了解模式定义。
 
-{{< img src="/fig/flow-of-events.png" alt="Flow of Events" >}}
+<img src="@@BASE_URL@@fig/flow-of-events.png" alt="Flow of Events" class="doc-image">
 
 ## 数据源（Data Source）
 

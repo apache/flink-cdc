@@ -1,9 +1,9 @@
 ---
 title: "Data Pipeline"
-weight: 1
-type: docs
-aliases:
-  - /core-concept/data-pipeline/
+slug: "/docs/core-concept/data-pipeline"
+sidebar_position: 1
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -30,16 +30,16 @@ under the License.
 # 参数
 一个 pipeline 包含着 Flink 的一组算子链。
 为了描述 Data Pipeline，我们需要定义以下部分：
-- [source]({{< ref "docs/core-concept/data-source" >}})
-- [sink]({{< ref "docs/core-concept/data-sink" >}})
+- [source](data-source.md)
+- [sink](data-sink.md)
 - [pipeline](#pipeline-配置)
 
 下面是 Data Pipeline 的一些可选配置：
-- [route]({{< ref "docs/core-concept/route" >}})
-- [transform]({{< ref "docs/core-concept/transform" >}})
+- [route](route.md)
+- [transform](transform.md)
 
 # 示例
-## 只包含必需部分 {#只包含必须部分}
+## 只包含必需部分
 我们可以使用以下 yaml 文件来定义一个简单的 Data Pipeline 来同步 MySQL app_db 数据库下的所有表到 Doris：
 
 ```yaml
@@ -110,7 +110,7 @@ under the License.
          classpath: com.example.functions.FormatFunctionClass
 ```
 
-# Pipeline 配置
+## Pipeline 配置
 下面是 Data Pipeline 级别支持的配置选项。
 请注意，虽然这些参数都是可选的，但至少需要指定其中一个。也就是说，`pipeline` 部分是必需的，不能为空。
 
@@ -120,8 +120,8 @@ under the License.
 | `parallelism`                              | pipeline 的全局并发度，默认值是 1。                                                                                                                                                                                                                                                                                                                                                                                                                                                              | optional          |
 | `local-time-zone`                          | 作业级别的本地时区。                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | optional          |
 | `execution.runtime-mode`                   | pipeline 的运行模式，包含 STREAMING 和 BATCH，默认值是 STREAMING。                                                                                                                                                                                                                                                                                                                                                                                                                             | optional          |
-| `route-mode`                               | [路由]({{< ref "docs/core-concept/route" >}}#路由模式)规则的匹配模式。可选值：`ALL_MATCH`（默认，应用所有匹配的规则）或 `FIRST_MATCH`（只应用第一个匹配的规则）。                                                                                                                                                                                                                                                                                                                              | optional          |
-| `schema.change.behavior`                   | 如何处理 [schema 变更]({{< ref "docs/core-concept/schema-evolution" >}})。可选值：[`exception`]({{< ref "docs/core-concept/schema-evolution" >}}#exception-mode)、[`evolve`]({{< ref "docs/core-concept/schema-evolution" >}}#evolve-mode)、[`try_evolve`]({{< ref "docs/core-concept/schema-evolution" >}}#tryevolve-mode)、[`lenient`]({{< ref "docs/core-concept/schema-evolution" >}}#lenient-mode)（默认值）或 [`ignore`]({{< ref "docs/core-concept/schema-evolution" >}}#ignore-mode)。 | optional          |
+| `route-mode`                               | [路由](route.md#路由模式)规则的匹配模式。可选值：`ALL_MATCH`（默认，应用所有匹配的规则）或 `FIRST_MATCH`（只应用第一个匹配的规则）。                                                                                                                                                                                                                                                                                                                              | optional          |
+| `schema.change.behavior`                   | 如何处理 [schema 变更](schema-evolution.md)。可选值：[`exception`](schema-evolution.md#exception-模式)、[`evolve`](schema-evolution.md#evolve-模式)、[`try_evolve`](schema-evolution.md#tryevolve-模式)、[`lenient`](schema-evolution.md#lenient-模式)（默认值）或 [`ignore`](schema-evolution.md#ignore-模式)。 | optional          |
 | `schema.operator.uid`                      | Schema 算子的唯一 ID。此 ID 用于算子间通信，必须在所有算子中保持唯一。**已废弃**：请使用 `operator.uid.prefix` 代替。                                                                                                                                                                                                                                                                                                                                                                          | optional          |
 | `schema-operator.rpc-timeout`              | SchemaOperator 等待下游 SchemaChangeEvent 应用完成的超时时间，默认值是 3 分钟。                                                                                                                                                                                                                                                                                                                                                                                                                | optional          |
 | `operator.uid.prefix`                      | Pipeline 中算子 UID 的前缀。如果不设置，Flink 会为每个算子生成唯一的 UID。建议设置这个参数以提供稳定和可识别的算子 ID，这有助于有状态升级、问题排查和在 Flink UI 上的诊断。                                                                                                                                                                                                                                                                                                                   | optional          |

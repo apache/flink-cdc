@@ -1,9 +1,9 @@
 ---
 title: "Standalone"
-weight: 1
-type: docs
-aliases:
-  - /deployment/standalone
+slug: "/docs/deployment/standalone"
+sidebar_position: 1
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -32,7 +32,7 @@ You will also run an example Flink CDC job and view it in the web UI.
 ## Preparation
 
 Flink runs on all UNIX-like environments, i.e. Linux, Mac OS X, and Cygwin (for Windows).  
-You can refer [overview]({{< ref "docs/connectors/pipeline-connectors/overview" >}}) to check supported versions and download [the binary release](https://flink.apache.org/downloads/) of Flink,
+You can refer [overview](../connectors/pipeline-connectors/overview.md) to check supported versions and download [the binary release](https://flink.apache.org/downloads/) of Flink,
 then extract the archive:
 
 ```bash
@@ -111,8 +111,8 @@ pipeline:
 ```
 
 You need to modify the configuration file according to your needs, refer to connectors more information.
-- [MySQL pipeline connector]({{< ref "docs/connectors/pipeline-connectors/mysql.md" >}})
-- [Apache Doris pipeline connector]({{< ref "docs/connectors/pipeline-connectors/doris.md" >}})
+- [MySQL pipeline connector](../connectors/pipeline-connectors/mysql.md)
+- [Apache Doris pipeline connector](../connectors/pipeline-connectors/doris.md)
 
 Finally, submit job to Flink Standalone cluster using CLI.
 
@@ -129,4 +129,4 @@ Job ID: ae30f4580f1918bebf16752d4963dc54
 Job Description: Sync MySQL Database to Doris
 ```
 
-Then you can find a job named `Sync MySQL Database to Doris` running through Flink Web UI. 
+Then you can find a job named `Sync MySQL Database to Doris` running through Flink Web UI.

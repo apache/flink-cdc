@@ -1,9 +1,9 @@
 ---
 title: "MongoDB Tutorial"
-weight: 1
-type: docs
-aliases:
-- /connectors/flink-sources/tutorials/mongodb-tutorial.html
+slug: "/docs/connectors/flink-sources/tutorials/mongodb-tutorial"
+sidebar_position: 1
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -240,5 +240,3 @@ db.orders.deleteOne(
   { order_id : 104 }
 );
 ```
-
-{{< top >}}

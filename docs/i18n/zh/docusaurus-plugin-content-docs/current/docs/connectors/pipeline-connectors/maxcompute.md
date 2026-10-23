@@ -1,9 +1,9 @@
 ---
 title: "MaxCompute"
-weight: 7
-type: docs
-aliases:
-  - /connectors/maxcompute
+slug: "/docs/connectors/pipeline-connectors/maxcompute"
+sidebar_position: 7
+hide_title: true
+displayed_sidebar: docs
 ---
 
 <!--
@@ -324,5 +324,3 @@ Database。（其他 Datasource 同理，连接器会忽略 TableId.namespace �
     </tbody>
 </table>
 </div>
-
-{{< top >}}

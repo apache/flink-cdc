@@ -1,8 +1,9 @@
 ---
 title: "Core Concept"
-bold: true
-bookCollapseSection: true
-weight: 2
+slug: "/docs/core-concept"
+sidebar_position: 2
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one

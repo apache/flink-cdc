@@ -1,9 +1,9 @@
 ---
 title: "Kafka"
-weight: 4
-type: docs
-aliases:
-- /connectors/pipeline-connectors/kafka
+slug: "/docs/connectors/pipeline-connectors/kafka"
+sidebar_position: 4
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -402,5 +402,3 @@ Data Type Mapping
     </tbody>
 </table>
 </div>
-
-{{< top >}}

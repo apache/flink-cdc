@@ -1,9 +1,9 @@
 ---
 title: "使用 Flink CDC 构建 Streaming ETL"
-weight: 999
-type: docs
-aliases:
-- /connectors/flink-sources/tutorials/mysql-postgres-tutorial.html
+slug: "/docs/connectors/flink-sources/tutorials/build-streaming-etl-tutorial"
+sidebar_position: 999
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -32,7 +32,7 @@ under the License.
 对于订单表，为了方便进行分析，我们希望让它关联上其对应的商品和物流信息，构成一张宽表，并且实时把它写到 ElasticSearch 中。
 
 接下来的内容将介绍如何使用 Flink MySQL/Postgres CDC 来实现这个需求，系统的整体架构如下图所示：
-{{< img src="/fig/mysql-postgres-tutorial/flink-cdc-streaming-etl.png" width="700px" alt="Flink CDC Streaming ETL" >}}
+<img src="@@BASE_URL@@fig/mysql-postgres-tutorial/flink-cdc-streaming-etl.png" alt="Flink CDC Streaming ETL" width="700px" class="doc-image">
 
 ## 准备阶段
 准备一台已经安装了 Docker 的 Linux 或者 macOS 电脑。
@@ -182,7 +182,7 @@ docker-compose up -d
     ```
    启动成功的话，可以在 [http://localhost:8081/](http://localhost:8081/) 访问到 Flink Web UI，如下所示：
 
-   {{< img src="/fig/mysql-postgres-tutorial/flink-ui.png" width="700px" alt="Flink UI" >}}
+   <img src="@@BASE_URL@@fig/mysql-postgres-tutorial/flink-ui.png" alt="Flink UI" width="700px" class="doc-image">
 
 3. 使用下面的命令启动 Flink SQL CLI
     ```shell
@@ -190,7 +190,7 @@ docker-compose up -d
     ```
    启动成功后，可以看到如下的页面：
 
-   {{< img src="/fig/mysql-postgres-tutorial/flink-sql-client.png" alt="Flink SQL Client" >}}
+   <img src="@@BASE_URL@@fig/mysql-postgres-tutorial/flink-sql-client.png" alt="Flink SQL Client" class="doc-image">
 
 ## 在 Flink SQL CLI 中使用 Flink DDL 创建表
 首先，开启 checkpoint，每隔 3 秒做一次 checkpoint
@@ -293,11 +293,11 @@ Flink SQL> INSERT INTO enriched_orders
 
 首先访问  [http://localhost:5601/app/kibana#/management/kibana/index_pattern](http://localhost:5601/app/kibana#/management/kibana/index_pattern) 创建 index pattern `enriched_orders`。
 
-{{< img src="/fig/mysql-postgres-tutorial/kibana-create-index-pattern.png" width="700px" alt="Create Index Pattern" >}}
+<img src="@@BASE_URL@@fig/mysql-postgres-tutorial/kibana-create-index-pattern.png" alt="Create Index Pattern" width="700px" class="doc-image">
 
 然后就可以在 [http://localhost:5601/app/kibana#/discover](http://localhost:5601/app/kibana#/discover) 看到写入的数据了。
 
-{{< img src="/fig/mysql-postgres-tutorial/kibana-detailed-orders.png" width="700px" alt="Find enriched Orders" >}}
+<img src="@@BASE_URL@@fig/mysql-postgres-tutorial/kibana-detailed-orders.png" alt="Find enriched Orders" width="700px" class="doc-image">
 
 接下来，修改 MySQL 和 Postgres 数据库中表的数据，Kibana 中显示的订单数据也将实时更新：
 1. 在 MySQL 的 `orders` 表中插入一条数据
@@ -328,7 +328,7 @@ Flink SQL> INSERT INTO enriched_orders
    DELETE FROM orders WHERE order_id = 10004;
    ```
    每执行一步就刷新一次 Kibana，可以看到 Kibana 中显示的订单数据将实时更新，如下所示：
-   {{< img src="/fig/mysql-postgres-tutorial/kibana-detailed-orders-changes.gif" width="700px" alt="Enriched Orders Changes" >}}
+   <img src="@@BASE_URL@@fig/mysql-postgres-tutorial/kibana-detailed-orders-changes.gif" alt="Enriched Orders Changes" width="700px" class="doc-image">
 
 ## 环境清理
 本教程结束后，在 `docker-compose.yml` 文件所在的目录下执行如下命令停止所有容器：
@@ -339,5 +339,3 @@ docker-compose down
 ```shell
 ./bin/stop-cluster.sh
 ```
-
-{{< top >}}

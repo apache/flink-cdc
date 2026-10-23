@@ -1,9 +1,9 @@
 ---
 title: "YARN"
-weight: 2
-type: docs
-aliases:
-  - /deployment/yarn
+slug: "/docs/deployment/yarn"
+sidebar_position: 2
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -43,7 +43,7 @@ This *Getting Started* section assumes a functional YARN environment, starting f
 export HADOOP_CLASSPATH=`hadoop classpath`
 ```
 Flink runs on all UNIX-like environments, i.e. Linux, Mac OS X, and Cygwin (for Windows).  
-You can refer [overview]({{< ref "docs/connectors/pipeline-connectors/overview" >}}) to check supported versions and download [the binary release](https://flink.apache.org/downloads/) of Flink,
+You can refer [overview](../connectors/pipeline-connectors/overview.md) to check supported versions and download [the binary release](https://flink.apache.org/downloads/) of Flink,
 then extract the archive:
 
 ```bash
@@ -175,4 +175,3 @@ Job ID: application_1728995081590_1254
 Job Description: submit job successful
 ```
 You can find a application_id `application_1728995081590_1254` running through YARN Web UI.
-

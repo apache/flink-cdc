@@ -1,9 +1,9 @@
 ---
 title: "Paimon"
-weight: 3
-type: docs
-aliases:
-- /connectors/pipeline-connectors/paimon
+slug: "/docs/connectors/pipeline-connectors/paimon"
+sidebar_position: 3
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -233,5 +233,3 @@ Data Type Mapping
     </tbody>
 </table>
 </div>
-
-{{< top >}}

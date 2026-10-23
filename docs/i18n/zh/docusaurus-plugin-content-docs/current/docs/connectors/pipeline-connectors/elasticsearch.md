@@ -1,9 +1,9 @@
 ---
 title: "Elasticsearch"
-weight: 7
-type: docs
-aliases:
-- /connectors/pipeline-connectors/elasticsearch
+slug: "/docs/connectors/pipeline-connectors/elasticsearch"
+sidebar_position: 7
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -285,5 +285,3 @@ Elasticsearch 将文档存储在 JSON 字符串中，数据类型之间的映射
     </tbody>
 </table>
 </div>
-
-{{< top >}}

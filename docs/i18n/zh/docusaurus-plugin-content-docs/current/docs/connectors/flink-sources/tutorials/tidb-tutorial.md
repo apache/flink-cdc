@@ -1,9 +1,9 @@
 ---
 title: "TiDB 教程"
-weight: 7
-type: docs
-aliases:
-- /connectors/flink-sources/tutorials/tidb-tutorial.html
+slug: "/docs/connectors/flink-sources/tutorials/tidb-tutorial"
+sidebar_position: 7
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -24,7 +24,7 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-# 演示：TiDB CDC 导入 Elasticsearch {#演示-tidb-cdc-导入-elasticsearch}
+# 演示：TiDB CDC 导入 Elasticsearch
 
 **首先我们得通过 docker 来启动 TiDB 集群。**
 
@@ -257,5 +257,3 @@ UPDATE orders SET order_status = true WHERE order_id = 10004;
 
 DELETE FROM orders WHERE order_id = 10004;
 ```
-
-{{< top >}}

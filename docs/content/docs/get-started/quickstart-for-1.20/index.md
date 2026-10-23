@@ -1,7 +1,9 @@
 ---
 title: "Quickstart for Flink 1.20"
-bookCollapseSection: true
-weight: 2
+slug: "/docs/get-started/quickstart-for-1.20"
+sidebar_position: 2
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one

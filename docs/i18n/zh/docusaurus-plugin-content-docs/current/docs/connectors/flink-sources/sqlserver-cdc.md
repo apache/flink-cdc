@@ -1,9 +1,9 @@
 ---
 title: "SQL Server"
-weight: 4
-type: docs
-aliases:
-- /connectors/flink-sources/sqlserver-cdc
+slug: "/docs/connectors/flink-sources/sqlserver-cdc"
+sidebar_position: 4
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -24,7 +24,7 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-# SQL Server CDC 连接器 {#sqlserver-cdc-连接器}
+# SQL Server CDC 连接器
 
 SQL Server CDC 连接器允许从 SQL Server 数据库读取快照数据和增量数据。本文描述了如何设置 SQL Server CDC 连接器来对 SQL Server 数据库运行 SQL 查询。
 
@@ -35,7 +35,13 @@ SQL Server CDC 连接器允许从 SQL Server 数据库读取快照数据和增�
 
 ### Maven dependency
 
-{{< artifact flink-connector-sqlserver-cdc >}}
+```xml
+<dependency>
+    <groupId>org.apache.flink</groupId>
+    <artifactId>flink-connector-sqlserver-cdc</artifactId>
+    <version>@@VERSION@@</version>
+</dependency>
+```
 
 ### SQL Client JAR
 
@@ -45,7 +51,7 @@ SQL Server CDC 连接器允许从 SQL Server 数据库读取快照数据和增�
 
 **注意：** 参考 [flink-sql-connector-sqlserver-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-sqlserver-cdc) 当前已发布的所有版本都可以在 Maven 中央仓库获取。
 
-设置 SQL Server 数据库 {#设置-sqlserver-数据库}
+设置 SQL Server 数据库
 ----------------
 SQL Server 管理员必须在你想要捕获的源表上启用变更数据捕获（CDC）。数据库必须已经启用了 CDC。要在表上启用 CDC，SQL Server 管理员需要为该表运行存储过程 ```sys.sp_cdc_enable_table```。
 
@@ -79,7 +85,7 @@ GO
 ```
 该查询会针对数据库中已启用 CDC 且包含调用者有权访问的变更数据的每个表返回配置信息。如果结果为空，请验证用户是否有权访问捕获实例和 CDC 表。
 
-如何创建 SQL Server CDC 表 {#如何创建-sqlserver-cdc-表}
+如何创建 SQL Server CDC 表
 ----------------
 
 SqlServer CDC 表可以定义如下：
@@ -506,7 +512,7 @@ public class SqlServerIncrementalSourceExample {
     <thead>
       <tr>
         <th class="text-left">SQL Server type<a href="https://docs.microsoft.com/en-us/sql/t-sql/data-types/data-types-transact-sql"></a></th>
-        <th class="text-left">Flink SQL type<a href="{% link dev/table/types.md %}"></a></th>
+        <th class="text-left">Flink SQL type</th>
       </tr>
     </thead>
     <tbody>
@@ -592,5 +598,3 @@ public class SqlServerIncrementalSourceExample {
     </tbody>
 </table>
 </div>
-
-{{< top >}}

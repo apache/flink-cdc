@@ -1,9 +1,9 @@
 ---
 title: "Kubernetes"
-weight: 3
-type: docs
-aliases:
-  - /deployment/kubernetes
+slug: "/docs/deployment/kubernetes"
+sidebar_position: 3
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -48,7 +48,7 @@ If you have problems setting up a Kubernetes cluster, please take a look at [how
 ## Session Mode
 
 Flink runs on all UNIX-like environments, i.e. Linux, Mac OS X, and Cygwin (for Windows).  
-You can refer [overview]({{< ref "docs/connectors/pipeline-connectors/overview" >}}) to check supported versions and download [the binary release](https://flink.apache.org/downloads/) of Flink,
+You can refer [overview](../connectors/pipeline-connectors/overview.md) to check supported versions and download [the binary release](https://flink.apache.org/downloads/) of Flink,
 then extract the archive:
 
 ```bash
@@ -79,10 +79,12 @@ org.apache.flink.kubernetes.KubernetesClusterDescriptor      [] - Please note th
 org.apache.flink.kubernetes.KubernetesClusterDescriptor      [] - Create flink session cluster my-first-flink-cluster successfully, JobManager Web Interface: http://my-first-flink-cluster-rest.default:8081
 ```
 
-{{< hint info >}}  
+:::info
+
 please refer to [Flink documentation](https://nightlies.apache.org/flink/flink-docs-master/docs/deployment/resource-providers/native_kubernetes/#accessing-flinks-web-ui) to expose Flink’s Web UI and REST endpoint.   
 You should ensure that REST endpoint can be accessed by the node of your submission.  
-{{< /hint >}}  
+
+:::
 Then, you need to add these two config to your flink-conf.yaml:
 
 ```yaml
@@ -134,8 +136,8 @@ pipeline:
 ```
 
 Modify the configuration file as needed. For more information, refer to the connector documentation.
-- [MySQL pipeline connector]({{< ref "docs/connectors/pipeline-connectors/mysql.md" >}})
-- [Apache Doris pipeline connector]({{< ref "docs/connectors/pipeline-connectors/doris.md" >}})       
+- [MySQL pipeline connector](../connectors/pipeline-connectors/mysql.md)
+- [Apache Doris pipeline connector](../connectors/pipeline-connectors/doris.md)
 
 Finally, submit job to Flink Standalone cluster using CLI.
 
@@ -162,9 +164,9 @@ The doc assumes a [Flink Kubernetes Operator](https://nightlies.apache.org/flink
    Assume that your docker image build directory is `/opt/docker/flink-cdc`, The structure of this directory is as follow:
     ```text
     /opt/docker/flink-cdc
-        ├── flink-cdc-{{< param Version >}}-bin.tar.gz
-        ├── flink-cdc-pipeline-connector-doris-{{< param Version >}}.jar
-        ├── flink-cdc-pipeline-connector-mysql-{{< param Version >}}.jar
+        ├── flink-cdc-@@VERSION@@-bin.tar.gz
+        ├── flink-cdc-pipeline-connector-doris-@@VERSION@@.jar
+        ├── flink-cdc-pipeline-connector-mysql-@@VERSION@@.jar
         ├── mysql-connector-java-8.0.27.jar
         └── ...
     ```
@@ -173,23 +175,23 @@ The doc assumes a [Flink Kubernetes Operator](https://nightlies.apache.org/flink
     FROM flink:1.18.0-java8
     ADD *.jar $FLINK_HOME/lib/
     ADD flink-cdc*.tar.gz $FLINK_HOME/
-    RUN mv $FLINK_HOME/flink-cdc-{{< param Version >}}/lib/flink-cdc-dist-{{< param Version >}}.jar $FLINK_HOME/lib/
+    RUN mv $FLINK_HOME/flink-cdc-@@VERSION@@/lib/flink-cdc-dist-@@VERSION@@.jar $FLINK_HOME/lib/
     ```
    Finally, The structure is as follow:
     ```text
     /opt/docker/flink-cdc
         ├── Dockerfile
-        ├── flink-cdc-{{< param Version >}}-bin.tar.gz
-        ├── flink-cdc-pipeline-connector-doris-{{< param Version >}}.jar
-        ├── flink-cdc-pipeline-connector-mysql-{{< param Version >}}.jar
+        ├── flink-cdc-@@VERSION@@-bin.tar.gz
+        ├── flink-cdc-pipeline-connector-doris-@@VERSION@@.jar
+        ├── flink-cdc-pipeline-connector-mysql-@@VERSION@@.jar
         ├── mysql-connector-java-8.0.27.jar
         └── ...
     ```
 3. Build the custom Docker image then push.
     ```bash
-   docker build -t flink-cdc-pipeline:{{< param Version >}} .
+   docker build -t flink-cdc-pipeline:@@VERSION@@ .
    
-   docker push flink-cdc-pipeline:{{< param Version >}}
+   docker push flink-cdc-pipeline:@@VERSION@@
    ```
 
 ### Create a ConfigMap for mounting Flink CDC configuration files
@@ -240,14 +242,14 @@ spec:
     state.checkpoints.dir: 'file:///tmp/checkpoints'
     state.savepoints.dir: 'file:///tmp/savepoints'
   flinkVersion: v1_18
-  image: 'flink-cdc-pipeline:{{< param Version >}}'
+  image: 'flink-cdc-pipeline:@@VERSION@@'
   imagePullPolicy: Always
   job:
     args:
       - '--use-mini-cluster'
-      - /opt/flink/flink-cdc-{{< param Version >}}/conf/mysql-to-doris.yaml
+      - /opt/flink/flink-cdc-@@VERSION@@/conf/mysql-to-doris.yaml
     entryClass: org.apache.flink.cdc.cli.CliFrontend
-    jarURI: 'local:///opt/flink/lib/flink-cdc-dist-{{< param Version >}}.jar'
+    jarURI: 'local:///opt/flink/lib/flink-cdc-dist-@@VERSION@@.jar'
     parallelism: 1
     state: running
     upgradeMode: savepoint
@@ -264,7 +266,7 @@ spec:
         # don't modify this name
         - name: flink-main-container
           volumeMounts:
-            - mountPath: /opt/flink/flink-cdc-{{< param Version >}}/conf
+            - mountPath: /opt/flink/flink-cdc-@@VERSION@@/conf
               name: flink-cdc-pipeline-config
       volumes:
         - configMap:
@@ -277,10 +279,12 @@ spec:
       cpu: 1
       memory: 1024m
 ```
-{{< hint info >}}  
+:::info
+
 1. Due to Flink's class loader, the parameter of `classloader.resolve-order` must be `parent-first`.
 2. Flink CDC submits a job to a remote Flink cluster by default, you should start a Standalone Flink cluster in the pod by `--use-mini-cluster` in Operator mode.  
-{{< /hint >}}
+
+:::
 
 ### Submit a Flink CDC Job
 After the ConfigMap and FlinkDeployment YAML are created, you can submit the Flink CDC job to the Operator through kubectl like:
@@ -294,6 +298,8 @@ flinkdeployment.flink.apache.org/flink-cdc-pipeline-job created
 ```
 If you want to trace the logs or expose the Flink Web UI, please refer to: [Flink Kubernetes Operator documentation](https://nightlies.apache.org/flink/flink-kubernetes-operator-docs-main/docs/concepts/overview/).
 
-{{< hint info >}}  
+:::info
+
 Please note that submitting with **native application mode** is not supported for now.  
-{{< /hint >}}
+
+:::

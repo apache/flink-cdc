@@ -1,9 +1,9 @@
 ---
 title: "StarRocks"
-weight: 6
-type: docs
-aliases:
-- /connectors/pipeline-connectors/starrocks
+slug: "/docs/connectors/pipeline-connectors/starrocks"
+sidebar_position: 6
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -359,5 +359,3 @@ pipeline:
     </tbody>
 </table>
 </div>
-
-{{< top >}}

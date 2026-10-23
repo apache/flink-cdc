@@ -1,7 +1,9 @@
 ---
-title: Pipeline Connectors
-bookCollapseSection: true
-weight: 1
+title: "Pipeline Connectors"
+slug: "/docs/connectors/pipeline-connectors"
+sidebar_position: 1
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one

@@ -1,9 +1,9 @@
 ---
 title: "Schema Evolution"
-weight: 7
-type: docs
-aliases:
-  - /core-concept/schema-evolution/
+slug: "/docs/core-concept/schema-evolution"
+sidebar_position: 7
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one

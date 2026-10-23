@@ -1,9 +1,9 @@
 ---
 title: "Doris"
-weight: 5
-type: docs
-aliases:
-- /connectors/pipeline-connectors/doris
+slug: "/docs/connectors/pipeline-connectors/doris"
+sidebar_position: 5
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -376,5 +376,3 @@ pipeline:
     </tbody>
 </table>
 </div>
-
-{{< top >}}

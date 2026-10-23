@@ -1,9 +1,9 @@
 ---
 title: "SQL Server"
-weight: 2
-type: docs
-aliases:
-- /connectors/pipeline-connectors/sqlserver
+slug: "/docs/connectors/pipeline-connectors/sqlserver"
+sidebar_position: 2
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -473,5 +473,3 @@ pipeline:
 ### 单数据库
 
 `tables` 中的所有条目必须属于同一个数据库。数据库只支持单个固定库名，schema 和 table 支持正则表达式匹配多个。
-
-{{< top >}}

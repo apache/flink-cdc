@@ -1,9 +1,9 @@
 ---
 title: "向 Flink CDC 提交贡献"
-weight: 2
-type: docs
-aliases:
-  - /developer-guide/contribute-to-flink-cdc
+slug: "/docs/developer-guide/contribute-to-flink-cdc"
+sidebar_position: 2
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -36,13 +36,13 @@ Flink CDC 社区的贡献不仅限于为项目贡献代码，下面列举了一�
 | 贡献方式  | 更多信息                                                                                                                                                                            |
 |:------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | 提交 BUG | 为了提交问题，您需要首先在 [Flink jira](https://issues.apache.org/jira/projects/FLINK/issues) 建立对应的 issue，并在 `Component/s` 选择 `Flink CDC`。然后在问题描述中详细描述遇到的问题的信息，如果可能的话，最好提供一下能够复现问题的操作步骤。         |
-| 贡献代码  | 请阅读 <a href="#code-contribution-guide">贡献代码指导</a>                                                                                                                                    |
-| 代码评审  | 请阅读 <a href="#code-review-guide">代码评审指导</a>                                                                                                                                          |
+| 贡献代码  | 请阅读 <a href="#贡献代码指导">贡献代码指导</a>                                                                                                                                    |
+| 代码评审  | 请阅读 <a href="#代码评审指导">代码评审指导</a>                                                                                                                                          |
 | 用户支持  | 通过 [Flink 用户邮件列表](https://flink.apache.org/what-is-flink/community/#mailing-lists) 来帮助回复用户问题，在 [Flink jira](https://issues.apache.org/jira/projects/FLINK/issues) 可以查询到最新的已知问题。 |
 
 如果还有其他问题，可以通过 Flink Dev 邮件列表寻求帮助。
 
-<h2 id="code-contribution-guide">贡献代码指导</h2>
+## 贡献代码指导
 
 Flink CDC 项目通过众多贡献者的代码贡献来维护，改进和拓展，欢迎各种形式的社区贡献。
 
@@ -59,7 +59,7 @@ Flink CDC 使用 JDK 11 作为基础版本，请确保您的开发环境已经�
 4. 找到一个开发者帮忙评审代码，评审前请确保 CI 通过。
 5. Flink committer 确认代码贡献满足全部要求后，代码会被合并到代码仓库。
 
-<h2 id="code-review-guide">代码评审指导</h2>
+## 代码评审指导
 
 每一次的代码评审需要检查如下一些方面的内容。
 

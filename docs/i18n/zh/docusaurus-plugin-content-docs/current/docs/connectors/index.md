@@ -1,8 +1,9 @@
 ---
-title: 连接器
-bold: true
-bookCollapseSection: true
-weight: 3
+title: "连接器"
+slug: "/docs/connectors"
+sidebar_position: 3
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one

@@ -1,7 +1,9 @@
 ---
 title: "Postgres 同步到 Fluss"
-weight: 5
-type: docs
+slug: "/docs/get-started/quickstart-for-1.20/postgres-to-fluss"
+sidebar_position: 5
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -193,9 +195,9 @@ under the License.
     ```
 
 ## 通过 Flink CDC CLI 提交任务
-1. 下载下面列出的二进制压缩包，并解压得到目录 `flink-cdc-{{< param Version >}}`；
-   [flink-cdc-{{< param Version >}}-bin.tar.gz](https://www.apache.org/dyn/closer.lua/flink/flink-cdc-{{< param Version >}}/flink-cdc-{{< param Version >}}-bin.tar.gz)
-   flink-cdc-{{< param Version >}} 下会包含 `bin`、`lib`、`log`、`conf` 四个目录。
+1. 下载下面列出的二进制压缩包，并解压得到目录 `flink-cdc-@@VERSION@@`；
+   [flink-cdc-@@VERSION@@-bin.tar.gz](https://www.apache.org/dyn/closer.lua/flink/flink-cdc-@@VERSION@@/flink-cdc-@@VERSION@@-bin.tar.gz)
+   flink-cdc-@@VERSION@@ 下会包含 `bin`、`lib`、`log`、`conf` 四个目录。
 
 2. 下载下面列出的 connector 包，并且移动到 `lib` 目录下；
    **下载链接只对已发布的版本有效，SNAPSHOT 版本需要本地基于 master 或 release- 分支编译。**
@@ -400,5 +402,3 @@ PostgreSQL 的表结构变更是**数据驱动**的 — DDL 变更不会立即�
    ```shell
    ./bin/stop-cluster.sh
    ```
-
-{{< top >}}

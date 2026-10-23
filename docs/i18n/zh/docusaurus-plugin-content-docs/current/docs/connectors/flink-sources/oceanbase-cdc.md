@@ -1,9 +1,9 @@
 ---
 title: "OceanBase"
-weight: 9
-type: docs
-aliases:
-- /connectors/flink-sources/oceanbase-cdc
+slug: "/docs/connectors/flink-sources/oceanbase-cdc"
+sidebar_position: 9
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -104,7 +104,13 @@ OceanBase CDC 源端读取方案：
 
 ### Maven dependency
 
-{{< artifact flink-connector-oceanbase-cdc >}}
+```xml
+<dependency>
+    <groupId>org.apache.flink</groupId>
+    <artifactId>flink-connector-oceanbase-cdc</artifactId>
+    <version>@@VERSION@@</version>
+</dependency>
+```
 
 ### SQL Client JAR
 
@@ -260,7 +266,7 @@ Flink SQL> SELECT * FROM orders;
 （3）在快照读取之前，Source 不需要数据库锁权限。
               如果希望 Source 并行运行，则每个并行 Readers 都应该具有唯一的 Server id，所以
               Server id 必须是类似 `5400-6400` 的范围，并且该范围必须大于并行度。
-              请查阅 <a href="./mysql-cdc.md#增量快照读取">增量快照读取</a> 章节了解更多详细信息。
+              请查阅 <a href="../mysql-cdc/#增量快照读取">增量快照读取</a> 章节了解更多详细信息。
           </td>
     </tr>
     <tr>
@@ -285,7 +291,7 @@ Flink SQL> SELECT * FROM orders;
           <td>表快照的分片键，在读取表的快照时，被捕获的表会按分片键拆分为多个分片。  
               默认情况下，分片键是主键的第一列。可以使用非主键列作为分片键，但这可能会导致查询性能下降。  
               <br>  
-              <b>警告：</b> 使用非主键列作为分片键可能会导致数据不一致。请参阅 <a href="./mysql-cdc.md#警告">警告</a> 章节了解详细信息。  
+              <b>警告：</b> 使用非主键列作为分片键可能会导致数据不一致。请参阅 <a href="../mysql-cdc/#警告">警告</a> 章节了解详细信息。
           </td>
     </tr>
     <tr>
@@ -295,7 +301,7 @@ Flink SQL> SELECT * FROM orders;
       <td>String</td>
       <td> OceanBase CDC 消费者可选的启动模式，
          合法的模式为 "initial"，"earliest-offset"，"latest-offset"，"specific-offset"，"timestamp" 和 "snapshot"。
-           请查阅 <a href="./mysql-cdc.md#启动模式">启动模式</a> 章节了解更多详细信息。</td>
+           请查阅 <a href="../mysql-cdc/#启动模式">启动模式</a> 章节了解更多详细信息。</td>
     </tr>
     <tr>
       <td>scan.startup.specific-offset.file</td>
@@ -618,7 +624,7 @@ CREATE TABLE products
     <thead>
       <tr>
         <th class="text-left" style="width:30%;">OceanBase type<a href="https://www.oceanbase.com/docs/common-oceanbase-database-cn-1000000003383166"></a></th>
-        <th class="text-left" style="width:10%;">Flink SQL type<a href="{% link dev/table/types.md %}"></a></th>
+        <th class="text-left" style="width:10%;">Flink SQL type</th>
         <th class="text-left" style="width:60%;">NOTE</th>
       </tr>
     </thead>
@@ -918,5 +924,3 @@ CREATE TABLE products
     </tbody>
 </table>
 </div>
-
-{{< top >}}

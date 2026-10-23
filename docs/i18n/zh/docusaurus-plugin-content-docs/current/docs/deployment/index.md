@@ -1,8 +1,9 @@
 ---
-title: 部署模式
-bold: true
-bookCollapseSection: true
-weight: 4
+title: "部署模式"
+slug: "/docs/deployment"
+sidebar_position: 4
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one

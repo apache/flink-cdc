@@ -1,9 +1,9 @@
 ---
 title: "Postgres"
-weight: 5
-type: docs
-aliases:
-- /connectors/flink-sources/postgres-cdc
+slug: "/docs/connectors/flink-sources/postgres-cdc"
+sidebar_position: 5
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -34,7 +34,13 @@ To set up the Postgres CDC connector, the following table provides dependency in
 
 ### Maven dependency
 
-{{< artifact flink-connector-postgres-cdc >}}
+```xml
+<dependency>
+    <groupId>org.apache.flink</groupId>
+    <artifactId>flink-connector-postgres-cdc</artifactId>
+    <version>@@VERSION@@</version>
+</dependency>
+```
 
 ### SQL Client JAR
 
@@ -751,7 +757,7 @@ Since the order of processing these records cannot be guaranteed, the final valu
     <thead>
       <tr>
         <th class="text-left">PostgreSQL type<a href="https://www.postgresql.org/docs/12/datatype.html"></a></th>
-        <th class="text-left">Flink SQL type<a href="{% link dev/table/types.md %}"></a></th>
+        <th class="text-left">Flink SQL type</th>
       </tr>
     </thead>
     <tbody>
@@ -842,5 +848,3 @@ Since the order of processing these records cannot be guaranteed, the final valu
     </tbody>
 </table>
 </div>
-
-{{< top >}}

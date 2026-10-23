@@ -1,9 +1,9 @@
 ---
 title: "Oracle Tutorial"
-weight: 4
-type: docs
-aliases:
-- /connectors/flink-sources/tutorials/oracle-tutorial.html
+slug: "/docs/connectors/flink-sources/tutorials/oracle-tutorial"
+sidebar_position: 4
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -229,5 +229,3 @@ UPDATE DEBEZIUM.ORDERS SET QUANTITY = 10 WHERE ID = 1002;
 
 DELETE FROM DEBEZIUM.ORDERS WHERE ID = 1004;
 ```
-
-{{< top >}}

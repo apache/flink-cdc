@@ -1,9 +1,9 @@
 ---
 title: "Iceberg"
-weight: 9
-type: docs
-aliases:
-- /connectors/pipeline-connectors/iceberg
+slug: "/docs/connectors/pipeline-connectors/iceberg"
+sidebar_position: 9
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -339,5 +339,3 @@ Data Type Mapping
     </tbody>
 </table>
 </div>
-
-{{< top >}}

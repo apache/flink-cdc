@@ -1,9 +1,9 @@
 ---
 title: "YARN"
-weight: 2
-type: docs
-aliases:
-  - /deployment/yarn
+slug: "/docs/deployment/yarn"
+sidebar_position: 2
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -43,7 +43,7 @@ Flink 可以根据在 JobManager 上运行的作业处理所需的 slot 数量�
 export HADOOP_CLASSPATH=`hadoop classpath`
 ```
 Flink 在所有类 UNIX 的环境中运行，即在 Linux、Mac OS X 以及（针对 Windows 的）Cygwin 上运行。
-你可以参考[概览]({{< ref "docs/connectors/pipeline-connectors/overview" >}})来检查支持的版本并下载 [Flink 二进制版本](https://flink.apache.org/downloads/)，
+你可以参考[概览](../connectors/pipeline-connectors/overview.md)来检查支持的版本并下载 [Flink 二进制版本](https://flink.apache.org/downloads/)，
 然后解压文件：
 ```bash
 tar -xzf flink-*.tgz
@@ -56,7 +56,7 @@ export FLINK_HOME=/path/flink-*
 
 ## Session 模式
 
-### 在 YARN 启动一个 Flink Session {#在-yarn-启动一个flink-session}
+### 在 YARN 启动一个 Flink Session
 
 确保已设置 `HADOOP_CLASSPATH` 环境变量，即可在 YARN 会话启动一个 Flink 任务：
 

@@ -1,9 +1,9 @@
 ---
 title: "MongoDB 教程"
-weight: 1
-type: docs
-aliases:
-- /connectors/flink-sources/tutorials/mongodb-tutorial.html
+slug: "/docs/connectors/flink-sources/tutorials/mongodb-tutorial"
+sidebar_position: 1
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -24,7 +24,7 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-# 演示：MongoDB CDC 导入 Elasticsearch {#演示-mongodb-cdc-导入-elasticsearch}
+# 演示：MongoDB CDC 导入 Elasticsearch
 
 1. 下载 `docker-compose.yml`
 
@@ -240,5 +240,3 @@ db.orders.deleteOne(
     { order_id : 104 }
 );
 ```
-
-{{< top >}}

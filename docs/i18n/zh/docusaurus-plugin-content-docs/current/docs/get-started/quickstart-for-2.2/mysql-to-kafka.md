@@ -1,9 +1,9 @@
 ---
 title: "MySQL 同步到 Kafka"
-weight: 4
-type: docs
-aliases:
-- /try-flink-cdc/pipeline-connectors/mysql-Kafka-pipeline-tutorial.html
+slug: "/docs/get-started/quickstart-for-2.2/mysql-to-kafka"
+sidebar_position: 4
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -59,7 +59,7 @@ under the License.
 
 启动成功后，即可在 [http://localhost:8081/](http://localhost:8081/) 访问到 Flink Web UI，如下所示：
 
-{{< img src="/fig/mysql-Kafka-tutorial/flink-ui-flink22.png" alt="Flink UI" >}}
+<img src="@@BASE_URL@@fig/mysql-Kafka-tutorial/flink-ui-flink22.png" alt="Flink UI" class="doc-image">
 
 多次执行 `start-cluster.sh` 可以拉起多个 TaskManager。
 
@@ -114,7 +114,7 @@ under the License.
 
 该命令将以 detached 模式自动启动 Docker Compose 配置中定义的所有容器。你可以通过执行 `docker ps` 命令来观察上述的容器是否正常启动，如下图所示。
 
-{{< img src="/fig/mysql-Kafka-tutorial/docker-ps.png" alt="Executing docker ps command" >}}
+<img src="@@BASE_URL@@fig/mysql-Kafka-tutorial/docker-ps.png" alt="Executing docker ps command" class="doc-image">
 
 #### 在 MySQL 数据库中准备数据
 1. 进入 MySQL 容器
@@ -170,9 +170,9 @@ under the License.
 
 **下载链接只对已发布的版本有效，SNAPSHOT 版本需要本地基于 master 或 release- 分支编译。**
 
-1. 下载下面列出的二进制压缩包，并解压得到目录 `flink-cdc-{{< param Version >}}`；  
-   [flink-cdc-{{< param Version >}}-bin.tar.gz](https://www.apache.org/dyn/closer.lua/flink/flink-cdc-{{< param Version >}}/flink-cdc-{{< param Version >}}-bin.tar.gz)
-   flink-cdc-{{< param Version >}} 下会包含 `bin`、`lib`、`log`、`conf` 四个目录。
+1. 下载下面列出的二进制压缩包，并解压得到目录 `flink-cdc-@@VERSION@@`；\
+   [flink-cdc-@@VERSION@@-bin.tar.gz](https://www.apache.org/dyn/closer.lua/flink/flink-cdc-@@VERSION@@/flink-cdc-@@VERSION@@-bin.tar.gz)
+   flink-cdc-@@VERSION@@ 下会包含 `bin`、`lib`、`log`、`conf` 四个目录。
 
 2. 下载下面列出的 connector 包，并且移动到 lib 目录下；
    **请注意，您需要将 jar 移动到 Flink CDC Home 的 lib 目录，而非 Flink Home 的 lib 目录下。**
@@ -230,7 +230,7 @@ under the License.
 
     在 Flink Web UI，可以看到一个名为 `Sync MySQL Database to Kafka` 的任务正在运行。
 
-    {{< img src="/fig/mysql-Kafka-tutorial/mysql-to-Kafka-flink22.png" alt="MySQL-to-Kafka" >}}
+    <img src="@@BASE_URL@@fig/mysql-Kafka-tutorial/mysql-to-Kafka-flink22.png" alt="MySQL-to-Kafka" class="doc-image">
 
     您可以通过 Kafka 提供的命令行工具查看 Topic 中的消息，像这样：
 
@@ -628,5 +628,3 @@ docker compose down
 ```shell
 ./bin/stop-cluster.sh
 ```
-
-{{< top >}}

@@ -1,9 +1,9 @@
 ---
 title: "MySQL"
-weight: 2
-type: docs
-aliases:
-- /connectors/pipeline-connectors/mysql
+slug: "/docs/connectors/pipeline-connectors/mysql"
+sidebar_position: 2
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -730,5 +730,3 @@ MySQL 中除 `GEOMETRYCOLLECTION` 之外的空间数据类型都会转换为 Jso
     </tbody>
 </table>
 </div>
-
-{{< top >}}

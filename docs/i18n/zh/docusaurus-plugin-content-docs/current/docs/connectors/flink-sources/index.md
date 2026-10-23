@@ -1,7 +1,9 @@
 ---
-title: Flink Source 连接器
-bookCollapseSection: true
-weight: 2
+title: "Flink Source 连接器"
+slug: "/docs/connectors/flink-sources"
+sidebar_position: 2
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one

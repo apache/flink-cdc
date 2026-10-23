@@ -1,9 +1,9 @@
 ---
 title: "Kubernetes"
-weight: 3
-type: docs
-aliases:
-  - /deployment/kubernetes
+slug: "/docs/deployment/kubernetes"
+sidebar_position: 3
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -43,10 +43,10 @@ Apache Flink 还提供了 Kubernetes Operator，用于管理 Kubernetes 上的 F
 
 如果您在配置 Kubernetes 集群时遇到问题，请参考：[如何配置 Kubernetes 集群](https://kubernetes.io/docs/setup/)。
 
-## Session 模式 {#session模式}
+## Session 模式
 
 Flink 可以在所有类 UNIX 环境上运行，即 Linux、Mac OS X 和 Cygwin（适用于 Windows）。\
-您可以参考 [overview]({{< ref "docs/connectors/pipeline-connectors/overview" >}})页面，查看支持的 Flink 版本并下载[发行包](https://flink.apache.org/downloads/)，然后解压：
+您可以参考 [overview](../connectors/pipeline-connectors/overview.md)页面，查看支持的 Flink 版本并下载[发行包](https://flink.apache.org/downloads/)，然后解压：
 
 ```bash
 tar -xzf flink-*.tgz
@@ -58,7 +58,7 @@ tar -xzf flink-*.tgz
 export FLINK_HOME=/path/flink-*
 ```
 
-### 启动 Session 集群 {#启动session集群}
+### 启动 Session 集群
 
 要在 k8s 上启动 Session 集群，请运行 Flink 附带的 bash 脚本：
 
@@ -76,10 +76,12 @@ org.apache.flink.kubernetes.KubernetesClusterDescriptor      [] - Please note th
 org.apache.flink.kubernetes.KubernetesClusterDescriptor      [] - Create flink session cluster my-first-flink-cluster successfully, JobManager Web Interface: http://my-first-flink-cluster-rest.default:8081
 ```
 
-{{< hint info >}}  
+:::info
+
 请参考 [Flink 文档](https://nightlies.apache.org/flink/flink-docs-master/docs/deployment/resource-providers/native_kubernetes/#accessing-flinks-web-ui)来暴露 Flink Web UI 和 REST 端口。\
 请确保您提交作业的节点可以访问 REST 端口。\
-{{< /hint >}}  
+
+:::
 然后，将以下两个配置添加到 flink-conf.yaml 中：
 
 ```yaml
@@ -89,7 +91,7 @@ rest.address: {{NODE_IP}}
 
 {{REST_PORT}} 和 {{NODE_IP}} 替换为 JobManager Web 界面的实际值。
 
-### 配置 Flink CDC {#配置flink-cdc}
+### 配置 Flink CDC
 从[发行页面](https://github.com/apache/flink-cdc/releases)下载 Flink CDC 的 tar 文件并解压：
 
 ```bash
@@ -101,7 +103,7 @@ tar -xzf flink-cdc-*.tar.gz
 从[发行页面](https://github.com/apache/flink-cdc/releases)下载连接器，并移动到 `lib` 路径下。\
 下载链接仅适用于稳定版本，SNAPSHOT 依赖项需要您根据特定分支自行构建。
 
-### 提交 Flink CDC 作业 {#提交flink-cdc作业}
+### 提交 Flink CDC 作业
 以下是 mysql 整库同步到 doris 的示例配置文件：`mysql-to-doris.yaml`
 
 ```yaml
@@ -131,8 +133,8 @@ pipeline:
 ```
 
 请参考连接器信息，按需修改配置文件。
-- [MySQL Pipeline 连接器]({{< ref "docs/connectors/pipeline-connectors/mysql.md" >}})
-- [Apache Doris Pipeline 连接器]({{< ref "docs/connectors/pipeline-connectors/doris.md" >}})
+- [MySQL Pipeline 连接器](../connectors/pipeline-connectors/mysql.md)
+- [Apache Doris Pipeline 连接器](../connectors/pipeline-connectors/doris.md)
 
 最后，通过 CLI 将作业提交到 Flink Standalone 集群。
 
@@ -151,17 +153,17 @@ Job Description: Sync MySQL Database to Doris
 
 通过 Flink Web UI，您可以找到一个名为 `Sync MySQL Database to Doris` 的作业正在运行。
 
-## Kubernetes Operator 模式 {#kubernetes-operator模式}
+## Kubernetes Operator 模式
 假设您已经在 K8s 集群上部署 [Flink Kubernetes Operator](https://nightlies.apache.org/flink/flink-kubernetes-operator-docs-main/docs/concepts/overview/)，您只需构建自定义的 Flink CDC Docker 镜像即可。
 
-### 构建自定义 Docker 镜像 {#构建自定义docker镜像}
+### 构建自定义 Docker 镜像
 1. 从[发行页面](https://github.com/apache/flink-cdc/releases)下载 Flink CDC 的 tar 文件和需要的连接器，并移动到 Docker 镜像构建目录。\
    假设您的 Docker 构建目录为 `/opt/docker/flink-cdc`，此时该目录下的文件结构如下：
     ```text
     /opt/docker/flink-cdc
-        ├── flink-cdc-{{< param Version >}}-bin.tar.gz
-        ├── flink-cdc-pipeline-connector-doris-{{< param Version >}}.jar
-        ├── flink-cdc-pipeline-connector-mysql-{{< param Version >}}.jar
+        ├── flink-cdc-@@VERSION@@-bin.tar.gz
+        ├── flink-cdc-pipeline-connector-doris-@@VERSION@@.jar
+        ├── flink-cdc-pipeline-connector-mysql-@@VERSION@@.jar
         ├── mysql-connector-java-8.0.27.jar
         └── ...
     ```
@@ -170,26 +172,26 @@ Job Description: Sync MySQL Database to Doris
     FROM flink:1.18.0-java8
     ADD *.jar $FLINK_HOME/lib/
     ADD flink-cdc*.tar.gz $FLINK_HOME/
-    RUN mv $FLINK_HOME/flink-cdc-{{< param Version >}}/lib/flink-cdc-dist-{{< param Version >}}.jar $FLINK_HOME/lib/
+    RUN mv $FLINK_HOME/flink-cdc-@@VERSION@@/lib/flink-cdc-dist-@@VERSION@@.jar $FLINK_HOME/lib/
     ```
    Docker 镜像构建目录最终如下：
     ```text
     /opt/docker/flink-cdc
         ├── Dockerfile
-        ├── flink-cdc-{{< param Version >}}-bin.tar.gz
-        ├── flink-cdc-pipeline-connector-doris-{{< param Version >}}.jar
-        ├── flink-cdc-pipeline-connector-mysql-{{< param Version >}}.jar
+        ├── flink-cdc-@@VERSION@@-bin.tar.gz
+        ├── flink-cdc-pipeline-connector-doris-@@VERSION@@.jar
+        ├── flink-cdc-pipeline-connector-mysql-@@VERSION@@.jar
         ├── mysql-connector-java-8.0.27.jar
         └── ...
     ```
 3. 构建自定义镜像并推送至仓库
     ```bash
-   docker build -t flink-cdc-pipeline:{{< param Version >}} .
+   docker build -t flink-cdc-pipeline:@@VERSION@@ .
    
-   docker push flink-cdc-pipeline:{{< param Version >}}
+   docker push flink-cdc-pipeline:@@VERSION@@
    ```
 
-### 创建 ConfigMap 用于挂载 Flink CDC 配置文件 {#创建configmap用于挂载flink-cdc配置文件}
+### 创建 ConfigMap 用于挂载 Flink CDC 配置文件
 以下是一个示例文件，请修改其中对应的连接参数为实际值：
 ```yaml
 ---
@@ -223,7 +225,7 @@ metadata:
   name: flink-cdc-pipeline-configmap
 ```
 
-### 创建 FlinkDeployment YAML 文件 {#创建flinkdeployment-yaml文件}
+### 创建 FlinkDeployment YAML 文件
 以下是示例文件 `flink-cdc-pipeline-job.yaml`：
 ```yaml
 ---
@@ -237,14 +239,14 @@ spec:
     state.checkpoints.dir: 'file:///tmp/checkpoints'
     state.savepoints.dir: 'file:///tmp/savepoints'
   flinkVersion: v1_18
-  image: 'flink-cdc-pipeline:{{< param Version >}}'
+  image: 'flink-cdc-pipeline:@@VERSION@@'
   imagePullPolicy: Always
   job:
     args:
       - '--use-mini-cluster'
-      - /opt/flink/flink-cdc-{{< param Version >}}/conf/mysql-to-doris.yaml
+      - /opt/flink/flink-cdc-@@VERSION@@/conf/mysql-to-doris.yaml
     entryClass: org.apache.flink.cdc.cli.CliFrontend
-    jarURI: 'local:///opt/flink/flink-cdc-{{< param Version >}}/lib/flink-cdc-dist-{{< param Version >}}.jar'
+    jarURI: 'local:///opt/flink/flink-cdc-@@VERSION@@/lib/flink-cdc-dist-@@VERSION@@.jar'
     parallelism: 1
     state: running
     upgradeMode: savepoint
@@ -261,7 +263,7 @@ spec:
         # don't modify this name
         - name: flink-main-container
           volumeMounts:
-            - mountPath: /opt/flink/flink-cdc-{{< param Version >}}/conf
+            - mountPath: /opt/flink/flink-cdc-@@VERSION@@/conf
               name: flink-cdc-pipeline-config
       volumes:
         - configMap:
@@ -274,12 +276,14 @@ spec:
       cpu: 1
       memory: 1024m
 ```
-{{< hint info >}}
+:::info
+
 1. 由于 Flink 的类加载机制，参数 `classloader.resolve-order` 必须设置为 `parent-first`。
 2. Flink CDC 默认提交作业到远程 Flink 集群，在 Operator 模式下，您需要通过指定 `--use-mini-cluster` 参数在 pod 内部启动一个 Standalone Flink 集群。\
-{{< /hint >}}
 
-### 提交 Flink CDC 作业 {#提交flink-cdc作业-1}
+:::
+
+### 提交 Flink CDC 作业
 ConfigMap 和 FlinkDeployment YAML 文件创建完成后，即可通过 kubectl 提交作业到 Operator：
 ```bash
 kubectl apply -f flink-cdc-pipeline-job.yaml
@@ -292,6 +296,8 @@ flinkdeployment.flink.apache.org/flink-cdc-pipeline-job created
 如您需要查看日志、暴露 Flink Web UI 等，请参考：[Flink Kubernetes Operator 文档](https://nightlies.apache.org/flink/flink-kubernetes-operator-docs-main/docs/concepts/overview/)。
 
 
-{{< hint info >}}  
+:::info
+
 请注意，目前不支持使用**native application mode**提交作业。  
-{{< /hint >}}
+
+:::

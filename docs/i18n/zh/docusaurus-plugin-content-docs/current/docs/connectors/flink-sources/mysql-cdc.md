@@ -1,9 +1,9 @@
 ---
 title: "MySQL"
-weight: 2
-type: docs
-aliases:
-- /connectors/flink-sources/mysql-cdc
+slug: "/docs/connectors/flink-sources/mysql-cdc"
+sidebar_position: 2
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -41,7 +41,13 @@ MySQL CDC 连接器允许从 MySQL 数据库读取快照数据和增量数据。
 
 ### Maven dependency
 
-{{< artifact flink-connector-mysql-cdc >}}
+```xml
+<dependency>
+    <groupId>org.apache.flink</groupId>
+    <artifactId>flink-connector-mysql-cdc</artifactId>
+    <version>@@VERSION@@</version>
+</dependency>
+```
 
 ### SQL Client JAR
 
@@ -625,7 +631,7 @@ Flink SQL> SET 'parallelism.default' = 8;
 
 MySQL CDC source 使用**增量快照算法**，避免了获取全局读锁（FLUSH TABLES WITH READ LOCK），因此不需要 `RELOAD` 权限。
 
-#### MySQL 高可用性支持 {#mysql高可用性支持}
+#### MySQL 高可用性支持
 
 ```mysql-cdc``` 连接器通过使用 [GTID](https://dev.mysql.com/doc/refman/5.7/en/replication-gtids-concepts.html) 信息提供 MySQL 高可用集群的高可用性。为了获得高可用性， MySQL集群需要启用 GTID 模式，MySQL 配置文件中的 GTID 模式应该包含以下设置：
 
@@ -646,7 +652,7 @@ MySQL 集群中你监控的服务器出现故障后，你只需将受监视的�
 
 建议为 MySQL 集群配置 DNS（域名服务）或 VIP（虚拟 IP 地址），使用 ```mysql-cdc``` 连接器的 DNS 或 VIP 地址，DNS 或 VIP 将自动将网络请求路由到活动 MySQL 服务器。这样，你就不再需要修改地址和重新启动管道。
 
-#### MySQL 心跳事件支持 {#mysql心跳事件支持}
+#### MySQL 心跳事件支持
 
 如果表不经常更新，则 binlog 文件或 GTID 集可能已在其最后提交的 binlog 位置被清理。
 在这种情况下，CDC 作业可能会重新启动失败。因此心跳事件将帮助更新 binlog 位置。默认情况下，MySQL CDC Source 启用心跳事件，间隔设置为 30 秒。可以使用表选项 ```heartbeat.interval``` 指定间隔。或将选项设置为 `0s` 以禁用心跳事件。
@@ -952,7 +958,7 @@ CREATE TABLE products (
     <thead>
       <tr>
         <th class="text-left" style="width:30%;">MySQL type<a href="https://dev.mysql.com/doc/refman/8.0/en/data-types.html"></a></th>
-        <th class="text-left" style="width:10%;">Flink SQL type<a href="{% link dev/table/types.md %}"></a></th>
+        <th class="text-left" style="width:10%;">Flink SQL type</th>
         <th class="text-left" style="width:60%;">NOTE</th>
       </tr>
     </thead>
@@ -1253,5 +1259,3 @@ MySQL 中除 `GEOMETRYCOLLECTION` 之外的空间数据类型都会转换为 Jso
     </tbody>
 </table>
 </div>
-
-{{< top >}}

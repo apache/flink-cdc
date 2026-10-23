@@ -1,9 +1,9 @@
 ---
 title: "PolarDB-X 教程"
-weight: 5
-type: docs
-aliases:
-- /connectors/flink-sources/tutorials/mongodb-tutorial.html
+slug: "/docs/connectors/flink-sources/tutorials/polardbx-tutorial"
+sidebar_position: 5
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -24,7 +24,7 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-# 演示：PolarDB-X CDC 导入 Elasticsearch {#演示-polardb-x-cdc-导入-elasticsearch}
+# 演示：PolarDB-X CDC 导入 Elasticsearch
 
 本示例我们通过演示 PolarDB-X 借助 Flink-CDC 将数据导入至 Elasticsearch 来介绍 PolarDB-X 的增量订阅能力，你可以前往：[PolarDB-X](https://github.com/ApsaraDB/galaxysql) 了解更多细节。
 
@@ -144,7 +144,7 @@ VALUES (default, '2020-07-30 10:08:22', 'Jark', 50.50, 102, false),
 
 我们可以访问 [http://localhost:8081/](http://localhost:8081/) 看到 Flink 正常运行：
 
-{{< img src="/fig/mysql-postgres-tutorial/flink-ui.png" alt="Flink UI" >}}
+<img src="@@BASE_URL@@fig/mysql-postgres-tutorial/flink-ui.png" alt="Flink UI" class="doc-image">
 
 
 4. 启动 Flink SQL CLI:
@@ -256,5 +256,3 @@ docker-compose down
 ```shell
 ./bin/stop-cluster.sh
 ```
-
-{{< top >}}

@@ -1,7 +1,9 @@
 ---
-title: Tutorials
-bookCollapseSection: true
-weight: 999
+title: "Tutorials"
+slug: "/docs/connectors/flink-sources/tutorials"
+sidebar_position: 999
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one

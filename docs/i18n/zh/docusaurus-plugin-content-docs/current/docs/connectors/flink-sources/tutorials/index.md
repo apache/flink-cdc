@@ -1,7 +1,9 @@
 ---
 title: "Flink CDC Sources 教程"
-bookCollapseSection: true
-weight: 999
+slug: "/docs/connectors/flink-sources/tutorials"
+sidebar_position: 999
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one

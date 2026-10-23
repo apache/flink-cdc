@@ -1,9 +1,9 @@
 ---
 title: "MongoDB"
-weight: 6
-type: docs
-aliases:
-- /connectors/flink-sources/mongodb-cdc
+slug: "/docs/connectors/flink-sources/mongodb-cdc"
+sidebar_position: 6
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -35,7 +35,13 @@ MongoDB CDC 连接器允许从 MongoDB 读取快照数据和增量数据。本�
 
 ### Maven dependency
 
-{{< artifact flink-connector-mongodb-cdc >}}
+```xml
+<dependency>
+    <groupId>org.apache.flink</groupId>
+    <artifactId>flink-connector-mongodb-cdc</artifactId>
+    <version>@@VERSION@@</version>
+</dependency>
+```
 
 ### SQL Client JAR
 
@@ -303,7 +309,7 @@ MongoDB 的更改事件记录没有 UPDATE_BEFORE 消息。因此，我们只能
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>
       <td>Boolean</td>
-      <td>是否尝试基于 MongoDB 中的前镜像和后镜像生成 full-mode changelog。详情请参阅 <a href="#a-name-id-003-a">Full Changelog</a>。仅支持 MongoDB 6.0 及以上版本。</td>
+      <td>是否尝试基于 MongoDB 中的前镜像和后镜像生成 full-mode changelog。详情请参阅 <a href="#完整的-changelog">Full Changelog</a>。仅支持 MongoDB 6.0 及以上版本。</td>
     </tr>
     <tr>
       <td>scan.incremental.snapshot.enabled</td>
@@ -694,7 +700,7 @@ public class MongoDBIncrementalSourceExample {
 - 如果使用数据库正则表达式，则需要 `readAnyDatabase` 角色。
 - 增量快照功能仅支持 MongoDB 4.0 之后的版本。
 
-### 完整的 Changelog<a name="Full Changelog" id="003" ></a>
+### 完整的 Changelog
 
 MongoDB 6.0 以及更高的版本支持发送更改流事件，其中包含文档的更新前和更新后的内容（或者说数据的前后镜像）。
 
@@ -783,7 +789,7 @@ CREATE TABLE mongodb_source (...) WITH (
     <thead>
       <tr>
         <th class="text-left">BSON type<a href="https://docs.mongodb.com/manual/reference/bson-types/"></a></th>
-        <th class="text-left">Flink SQL type<a href="{% link dev/table/types.md %}"></a></th>
+        <th class="text-left">Flink SQL type</th>
       </tr>
     </thead>
     <tbody>
@@ -891,5 +897,3 @@ CREATE TABLE mongodb_source (...) WITH (
 - [Document Pre- and Post-Images](https://www.mongodb.com/docs/v6.0/changeStreams/#change-streams-with-document-pre--and-post-images)
 - [BSON Types](https://docs.mongodb.com/manual/reference/bson-types/)
 - [Flink DataTypes](https://nightlies.apache.org/flink/flink-docs-release-1.20/docs/dev/table/types/)
-
-{{< top >}}

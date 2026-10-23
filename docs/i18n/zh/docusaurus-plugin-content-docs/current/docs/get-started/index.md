@@ -1,8 +1,9 @@
 ---
 title: "入门指南"
-bold: true
-bookCollapseSection: true
-weight: 1
+slug: "/docs/get-started"
+sidebar_position: 1
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one

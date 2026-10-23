@@ -1,9 +1,9 @@
 ---
 title: "OceanBase 教程"
-weight: 3
-type: docs
-aliases:
-- /connectors/flink-sources/tutorials/oceanbase-tutorial.html
+slug: "/docs/connectors/flink-sources/tutorials/oceanbase-tutorial"
+sidebar_position: 3
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -24,7 +24,7 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-# 演示：OceanBase CDC 导入 Elasticsearch {#演示-oceanbase-cdc-导入-elasticsearch}
+# 演示：OceanBase CDC 导入 Elasticsearch
 
 ## 视频教程
 
@@ -273,5 +273,3 @@ docker-compose down
 ```shell
 ./bin/stop-cluster.sh
 ```
-
-{{< top >}}

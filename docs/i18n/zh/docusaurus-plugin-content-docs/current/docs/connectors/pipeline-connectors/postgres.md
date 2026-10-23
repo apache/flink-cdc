@@ -1,9 +1,9 @@
 ---
 title: "Postgres"
-weight: 2
-type: docs
-aliases:
-- /connectors/pipeline-connectors/Postgres
+slug: "/docs/connectors/pipeline-connectors/postgres"
+sidebar_position: 2
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -432,7 +432,7 @@ transform:
     <thead>
       <tr>
         <th class="text-left">PostgreSQL type<a href="https://www.postgresql.org/docs/12/datatype.html"></a></th>
-        <th class="text-left">CDC type<a href="{% link dev/table/types.md %}"></a></th>
+        <th class="text-left">CDC type</th>
       </tr>
     </thead>
     <tbody>
@@ -553,7 +553,7 @@ transform:
     <thead>
       <tr>
         <th class="text-left">PostgreSQL type<a href="https://www.postgresql.org/docs/12/datatype.html"></a></th>
-        <th class="text-left">CDC type<a href="{% link dev/table/types.md %}"></a></th>
+        <th class="text-left">CDC type</th>
       </tr>
     </thead>
     <tbody>
@@ -586,7 +586,7 @@ transform:
     <thead>
       <tr>
         <th class="text-left">PostgreSQL type<a href="https://www.postgresql.org/docs/12/datatype.html"></a></th>
-        <th class="text-left">CDC type<a href="{% link dev/table/types.md %}"></a></th>
+        <th class="text-left">CDC type</th>
       </tr>
     </thead>
     <tbody>
@@ -619,7 +619,7 @@ transform:
     <thead>
       <tr>
         <th class="text-left">PostgreSQL type<a href="https://www.postgresql.org/docs/12/datatype.html"></a></th>
-        <th class="text-left">CDC type<a href="{% link dev/table/types.md %}"></a></th>
+        <th class="text-left">CDC type</th>
       </tr>
     </thead>
     <tbody>
@@ -653,7 +653,7 @@ PostgreSQL 连接器配置属性 <code>debezium.decimal.handling.mode</code> 的
     <thead>
       <tr>
         <th class="text-left">PostgreSQL type<a href="https://www.postgresql.org/docs/12/datatype.html"></a></th>
-        <th class="text-left">CDC type<a href="{% link dev/table/types.md %}"></a></th>
+        <th class="text-left">CDC type</th>
       </tr>
     </thead>
     <tbody>
@@ -693,7 +693,7 @@ PostgreSQL 连接器配置属性 <code>debezium.decimal.handling.mode</code> 的
     <thead>
       <tr>
         <th class="text-left">PostgreSQL type<a href="https://www.postgresql.org/docs/12/datatype.html"></a></th>
-        <th class="text-left">CDC type<a href="{% link dev/table/types.md %}"></a></th>
+        <th class="text-left">CDC type</th>
       </tr>
     </thead>
     <tbody>
@@ -722,7 +722,7 @@ PostgreSQL 连接器配置属性 <code>debezium.decimal.handling.mode</code> 的
     <thead>
       <tr>
         <th class="text-left">PostgreSQL type<a href="https://www.postgresql.org/docs/12/datatype.html"></a></th>
-        <th class="text-left">CDC type<a href="{% link dev/table/types.md %}"></a></th>
+        <th class="text-left">CDC type</th>
       </tr>
     </thead>
     <tbody>
@@ -756,7 +756,7 @@ PostgreSQL 连接器配置属性 <code>debezium.hstore.handling.mode</code> 的�
     <thead>
       <tr>
         <th class="text-left">PostgreSQL type<a href="https://www.postgresql.org/docs/12/datatype.html"></a></th>
-        <th class="text-left">CDC type<a href="{% link dev/table/types.md %}"></a></th>
+        <th class="text-left">CDC type</th>
       </tr>
     </thead>
     <tbody>
@@ -781,7 +781,7 @@ PostgreSQL 拥有可以存储 IPv4、IPv6 和 MAC 地址的数据类型。使用
     <thead>
       <tr>
         <th class="text-left">PostgreSQL type<a href="https://www.postgresql.org/docs/12/datatype.html"></a></th>
-        <th class="text-left">CDC type<a href="{% link dev/table/types.md %}"></a></th>
+        <th class="text-left">CDC type</th>
       </tr>
     </thead>
     <tbody>
@@ -836,5 +836,3 @@ PostgreSQL 通过 PostGIS 扩展支持空间数据类型：
     </tbody>
 </table>
 </div>
-
-{{< top >}}

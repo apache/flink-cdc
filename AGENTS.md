@@ -90,7 +90,7 @@ Write unit tests and integration tests in the corresponding submodules. End-to-e
 
 ### Documentation
 
-- `docs/` — Hugo-based documentation site. `docs/content/` for English, `docs/content.zh/` for Chinese. Update both when adding new features.
+- `docs/` — Docusaurus documentation site on master. `docs/content/` for English, `docs/i18n/zh/docusaurus-plugin-content-docs/current/` for Chinese. Update both when adding new features. Historical release branches retain Hugo.
 
 ## Coding Standards
 

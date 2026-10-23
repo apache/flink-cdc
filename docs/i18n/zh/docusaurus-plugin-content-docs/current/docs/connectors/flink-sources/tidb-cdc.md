@@ -1,9 +1,9 @@
 ---
 title: "TiDB"
-weight: 8
-type: docs
-aliases:
-- /connectors/flink-sources/tidb-cdc
+slug: "/docs/connectors/flink-sources/tidb-cdc"
+sidebar_position: 8
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -35,7 +35,13 @@ TiDB CDC 连接器允许从 TiDB 数据库读取快照数据和增量数据。�
 
 ### Maven dependency
 
-{{< artifact flink-connector-tidb-cdc >}}
+```xml
+<dependency>
+    <groupId>org.apache.flink</groupId>
+    <artifactId>flink-connector-tidb-cdc</artifactId>
+    <version>@@VERSION@@</version>
+</dependency>
+```
 
 ### SQL Client JAR
 
@@ -317,7 +323,7 @@ public class TiDBSourceExample {
     <thead>
       <tr>
         <th class="text-left">TiDB type<a href="https://dev.tidb.com/doc/man/8.0/en/data-types.html"></a></th>
-        <th class="text-left">Flink SQL type<a href="{% link dev/table/types.md %}"></a></th>
+        <th class="text-left">Flink SQL type</th>
         <th class="text-left">NOTE</th>
       </tr>
     </thead>
@@ -499,5 +505,3 @@ public class TiDBSourceExample {
     </tbody>
 </table>
 </div>
-
-{{< top >}}

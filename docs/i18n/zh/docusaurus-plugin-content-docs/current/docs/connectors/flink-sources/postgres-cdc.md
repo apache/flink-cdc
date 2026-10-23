@@ -1,9 +1,9 @@
 ---
 title: "Postgres"
-weight: 5
-type: docs
-aliases:
-- /connectors/flink-sources/postgres-cdc
+slug: "/docs/connectors/flink-sources/postgres-cdc"
+sidebar_position: 5
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -34,7 +34,13 @@ Postgres CDC 连接器允许从 PostgreSQL 数据库读取快照数据和增量�
 
 ### Maven dependency
 
-{{< artifact flink-connector-postgres-cdc >}}
+```xml
+<dependency>
+    <groupId>org.apache.flink</groupId>
+    <artifactId>flink-connector-postgres-cdc</artifactId>
+    <version>@@VERSION@@</version>
+</dependency>
+```
 
 ### SQL Client JAR
 
@@ -745,7 +751,7 @@ public class PostgreSQLSourceExample {
     <thead>
       <tr>
         <th class="text-left">PostgreSQL type<a href="https://www.postgresql.org/docs/12/datatype.html"></a></th>
-        <th class="text-left">Flink SQL type<a href="{% link dev/table/types.md %}"></a></th>
+        <th class="text-left">Flink SQL type</th>
       </tr>
     </thead>
     <tbody>
@@ -836,5 +842,3 @@ public class PostgreSQLSourceExample {
     </tbody>
 </table>
 </div>
-
-{{< top >}}

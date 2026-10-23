@@ -1,7 +1,11 @@
 ---
-title: Apache Flink CDC
-type: docs
-bookToc: false
+title: "Apache Flink CDC"
+slug: "/"
+hide_table_of_contents: true
+hide_title: true
+displayed_sidebar: docs
+pagination_prev: null
+pagination_next: null
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -32,13 +36,13 @@ under the License.
                 A streaming data integration tool
             </p>
             <div class="text-center xl:text-left">
-                <a href="{{< ref "docs/get-started/introduction" >}}" class="mx-auto link-as-button bg-white text-black font-bold px-8">
+                <a href="@@BASE_URL@@@@LOCALE_PREFIX@@docs/get-started/introduction/" class="mx-auto link-as-button bg-white text-black font-bold px-8">
                     Quick Start
                 </a>
             </div>
         </div>
         <div class="w-full text-center mt-8 xl:mt-0 ml-0 xl:ml-16">
-            {{< img src="/fig/cdc-flow.png" alt="Flink CDC Flow" >}}
+            <img src="@@BASE_URL@@fig/cdc-flow.png" alt="Flink CDC Flow" class="doc-image">
         </div>
     </div>
     <div class="relative -mt-8 bg-purple">
@@ -73,7 +77,7 @@ under the License.
             </div>
             <div class="w-full flex justify-center	">
                 <div class="w-4/5">
-                    {{< img src="/fig/index-yaml-example.png" alt="Flink CDC Example" >}}
+                    <img src="@@BASE_URL@@fig/index-yaml-example.png" alt="Flink CDC Example" class="doc-image">
                 </div>
             </div>
         </div>
@@ -153,7 +157,7 @@ under the License.
                 </div>
                 <p class="text-sm my-0 text-center md:text-left">
                     Flink CDC provides a series of quick start demos without any dependencies or java code. A Linux or macOS computer with Docker installed is enough.
-                    Please check out our <a href="{{< ref "docs/get-started/introduction" >}}">Quick Start</a> for more information.
+                    Please check out our <a href="@@BASE_URL@@@@LOCALE_PREFIX@@docs/get-started/introduction/">Quick Start</a> for more information.
                 </p>
             </div>
             <div class="w-full md:w-1/2 px-8 py-6 flex flex-col flex-grow flex-shrink">

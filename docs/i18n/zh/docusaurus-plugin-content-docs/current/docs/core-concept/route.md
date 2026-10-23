@@ -1,9 +1,9 @@
 ---
 title: "Route"
-weight: 6
-type: docs
-aliases:
-  - /core-concept/route/
+slug: "/docs/core-concept/route"
+sidebar_position: 6
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -39,7 +39,7 @@ under the License.
 
 一个 Route 模块可以包含一个或多个 source-table/sink-table 规则。
 
-# 路由模式
+## 路由模式
 默认情况下，所有匹配的路由规则都会被应用到表上。你可以在 pipeline 配置中通过 `route-mode` 选项来改变这一行为：
 
 | 值            | 描述                                              |
@@ -56,11 +56,13 @@ pipeline:
   route-mode: FIRST_MATCH
 ```
 
-{{< hint info >}}
+:::info
+
 
 当使用 `FIRST_MATCH` 模式时，路由规则会按照定义的顺序进行计算。第一个匹配源表的规则会被应用，后续的规则将被跳过。
 
-{{< /hint >}}
+
+:::
 
 # 示例
 ## 路由一个 Data Source 表到一个 Data Sink 表
@@ -125,11 +127,13 @@ route:
 以上游表 `db_foo.bar_tbl` 为例，我们将会从中提取出 `(foo, bar)` 作为捕获组，并且将其依次绑定到 `$1` 和 `$2` 变量中。
 因此，这张表将被路由到 `sink_db_foo.sink_table_bar` 下游表中。
 
-{{< hint info >}}
+:::info
+
 
 注意：基于正则捕获组的替换规则无法与 `replace-symbol` 选项搭配使用。
 
-{{< /hint >}}
+
+:::
 
 # 兼容性说明 — 前缀匹配导致的 Sink-Table 后缀泄漏
 

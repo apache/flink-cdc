@@ -1,8 +1,9 @@
 ---
-title: 开发者指南
-bold: true
-bookCollapseSection: true
-weight: 5
+title: "开发者指南"
+slug: "/docs/developer-guide"
+sidebar_position: 5
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one

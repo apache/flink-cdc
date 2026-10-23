@@ -1,9 +1,9 @@
 ---
 title: "Postgres to Fluss"
-weight: 5
-type: docs
-aliases:
-- /get-started/quickstart/postgres-to-fluss
+slug: "/docs/get-started/quickstart-for-2.2/postgres-to-fluss"
+sidebar_position: 5
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -197,9 +197,9 @@ This command automatically starts all the containers defined in the Docker Compo
     ```
 
 ## Submit job with Flink CDC CLI
-1. Download the binary compressed packages listed below and extract them to the directory `flink-cdc-{{< param Version >}}`:\
-   [flink-cdc-{{< param Version >}}-bin.tar.gz](https://www.apache.org/dyn/closer.lua/flink/flink-cdc-{{< param Version >}}/flink-cdc-{{< param Version >}}-bin.tar.gz)
-   flink-cdc-{{< param Version >}} directory will contain four directories: `bin`, `lib`, `log`, and `conf`.
+1. Download the binary compressed packages listed below and extract them to the directory `flink-cdc-@@VERSION@@`:\
+   [flink-cdc-@@VERSION@@-bin.tar.gz](https://www.apache.org/dyn/closer.lua/flink/flink-cdc-@@VERSION@@/flink-cdc-@@VERSION@@-bin.tar.gz)
+   flink-cdc-@@VERSION@@ directory will contain four directories: `bin`, `lib`, `log`, and `conf`.
 
 2. Download the connector packages listed below and move them to the `lib` directory
    **Download links are available only for stable releases, SNAPSHOT dependencies need to be built based on master or release branches by yourself.**
@@ -404,5 +404,3 @@ Run the following command to stop the Flink cluster in the directory of Flink `f
    ```shell
    ./bin/stop-cluster.sh
    ```
-
-{{< top >}}

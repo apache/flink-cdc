@@ -1,10 +1,9 @@
 ---
 title: "使用 Flink CDC 构建实时数据湖"
-weight: 998
-type: docs
-aliases:
-- /connectors/flink-sources/tutorials/build-real-time-data-lake-tutorial.html
-
+slug: "/docs/connectors/flink-sources/tutorials/build-real-time-data-lake-tutorial"
+sidebar_position: 998
+hide_title: true
+displayed_sidebar: docs
 ---
 
 <!--
@@ -35,7 +34,7 @@ under the License.
 
 接下来将以数据从 MySQL 同步到 [Iceberg](https://iceberg.apache.org/) 为例展示整个流程，架构图如下所示：
 
-{{< img src="/fig/real-time-data-lake-tutorial/real-time-data-lake-tutorial.png" alt="Real-time data lake with Flink CDC" >}}
+<img src="@@BASE_URL@@fig/real-time-data-lake-tutorial/real-time-data-lake-tutorial.png" alt="Real-time data lake with Flink CDC" class="doc-image">
 
 你也可以使用不同的 source 比如 Oracle/Postgres 和 sink 比如 Hudi 来构建自己的 ETL 流程。
 
@@ -50,7 +49,7 @@ under the License.
 - [flink-shaded-hadoop-2-uber-2.7.5-10.0.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-shaded-hadoop-2-uber/2.7.5-10.0/flink-shaded-hadoop-2-uber-2.7.5-10.0.jar)
 - [iceberg-flink-runtime-1.20-1.7.2.jar](https://repo.maven.apache.org/maven2/org/apache/iceberg/iceberg-flink-runtime-1.20/1.7.2/iceberg-flink-runtime-1.20-1.7.2.jar)
 
-### 启动所需组件 {#准备教程所需要的组件}
+### 启动所需组件
 本教程使用 Docker Compose 管理所需组件。
 
 1. 使用以下内容创建 `Dockerfile`：
@@ -137,7 +136,7 @@ docker-compose up -d
 ```
 该命令将以 detached 模式自动启动 Docker Compose 配置中定义的所有容器。你可以通过 `docker ps` 来观察上述的容器是否正常启动了，也可以通过访问 [http://localhost:8081/](http://localhost:8081//) 来查看 Flink 是否运行正常。
 
-{{< img src="/fig/real-time-data-lake-tutorial/flink-ui.png" alt="Flink UI" >}}
+<img src="@@BASE_URL@@fig/real-time-data-lake-tutorial/flink-ui.png" alt="Flink UI" class="doc-image">
 
 ### 准备数据
 1. 进入 MySQL 容器中
@@ -197,7 +196,7 @@ docker-compose exec sql-client /opt/flink/bin/sql-client.sh
 ```
 我们可以看到如下界面：
 
-{{< img src="/fig/real-time-data-lake-tutorial/flink-sql-client.png" alt="Flink SQL Client" >}}
+<img src="@@BASE_URL@@fig/real-time-data-lake-tutorial/flink-sql-client.png" alt="Flink SQL Client" class="doc-image">
 
 然后，进行如下步骤：
 1. 开启 checkpoint，每隔 3 秒做一次 checkpoint
@@ -267,7 +266,7 @@ docker-compose exec sql-client /opt/flink/bin/sql-client.sh
    上述命令将会启动一个流式作业，源源不断将 MySQL 数据库中的全量和增量数据同步到 Iceberg 中。
    在 [Flink UI](http://localhost:8081/#/job/running) 上可以看到这个运行的作业：
 
-   {{< img src="/fig/real-time-data-lake-tutorial/flink-cdc-iceberg-running-job.png" alt="CDC to Iceberg Running Job" >}}
+   <img src="@@BASE_URL@@fig/real-time-data-lake-tutorial/flink-cdc-iceberg-running-job.png" alt="CDC to Iceberg Running Job" class="doc-image">
 
    然后我们就可以使用如下的命令看到 Iceberg 中的写入的文件：
    ```shell
@@ -275,7 +274,7 @@ docker-compose exec sql-client /opt/flink/bin/sql-client.sh
    ```
    如下所示：
 
-   {{< img src="/fig/real-time-data-lake-tutorial/files-in-iceberg.png" alt="Files in Iceberg" >}}
+   <img src="@@BASE_URL@@fig/real-time-data-lake-tutorial/files-in-iceberg.png" alt="Files in Iceberg" class="doc-image">
 
    在你的运行环境中，实际的文件可能与上面的截图不相同，但是整体的目录结构应该相似。
 
@@ -286,7 +285,7 @@ docker-compose exec sql-client /opt/flink/bin/sql-client.sh
    ```
    在 Flink SQL CLI 中我们可以看到如下查询结果：
 
-   {{< img src="/fig/real-time-data-lake-tutorial/data_in_iceberg.png" alt="Data in Iceberg" >}}
+   <img src="@@BASE_URL@@fig/real-time-data-lake-tutorial/data_in_iceberg.png" alt="Data in Iceberg" class="doc-image">
 
 3. 修改 MySQL 中表的数据，Iceberg 中的表 `all_users_sink` 中的数据也将实时更新：
 
@@ -311,7 +310,7 @@ docker-compose exec sql-client /opt/flink/bin/sql-client.sh
 
    最后的查询结果如下所示：
 
-   {{< img src="/fig/real-time-data-lake-tutorial/final-data-in-iceberg.png" alt="Final Data in Iceberg" >}}
+   <img src="@@BASE_URL@@fig/real-time-data-lake-tutorial/final-data-in-iceberg.png" alt="Final Data in Iceberg" class="doc-image">
 
    从 Iceberg 的最新结果中可以看到新增了 `(db_1, user_1, 111)` 的记录，`(db_1, user_2, 120)` 的地址更新成了 `Beijing`，且 `(db_2, user_2, 220)` 的记录被删除了，与我们在 MySQL 做的数据更新完全一致。
 
@@ -320,5 +319,3 @@ docker-compose exec sql-client /opt/flink/bin/sql-client.sh
 ```shell
 docker-compose down
 ```
-
-{{< top >}}
