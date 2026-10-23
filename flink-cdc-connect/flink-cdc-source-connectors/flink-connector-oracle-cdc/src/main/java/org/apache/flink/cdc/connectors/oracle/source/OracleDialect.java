@@ -84,8 +84,17 @@ public class OracleDialect implements JdbcDataSourceDialect {
 
     @Override
     public JdbcConnection openJdbcConnection(JdbcSourceConfig sourceConfig) {
-        return OracleConnectionUtils.createOracleConnection(
-                sourceConfig.getDbzConnectorConfig().getJdbcConfig());
+        OracleSourceConnection connection =
+                OracleConnectionUtils.createOracleConnection(
+                        sourceConfig.getDbzConnectorConfig().getJdbcConfig());
+        // When database.pdb.name is configured the JDBC URL points to the CDB root.
+        // Switch the session to the target PDB so that ALL_TABLES, schema reads, and
+        // split key queries see the PDB-local tables instead of the CDB root tables.
+        String pdbName = sourceConfig.getDbzConfiguration().getString("database.pdb.name");
+        if (pdbName != null && !pdbName.isEmpty()) {
+            connection.setSessionToPdb(pdbName);
+        }
+        return connection;
     }
 
     @Override
@@ -109,6 +118,14 @@ public class OracleDialect implements JdbcDataSourceDialect {
     public List<TableId> discoverDataCollections(JdbcSourceConfig sourceConfig) {
         OracleSourceConfig oracleSourceConfig = (OracleSourceConfig) sourceConfig;
         try (JdbcConnection jdbcConnection = openJdbcConnection(sourceConfig)) {
+            // When database.pdb.name is configured the connection goes to the CDB root.
+            // ALL_TABLES from CDB root does not include PDB-local tables, so switch the
+            // session to the target PDB before running the discovery query.
+            String pdbName =
+                    oracleSourceConfig.getDbzConfiguration().getString("database.pdb.name");
+            if (pdbName != null && !pdbName.isEmpty()) {
+                ((OracleSourceConnection) jdbcConnection).setSessionToPdb(pdbName);
+            }
             return OracleConnectionUtils.listTables(
                     jdbcConnection, oracleSourceConfig.getTableFilters());
         } catch (SQLException e) {
@@ -122,6 +139,12 @@ public class OracleDialect implements JdbcDataSourceDialect {
 
         try (OracleSourceConnection jdbc =
                 createOracleConnection(sourceConfig.getDbzConfiguration())) {
+            // Same PDB switch as discoverDataCollections — schema metadata queries must run
+            // against the PDB when database.pdb.name is set.
+            String pdbName = sourceConfig.getDbzConfiguration().getString("database.pdb.name");
+            if (pdbName != null && !pdbName.isEmpty()) {
+                jdbc.setSessionToPdb(pdbName);
+            }
             // fetch table schemas
             Map<TableId, TableChange> tableSchemas = new HashMap<>();
             for (TableId tableId : capturedTableIds) {

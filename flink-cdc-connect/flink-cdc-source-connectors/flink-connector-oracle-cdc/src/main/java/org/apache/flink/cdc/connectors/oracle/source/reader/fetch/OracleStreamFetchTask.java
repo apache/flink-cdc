@@ -24,14 +24,14 @@ import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
 import org.apache.flink.cdc.connectors.base.source.reader.external.FetchTask;
 
 import io.debezium.config.Configuration;
+import io.debezium.connector.oracle.AbstractOracleStreamingChangeEventSourceMetrics;
 import io.debezium.connector.oracle.OracleConnection;
 import io.debezium.connector.oracle.OracleConnectorConfig;
 import io.debezium.connector.oracle.OracleDatabaseSchema;
 import io.debezium.connector.oracle.OracleOffsetContext;
 import io.debezium.connector.oracle.OraclePartition;
-import io.debezium.connector.oracle.OracleStreamingChangeEventSourceMetrics;
 import io.debezium.connector.oracle.logminer.LogMinerStreamingChangeEventSource;
-import io.debezium.connector.oracle.logminer.processor.LogMinerEventProcessor;
+import io.debezium.connector.oracle.logminer.events.LogMinerEventRow;
 import io.debezium.pipeline.ErrorHandler;
 import io.debezium.pipeline.EventDispatcher;
 import io.debezium.relational.TableId;
@@ -91,6 +91,10 @@ public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
     /**
      * A wrapped task to read all redo log for table and also supports read bounded (from
      * lowWatermark to highWatermark) redo log.
+     *
+     * <p>Overrides {@link LogMinerStreamingChangeEventSource#handleRowPreProcessing} to intercept
+     * each LogMiner event row and check whether the bounded split's high-watermark has been
+     * reached.
      */
     public static class RedoLogSplitReadTask extends LogMinerStreamingChangeEventSource {
 
@@ -99,12 +103,6 @@ public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
         EventDispatcher<OraclePartition, TableId> eventDispatcher;
         private final WatermarkDispatcher watermarkDispatcher;
         private final ErrorHandler errorHandler;
-        private final OracleConnectorConfig connectorConfig;
-        private final OracleConnection connection;
-
-        private final OracleDatabaseSchema schema;
-
-        private final OracleStreamingChangeEventSourceMetrics metrics;
 
         public RedoLogSplitReadTask(
                 OracleConnectorConfig connectorConfig,
@@ -114,7 +112,7 @@ public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
                 ErrorHandler errorHandler,
                 OracleDatabaseSchema schema,
                 Configuration jdbcConfig,
-                OracleStreamingChangeEventSourceMetrics metrics,
+                AbstractOracleStreamingChangeEventSourceMetrics metrics,
                 StreamSplit redoLogSplit) {
             super(
                     connectorConfig,
@@ -129,41 +127,31 @@ public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
             this.eventDispatcher = eventDispatcher;
             this.watermarkDispatcher = watermarkDispatcher;
             this.errorHandler = errorHandler;
-            this.connectorConfig = connectorConfig;
-            this.connection = connection;
-            this.metrics = metrics;
-            this.schema = schema;
         }
 
         @Override
         public void execute(
                 ChangeEventSourceContext context,
                 OraclePartition partition,
-                OracleOffsetContext offsetContext) {
+                OracleOffsetContext offsetContext)
+                throws InterruptedException {
             super.execute(context, partition, offsetContext);
         }
 
         /**
-         * Delegate {@link EventProcessorFactory} to produce a LogMinerEventProcessor with enhanced
-         * processRow method to distinguish whether is bounded.
+         * Intercepts each LogMiner event row before normal processing to detect the end of a
+         * bounded stream split. Returns {@code true} (skip + stop) when the row's SCN has reached
+         * or passed the split's high-watermark.
          */
         @Override
-        protected LogMinerEventProcessor createProcessor(
-                ChangeEventSourceContext context,
-                OraclePartition partition,
-                OracleOffsetContext offsetContext) {
-            return EventProcessorFactory.createProcessor(
-                    context,
-                    connectorConfig,
-                    connection,
-                    eventDispatcher,
-                    watermarkDispatcher,
-                    partition,
-                    offsetContext,
-                    schema,
-                    metrics,
+        protected boolean handleRowPreProcessing(LogMinerEventRow row) throws InterruptedException {
+            return EventProcessorFactory.reachEndingOffset(
+                    getPartition(),
+                    row,
+                    redoLogSplit,
                     errorHandler,
-                    redoLogSplit);
+                    watermarkDispatcher,
+                    getContext());
         }
     }
 }

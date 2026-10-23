@@ -19,7 +19,6 @@ package org.apache.flink.cdc.debezium.internal;
 
 import org.apache.flink.cdc.debezium.DebeziumSourceFunction;
 
-import io.debezium.embedded.EmbeddedEngine;
 import io.debezium.engine.DebeziumEngine;
 import org.apache.kafka.common.utils.ThreadUtils;
 import org.apache.kafka.connect.errors.ConnectException;
@@ -87,7 +86,7 @@ public class FlinkOffsetBackingStore implements OffsetBackingStore {
             throw new RuntimeException(e);
         }
 
-        String engineName = (String) conf.get(EmbeddedEngine.ENGINE_NAME.name());
+        String engineName = (String) conf.get("name");
         Converter keyConverter = new JsonConverter();
         Converter valueConverter = new JsonConverter();
         keyConverter.configure(config.originals(), true);
@@ -199,5 +198,10 @@ public class FlinkOffsetBackingStore implements OffsetBackingStore {
                     }
                     return null;
                 });
+    }
+
+    @Override
+    public java.util.Set<java.util.Map<String, Object>> connectorPartitions(String connectorName) {
+        return java.util.Collections.emptySet();
     }
 }

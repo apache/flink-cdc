@@ -55,6 +55,8 @@ limitations under the License.
                                     <include>io.debezium:debezium-api</include>
                                     <include>io.debezium:debezium-embedded</include>
                                     <include>io.debezium:debezium-core</include>
+                                    <include>io.debezium:debezium-common</include>
+                                    <include>io.debezium:debezium-openlineage-api</include>
                                     <incldue>io.debezium:debezium-ddl-parser</incldue>
                                     <include>io.debezium:debezium-connector-oracle</include>
                                     <include>org.apache.flink:flink-connector-debezium</include>

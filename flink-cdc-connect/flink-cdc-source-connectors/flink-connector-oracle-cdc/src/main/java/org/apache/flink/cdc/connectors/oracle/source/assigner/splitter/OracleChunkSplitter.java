@@ -58,7 +58,7 @@ public class OracleChunkSplitter extends JdbcSourceChunkSplitter {
         // oracle query only use schema and table.
         String quoteSchemaAndTable = OracleUtils.quoteSchemaAndTable(tableId);
         return JdbcChunkUtils.queryMinMax(
-                jdbc, quoteSchemaAndTable, jdbc.quotedColumnIdString(splitColumn.name()));
+                jdbc, quoteSchemaAndTable, jdbc.quoteIdentifier(splitColumn.name()));
     }
 
     @Override

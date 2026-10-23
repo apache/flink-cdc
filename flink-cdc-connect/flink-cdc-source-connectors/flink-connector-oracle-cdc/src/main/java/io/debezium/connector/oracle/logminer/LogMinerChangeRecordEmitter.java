@@ -16,22 +16,27 @@ import io.debezium.pipeline.spi.OffsetContext;
 import io.debezium.pipeline.spi.Partition;
 import io.debezium.relational.Table;
 import io.debezium.util.Clock;
-import oracle.sql.ROWID;
-import org.apache.kafka.connect.data.SchemaAndValue;
-import org.apache.kafka.connect.header.ConnectHeaders;
-
-import java.util.Optional;
 
 /**
- * Copied from Debezium 1.9.8.Final. Emits change records based on an event read from Oracle
+ * Vendored from Debezium 3.4.2.Final. Emits change records based on an event read from Oracle
  * LogMiner.
  *
- * <p>This class add RowId and overrides the emit methods to put rowId in the header.
+ * <p>Changes from the Flink CDC 3.6 / Debezium 1.9.x version:
+ *
+ * <ul>
+ *   <li>Constructor reduced from 10 args to 9 args (rowId removed) to match the signature called by
+ *       {@code UnbufferedLogMinerStreamingChangeEventSource.dispatchEvent()} in Debezium
+ *       3.4.2.Final.
+ *   <li>The {@code getEmitConnectHeaders()} override that injected the ROWID into Kafka Connect
+ *       headers has been removed. {@code OracleSourceFetchTaskContext.isRecordBetween()} has been
+ *       updated to handle the absent header by falling back to SCN-range inclusion. Tables without
+ *       a primary key that use multi-chunk ROWID splits should set {@code
+ *       scan.incremental.snapshot.chunk.key-column} explicitly.
+ * </ul>
  */
 public class LogMinerChangeRecordEmitter extends BaseChangeRecordEmitter<Object> {
 
     private final Operation operation;
-    private final String rowId;
 
     public LogMinerChangeRecordEmitter(
             OracleConnectorConfig connectorConfig,
@@ -42,11 +47,9 @@ public class LogMinerChangeRecordEmitter extends BaseChangeRecordEmitter<Object>
             Object[] newValues,
             Table table,
             OracleDatabaseSchema schema,
-            Clock clock,
-            String rowId) {
+            Clock clock) {
         super(connectorConfig, partition, offset, schema, table, clock, oldValues, newValues);
         this.operation = operation;
-        this.rowId = rowId;
     }
 
     public LogMinerChangeRecordEmitter(
@@ -58,8 +61,7 @@ public class LogMinerChangeRecordEmitter extends BaseChangeRecordEmitter<Object>
             Object[] newValues,
             Table table,
             OracleDatabaseSchema schema,
-            Clock clock,
-            String rowId) {
+            Clock clock) {
         this(
                 connectorConfig,
                 partition,
@@ -69,8 +71,7 @@ public class LogMinerChangeRecordEmitter extends BaseChangeRecordEmitter<Object>
                 newValues,
                 table,
                 schema,
-                clock,
-                rowId);
+                clock);
     }
 
     private static Operation getOperation(EventType eventType) {
@@ -90,12 +91,5 @@ public class LogMinerChangeRecordEmitter extends BaseChangeRecordEmitter<Object>
     @Override
     public Operation getOperation() {
         return operation;
-    }
-
-    @Override
-    protected Optional<ConnectHeaders> getEmitConnectHeaders() {
-        ConnectHeaders headers = new ConnectHeaders();
-        headers.add(ROWID.class.getSimpleName(), new SchemaAndValue(null, rowId));
-        return Optional.of(headers);
     }
 }

@@ -18,7 +18,7 @@
 package org.apache.flink.cdc.connectors.db2.source.config;
 
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfigFactory;
-import org.apache.flink.cdc.connectors.base.source.EmbeddedFlinkDatabaseHistory;
+import org.apache.flink.cdc.connectors.base.source.EmbeddedFlinkSchemaHistory;
 
 import io.debezium.config.Configuration;
 import io.debezium.connector.db2.Db2Connector;
@@ -43,7 +43,7 @@ public class Db2SourceConfigFactory extends JdbcSourceConfigFactory {
 
         // set database history impl to flink database history
         props.setProperty(
-                "database.history", EmbeddedFlinkDatabaseHistory.class.getCanonicalName());
+                "database.history", EmbeddedFlinkSchemaHistory.class.getCanonicalName());
         props.setProperty("database.history.instance.name", UUID.randomUUID() + "_" + subtask);
 
         // hard code server name, because we don't need to distinguish it, docs:

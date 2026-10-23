@@ -288,7 +288,7 @@ public abstract class JdbcSourceChunkSplitter implements ChunkSplitter {
         return JdbcChunkUtils.queryMinMax(
                 jdbc,
                 jdbc.quotedTableIdString(tableId),
-                jdbc.quotedColumnIdString(splitColumn.name()));
+                jdbc.quoteIdentifier(splitColumn.name()));
     }
 
     /**
@@ -308,7 +308,7 @@ public abstract class JdbcSourceChunkSplitter implements ChunkSplitter {
         return JdbcChunkUtils.queryMin(
                 jdbc,
                 jdbc.quotedTableIdString(tableId),
-                jdbc.quotedColumnIdString(splitColumn.name()),
+                jdbc.quoteIdentifier(splitColumn.name()),
                 excludedLowerBound);
     }
 

@@ -18,7 +18,7 @@
 package org.apache.flink.cdc.connectors.postgres.source.config;
 
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfigFactory;
-import org.apache.flink.cdc.connectors.base.source.EmbeddedFlinkDatabaseHistory;
+import org.apache.flink.cdc.connectors.base.source.EmbeddedFlinkSchemaHistory;
 
 import io.debezium.config.Configuration;
 import io.debezium.connector.postgresql.PostgresConnector;
@@ -81,7 +81,7 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
         props.setProperty("slot.name", checkNotNull(slotName));
         // database history
         props.setProperty(
-                "database.history", EmbeddedFlinkDatabaseHistory.class.getCanonicalName());
+                "database.history", EmbeddedFlinkSchemaHistory.class.getCanonicalName());
         props.setProperty("database.history.instance.name", UUID.randomUUID() + "_" + subtaskId);
         props.setProperty("database.history.skip.unparseable.ddl", String.valueOf(true));
         props.setProperty("database.history.refer.ddl", String.valueOf(true));
