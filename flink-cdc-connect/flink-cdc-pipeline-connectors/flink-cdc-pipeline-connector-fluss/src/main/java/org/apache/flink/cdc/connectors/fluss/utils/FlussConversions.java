@@ -42,12 +42,14 @@ import org.apache.flink.cdc.common.types.ZonedTimestampType;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.util.CollectionUtil;
 
+import org.apache.fluss.metadata.DataLakeFormat;
 import org.apache.fluss.metadata.Schema;
 import org.apache.fluss.metadata.TableDescriptor;
 
 import javax.annotation.Nullable;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -177,13 +179,23 @@ public class FlussConversions {
                             .orElse(Collections.emptyList());
         }
 
-        return TableDescriptor.builder()
-                .schema(schema)
-                .partitionedBy(cdcSchema.partitionKeys())
-                .distributedBy(bucketNum, bucketKeys)
-                .comment(cdcSchema.comment())
-                .properties(tableProperties)
-                .build();
+        TableDescriptor.Builder builder =
+                TableDescriptor.builder()
+                        .schema(schema)
+                        .partitionedBy(cdcSchema.partitionKeys())
+                        .distributedBy(bucketNum, bucketKeys)
+                        .comment(cdcSchema.comment());
+        tableProperties.forEach(
+                (key, value) -> {
+                    if (Arrays.stream(DataLakeFormat.values())
+                            .anyMatch(format -> key.startsWith(format + "."))) {
+                        // Lake options must use custom properties to pass Fluss table validation.
+                        builder.customProperty(key, value);
+                    } else {
+                        builder.property(key, value);
+                    }
+                });
+        return builder.build();
     }
 
     public static org.apache.fluss.metadata.Schema toFlussSchema(

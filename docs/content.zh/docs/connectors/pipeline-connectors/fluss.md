@@ -150,6 +150,13 @@ Pipeline Connector Options
       <td>将 Fluss table 支持的参数传递给 pipeline，参考，See <a href="https://fluss.apache.org/docs/engine-flink/options/#storage-options">Fluss table options</a>。</td>
     </tr>
     <tr>
+      <td>properties.&lt;data-lake-format&gt;.*</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>建表时向 Fluss 传递数据湖表参数。支持的前缀跟随 Fluss 客户端的数据湖格式，当前包括 <code>properties.paimon.*</code>、<code>properties.iceberg.*</code>、<code>properties.hudi.*</code> 和 <code>properties.lance.*</code>。仅移除最外层的 <code>properties.</code> 前缀，Flink CDC 不校验其中的具体参数。</td>
+    </tr>
+    <tr>
       <td>properties.client.*</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
@@ -185,6 +192,31 @@ sink:
 ## 使用说明
 
 * 支持 Fluss 主键表和日志表。
+
+### 数据湖表参数
+
+要自动创建启用湖存储的 Fluss 表，可以使用以下 Sink 配置：
+
+```yaml
+sink:
+  type: fluss
+  bootstrap.servers: localhost:9123
+  properties.table.datalake.enabled: 'true'
+  properties.table.datalake.freshness: 30s
+  properties.paimon.file.format: orc
+  properties.paimon.deletion-vectors.enabled: 'true'
+```
+
+连接器仅移除 `properties.`，因此 `properties.paimon.file.format` 会作为
+`paimon.file.format` 传入 Fluss 表参数。使用 Iceberg 时，配置 `properties.iceberg.*`，
+例如 `properties.iceberg.write.format.default: parquet`。
+数据湖格式和分层服务需要在 Fluss 中配置，详见
+[Fluss 湖存储文档](https://fluss.apache.org/docs/streaming-lakehouse/datalake-formats/paimon/)。
+
+这些参数对该 Sink 创建的所有表生效，不会修改已有表的属性。
+Flink CDC 允许支持的数据湖前缀下的任意参数名和值，由 Fluss 和对应的湖集成负责解释和校验；
+如果下游实现不拒绝未知参数，拼写错误也可能被忽略。
+不支持的前缀（例如 `properties.icerberg.*`）仍会被 Flink CDC 拒绝。
 
 ### 动态 Source 订阅
 

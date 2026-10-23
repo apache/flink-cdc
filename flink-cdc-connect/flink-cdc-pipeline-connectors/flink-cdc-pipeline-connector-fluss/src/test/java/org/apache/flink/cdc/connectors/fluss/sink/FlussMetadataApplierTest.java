@@ -1175,6 +1175,37 @@ class FlussMetadataApplierTest {
     }
 
     @Test
+    void testCreateTableWithDataLakeProperties() throws Exception {
+        Map<String, String> tableProperties = new HashMap<>();
+        tableProperties.put("paimon.file.format", "orc");
+        tableProperties.put("iceberg.write.format.default", "parquet");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.BIGINT().notNull())
+                        .primaryKey("id")
+                        .build();
+        TableId tableId = TableId.tableId(DATABASE_NAME, "table1");
+
+        try (FlussMetaDataApplier applier =
+                new FlussMetaDataApplier(
+                        FLUSS_CLUSTER_EXTENSION.getClientConfig(),
+                        tableProperties,
+                        Collections.emptyMap(),
+                        Collections.emptyMap())) {
+            applier.applySchemaChange(new CreateTableEvent(tableId, schema));
+
+            TableDescriptor tableDescriptor =
+                    admin.getTableInfo(new TablePath(DATABASE_NAME, "table1"))
+                            .get()
+                            .toTableDescriptor();
+            assertThat(tableDescriptor.getCustomProperties())
+                    .containsExactlyInAnyOrderEntriesOf(tableProperties);
+            assertThat(tableDescriptor.getProperties())
+                    .doesNotContainKeys("paimon.file.format", "iceberg.write.format.default");
+        }
+    }
+
+    @Test
     void testCreateTableWithTableOptions() throws Exception {
         Schema schema =
                 Schema.newBuilder()
