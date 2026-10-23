@@ -64,7 +64,7 @@ import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtil
 class MySqlOscITCase extends MySqlSourceTestBase {
     private static final MySqlContainer MYSQL8_CONTAINER = createMySqlContainer(MySqlVersion.V8_0);
 
-    private static final String PERCONA_TOOLKIT = "perconalab/percona-toolkit:3.7.1";
+    private static final String PERCONA_TOOLKIT = "perconalab/percona-toolkit:3.7.1-4";
 
     protected static final GenericContainer<?> PERCONA_TOOLKIT_CONTAINER =
             createPerconaToolkitContainer();
