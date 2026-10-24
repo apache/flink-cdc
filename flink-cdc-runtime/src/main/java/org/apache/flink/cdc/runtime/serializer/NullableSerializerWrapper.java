@@ -182,11 +182,16 @@ public class NullableSerializerWrapper<T> extends TypeSerializer<T> {
 
             NullableSerializerWrapper<T> newNullableSerializerWrapper =
                     (NullableSerializerWrapper<T>) newSerializer;
-            if (!innerSerializer.equals(newNullableSerializerWrapper.innerSerializer)) {
-                return TypeSerializerSchemaCompatibility.incompatible();
-            } else {
+            TypeSerializerSchemaCompatibility<?> innerCompatibility =
+                    NestedSerializersSnapshotDelegate.resolveSerializerCompatibility(
+                            innerSerializer, newNullableSerializerWrapper.innerSerializer);
+            if (innerCompatibility.isCompatibleAsIs()) {
                 return TypeSerializerSchemaCompatibility.compatibleAsIs();
             }
+            if (innerCompatibility.isCompatibleAfterMigration()) {
+                return TypeSerializerSchemaCompatibility.compatibleAfterMigration();
+            }
+            return TypeSerializerSchemaCompatibility.incompatible();
         }
     }
 }

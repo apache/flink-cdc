@@ -61,7 +61,7 @@ import static org.apache.flink.cdc.common.types.DataTypeChecks.getScale;
  * +--------------------------------+-----------------------------------------+
  * | DATE                           | int (number of days since epoch)        |
  * +--------------------------------+-----------------------------------------+
- * | TIME                           | int (number of milliseconds of the day) |
+ * | TIME                           | {@link TimeData}                        |
  * +--------------------------------+-----------------------------------------+
  * | TIMESTAMP                      | {@link TimestampData}                   |
  * +--------------------------------+-----------------------------------------+
