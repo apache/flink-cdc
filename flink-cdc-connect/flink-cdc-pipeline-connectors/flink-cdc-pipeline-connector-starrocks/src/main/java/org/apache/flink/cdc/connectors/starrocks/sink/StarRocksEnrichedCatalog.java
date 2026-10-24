@@ -28,15 +28,31 @@ import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /** An enriched {@code StarRocksCatalog} with more schema evolution abilities. */
 public class StarRocksEnrichedCatalog extends StarRocksCatalog {
+    private static final Logger LOG = LoggerFactory.getLogger(StarRocksEnrichedCatalog.class);
+    private static final Pattern VERSION_PATTERN = Pattern.compile("(\\d+)\\.(\\d+)(?:\\.(\\d+))?");
+
+    private final String jdbcUrl;
+    private final String username;
+    private final String password;
+    private Boolean supportsAlterTableComment;
+
     public StarRocksEnrichedCatalog(String jdbcUrl, String username, String password) {
         super(jdbcUrl, username, password);
+        this.jdbcUrl = jdbcUrl;
+        this.username = username;
+        this.password = password;
     }
-
-    private static final Logger LOG = LoggerFactory.getLogger(StarRocksEnrichedCatalog.class);
 
     public void truncateTable(String databaseName, String tableName)
             throws StarRocksCatalogException {
@@ -137,6 +153,41 @@ public class StarRocksEnrichedCatalog extends StarRocksCatalog {
         }
     }
 
+    public boolean supportsAlterTableComment() throws StarRocksCatalogException {
+        if (supportsAlterTableComment == null) {
+            supportsAlterTableComment =
+                    isAlterTableCommentSupportedVersion(fetchStarRocksVersion());
+        }
+        return supportsAlterTableComment;
+    }
+
+    public void alterTableComment(String databaseName, String tableName, String comment)
+            throws StarRocksCatalogException {
+        checkTableArgument(databaseName, tableName);
+        Preconditions.checkArgument(comment != null, "Table comment cannot be null.");
+        String alterSql = buildAlterTableCommentSql(databaseName, tableName, comment);
+        try {
+            long startTimeMillis = System.currentTimeMillis();
+            executeUpdateStatement(alterSql);
+            LOG.info(
+                    "Success to alter table {}.{} comment, duration: {}ms, sql: {}",
+                    databaseName,
+                    tableName,
+                    System.currentTimeMillis() - startTimeMillis,
+                    alterSql);
+        } catch (Exception e) {
+            LOG.error(
+                    "Failed to alter table {}.{} comment, sql: {}",
+                    databaseName,
+                    tableName,
+                    alterSql,
+                    e);
+            throw new StarRocksCatalogException(
+                    String.format("Failed to alter table %s.%s comment", databaseName, tableName),
+                    e);
+        }
+    }
+
     private String buildTruncateTableSql(String databaseName, String tableName) {
         return String.format("TRUNCATE TABLE `%s`.`%s`;", databaseName, tableName);
     }
@@ -158,6 +209,13 @@ public class StarRocksEnrichedCatalog extends StarRocksCatalog {
                 "ALTER TABLE `%s`.`%s` MODIFY COLUMN %s", databaseName, tableName, columnStmt);
     }
 
+    private String buildAlterTableCommentSql(
+            String databaseName, String tableName, String comment) {
+        return String.format(
+                "ALTER TABLE `%s`.`%s` COMMENT = \"%s\";",
+                databaseName, tableName, escapeSqlStringLiteral(comment));
+    }
+
     private void executeUpdateStatement(String sql) throws StarRocksCatalogException {
         try {
             Method m =
@@ -169,6 +227,52 @@ public class StarRocksEnrichedCatalog extends StarRocksCatalog {
         } catch (InvocationTargetException | NoSuchMethodException | IllegalAccessException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    private String fetchStarRocksVersion() throws StarRocksCatalogException {
+        try {
+            return executeScalar("SELECT current_version()");
+        } catch (Exception e) {
+            LOG.debug("Failed to get StarRocks version by current_version().", e);
+        }
+
+        try {
+            // version() returns the MySQL-compatible server version, not the StarRocks version.
+            return executeScalar("SELECT @@version_comment");
+        } catch (Exception e) {
+            throw new StarRocksCatalogException("Failed to get StarRocks version.", e);
+        }
+    }
+
+    private String executeScalar(String sql) throws SQLException {
+        try (Connection connection = DriverManager.getConnection(jdbcUrl, username, password);
+                Statement statement = connection.createStatement();
+                ResultSet resultSet = statement.executeQuery(sql)) {
+            if (resultSet.next()) {
+                return resultSet.getString(1);
+            }
+        }
+        throw new SQLException("No result returned for SQL: " + sql);
+    }
+
+    static boolean isAlterTableCommentSupportedVersion(String version) {
+        if (StringUtils.isNullOrWhitespaceOnly(version)) {
+            return false;
+        }
+        Matcher matcher = VERSION_PATTERN.matcher(version);
+        if (!matcher.find()) {
+            return false;
+        }
+        int major = Integer.parseInt(matcher.group(1));
+        int minor = Integer.parseInt(matcher.group(2));
+        return major > 3 || (major == 3 && minor >= 1);
+    }
+
+    static String escapeSqlStringLiteral(String str) {
+        return str.replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r");
     }
 
     private void checkTableArgument(String databaseName, String tableName) {
