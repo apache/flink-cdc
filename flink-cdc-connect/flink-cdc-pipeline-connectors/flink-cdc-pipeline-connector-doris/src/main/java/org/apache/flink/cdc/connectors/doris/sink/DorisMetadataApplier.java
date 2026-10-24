@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.doris.sink;
 
+import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
@@ -157,7 +158,8 @@ public class DorisMetadataApplier implements MetadataApplier {
         }
     }
 
-    private Map<String, FieldSchema> buildFields(Schema schema) {
+    @VisibleForTesting
+    Map<String, FieldSchema> buildFields(Schema schema) {
         // Guaranteed the order of column
         Map<String, FieldSchema> fieldSchemaMap = new LinkedHashMap<>();
         List<String> columnNameList = schema.getColumnNames();
@@ -174,6 +176,9 @@ public class DorisMetadataApplier implements MetadataApplier {
                 typeString =
                         DorisTypeMapper.toDorisType(
                                 DataTypeUtils.toFlinkDataType(column.getType()));
+            }
+            if (!column.getType().isNullable()) {
+                typeString += " NOT NULL";
             }
             fieldSchemaMap.put(
                     column.getName(),
