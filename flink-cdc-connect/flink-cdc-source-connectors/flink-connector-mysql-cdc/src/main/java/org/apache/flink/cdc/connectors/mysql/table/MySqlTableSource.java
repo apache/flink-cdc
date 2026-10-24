@@ -104,6 +104,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
     private final boolean assignUnboundedChunkFirst;
 
     private final boolean appendOnly;
+    private final String snapshotFilter;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -146,7 +147,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
             boolean parseOnlineSchemaChanges,
             boolean useLegacyJsonFormat,
             boolean assignUnboundedChunkFirst,
-            boolean appendOnly) {
+            boolean appendOnly,
+            @Nullable String snapshotFilter) {
         this.physicalSchema = physicalSchema;
         this.port = port;
         this.hostname = checkNotNull(hostname);
@@ -181,6 +183,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
         this.useLegacyJsonFormat = useLegacyJsonFormat;
         this.assignUnboundedChunkFirst = assignUnboundedChunkFirst;
         this.appendOnly = appendOnly;
+        this.snapshotFilter = snapshotFilter;
     }
 
     @Override
@@ -245,6 +248,9 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                             .parseOnLineSchemaChanges(parseOnlineSchemaChanges)
                             .useLegacyJsonFormat(useLegacyJsonFormat)
                             .assignUnboundedChunkFirst(assignUnboundedChunkFirst)
+                            .snapshotFilters(
+                                    escapeDot(database) + "." + escapeDot(tableName),
+                                    snapshotFilter)
                             .build();
             return SourceProvider.of(parallelSource);
         } else {
@@ -335,7 +341,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                         parseOnlineSchemaChanges,
                         useLegacyJsonFormat,
                         assignUnboundedChunkFirst,
-                        appendOnly);
+                        appendOnly,
+                        snapshotFilter);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
@@ -382,7 +389,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 && parseOnlineSchemaChanges == that.parseOnlineSchemaChanges
                 && useLegacyJsonFormat == that.useLegacyJsonFormat
                 && assignUnboundedChunkFirst == that.assignUnboundedChunkFirst
-                && Objects.equals(appendOnly, that.appendOnly);
+                && Objects.equals(appendOnly, that.appendOnly)
+                && Objects.equals(snapshotFilter, that.snapshotFilter);
     }
 
     @Override
@@ -420,7 +428,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 parseOnlineSchemaChanges,
                 useLegacyJsonFormat,
                 assignUnboundedChunkFirst,
-                appendOnly);
+                appendOnly,
+                snapshotFilter);
     }
 
     @Override
@@ -444,5 +453,9 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
             }
         }
         return newDbzProperties;
+    }
+
+    private String escapeDot(String str) {
+        return str.replace(".", "\\.");
     }
 }

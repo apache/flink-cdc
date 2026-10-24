@@ -324,6 +324,16 @@ public class MySqlSourceBuilder<T> {
     }
 
     /**
+     * When reading a table snapshot, the rows of captured tables will be filtered using the
+     * specified SQL WHERE clause during the snapshot query. Binlog events, including snapshot
+     * backfill, are not filtered. The first matching table pattern in call order wins.
+     */
+    public MySqlSourceBuilder<T> snapshotFilters(String table, String filter) {
+        this.configFactory.snapshotFilters(table, filter);
+        return this;
+    }
+
+    /**
      * Build the {@link MySqlSource}.
      *
      * @return a MySqlParallelSource with the settings made for this builder.
