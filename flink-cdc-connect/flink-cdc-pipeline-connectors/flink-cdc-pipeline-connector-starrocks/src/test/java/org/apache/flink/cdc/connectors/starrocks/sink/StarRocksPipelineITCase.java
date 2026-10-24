@@ -37,7 +37,9 @@ import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.util.RestartStrategyUtils;
+import org.apache.flink.table.api.ValidationException;
 
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -217,5 +219,22 @@ class StarRocksPipelineITCase extends StarRocksSinkTestBase {
                         "21 | 1.732 | Disenchanted | 2023-01-01 00:00:00.0");
 
         assertEqualsInAnyOrder(expected, actual);
+    }
+
+    @Test
+    void testMultiTableTransactionFailsFastOnUnsupportedServerVersion() {
+        // StarRocks 3.5.10 does not support multi-table transaction stream load (requires >= 4.0),
+        // so enabling the option must fail during sink creation.
+        Configuration config =
+                new Configuration()
+                        .set(LOAD_URL, STARROCKS_CONTAINER.getLoadUrl())
+                        .set(JDBC_URL, STARROCKS_CONTAINER.getJdbcUrl())
+                        .set(USERNAME, StarRocksContainer.STARROCKS_USERNAME)
+                        .set(PASSWORD, StarRocksContainer.STARROCKS_PASSWORD)
+                        .set(StarRocksDataSinkOptions.SINK_MULTI_TABLE_TRANSACTION_ENABLED, true);
+
+        Assertions.assertThatThrownBy(() -> createStarRocksDataSink(config))
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining("requires StarRocks server version >= 4.0");
     }
 }
