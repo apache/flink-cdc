@@ -27,5 +27,6 @@ public enum OperationType {
     INSERT,
     UPDATE,
     REPLACE,
-    DELETE
+    DELETE,
+    UPDATE_BEFORE
 }

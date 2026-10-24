@@ -93,6 +93,11 @@ public class DataChangeEventSerializer extends TypeSerializerSingleton<DataChang
                         recordDataSerializer.deserialize(source),
                         recordDataSerializer.deserialize(source),
                         metaSerializer.deserialize(source));
+            case UPDATE_BEFORE:
+                return DataChangeEvent.updateBeforeEvent(
+                        tableId,
+                        recordDataSerializer.deserialize(source),
+                        metaSerializer.deserialize(source));
             case REPLACE:
                 return DataChangeEvent.replaceEvent(
                         tableId,
@@ -128,6 +133,11 @@ public class DataChangeEventSerializer extends TypeSerializerSingleton<DataChang
                         tableIdSerializer.copy(from.tableId()),
                         recordDataSerializer.copy(from.before()),
                         recordDataSerializer.copy(from.after()),
+                        metaSerializer.copy(from.meta()));
+            case UPDATE_BEFORE:
+                return DataChangeEvent.updateBeforeEvent(
+                        tableIdSerializer.copy(from.tableId()),
+                        recordDataSerializer.copy(from.before()),
                         metaSerializer.copy(from.meta()));
             case REPLACE:
                 return DataChangeEvent.replaceEvent(

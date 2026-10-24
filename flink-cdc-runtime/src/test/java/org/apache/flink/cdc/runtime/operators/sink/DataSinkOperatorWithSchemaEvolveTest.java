@@ -41,6 +41,7 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -321,6 +322,36 @@ class DataSinkOperatorWithSchemaEvolveTest {
                             new CreateTableEvent(CUSTOMERS_TABLEID, CUSTOMERS_SCHEMA),
                             insertEvent));
             dataSinkWriterOperatorHarness.clearOutputRecords();
+        }
+    }
+
+    @Test
+    void testUpdateBeforeAfterFailoverReceivesSchemaBeforeRetraction() throws Exception {
+        DataSinkOperatorAdapter dataSinkWriterOperator = new DataSinkOperatorAdapter();
+        try (RegularEventOperatorTestHarness<DataSinkOperatorAdapter, Event>
+                dataSinkWriterOperatorHarness = setupHarness(dataSinkWriterOperator)) {
+            dataSinkWriterOperatorHarness.registerOriginalSchema(
+                    CUSTOMERS_TABLEID, CUSTOMERS_SCHEMA);
+            dataSinkWriterOperatorHarness.registerEvolvedSchema(
+                    CUSTOMERS_TABLEID, CUSTOMERS_SCHEMA);
+            BinaryRecordDataGenerator recordDataGenerator =
+                    new BinaryRecordDataGenerator((RowType) CUSTOMERS_SCHEMA.toRowDataType());
+            DataChangeEvent updateBefore =
+                    DataChangeEvent.updateBeforeEvent(
+                            CUSTOMERS_TABLEID,
+                            recordDataGenerator.generate(
+                                    new Object[] {
+                                        new BinaryStringData("1"), new BinaryStringData("old")
+                                    }),
+                            Map.of("trace-id", "split-1"));
+
+            processDataChangeEvent(dataSinkWriterOperator, updateBefore);
+
+            assertOutputEvents(
+                    dataSinkWriterOperatorHarness,
+                    Arrays.asList(
+                            new CreateTableEvent(CUSTOMERS_TABLEID, CUSTOMERS_SCHEMA),
+                            updateBefore));
         }
     }
 }
