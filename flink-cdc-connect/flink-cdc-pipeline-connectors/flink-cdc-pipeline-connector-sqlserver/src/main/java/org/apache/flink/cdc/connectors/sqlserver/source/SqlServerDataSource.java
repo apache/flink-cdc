@@ -19,10 +19,12 @@ package org.apache.flink.cdc.connectors.sqlserver.source;
 
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
+import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.common.source.EventSourceProvider;
 import org.apache.flink.cdc.common.source.FlinkSourceProvider;
 import org.apache.flink.cdc.common.source.MetadataAccessor;
+import org.apache.flink.cdc.common.source.SupportsTableDiscovery;
 import org.apache.flink.cdc.connectors.sqlserver.source.config.SqlServerSourceConfig;
 import org.apache.flink.cdc.connectors.sqlserver.source.config.SqlServerSourceConfigFactory;
 import org.apache.flink.cdc.connectors.sqlserver.source.dialect.SqlServerDialect;
@@ -32,10 +34,11 @@ import org.apache.flink.cdc.debezium.table.DebeziumChangelogMode;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /** A {@link DataSource} for SQL Server CDC connector. */
 @Internal
-public class SqlServerDataSource implements DataSource {
+public class SqlServerDataSource implements DataSource, SupportsTableDiscovery {
 
     private final SqlServerSourceConfigFactory configFactory;
     private final SqlServerSourceConfig sqlServerSourceConfig;
@@ -70,6 +73,18 @@ public class SqlServerDataSource implements DataSource {
                         configFactory, deserializer, lsnFactory, sqlServerDialect);
 
         return FlinkSourceProvider.of(source);
+    }
+
+    @Override
+    public List<TableId> listCapturedTables() {
+        return createTableDiscoveryDialect().discoverDataCollections(sqlServerSourceConfig).stream()
+                .map(table -> TableId.tableId(table.catalog(), table.schema(), table.table()))
+                .collect(Collectors.toList());
+    }
+
+    @VisibleForTesting
+    SqlServerDialect createTableDiscoveryDialect() {
+        return new SqlServerDialect(sqlServerSourceConfig);
     }
 
     @Override

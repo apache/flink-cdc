@@ -28,8 +28,12 @@ import org.apache.flink.api.connector.sink2.TwoPhaseCommittingSink;
 import org.apache.flink.api.connector.sink2.WriterInitContext;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.sink.SupportsStreamGraphPostProcessing;
 import org.apache.flink.cdc.connectors.iceberg.sink.v2.compaction.CompactionOperator;
 import org.apache.flink.cdc.connectors.iceberg.sink.v2.compaction.CompactionOptions;
+import org.apache.flink.cdc.connectors.iceberg.sink.v2.maintenance.MaintenanceGraphAdapter;
+import org.apache.flink.cdc.connectors.iceberg.sink.v2.maintenance.MaintenanceOptions;
+import org.apache.flink.cdc.connectors.iceberg.sink.v2.maintenance.TableMaintenanceTopology;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
 import org.apache.flink.metrics.groups.SinkCommitterMetricGroup;
 import org.apache.flink.runtime.checkpoint.CheckpointIDCounter;
@@ -40,6 +44,7 @@ import org.apache.flink.streaming.api.connector.sink2.WithPostCommitTopology;
 import org.apache.flink.streaming.api.connector.sink2.WithPreCommitTopology;
 import org.apache.flink.streaming.api.connector.sink2.WithPreWriteTopology;
 import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.graph.StreamGraph;
 
 import java.time.ZoneId;
 import java.util.Collection;
@@ -54,6 +59,7 @@ public class IcebergSink
                 WithPreCommitTopology<Event, WriteResultWrapper>,
                 TwoPhaseCommittingSink<Event, WriteResultWrapper>,
                 WithPostCommitTopology<Event, WriteResultWrapper>,
+                SupportsStreamGraphPostProcessing,
                 SupportsWriterState<Event, IcebergWriterState> {
 
     protected final Map<String, String> catalogOptions;
@@ -61,6 +67,9 @@ public class IcebergSink
     protected final Map<String, String> hadoopConfOptions;
 
     private final ZoneId zoneId;
+
+    private final MaintenanceOptions maintenanceOptions;
+    private final MaintenanceGraphAdapter maintenanceGraphAdapter;
 
     private final CompactionOptions compactionOptions;
 
@@ -75,6 +84,46 @@ public class IcebergSink
             CompactionOptions compactionOptions,
             String jobIdPrefix,
             Map<String, String> hadoopConfOptions) {
+        this(
+                catalogOptions,
+                tableOptions,
+                zoneId,
+                compactionOptions,
+                jobIdPrefix,
+                hadoopConfOptions,
+                MaintenanceOptions.disabled());
+    }
+
+    public IcebergSink(
+            Map<String, String> catalogOptions,
+            Map<String, String> tableOptions,
+            ZoneId zoneId,
+            CompactionOptions compactionOptions,
+            String jobIdPrefix,
+            Map<String, String> hadoopConfOptions,
+            MaintenanceOptions maintenanceOptions) {
+        this(
+                catalogOptions,
+                tableOptions,
+                zoneId,
+                compactionOptions,
+                jobIdPrefix,
+                hadoopConfOptions,
+                maintenanceOptions,
+                new MaintenanceGraphAdapter());
+    }
+
+    public IcebergSink(
+            Map<String, String> catalogOptions,
+            Map<String, String> tableOptions,
+            ZoneId zoneId,
+            CompactionOptions compactionOptions,
+            String jobIdPrefix,
+            Map<String, String> hadoopConfOptions,
+            MaintenanceOptions maintenanceOptions,
+            MaintenanceGraphAdapter maintenanceGraphAdapter) {
+        this.maintenanceOptions = maintenanceOptions;
+        this.maintenanceGraphAdapter = maintenanceGraphAdapter;
         this.catalogOptions = catalogOptions;
         this.tableOptions = tableOptions;
         this.zoneId = zoneId;
@@ -82,6 +131,16 @@ public class IcebergSink
         this.jobId = jobIdPrefix + UUID.randomUUID();
         this.operatorId = UUID.randomUUID().toString();
         this.hadoopConfOptions = hadoopConfOptions;
+    }
+
+    @Override
+    public boolean requiresStreamGraphPostProcessing() {
+        return maintenanceOptions.get(MaintenanceOptions.ENABLED);
+    }
+
+    @Override
+    public void postProcessStreamGraph(StreamGraph graph) {
+        maintenanceGraphAdapter.postProcessStreamGraph(graph);
     }
 
     @Override
@@ -183,6 +242,12 @@ public class IcebergSink
     @Override
     public void addPostCommitTopology(
             DataStream<CommittableMessage<WriteResultWrapper>> committableMessageDataStream) {
+        TableMaintenanceTopology.append(
+                committableMessageDataStream.getExecutionEnvironment(),
+                catalogOptions,
+                hadoopConfOptions,
+                maintenanceOptions,
+                maintenanceGraphAdapter);
         if (compactionOptions.isEnabled()) {
             TypeInformation<CommittableMessage<WriteResultWrapper>> typeInformation =
                     CommittableMessageTypeInfo.of(this::getCommittableSerializer);
