@@ -117,6 +117,7 @@ public class OracleDataSourceFactory implements DataSourceFactory {
                 config.get(OracleDataSourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
         boolean skipSnapshotBackfill =
                 config.get(OracleDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP);
+        double recordsPerSecond = config.get(OracleDataSourceOptions.RECORDS_PER_SECOND);
         OracleSourceConfigFactory configFactory = new OracleSourceConfigFactory();
         configFactory.url(url);
         configFactory.hostname(hostname);
@@ -138,6 +139,7 @@ public class OracleDataSourceFactory implements DataSourceFactory {
         configFactory.skipSnapshotBackfill(skipSnapshotBackfill);
         configFactory.includeSchemaChanges(true);
         configFactory.serverTimeZone(serverTimeZone);
+        configFactory.recordsPerSecond(recordsPerSecond);
 
         Selectors selectors = new Selectors.SelectorsBuilder().includeTables(tables).build();
         String[] capturedTables = getTableList(configFactory.create(0), selectors);
@@ -204,6 +206,7 @@ public class OracleDataSourceFactory implements DataSourceFactory {
         options.add(OracleDataSourceOptions.LOG_MINING_STRATEGY);
         options.add(OracleDataSourceOptions.DATABASE_CONNECTION_ADAPTER);
         options.add(OracleDataSourceOptions.SCAN_STARTUP_MODE);
+        options.add(OracleDataSourceOptions.RECORDS_PER_SECOND);
         return options;
     }
 
