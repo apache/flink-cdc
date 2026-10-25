@@ -8,7 +8,7 @@ Historical release branches retain their Hugo sources and build scripts.
 Install Node.js 22 LTS and npm, then run from this directory:
 
 ```sh
-npm install --package-lock=false
+npm ci
 npm start
 ```
 
@@ -66,8 +66,8 @@ existing Maven/Javadoc steps in the Java container. Javadoc remains at
 `target/api/java/`. The alias gets its own site build and a copy of Javadoc.
 Branches without `package.json` continue to use their original Hugo script.
 
-The npm lockfile is deferred to a separate change. Until then, installation does
-not generate one, and transitive dependency versions are not pinned.
+The committed npm lockfile pins dependency versions. Use `npm ci` for a clean
+installation, and commit lockfile updates when changing dependencies with `npm install`.
 
 To build the complete site and Javadoc locally, select Java 11 with SDKMAN and run
 `.github/workflows/docs.sh` from the repository root. A site-only build needs no JDK.

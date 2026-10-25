@@ -34,7 +34,7 @@ git config --global --add safe.directory /root/flink-cdc
 
 # CI builds the site on the host before generating Javadoc in the Java container.
 if [ "${DOCS_SKIP_SITE_BUILD:-false}" != "true" ]; then
-    npm --prefix docs install --package-lock=false
+    npm --prefix docs ci
     npm --prefix docs run build
 fi
 

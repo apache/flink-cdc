@@ -46,7 +46,7 @@ jobs:
       - name: Build Docusaurus site
         if: hashFiles('docs/package.json') != ''
         run: |
-          npm --prefix docs install --package-lock=false
+          npm --prefix docs ci
           npm --prefix docs test
           npm --prefix docs run build
       - name: Build doc
@@ -92,7 +92,7 @@ jobs:
       - name: Build Docusaurus site
         if: hashFiles('docs/package.json') != ''
         run: |
-          npm --prefix docs install --package-lock=false
+          npm --prefix docs ci
           npm --prefix docs test
           npm --prefix docs run build
 
