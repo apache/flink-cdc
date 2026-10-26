@@ -1,9 +1,9 @@
 ---
 title: "Postgres"
-weight: 2
-type: docs
-aliases:
-- /connectors/pipeline-connectors/Postgres
+slug: "/docs/connectors/pipeline-connectors/postgres"
+sidebar_position: 2
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -430,7 +430,7 @@ transform:
     <thead>
       <tr>
         <th class="text-left">PostgreSQL type<a href="https://www.postgresql.org/docs/12/datatype.html"></a></th>
-        <th class="text-left">CDC type<a href="{% link dev/table/types.md %}"></a></th>
+        <th class="text-left">CDC type</th>
       </tr>
     </thead>
     <tbody>
@@ -551,7 +551,7 @@ When the <code>debezium.time.precision.mode</code> property is set to the defaul
     <thead>
       <tr>
         <th class="text-left">PostgreSQL type<a href="https://www.postgresql.org/docs/12/datatype.html"></a></th>
-        <th class="text-left">CDC type<a href="{% link dev/table/types.md %}"></a></th>
+        <th class="text-left">CDC type</th>
       </tr>
     </thead>
     <tbody>
@@ -584,7 +584,7 @@ When the `debezium.time.precision.mode` property is set to the value `adaptive_t
     <thead>
       <tr>
         <th class="text-left">PostgreSQL type<a href="https://www.postgresql.org/docs/12/datatype.html"></a></th>
-        <th class="text-left">CDC type<a href="{% link dev/table/types.md %}"></a></th>
+        <th class="text-left">CDC type</th>
       </tr>
     </thead>
     <tbody>
@@ -617,7 +617,7 @@ When the <code>debezium.time.precision.mode</code> property is set to the defaul
     <thead>
       <tr>
         <th class="text-left">PostgreSQL type<a href="https://www.postgresql.org/docs/12/datatype.html"></a></th>
-        <th class="text-left">CDC type<a href="{% link dev/table/types.md %}"></a></th>
+        <th class="text-left">CDC type</th>
       </tr>
     </thead>
     <tbody>
@@ -651,7 +651,7 @@ When the <code>debezium.decimal.handling.mode</code> property is set to precise,
     <thead>
       <tr>
         <th class="text-left">PostgreSQL type<a href="https://www.postgresql.org/docs/12/datatype.html"></a></th>
-        <th class="text-left">CDC type<a href="{% link dev/table/types.md %}"></a></th>
+        <th class="text-left">CDC type</th>
       </tr>
     </thead>
     <tbody>
@@ -691,7 +691,7 @@ When the <code>debezium.decimal.handling.mode</code> property is set to double, 
     <thead>
       <tr>
         <th class="text-left">PostgreSQL type<a href="https://www.postgresql.org/docs/12/datatype.html"></a></th>
-        <th class="text-left">CDC type<a href="{% link dev/table/types.md %}"></a></th>
+        <th class="text-left">CDC type</th>
       </tr>
     </thead>
     <tbody>
@@ -720,7 +720,7 @@ The last possible setting for the <code>debezium.decimal.handling.mode</code> co
     <thead>
       <tr>
         <th class="text-left">PostgreSQL type<a href="https://www.postgresql.org/docs/12/datatype.html"></a></th>
-        <th class="text-left">CDC type<a href="{% link dev/table/types.md %}"></a></th>
+        <th class="text-left">CDC type</th>
       </tr>
     </thead>
     <tbody>
@@ -754,7 +754,7 @@ When the <code>debezium.hstore.handling.mode</code> property is set to json (the
     <thead>
       <tr>
         <th class="text-left">PostgreSQL type<a href="https://www.postgresql.org/docs/12/datatype.html"></a></th>
-        <th class="text-left">CDC type<a href="{% link dev/table/types.md %}"></a></th>
+        <th class="text-left">CDC type</th>
       </tr>
     </thead>
     <tbody>
@@ -779,7 +779,7 @@ PostgreSQL has data types that can store IPv4, IPv6, and MAC addresses. It is be
     <thead>
       <tr>
         <th class="text-left">PostgreSQL type<a href="https://www.postgresql.org/docs/12/datatype.html"></a></th>
-        <th class="text-left">CDC type<a href="{% link dev/table/types.md %}"></a></th>
+        <th class="text-left">CDC type</th>
       </tr>
     </thead>
     <tbody>
@@ -834,5 +834,3 @@ The former is used for small-area planar data, while the latter is used for larg
     </tbody>
 </table>
 </div>
-
-{{< top >}}

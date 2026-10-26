@@ -1,9 +1,9 @@
 ---
 title: "Db2"
-weight: 7
-type: docs
-aliases:
-- /connectors/flink-sources/db2-cdc
+slug: "/docs/connectors/flink-sources/db2-cdc"
+sidebar_position: 7
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -44,7 +44,13 @@ using a build automation tool (such as Maven or SBT) and SQL Client with SQL JAR
 
 ### Maven dependency
 
-{{< artifact flink-connector-db2-cdc >}}
+```xml
+<dependency>
+    <groupId>org.apache.flink</groupId>
+    <artifactId>flink-connector-db2-cdc</artifactId>
+    <version>@@VERSION@@</version>
+</dependency>
+```
 
 ### SQL Client JAR
 
@@ -476,7 +482,7 @@ Data Type Mapping
     <thead>
       <tr>
         <th class="text-left" style="width:30%;"><a href="https://www.ibm.com/docs/en/db2/11.5?topic=elements-data-types">Db2 type</a></th>
-        <th class="text-left" style="width:10%;">Flink SQL type<a href="{% link dev/table/types.md %}"></a></th>
+        <th class="text-left" style="width:10%;">Flink SQL type</th>
         <th class="text-left" style="width:60%;">NOTE</th>
       </tr>
     </thead>
@@ -589,5 +595,3 @@ Data Type Mapping
     </tbody>
 </table>
 </div>
-
-{{< top >}}

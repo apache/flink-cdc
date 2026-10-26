@@ -1,9 +1,9 @@
 ---
 title: "OceanBase Tutorial"
-weight: 3
-type: docs
-aliases:
-- /connectors/flink-sources/tutorials/oceanbase-tutorial.html
+slug: "/docs/connectors/flink-sources/tutorials/oceanbase-tutorial"
+sidebar_position: 3
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -273,5 +273,3 @@ Stop the flink cluster by following command.
 ```shell
 ./bin/stop-cluster.sh
 ```
-
-{{< top >}}

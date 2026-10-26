@@ -1,7 +1,9 @@
 ---
 title: "MySQL to Doris"
-weight: 1
-type: docs
+slug: "/docs/get-started/quickstart-for-1.20/mysql-to-doris"
+sidebar_position: 1
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -56,7 +58,7 @@ Prepare a Linux or macOS computer with Docker installed.
 
 If successfully started, you can access the Flink Web UI at [http://localhost:8081/](http://localhost:8081/), as shown below.
 
-{{< img src="/fig/mysql-doris-tutorial/flink-ui.png" alt="Flink UI" >}}
+<img src="@@BASE_URL@@fig/mysql-doris-tutorial/flink-ui.png" alt="Flink UI" class="doc-image">
 
 Executing `start-cluster.sh` multiple times can start multiple `TaskManager`s.
 
@@ -171,7 +173,7 @@ This command automatically starts all the containers defined in the Docker Compo
    [http://localhost:8030/](http://localhost:8030/)  
    The default username is `root`, and the default password is empty.
 
-   {{< img src="/fig/mysql-doris-tutorial/doris-ui.png" alt="Doris UI" >}}
+   <img src="@@BASE_URL@@fig/mysql-doris-tutorial/doris-ui.png" alt="Doris UI" class="doc-image">
 
 2. Create `app_db` database through Web UI.
 
@@ -179,12 +181,12 @@ This command automatically starts all the containers defined in the Docker Compo
    create database app_db;
     ```
 
-   {{< img src="/fig/mysql-doris-tutorial/doris-create-table.png" alt="Doris create table" >}}
+   <img src="@@BASE_URL@@fig/mysql-doris-tutorial/doris-create-table.png" alt="Doris create table" class="doc-image">
 
 ## Submit job with Flink CDC CLI
-1. Download the binary compressed packages listed below and extract them to the directory `flink-cdc-{{< param Version >}}`:\
-   [flink-cdc-{{< param Version >}}-bin.tar.gz](https://www.apache.org/dyn/closer.lua/flink/flink-cdc-{{< param Version >}}/flink-cdc-{{< param Version >}}-bin.tar.gz)
-   flink-cdc-{{< param Version >}} directory will contain four directory: `bin`, `lib`, `log`, and `conf`.
+1. Download the binary compressed packages listed below and extract them to the directory `flink-cdc-@@VERSION@@`:\
+   [flink-cdc-@@VERSION@@-bin.tar.gz](https://www.apache.org/dyn/closer.lua/flink/flink-cdc-@@VERSION@@/flink-cdc-@@VERSION@@-bin.tar.gz)
+   flink-cdc-@@VERSION@@ directory will contain four directory: `bin`, `lib`, `log`, and `conf`.
 
 2. Download the connector package listed below and move it to the `lib` directory  
    **Download links are available only for stable releases, SNAPSHOT dependencies need to be built based on master or release branches by yourself.**
@@ -242,11 +244,11 @@ After successful submission, the return information is as follows:
    ```
  We can find a job  named `Sync MySQL Database to Doris` is running through Flink Web UI.   
 
-{{< img src="/fig/mysql-doris-tutorial/mysql-to-doris.png" alt="MySQL-to-Doris" >}}
+<img src="@@BASE_URL@@fig/mysql-doris-tutorial/mysql-to-doris.png" alt="MySQL-to-Doris" class="doc-image">
 
 We can find that tables are created and inserted through Doris Web UI.   
 
-{{< img src="/fig/mysql-doris-tutorial/doris-display-data.png" alt="Doris display data" >}}
+<img src="@@BASE_URL@@fig/mysql-doris-tutorial/doris-display-data.png" alt="Doris display data" class="doc-image">
 
 ### Synchronize Schema and Data changes
 Enter MySQL container
@@ -281,7 +283,7 @@ Then, modify schema and record in MySQL, and the tables of Doris will change the
 
 Refresh the Doris Web UI every time you execute a step, and you can see that the `orders` table displayed in Doris will be updated in real-time, like the following:
 
-{{< img src="/fig/mysql-doris-tutorial/doris-display-result.png" alt="Doris display result" >}}
+<img src="@@BASE_URL@@fig/mysql-doris-tutorial/doris-display-result.png" alt="Doris display result" class="doc-image">
 
 Similarly, by modifying the 'shipments' and' products' tables, you can also see the results of synchronized changes in real-time in Doris.
 
@@ -348,5 +350,3 @@ Run the following command to stop the Flink cluster in the directory of Flink `f
    ```shell
    ./bin/stop-cluster.sh
    ```
-
-{{< top >}}

@@ -1,9 +1,9 @@
 ---
 title: "Oracle"
-weight: 3
-type: docs
-aliases:
-- /connectors/flink-sources/oracle-cdc
+slug: "/docs/connectors/flink-sources/oracle-cdc"
+sidebar_position: 3
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -35,7 +35,13 @@ To set up the Oracle CDC connector, the following table provides dependency info
 
 ### Maven dependency
 
-{{< artifact flink-connector-oracle-cdc >}}
+```xml
+<dependency>
+    <groupId>org.apache.flink</groupId>
+    <artifactId>flink-connector-oracle-cdc</artifactId>
+    <version>@@VERSION@@</version>
+</dependency>
+```
 
 ### SQL Client JAR
 
@@ -778,7 +784,7 @@ Data Type Mapping
     <thead>
       <tr>
         <th class="text-left"><a href="https://docs.oracle.com/en/database/oracle/oracle-database/21/sqlrf/Data-Types.html">Oracle type</a></th>
-        <th class="text-left">Flink SQL type<a href="{% link dev/table/types.md %}"></a></th>
+        <th class="text-left">Flink SQL type</th>
       </tr>
     </thead>
     <tbody>
@@ -880,5 +886,3 @@ Data Type Mapping
     </tbody>
 </table>
 </div>
-
-{{< top >}}

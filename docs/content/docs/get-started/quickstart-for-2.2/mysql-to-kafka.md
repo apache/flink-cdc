@@ -1,9 +1,9 @@
 ---
 title: "MySQL to Kafka"
-weight: 4
-type: docs
-aliases:
-- /try-flink-cdc/pipeline-connectors/mysql-Kafka-pipeline-tutorial.html
+slug: "/docs/get-started/quickstart-for-2.2/mysql-to-kafka"
+sidebar_position: 4
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -61,7 +61,7 @@ You need a Linux or macOS computer with Docker installed before starting.
 
 After the cluster gets started, you can access the Flink Web UI at [http://localhost:8081/](http://localhost:8081/).
 
-{{< img src="/fig/mysql-Kafka-tutorial/flink-ui-flink22.png" alt="Flink UI" >}}
+<img src="@@BASE_URL@@fig/mysql-Kafka-tutorial/flink-ui-flink22.png" alt="Flink UI" class="doc-image">
 
 Run `start-cluster.sh` multiple times to start more TaskManagers if necessary.  
 
@@ -116,7 +116,7 @@ This command automatically starts all the containers defined in the Docker Compo
 
 Run `docker ps` to check whether these containers are running properly.  
 
-{{< img src="/fig/mysql-Kafka-tutorial/docker-ps.png" alt="Executing docker ps command" >}}
+<img src="@@BASE_URL@@fig/mysql-Kafka-tutorial/docker-ps.png" alt="Executing docker ps command" class="doc-image">
 
 #### Prepare records for MySQL
 
@@ -174,9 +174,9 @@ Run `docker ps` to check whether these containers are running properly.
 **Please note that the following download links are available only for stable releases.
 You need to build your own SNAPSHOT versions based on master or release branches by yourself.**
 
-1. Download the binary compressed packages listed below and extract them to the directory `flink-cdc-{{< param Version >}}`:
-   [flink-cdc-{{< param Version >}}-bin.tar.gz](https://www.apache.org/dyn/closer.lua/flink/flink-cdc-{{< param Version >}}/flink-cdc-{{< param Version >}}-bin.tar.gz)
-   `flink-cdc-{{< param Version >}}` directory will contain four directories: `bin`, `lib`, `log`, and `conf`.
+1. Download the binary compressed packages listed below and extract them to the directory `flink-cdc-@@VERSION@@`:
+   [flink-cdc-@@VERSION@@-bin.tar.gz](https://www.apache.org/dyn/closer.lua/flink/flink-cdc-@@VERSION@@/flink-cdc-@@VERSION@@-bin.tar.gz)
+   `flink-cdc-@@VERSION@@` directory will contain four directories: `bin`, `lib`, `log`, and `conf`.
 
 2. Download the connector package listed below and move it to the `lib` directory:
    **Please note that you need to move the jar to the lib directory of Flink CDC Home, not to the lib directory of Flink Home.**
@@ -230,7 +230,7 @@ You need to build your own SNAPSHOT versions based on master or release branches
 
     A job named `Sync MySQL Database to Kafka` could be seen running in the Flink Web UI.
 
-    {{< img src="/fig/mysql-Kafka-tutorial/mysql-to-Kafka-flink22.png" alt="MySQL-to-Kafka" >}}
+    <img src="@@BASE_URL@@fig/mysql-Kafka-tutorial/mysql-to-Kafka-flink22.png" alt="MySQL-to-Kafka" class="doc-image">
 
     We can subscribe the sink kafka topic to monitor messages sent to Kafka with this command:  
 
@@ -337,7 +337,7 @@ By monitoring the topic through consumers, we may expect these messages in Kafka
 
 Similarly, by modifying the `shipments` and `products` table, you can see the results of other changes synchronized in real-time in corresponding topics in Kafka.
 
-### Route the changes  
+### Route the changes
 
 Flink CDC provides the configuration to route the table structure/data of the source table to other table names.
 With this ability, we can achieve functions such as table name, database name replacement, and whole database synchronization.
@@ -614,5 +614,3 @@ Run the following command to stop the Flink cluster in `FLINK_HOME`:
 ```shell
 ./bin/stop-cluster.sh
 ```
-
-{{< top >}}

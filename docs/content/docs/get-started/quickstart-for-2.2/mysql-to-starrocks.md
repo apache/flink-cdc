@@ -1,9 +1,9 @@
 ---
 title: "MySQL to StarRocks"
-weight: 2
-type: docs
-aliases:
-- /try-flink-cdc/pipeline-connectors/mysql-starrocks-pipeline-tutorial.html
+slug: "/docs/get-started/quickstart-for-2.2/mysql-to-starrocks"
+sidebar_position: 2
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -58,7 +58,7 @@ Prepare a Linux or macOS computer with Docker installed.
 
 If successfully started, you can access the Flink Web UI at [http://localhost:8081/](http://localhost:8081/), as shown below.
 
-{{< img src="/fig/mysql-starrocks-tutorial/flink-ui-flink22.png" alt="Flink UI" >}}
+<img src="@@BASE_URL@@fig/mysql-starrocks-tutorial/flink-ui-flink22.png" alt="Flink UI" class="doc-image">
 
 Executing `start-cluster.sh` multiple times can start multiple `TaskManager`s.
 
@@ -146,9 +146,9 @@ This command automatically starts all the containers defined in the Docker Compo
     ```
 
 ## Submit job with Flink CDC CLI
-1. Download the binary compressed packages listed below and extract them to the directory `flink-cdc-{{< param Version >}}`:
-   [flink-cdc-{{< param Version >}}-bin.tar.gz](https://www.apache.org/dyn/closer.lua/flink/flink-cdc-{{< param Version >}}/flink-cdc-{{< param Version >}}-bin.tar.gz)
-   `flink-cdc-{{< param Version >}}` directory will contain four directories: `bin`, `lib`, `log`, and `conf`.
+1. Download the binary compressed packages listed below and extract them to the directory `flink-cdc-@@VERSION@@`:
+   [flink-cdc-@@VERSION@@-bin.tar.gz](https://www.apache.org/dyn/closer.lua/flink/flink-cdc-@@VERSION@@/flink-cdc-@@VERSION@@-bin.tar.gz)
+   `flink-cdc-@@VERSION@@` directory will contain four directories: `bin`, `lib`, `log`, and `conf`.
 
 2. Download the connector package listed below and move it to the `lib` directory
    **Download links are available only for stable releases, SNAPSHOT dependencies need to be built based on master or release branches by yourself.**
@@ -211,11 +211,11 @@ After successful submission, the return information is as follows:
 
 We can find a job  named `Sync MySQL Database to StarRocks` is running through Flink Web UI.
 
-{{< img src="/fig/mysql-starrocks-tutorial/mysql-to-starrocks-flink22.png" alt="MySQL-to-StarRocks" >}}
+<img src="@@BASE_URL@@fig/mysql-starrocks-tutorial/mysql-to-starrocks-flink22.png" alt="MySQL-to-StarRocks" class="doc-image">
 
 Connect to jdbc through database connection tools such as Dbeaver using `mysql://127.0.0.1:9030`. You can view the data written to three tables in StarRocks.
 
-{{< img src="/fig/mysql-starrocks-tutorial/starrocks-display-data.png" alt="StarRocks-display-data" >}}
+<img src="@@BASE_URL@@fig/mysql-starrocks-tutorial/starrocks-display-data.png" alt="StarRocks-display-data" class="doc-image">
 
 ### Synchronize Schema and Data changes
 Enter MySQL container
@@ -250,7 +250,7 @@ Then, modify schema and record in MySQL, and the tables of StarRocks will change
 
 Refresh the Dbeaver every time you execute a step, and you can see that the `orders` table displayed in StarRocks will be updated in real-time, like the following:
 
-{{< img src="/fig/mysql-starrocks-tutorial/starrocks-display-result.png" alt="StarRocks-display-result" >}}
+<img src="@@BASE_URL@@fig/mysql-starrocks-tutorial/starrocks-display-result.png" alt="StarRocks-display-result" class="doc-image">
 
 Similarly, by modifying the `shipments` and `products` tables, you can also see the results of synchronized changes in real-time in StarRocks.
 
@@ -317,5 +317,3 @@ Run the following command to stop the Flink cluster in the directory of Flink `f
    ```shell
    ./bin/stop-cluster.sh
    ```
-
-{{< top >}}

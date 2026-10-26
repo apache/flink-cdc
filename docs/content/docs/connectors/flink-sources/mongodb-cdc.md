@@ -1,9 +1,9 @@
 ---
 title: "MongoDB"
-weight: 6
-type: docs
-aliases:
-- /connectors/flink-sources/mongodb-cdc
+slug: "/docs/connectors/flink-sources/mongodb-cdc"
+sidebar_position: 6
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -35,7 +35,13 @@ To set up the MongoDB CDC connector, the following table provides dependency inf
 
 ### Maven dependency
 
-{{< artifact flink-connector-mongodb-cdc >}}
+```xml
+<dependency>
+    <groupId>org.apache.flink</groupId>
+    <artifactId>flink-connector-mongodb-cdc</artifactId>
+    <version>@@VERSION@@</version>
+</dependency>
+```
 
 ### SQL Client JAR
 
@@ -309,7 +315,7 @@ Connector Options
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>
       <td>Boolean</td>
-      <td>Whether try to generate full-mode changelog based on pre- and post-images in MongoDB. Refer to <a href="#a-name-id-003-a">Full Changelog</a>  for more details. Supports MongoDB 6.0 and above only.</td>
+      <td>Whether try to generate full-mode changelog based on pre- and post-images in MongoDB. Refer to <a href="#full-changelog">Full Changelog</a>  for more details. Supports MongoDB 6.0 and above only.</td>
     </tr>
     <tr>
       <td>scan.incremental.snapshot.enabled</td>
@@ -702,7 +708,7 @@ public class MongoDBIncrementalSourceExample {
 - If database regex is used, `readAnyDatabase` role is required.
 - The incremental snapshot feature only supports after MongoDB 4.0.
 
-### Full Changelog<a name="Full Changelog" id="003" ></a>
+### Full Changelog
 
 MongoDB 6.0 and above supports emitting change stream events containing document before and after the change was made (aka. pre- and post-images).
 
@@ -791,7 +797,7 @@ The following is the mapping of BSON type and Flink SQL type.
     <thead>
       <tr>
         <th class="text-left">BSON type<a href="https://docs.mongodb.com/manual/reference/bson-types/"></a></th>
-        <th class="text-left">Flink SQL type<a href="{% link dev/table/types.md %}"></a></th>
+        <th class="text-left">Flink SQL type</th>
       </tr>
     </thead>
     <tbody>
@@ -901,5 +907,3 @@ Reference
 - [Document Pre- and Post-Images](https://www.mongodb.com/docs/v6.0/changeStreams/#change-streams-with-document-pre--and-post-images)
 - [BSON Types](https://docs.mongodb.com/manual/reference/bson-types/)
 - [Flink DataTypes](https://nightlies.apache.org/flink/flink-docs-release-1.20/docs/dev/table/types/)
-
-{{< top >}}

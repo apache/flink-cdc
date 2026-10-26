@@ -1,0 +1,184 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/* Preserve the Hugo Book layout while using Docusaurus navigation. */
+html:root {
+  --ifm-color-primary: #0055bb;
+  --ifm-font-family-base: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --ifm-font-size-base: 16px;
+  --ifm-line-height-base: 1.43;
+  --ifm-heading-font-weight: 500;
+  --ifm-heading-line-height: 1.1;
+  --ifm-menu-color: #222;
+  --ifm-menu-color-background-hover: #eee;
+  --doc-sidebar-width: 280px;
+  --cdc-navbar-height: var(--ifm-navbar-height);
+  --ifm-navbar-shadow: none;
+}
+
+body {
+  letter-spacing: normal;
+  -webkit-font-smoothing: auto;
+}
+.navbar__brand:empty {
+  display: none;
+}
+.cdc-sidebar-content {
+  --ifm-menu-color-background-active: #fff;
+  height: 100%;
+  overflow-y: auto;
+  background: #f8f8f8;
+}
+.cdc-sidebar-header {
+  padding: 2rem 1rem 1rem;
+}
+.cdc-sidebar-logo {
+  width: 70%;
+  display: block;
+}
+.cdc-sidebar-version {
+  text-align: right;
+  margin: 0.5rem 0 1rem;
+  color: #444;
+}
+.cdc-sidebar-content .menu {
+  --ifm-menu-link-padding-vertical: 0.25rem;
+  flex-grow: 0;
+  overflow: visible;
+  padding: 0 1rem;
+  font-size: 13px;
+}
+.menu__list .menu__list {
+  border-left: 1px solid #ddd;
+  padding-left: 0.75rem;
+  /* Outer margins are not included in the collapse height animation. */
+  margin-top: 0;
+  margin-left: 0.5rem;
+}
+.menu__link {
+  line-height: 1.4;
+}
+.menu__link--active {
+  font-weight: 700;
+}
+.menu__caret {
+  padding: 0.25rem;
+}
+.menu__caret::before {
+  width: 1rem;
+  height: 1rem;
+}
+.cdc-sidebar-footer {
+  margin: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #ddd;
+  font-size: 13px;
+}
+.cdc-sidebar-footer a {
+  display: block;
+  margin: 0.65rem 0;
+  color: #222;
+}
+.cdc-version-notice {
+  border-left: 3px solid #fd6;
+  background: #fff9df;
+  padding: 1rem;
+  margin-bottom: 2rem;
+}
+.cdc-version-notice a {
+  color: #0055bb;
+}
+.markdown h1 {
+  font-size: 36px;
+  margin: 1em 0 0.5em;
+}
+.markdown h2 {
+  font-size: 30px;
+  border-bottom: 1px solid #e5e5e5;
+  margin: 1.2em 0 0.5em;
+  padding-bottom: 0.25rem;
+}
+.markdown h3 {
+  font-size: 24px;
+}
+.markdown h4 {
+  font-size: 18px;
+}
+.doc-image {
+  display: block;
+  margin: 1rem auto;
+  max-width: 100%;
+  height: auto;
+}
+.cdc-copyright {
+  font-size: 12px;
+  color: #666;
+  margin-top: 2rem;
+}
+.table-of-contents {
+  font-size: 13px;
+}
+.table-of-contents__link--active {
+  font-weight: 600;
+}
+
+@media (min-width: 997px) {
+  html.docs-doc-page .navbar {
+    margin-left: var(--doc-sidebar-width);
+  }
+  aside.theme-doc-sidebar-container {
+    --ifm-navbar-height: 0px;
+    margin-top: calc(-1 * var(--cdc-navbar-height));
+    border-right: 0 !important;
+  }
+  .theme-doc-markdown {
+    padding-top: 0;
+  }
+  .docMainContainer {
+    padding-top: 1rem;
+  }
+  main > .container {
+    padding: 2rem;
+    max-width: 1440px;
+  }
+}
+
+@media (max-width: 996px) {
+  :root {
+    --ifm-navbar-height: 3.5rem;
+  }
+  .markdown h1 {
+    font-size: 30px;
+  }
+  .markdown h2 {
+    font-size: 25px;
+  }
+  .cdc-mobile-menu .cdc-sidebar-header {
+    padding: 1rem 0;
+  }
+  .cdc-mobile-menu > .menu__list {
+    --ifm-menu-link-padding-vertical: 0.25rem;
+    font-size: 14px;
+  }
+  .cdc-mobile-menu .cdc-sidebar-logo {
+    width: 150px;
+  }
+  .cdc-mobile-menu .cdc-sidebar-footer {
+    margin: 1rem 0;
+  }
+}

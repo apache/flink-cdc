@@ -1,9 +1,9 @@
 ---
 title: "SQL Server"
-weight: 4
-type: docs
-aliases:
-- /connectors/flink-sources/sqlserver-cdc
+slug: "/docs/connectors/flink-sources/sqlserver-cdc"
+sidebar_position: 4
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -24,7 +24,7 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-# SQL Server CDC Connector {#sqlserver-cdc-connector}
+# SQL Server CDC Connector
 
 The SQL Server CDC connector allows for reading snapshot data and incremental data from SQL Server database. This document describes how to set up the SQL Server CDC connector to run SQL queries against SQL Server databases.
 
@@ -35,7 +35,13 @@ To set up the SQL Server CDC connector, the following table provides dependency 
 
 ### Maven dependency
 
-{{< artifact flink-connector-sqlserver-cdc >}}
+```xml
+<dependency>
+    <groupId>org.apache.flink</groupId>
+    <artifactId>flink-connector-sqlserver-cdc</artifactId>
+    <version>@@VERSION@@</version>
+</dependency>
+```
 
 ### SQL Client JAR
 
@@ -45,7 +51,7 @@ Download [flink-sql-connector-sqlserver-cdc](https://mvnrepository.com/artifact/
 
 **Note:** Refer to [flink-sql-connector-sqlserver-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-sqlserver-cdc), more released versions will be available in the Maven central warehouse.
 
-Setup SQL Server Database {#setup-sqlserver-database}
+Setup SQL Server Database
 ----------------
 A SQL Server administrator must enable change data capture on the source tables that you want to capture. The database must already be enabled for CDC. To enable CDC on a table, a SQL Server administrator runs the stored procedure ```sys.sp_cdc_enable_table``` for the table.
 
@@ -79,7 +85,7 @@ GO
 ```
 The query returns configuration information for each table in the database that is enabled for CDC and that contains change data that the caller is authorized to access. If the result is empty, verify that the user has privileges to access both the capture instance and the CDC tables.
 
-How to create a SQL Server CDC table {#how-to-create-a-sqlserver-cdc-table}
+How to create a SQL Server CDC table
 ----------------
 
 The SQL Server CDC table can be defined as follows:
@@ -506,7 +512,7 @@ Data Type Mapping
     <thead>
       <tr>
         <th class="text-left">SQL Server type<a href="https://docs.microsoft.com/en-us/sql/t-sql/data-types/data-types-transact-sql"></a></th>
-        <th class="text-left">Flink SQL type<a href="{% link dev/table/types.md %}"></a></th>
+        <th class="text-left">Flink SQL type</th>
       </tr>
     </thead>
     <tbody>
@@ -592,5 +598,3 @@ Data Type Mapping
     </tbody>
 </table>
 </div>
-
-{{< top >}}

@@ -1,9 +1,9 @@
 ---
 title: "Building a Streaming ETL with Flink CDC"
-weight: 999
-type: docs
-aliases:
-- /connectors/flink-sources/tutorials/mysql-postgres-tutorial.html
+slug: "/docs/connectors/flink-sources/tutorials/build-streaming-etl-tutorial"
+sidebar_position: 999
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -35,7 +35,7 @@ In the following sections, we will describe how to use Flink MySQL/Postgres CDC 
 All exercises in this tutorial are performed in the Flink SQL CLI, and the entire process uses standard SQL syntax, without a single line of Java/Scala code or IDE installation.
 
 The overview of the architecture is as follows:
-{{< img src="/fig/mysql-postgres-tutorial/flink-cdc-streaming-etl.png" width="700px" alt="Flink CDC Streaming ETL" >}}
+<img src="@@BASE_URL@@fig/mysql-postgres-tutorial/flink-cdc-streaming-etl.png" alt="Flink CDC Streaming ETL" width="700px" class="doc-image">
 
 ## Preparation
 Prepare a Linux or macOS computer with Docker installed.
@@ -186,7 +186,7 @@ We can also visit [http://localhost:5601/](http://localhost:5601/) to see if Kib
     ```
    Then we can visit [http://localhost:8081/](http://localhost:8081/) to see if Flink is running normally, and the web page looks like:
 
-   {{< img src="/fig/mysql-postgres-tutorial/flink-ui.png" width="700px" alt="Flink UI" >}}
+   <img src="@@BASE_URL@@fig/mysql-postgres-tutorial/flink-ui.png" alt="Flink UI" width="700px" class="doc-image">
 
 3. Use the following command to start a Flink SQL CLI:
     ```shell
@@ -194,7 +194,7 @@ We can also visit [http://localhost:5601/](http://localhost:5601/) to see if Kib
     ```
    We should see the welcome screen of the CLI client.
 
-   {{< img src="/fig/mysql-postgres-tutorial/flink-sql-client.png" alt="Flink SQL Client" >}}
+   <img src="@@BASE_URL@@fig/mysql-postgres-tutorial/flink-sql-client.png" alt="Flink SQL Client" class="doc-image">
 
 ## Creating tables using Flink DDL in Flink SQL CLI
 First, enable checkpoints every 3 seconds
@@ -296,11 +296,11 @@ Flink SQL> INSERT INTO enriched_orders
 Now, the enriched orders should be shown in Kibana.
 Visit [http://localhost:5601/app/kibana#/management/kibana/index_pattern](http://localhost:5601/app/kibana#/management/kibana/index_pattern) to create an index pattern `enriched_orders`.
 
-{{< img src="/fig/mysql-postgres-tutorial/kibana-create-index-pattern.png" width="700px" alt="Create Index Pattern" >}}
+<img src="@@BASE_URL@@fig/mysql-postgres-tutorial/kibana-create-index-pattern.png" alt="Create Index Pattern" width="700px" class="doc-image">
 
 Visit [http://localhost:5601/app/kibana#/discover](http://localhost:5601/app/kibana#/discover) to find the enriched orders.
 
-{{< img src="/fig/mysql-postgres-tutorial/kibana-detailed-orders.png" width="700px" alt="Find enriched Orders" >}}
+<img src="@@BASE_URL@@fig/mysql-postgres-tutorial/kibana-detailed-orders.png" alt="Find enriched Orders" width="700px" class="doc-image">
 
 Next, do some change in the databases, and then the enriched orders shown in Kibana will be updated after each step in real time.
 1. Insert a new order in MySQL
@@ -331,7 +331,7 @@ Next, do some change in the databases, and then the enriched orders shown in Kib
    DELETE FROM orders WHERE order_id = 10004;
    ```
    The changes of enriched orders in Kibana are as follows:
-   {{< img src="/fig/mysql-postgres-tutorial/kibana-detailed-orders-changes.gif" width="700px" alt="Enriched Orders Changes" >}}
+   <img src="@@BASE_URL@@fig/mysql-postgres-tutorial/kibana-detailed-orders-changes.gif" alt="Enriched Orders Changes" width="700px" class="doc-image">
    
 ## Clean up
 After finishing the tutorial, run the following command to stop all containers in the directory of `docker-compose.yml`:
@@ -342,5 +342,3 @@ Run the following command to stop the Flink cluster in the directory of Flink `f
 ```shell
 ./bin/stop-cluster.sh
 ```
-
-{{< top >}}

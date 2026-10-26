@@ -450,6 +450,11 @@ limitations under the License.
                         <!-- Build files -->
                         <exclude>**/*.iml</exclude>
                         <!-- Docs -->
+                        <exclude>docs/node_modules/**</exclude>
+                        <exclude>docs/target-alias/**</exclude>
+                        <exclude>docs/package.json</exclude>
+                        <exclude>docs/package-lock.json</exclude>
+                        <exclude>docs/i18n/**/*.json</exclude>
                         <exclude>docs/themes/book/**</exclude>
                         <exclude>docs/static/**</exclude>
                         <exclude>docs/assets/github.css</exclude>

@@ -1,9 +1,9 @@
 ---
 title: "MySQL"
-weight: 2
-type: docs
-aliases:
-- /connectors/flink-sources/mysql-cdc
+slug: "/docs/connectors/flink-sources/mysql-cdc"
+sidebar_position: 2
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -42,7 +42,13 @@ To set up the MySQL CDC connector, the following table provides dependency infor
 
 ### Maven dependency
 
-{{< artifact flink-connector-mysql-cdc >}}
+```xml
+<dependency>
+    <groupId>org.apache.flink</groupId>
+    <artifactId>flink-connector-mysql-cdc</artifactId>
+    <version>@@VERSION@@</version>
+</dependency>
+```
 
 ### SQL Client JAR
 
@@ -964,7 +970,7 @@ Data Type Mapping
     <thead>
       <tr>
         <th class="text-left" style="width:30%;">MySQL type<a href="https://dev.mysql.com/doc/refman/8.0/en/data-types.html"></a></th>
-        <th class="text-left" style="width:10%;">Flink SQL type<a href="{% link dev/table/types.md %}"></a></th>
+        <th class="text-left" style="width:10%;">Flink SQL type</th>
         <th class="text-left" style="width:60%;">NOTE</th>
       </tr>
     </thead>
@@ -1265,5 +1271,3 @@ The example for different spatial data types mapping is as follows:
     </tbody>
 </table>
 </div>
-
-{{< top >}}
