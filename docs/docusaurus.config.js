@@ -96,7 +96,15 @@ module.exports = {
       respectPrefersColorScheme: false,
     },
     navbar: {
-      items: [{ type: 'localeDropdown', position: 'right' }],
+      items: [
+        { type: 'docsVersionDropdown', position: 'right' },
+        { type: 'localeDropdown', position: 'right' },
+        {
+          href: metadata.repository,
+          label: 'GitHub',
+          position: 'right',
+        },
+      ],
     },
     docs: { sidebar: { autoCollapseCategories: false } },
     prism: {

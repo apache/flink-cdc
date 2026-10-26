@@ -94,18 +94,6 @@ body {
   margin: 0.65rem 0;
   color: #222;
 }
-.cdc-version-picker {
-  border-top: 1px solid #ddd;
-  border-bottom: 1px solid #ddd;
-  padding: 0.75rem 0;
-  margin: 1rem 0;
-}
-.cdc-version-picker summary {
-  cursor: pointer;
-}
-.cdc-version-picker a {
-  margin-left: 1rem;
-}
 .cdc-version-notice {
   border-left: 3px solid #fd6;
   background: #fff9df;
