@@ -31,17 +31,24 @@ import org.apache.flink.cdc.connectors.fluss.source.split.FlussHybridSnapshotLog
 import org.apache.flink.cdc.connectors.fluss.source.split.FlussLogSplit;
 import org.apache.flink.cdc.connectors.fluss.source.split.FlussSplitBase;
 import org.apache.flink.cdc.connectors.fluss.source.split.FlussSplitState;
+import org.apache.flink.connector.base.source.reader.RecordsBySplits;
 import org.apache.flink.connector.base.source.reader.RecordsWithSplitIds;
 import org.apache.flink.connector.base.source.reader.synchronization.FutureCompletingBlockingQueue;
 import org.apache.flink.metrics.groups.SourceReaderMetricGroup;
-import org.apache.flink.metrics.testutils.MetricListener;
 import org.apache.flink.runtime.metrics.groups.InternalSourceReaderMetricGroup;
+import org.apache.flink.runtime.metrics.groups.UnregisteredMetricGroups;
 import org.apache.flink.util.UserCodeClassLoader;
 
+import org.apache.fluss.client.table.scanner.ScanRecord;
 import org.apache.fluss.config.Configuration;
 import org.apache.fluss.metadata.PhysicalTablePath;
 import org.apache.fluss.metadata.TableBucket;
 import org.apache.fluss.metadata.TablePath;
+import org.apache.fluss.record.ChangeType;
+import org.apache.fluss.row.GenericRow;
+import org.apache.fluss.types.DataType;
+import org.apache.fluss.types.DataTypes;
+import org.apache.fluss.types.RowType;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -53,6 +60,113 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /** Tests for subscription-aware split handling in {@link FlussSourceReader}. */
 class FlussSourceReaderTest {
+
+    @Test
+    void testQueuedSnapshotPrecedesFirstLogProgress() throws Exception {
+        TestingReaderContext context = new TestingReaderContext();
+        TrackingFetcherManager manager =
+                new TrackingFetcherManager(new FutureCompletingBlockingQueue<>());
+        FutureCompletingBlockingQueue<RecordsWithSplitIds<FlussSourceRecord>> queue =
+                manager.getQueue();
+        RowType rowType = RowType.of(new DataType[] {DataTypes.INT()}, new String[] {"id"});
+        FlussHybridSnapshotLogSplit split =
+                new FlussHybridSnapshotLogSplit(
+                        testSplit().getPhysicalTablePath(),
+                        testSplit().getTableBucket(),
+                        1L,
+                        3L,
+                        100L,
+                        false,
+                        1,
+                        rowType);
+        FlussRecordEmitterTest.SimpleReaderOutput<Event> output =
+                new FlussRecordEmitterTest.SimpleReaderOutput<>();
+        try (FlussSourceReader<Event> reader = manuallyScheduledReader(context, manager)) {
+            reader.handleSourceEvents(
+                    new TableSubscriptionEvent(
+                            Collections.singleton(split.getTablePath()), Collections.emptyMap()));
+            reader.addSplits(Collections.singletonList(split));
+            RecordsBySplits.Builder<FlussSourceRecord> records = new RecordsBySplits.Builder<>();
+            records.add(
+                    split.splitId(),
+                    new FlussSourceRecord(
+                            new ScanRecord(1L, 1, -1L, -1L, ChangeType.INSERT, GenericRow.of(7), 1),
+                            split.getTablePath(),
+                            rowType,
+                            4L,
+                            Collections.emptyList()));
+            records.add(split.splitId(), FlussSourceRecord.forProgress(split.getTablePath(), 105L));
+            queue.put(0, records.build());
+
+            reader.pollNext(output);
+            FlussHybridSnapshotLogSplit snapshot =
+                    reader.snapshotState(1L).get(0).asHybridSnapshotLogSplit();
+            assertThat(snapshot.isSnapshotFinished()).isFalse();
+            assertThat(snapshot.getRecordsToSkip()).isEqualTo(4L);
+            assertThat(snapshot.getLogStartingOffset()).isEqualTo(100L);
+            assertThat(context.getSentEvents()).isEmpty();
+            assertThat(output.getCollectedEvents()).hasSize(2);
+
+            reader.pollNext(output);
+            snapshot = reader.snapshotState(2L).get(0).asHybridSnapshotLogSplit();
+            assertThat(snapshot.isSnapshotFinished()).isTrue();
+            assertThat(snapshot.getRecordsToSkip()).isEqualTo(4L);
+            assertThat(snapshot.getLogStartingOffset()).isEqualTo(105L);
+            assertThat(snapshot.getSchemaId()).isEqualTo(1);
+            assertThat(snapshot.getRowType()).isEqualTo(rowType);
+            assertThat(output.getCollectedEvents()).hasSize(2);
+            assertThat(context.metricGroup().getIOMetricGroup().getNumRecordsInCounter().getCount())
+                    .isEqualTo(1L);
+            assertThat(context.getSentEvents())
+                    .singleElement()
+                    .isInstanceOf(FinishedKvSnapshotConsumeEvent.class);
+        }
+    }
+
+    @Test
+    void testQueuedProgressAfterTableRemovalDoesNotAdvanceOrCountAsInput() throws Exception {
+        TestingReaderContext context = new TestingReaderContext();
+        TrackingFetcherManager manager =
+                new TrackingFetcherManager(new FutureCompletingBlockingQueue<>());
+        FutureCompletingBlockingQueue<RecordsWithSplitIds<FlussSourceRecord>> queue =
+                manager.getQueue();
+        FlussLogSplit split = testSplit();
+        FlussRecordEmitterTest.SimpleReaderOutput<Event> output =
+                new FlussRecordEmitterTest.SimpleReaderOutput<>();
+        try (FlussSourceReader<Event> reader = manuallyScheduledReader(context, manager)) {
+            reader.handleSourceEvents(
+                    new TableSubscriptionEvent(
+                            Collections.singleton(split.getTablePath()), Collections.emptyMap()));
+            reader.addSplits(Collections.singletonList(split));
+            RecordsBySplits.Builder<FlussSourceRecord> records = new RecordsBySplits.Builder<>();
+            records.add(split.splitId(), FlussSourceRecord.forProgress(split.getTablePath(), 2L));
+            queue.put(0, records.build());
+            reader.handleSourceEvents(
+                    new TableSubscriptionEvent(
+                            Collections.emptySet(),
+                            Collections.singletonMap(split.getTablePath(), 1L)));
+            reader.pollNext(output);
+            assertThat(reader.snapshotState(1L))
+                    .singleElement()
+                    .satisfies(
+                            saved -> assertThat(saved.asLogSplit().getStartingOffset()).isZero());
+            assertThat(output.getCollectedEvents()).isEmpty();
+            assertThat(context.metricGroup().getIOMetricGroup().getNumRecordsInCounter().getCount())
+                    .isZero();
+        }
+    }
+
+    private static FlussSourceReader<Event> manuallyScheduledReader(
+            TestingReaderContext context, TrackingFetcherManager manager) {
+        return new FlussSourceReader<>(
+                manager.getQueue(),
+                context,
+                new WrapperFlussMetricRegistry(context.metricGroup(), Collections.emptySet()),
+                new FlussRecordEmitter<>(
+                        new FlussRecordDeserializer(),
+                        context.metricGroup().getIOMetricGroup().getNumRecordsInCounter()),
+                manager);
+    }
 
     @Test
     void testStagesSplitUntilFirstSubscriptionSnapshotAndIncludesItInCheckpoint() throws Exception {
@@ -293,14 +407,15 @@ class FlussSourceReaderTest {
         }
     }
 
-    private static class TestingReaderContext implements SourceReaderContext {
+    static class TestingReaderContext implements SourceReaderContext {
 
         private final SourceReaderMetricGroup metricGroup;
         private final List<SourceEvent> sentEvents = new ArrayList<>();
 
-        private TestingReaderContext() {
-            MetricListener metricListener = new MetricListener();
-            metricGroup = InternalSourceReaderMetricGroup.mock(metricListener.getMetricGroup());
+        TestingReaderContext() {
+            metricGroup =
+                    InternalSourceReaderMetricGroup.wrap(
+                            UnregisteredMetricGroups.createUnregisteredOperatorMetricGroup());
         }
 
         @Override
