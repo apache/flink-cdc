@@ -29,7 +29,7 @@ import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.connectors.kafka.json.TableSchemaInfo;
 import org.apache.flink.formats.common.TimestampFormat;
 import org.apache.flink.formats.json.JsonFormatOptions;
-import org.apache.flink.formats.json.JsonRowDataSerializationSchema;
+import org.apache.flink.formats.json.RowDataToJsonConverters;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.data.GenericArrayData;
 import org.apache.flink.table.data.GenericRowData;
@@ -38,9 +38,16 @@ import org.apache.flink.table.data.StringData;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.RowType;
+import org.apache.flink.util.jackson.JacksonMapperFactory;
+
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonGenerator;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.JsonNode;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.node.ObjectNode;
 
 import java.time.ZoneId;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 
 import static java.lang.String.format;
@@ -117,8 +124,8 @@ public class CanalJsonSerializationSchema implements SerializationSchema<Event> 
             }
             LogicalType rowType =
                     DataTypeUtils.toFlinkDataType(schema.toRowDataType()).getLogicalType();
-            JsonRowDataSerializationSchema jsonSerializer =
-                    new JsonRowDataSerializationSchema(
+            CanalRowDataSerializationSchema jsonSerializer =
+                    new CanalRowDataSerializationSchema(
                             createJsonRowType(fromLogicalToDataType(rowType)),
                             timestampFormat,
                             mapNullKeyMode,
@@ -237,5 +244,64 @@ public class CanalJsonSerializationSchema implements SerializationSchema<Event> 
                                 DataTypes.FIELD("table", DataTypes.STRING()),
                                 DataTypes.FIELD("pkNames", DataTypes.ARRAY(DataTypes.STRING())))
                         .getLogicalType();
+    }
+
+    /** Serializes the envelope while retaining only changed fields in the old row. */
+    private static class CanalRowDataSerializationSchema implements SerializationSchema<RowData> {
+
+        private static final long serialVersionUID = 1L;
+
+        private final RowDataToJsonConverters.RowDataToJsonConverter converter;
+        private final boolean encodeDecimalAsPlainNumber;
+        private transient ObjectMapper mapper;
+
+        private CanalRowDataSerializationSchema(
+                RowType rowType,
+                TimestampFormat timestampFormat,
+                JsonFormatOptions.MapNullKeyMode mapNullKeyMode,
+                String mapNullKeyLiteral,
+                boolean encodeDecimalAsPlainNumber,
+                boolean ignoreNullFields) {
+            this.converter =
+                    new RowDataToJsonConverters(
+                                    timestampFormat,
+                                    mapNullKeyMode,
+                                    mapNullKeyLiteral,
+                                    ignoreNullFields)
+                            .createConverter(rowType);
+            this.encodeDecimalAsPlainNumber = encodeDecimalAsPlainNumber;
+        }
+
+        @Override
+        public void open(InitializationContext context) {
+            mapper =
+                    JacksonMapperFactory.createObjectMapper()
+                            .configure(
+                                    JsonGenerator.Feature.WRITE_BIGDECIMAL_AS_PLAIN,
+                                    encodeDecimalAsPlainNumber);
+        }
+
+        @Override
+        public byte[] serialize(RowData row) {
+            // Do not reuse a pruned old row for subsequent events.
+            ObjectNode node = mapper.createObjectNode();
+            try {
+                converter.convert(mapper, node, row);
+                JsonNode old = node.get("old");
+                if (old != null && !old.isNull()) {
+                    JsonNode after = node.get("data").get(0);
+                    Iterator<Map.Entry<String, JsonNode>> fields = old.get(0).fields();
+                    while (fields.hasNext()) {
+                        Map.Entry<String, JsonNode> field = fields.next();
+                        if (field.getValue().equals(after.get(field.getKey()))) {
+                            fields.remove();
+                        }
+                    }
+                }
+                return mapper.writeValueAsBytes(node);
+            } catch (Throwable t) {
+                throw new RuntimeException(format("Could not serialize row '%s'.", row), t);
+            }
+        }
     }
 }
