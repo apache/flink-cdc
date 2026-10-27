@@ -130,6 +130,20 @@ module.exports = {
     },
     {
       type: 'category',
+      label: 'Examples and Best Practices',
+      collapsed: true,
+      items: [
+        'docs/examples-and-best-practices/index',
+        'docs/examples-and-best-practices/mysql-to-paimon',
+        'docs/examples-and-best-practices/mysql-to-kafka',
+        'docs/examples-and-best-practices/postgres-to-iceberg',
+        'docs/examples-and-best-practices/table-selection-and-new-tables',
+        'docs/examples-and-best-practices/metadata-and-soft-deletes',
+        'docs/examples-and-best-practices/ai-text-labeling',
+      ],
+    },
+    {
+      type: 'category',
       label: 'Deployment',
       collapsed: true,
       items: [
