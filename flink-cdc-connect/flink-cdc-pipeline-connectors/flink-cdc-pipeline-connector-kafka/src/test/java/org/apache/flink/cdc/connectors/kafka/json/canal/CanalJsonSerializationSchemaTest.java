@@ -18,6 +18,9 @@
 package org.apache.flink.cdc.connectors.kafka.json.canal;
 
 import org.apache.flink.api.common.serialization.SerializationSchema;
+import org.apache.flink.cdc.common.data.GenericArrayData;
+import org.apache.flink.cdc.common.data.GenericMapData;
+import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
@@ -26,6 +29,7 @@ import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.connectors.kafka.json.ChangeLogJsonFormatFactory;
@@ -44,7 +48,11 @@ import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.time.ZoneId;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /** Tests for {@link CanalJsonSerializationSchema}. */
 class CanalJsonSerializationSchemaTest {
@@ -180,22 +188,21 @@ class CanalJsonSerializationSchemaTest {
         BinaryRecordDataGenerator generator = new BinaryRecordDataGenerator(rowType);
 
         // Create test data with complex types
-        org.apache.flink.cdc.common.data.GenericArrayData arrayData =
-                new org.apache.flink.cdc.common.data.GenericArrayData(
+        GenericArrayData arrayData =
+                new GenericArrayData(
                         new Object[] {
                             BinaryStringData.fromString("item1"),
                             BinaryStringData.fromString("item2")
                         });
 
-        java.util.Map<Object, Object> mapValues = new java.util.HashMap<>();
+        Map<Object, Object> mapValues = new HashMap<>();
         mapValues.put(BinaryStringData.fromString("key1"), 100);
         mapValues.put(BinaryStringData.fromString("key2"), 200);
-        org.apache.flink.cdc.common.data.GenericMapData mapData =
-                new org.apache.flink.cdc.common.data.GenericMapData(mapValues);
+        GenericMapData mapData = new GenericMapData(mapValues);
 
         BinaryRecordDataGenerator nestedRowGenerator =
                 new BinaryRecordDataGenerator(RowType.of(DataTypes.STRING(), DataTypes.INT()));
-        org.apache.flink.cdc.common.data.RecordData nestedRow =
+        RecordData nestedRow =
                 nestedRowGenerator.generate(
                         new Object[] {BinaryStringData.fromString("nested"), 42});
 
@@ -232,18 +239,17 @@ class CanalJsonSerializationSchemaTest {
         Assertions.assertThat(rowNode.has("f1")).isTrue();
         Assertions.assertThat(rowNode.has("f2")).isTrue();
 
-        org.apache.flink.cdc.common.data.GenericArrayData equalArray =
-                new org.apache.flink.cdc.common.data.GenericArrayData(
+        GenericArrayData equalArray =
+                new GenericArrayData(
                         new Object[] {
                             BinaryStringData.fromString("item1"),
                             BinaryStringData.fromString("item2")
                         });
-        java.util.Map<Object, Object> reversedMapValues = new java.util.LinkedHashMap<>();
+        Map<Object, Object> reversedMapValues = new LinkedHashMap<>();
         reversedMapValues.put(BinaryStringData.fromString("key2"), 200);
         reversedMapValues.put(BinaryStringData.fromString("key1"), 100);
-        org.apache.flink.cdc.common.data.GenericMapData equalMap =
-                new org.apache.flink.cdc.common.data.GenericMapData(reversedMapValues);
-        org.apache.flink.cdc.common.data.RecordData equalRow =
+        GenericMapData equalMap = new GenericMapData(reversedMapValues);
+        RecordData equalRow =
                 nestedRowGenerator.generate(
                         new Object[] {BinaryStringData.fromString("nested"), 42});
         JsonNode unchanged =
@@ -260,14 +266,12 @@ class CanalJsonSerializationSchemaTest {
         Assertions.assertThat(unchanged.get("old").get(0).size()).isZero();
         Assertions.assertThat(unchanged.get("data")).isEqualTo(actual.get("data"));
 
-        org.apache.flink.cdc.common.data.GenericArrayData changedArray =
-                new org.apache.flink.cdc.common.data.GenericArrayData(
-                        new Object[] {BinaryStringData.fromString("changed")});
-        java.util.Map<Object, Object> changedMapValues = new java.util.HashMap<>(mapValues);
+        GenericArrayData changedArray =
+                new GenericArrayData(new Object[] {BinaryStringData.fromString("changed")});
+        Map<Object, Object> changedMapValues = new HashMap<>(mapValues);
         changedMapValues.put(BinaryStringData.fromString("key1"), 101);
-        org.apache.flink.cdc.common.data.GenericMapData changedMap =
-                new org.apache.flink.cdc.common.data.GenericMapData(changedMapValues);
-        org.apache.flink.cdc.common.data.RecordData changedRow =
+        GenericMapData changedMap = new GenericMapData(changedMapValues);
+        RecordData changedRow =
                 nestedRowGenerator.generate(
                         new Object[] {BinaryStringData.fromString("nested"), 43});
         JsonNode changed =
@@ -464,9 +468,8 @@ class CanalJsonSerializationSchemaTest {
     }
 
     private static BinaryRecordDataGenerator stringGenerator(int count) {
-        org.apache.flink.cdc.common.types.DataType[] types =
-                new org.apache.flink.cdc.common.types.DataType[count];
-        java.util.Arrays.fill(types, DataTypes.STRING());
+        DataType[] types = new DataType[count];
+        Arrays.fill(types, DataTypes.STRING());
         return new BinaryRecordDataGenerator(RowType.of(types));
     }
 
