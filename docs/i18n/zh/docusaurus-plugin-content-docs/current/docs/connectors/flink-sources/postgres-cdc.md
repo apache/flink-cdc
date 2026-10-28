@@ -319,7 +319,7 @@ SELECT * FROM shipments;
     <tr>
       <td>records.per.second</td>
       <td>optional</td>
-      <td style="word-wrap: break-word;">true</td>
+      <td style="word-wrap: break-word;">-1</td>
       <td>Double</td>
       <td>
         每秒发出的最大记录数，默认值为 -1，表示不进行速率限制。（仅适用于 flink 2.x）<br>

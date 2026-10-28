@@ -241,6 +241,7 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
                             .assignUnboundedChunkFirst(assignUnboundedChunkFirst)
                             .includePartitionedTables(includePartitionedTables)
                             .releaseSnapshotMetadataEnabled(releaseSnapshotMetadataEnabled)
+                            .recordsPerSecond(recordsPerSecond)
                             .build();
             return SourceProvider.of(parallelSource);
         } else {

@@ -444,7 +444,7 @@ Connector Options
     <tr>
       <td>records.per.second</td>
       <td>optional</td>
-      <td style="word-wrap: break-word;">true</td>
+      <td style="word-wrap: break-word;">-1</td>
       <td>Double</td>
       <td>
         The maximum number of records emitted per second, the default value: -1, means no rate limiting.(only for flink2.x)<br>
