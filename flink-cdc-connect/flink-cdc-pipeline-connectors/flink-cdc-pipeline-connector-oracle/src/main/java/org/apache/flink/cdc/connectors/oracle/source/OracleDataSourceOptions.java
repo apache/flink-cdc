@@ -208,8 +208,8 @@ public class OracleDataSourceOptions {
                             "List of readable metadata from SourceRecord to be passed to downstream, split by `,`. "
                                     + "Available readable metadata are: op_ts.");
 
-    public static final ConfigOption<Double> RECORDS_PER_SECOND =
-            ConfigOptions.key("records.per.second")
+    public static final ConfigOption<Double> SCAN_RATE_LIMIT_RECORDS_PER_SECOND =
+            ConfigOptions.key("scan.rate-limit.records-per-second")
                     .doubleType()
                     .defaultValue(-1d)
                     .withDescription(

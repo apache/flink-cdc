@@ -83,7 +83,7 @@ public class MySqlSourceConfig implements Serializable {
     private final MySqlConnectorConfig dbzMySqlConfig;
     private final boolean treatTinyInt1AsBoolean;
 
-    private final double recordsPerSecond;
+    private final double scanRateLimitRecordsPerSecond;
 
     MySqlSourceConfig(
             String hostname,
@@ -118,7 +118,7 @@ public class MySqlSourceConfig implements Serializable {
             boolean useLegacyJsonFormat,
             boolean assignUnboundedChunkFirst,
             boolean releaseSnapshotMetadataEnabled,
-            double recordsPerSecond) {
+            double scanRateLimitRecordsPerSecond) {
         this.hostname = checkNotNull(hostname);
         this.port = port;
         this.username = checkNotNull(username);
@@ -167,7 +167,7 @@ public class MySqlSourceConfig implements Serializable {
         this.useLegacyJsonFormat = useLegacyJsonFormat;
         this.assignUnboundedChunkFirst = assignUnboundedChunkFirst;
         this.releaseSnapshotMetadataEnabled = releaseSnapshotMetadataEnabled;
-        this.recordsPerSecond = recordsPerSecond;
+        this.scanRateLimitRecordsPerSecond = scanRateLimitRecordsPerSecond;
     }
 
     public String getHostname() {
@@ -314,7 +314,7 @@ public class MySqlSourceConfig implements Serializable {
         return treatTinyInt1AsBoolean;
     }
 
-    public double getRecordsPerSecond() {
-        return recordsPerSecond;
+    public double getScanRateLimitRecordsPerSecond() {
+        return scanRateLimitRecordsPerSecond;
     }
 }

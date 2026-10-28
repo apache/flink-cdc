@@ -77,7 +77,8 @@ public class MongoDBSourceConfigFactory implements Factory<MongoDBSourceConfig> 
     private String sslTrustStorePassword =
             MongoDBSourceOptions.SSL_TRUSTSTORE_PASSWORD.defaultValue();
     private String sslTrustStoreType = MongoDBSourceOptions.SSL_TRUSTSTORE_TYPE.defaultValue();
-    private double recordsPerSecond = MongoDBSourceOptions.RECORDS_PER_SECOND.defaultValue();
+    private double scanRateLimitRecordsPerSecond =
+            MongoDBSourceOptions.SCAN_RATE_LIMIT_RECORDS_PER_SECOND.defaultValue();
 
     /** The protocol connected to MongoDB. For example mongodb or mongodb+srv. */
     public MongoDBSourceConfigFactory scheme(String scheme) {
@@ -353,8 +354,9 @@ public class MongoDBSourceConfigFactory implements Factory<MongoDBSourceConfig> 
         return this;
     }
 
-    public MongoDBSourceConfigFactory recordsPerSecond(double recordsPerSecond) {
-        this.recordsPerSecond = recordsPerSecond;
+    public MongoDBSourceConfigFactory scanRateLimitRecordsPerSecond(
+            double scanRateLimitRecordsPerSecond) {
+        this.scanRateLimitRecordsPerSecond = scanRateLimitRecordsPerSecond;
         return this;
     }
 
@@ -394,6 +396,6 @@ public class MongoDBSourceConfigFactory implements Factory<MongoDBSourceConfig> 
                 sslTrustStore,
                 sslTrustStorePassword,
                 sslTrustStoreType,
-                recordsPerSecond);
+                scanRateLimitRecordsPerSecond);
     }
 }

@@ -120,7 +120,7 @@ class OracleTableSourceFactoryTest {
                                 .defaultValue(),
                         JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED
                                 .defaultValue(),
-                        JdbcSourceOptions.RECORDS_PER_SECOND.defaultValue());
+                        JdbcSourceOptions.SCAN_RATE_LIMIT_RECORDS_PER_SECOND.defaultValue());
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
@@ -162,7 +162,7 @@ class OracleTableSourceFactoryTest {
                                 .defaultValue(),
                         JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED
                                 .defaultValue(),
-                        JdbcSourceOptions.RECORDS_PER_SECOND.defaultValue());
+                        JdbcSourceOptions.SCAN_RATE_LIMIT_RECORDS_PER_SECOND.defaultValue());
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
@@ -209,7 +209,7 @@ class OracleTableSourceFactoryTest {
                                 .defaultValue(),
                         JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED
                                 .defaultValue(),
-                        JdbcSourceOptions.RECORDS_PER_SECOND.defaultValue());
+                        JdbcSourceOptions.SCAN_RATE_LIMIT_RECORDS_PER_SECOND.defaultValue());
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
@@ -284,7 +284,7 @@ class OracleTableSourceFactoryTest {
                         true,
                         JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED
                                 .defaultValue(),
-                        JdbcSourceOptions.RECORDS_PER_SECOND.defaultValue());
+                        JdbcSourceOptions.SCAN_RATE_LIMIT_RECORDS_PER_SECOND.defaultValue());
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
@@ -327,7 +327,7 @@ class OracleTableSourceFactoryTest {
                                 .defaultValue(),
                         JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED
                                 .defaultValue(),
-                        JdbcSourceOptions.RECORDS_PER_SECOND.defaultValue());
+                        JdbcSourceOptions.SCAN_RATE_LIMIT_RECORDS_PER_SECOND.defaultValue());
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
@@ -370,7 +370,7 @@ class OracleTableSourceFactoryTest {
                                 .defaultValue(),
                         JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED
                                 .defaultValue(),
-                        JdbcSourceOptions.RECORDS_PER_SECOND.defaultValue());
+                        JdbcSourceOptions.SCAN_RATE_LIMIT_RECORDS_PER_SECOND.defaultValue());
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
@@ -417,7 +417,7 @@ class OracleTableSourceFactoryTest {
                                 .defaultValue(),
                         JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED
                                 .defaultValue(),
-                        JdbcSourceOptions.RECORDS_PER_SECOND.defaultValue());
+                        JdbcSourceOptions.SCAN_RATE_LIMIT_RECORDS_PER_SECOND.defaultValue());
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys =
                 Arrays.asList("op_ts", "database_name", "table_name", "schema_name");

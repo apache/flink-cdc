@@ -81,7 +81,7 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
     private final boolean skipSnapshotBackfill;
     private final boolean assignUnboundedChunkFirst;
     private final boolean releaseSnapshotMetadataEnabled;
-    private final double recordsPerSecond;
+    private final double scanRateLimitRecordsPerSecond;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -118,7 +118,7 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
             boolean skipSnapshotBackfill,
             boolean assignUnboundedChunkFirst,
             boolean releaseSnapshotMetadataEnabled,
-            double recordsPerSecond) {
+            double scanRateLimitRecordsPerSecond) {
         this.physicalSchema = physicalSchema;
         this.port = port;
         this.hostname = checkNotNull(hostname);
@@ -145,7 +145,7 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
         this.skipSnapshotBackfill = skipSnapshotBackfill;
         this.assignUnboundedChunkFirst = assignUnboundedChunkFirst;
         this.releaseSnapshotMetadataEnabled = releaseSnapshotMetadataEnabled;
-        this.recordsPerSecond = recordsPerSecond;
+        this.scanRateLimitRecordsPerSecond = scanRateLimitRecordsPerSecond;
     }
 
     @Override
@@ -196,7 +196,7 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
                             .skipSnapshotBackfill(skipSnapshotBackfill)
                             .assignUnboundedChunkFirst(assignUnboundedChunkFirst)
                             .releaseSnapshotMetadataEnabled(releaseSnapshotMetadataEnabled)
-                            .recordsPerSecond(recordsPerSecond)
+                            .scanRateLimitRecordsPerSecond(scanRateLimitRecordsPerSecond)
                             .build();
             return SourceProvider.of(sqlServerChangeEventSource);
         } else {
@@ -260,7 +260,7 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
                         skipSnapshotBackfill,
                         assignUnboundedChunkFirst,
                         releaseSnapshotMetadataEnabled,
-                        recordsPerSecond);
+                        scanRateLimitRecordsPerSecond);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
@@ -302,7 +302,8 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
                 && Objects.equals(assignUnboundedChunkFirst, that.assignUnboundedChunkFirst)
                 && Objects.equals(
                         releaseSnapshotMetadataEnabled, that.releaseSnapshotMetadataEnabled)
-                && Objects.equals(recordsPerSecond, that.recordsPerSecond);
+                && Objects.equals(
+                        scanRateLimitRecordsPerSecond, that.scanRateLimitRecordsPerSecond);
     }
 
     @Override
@@ -334,7 +335,7 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
                 skipSnapshotBackfill,
                 assignUnboundedChunkFirst,
                 releaseSnapshotMetadataEnabled,
-                recordsPerSecond);
+                scanRateLimitRecordsPerSecond);
     }
 
     @Override

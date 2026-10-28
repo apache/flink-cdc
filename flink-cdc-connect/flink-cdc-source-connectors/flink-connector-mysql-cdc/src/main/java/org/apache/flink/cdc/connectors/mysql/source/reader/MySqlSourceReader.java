@@ -106,10 +106,12 @@ public class MySqlSourceReader<T>
                 null,
                 config,
                 context.getSourceReaderContext(),
-                sourceConfig.getRecordsPerSecond()
-                                == MySqlSourceOptions.RECORDS_PER_SECOND.defaultValue()
+                sourceConfig.getScanRateLimitRecordsPerSecond()
+                                == MySqlSourceOptions.SCAN_RATE_LIMIT_RECORDS_PER_SECOND
+                                        .defaultValue()
                         ? null
-                        : RateLimiterStrategy.perSecond(sourceConfig.getRecordsPerSecond()));
+                        : RateLimiterStrategy.perSecond(
+                                sourceConfig.getScanRateLimitRecordsPerSecond()));
         this.recordEmitter = recordEmitter;
         this.sourceConfig = sourceConfig;
         this.finishedUnackedSplits = new HashMap<>();

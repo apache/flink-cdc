@@ -464,7 +464,7 @@ class SnapshotSplitAssignerReleaseTest {
         }
 
         @Override
-        public double getRecordsPerSecond() {
+        public double getScanRateLimitRecordsPerSecond() {
             return -1d;
         }
     }

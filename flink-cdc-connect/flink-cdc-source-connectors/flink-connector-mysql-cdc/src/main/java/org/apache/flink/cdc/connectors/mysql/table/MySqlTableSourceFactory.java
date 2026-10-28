@@ -112,7 +112,8 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         boolean appendOnly =
                 config.get(MySqlSourceOptions.SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED);
 
-        double recordsPerSecond = config.get(MySqlSourceOptions.RECORDS_PER_SECOND);
+        double scanRateLimitRecordsPerSecond =
+                config.get(MySqlSourceOptions.SCAN_RATE_LIMIT_RECORDS_PER_SECOND);
 
         if (enableParallelRead) {
             validatePrimaryKeyIfEnableParallel(physicalSchema, chunkKeyColumn);
@@ -162,7 +163,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                 useLegacyJsonFormat,
                 assignUnboundedChunkFirst,
                 appendOnly,
-                recordsPerSecond);
+                scanRateLimitRecordsPerSecond);
     }
 
     @Override
@@ -213,7 +214,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         options.add(MySqlSourceOptions.USE_LEGACY_JSON_FORMAT);
         options.add(MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST);
         options.add(MySqlSourceOptions.SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED);
-        options.add(MySqlSourceOptions.RECORDS_PER_SECOND);
+        options.add(MySqlSourceOptions.SCAN_RATE_LIMIT_RECORDS_PER_SECOND);
         return options;
     }
 

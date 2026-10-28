@@ -51,7 +51,7 @@ public abstract class SingleThreadMultiplexSourceReaderBaseAdapter<
         super(splitFetcherManager, recordEmitter, eofRecordEvaluator, config, context);
         if (null != rateLimiterStrategy) {
             LOG.warn(
-                    "Because the runtime environment is Flink 1.x, the connector options `records.per.second` is ignored.");
+                    "Because the runtime environment is Flink 1.x, the connector options `scan.rate-limit.records-per-second` is ignored.");
         }
     }
 }
