@@ -296,6 +296,3 @@ ORDER BY orderkey;
 "$FLINK_HOME/bin/stop-cluster.sh"
 docker compose down
 ```
-
-仓库文件保留在 `/tmp/flink-cdc-paimon-tutorial/warehouse`。
-如果需要从头重做本示例，请使用空仓库。

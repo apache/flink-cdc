@@ -332,8 +332,5 @@ docker compose exec postgres psql -U postgres -d inventory \
 docker compose down
 ```
 
-本地仓库保留在 `/tmp/flink-cdc-postgres-iceberg/warehouse`。
-如果需要从头重做本示例，请使用空仓库。
-
 连接器详情请参见 [Postgres](../connectors/pipeline-connectors/postgres.md)和
 [Iceberg](../connectors/pipeline-connectors/iceberg.md)。

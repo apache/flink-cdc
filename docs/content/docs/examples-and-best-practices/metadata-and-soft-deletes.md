@@ -372,6 +372,3 @@ Replace `<job-id>` with the ingestion Job ID, cancel the job, and stop the tutor
 "$FLINK_HOME/bin/stop-cluster.sh"
 docker compose down
 ```
-
-The warehouse remains under `/tmp/flink-cdc-transform/warehouse`.
-Use an empty warehouse when starting this example again from scratch.

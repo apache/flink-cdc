@@ -400,6 +400,3 @@ Source 选项的详细说明请参见 [MySQL Pipeline 连接器](../connectors/p
 "$FLINK_HOME/bin/stop-cluster.sh"
 docker compose down
 ```
-
-仓库和 Savepoint 保留在 `/tmp/flink-cdc-table-selection` 下。
-如果需要从头重做本示例，请使用空的示例存储目录。

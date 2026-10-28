@@ -369,6 +369,3 @@ ORDER BY id;
 "$FLINK_HOME/bin/stop-cluster.sh"
 docker compose down
 ```
-
-仓库保留在 `/tmp/flink-cdc-transform/warehouse`。
-如果需要从头重做本示例，请使用空仓库。

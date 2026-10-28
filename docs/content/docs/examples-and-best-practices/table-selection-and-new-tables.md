@@ -403,6 +403,3 @@ Use the restored Job ID to cancel the job, then stop the tutorial services:
 "$FLINK_HOME/bin/stop-cluster.sh"
 docker compose down
 ```
-
-The warehouse and savepoints remain under `/tmp/flink-cdc-table-selection`.
-Use empty tutorial storage when starting this example again from scratch.

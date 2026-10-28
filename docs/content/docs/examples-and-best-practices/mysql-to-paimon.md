@@ -296,6 +296,3 @@ Exit the SQL and MySQL clients. Replace `<job-id>` with the ingestion Job ID, ca
 "$FLINK_HOME/bin/stop-cluster.sh"
 docker compose down
 ```
-
-The warehouse files remain under `/tmp/flink-cdc-paimon-tutorial/warehouse`.
-Use an empty warehouse when repeating this example from scratch.
