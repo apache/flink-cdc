@@ -80,7 +80,8 @@ public class MySqlSourceConfigFactory implements Serializable {
     private boolean treatTinyInt1AsBoolean = true;
     private boolean useLegacyJsonFormat = true;
     private boolean assignUnboundedChunkFirst = false;
-    private double recordsPerSecond = MySqlSourceOptions.RECORDS_PER_SECOND.defaultValue();
+    private double scanRateLimitRecordsPerSecond =
+            MySqlSourceOptions.SCAN_RATE_LIMIT_RECORDS_PER_SECOND.defaultValue();
 
     public MySqlSourceConfigFactory hostname(String hostname) {
         this.hostname = hostname;
@@ -355,8 +356,9 @@ public class MySqlSourceConfigFactory implements Serializable {
         return this;
     }
 
-    public MySqlSourceConfigFactory recordsPerSecond(double recordsPerSecond) {
-        this.recordsPerSecond = recordsPerSecond;
+    public MySqlSourceConfigFactory scanRateLimitRecordsPerSecond(
+            double scanRateLimitRecordsPerSecond) {
+        this.scanRateLimitRecordsPerSecond = scanRateLimitRecordsPerSecond;
         return this;
     }
 
@@ -471,6 +473,6 @@ public class MySqlSourceConfigFactory implements Serializable {
                 useLegacyJsonFormat,
                 assignUnboundedChunkFirst,
                 releaseSnapshotMetadataEnabled,
-                recordsPerSecond);
+                scanRateLimitRecordsPerSecond);
     }
 }

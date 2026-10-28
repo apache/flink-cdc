@@ -436,7 +436,7 @@ MongoDB 的更改事件记录没有 UPDATE_BEFORE 消息。因此，我们只能
       <td>信任库文件的类型。该项为可选，仅在配置了 <code>mongodb.ssl.truststore</code> 时才需要。默认为 PKCS12。</td>
     </tr>
     <tr>
-      <td>records.per.second</td>
+      <td>scan.rate-limit.records-per-second</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">-1</td>
       <td>Double</td>

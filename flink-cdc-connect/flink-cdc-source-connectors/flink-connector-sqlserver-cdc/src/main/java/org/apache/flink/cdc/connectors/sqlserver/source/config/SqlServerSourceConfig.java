@@ -60,7 +60,7 @@ public class SqlServerSourceConfig extends JdbcSourceConfig {
             boolean scanNewlyAddedTableEnabled,
             boolean assignUnboundedChunkFirst,
             boolean releaseSnapshotMetadataEnabled,
-            double recordsPerSecond) {
+            double scanRateLimitRecordsPerSecond) {
         super(
                 startupOptions,
                 databaseList,
@@ -89,7 +89,7 @@ public class SqlServerSourceConfig extends JdbcSourceConfig {
                 scanNewlyAddedTableEnabled,
                 assignUnboundedChunkFirst,
                 releaseSnapshotMetadataEnabled,
-                recordsPerSecond);
+                scanRateLimitRecordsPerSecond);
     }
 
     @Override

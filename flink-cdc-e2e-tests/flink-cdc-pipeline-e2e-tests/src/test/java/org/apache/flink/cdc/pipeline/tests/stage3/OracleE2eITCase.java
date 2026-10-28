@@ -298,7 +298,7 @@ public class OracleE2eITCase extends PipelineTestEnvironment {
                                 + "  tables: DEBEZIUM.PRODUCTS,DEBEZIUM.CUSTOMERS,DEBEZIUM.CUSTOMERS_1\n"
                                 + "  database: %s\n"
                                 + "  scan.startup.mode: initial\n"
-                                + "  records.per.second: %f\n"
+                                + "  scan.rate-limit.records-per-second: %f\n"
                                 + "\n"
                                 + "sink:\n"
                                 + "  type: values\n"

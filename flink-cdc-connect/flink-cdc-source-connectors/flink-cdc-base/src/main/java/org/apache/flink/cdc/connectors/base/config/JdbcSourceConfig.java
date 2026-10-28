@@ -77,7 +77,7 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
             boolean isScanNewlyAddedTableEnabled,
             boolean assignUnboundedChunkFirst,
             boolean releaseSnapshotMetadataEnabled,
-            double recordsPerSecond) {
+            double scanRateLimitRecordsPerSecond) {
         super(
                 startupOptions,
                 splitSize,
@@ -92,7 +92,7 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
                 dbzConfiguration,
                 assignUnboundedChunkFirst,
                 releaseSnapshotMetadataEnabled,
-                recordsPerSecond);
+                scanRateLimitRecordsPerSecond);
         Preconditions.checkState(
                 !(isScanNewlyAddedTableEnabled && releaseSnapshotMetadataEnabled),
                 "scan.incremental.snapshot.metadata.release.enabled and "

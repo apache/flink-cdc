@@ -317,7 +317,7 @@ SELECT * FROM shipments;
       </td>
     </tr>
     <tr>
-      <td>records.per.second</td>
+      <td>scan.rate-limit.records-per-second</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">-1</td>
       <td>Double</td>

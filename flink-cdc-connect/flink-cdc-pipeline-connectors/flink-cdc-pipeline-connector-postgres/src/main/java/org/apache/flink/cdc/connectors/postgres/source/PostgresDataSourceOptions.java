@@ -311,8 +311,8 @@ public class PostgresDataSourceOptions {
                                     + "the captured set at savepoint time. Mirrors the MySQL Pipeline connector option "
                                     + "of the same name.");
 
-    public static final ConfigOption<Double> RECORDS_PER_SECOND =
-            ConfigOptions.key("records.per.second")
+    public static final ConfigOption<Double> SCAN_RATE_LIMIT_RECORDS_PER_SECOND =
+            ConfigOptions.key("scan.rate-limit.records-per-second")
                     .doubleType()
                     .defaultValue(-1d)
                     .withDescription(

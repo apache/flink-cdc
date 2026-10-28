@@ -241,8 +241,8 @@ public class Db2SourceBuilder<T> {
         return this;
     }
 
-    public Db2SourceBuilder<T> recordsPerSecond(double recordsPerSecond) {
-        this.configFactory.recordsPerSecond(recordsPerSecond);
+    public Db2SourceBuilder<T> scanRateLimitRecordsPerSecond(double scanRateLimitRecordsPerSecond) {
+        this.configFactory.scanRateLimitRecordsPerSecond(scanRateLimitRecordsPerSecond);
         return this;
     }
 

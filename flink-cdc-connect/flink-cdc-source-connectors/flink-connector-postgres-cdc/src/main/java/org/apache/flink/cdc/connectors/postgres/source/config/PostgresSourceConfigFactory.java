@@ -145,7 +145,7 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
                 includeDatabaseInTableId,
                 logicalMessagePrefixes,
                 releaseSnapshotMetadataEnabled,
-                recordsPerSecond);
+                scanRateLimitRecordsPerSecond);
     }
 
     /**

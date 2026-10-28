@@ -244,7 +244,7 @@ public class PostgresE2eITCase extends PipelineTestEnvironment {
                                 + "  server-time-zone: UTC\n"
                                 + "  connect.timeout: 120s\n"
                                 + "  schema-change.enabled: true\n"
-                                + "  records.per.second: %f\n"
+                                + "  scan.rate-limit.records-per-second: %f\n"
                                 + "\n"
                                 + "sink:\n"
                                 + "  type: values\n"

@@ -37,8 +37,8 @@ import java.util.Set;
 import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.CONNECTION_POOL_SIZE;
 import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.CONNECT_MAX_RETRIES;
 import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.CONNECT_TIMEOUT;
-import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.RECORDS_PER_SECOND;
 import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN;
+import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.SCAN_RATE_LIMIT_RECORDS_PER_SECOND;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.CHUNK_META_GROUP_SIZE;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP;
@@ -145,7 +145,7 @@ public class Db2TableSourceFactory implements DynamicTableSourceFactory {
                 config.get(SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED);
         boolean releaseSnapshotMetadataEnabled =
                 config.get(SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED);
-        double recordsPerSecond = config.get(RECORDS_PER_SECOND);
+        double scanRateLimitRecordsPerSecond = config.get(SCAN_RATE_LIMIT_RECORDS_PER_SECOND);
 
         if (enableParallelRead) {
             validateIntegerOption(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE, splitSize, 1);
@@ -184,7 +184,7 @@ public class Db2TableSourceFactory implements DynamicTableSourceFactory {
                 skipSnapshotBackfill,
                 assignUnboundedChunkFirst,
                 releaseSnapshotMetadataEnabled,
-                recordsPerSecond);
+                scanRateLimitRecordsPerSecond);
     }
 
     @Override
@@ -223,7 +223,7 @@ public class Db2TableSourceFactory implements DynamicTableSourceFactory {
         options.add(SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED);
-        options.add(RECORDS_PER_SECOND);
+        options.add(SCAN_RATE_LIMIT_RECORDS_PER_SECOND);
         return options;
     }
 

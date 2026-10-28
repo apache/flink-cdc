@@ -243,8 +243,8 @@ public class MongoDBSourceOptions {
                             "The type of trust store file. "
                                     + "This is optional and only needed if 'mongodb.ssl.truststore' is configured. Defaults to PKCS12.");
 
-    public static final ConfigOption<Double> RECORDS_PER_SECOND =
-            ConfigOptions.key("records.per.second")
+    public static final ConfigOption<Double> SCAN_RATE_LIMIT_RECORDS_PER_SECOND =
+            ConfigOptions.key("scan.rate-limit.records-per-second")
                     .doubleType()
                     .defaultValue(-1d)
                     .withDescription(

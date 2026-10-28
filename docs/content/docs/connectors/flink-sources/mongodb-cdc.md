@@ -442,7 +442,7 @@ Connector Options
       <td>The type of trust store file. This is optional and only needed if <code>mongodb.ssl.truststore</code> is configured. Defaults to PKCS12.</td>
     </tr>
     <tr>
-      <td>records.per.second</td>
+      <td>scan.rate-limit.records-per-second</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">-1</td>
       <td>Double</td>

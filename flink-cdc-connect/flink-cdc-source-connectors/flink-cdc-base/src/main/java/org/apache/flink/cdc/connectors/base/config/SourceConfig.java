@@ -51,7 +51,7 @@ public interface SourceConfig extends Serializable {
         return false;
     }
 
-    double getRecordsPerSecond();
+    double getScanRateLimitRecordsPerSecond();
 
     /** Factory for the {@code SourceConfig}. */
     @FunctionalInterface

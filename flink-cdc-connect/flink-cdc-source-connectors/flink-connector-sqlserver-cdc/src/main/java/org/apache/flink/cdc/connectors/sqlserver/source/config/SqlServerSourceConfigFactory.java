@@ -131,6 +131,6 @@ public class SqlServerSourceConfigFactory extends JdbcSourceConfigFactory {
                 scanNewlyAddedTableEnabled,
                 assignUnboundedChunkFirst,
                 releaseSnapshotMetadataEnabled,
-                recordsPerSecond);
+                scanRateLimitRecordsPerSecond);
     }
 }

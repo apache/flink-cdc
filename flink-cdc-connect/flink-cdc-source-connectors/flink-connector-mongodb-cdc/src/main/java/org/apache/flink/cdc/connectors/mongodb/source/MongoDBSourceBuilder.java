@@ -277,8 +277,9 @@ public class MongoDBSourceBuilder<T> {
         return this;
     }
 
-    public MongoDBSourceBuilder<T> recordsPerSecond(double recordsPerSecond) {
-        this.configFactory.recordsPerSecond(recordsPerSecond);
+    public MongoDBSourceBuilder<T> scanRateLimitRecordsPerSecond(
+            double scanRateLimitRecordsPerSecond) {
+        this.configFactory.scanRateLimitRecordsPerSecond(scanRateLimitRecordsPerSecond);
         return this;
     }
 

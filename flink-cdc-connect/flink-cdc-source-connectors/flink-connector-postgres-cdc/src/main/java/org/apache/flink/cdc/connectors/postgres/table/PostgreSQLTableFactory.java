@@ -39,7 +39,7 @@ import java.util.Set;
 import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.DATABASE_NAME;
 import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.HOSTNAME;
 import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.PASSWORD;
-import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.RECORDS_PER_SECOND;
+import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.SCAN_RATE_LIMIT_RECORDS_PER_SECOND;
 import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.SCHEMA_NAME;
 import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.TABLE_NAME;
 import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.USERNAME;
@@ -128,7 +128,7 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
         boolean appendOnly = config.get(SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED);
         boolean releaseSnapshotMetadataEnabled =
                 config.get(SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED);
-        double recordsPerSecond = config.get(RECORDS_PER_SECOND);
+        double scanRateLimitRecordsPerSecond = config.get(SCAN_RATE_LIMIT_RECORDS_PER_SECOND);
 
         Properties dbzProperties = getDebeziumProperties(context.getCatalogTable().getOptions());
         // The timestamp conversion is done by the Debezium value converter, so the option is
@@ -193,7 +193,7 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
                 appendOnly,
                 includePartitionedTables,
                 releaseSnapshotMetadataEnabled,
-                recordsPerSecond);
+                scanRateLimitRecordsPerSecond);
     }
 
     @Override
@@ -241,7 +241,7 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
         options.add(SCAN_INCLUDE_PARTITIONED_TABLES_ENABLED);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED);
         options.add(SCAN_PRE_EPOCH_TIMESTAMP_WALL_CLOCK_CONVERSION_ENABLED);
-        options.add(RECORDS_PER_SECOND);
+        options.add(SCAN_RATE_LIMIT_RECORDS_PER_SECOND);
         return options;
     }
 

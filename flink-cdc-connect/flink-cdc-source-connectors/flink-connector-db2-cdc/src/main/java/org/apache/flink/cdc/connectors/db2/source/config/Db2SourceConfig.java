@@ -59,7 +59,7 @@ public class Db2SourceConfig extends JdbcSourceConfig {
             boolean skipSnapshotBackfill,
             boolean assignUnboundedChunkFirst,
             boolean releaseSnapshotMetadataEnabled,
-            double recordsPerSecond) {
+            double scanRateLimitRecordsPerSecond) {
         super(
                 startupOptions,
                 databaseList,
@@ -88,7 +88,7 @@ public class Db2SourceConfig extends JdbcSourceConfig {
                 false,
                 assignUnboundedChunkFirst,
                 releaseSnapshotMetadataEnabled,
-                recordsPerSecond);
+                scanRateLimitRecordsPerSecond);
     }
 
     @Override

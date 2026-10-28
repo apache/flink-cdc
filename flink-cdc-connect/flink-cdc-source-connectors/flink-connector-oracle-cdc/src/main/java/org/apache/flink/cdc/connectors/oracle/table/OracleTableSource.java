@@ -82,7 +82,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
     private final boolean scanNewlyAddedTableEnabled;
     private final boolean assignUnboundedChunkFirst;
     private final boolean releaseSnapshotMetadataEnabled;
-    private final double recordsPerSecond;
+    private final double scanRateLimitRecordsPerSecond;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -121,7 +121,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
             boolean scanNewlyAddedTableEnabled,
             boolean assignUnboundedChunkFirst,
             boolean releaseSnapshotMetadataEnabled,
-            double recordsPerSecond) {
+            double scanRateLimitRecordsPerSecond) {
         this.physicalSchema = physicalSchema;
         this.url = url;
         this.port = port;
@@ -150,7 +150,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
         this.scanNewlyAddedTableEnabled = scanNewlyAddedTableEnabled;
         this.assignUnboundedChunkFirst = assignUnboundedChunkFirst;
         this.releaseSnapshotMetadataEnabled = releaseSnapshotMetadataEnabled;
-        this.recordsPerSecond = recordsPerSecond;
+        this.scanRateLimitRecordsPerSecond = scanRateLimitRecordsPerSecond;
     }
 
     @Override
@@ -202,7 +202,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                             .scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled)
                             .assignUnboundedChunkFirst(assignUnboundedChunkFirst)
                             .releaseSnapshotMetadataEnabled(releaseSnapshotMetadataEnabled)
-                            .recordsPerSecond(recordsPerSecond)
+                            .scanRateLimitRecordsPerSecond(scanRateLimitRecordsPerSecond)
                             .build();
 
             return SourceProvider.of(oracleChangeEventSource);
@@ -272,7 +272,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                         scanNewlyAddedTableEnabled,
                         assignUnboundedChunkFirst,
                         releaseSnapshotMetadataEnabled,
-                        recordsPerSecond);
+                        scanRateLimitRecordsPerSecond);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
@@ -316,7 +316,8 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                 && Objects.equals(assignUnboundedChunkFirst, that.assignUnboundedChunkFirst)
                 && Objects.equals(
                         releaseSnapshotMetadataEnabled, that.releaseSnapshotMetadataEnabled)
-                && Objects.equals(recordsPerSecond, that.recordsPerSecond);
+                && Objects.equals(
+                        scanRateLimitRecordsPerSecond, that.scanRateLimitRecordsPerSecond);
     }
 
     @Override
@@ -350,7 +351,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                 scanNewlyAddedTableEnabled,
                 assignUnboundedChunkFirst,
                 releaseSnapshotMetadataEnabled,
-                recordsPerSecond);
+                scanRateLimitRecordsPerSecond);
     }
 
     @Override

@@ -135,9 +135,10 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
                 null,
                 config,
                 incrementalSourceReaderContext.getSourceReaderContext(),
-                sourceConfig.getRecordsPerSecond() == -1
+                sourceConfig.getScanRateLimitRecordsPerSecond() == -1
                         ? null
-                        : RateLimiterStrategy.perSecond(sourceConfig.getRecordsPerSecond()));
+                        : RateLimiterStrategy.perSecond(
+                                sourceConfig.getScanRateLimitRecordsPerSecond()));
         this.sourceConfig = sourceConfig;
         this.finishedUnackedSplits = new HashMap<>();
         this.uncompletedStreamSplits = new HashMap<>();

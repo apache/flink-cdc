@@ -80,7 +80,7 @@ public class Db2TableSource implements ScanTableSource, SupportsReadingMetadata 
     private final boolean skipSnapshotBackfill;
     private final boolean assignUnboundedChunkFirst;
     private final boolean releaseSnapshotMetadataEnabled;
-    private final double recordsPerSecond;
+    private final double scanRateLimitRecordsPerSecond;
 
     /** Metadata that is appended at the end of a physical source row. */
     protected List<String> metadataKeys;
@@ -110,7 +110,7 @@ public class Db2TableSource implements ScanTableSource, SupportsReadingMetadata 
             boolean skipSnapshotBackfill,
             boolean assignUnboundedChunkFirst,
             boolean releaseSnapshotMetadataEnabled,
-            double recordsPerSecond) {
+            double scanRateLimitRecordsPerSecond) {
         this.physicalSchema = physicalSchema;
         this.port = port;
         this.hostname = hostname;
@@ -137,7 +137,7 @@ public class Db2TableSource implements ScanTableSource, SupportsReadingMetadata 
         this.skipSnapshotBackfill = skipSnapshotBackfill;
         this.assignUnboundedChunkFirst = assignUnboundedChunkFirst;
         this.releaseSnapshotMetadataEnabled = releaseSnapshotMetadataEnabled;
-        this.recordsPerSecond = recordsPerSecond;
+        this.scanRateLimitRecordsPerSecond = scanRateLimitRecordsPerSecond;
     }
 
     @Override
@@ -186,7 +186,7 @@ public class Db2TableSource implements ScanTableSource, SupportsReadingMetadata 
                             .skipSnapshotBackfill(skipSnapshotBackfill)
                             .assignUnboundedChunkFirst(assignUnboundedChunkFirst)
                             .releaseSnapshotMetadataEnabled(releaseSnapshotMetadataEnabled)
-                            .recordsPerSecond(recordsPerSecond)
+                            .scanRateLimitRecordsPerSecond(scanRateLimitRecordsPerSecond)
                             .build();
             return SourceProvider.of(db2ChangeEventSource);
         } else {
@@ -250,7 +250,7 @@ public class Db2TableSource implements ScanTableSource, SupportsReadingMetadata 
                         skipSnapshotBackfill,
                         assignUnboundedChunkFirst,
                         releaseSnapshotMetadataEnabled,
-                        recordsPerSecond);
+                        scanRateLimitRecordsPerSecond);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
@@ -290,7 +290,8 @@ public class Db2TableSource implements ScanTableSource, SupportsReadingMetadata 
                 && Objects.equals(assignUnboundedChunkFirst, that.assignUnboundedChunkFirst)
                 && Objects.equals(
                         releaseSnapshotMetadataEnabled, that.releaseSnapshotMetadataEnabled)
-                && Objects.equals(recordsPerSecond, that.recordsPerSecond);
+                && Objects.equals(
+                        scanRateLimitRecordsPerSecond, that.scanRateLimitRecordsPerSecond);
     }
 
     @Override
@@ -320,7 +321,7 @@ public class Db2TableSource implements ScanTableSource, SupportsReadingMetadata 
                 skipSnapshotBackfill,
                 assignUnboundedChunkFirst,
                 releaseSnapshotMetadataEnabled,
-                recordsPerSecond);
+                scanRateLimitRecordsPerSecond);
     }
 
     @Override

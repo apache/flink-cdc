@@ -323,8 +323,9 @@ public class MySqlSourceBuilder<T> {
         return this;
     }
 
-    public MySqlSourceBuilder<T> recordsPerSecond(double recordsPerSecond) {
-        this.configFactory.recordsPerSecond(recordsPerSecond);
+    public MySqlSourceBuilder<T> scanRateLimitRecordsPerSecond(
+            double scanRateLimitRecordsPerSecond) {
+        this.configFactory.scanRateLimitRecordsPerSecond(scanRateLimitRecordsPerSecond);
         return this;
     }
 

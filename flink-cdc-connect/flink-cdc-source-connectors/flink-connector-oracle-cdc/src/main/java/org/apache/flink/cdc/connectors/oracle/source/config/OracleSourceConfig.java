@@ -67,7 +67,7 @@ public class OracleSourceConfig extends JdbcSourceConfig {
             boolean scanNewlyAddedTableEnabled,
             boolean assignUnboundedChunkFirst,
             boolean releaseSnapshotMetadataEnabled,
-            double recordsPerSecond) {
+            double scanRateLimitRecordsPerSecond) {
         super(
                 startupOptions,
                 databaseList,
@@ -96,7 +96,7 @@ public class OracleSourceConfig extends JdbcSourceConfig {
                 scanNewlyAddedTableEnabled,
                 assignUnboundedChunkFirst,
                 releaseSnapshotMetadataEnabled,
-                recordsPerSecond);
+                scanRateLimitRecordsPerSecond);
         this.url = url;
     }
 

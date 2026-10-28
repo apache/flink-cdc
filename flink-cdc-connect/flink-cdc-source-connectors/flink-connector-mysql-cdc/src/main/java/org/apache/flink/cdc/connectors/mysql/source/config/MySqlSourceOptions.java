@@ -308,8 +308,8 @@ public class MySqlSourceOptions {
                     .withDescription(
                             "Whether to assign the unbounded chunks first during snapshot reading phase. This might help reduce the risk of the TaskManager experiencing an out-of-memory (OOM) error when taking a snapshot of the largest unbounded chunk.");
 
-    public static final ConfigOption<Double> RECORDS_PER_SECOND =
-            ConfigOptions.key("records.per.second")
+    public static final ConfigOption<Double> SCAN_RATE_LIMIT_RECORDS_PER_SECOND =
+            ConfigOptions.key("scan.rate-limit.records-per-second")
                     .doubleType()
                     .defaultValue(-1d)
                     .withDescription(

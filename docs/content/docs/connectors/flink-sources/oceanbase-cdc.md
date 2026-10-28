@@ -493,7 +493,7 @@ During a snapshot operation, the connector will query each included table to pro
       </td>
     </tr>
     <tr>
-      <td>records.per.second</td>
+      <td>scan.rate-limit.records-per-second</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">-1</td>
       <td>Double</td>

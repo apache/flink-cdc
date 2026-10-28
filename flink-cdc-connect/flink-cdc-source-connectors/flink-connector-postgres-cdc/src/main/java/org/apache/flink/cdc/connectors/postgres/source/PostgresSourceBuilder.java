@@ -365,8 +365,9 @@ public class PostgresSourceBuilder<T> {
         return this;
     }
 
-    public PostgresSourceBuilder<T> recordsPerSecond(double recordsPerSecond) {
-        this.configFactory.recordsPerSecond(recordsPerSecond);
+    public PostgresSourceBuilder<T> scanRateLimitRecordsPerSecond(
+            double scanRateLimitRecordsPerSecond) {
+        this.configFactory.scanRateLimitRecordsPerSecond(scanRateLimitRecordsPerSecond);
         return this;
     }
 

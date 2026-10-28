@@ -260,8 +260,9 @@ public class OracleSourceBuilder<T> {
         return this;
     }
 
-    public OracleSourceBuilder<T> recordsPerSecond(double recordsPerSecond) {
-        this.configFactory.recordsPerSecond(recordsPerSecond);
+    public OracleSourceBuilder<T> scanRateLimitRecordsPerSecond(
+            double scanRateLimitRecordsPerSecond) {
+        this.configFactory.scanRateLimitRecordsPerSecond(scanRateLimitRecordsPerSecond);
         return this;
     }
 

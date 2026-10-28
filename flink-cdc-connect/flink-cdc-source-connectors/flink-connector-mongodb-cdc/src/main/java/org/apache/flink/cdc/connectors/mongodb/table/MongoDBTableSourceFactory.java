@@ -55,11 +55,11 @@ import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourc
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.PASSWORD;
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.POLL_AWAIT_TIME_MILLIS;
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.POLL_MAX_BATCH_SIZE;
-import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.RECORDS_PER_SECOND;
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SAMPLES;
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE_MB;
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED;
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_NO_CURSOR_TIMEOUT;
+import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_RATE_LIMIT_RECORDS_PER_SECOND;
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCHEME;
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SSL_ENABLED;
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SSL_INVALID_HOSTNAME_ALLOWED;
@@ -152,7 +152,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
 
         boolean noCursorTimeout = config.getOptional(SCAN_NO_CURSOR_TIMEOUT).orElse(true);
 
-        double recordsPerSecond = config.get(RECORDS_PER_SECOND);
+        double scanRateLimitRecordsPerSecond = config.get(SCAN_RATE_LIMIT_RECORDS_PER_SECOND);
         ResolvedSchema physicalSchema =
                 getPhysicalSchema(context.getCatalogTable().getResolvedSchema());
         checkArgument(physicalSchema.getPrimaryKey().isPresent(), "Primary key must be present");
@@ -206,7 +206,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
                 sslTrustStore,
                 sslTrustStorePassword,
                 sslTrustStoreType,
-                recordsPerSecond);
+                scanRateLimitRecordsPerSecond);
     }
 
     private void checkPrimaryKey(UniqueConstraint pk, String message) {
@@ -300,7 +300,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         options.add(SSL_TRUSTSTORE);
         options.add(SSL_TRUSTSTORE_PASSWORD);
         options.add(SSL_TRUSTSTORE_TYPE);
-        options.add(RECORDS_PER_SECOND);
+        options.add(SCAN_RATE_LIMIT_RECORDS_PER_SECOND);
         return options;
     }
 }
