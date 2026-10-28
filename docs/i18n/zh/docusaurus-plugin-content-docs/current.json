@@ -14,6 +14,9 @@
   "sidebar.docs.category.Core Concept": {
     "message": "核心概念"
   },
+  "sidebar.docs.category.Examples and Best Practices": {
+    "message": "示例与最佳实践"
+  },
   "sidebar.docs.category.Deployment": {
     "message": "部署模式"
   },

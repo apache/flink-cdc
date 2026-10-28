@@ -101,7 +101,7 @@ sink:
 |----------------------|-----------|------------|-------|
 | JDBC                 | Catalog   | Schema     | Table |
 | Debezium             | Catalog   | Schema     | Table |
-| MySQL                | Database  | -          | Table |
+| MySQL                | -         | Database   | Table |
 | Postgres             | Database  | Schema     | Table |
 | Oracle               | -         | Schema     | Table |
 | Microsoft SQL Server | Database  | Schema     | Table |
