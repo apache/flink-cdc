@@ -283,11 +283,11 @@ Flink SQL> SELECT * FROM products;
     <tr>
       <td>records.per.second</td>
       <td>optional</td>
-      <td style="word-wrap: break-word;">true</td>
+      <td style="word-wrap: break-word;">-1</td>
       <td>Double</td>
       <td>
-        The maximum number of records emitted per second, the default value: -1, means no rate limiting.(only for flink2.x)<br>
-        WARNING: Incremental/binlog phase: Rate limiting can cause the connector to fall behind the upstream change stream, risking binlog/WAL purging before the connector catches up (data loss for MySQL, replication slot issues for PostgreSQL).
+        每秒发出的最大记录数，默认值为 -1，表示不进行速率限制。（仅适用于 flink 2.x）<br>
+        警告：增量/二进制日志阶段：速率限制可能导致连接器落后于上游变更流，在连接器赶上之前，二进制日志/WAL 可能会被清除（MySQL 数据丢失，PostgreSQL 复制槽问题）。
       </td>
     </tr>
     </tbody>
