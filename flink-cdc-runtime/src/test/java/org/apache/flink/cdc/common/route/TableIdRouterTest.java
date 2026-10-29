@@ -30,6 +30,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.AssertionsForInterfaceTypes.assertThat;
 
 /** Unit test for {@link TableIdRouter}. */
@@ -43,6 +44,316 @@ public class TableIdRouterTest extends SchemaTestBase {
 
     private static String testConvert(String input) {
         return TableIdRouter.convertTableListToRegExpPattern(input);
+    }
+
+    @Test
+    void testReplacementPreservesTemplateStructureByDefault() {
+        TableId source = TableId.tableId("source_db", "daily.archive");
+        List<RouteRule> rules =
+                List.of(
+                        new RouteRule("source_db.\\.*", "target_db.<>", "<>"),
+                        new RouteRule("source_db.(\\.*)", "target_db.$1"));
+        for (RouteRule rule : rules) {
+            assertThat(new TableIdRouter(List.of(rule)).route(source))
+                    .containsExactly(TableId.tableId("target_db", "daily.archive"));
+        }
+    }
+
+    @Test
+    void testPreservesDottedReplacementSymbol() {
+        TableIdRouter router =
+                new TableIdRouter(List.of(new RouteRule("source_db.\\.*", "target_db.<>", "<>")));
+        TableId result = router.route(TableId.tableId("source_db", "daily.archive")).get(0);
+        assertThat(result.getNamespace()).isNull();
+        assertThat(result.getSchemaName()).isEqualTo("target_db");
+        assertThat(result.getTableName()).isEqualTo("daily.archive");
+    }
+
+    @Test
+    void testPreservesDottedCaptureGroup() {
+        TableIdRouter router =
+                new TableIdRouter(List.of(new RouteRule("source_db.(\\.*)", "target_db.$1", null)));
+        TableId result = router.route(TableId.tableId("source_db", "daily.archive")).get(0);
+        assertThat(result.getNamespace()).isNull();
+        assertThat(result.getSchemaName()).isEqualTo("target_db");
+        assertThat(result.getTableName()).isEqualTo("daily.archive");
+    }
+
+    @Test
+    void testSupportsOneTwoAndThreeTemplateComponents() {
+        TableId source = TableId.tableId("source_db", "daily.archive.backup");
+        List<RouteRule> rules =
+                List.of(
+                        new RouteRule("source_db.\\.*", "<>", "<>"),
+                        new RouteRule("source_db.\\.*", "target_db.<>", "<>"),
+                        new RouteRule("source_db.\\.*", "target_ns.target_db.<>", "<>"));
+        List<TableId> expected =
+                List.of(
+                        TableId.tableId("daily.archive.backup"),
+                        TableId.tableId("target_db", "daily.archive.backup"),
+                        TableId.tableId("target_ns", "target_db", "daily.archive.backup"));
+        for (int i = 0; i < rules.size(); i++) {
+            assertThat(new TableIdRouter(List.of(rules.get(i))).route(source))
+                    .containsExactly(expected.get(i));
+        }
+    }
+
+    @Test
+    void testSupportsCaptureInEveryComponent() {
+        TableIdRouter router =
+                new TableIdRouter(List.of(new RouteRule("source_db.(\\.*)", "$1.$1.$1", null)));
+        assertThat(router.route(TableId.tableId("source_db", "daily.archive")))
+                .containsExactly(
+                        TableId.tableId("daily.archive", "daily.archive", "daily.archive"));
+    }
+
+    @Test
+    void testRepeatsSymbolWithoutReinterpretingReplacement() {
+        TableIdRouter router =
+                new TableIdRouter(
+                        List.of(
+                                new RouteRule(
+                                        "source_db.\\.*", "target_db.pre_<>_<>_suffix", "<>")));
+        assertThat(router.route(TableId.tableId("source_db", "daily.$1\\archive")))
+                .containsExactly(
+                        TableId.tableId(
+                                "target_db", "pre_daily.$1\\archive_daily.$1\\archive_suffix"));
+    }
+
+    @Test
+    void testRepeatsCapturesWithoutReinterpretingTheirContents() {
+        TableIdRouter router =
+                new TableIdRouter(
+                        List.of(
+                                new RouteRule(
+                                        "source_db.(\\.*)", "target_db.pre_$1_$1_suffix", null)));
+        assertThat(router.route(TableId.tableId("source_db", "daily.$1\\archive")))
+                .containsExactly(
+                        TableId.tableId(
+                                "target_db", "pre_daily.$1\\archive_daily.$1\\archive_suffix"));
+    }
+
+    @Test
+    void testSupportsNamedGroupsAndLiteralReplacementEscapes() {
+        TableIdRouter router =
+                new TableIdRouter(
+                        List.of(
+                                new RouteRule(
+                                        "source_db.(?<table>\\.*)",
+                                        "target_db.\\$${table}_\\\\suffix",
+                                        null)));
+        assertThat(router.route(TableId.tableId("source_db", "daily.archive")))
+                .containsExactly(TableId.tableId("target_db", "$daily.archive_\\suffix"));
+    }
+
+    @Test
+    void testCaptureGroupSeparatorEscapes() {
+        for (String table : List.of("daily", "daily.archive")) {
+            for (int backslashes = 0; backslashes <= 5; backslashes++) {
+                String escapes = "\\".repeat(backslashes);
+                String literalBackslashes = "\\".repeat(backslashes / 2);
+                TableIdRouter router =
+                        new TableIdRouter(
+                                List.of(
+                                        new RouteRule(
+                                                "source_db.(\\.*)",
+                                                "target_db" + escapes + ".$1")));
+                assertThat(router.route(TableId.tableId("source_db", table)))
+                        .containsExactly(TableId.tableId("target_db" + literalBackslashes, table));
+            }
+        }
+    }
+
+    @Test
+    void testCaptureGroupEscapesAtBothSeparators() {
+        TableIdRouter router =
+                new TableIdRouter(
+                        List.of(new RouteRule("source_db.(\\.*)", "target_ns\\.target_db\\.$1")));
+        assertThat(router.route(TableId.tableId("source_db", "daily.archive")))
+                .containsExactly(TableId.tableId("target_ns", "target_db", "daily.archive"));
+    }
+
+    @Test
+    void testSymbolReplacementDoesNotInterpretBackslashes() {
+        TableIdRouter router =
+                new TableIdRouter(List.of(new RouteRule("source_db.\\.*", "target_db\\.<>", "<>")));
+        assertThat(router.route(TableId.tableId("source_db", "daily.archive")))
+                .containsExactly(TableId.tableId("target_db\\", "daily.archive"));
+    }
+
+    @Test
+    void testCaptureGroupRejectsUnterminatedEscape() {
+        TableIdRouter router =
+                new TableIdRouter(List.of(new RouteRule("source_db.(\\.*)", "target_db.$1\\")));
+        assertThatThrownBy(() -> router.route(TableId.tableId("source_db", "daily")))
+                .hasRootCauseInstanceOf(IllegalArgumentException.class)
+                .hasStackTraceContaining("character to be escaped is missing");
+    }
+
+    @Test
+    void testCaptureGroupEscapesRetainReplacementReferences() {
+        TableId source = TableId.tableId("source_db", "daily.archive");
+        TableIdRouter router =
+                new TableIdRouter(
+                        List.of(
+                                new RouteRule("source_db.(\\.*)", "target_db\\.$0"),
+                                new RouteRule("source_db.(\\.*)", "target_db\\.$12"),
+                                new RouteRule("source_db.(\\.*)", "target_db\\$\\.$1\\$"),
+                                new RouteRule("source_db.(?<table>\\.*)", "target_db\\.${table}")));
+        assertThat(router.route(source))
+                .containsExactly(
+                        TableId.tableId("target_db", "source_db.daily.archive"),
+                        TableId.tableId("target_db", "daily.archive2"),
+                        TableId.tableId("target_db$", "daily.archive$"),
+                        TableId.tableId("target_db", "daily.archive"));
+    }
+
+    @Test
+    void testCrossLevelCaptureStaysInOneTemplateComponent() {
+        TableId source = TableId.tableId("source_ns", "source_db", "daily");
+        TableIdRouter router =
+                new TableIdRouter(
+                        List.of(
+                                new RouteRule("source_ns.(\\.*)", "target_ns.$1"),
+                                new RouteRule("source_ns.(\\.*).(\\.*)", "target_ns.$1.$2")));
+        assertThat(router.route(source))
+                .containsExactly(
+                        TableId.tableId("target_ns", "source_db.daily"),
+                        TableId.tableId("target_ns", "source_db", "daily"));
+    }
+
+    @Test
+    void testDoesNotLeakShorterPrefix() {
+        TableIdRouter router =
+                new TableIdRouter(
+                        List.of(
+                                new RouteRule(
+                                        "source_db.table_([1-9]|1[0-6])",
+                                        "target_db.table_$1_suffix",
+                                        null)));
+        assertThat(router.route(TableId.tableId("source_db", "table_13")))
+                .containsExactly(TableId.tableId("target_db", "table_13_suffix"));
+    }
+
+    @Test
+    void testLeavesFixedTargetsAndUnmatchedSourcesUnchanged() {
+        TableIdRouter router =
+                new TableIdRouter(
+                        List.of(
+                                new RouteRule("source_db.\\.*", "target_db.fixed", "<>"),
+                                new RouteRule("other_db.\\.*", "target_db.fixed", null)));
+        assertThat(router.route(TableId.tableId("source_db", "daily.archive")))
+                .containsExactly(TableId.tableId("target_db", "fixed"));
+        assertThat(router.route(TableId.tableId("other_db", "daily.archive")))
+                .containsExactly(TableId.tableId("target_db", "fixed"));
+        TableId unmatched = TableId.tableId("unmatched_db", "daily.archive");
+        assertThat(router.route(unmatched)).containsExactly(unmatched);
+    }
+
+    @Test
+    void testDoesNotEnableImplicitReplacementSymbols() {
+        TableIdRouter router =
+                new TableIdRouter(List.of(new RouteRule("source_db.\\.*", "target_db.<>", null)));
+        assertThat(router.route(TableId.tableId("source_db", "daily.archive")))
+                .containsExactly(TableId.tableId("target_db", "<>"));
+    }
+
+    @Test
+    void testKeepsTemplateSeparatorsWithDotReplacementSymbol() {
+        TableIdRouter router =
+                new TableIdRouter(List.of(new RouteRule("source_db.\\.*", "target_db.fixed", ".")));
+        assertThat(router.route(TableId.tableId("source_db", "daily.archive")))
+                .containsExactly(TableId.tableId("target_db", "fixed"));
+    }
+
+    @Test
+    void testTemplateStructureRespectsMatchModeAndGrouping() {
+        RouteRule twoLevels = new RouteRule("source_db.\\.*", "target_db.<>", "<>");
+        RouteRule threeLevels = new RouteRule("source_db.\\.*", "target_ns.target_db.<>", "<>");
+        TableId source = TableId.tableId("source_db", "daily.archive");
+        TableIdRouter router =
+                new TableIdRouter(List.of(twoLevels, threeLevels), RouteMode.FIRST_MATCH);
+        assertThat(router.route(source))
+                .containsExactly(TableId.tableId("target_db", "daily.archive"));
+        assertThat(router.groupSourceTablesByRouteRule(Set.of(source)))
+                .containsExactly(Set.of(source), Set.of());
+        assertThat(
+                        new TableIdRouter(List.of(threeLevels, twoLevels), RouteMode.FIRST_MATCH)
+                                .route(source))
+                .containsExactly(TableId.tableId("target_ns", "target_db", "daily.archive"));
+        TableIdRouter allMatches = new TableIdRouter(List.of(twoLevels, threeLevels));
+        assertThat(allMatches.route(source))
+                .containsExactly(
+                        TableId.tableId("target_db", "daily.archive"),
+                        TableId.tableId("target_ns", "target_db", "daily.archive"));
+        assertThat(allMatches.groupSourceTablesByRouteRule(Set.of(source)))
+                .containsExactly(Set.of(source), Set.of(source));
+    }
+
+    @Test
+    void testReplacementPreservesOrdinaryTableNames() {
+        for (String replacement : List.of("<>", "$1")) {
+            String symbol = replacement.equals("<>") ? "<>" : null;
+            List<String> templates =
+                    List.of(replacement, "db." + replacement, "ns.db." + replacement);
+            List<TableId> expected =
+                    List.of(
+                            TableId.tableId("daily"),
+                            TableId.tableId("db", "daily"),
+                            TableId.tableId("ns", "db", "daily"));
+            for (int i = 0; i < templates.size(); i++) {
+                assertThat(
+                                new TableIdRouter(
+                                                List.of(
+                                                        new RouteRule(
+                                                                "source_db.(\\.*)",
+                                                                templates.get(i),
+                                                                symbol)))
+                                        .route(TableId.tableId("source_db", "daily")))
+                        .containsExactly(expected.get(i));
+            }
+        }
+    }
+
+    @Test
+    void testRejectsInvalidTemplatesBeforeRouting() {
+        for (String template : List.of("", ".table", "db.", "db..table", "a.b.c.d")) {
+            assertThatThrownBy(
+                            () ->
+                                    new TableIdRouter(
+                                            List.of(
+                                                    new RouteRule(
+                                                            "source_db.\\.*", template, null))))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("sink-table")
+                    .hasMessageContaining(template);
+        }
+    }
+
+    @Test
+    void testRejectsEmptyResolvedComponents() {
+        TableIdRouter router =
+                new TableIdRouter(
+                        List.of(new RouteRule("source_db.table(\\d*)", "target_db.$1", null)));
+        assertThatThrownBy(() -> router.route(TableId.tableId("source_db", "table")))
+                .hasRootCauseInstanceOf(IllegalArgumentException.class)
+                .hasStackTraceContaining("sink-table")
+                .hasStackTraceContaining("source_db.table");
+    }
+
+    @Test
+    void testPreservesCacheKeysForDistinctSourceStructures() {
+        TableIdRouter router =
+                new TableIdRouter(List.of(new RouteRule("source_db.\\.*", "target_db.<>", "<>")));
+        TableId twoLevels = TableId.tableId("source_db", "daily.archive");
+        TableId threeLevels = TableId.tableId("source_db", "daily", "archive");
+        assertThat(twoLevels.toString()).isEqualTo(threeLevels.toString());
+        assertThat(router.route(twoLevels))
+                .containsExactly(TableId.tableId("target_db", "daily.archive"));
+        assertThat(router.route(threeLevels))
+                .containsExactly(TableId.tableId("target_db", "archive"));
+        assertThat(router.route(twoLevels))
+                .containsExactly(TableId.tableId("target_db", "daily.archive"));
     }
 
     @Test
