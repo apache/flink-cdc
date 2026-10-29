@@ -29,7 +29,6 @@ import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.connectors.kafka.json.TableSchemaInfo;
 import org.apache.flink.formats.common.TimestampFormat;
 import org.apache.flink.formats.json.JsonFormatOptions;
-import org.apache.flink.formats.json.JsonRowDataSerializationSchema;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.data.GenericArrayData;
 import org.apache.flink.table.data.GenericRowData;
@@ -117,8 +116,8 @@ public class CanalJsonSerializationSchema implements SerializationSchema<Event> 
             }
             LogicalType rowType =
                     DataTypeUtils.toFlinkDataType(schema.toRowDataType()).getLogicalType();
-            JsonRowDataSerializationSchema jsonSerializer =
-                    new JsonRowDataSerializationSchema(
+            CanalRowDataSerializationSchema jsonSerializer =
+                    new CanalRowDataSerializationSchema(
                             createJsonRowType(fromLogicalToDataType(rowType)),
                             timestampFormat,
                             mapNullKeyMode,

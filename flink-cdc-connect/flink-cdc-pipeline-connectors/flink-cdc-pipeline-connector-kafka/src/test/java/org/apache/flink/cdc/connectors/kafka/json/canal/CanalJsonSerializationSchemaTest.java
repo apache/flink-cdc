@@ -18,12 +18,18 @@
 package org.apache.flink.cdc.connectors.kafka.json.canal;
 
 import org.apache.flink.api.common.serialization.SerializationSchema;
+import org.apache.flink.cdc.common.data.GenericArrayData;
+import org.apache.flink.cdc.common.data.GenericMapData;
+import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
+import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.connectors.kafka.json.ChangeLogJsonFormatFactory;
@@ -31,6 +37,7 @@ import org.apache.flink.cdc.connectors.kafka.json.JsonSerializationType;
 import org.apache.flink.cdc.connectors.kafka.json.MockInitializationContext;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.formats.json.JsonFormatOptions;
 import org.apache.flink.util.jackson.JacksonMapperFactory;
 
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonGenerator;
@@ -41,6 +48,11 @@ import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.time.ZoneId;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /** Tests for {@link CanalJsonSerializationSchema}. */
 class CanalJsonSerializationSchemaTest {
@@ -130,7 +142,7 @@ class CanalJsonSerializationSchemaTest {
                                 }));
         expected =
                 mapper.readTree(
-                        "{\"old\":[{\"col1\":\"1\",\"col2\":\"1\"}],\"data\":[{\"col1\":\"1\",\"col2\":\"x\"}],\"type\":\"UPDATE\",\"database\":\"default_schema\",\"table\":\"table1\",\"pkNames\":[\"col1\"]}");
+                        "{\"old\":[{\"col2\":\"1\"}],\"data\":[{\"col1\":\"1\",\"col2\":\"x\"}],\"type\":\"UPDATE\",\"database\":\"default_schema\",\"table\":\"table1\",\"pkNames\":[\"col1\"]}");
         actual = mapper.readTree(serializationSchema.serialize(updateEvent));
         Assertions.assertThat(actual).isEqualTo(expected);
     }
@@ -176,22 +188,21 @@ class CanalJsonSerializationSchemaTest {
         BinaryRecordDataGenerator generator = new BinaryRecordDataGenerator(rowType);
 
         // Create test data with complex types
-        org.apache.flink.cdc.common.data.GenericArrayData arrayData =
-                new org.apache.flink.cdc.common.data.GenericArrayData(
+        GenericArrayData arrayData =
+                new GenericArrayData(
                         new Object[] {
                             BinaryStringData.fromString("item1"),
                             BinaryStringData.fromString("item2")
                         });
 
-        java.util.Map<Object, Object> mapValues = new java.util.HashMap<>();
+        Map<Object, Object> mapValues = new HashMap<>();
         mapValues.put(BinaryStringData.fromString("key1"), 100);
         mapValues.put(BinaryStringData.fromString("key2"), 200);
-        org.apache.flink.cdc.common.data.GenericMapData mapData =
-                new org.apache.flink.cdc.common.data.GenericMapData(mapValues);
+        GenericMapData mapData = new GenericMapData(mapValues);
 
         BinaryRecordDataGenerator nestedRowGenerator =
                 new BinaryRecordDataGenerator(RowType.of(DataTypes.STRING(), DataTypes.INT()));
-        org.apache.flink.cdc.common.data.RecordData nestedRow =
+        RecordData nestedRow =
                 nestedRowGenerator.generate(
                         new Object[] {BinaryStringData.fromString("nested"), 42});
 
@@ -227,5 +238,243 @@ class CanalJsonSerializationSchemaTest {
         Assertions.assertThat(rowNode.isObject()).isTrue();
         Assertions.assertThat(rowNode.has("f1")).isTrue();
         Assertions.assertThat(rowNode.has("f2")).isTrue();
+
+        GenericArrayData equalArray =
+                new GenericArrayData(
+                        new Object[] {
+                            BinaryStringData.fromString("item1"),
+                            BinaryStringData.fromString("item2")
+                        });
+        Map<Object, Object> reversedMapValues = new LinkedHashMap<>();
+        reversedMapValues.put(BinaryStringData.fromString("key2"), 200);
+        reversedMapValues.put(BinaryStringData.fromString("key1"), 100);
+        GenericMapData equalMap = new GenericMapData(reversedMapValues);
+        RecordData equalRow =
+                nestedRowGenerator.generate(
+                        new Object[] {BinaryStringData.fromString("nested"), 42});
+        JsonNode unchanged =
+                mapper.readTree(
+                        serializationSchema.serialize(
+                                DataChangeEvent.updateEvent(
+                                        TABLE_1,
+                                        generator.generate(
+                                                new Object[] {1, arrayData, mapData, nestedRow}),
+                                        generator.generate(
+                                                new Object[] {
+                                                    1, equalArray, equalMap, equalRow
+                                                }))));
+        Assertions.assertThat(unchanged.get("old").get(0).size()).isZero();
+        Assertions.assertThat(unchanged.get("data")).isEqualTo(actual.get("data"));
+
+        GenericArrayData changedArray =
+                new GenericArrayData(new Object[] {BinaryStringData.fromString("changed")});
+        Map<Object, Object> changedMapValues = new HashMap<>(mapValues);
+        changedMapValues.put(BinaryStringData.fromString("key1"), 101);
+        GenericMapData changedMap = new GenericMapData(changedMapValues);
+        RecordData changedRow =
+                nestedRowGenerator.generate(
+                        new Object[] {BinaryStringData.fromString("nested"), 43});
+        JsonNode changed =
+                mapper.readTree(
+                        serializationSchema.serialize(
+                                DataChangeEvent.updateEvent(
+                                        TABLE_1,
+                                        generator.generate(
+                                                new Object[] {1, arrayData, mapData, nestedRow}),
+                                        generator.generate(
+                                                new Object[] {
+                                                    1, changedArray, changedMap, changedRow
+                                                }))));
+        Assertions.assertThat(changed.get("old").get(0).size()).isEqualTo(3);
+        Assertions.assertThat(changed.get("old").get(0).get("arr")).isEqualTo(arrNode);
+        Assertions.assertThat(changed.get("old").get(0).get("map")).isEqualTo(mapNode);
+        Assertions.assertThat(changed.get("old").get(0).get("row")).isEqualTo(rowNode);
+        Assertions.assertThat(changed.get("data").get(0))
+                .isEqualTo(
+                        mapper.readTree(
+                                "{\"id\":1,\"arr\":[\"changed\"],\"map\":{\"key1\":101,\"key2\":200},\"row\":{\"f1\":\"nested\",\"f2\":43}}"));
+    }
+
+    @Test
+    void testUpdateNullsAndUnchangedFields() throws Exception {
+        SerializationSchema<Event> serializer = createStringSerializer(false);
+        BinaryRecordDataGenerator generator = stringGenerator(3);
+        assertJson(
+                serializer.serialize(
+                        DataChangeEvent.updateEvent(
+                                TABLE_1,
+                                generator.generate(
+                                        new Object[] {
+                                            null, BinaryStringData.fromString("old"), null
+                                        }),
+                                generator.generate(
+                                        new Object[] {
+                                            BinaryStringData.fromString("new"), null, null
+                                        }))),
+                "{\"old\":[{\"col1\":null,\"col2\":\"old\"}],\"data\":[{\"col1\":\"new\",\"col2\":null,\"col3\":null}],\"type\":\"UPDATE\",\"database\":\"default_schema\",\"table\":\"table1\",\"pkNames\":[\"col1\"]}");
+        assertJson(
+                serializer.serialize(
+                        DataChangeEvent.updateEvent(
+                                TABLE_1,
+                                generator.generate(
+                                        new Object[] {
+                                            BinaryStringData.fromString("new"), null, null
+                                        }),
+                                generator.generate(
+                                        new Object[] {
+                                            BinaryStringData.fromString("new"), null, null
+                                        }))),
+                "{\"old\":[{}],\"data\":[{\"col1\":\"new\",\"col2\":null,\"col3\":null}],\"type\":\"UPDATE\",\"database\":\"default_schema\",\"table\":\"table1\",\"pkNames\":[\"col1\"]}");
+        JsonNode inserted =
+                JacksonMapperFactory.createObjectMapper()
+                        .readTree(
+                                serializer.serialize(
+                                        DataChangeEvent.insertEvent(
+                                                TABLE_1,
+                                                generator.generate(
+                                                        new Object[] {
+                                                            BinaryStringData.fromString("new"),
+                                                            null,
+                                                            null
+                                                        }))));
+        Assertions.assertThat(inserted.get("old").isNull()).isTrue();
+        Assertions.assertThat(inserted.get("data").get(0).size()).isEqualTo(3);
+        // A field removed from old must be available again in the next record.
+        JsonNode next =
+                JacksonMapperFactory.createObjectMapper()
+                        .readTree(
+                                serializer.serialize(
+                                        DataChangeEvent.updateEvent(
+                                                TABLE_1,
+                                                generator.generate(
+                                                        new Object[] {
+                                                            BinaryStringData.fromString("new"),
+                                                            null,
+                                                            null
+                                                        }),
+                                                generator.generate(
+                                                        new Object[] {
+                                                            BinaryStringData.fromString("changed"),
+                                                            null,
+                                                            null
+                                                        }))));
+        Assertions.assertThat(next.get("old").get(0).toString()).isEqualTo("{\"col1\":\"new\"}");
+    }
+
+    @Test
+    void testIgnoreNullFields() throws Exception {
+        SerializationSchema<Event> serializer = createStringSerializer(true);
+        BinaryRecordDataGenerator generator = stringGenerator(3);
+        assertJson(
+                serializer.serialize(
+                        DataChangeEvent.updateEvent(
+                                TABLE_1,
+                                generator.generate(
+                                        new Object[] {
+                                            null,
+                                            BinaryStringData.fromString("old"),
+                                            BinaryStringData.fromString("same")
+                                        }),
+                                generator.generate(
+                                        new Object[] {
+                                            BinaryStringData.fromString("new"),
+                                            null,
+                                            BinaryStringData.fromString("same")
+                                        }))),
+                "{\"old\":[{\"col2\":\"old\"}],\"data\":[{\"col1\":\"new\",\"col3\":\"same\"}],\"type\":\"UPDATE\",\"database\":\"default_schema\",\"table\":\"table1\",\"pkNames\":[\"col1\"]}");
+        ObjectMapper mapper = JacksonMapperFactory.createObjectMapper();
+        JsonNode inserted =
+                mapper.readTree(
+                        serializer.serialize(
+                                DataChangeEvent.insertEvent(
+                                        TABLE_1,
+                                        generator.generate(
+                                                new Object[] {
+                                                    BinaryStringData.fromString("new"), null, null
+                                                }))));
+        Assertions.assertThat(inserted.has("old")).isFalse();
+        Assertions.assertThat(inserted.get("data").get(0).toString())
+                .isEqualTo("{\"col1\":\"new\"}");
+        JsonNode deleted =
+                mapper.readTree(
+                        serializer.serialize(
+                                DataChangeEvent.deleteEvent(
+                                        TABLE_1,
+                                        generator.generate(
+                                                new Object[] {
+                                                    BinaryStringData.fromString("new"), null, null
+                                                }))));
+        Assertions.assertThat(deleted.has("old")).isFalse();
+        Assertions.assertThat(deleted.get("data")).isEqualTo(inserted.get("data"));
+    }
+
+    @Test
+    void testSchemaChangeAndReplaceWithBefore() throws Exception {
+        SerializationSchema<Event> serializer = createStringSerializer(false);
+        serializer.serialize(
+                new AddColumnEvent(
+                        TABLE_1,
+                        Collections.singletonList(
+                                AddColumnEvent.last(
+                                        Column.physicalColumn("col4", DataTypes.STRING())))));
+        BinaryRecordDataGenerator generator = stringGenerator(4);
+        JsonNode actual =
+                JacksonMapperFactory.createObjectMapper()
+                        .readTree(
+                                serializer.serialize(
+                                        DataChangeEvent.projectBefore(
+                                                DataChangeEvent.replaceEvent(
+                                                        TABLE_1,
+                                                        generator.generate(
+                                                                new Object[] {
+                                                                    BinaryStringData.fromString(
+                                                                            "id"),
+                                                                    null,
+                                                                    null,
+                                                                    BinaryStringData.fromString(
+                                                                            "after")
+                                                                })),
+                                                generator.generate(
+                                                        new Object[] {
+                                                            BinaryStringData.fromString("id"),
+                                                            null,
+                                                            null,
+                                                            BinaryStringData.fromString("before")
+                                                        }))));
+        Assertions.assertThat(actual.get("old").get(0).toString())
+                .isEqualTo("{\"col4\":\"before\"}");
+        Assertions.assertThat(actual.get("data").get(0).size()).isEqualTo(4);
+        Assertions.assertThat(actual.get("type").asText()).isEqualTo("UPDATE");
+    }
+
+    private static SerializationSchema<Event> createStringSerializer(boolean ignoreNullFields)
+            throws Exception {
+        Configuration configuration = new Configuration();
+        configuration.set(JsonFormatOptions.ENCODE_IGNORE_NULL_FIELDS, ignoreNullFields);
+        SerializationSchema<Event> serializer =
+                ChangeLogJsonFormatFactory.createSerializationSchema(
+                        configuration, JsonSerializationType.CANAL_JSON, ZoneId.systemDefault());
+        serializer.open(new MockInitializationContext());
+        serializer.serialize(
+                new CreateTableEvent(
+                        TABLE_1,
+                        Schema.newBuilder()
+                                .physicalColumn("col1", DataTypes.STRING())
+                                .physicalColumn("col2", DataTypes.STRING())
+                                .physicalColumn("col3", DataTypes.STRING())
+                                .primaryKey("col1")
+                                .build()));
+        return serializer;
+    }
+
+    private static BinaryRecordDataGenerator stringGenerator(int count) {
+        DataType[] types = new DataType[count];
+        Arrays.fill(types, DataTypes.STRING());
+        return new BinaryRecordDataGenerator(RowType.of(types));
+    }
+
+    private static void assertJson(byte[] actual, String expected) throws Exception {
+        ObjectMapper mapper = JacksonMapperFactory.createObjectMapper();
+        Assertions.assertThat(mapper.readTree(actual)).isEqualTo(mapper.readTree(expected));
     }
 }
