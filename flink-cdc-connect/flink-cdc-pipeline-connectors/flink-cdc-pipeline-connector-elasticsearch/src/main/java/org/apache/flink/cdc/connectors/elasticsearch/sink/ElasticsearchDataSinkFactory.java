@@ -17,9 +17,9 @@
 
 package org.apache.flink.cdc.connectors.elasticsearch.sink;
 
+import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.configuration.Configuration;
-import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.factories.DataSinkFactory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
@@ -86,20 +86,20 @@ public class ElasticsearchDataSinkFactory implements DataSinkFactory {
                 : ZoneId.of(configuredZone);
     }
 
-    private ElasticsearchSinkOptions buildSinkConnectorOptions(Configuration cdcConfig) {
+    @VisibleForTesting
+    ElasticsearchSinkOptions buildSinkConnectorOptions(Configuration cdcConfig) {
         List<HttpHost> hosts = parseHosts(cdcConfig.get(HOSTS));
         String username = cdcConfig.get(USERNAME);
         String password = cdcConfig.get(PASSWORD);
         int version = cdcConfig.get(VERSION);
-        Map<TableId, String> shardingMaps = new HashMap<>();
+        Map<String, String> shardingMaps = new HashMap<>();
         String shardingKey = cdcConfig.get(SHARDING_SUFFIX_KEY);
         String shardingSeparator = cdcConfig.get(SHARDING_SUFFIX_SEPARATOR);
         if (!shardingKey.isEmpty()) {
             for (String tables : shardingKey.split(";")) {
                 String[] splits = tables.split(":");
                 if (splits.length == 2) {
-                    TableId tableId = TableId.parse(splits[0]);
-                    shardingMaps.put(tableId, splits[1].trim());
+                    shardingMaps.put(splits[0], splits[1].trim());
                 } else {
                     throw new IllegalArgumentException(
                             String.format(

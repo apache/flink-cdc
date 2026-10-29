@@ -104,7 +104,11 @@ public class ElasticsearchDataSinkOptions {
                     .stringType()
                     .defaultValue("")
                     .withDescription(
-                            "Sharding suffix key for each table, allow setting sharding suffix key for multiTables.Default sink table name is test_table${suffix_key}.Default sharding column is first partition column.Tables are separated by ';'.Table and column are separated by '$'.For example, we can set sharding.suffix.key by 'table1$col1;table2$col2'");
+                            "Sharding suffix column for each table, matched by the complete table ID string after routing. "
+                                    + "Dots are not reinterpreted as field separators. "
+                                    + "The default sharding column is the first partition column. "
+                                    + "Tables are separated by ';', and the table ID and column are separated by ':'. "
+                                    + "For example: 'table1:col1;table2:col2'.");
 
     /** The sharding for Elasticsearch index, default sink table name is test_table_${suffix}. */
     public static final ConfigOption<String> SHARDING_SUFFIX_SEPARATOR =

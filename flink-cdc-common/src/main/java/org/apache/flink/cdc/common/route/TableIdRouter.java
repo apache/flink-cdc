@@ -17,11 +17,12 @@
 
 package org.apache.flink.cdc.common.route;
 
-import org.apache.flink.api.java.tuple.Tuple3;
+import org.apache.flink.api.java.tuple.Tuple4;
 import org.apache.flink.cdc.common.annotation.PublicEvolving;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.RouteMode;
 import org.apache.flink.cdc.common.schema.Selectors;
+import org.apache.flink.cdc.common.utils.Preconditions;
 
 import org.apache.flink.shaded.guava31.com.google.common.cache.CacheBuilder;
 import org.apache.flink.shaded.guava31.com.google.common.cache.CacheLoader;
@@ -55,7 +56,7 @@ public class TableIdRouter {
     private static final Logger LOG = LoggerFactory.getLogger(TableIdRouter.class);
     private static final Duration CACHE_EXPIRE_DURATION = Duration.ofDays(1);
 
-    private final List<Tuple3<Pattern, String, String>> routes;
+    private final List<Tuple4<Pattern, String, String, String[]>> routes;
     private final LoadingCache<TableId, List<TableId>> routingCache;
     private final RouteMode routeMode;
 
@@ -120,12 +121,13 @@ public class TableIdRouter {
         for (RouteRule rule : routingRules) {
             try {
                 routes.add(
-                        new Tuple3<>(
+                        new Tuple4<>(
                                 Pattern.compile(
                                         convertTableListToRegExpPattern(rule.sourceTable),
                                         Pattern.CASE_INSENSITIVE),
                                 rule.sinkTable,
-                                rule.replaceSymbol));
+                                rule.replaceSymbol,
+                                splitSinkTableTemplate(rule.sinkTable, rule.replaceSymbol)));
             } catch (PatternSyntaxException e) {
                 throw new IllegalArgumentException(
                         String.format(
@@ -153,7 +155,7 @@ public class TableIdRouter {
     private List<TableId> calculateRoute(TableId sourceTableId) {
         List<TableId> routedTableIds = new ArrayList<>();
 
-        for (Tuple3<Pattern, String, String> route : routes) {
+        for (Tuple4<Pattern, String, String, String[]> route : routes) {
             if (matches(route.f0, sourceTableId)) {
                 routedTableIds.add(resolveReplacement(sourceTableId, route));
 
@@ -170,10 +172,57 @@ public class TableIdRouter {
         return routedTableIds;
     }
 
+    private static String[] splitSinkTableTemplate(String template, String replaceSymbol) {
+        String[] components = template.split("\\.", -1);
+        if (replaceSymbol == null) {
+            for (int i = 0; i < components.length - 1; i++) {
+                String component = components[i];
+                int backslashes = 0;
+                for (int j = component.length() - 1; j >= 0 && component.charAt(j) == '\\'; j--) {
+                    backslashes++;
+                }
+                if (backslashes % 2 != 0) {
+                    // The final escape belongs to the dot separator, not this component.
+                    components[i] = component.substring(0, component.length() - 1);
+                }
+            }
+        }
+        Preconditions.checkArgument(
+                components.length >= 1
+                        && components.length <= 3
+                        && Arrays.stream(components).noneMatch(String::isEmpty),
+                "Invalid sink-table template '%s': expected 1 to 3 non-empty components.",
+                template);
+        return components;
+    }
+
     private TableId resolveReplacement(
-            TableId originalTable, Tuple3<Pattern, String, String> route) {
+            TableId originalTable, Tuple4<Pattern, String, String, String[]> route) {
+        String[] resolved = new String[route.f3.length];
+        for (int i = 0; i < resolved.length; i++) {
+            resolved[i] = replace(originalTable, route, route.f3[i]);
+            Preconditions.checkArgument(
+                    !resolved[i].isEmpty(),
+                    "Invalid sink-table '%s' for source table '%s': component %s is empty after replacement.",
+                    route.f1,
+                    originalTable,
+                    i + 1);
+        }
+        if (resolved.length == 1) {
+            return TableId.tableId(resolved[0]);
+        } else if (resolved.length == 2) {
+            return TableId.tableId(resolved[0], resolved[1]);
+        } else {
+            return TableId.tableId(resolved[0], resolved[1], resolved[2]);
+        }
+    }
+
+    private String replace(
+            TableId originalTable,
+            Tuple4<Pattern, String, String, String[]> route,
+            String template) {
         if (route.f2 != null) {
-            return TableId.parse(route.f1.replace(route.f2, originalTable.getTableName()));
+            return template.replace(route.f2, originalTable.getTableName());
         } else {
             // Use matches() so that the entire source table id is consumed. After matches() the
             // matcher holds the full match, and we feed it through appendReplacement /
@@ -185,12 +234,12 @@ public class TableIdRouter {
             Matcher matcher = route.f0.matcher(originalTable.toString());
             if (matcher.matches()) {
                 StringBuilder sb = new StringBuilder();
-                matcher.appendReplacement(sb, route.f1);
+                matcher.appendReplacement(sb, template);
                 matcher.appendTail(sb);
-                return TableId.parse(sb.toString());
+                return sb.toString();
             }
         }
-        return TableId.parse(route.f1);
+        return template;
     }
 
     /**

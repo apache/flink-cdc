@@ -39,6 +39,53 @@ under the License.
 
 一个 Route 模块可以包含一个或多个 source-table/sink-table 规则。
 
+## Table ID 字段层级
+
+所有 route 规则都由 `sink-table` 模板固定目标表 ID 的层级。路由器先按字面点号将模板
+切分为一至三个非空段，再逐段替换并构造表 ID，不重新解析替换结果：
+
+- 一段表示表名。
+- 两段表示 schema 名和表名。
+- 三段表示 namespace、schema 名和表名。
+
+替换值中的点号保留在对应字段内，不改变层级数量或字段映射。模板分隔符不参与替换。
+替换后的每段也必须非空，模板没有新增点号转义语法。
+捕获组替换保留现有 Java replacement 转义，例如 `sink-table: 'target_db\.$1'` 与
+`target_db.$1` 一样有两段。反斜杠按 Java replacement 规则处理，不会让模板中的点号变成字段内容。
+使用 `replace-symbol` 时，反斜杠仍按字面值保留。
+
+这些规则同时适用于 `replace-symbol` 和正则捕获组替换（`$N`）；捕获组替换无需配置
+`replace-symbol`。源表匹配、路由顺序和 `route-mode` 保持不变。
+
+例如：
+
+```yaml
+route:
+  - source-table: source_db.\.*
+    sink-table: target_db.<>
+    replace-symbol: <>
+```
+
+如果源表的 schema 名为 `source_db`，表名为 `daily.archive`，结果为
+`TableId.tableId("target_db", "daily.archive")`：namespace 为空，schema 名为 `target_db`，
+表名为 `daily.archive`。其字符串表示为 `target_db.daily.archive`，仅凭字符串中的点号
+无法确定字段边界。
+
+跨层级捕获也遵循相同规则。例如，`source-table: '(\.*)'`、`sink-table: target_db.$1` 捕获到
+`daily.archive` 时，会将其保留为单个表名字段，即使捕获内容跨越了源 ID 的 schema 和表名。
+如果需要生成三层目标，应在模板中显式写出三段，并分别捕获对应字段，例如
+`sink-table: target_ns.$1.$2`。
+
+:::info
+
+这一行为不同于早期版本对整个模板替换后再解析的方式。替换值包含点号，或原规则替换了模板
+分隔符时，升级可能改变结构化目标 ID，即使其字符串表示不变。升级前，请核实已有目标表与
+checkpoint/savepoint 中保存的表 ID，规划必要的表、数据和状态迁移，并验证恢复行为。
+已有目标表和状态不会自动迁移。
+Sink 及其 catalog 必须支持生成的字段值，包括内嵌点号；请验证所选 Sink 的字段映射和最终目标。
+
+:::
+
 ## 路由模式
 默认情况下，所有匹配的路由规则都会被应用到表上。你可以在 pipeline 配置中通过 `route-mode` 选项来改变这一行为：
 
