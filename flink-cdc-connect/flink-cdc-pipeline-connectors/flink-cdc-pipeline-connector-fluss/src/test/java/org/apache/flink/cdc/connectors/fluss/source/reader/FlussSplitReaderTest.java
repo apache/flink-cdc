@@ -26,12 +26,19 @@ import org.apache.flink.connector.base.source.reader.splitreader.SplitsChange;
 import org.apache.flink.connector.base.source.reader.synchronization.FutureCompletingBlockingQueue;
 
 import org.apache.fluss.client.table.Table;
+import org.apache.fluss.client.table.scanner.MultiTableRecord;
+import org.apache.fluss.client.table.scanner.ScanRecord;
 import org.apache.fluss.client.table.scanner.batch.BatchScanner;
 import org.apache.fluss.client.table.scanner.log.MultiTableLogScanner;
+import org.apache.fluss.client.table.scanner.log.MultiTableRecords;
 import org.apache.fluss.config.Configuration;
 import org.apache.fluss.metadata.PhysicalTablePath;
+import org.apache.fluss.metadata.Schema;
 import org.apache.fluss.metadata.TableBucket;
 import org.apache.fluss.metadata.TablePath;
+import org.apache.fluss.record.ChangeType;
+import org.apache.fluss.row.GenericRow;
+import org.apache.fluss.types.DataTypes;
 import org.apache.fluss.types.RowType;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -41,7 +48,9 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Proxy;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -65,6 +74,113 @@ class FlussSplitReaderTest {
     private static final TablePath TABLE_PATH = TablePath.of("test_db", "test_table");
     private static final PhysicalTablePath PHYSICAL_TABLE_PATH = PhysicalTablePath.of(TABLE_PATH);
     private static final TableBucket TABLE_BUCKET = new TableBucket(TABLE_ID, 0);
+
+    @ParameterizedTest
+    @ValueSource(longs = {0L, 2L})
+    void testEmptyPollPreservesConsumedOffset(long consumedOffset) throws Exception {
+        FlussSplitReader reader = new FlussSplitReader(new Configuration(), null, null);
+        FlussLogSplit split = new FlussLogSplit(PHYSICAL_TABLE_PATH, TABLE_BUCKET, 1L);
+        bucketToSplit(reader).put(TABLE_BUCKET, split);
+        MultiTableRecords poll =
+                new MultiTableRecords.Builder()
+                        .addConsumedUpToOffset(TABLE_PATH, TABLE_BUCKET, consumedOffset)
+                        .build();
+        setField(
+                reader,
+                "currentLogScanner",
+                proxy(
+                        MultiTableLogScanner.class,
+                        (proxy, method, arguments) ->
+                                method.getName().equals("poll") ? poll : null));
+
+        RecordsWithSplitIds<FlussSourceRecord> records = reader.fetch();
+        assertThat(records.nextSplit()).isEqualTo(split.splitId());
+        FlussSourceRecord progress = records.nextRecordFromSplit();
+        assertThat(progress.isProgressOnly()).isTrue();
+        assertThat(progress.getConsumedUpToOffset()).isEqualTo(consumedOffset);
+        assertThat(records.nextRecordFromSplit()).isNull();
+    }
+
+    @Test
+    void testMixedPollPreservesBucketOrderAndOnlyAddsUnrepresentedProgress() throws Exception {
+        FlussSplitReader reader = new FlussSplitReader(new Configuration(), null, null);
+        TableBucket emptyBucket = new TableBucket(TABLE_ID, 1);
+        TableBucket ordinaryBucket = new TableBucket(TABLE_ID, 2);
+        TableBucket noProgressBucket = new TableBucket(TABLE_ID, 3);
+        TableBucket unknownBucket = new TableBucket(TABLE_ID, 4);
+        for (TableBucket bucket :
+                new TableBucket[] {TABLE_BUCKET, emptyBucket, ordinaryBucket, noProgressBucket}) {
+            bucketToSplit(reader).put(bucket, new FlussLogSplit(PHYSICAL_TABLE_PATH, bucket, 0L));
+        }
+        MultiTableRecords poll =
+                new MultiTableRecords.Builder()
+                        .add(TABLE_PATH, TABLE_BUCKET, logRecord(5L))
+                        .addConsumedUpToOffset(TABLE_PATH, TABLE_BUCKET, 8L)
+                        .addConsumedUpToOffset(TABLE_PATH, emptyBucket, 0L)
+                        .add(TABLE_PATH, ordinaryBucket, logRecord(10L))
+                        .addConsumedUpToOffset(TABLE_PATH, ordinaryBucket, 11L)
+                        .add(TABLE_PATH, noProgressBucket, logRecord(20L))
+                        .addConsumedUpToOffset(TABLE_PATH, unknownBucket, 30L)
+                        .build();
+        setField(
+                reader,
+                "currentLogScanner",
+                proxy(
+                        MultiTableLogScanner.class,
+                        (proxy, method, arguments) ->
+                                method.getName().equals("poll") ? poll : null));
+        RecordsWithSplitIds<FlussSourceRecord> fetched = reader.fetch();
+        Map<String, List<FlussSourceRecord>> records = new HashMap<>();
+        String splitId;
+        while ((splitId = fetched.nextSplit()) != null) {
+            List<FlussSourceRecord> bucketRecords = new ArrayList<>();
+            FlussSourceRecord record;
+            while ((record = fetched.nextRecordFromSplit()) != null) {
+                bucketRecords.add(record);
+            }
+            records.put(splitId, bucketRecords);
+        }
+        assertThat(records).hasSize(4);
+        List<FlussSourceRecord> trailingGap =
+                records.get(bucketToSplit(reader).get(TABLE_BUCKET).splitId());
+        assertThat(trailingGap).hasSize(2);
+        assertThat(trailingGap.get(0).isProgressOnly()).isFalse();
+        assertThat(trailingGap.get(0).getScanRecord().logOffset()).isEqualTo(5L);
+        assertThat(trailingGap.get(1).isProgressOnly()).isTrue();
+        assertThat(trailingGap.get(1).getConsumedUpToOffset()).isEqualTo(8L);
+        assertThat(records.get(bucketToSplit(reader).get(emptyBucket).splitId()))
+                .singleElement()
+                .satisfies(
+                        record -> {
+                            assertThat(record.isProgressOnly()).isTrue();
+                            assertThat(record.getConsumedUpToOffset()).isZero();
+                        });
+        for (TableBucket bucket : new TableBucket[] {ordinaryBucket, noProgressBucket}) {
+            assertThat(records.get(bucketToSplit(reader).get(bucket).splitId()))
+                    .singleElement()
+                    .satisfies(record -> assertThat(record.isProgressOnly()).isFalse());
+        }
+    }
+
+    @Test
+    void testNullPollHasNoProgress() throws Exception {
+        FlussSplitReader reader = new FlussSplitReader(new Configuration(), null, null);
+        setField(
+                reader,
+                "currentLogScanner",
+                proxy(MultiTableLogScanner.class, (proxy, method, arguments) -> null));
+        assertThat(reader.fetch().nextSplit()).isNull();
+    }
+
+    private static MultiTableRecord logRecord(long offset) {
+        Schema schema = Schema.newBuilder().column("id", DataTypes.INT()).build();
+        return new MultiTableRecord(
+                TABLE_PATH,
+                TABLE_ID,
+                1,
+                schema,
+                new ScanRecord(TABLE_ID, 1, offset, -1L, ChangeType.INSERT, GenericRow.of(7), 1));
+    }
 
     @Test
     void testValidateLogSplitTableId() {

@@ -137,21 +137,34 @@ public class FlussSplitReader implements SplitReader<FlussSourceRecord, FlussSpl
         MultiTableLogScanner scanner = getOrCreateTableLogScanner();
         MultiTableRecords scanRecords = scanner.poll(POLL_TIMEOUT);
         long pollCompletionTimestamp = System.currentTimeMillis();
-        if (scanRecords != null && !scanRecords.isEmpty()) {
+        if (scanRecords != null) {
             for (TablePath tablePath : scanRecords.tablePaths()) {
                 for (TableBucket bucket : scanRecords.buckets(tablePath)) {
-                    for (MultiTableRecord record : scanRecords.records(tablePath, bucket)) {
-                        FlussSplitBase split = bucketToSplit.get(bucket);
-                        if (split == null) {
-                            LOG.warn("Received records for unknown bucket {}, skipping", bucket);
-                            continue;
-                        }
+                    FlussSplitBase split = bucketToSplit.get(bucket);
+                    if (split == null) {
+                        LOG.warn("Received records for unknown bucket {}, skipping", bucket);
+                        continue;
+                    }
+                    List<MultiTableRecord> bucketRecords = scanRecords.records(tablePath, bucket);
+                    for (MultiTableRecord record : bucketRecords) {
                         builder.add(
                                 split.splitId(),
                                 new FlussSourceRecord(
                                         record, getPartitionKeyNames(record.getTablePath())));
 
                         maxRecordTimestamp = Math.max(maxRecordTimestamp, record.timestamp());
+                    }
+                    Long consumedUpToOffset = scanRecords.consumedUpToOffset(tablePath, bucket);
+                    if (consumedUpToOffset != null
+                            && (bucketRecords.isEmpty()
+                                    || consumedUpToOffset
+                                            > bucketRecords
+                                                            .get(bucketRecords.size() - 1)
+                                                            .logOffset()
+                                                    + 1)) {
+                        builder.add(
+                                split.splitId(),
+                                FlussSourceRecord.forProgress(tablePath, consumedUpToOffset));
                     }
                 }
             }
