@@ -26,6 +26,7 @@ import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
+import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
@@ -41,15 +42,37 @@ import org.apache.commons.collections.CollectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.EnumSet;
+import java.util.Set;
+
 /** A {@link MetadataApplier} for "MaxCompute" connector. */
 public class MaxComputeMetadataApplier implements MetadataApplier {
     private static final long serialVersionUID = 1L;
     private static final Logger LOG = LoggerFactory.getLogger(MaxComputeMetadataApplier.class);
 
     private final MaxComputeOptions maxComputeOptions;
+    private Set<SchemaChangeEventType> enabledSchemaEvolutionTypes;
 
     public MaxComputeMetadataApplier(MaxComputeOptions maxComputeOptions) {
         this.maxComputeOptions = maxComputeOptions;
+        this.enabledSchemaEvolutionTypes = getSupportedSchemaEvolutionTypes();
+    }
+
+    @Override
+    public MetadataApplier setAcceptedSchemaEvolutionTypes(
+            Set<SchemaChangeEventType> schemaEvolutionTypes) {
+        this.enabledSchemaEvolutionTypes = schemaEvolutionTypes;
+        return this;
+    }
+
+    @Override
+    public boolean acceptsSchemaEvolutionType(SchemaChangeEventType schemaChangeEventType) {
+        return enabledSchemaEvolutionTypes.contains(schemaChangeEventType);
+    }
+
+    @Override
+    public Set<SchemaChangeEventType> getSupportedSchemaEvolutionTypes() {
+        return EnumSet.allOf(SchemaChangeEventType.class);
     }
 
     @Override
