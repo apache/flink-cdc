@@ -42,7 +42,7 @@ public class LegacyMongoDBContainer extends GenericContainer<LegacyMongoDBContai
 
     private static final Logger LOG = LoggerFactory.getLogger(LegacyMongoDBContainer.class);
 
-    private static final String DOCKER_IMAGE_NAME = "mongo:5.0.2";
+    private static final String DEFAULT_DOCKER_IMAGE_NAME = "mongo:5.0.2";
 
     public static final int MONGODB_PORT = 27017;
 
@@ -57,19 +57,25 @@ public class LegacyMongoDBContainer extends GenericContainer<LegacyMongoDBContai
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)//.*$");
 
     private final ShardingClusterRole clusterRole;
+    private final String dockerImageName;
 
     public LegacyMongoDBContainer(Network network) {
-        this(network, ShardingClusterRole.NONE);
+        this(network, ShardingClusterRole.NONE, DEFAULT_DOCKER_IMAGE_NAME);
     }
 
     public LegacyMongoDBContainer(Network network, ShardingClusterRole clusterRole) {
+        this(network, clusterRole, DEFAULT_DOCKER_IMAGE_NAME);
+    }
+
+    public LegacyMongoDBContainer(
+            Network network, ShardingClusterRole clusterRole, String dockerImageName) {
         super(
                 new ImageFromDockerfile()
                         .withFileFromClasspath("random.key", "docker/mongodb/random.key")
                         .withFileFromClasspath("setup.js", "docker/mongodb/setup.js")
                         .withDockerfileFromBuilder(
                                 builder ->
-                                        builder.from(DOCKER_IMAGE_NAME)
+                                        builder.from(dockerImageName)
                                                 .copy(
                                                         "setup.js",
                                                         "/docker-entrypoint-initdb.d/setup.js")
@@ -83,6 +89,7 @@ public class LegacyMongoDBContainer extends GenericContainer<LegacyMongoDBContai
                                                 .env("MONGO_INITDB_DATABASE", "admin")
                                                 .build()));
         this.clusterRole = clusterRole;
+        this.dockerImageName = dockerImageName;
 
         withNetwork(network);
         withNetworkAliases(clusterRole.hostname);
@@ -111,6 +118,8 @@ public class LegacyMongoDBContainer extends GenericContainer<LegacyMongoDBContai
                             MONGO_SUPER_USER,
                             "-p",
                             MONGO_SUPER_PASSWORD,
+                            "--authenticationDatabase",
+                            "admin",
                             "--eval",
                             command);
             LOG.info(execResult.getStdout());
@@ -125,7 +134,10 @@ public class LegacyMongoDBContainer extends GenericContainer<LegacyMongoDBContai
 
     @Override
     protected void containerIsStarted(InspectContainerResponse containerInfo) {
-        LOG.info("Preparing a MongoDB Container with sharding cluster role {}...", clusterRole);
+        LOG.info(
+                "Preparing MongoDB container image {} with sharding cluster role {}...",
+                dockerImageName,
+                clusterRole);
         if (clusterRole != ShardingClusterRole.ROUTER) {
             initReplicaSet();
         } else {
