@@ -69,6 +69,10 @@ class FlussDataSourceFactoryTest {
                                                 + "pattern",
                                         "test_db\\.orders_.*")
                                 .put(FlussDataSourceOptions.SCAN_STARTUP_MODE.key(), "latest")
+                                .put(
+                                        FlussDataSourceOptions.SCAN_RATE_LIMIT_RECORDS_PER_SECOND
+                                                .key(),
+                                        "2")
                                 .build());
 
         DataSource dataSource =

@@ -61,6 +61,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -162,8 +164,9 @@ public class FlussSourcePipelineITCase {
                 "+I[3, Charlie]");
     }
 
-    @Test
-    void testNonPartitionedLogTable() throws Exception {
+    @ParameterizedTest(name = "rateLimit={0}")
+    @ValueSource(doubles = {-1d, 2d})
+    void testNonPartitionedLogTable(double rateLimit) throws Exception {
         String tableName = "log_table";
         tBatchEnv
                 .executeSql(String.format("CREATE TABLE %s (id INT, name STRING)", tableName))
@@ -176,7 +179,8 @@ public class FlussSourcePipelineITCase {
                                 tableName))
                 .await();
 
-        FlussSource<Event> source = createFlussSource(DATABASE_NAME, tableName, "earliest");
+        FlussSource<Event> source =
+                createFlussSource(DATABASE_NAME, tableName, "earliest", rateLimit);
         List<Event> allEvents = collectAllEvents(source, 6, COLLECT_TIMEOUT);
         List<String> actual = convertToStringList(allEvents, DataTypes.INT(), DataTypes.STRING());
         assertSchemaAndDataEvents(
@@ -1315,8 +1319,18 @@ public class FlussSourcePipelineITCase {
 
     private FlussSource<Event> createFlussSource(
             String database, String tablePattern, String startupMode) {
+        return createFlussSource(database, tablePattern, startupMode, -1d);
+    }
+
+    private FlussSource<Event> createFlussSource(
+            String database, String tablePattern, String startupMode, double rateLimit) {
         return createFlussSourceWithDiscoveryInterval(
-                database, tablePattern, startupMode, Duration.ofMinutes(1));
+                database,
+                tablePattern,
+                startupMode,
+                Duration.ofMinutes(1),
+                new FlussDefaultDiscoverer(),
+                rateLimit);
     }
 
     private FlussSource<Event> createFlussSourceWithTimestamp(
@@ -1325,7 +1339,7 @@ public class FlussSourcePipelineITCase {
                 FLUSS_CLUSTER_EXTENSION.getClientConfig();
         FlussDefaultDiscoverer discoverer = new FlussDefaultDiscoverer();
         Configuration sourceConfig =
-                buildSourceConfig(flussConfig, toFqnRegex(database, tablePattern));
+                buildSourceConfig(flussConfig, toFqnRegex(database, tablePattern), -1d);
         OffsetsInitializer offsetsInitializer = OffsetsInitializer.timestamp(timestampMs);
         return new FlussSource<>(
                 discoverer,
@@ -1333,7 +1347,8 @@ public class FlussSourcePipelineITCase {
                 sourceConfig,
                 offsetsInitializer,
                 Duration.ofMinutes(1).toMillis(),
-                new FlussRecordDeserializer());
+                new FlussRecordDeserializer(),
+                -1d);
     }
 
     private FlussSource<Event> createFlussSourceWithTableSubscriber(
@@ -1343,7 +1358,8 @@ public class FlussSourcePipelineITCase {
                 null,
                 startupMode,
                 discoveryInterval,
-                new FlussSubscriberTableDiscoverer(subscriptionTableFqn, 100));
+                new FlussSubscriberTableDiscoverer(subscriptionTableFqn, 100),
+                -1d);
     }
 
     private FlussSource<Event> createFlussSourceWithDiscoveryInterval(
@@ -1353,7 +1369,8 @@ public class FlussSourcePipelineITCase {
                 tablePattern,
                 startupMode,
                 discoveryInterval,
-                new FlussDefaultDiscoverer());
+                new FlussDefaultDiscoverer(),
+                -1d);
     }
 
     private FlussSource<Event> createFlussSourceWithDiscoveryInterval(
@@ -1361,14 +1378,15 @@ public class FlussSourcePipelineITCase {
             @Nullable String tablePattern,
             String startupMode,
             Duration discoveryInterval,
-            TableDiscoverer tableDiscoverer) {
+            TableDiscoverer tableDiscoverer,
+            double rateLimit) {
         org.apache.fluss.config.Configuration flussConfig =
                 FLUSS_CLUSTER_EXTENSION.getClientConfig();
         String pattern =
                 (database == null || tablePattern == null)
                         ? null
                         : toFqnRegex(database, tablePattern);
-        Configuration sourceConfig = buildSourceConfig(flussConfig, pattern);
+        Configuration sourceConfig = buildSourceConfig(flussConfig, pattern, rateLimit);
         OffsetsInitializer offsetsInitializer;
         switch (startupMode) {
             case "earliest":
@@ -1389,7 +1407,8 @@ public class FlussSourcePipelineITCase {
                 sourceConfig,
                 offsetsInitializer,
                 discoveryInterval.toMillis(),
-                new FlussRecordDeserializer());
+                new FlussRecordDeserializer(),
+                rateLimit);
     }
 
     /**
@@ -1407,7 +1426,7 @@ public class FlussSourcePipelineITCase {
      * table.discoverer.pattern.
      */
     private static Configuration buildSourceConfig(
-            org.apache.fluss.config.Configuration flussConfig, String pattern) {
+            org.apache.fluss.config.Configuration flussConfig, String pattern, double rateLimit) {
         Map<String, String> map = new HashMap<>();
         String bootstrapServers =
                 flussConfig
@@ -1419,6 +1438,9 @@ public class FlussSourcePipelineITCase {
         if (pattern != null) {
             map.put("table.discoverer.pattern", pattern);
         }
+        map.put(
+                FlussDataSourceOptions.SCAN_RATE_LIMIT_RECORDS_PER_SECOND.key(),
+                String.valueOf(rateLimit));
         // Copy client.* properties
         flussConfig
                 .toMap()

@@ -40,18 +40,21 @@ public class FlussDataSource implements DataSource {
     private final TableDiscoverer discoverer;
     private final OffsetsInitializer offsetsInitializer;
     private final long scanDiscoveryIntervalMs;
+    private final double scanRateLimitRecordsPerSecond;
 
     public FlussDataSource(
             Configuration flussConfig,
             org.apache.flink.cdc.common.configuration.Configuration sourceConfig,
             TableDiscoverer discoverer,
             OffsetsInitializer offsetsInitializer,
-            long scanDiscoveryIntervalMs) {
+            long scanDiscoveryIntervalMs,
+            double scanRateLimitRecordsPerSecond) {
         this.flussConfig = flussConfig;
         this.sourceConfig = sourceConfig;
         this.discoverer = discoverer;
         this.offsetsInitializer = offsetsInitializer;
         this.scanDiscoveryIntervalMs = scanDiscoveryIntervalMs;
+        this.scanRateLimitRecordsPerSecond = scanRateLimitRecordsPerSecond;
     }
 
     @Override
@@ -63,7 +66,8 @@ public class FlussDataSource implements DataSource {
                         sourceConfig,
                         offsetsInitializer,
                         scanDiscoveryIntervalMs,
-                        new FlussRecordDeserializer()));
+                        new FlussRecordDeserializer(),
+                        scanRateLimitRecordsPerSecond));
     }
 
     @Override

@@ -37,6 +37,7 @@ import static org.apache.flink.cdc.connectors.fluss.source.FlussDataSourceOption
 import static org.apache.flink.cdc.connectors.fluss.source.FlussDataSourceOptions.SCAN_DISCOVERY_INTERVAL;
 import static org.apache.flink.cdc.connectors.fluss.source.FlussDataSourceOptions.SCAN_KV_SNAPSHOT_LEASE_DURATION;
 import static org.apache.flink.cdc.connectors.fluss.source.FlussDataSourceOptions.SCAN_KV_SNAPSHOT_LEASE_ID;
+import static org.apache.flink.cdc.connectors.fluss.source.FlussDataSourceOptions.SCAN_RATE_LIMIT_RECORDS_PER_SECOND;
 import static org.apache.flink.cdc.connectors.fluss.source.FlussDataSourceOptions.SCAN_STARTUP_MODE;
 import static org.apache.flink.cdc.connectors.fluss.source.FlussDataSourceOptions.SCAN_STARTUP_TIMESTAMP;
 import static org.apache.flink.cdc.connectors.fluss.source.FlussDataSourceOptions.TABLE_DISCOVERER_OPTIONS_PREFIX;
@@ -67,12 +68,16 @@ public class FlussDataSourceFactory implements DataSourceFactory {
 
         long scanDiscoveryIntervalMs = factoryConfiguration.get(SCAN_DISCOVERY_INTERVAL).toMillis();
 
+        double scanRateLimitRecordsPerSecond =
+                factoryConfiguration.get(SCAN_RATE_LIMIT_RECORDS_PER_SECOND);
+
         return new FlussDataSource(
                 flussConfig,
                 factoryConfiguration,
                 discoverer,
                 offsetsInitializer,
-                scanDiscoveryIntervalMs);
+                scanDiscoveryIntervalMs,
+                scanRateLimitRecordsPerSecond);
     }
 
     private static TableDiscoverer createDiscoverer(
@@ -103,6 +108,7 @@ public class FlussDataSourceFactory implements DataSourceFactory {
         options.add(SCAN_DISCOVERY_INTERVAL);
         options.add(SCAN_KV_SNAPSHOT_LEASE_ID);
         options.add(SCAN_KV_SNAPSHOT_LEASE_DURATION);
+        options.add(SCAN_RATE_LIMIT_RECORDS_PER_SECOND);
         return options;
     }
 

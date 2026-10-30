@@ -250,7 +250,8 @@ class FlussSourceReaderTest {
                 new Configuration(),
                 new WrapperFlussMetricRegistry(readerContext.metricGroup(), Collections.emptySet()),
                 new FlussSourceReaderMetrics(readerContext.metricGroup()),
-                new FlussRecordEmitter<>(new FlussRecordDeserializer()));
+                new FlussRecordEmitter<>(new FlussRecordDeserializer()),
+                null);
     }
 
     private static FlussLogSplit testSplit() {

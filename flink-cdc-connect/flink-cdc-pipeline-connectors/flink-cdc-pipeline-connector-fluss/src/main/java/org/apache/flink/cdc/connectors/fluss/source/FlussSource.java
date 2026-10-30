@@ -23,6 +23,7 @@ import org.apache.flink.api.connector.source.SourceReader;
 import org.apache.flink.api.connector.source.SourceReaderContext;
 import org.apache.flink.api.connector.source.SplitEnumerator;
 import org.apache.flink.api.connector.source.SplitEnumeratorContext;
+import org.apache.flink.api.connector.source.util.ratelimit.RateLimiterStrategy;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.source.discover.TableDiscoverer;
 import org.apache.flink.cdc.connectors.fluss.sink.v2.metrics.WrapperFlussMetricRegistry;
@@ -67,6 +68,7 @@ public class FlussSource<T> implements Source<T, FlussSplitBase, FlussSourceEnum
     private final long scanDiscoveryIntervalMs;
     private final FlussDeserializer<T> deserializer;
     private final LeaseContext leaseContext;
+    private final double scanRateLimitRecordsPerSecond;
 
     public FlussSource(
             TableDiscoverer discoverer,
@@ -74,7 +76,8 @@ public class FlussSource<T> implements Source<T, FlussSplitBase, FlussSourceEnum
             Configuration sourceConfig,
             OffsetsInitializer offsetsInitializer,
             long scanDiscoveryIntervalMs,
-            FlussDeserializer<T> deserializer) {
+            FlussDeserializer<T> deserializer,
+            double scanRateLimitRecordsPerSecond) {
         this(
                 discoverer,
                 flussConfig,
@@ -83,8 +86,8 @@ public class FlussSource<T> implements Source<T, FlussSplitBase, FlussSourceEnum
                 scanDiscoveryIntervalMs,
                 deserializer,
                 LeaseContext.fromConf(
-                        org.apache.flink.configuration.Configuration.fromMap(
-                                sourceConfig.toMap())));
+                        org.apache.flink.configuration.Configuration.fromMap(sourceConfig.toMap())),
+                scanRateLimitRecordsPerSecond);
     }
 
     FlussSource(
@@ -94,7 +97,8 @@ public class FlussSource<T> implements Source<T, FlussSplitBase, FlussSourceEnum
             OffsetsInitializer offsetsInitializer,
             long scanDiscoveryIntervalMs,
             FlussDeserializer<T> deserializer,
-            LeaseContext leaseContext) {
+            LeaseContext leaseContext,
+            double scanRateLimitRecordsPerSecond) {
         this.discoverer = discoverer;
         this.flussConfig = flussConfig;
         this.sourceConfig = sourceConfig;
@@ -102,6 +106,7 @@ public class FlussSource<T> implements Source<T, FlussSplitBase, FlussSourceEnum
         this.scanDiscoveryIntervalMs = scanDiscoveryIntervalMs;
         this.deserializer = deserializer;
         this.leaseContext = leaseContext;
+        this.scanRateLimitRecordsPerSecond = scanRateLimitRecordsPerSecond;
     }
 
     @Override
@@ -159,12 +164,19 @@ public class FlussSource<T> implements Source<T, FlussSplitBase, FlussSourceEnum
         FlussRecordEmitter<T> recordEmitter = new FlussRecordEmitter<>(deserializer);
         FutureCompletingBlockingQueue<RecordsWithSplitIds<FlussSourceRecord>> elementsQueue =
                 new FutureCompletingBlockingQueue<>();
+        RateLimiterStrategy rateLimiterStrategy =
+                scanRateLimitRecordsPerSecond
+                                == FlussDataSourceOptions.SCAN_RATE_LIMIT_RECORDS_PER_SECOND
+                                        .defaultValue()
+                        ? null
+                        : RateLimiterStrategy.perSecond(scanRateLimitRecordsPerSecond);
         return new FlussSourceReader<>(
                 elementsQueue,
                 readerContext,
                 flussConfig,
                 metricRegistry,
                 sourceReaderMetrics,
-                recordEmitter);
+                recordEmitter,
+                rateLimiterStrategy);
     }
 }
