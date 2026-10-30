@@ -31,25 +31,37 @@ import java.util.List;
 public class RowDataUtils {
 
     /**
-     * Convert a {@link DataChangeEvent} to one or two {@link RowData}.
+     * Convert a {@link DataChangeEvent} to zero, one or two {@link RowData}.
      *
-     * <p>An {@code UPDATE} is split into a {@code DELETE} built from the before-image followed by
-     * an {@code INSERT} built from the after-image, rather than a single after-image row. Iceberg
+     * <p>For tables with equality fields, an {@code UPDATE} is split into a {@code DELETE} built
+     * from the before-image followed by an {@code INSERT} built from the after-image. Iceberg
      * derives both the equality-delete key and the delete's target partition from the row passed to
      * the writer; collapsing an UPDATE to just the after-image (as before) means a partition key
      * change is never deleted from its old partition, leaving a stale duplicate behind.
+     *
+     * <p>Append-only writers do not interpret {@link RowKind#DELETE}. For tables without equality
+     * fields, only the after-image of an update is appended, and deletes are ignored.
      */
     public static List<RowData> convertDataChangeEventToRowData(
-            DataChangeEvent dataChangeEvent, List<RecordData.FieldGetter> fieldGetters) {
+            DataChangeEvent dataChangeEvent,
+            List<RecordData.FieldGetter> fieldGetters,
+            boolean supportsEqualityDeletes) {
         switch (dataChangeEvent.op()) {
             case INSERT:
             case REPLACE:
                 return Collections.singletonList(
                         toRowData(dataChangeEvent.after(), fieldGetters, RowKind.INSERT));
             case DELETE:
+                if (!supportsEqualityDeletes) {
+                    return Collections.emptyList();
+                }
                 return Collections.singletonList(
                         toRowData(dataChangeEvent.before(), fieldGetters, RowKind.DELETE));
             case UPDATE:
+                if (!supportsEqualityDeletes) {
+                    return Collections.singletonList(
+                            toRowData(dataChangeEvent.after(), fieldGetters, RowKind.INSERT));
+                }
                 return Arrays.asList(
                         toRowData(dataChangeEvent.before(), fieldGetters, RowKind.DELETE),
                         toRowData(dataChangeEvent.after(), fieldGetters, RowKind.INSERT));
