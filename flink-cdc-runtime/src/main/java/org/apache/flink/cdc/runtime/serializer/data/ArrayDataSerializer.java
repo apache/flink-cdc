@@ -31,6 +31,7 @@ import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.utils.DataTypeUtils;
 import org.apache.flink.cdc.common.utils.InstantiationUtil;
 import org.apache.flink.cdc.runtime.serializer.InternalSerializers;
+import org.apache.flink.cdc.runtime.serializer.NestedSerializersSnapshotDelegate;
 import org.apache.flink.cdc.runtime.serializer.NullableSerializerWrapper;
 import org.apache.flink.cdc.runtime.serializer.data.writer.BinaryArrayWriter;
 import org.apache.flink.cdc.runtime.serializer.data.writer.BinaryWriter;
@@ -274,12 +275,20 @@ public class ArrayDataSerializer extends TypeSerializer<ArrayData> {
             }
 
             ArrayDataSerializer newArrayDataSerializer = (ArrayDataSerializer) newSerializer;
-            if (!previousType.equals(newArrayDataSerializer.eleType)
-                    || !previousEleSer.equals(newArrayDataSerializer.eleSer)) {
+            if (!previousType.equals(newArrayDataSerializer.eleType)) {
                 return TypeSerializerSchemaCompatibility.incompatible();
-            } else {
+            }
+
+            TypeSerializerSchemaCompatibility<?> elementCompatibility =
+                    NestedSerializersSnapshotDelegate.resolveSerializerCompatibility(
+                            previousEleSer, newArrayDataSerializer.eleSer);
+            if (elementCompatibility.isCompatibleAsIs()) {
                 return TypeSerializerSchemaCompatibility.compatibleAsIs();
             }
+            if (elementCompatibility.isCompatibleAfterMigration()) {
+                return TypeSerializerSchemaCompatibility.compatibleAfterMigration();
+            }
+            return TypeSerializerSchemaCompatibility.incompatible();
         }
     }
 }

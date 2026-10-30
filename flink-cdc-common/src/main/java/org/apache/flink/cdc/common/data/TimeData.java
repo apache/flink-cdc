@@ -26,31 +26,30 @@ import java.util.Objects;
  */
 public class TimeData implements Comparable<TimeData> {
 
-    private static final int SECONDS_TO_MILLIS = 1000;
-    private static final int MILLIS_TO_MICRO = 1000;
-    private static final int MILLIS_TO_NANO = 1_000_000;
+    private static final long SECONDS_TO_NANO = 1_000_000_000L;
+    private static final long MILLIS_TO_NANO = 1_000_000L;
+    private static final long MICRO_TO_NANO = 1_000L;
 
-    private final int millisOfDay;
+    private final long nanoOfDay;
 
-    private TimeData(int millisOfDay) {
-        this.millisOfDay = millisOfDay;
+    private TimeData(long nanoOfDay) {
+        this.nanoOfDay = nanoOfDay;
     }
 
     public static TimeData fromSecondOfDay(int secondOfDay) {
-        return new TimeData(secondOfDay * SECONDS_TO_MILLIS);
+        return new TimeData(secondOfDay * SECONDS_TO_NANO);
     }
 
     public static TimeData fromMillisOfDay(int millisOfDay) {
-        return new TimeData(millisOfDay);
+        return new TimeData(millisOfDay * MILLIS_TO_NANO);
     }
 
     public static TimeData fromMicroOfDay(long microOfDay) {
-        return new TimeData((int) (microOfDay / MILLIS_TO_MICRO));
+        return new TimeData(microOfDay * MICRO_TO_NANO);
     }
 
     public static TimeData fromNanoOfDay(long nanoOfDay) {
-        // millisOfDay should not exceed 86400000, which is safe to fit into INT.
-        return new TimeData((int) (nanoOfDay / MILLIS_TO_NANO));
+        return new TimeData(nanoOfDay);
     }
 
     public static TimeData fromLocalTime(LocalTime localTime) {
@@ -62,11 +61,19 @@ public class TimeData implements Comparable<TimeData> {
     }
 
     public int toMillisOfDay() {
-        return millisOfDay;
+        return (int) (nanoOfDay / MILLIS_TO_NANO);
+    }
+
+    public long toMicroOfDay() {
+        return nanoOfDay / MICRO_TO_NANO;
+    }
+
+    public long toNanoOfDay() {
+        return nanoOfDay;
     }
 
     public LocalTime toLocalTime() {
-        return LocalTime.ofNanoOfDay((long) millisOfDay * MILLIS_TO_NANO);
+        return LocalTime.ofNanoOfDay(nanoOfDay);
     }
 
     public String toString() {
@@ -80,16 +87,16 @@ public class TimeData implements Comparable<TimeData> {
         }
 
         TimeData timeData = (TimeData) o;
-        return millisOfDay == timeData.millisOfDay;
+        return nanoOfDay == timeData.nanoOfDay;
     }
 
     @Override
     public int compareTo(TimeData other) {
-        return Long.compare(millisOfDay, other.millisOfDay);
+        return Long.compare(nanoOfDay, other.nanoOfDay);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(millisOfDay);
+        return Objects.hash(nanoOfDay);
     }
 }

@@ -32,6 +32,7 @@ import org.apache.flink.cdc.common.data.binary.BinaryMapData;
 import org.apache.flink.cdc.common.data.binary.BinarySegmentUtils;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.runtime.serializer.InternalSerializers;
+import org.apache.flink.cdc.runtime.serializer.NestedSerializersSnapshotDelegate;
 import org.apache.flink.cdc.runtime.serializer.data.writer.BinaryArrayWriter;
 import org.apache.flink.cdc.runtime.serializer.data.writer.BinaryWriter;
 import org.apache.flink.core.memory.DataInputView;
@@ -317,13 +318,24 @@ public class MapDataSerializer extends TypeSerializer<MapData> {
 
             MapDataSerializer newMapDataSerializer = (MapDataSerializer) newSerializer;
             if (!keyType.equals(newMapDataSerializer.keyType)
-                    || !valueType.equals(newMapDataSerializer.valueType)
-                    || !keySerializer.equals(newMapDataSerializer.keySerializer)
-                    || !valueSerializer.equals(newMapDataSerializer.valueSerializer)) {
+                    || !valueType.equals(newMapDataSerializer.valueType)) {
                 return TypeSerializerSchemaCompatibility.incompatible();
-            } else {
-                return TypeSerializerSchemaCompatibility.compatibleAsIs();
             }
+
+            TypeSerializerSchemaCompatibility<?> keyCompatibility =
+                    NestedSerializersSnapshotDelegate.resolveSerializerCompatibility(
+                            keySerializer, newMapDataSerializer.keySerializer);
+            TypeSerializerSchemaCompatibility<?> valueCompatibility =
+                    NestedSerializersSnapshotDelegate.resolveSerializerCompatibility(
+                            valueSerializer, newMapDataSerializer.valueSerializer);
+            if (keyCompatibility.isIncompatible() || valueCompatibility.isIncompatible()) {
+                return TypeSerializerSchemaCompatibility.incompatible();
+            }
+            if (keyCompatibility.isCompatibleAfterMigration()
+                    || valueCompatibility.isCompatibleAfterMigration()) {
+                return TypeSerializerSchemaCompatibility.compatibleAfterMigration();
+            }
+            return TypeSerializerSchemaCompatibility.compatibleAsIs();
         }
     }
 }
