@@ -84,7 +84,8 @@ public class FlussSourceReader<T>
             org.apache.fluss.config.Configuration flussConfig,
             WrapperFlussMetricRegistry metricRegistry,
             FlussSourceReaderMetrics sourceReaderMetrics,
-            FlussRecordEmitter<T> recordEmitter) {
+            FlussRecordEmitter<T> recordEmitter,
+            @Nullable RateLimiterStrategy rateLimiterStrategy) {
         this(
                 readerContext,
                 metricRegistry,
@@ -94,7 +95,7 @@ public class FlussSourceReader<T>
                         () ->
                                 new FlussSplitReader(
                                         flussConfig, metricRegistry, sourceReaderMetrics)),
-                null);
+                rateLimiterStrategy);
     }
 
     FlussSourceReader(
