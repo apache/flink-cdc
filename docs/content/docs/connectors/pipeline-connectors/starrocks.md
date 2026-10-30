@@ -178,6 +178,20 @@ pipeline:
       <td>Whether to use transaction stream load for at-least-once when it's available.</td>
     </tr>
     <tr>
+      <td>sink.transaction.multi-table.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>Whether to enable multi-table transaction stream load. When enabled, all tables written by the same sink subtask within the same flush cycle share one StarRocks transaction label and become visible atomically. Requires StarRocks server version &gt;= 4.0 and all target tables to be in the same database.</td>
+    </tr>
+    <tr>
+      <td>sink.transaction.multi-table.buffer-size</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">134217728</td>
+      <td>Long</td>
+      <td>Global buffer size in bytes for multi-table transaction mode. A flush is triggered when the buffered bytes reach this threshold.</td>
+    </tr>
+    <tr>
       <td>sink.metric.histogram-window-size</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">100</td>
@@ -246,6 +260,11 @@ pipeline:
 * Only support StarRocks primary key table, so the source table must have primary keys.
 
 * Not support exactly-once. The connector uses at-least-once + primary key table for idempotent writing.
+
+* Multi-table transaction stream load (`sink.transaction.multi-table.enabled`) is only supported on StarRocks server version >= 4.0. Enabling it on an older server or on an unreachable cluster fails the pipeline submission. When enabled:
+  * all target tables must be routed to the same StarRocks database; the pipeline fails fast when tables from more than one database are detected
+  * tables written by the same sink subtask within the same flush cycle share one StarRocks transaction and become visible atomically; visibility across sink subtasks is not synchronized
+  * the semantics stays at-least-once, and duplicates on failure are deduplicated by the primary key table
 
 * For creating table automatically
   * the distribution keys are the same as the primary keys
