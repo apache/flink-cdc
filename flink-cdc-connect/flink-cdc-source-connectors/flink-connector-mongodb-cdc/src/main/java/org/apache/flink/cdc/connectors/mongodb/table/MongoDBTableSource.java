@@ -99,6 +99,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
     @Nullable private final String sslTrustStore;
     @Nullable private final String sslTrustStorePassword;
     private final String sslTrustStoreType;
+    private final double scanRateLimitRecordsPerSecond;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -146,7 +147,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
             String sslKeyStoreType,
             @Nullable String sslTrustStore,
             @Nullable String sslTrustStorePassword,
-            String sslTrustStoreType) {
+            String sslTrustStoreType,
+            double scanRateLimitRecordsPerSecond) {
         this.physicalSchema = physicalSchema;
         this.scheme = checkNotNull(scheme);
         this.hosts = checkNotNull(hosts);
@@ -185,6 +187,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
         this.sslTrustStore = sslTrustStore;
         this.sslTrustStorePassword = sslTrustStorePassword;
         this.sslTrustStoreType = sslTrustStoreType;
+        this.scanRateLimitRecordsPerSecond = scanRateLimitRecordsPerSecond;
     }
 
     @Override
@@ -246,7 +249,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                             .deserializer(deserializer)
                             .disableCursorTimeout(noCursorTimeout)
                             .assignUnboundedChunkFirst(assignUnboundedChunkFirst)
-                            .releaseSnapshotMetadataEnabled(releaseSnapshotMetadataEnabled);
+                            .releaseSnapshotMetadataEnabled(releaseSnapshotMetadataEnabled)
+                            .scanRateLimitRecordsPerSecond(scanRateLimitRecordsPerSecond);
 
             Optional.ofNullable(databaseList).ifPresent(builder::databaseList);
             Optional.ofNullable(collectionList).ifPresent(builder::collectionList);
@@ -372,7 +376,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                         sslKeyStoreType,
                         sslTrustStore,
                         sslTrustStorePassword,
-                        sslTrustStoreType);
+                        sslTrustStoreType,
+                        scanRateLimitRecordsPerSecond);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
@@ -425,7 +430,9 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                 && Objects.equals(sslKeyStoreType, that.sslKeyStoreType)
                 && Objects.equals(sslTrustStore, that.sslTrustStore)
                 && Objects.equals(sslTrustStorePassword, that.sslTrustStorePassword)
-                && Objects.equals(sslTrustStoreType, that.sslTrustStoreType);
+                && Objects.equals(sslTrustStoreType, that.sslTrustStoreType)
+                && Objects.equals(
+                        scanRateLimitRecordsPerSecond, that.scanRateLimitRecordsPerSecond);
     }
 
     @Override
@@ -468,7 +475,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                 sslKeyStoreType,
                 sslTrustStore,
                 sslTrustStorePassword,
-                sslTrustStoreType);
+                sslTrustStoreType,
+                scanRateLimitRecordsPerSecond);
     }
 
     @Override

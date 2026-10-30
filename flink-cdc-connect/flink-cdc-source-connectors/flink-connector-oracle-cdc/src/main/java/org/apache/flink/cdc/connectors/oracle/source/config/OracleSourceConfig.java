@@ -66,7 +66,8 @@ public class OracleSourceConfig extends JdbcSourceConfig {
             boolean skipSnapshotBackfill,
             boolean scanNewlyAddedTableEnabled,
             boolean assignUnboundedChunkFirst,
-            boolean releaseSnapshotMetadataEnabled) {
+            boolean releaseSnapshotMetadataEnabled,
+            double scanRateLimitRecordsPerSecond) {
         super(
                 startupOptions,
                 databaseList,
@@ -94,7 +95,8 @@ public class OracleSourceConfig extends JdbcSourceConfig {
                 skipSnapshotBackfill,
                 scanNewlyAddedTableEnabled,
                 assignUnboundedChunkFirst,
-                releaseSnapshotMetadataEnabled);
+                releaseSnapshotMetadataEnabled,
+                scanRateLimitRecordsPerSecond);
         this.url = url;
     }
 

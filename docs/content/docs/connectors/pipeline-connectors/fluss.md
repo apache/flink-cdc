@@ -166,6 +166,16 @@ Pipeline Connector Options
       <td>String</td>
       <td>Pass options of Fluss client to pipeline. See <a href="https://fluss.apache.org/docs/engine-flink/options/#write-options">Fluss client options</a>. </td>
     </tr>
+    <tr>
+      <td>scan.rate-limit.records-per-second</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">-1</td>
+      <td>Double</td>
+      <td>
+        The maximum number of records emitted per second, the default value: -1, means no rate limiting.(only for flink2.x)<br>
+        WARNING: In the log reading phase, rate limiting can make the source fall behind the table's log retention (table.log.ttl), so records may expire before they are consumed, which can lead to data loss.
+      </td>
+    </tr>
     </tbody>
 </table>    
 </div>

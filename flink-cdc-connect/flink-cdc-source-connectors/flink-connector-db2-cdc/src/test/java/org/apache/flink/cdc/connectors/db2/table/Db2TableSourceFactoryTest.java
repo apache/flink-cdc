@@ -44,6 +44,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
+import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.SCAN_RATE_LIMIT_RECORDS_PER_SECOND;
 import static org.apache.flink.cdc.debezium.utils.ResolvedSchemaUtils.getPhysicalSchema;
 import static org.apache.flink.table.api.TableSchema.fromResolvedSchema;
 
@@ -84,6 +85,9 @@ class Db2TableSourceFactoryTest {
     private static final String MY_TABLE = "flinkuser.myTable";
     private static final Properties PROPERTIES = new Properties();
 
+    private static final double SCAN_RATE_LIMIT_RECORDS_PER_SECOND_DEFAULT =
+            SCAN_RATE_LIMIT_RECORDS_PER_SECOND.defaultValue();
+
     @Test
     void testCommonProperties() {
         Map<String, String> properties = getAllOptions();
@@ -119,7 +123,8 @@ class Db2TableSourceFactoryTest {
                         JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED
                                 .defaultValue(),
                         JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED
-                                .defaultValue());
+                                .defaultValue(),
+                        SCAN_RATE_LIMIT_RECORDS_PER_SECOND_DEFAULT);
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
@@ -162,7 +167,8 @@ class Db2TableSourceFactoryTest {
                         JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
                         true,
                         JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED
-                                .defaultValue());
+                                .defaultValue(),
+                        SCAN_RATE_LIMIT_RECORDS_PER_SECOND_DEFAULT);
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
@@ -239,7 +245,8 @@ class Db2TableSourceFactoryTest {
                         JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED
                                 .defaultValue(),
                         JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED
-                                .defaultValue());
+                                .defaultValue(),
+                        SCAN_RATE_LIMIT_RECORDS_PER_SECOND_DEFAULT);
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys =
                 Arrays.asList("op_ts", "database_name", "table_name", "schema_name");

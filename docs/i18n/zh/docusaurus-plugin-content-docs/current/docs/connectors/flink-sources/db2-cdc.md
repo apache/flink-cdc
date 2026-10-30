@@ -280,6 +280,16 @@ Flink SQL> SELECT * FROM products;
         这可能有助于降低 TaskManager 在对最大的 UnboundedChunk 执行快照时出现内存溢出（OOM）错误的风险。<br>
       </td>
     </tr>
+    <tr>
+      <td>scan.rate-limit.records-per-second</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">-1</td>
+      <td>Double</td>
+      <td>
+        每秒发出的最大记录数，默认值为 -1，表示不进行速率限制。（仅适用于 flink 2.x）<br>
+        警告：增量/二进制日志阶段：速率限制可能导致连接器落后于上游变更流，在连接器赶上之前，二进制日志/WAL 可能会被清除（MySQL 数据丢失，PostgreSQL 复制槽问题）。
+      </td>
+    </tr>
     </tbody>
 </table>
 </div>

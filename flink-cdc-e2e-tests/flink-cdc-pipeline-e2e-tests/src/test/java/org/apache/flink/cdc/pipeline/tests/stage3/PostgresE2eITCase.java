@@ -23,8 +23,8 @@ import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedClass;
+import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -109,8 +109,9 @@ public class PostgresE2eITCase extends PipelineTestEnvironment {
         postgresInventoryDatabase.dropDatabase();
     }
 
-    @Test
-    void testSyncWholeDatabase() throws Exception {
+    @ParameterizedTest
+    @ValueSource(doubles = {-1d, 2d})
+    void testSyncWholeDatabase(double rateLimit) throws Exception {
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -125,6 +126,7 @@ public class PostgresE2eITCase extends PipelineTestEnvironment {
                                 + "  server-time-zone: UTC\n"
                                 + "  connect.timeout: 120s\n"
                                 + "  schema-change.enabled: true\n"
+                                + "  scan.rate-limit.records-per-second: %f\n"
                                 + "\n"
                                 + "sink:\n"
                                 + "  type: values\n"
@@ -139,6 +141,7 @@ public class PostgresE2eITCase extends PipelineTestEnvironment {
                         postgresInventoryDatabase.getDatabaseName(),
                         postgresInventoryDatabase.getDatabaseName(),
                         slotName,
+                        rateLimit,
                         parallelism);
         Path postgresCdcJar = TestUtils.getResource("postgres-cdc-pipeline-connector.jar");
         submitPipelineJob(pipelineJob, postgresCdcJar);

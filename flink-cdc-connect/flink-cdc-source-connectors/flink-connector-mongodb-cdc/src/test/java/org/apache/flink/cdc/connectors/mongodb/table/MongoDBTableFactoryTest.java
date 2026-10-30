@@ -62,6 +62,7 @@ import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourc
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE_MB;
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED;
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_NO_CURSOR_TIMEOUT;
+import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_RATE_LIMIT_RECORDS_PER_SECOND;
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCHEME;
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SSL_ENABLED;
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SSL_INVALID_HOSTNAME_ALLOWED;
@@ -148,6 +149,9 @@ class MongoDBTableFactoryTest {
             SSL_TRUSTSTORE_PASSWORD.defaultValue();
     private static final String SSL_TRUSTSTORE_TYPE_DEFAULT = SSL_TRUSTSTORE_TYPE.defaultValue();
 
+    private static final double SCAN_RATE_LIMIT_RECORDS_PER_SECOND_DEFAULT =
+            SCAN_RATE_LIMIT_RECORDS_PER_SECOND.defaultValue();
+
     @Test
     void testCommonProperties() {
         Map<String, String> properties = getAllOptions();
@@ -191,7 +195,8 @@ class MongoDBTableFactoryTest {
                         SSL_KEYSTORE_TYPE_DEFAULT,
                         SSL_TRUSTSTORE_DEFAULT,
                         SSL_TRUSTSTORE_PASSWORD_DEFAULT,
-                        SSL_TRUSTSTORE_TYPE_DEFAULT);
+                        SSL_TRUSTSTORE_TYPE_DEFAULT,
+                        SCAN_RATE_LIMIT_RECORDS_PER_SECOND_DEFAULT);
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
@@ -256,7 +261,8 @@ class MongoDBTableFactoryTest {
                         SSL_KEYSTORE_TYPE_DEFAULT,
                         SSL_TRUSTSTORE_DEFAULT,
                         SSL_TRUSTSTORE_PASSWORD_DEFAULT,
-                        SSL_TRUSTSTORE_TYPE_DEFAULT);
+                        SSL_TRUSTSTORE_TYPE_DEFAULT,
+                        SCAN_RATE_LIMIT_RECORDS_PER_SECOND_DEFAULT);
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
@@ -306,7 +312,8 @@ class MongoDBTableFactoryTest {
                         SSL_KEYSTORE_TYPE_DEFAULT,
                         SSL_TRUSTSTORE_DEFAULT,
                         SSL_TRUSTSTORE_PASSWORD_DEFAULT,
-                        SSL_TRUSTSTORE_TYPE_DEFAULT);
+                        SSL_TRUSTSTORE_TYPE_DEFAULT,
+                        SCAN_RATE_LIMIT_RECORDS_PER_SECOND_DEFAULT);
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
 
         // equals has to carry the field, or a source built without the option would compare equal
@@ -364,7 +371,8 @@ class MongoDBTableFactoryTest {
                         SSL_KEYSTORE_TYPE_DEFAULT,
                         SSL_TRUSTSTORE_DEFAULT,
                         SSL_TRUSTSTORE_PASSWORD_DEFAULT,
-                        SSL_TRUSTSTORE_TYPE_DEFAULT);
+                        SSL_TRUSTSTORE_TYPE_DEFAULT,
+                        SCAN_RATE_LIMIT_RECORDS_PER_SECOND_DEFAULT);
 
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys = Arrays.asList("op_ts", "database_name", "row_kind");
@@ -484,7 +492,8 @@ class MongoDBTableFactoryTest {
                         SSL_KEYSTORE_TYPE_DEFAULT,
                         SSL_TRUSTSTORE_DEFAULT,
                         SSL_TRUSTSTORE_PASSWORD_DEFAULT,
-                        SSL_TRUSTSTORE_TYPE_DEFAULT);
+                        SSL_TRUSTSTORE_TYPE_DEFAULT,
+                        SCAN_RATE_LIMIT_RECORDS_PER_SECOND_DEFAULT);
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 

@@ -43,6 +43,7 @@ import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.HOS
 import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.PASSWORD;
 import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED;
 import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN;
+import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.SCAN_RATE_LIMIT_RECORDS_PER_SECOND;
 import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.TABLE_NAME;
 import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.USERNAME;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.CHUNK_META_GROUP_SIZE;
@@ -120,6 +121,7 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
                 config.get(SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED);
         boolean releaseSnapshotMetadataEnabled =
                 config.get(SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED);
+        double scanRateLimitRecordsPerSecond = config.get(SCAN_RATE_LIMIT_RECORDS_PER_SECOND);
 
         if (enableParallelRead) {
             validateIntegerOption(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE, splitSize, 1);
@@ -159,7 +161,8 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
                 skipSnapshotBackfill,
                 scanNewlyAddedTableEnabled,
                 assignUnboundedChunkFirst,
-                releaseSnapshotMetadataEnabled);
+                releaseSnapshotMetadataEnabled,
+                scanRateLimitRecordsPerSecond);
     }
 
     @Override
@@ -200,6 +203,7 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
         options.add(SCAN_NEWLY_ADDED_TABLE_ENABLED);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED);
+        options.add(SCAN_RATE_LIMIT_RECORDS_PER_SECOND);
         return options;
     }
 

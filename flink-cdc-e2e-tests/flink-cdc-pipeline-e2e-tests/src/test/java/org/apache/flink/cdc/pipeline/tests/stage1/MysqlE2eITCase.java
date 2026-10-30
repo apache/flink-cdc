@@ -26,6 +26,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedClass;
+import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,8 +67,9 @@ class MysqlE2eITCase extends PipelineTestEnvironment {
         mysqlInventoryDatabase.dropDatabase();
     }
 
-    @Test
-    void testSyncWholeDatabase() throws Exception {
+    @ParameterizedTest
+    @ValueSource(doubles = {-1d, 2d})
+    void testSyncWholeDatabase(double rateLimit) throws Exception {
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -79,6 +81,7 @@ class MysqlE2eITCase extends PipelineTestEnvironment {
                                 + "  tables: %s.\\.*\n"
                                 + "  server-id: 5400-5404\n"
                                 + "  server-time-zone: UTC\n"
+                                + "  scan.rate-limit.records-per-second: %f\n"
                                 + "\n"
                                 + "sink:\n"
                                 + "  type: values\n"
@@ -89,6 +92,7 @@ class MysqlE2eITCase extends PipelineTestEnvironment {
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
                         mysqlInventoryDatabase.getDatabaseName(),
+                        rateLimit,
                         parallelism);
 
         submitPipelineJob(pipelineJob);

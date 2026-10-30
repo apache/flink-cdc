@@ -26,8 +26,8 @@ import io.debezium.relational.TableId;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedClass;
+import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -126,8 +126,9 @@ public class OracleE2eITCase extends PipelineTestEnvironment {
         super.after();
     }
 
-    @Test
-    void testSyncWholeDatabase() throws Exception {
+    @ParameterizedTest
+    @ValueSource(doubles = {-1d, 2d})
+    void testSyncWholeDatabase(double rateLimit) throws Exception {
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -139,6 +140,7 @@ public class OracleE2eITCase extends PipelineTestEnvironment {
                                 + "  tables: DEBEZIUM.PRODUCTS,DEBEZIUM.CUSTOMERS,DEBEZIUM.CUSTOMERS_1\n"
                                 + "  database: %s\n"
                                 + "  scan.startup.mode: initial\n"
+                                + "  scan.rate-limit.records-per-second: %f\n"
                                 + "\n"
                                 + "sink:\n"
                                 + "  type: values\n"
@@ -150,6 +152,7 @@ public class OracleE2eITCase extends PipelineTestEnvironment {
                         TOP_USER,
                         TOP_SECRET,
                         ORACLE_DATABASE,
+                        rateLimit,
                         1);
         submitPipelineJob(pipelineJob, postgresCdcJar, oracleOjdbcJar);
         LOG.info("Containers are started.");

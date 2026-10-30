@@ -97,5 +97,12 @@ public class FlussDataSourceOptions {
                     .withDescription(
                             "The duration for retaining KV snapshots acquired by the source.");
 
+    public static final ConfigOption<Double> SCAN_RATE_LIMIT_RECORDS_PER_SECOND =
+            ConfigOptions.key("scan.rate-limit.records-per-second")
+                    .doubleType()
+                    .defaultValue(-1d)
+                    .withDescription(
+                            "The maximum number of records emitted per second, the default value: -1, means no rate limiting.");
+
     private FlussDataSourceOptions() {}
 }
