@@ -17,6 +17,8 @@
 
 package org.apache.flink.cdc.pipeline.tests.stage1;
 
+import org.apache.flink.api.common.JobID;
+import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
@@ -36,7 +38,13 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
+import java.util.stream.Collectors;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 /** End-to-end tests for mysql cdc pipeline job. */
 @ParameterizedClass
@@ -593,5 +601,74 @@ class MysqlE2eITCase extends PipelineTestEnvironment {
                 dbNameFormatter,
                 "CreateTableEvent{tableId=%s.products, schema=columns={`id` INT NOT NULL,`name` VARCHAR(255) NOT NULL 'flink',`description` VARCHAR(512),`weight` FLOAT,`enum_c` STRING 'red',`json_c` STRING,`point_c` STRING}, primaryKeys=id, options=()}",
                 "DataChangeEvent{tableId=%s.products, before=[106, hammer, 16oz carpenter's hammer, 1.0, null, null, null], after=[106, hammer, 18oz carpenter hammer, 1.0, null, null, null], op=UPDATE, meta=()}");
+    }
+
+    @Test
+    void testSnapshotFilters() throws Exception {
+        String pipelineJob =
+                String.format(
+                        "source:\n"
+                                + "  type: mysql\n"
+                                + "  hostname: %s\n"
+                                + "  port: 3306\n"
+                                + "  username: %s\n"
+                                + "  password: %s\n"
+                                + "  tables: %s.\\.*\n"
+                                + "  server-id: 5400-5404\n"
+                                + "  server-time-zone: UTC\n"
+                                + "  scan.startup.mode: snapshot\n"
+                                + "  scan.snapshot.filters:\n"
+                                + "    - table: %s.customers\n"
+                                + "      filter: id > 102\n"
+                                + "    - table: %s.products\n"
+                                + "      filter: id < 105\n"
+                                + "\n"
+                                + "sink:\n"
+                                + "  type: values\n"
+                                + "\n"
+                                + "pipeline:\n"
+                                + "  parallelism: %d",
+                        INTER_CONTAINER_MYSQL_ALIAS,
+                        MYSQL_TEST_USER,
+                        MYSQL_TEST_PASSWORD,
+                        mysqlInventoryDatabase.getDatabaseName(),
+                        mysqlInventoryDatabase.getDatabaseName(),
+                        mysqlInventoryDatabase.getDatabaseName(),
+                        parallelism);
+
+        JobID jobId = submitPipelineJob(pipelineJob);
+        waitUntilJobFinished(Duration.ofSeconds(60));
+        assertThat(getRestClusterClient().getJobStatus(jobId).get(10, TimeUnit.SECONDS))
+                .isEqualTo(JobStatus.FINISHED);
+
+        // customers: only id > 102 (id=103, 104)
+        // products: only id < 105 (id=101, 102, 103, 104)
+        String[] expectedEvents = {
+            "CreateTableEvent{tableId=%s.customers, schema=columns={`id` INT NOT NULL,`name` VARCHAR(255) NOT NULL 'flink',`address` VARCHAR(1024),`phone_number` VARCHAR(512)}, primaryKeys=id, options=()}",
+            "DataChangeEvent{tableId=%s.customers, before=[], after=[103, user_3, Shanghai, 123567891234], op=INSERT, meta=()}",
+            "DataChangeEvent{tableId=%s.customers, before=[], after=[104, user_4, Shanghai, 123567891234], op=INSERT, meta=()}",
+            "CreateTableEvent{tableId=%s.products, schema=columns={`id` INT NOT NULL,`name` VARCHAR(255) NOT NULL 'flink',`description` VARCHAR(512),`weight` FLOAT,`enum_c` STRING 'red',`json_c` STRING,`point_c` STRING}, primaryKeys=id, options=()}",
+            "DataChangeEvent{tableId=%s.products, before=[], after=[101, scooter, Small 2-wheel scooter, 3.14, red, {\"key1\": \"value1\"}, {\"coordinates\":[1,1],\"type\":\"Point\",\"srid\":0}], op=INSERT, meta=()}",
+            "DataChangeEvent{tableId=%s.products, before=[], after=[102, car battery, 12V car battery, 8.1, white, {\"key2\": \"value2\"}, {\"coordinates\":[2,2],\"type\":\"Point\",\"srid\":0}], op=INSERT, meta=()}",
+            "DataChangeEvent{tableId=%s.products, before=[], after=[103, 12-pack drill bits, 12-pack of drill bits with sizes ranging from #40 to #3, 0.8, red, {\"key3\": \"value3\"}, {\"coordinates\":[3,3],\"type\":\"Point\",\"srid\":0}], op=INSERT, meta=()}",
+            "DataChangeEvent{tableId=%s.products, before=[], after=[104, hammer, 12oz carpenter's hammer, 0.75, white, {\"key4\": \"value4\"}, {\"coordinates\":[4,4],\"type\":\"Point\",\"srid\":0}], op=INSERT, meta=()}"
+        };
+        validateResult(dbNameFormatter, expectedEvents);
+
+        // Compare every emitted snapshot row after the bounded job finishes, including the count.
+        // A connector that ignores the filters must fail this assertion.
+        List<String> actualRows =
+                taskManagerConsumer
+                        .toUtf8String()
+                        .lines()
+                        .map(line -> line.replaceFirst("^\\d+> ", ""))
+                        .filter(line -> line.startsWith("DataChangeEvent{tableId="))
+                        .collect(Collectors.toList());
+        List<String> expectedRows =
+                Arrays.stream(expectedEvents)
+                        .map(dbNameFormatter)
+                        .filter(line -> line.startsWith("DataChangeEvent{tableId="))
+                        .collect(Collectors.toList());
+        assertThat(actualRows).containsExactlyInAnyOrderElementsOf(expectedRows);
     }
 }

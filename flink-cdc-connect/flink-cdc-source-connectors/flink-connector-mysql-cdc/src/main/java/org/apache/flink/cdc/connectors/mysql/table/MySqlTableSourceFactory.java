@@ -111,6 +111,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
 
         boolean appendOnly =
                 config.get(MySqlSourceOptions.SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED);
+        String snapshotFilter = config.get(MySqlSourceOptions.SCAN_SNAPSHOT_FILTER);
 
         if (enableParallelRead) {
             validatePrimaryKeyIfEnableParallel(physicalSchema, chunkKeyColumn);
@@ -125,6 +126,8 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
             validateDurationOption(
                     MySqlSourceOptions.CONNECT_TIMEOUT, connectTimeout, Duration.ofMillis(250));
         }
+
+        validateSnapshotFilterWithParallelRead(snapshotFilter, enableParallelRead);
 
         OptionUtils.printOptions(IDENTIFIER, config.toMap());
 
@@ -159,7 +162,8 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                 parseOnLineSchemaChanges,
                 useLegacyJsonFormat,
                 assignUnboundedChunkFirst,
-                appendOnly);
+                appendOnly,
+                snapshotFilter);
     }
 
     @Override
@@ -210,6 +214,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         options.add(MySqlSourceOptions.USE_LEGACY_JSON_FORMAT);
         options.add(MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST);
         options.add(MySqlSourceOptions.SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED);
+        options.add(MySqlSourceOptions.SCAN_SNAPSHOT_FILTER);
         return options;
     }
 
@@ -387,6 +392,28 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                         0.0d,
                         1.0d,
                         distributionFactorLower));
+    }
+
+    /**
+     * Checks that snapshot filter is only used when parallel read is enabled.
+     *
+     * @param snapshotFilter The snapshot filter expression
+     * @param enableParallelRead Whether parallel read is enabled
+     * @throws ValidationException If snapshot filter is set but parallel read is disabled
+     */
+    private void validateSnapshotFilterWithParallelRead(
+            @Nullable String snapshotFilter, boolean enableParallelRead) {
+        if (snapshotFilter != null && !snapshotFilter.isEmpty() && !enableParallelRead) {
+            throw new ValidationException(
+                    String.format(
+                            "Option '%s' can only be used when '%s' is enabled. "
+                                    + "Either enable parallel snapshot reading by setting '%s' to true, "
+                                    + "or remove the '%s' option.",
+                            MySqlSourceOptions.SCAN_SNAPSHOT_FILTER.key(),
+                            MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED.key(),
+                            MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED.key(),
+                            MySqlSourceOptions.SCAN_SNAPSHOT_FILTER.key()));
+        }
     }
 
     /** Replaces the default timezone placeholder with session timezone, if applicable. */

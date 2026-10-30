@@ -481,6 +481,13 @@ Only valid for cdc 1.x version. During a snapshot operation, the connector will 
         For example updating an already updated value in snapshot, or deleting an already deleted entry in snapshot. These replayed change log events should be handled specially.
       </td>
     </tr>
+    <tr>
+      <td>scan.snapshot.filter</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>SQL WHERE clause applied to the snapshot SELECT query, e.g. `id > 100`. It does not filter binlog events or snapshot backfill. The final snapshot may contain rows that do not satisfy the condition. By default, no filter is applied. See <a href="#snapshot-filter">Snapshot Filter</a> for details.</td>
+    </tr>
     </tbody>
 </table>
 </div>
@@ -941,6 +948,51 @@ CREATE TABLE products (
 
 `binary_data` field in the database is of type VARBINARY(N). In some scenarios, we need to convert binary data to base64 encoded string data. This feature can be enabled by adding the parameter 'debezium.binary.handling.mode'='base64',
 By adding this parameter, we can map the binary field type to 'STRING' in Flink SQL, thereby obtaining base64 encoded string data.
+
+### Snapshot Filter
+
+The `scan.snapshot.filter` option applies a SQL WHERE clause to the snapshot SELECT query. This is useful for partial initial loads (e.g. migrating only recent data) without modifying the source tables.
+
+The filter does not apply to binlog events, including events between the low and high watermarks during snapshot reading. With snapshot backfill enabled (the default), these events are merged into the snapshot without evaluating the filter again. A row that enters the condition can therefore be added, and a row that leaves the condition can still appear with its updated values in the final snapshot. The final snapshot is not guaranteed to satisfy the filter.
+
+When `scan.incremental.snapshot.backfill.skip` is `true`, the snapshot contains the rows matched by the SELECT query, and changes made during the snapshot are emitted later as unfiltered binlog events. Subsequent binlog events are always captured for all rows, regardless of the filter.
+
+For the DataStream API, filters are evaluated in the order of `snapshotFilters` calls. The first matching table pattern wins.
+
+**SQL DDL Example**
+
+```sql
+CREATE TABLE products (
+    id INT NOT NULL,
+    name STRING,
+    description STRING,
+    PRIMARY KEY(id) NOT ENFORCED
+) WITH (
+    'connector' = 'mysql-cdc',
+    'hostname' = 'localhost',
+    'port' = '3306',
+    'username' = 'root',
+    'password' = '123456',
+    'database-name' = 'mydb',
+    'table-name' = 'products',
+    'scan.snapshot.filter' = 'id > 100'
+);
+```
+
+**DataStream API Example**
+
+```java
+MySqlSource<String> mySqlSource = MySqlSource.<String>builder()
+    .hostname("yourHostname")
+    .port(yourPort)
+    .databaseList("mydb")
+    .tableList("mydb.products")
+    .username("yourUsername")
+    .password("yourPassword")
+    .snapshotFilters("mydb.products", "id > 100")
+    .deserializer(new JsonDebeziumDeserializationSchema())
+    .build();
+```
 
 ### Available Source metrics
 
