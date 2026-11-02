@@ -21,6 +21,7 @@ import org.apache.flink.api.common.eventtime.Watermark;
 import org.apache.flink.api.connector.sink2.CommittingSinkWriter;
 import org.apache.flink.api.connector.sink2.SinkWriter;
 import org.apache.flink.api.connector.sink2.StatefulSinkWriter;
+import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
@@ -35,6 +36,7 @@ import org.apache.flink.table.types.logical.RowType;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.iceberg.CatalogUtil;
 import org.apache.iceberg.FileFormat;
+import org.apache.iceberg.PartitionField;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.TableIdentifier;
@@ -44,14 +46,18 @@ import org.apache.iceberg.io.TaskWriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
+
 import java.io.IOException;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /** A {@link SinkWriter} for Apache Iceberg. */
 public class IcebergWriter
@@ -156,7 +162,23 @@ public class IcebergWriter
         rowDataTaskWriterFactory.initialize(taskId, attemptId);
         // Match the factory's actual append/delta writer selection, even for existing tables
         // whose identifier fields differ from the incoming CDC schema's primary key.
-        return new TableWriterFactory(rowDataTaskWriterFactory, !equalityFieldIds.isEmpty());
+        boolean supportsEqualityDeletes = !equalityFieldIds.isEmpty();
+        return new TableWriterFactory(
+                rowDataTaskWriterFactory,
+                supportsEqualityDeletes,
+                supportsEqualityDeletes ? createDeleteKeyGetters(tableId, table) : null);
+    }
+
+    /**
+     * Getters for the target table's identifier fields and partition source columns. An UPDATE that
+     * changes none of them can skip its before-image DELETE.
+     */
+    private RecordData.FieldGetter[] createDeleteKeyGetters(TableId tableId, Table table) {
+        Set<String> columnNames = new LinkedHashSet<>(table.schema().identifierFieldNames());
+        for (PartitionField field : table.spec().fields()) {
+            columnNames.add(table.schema().findColumnName(field.sourceId()));
+        }
+        return RowDataUtils.createDeleteKeyGetters(schemaMap.get(tableId).getSchema(), columnNames);
     }
 
     @Override
@@ -171,7 +193,8 @@ public class IcebergWriter
                     RowDataUtils.convertDataChangeEventToRowData(
                             dataChangeEvent,
                             tableSchemaWrapper.getFieldGetters(),
-                            writerFactory.supportsEqualityDeletes);
+                            writerFactory.supportsEqualityDeletes,
+                            writerFactory.deleteKeyGetters);
             if (rowDataList.isEmpty()) {
                 return;
             }
@@ -289,10 +312,15 @@ public class IcebergWriter
 
         private final boolean supportsEqualityDeletes;
 
+        @Nullable private final RecordData.FieldGetter[] deleteKeyGetters;
+
         private TableWriterFactory(
-                RowDataTaskWriterFactory taskWriterFactory, boolean supportsEqualityDeletes) {
+                RowDataTaskWriterFactory taskWriterFactory,
+                boolean supportsEqualityDeletes,
+                @Nullable RecordData.FieldGetter[] deleteKeyGetters) {
             this.taskWriterFactory = taskWriterFactory;
             this.supportsEqualityDeletes = supportsEqualityDeletes;
+            this.deleteKeyGetters = deleteKeyGetters;
         }
     }
 }

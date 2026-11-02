@@ -19,13 +19,21 @@ package org.apache.flink.cdc.connectors.iceberg.sink.utils;
 
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
+import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.types.RowKind;
 
+import javax.annotation.Nullable;
+
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
 
 /** Utils for convertion of {@link RowData} and {@link DataChangeEvent}. */
 public class RowDataUtils {
@@ -46,6 +54,25 @@ public class RowDataUtils {
             DataChangeEvent dataChangeEvent,
             List<RecordData.FieldGetter> fieldGetters,
             boolean supportsEqualityDeletes) {
+        return convertDataChangeEventToRowData(
+                dataChangeEvent, fieldGetters, supportsEqualityDeletes, null);
+    }
+
+    /**
+     * Like {@link #convertDataChangeEventToRowData(DataChangeEvent, List, boolean)}, but the
+     * before-image {@code DELETE} of an {@code UPDATE} is skipped when none of the columns read by
+     * {@code deleteKeyGetters} changed. The upsert {@code INSERT} already deletes the after-image
+     * key in the after-image partition, which is then exactly the row being replaced.
+     *
+     * <p>{@code deleteKeyGetters} must cover every equality field and every partition source column
+     * of the target table: the upsert delete only covers the new key, and equality deletes are
+     * partition-scoped. Pass {@code null} to always emit the {@code DELETE}.
+     */
+    public static List<RowData> convertDataChangeEventToRowData(
+            DataChangeEvent dataChangeEvent,
+            List<RecordData.FieldGetter> fieldGetters,
+            boolean supportsEqualityDeletes,
+            @Nullable RecordData.FieldGetter[] deleteKeyGetters) {
         switch (dataChangeEvent.op()) {
             case INSERT:
             case REPLACE:
@@ -59,6 +86,14 @@ public class RowDataUtils {
                         toRowData(dataChangeEvent.before(), fieldGetters, RowKind.DELETE));
             case UPDATE:
                 if (!supportsEqualityDeletes) {
+                    return Collections.singletonList(
+                            toRowData(dataChangeEvent.after(), fieldGetters, RowKind.INSERT));
+                }
+                if (deleteKeyGetters != null
+                        && !anyFieldChanged(
+                                dataChangeEvent.before(),
+                                dataChangeEvent.after(),
+                                deleteKeyGetters)) {
                     return Collections.singletonList(
                             toRowData(dataChangeEvent.after(), fieldGetters, RowKind.INSERT));
                 }
@@ -78,5 +113,36 @@ public class RowDataUtils {
             genericRowData.setField(i, fieldGetters.get(i).getFieldOrNull(recordData));
         }
         return genericRowData;
+    }
+
+    /**
+     * Creates getters for the given columns that return CDC internal values, so that comparing them
+     * avoids the conversions done by the Iceberg field getters. Returns {@code null} if a column is
+     * not in {@code schema}, e.g. a nested identifier field.
+     */
+    @Nullable
+    public static RecordData.FieldGetter[] createDeleteKeyGetters(
+            Schema schema, Collection<String> columnNames) {
+        List<String> schemaColumns = schema.getColumnNames();
+        List<DataType> types = schema.getColumnDataTypes();
+        List<RecordData.FieldGetter> getters = new ArrayList<>();
+        for (String name : new LinkedHashSet<>(columnNames)) {
+            int pos = schemaColumns.indexOf(name);
+            if (pos < 0) {
+                return null;
+            }
+            getters.add(RecordData.createFieldGetter(types.get(pos), pos));
+        }
+        return getters.toArray(new RecordData.FieldGetter[0]);
+    }
+
+    private static boolean anyFieldChanged(
+            RecordData before, RecordData after, RecordData.FieldGetter[] getters) {
+        for (RecordData.FieldGetter getter : getters) {
+            if (!Objects.deepEquals(getter.getFieldOrNull(before), getter.getFieldOrNull(after))) {
+                return true;
+            }
+        }
+        return false;
     }
 }
