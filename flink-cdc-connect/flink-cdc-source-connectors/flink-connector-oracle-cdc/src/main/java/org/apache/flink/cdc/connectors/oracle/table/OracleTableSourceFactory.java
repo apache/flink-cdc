@@ -123,6 +123,18 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
                 config.get(SCAN_INCREMENTAL_SNAPSHOT_METADATA_RELEASE_ENABLED);
         double scanRateLimitRecordsPerSecond = config.get(SCAN_RATE_LIMIT_RECORDS_PER_SECOND);
 
+        if (!enableParallelRead
+                && scanRateLimitRecordsPerSecond
+                        != SCAN_RATE_LIMIT_RECORDS_PER_SECOND.defaultValue()) {
+            throw new ValidationException(
+                    String.format(
+                            "Option '%s' requires option '%s' to be enabled. The legacy "
+                                    + "non-incremental source does not support rate limiting, "
+                                    + "please enable incremental snapshot.",
+                            SCAN_RATE_LIMIT_RECORDS_PER_SECOND.key(),
+                            SCAN_INCREMENTAL_SNAPSHOT_ENABLED.key()));
+        }
+
         if (enableParallelRead) {
             validateIntegerOption(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE, splitSize, 1);
             validateIntegerOption(SCAN_SNAPSHOT_FETCH_SIZE, fetchSize, 1);

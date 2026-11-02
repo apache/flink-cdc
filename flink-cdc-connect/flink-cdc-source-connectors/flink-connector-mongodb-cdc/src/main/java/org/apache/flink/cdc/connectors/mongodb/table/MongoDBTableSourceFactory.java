@@ -153,6 +153,19 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         boolean noCursorTimeout = config.getOptional(SCAN_NO_CURSOR_TIMEOUT).orElse(true);
 
         double scanRateLimitRecordsPerSecond = config.get(SCAN_RATE_LIMIT_RECORDS_PER_SECOND);
+
+        if (!enableParallelRead
+                && scanRateLimitRecordsPerSecond
+                        != SCAN_RATE_LIMIT_RECORDS_PER_SECOND.defaultValue()) {
+            throw new ValidationException(
+                    String.format(
+                            "Option '%s' requires option '%s' to be enabled. The legacy "
+                                    + "non-incremental source does not support rate limiting, "
+                                    + "please enable incremental snapshot.",
+                            SCAN_RATE_LIMIT_RECORDS_PER_SECOND.key(),
+                            SCAN_INCREMENTAL_SNAPSHOT_ENABLED.key()));
+        }
+
         ResolvedSchema physicalSchema =
                 getPhysicalSchema(context.getCatalogTable().getResolvedSchema());
         checkArgument(physicalSchema.getPrimaryKey().isPresent(), "Primary key must be present");

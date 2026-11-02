@@ -388,6 +388,18 @@ class MongoDBTableFactoryTest {
     }
 
     @Test
+    void testRateLimitRequiresIncrementalSnapshot() {
+        Map<String, String> properties = getAllOptions();
+        properties.put("scan.incremental.snapshot.enabled", "false");
+        properties.put("scan.rate-limit.records-per-second", "100");
+
+        Assertions.assertThatThrownBy(() -> createTableSource(SCHEMA, properties))
+                .hasStackTraceContaining(
+                        "Option 'scan.rate-limit.records-per-second' requires option "
+                                + "'scan.incremental.snapshot.enabled'");
+    }
+
+    @Test
     void testValidation() {
         // validate unsupported option
         Assertions.assertThatThrownBy(

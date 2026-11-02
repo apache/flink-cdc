@@ -173,6 +173,18 @@ class Db2TableSourceFactoryTest {
     }
 
     @Test
+    void testRateLimitRequiresIncrementalSnapshot() {
+        Map<String, String> properties = getAllOptions();
+        properties.put("scan.incremental.snapshot.enabled", "false");
+        properties.put("scan.rate-limit.records-per-second", "100");
+
+        Assertions.assertThatThrownBy(() -> createTableSource(properties, SCHEMA))
+                .hasStackTraceContaining(
+                        "Option 'scan.rate-limit.records-per-second' requires option "
+                                + "'scan.incremental.snapshot.enabled'");
+    }
+
+    @Test
     void testValidation() {
         // validate illegal port
         Assertions.assertThatThrownBy(

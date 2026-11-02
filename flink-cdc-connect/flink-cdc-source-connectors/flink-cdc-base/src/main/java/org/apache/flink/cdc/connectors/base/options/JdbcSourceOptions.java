@@ -116,5 +116,6 @@ public class JdbcSourceOptions extends SourceOptions {
                     .doubleType()
                     .defaultValue(-1d)
                     .withDescription(
-                            "The maximum number of records emitted per second, the default value: -1, means no rate limiting.");
+                            "The maximum number of records emitted per second, the default value: -1, means no rate limiting. "
+                                    + "This option only takes effect when 'scan.incremental.snapshot.enabled' is true.");
 }
