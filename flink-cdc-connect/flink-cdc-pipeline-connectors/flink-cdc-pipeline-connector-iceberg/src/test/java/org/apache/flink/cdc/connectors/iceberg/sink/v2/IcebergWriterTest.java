@@ -60,6 +60,8 @@ import org.apache.iceberg.types.Types;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import java.io.File;
 import java.math.BigDecimal;
@@ -649,15 +651,13 @@ public class IcebergWriterTest {
                 generator.generate(new Object[] {1L, BinaryStringData.fromString("b")});
 
         icebergWriter.write(DataChangeEvent.insertEvent(tableId, recordA), null);
-        // flush resets the factory cache but keeps the writer running, so the update
-        // lands in the same writer as the insert and uses a position delete.
+        // Flush keeps the active writer and its factory, so the update uses a position delete.
         icebergWriter.flush(false);
         icebergWriter.write(DataChangeEvent.updateEvent(tableId, recordA, recordB), null);
 
         Collection<WriteResultWrapper> writeResults = icebergWriter.prepareCommit();
 
-        // Both writes went through the same writer (batchIndex 0) since flush only
-        // cleared the factory. Position delete handles dedup within the snapshot.
+        // Both writes use the same writer (batchIndex 0) and deduplicate within the snapshot.
         List<Integer> batchIndexes =
                 writeResults.stream()
                         .map(WriteResultWrapper::getBatchIndex)
@@ -1645,6 +1645,126 @@ public class IcebergWriterTest {
         // region=north partition holding the original row.
         List<String> result = fetchTableContent(catalog, tableId, null);
         Assertions.assertThat(result).containsExactly("1, east");
+    }
+
+    @ParameterizedTest
+    @CsvSource({"false,false", "false,true", "true,false", "true,true"})
+    void testAppendOnlyUpdatesAndDeletes(boolean partitioned, boolean cdcHasPrimaryKey)
+            throws Exception {
+        Map<String, String> catalogOptions = new HashMap<>();
+        catalogOptions.put("type", "hadoop");
+        catalogOptions.put(
+                "warehouse",
+                new File(temporaryFolder.toFile(), UUID.randomUUID().toString()).toString());
+        catalogOptions.put("cache-enabled", "false");
+        Catalog catalog =
+                CatalogUtil.buildIcebergCatalog(
+                        "cdc-iceberg-catalog", catalogOptions, new Configuration());
+        TableId tableId = TableId.parse("test.iceberg_table");
+        Schema.Builder schemaBuilder =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.BIGINT().notNull())
+                        .physicalColumn("region", DataTypes.STRING().notNull());
+        if (partitioned) {
+            schemaBuilder.partitionKey("region");
+        }
+        Schema targetSchema = schemaBuilder.build();
+        IcebergMetadataApplier metadataApplier = new IcebergMetadataApplier(catalogOptions);
+        metadataApplier.applySchemaChange(new CreateTableEvent(tableId, targetSchema));
+        Assertions.assertThat(
+                        catalog.loadTable(TableIdentifier.parse(tableId.identifier()))
+                                .schema()
+                                .identifierFieldIds())
+                .isEmpty();
+
+        // An existing append-only target must stay append-only even if the CDC schema has a PK.
+        Schema cdcSchema =
+                cdcHasPrimaryKey
+                        ? Schema.newBuilder()
+                                .setColumns(targetSchema.getColumns())
+                                .partitionKey(targetSchema.partitionKeys())
+                                .primaryKey("id")
+                                .build()
+                        : targetSchema;
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(
+                        targetSchema.getColumnDataTypes().toArray(new DataType[0]));
+        RecordData north =
+                generator.generate(new Object[] {1L, BinaryStringData.fromString("north")});
+        RecordData east =
+                generator.generate(new Object[] {1L, BinaryStringData.fromString("east")});
+        RecordData south =
+                generator.generate(new Object[] {1L, BinaryStringData.fromString("south")});
+
+        try (IcebergWriter writer =
+                        new IcebergWriter(
+                                catalogOptions,
+                                1,
+                                1,
+                                ZoneId.of("UTC"),
+                                0,
+                                UUID.randomUUID().toString(),
+                                UUID.randomUUID().toString(),
+                                new HashMap<>());
+                IcebergCommitter committer =
+                        new IcebergCommitter(catalogOptions, new HashMap<>())) {
+            writer.write(new CreateTableEvent(tableId, cdcSchema), null);
+            writer.write(DataChangeEvent.insertEvent(tableId, north), null);
+            writer.write(DataChangeEvent.updateEvent(tableId, north, east), null);
+            committer.commit(
+                    writer.prepareCommit().stream()
+                            .map(MockCommitRequestImpl::new)
+                            .collect(Collectors.toList()));
+            Assertions.assertThat(fetchTableContent(catalog, tableId, null))
+                    .containsExactlyInAnyOrder("1, north", "1, east");
+
+            // A delete-only checkpoint must neither append the old row nor create a writer.
+            writer.write(DataChangeEvent.deleteEvent(tableId, north), null);
+            Assertions.assertThat(writer.prepareCommit()).isEmpty();
+            Assertions.assertThat(fetchTableContent(catalog, tableId, null))
+                    .containsExactlyInAnyOrder("1, north", "1, east");
+
+            // The capability must also be correct after checkpoint cache invalidation.
+            writer.write(DataChangeEvent.updateEvent(tableId, east, south), null);
+            committer.commit(
+                    writer.prepareCommit().stream()
+                            .map(MockCommitRequestImpl::new)
+                            .collect(Collectors.toList()));
+            Assertions.assertThat(fetchTableContent(catalog, tableId, null))
+                    .containsExactlyInAnyOrder("1, north", "1, east", "1, south");
+
+            // An ignored delete caches a factory without a writer. Schema changes must still
+            // invalidate that factory so subsequent inserts use the new physical schema.
+            writer.write(DataChangeEvent.deleteEvent(tableId, south), null);
+            AddColumnEvent addColumn =
+                    new AddColumnEvent(
+                            tableId,
+                            Arrays.asList(
+                                    new AddColumnEvent.ColumnWithPosition(
+                                            new PhysicalColumn(
+                                                    "extra", DataTypes.STRING(), null))));
+            metadataApplier.applySchemaChange(addColumn);
+            writer.write(addColumn, null);
+            Schema evolvedSchema = SchemaUtils.applySchemaChangeEvent(cdcSchema, addColumn);
+            BinaryRecordDataGenerator evolvedGenerator =
+                    new BinaryRecordDataGenerator(
+                            evolvedSchema.getColumnDataTypes().toArray(new DataType[0]));
+            RecordData west =
+                    evolvedGenerator.generate(
+                            new Object[] {
+                                1L,
+                                BinaryStringData.fromString("west"),
+                                BinaryStringData.fromString("added")
+                            });
+            writer.write(DataChangeEvent.insertEvent(tableId, west), null);
+            committer.commit(
+                    writer.prepareCommit().stream()
+                            .map(MockCommitRequestImpl::new)
+                            .collect(Collectors.toList()));
+            Assertions.assertThat(fetchTableContent(catalog, tableId, null))
+                    .containsExactlyInAnyOrder(
+                            "1, north, null", "1, east, null", "1, south, null", "1, west, added");
+        }
     }
 
     private static long countSnapshots(Table table) {

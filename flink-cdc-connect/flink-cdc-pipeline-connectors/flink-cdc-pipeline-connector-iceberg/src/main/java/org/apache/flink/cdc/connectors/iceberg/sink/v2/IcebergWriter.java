@@ -64,7 +64,7 @@ public class IcebergWriter
 
     public static final long DEFAULT_MAX_FILE_SIZE = 256 * 1024 * 1024;
 
-    private Map<TableId, RowDataTaskWriterFactory> writerFactoryMap;
+    private Map<TableId, TableWriterFactory> writerFactoryMap;
 
     private Map<TableId, TaskWriter<RowData>> writerMap;
 
@@ -140,9 +140,10 @@ public class IcebergWriter
         return list;
     }
 
-    private RowDataTaskWriterFactory getRowDataTaskWriterFactory(TableId tableId) {
+    private TableWriterFactory getTableWriterFactory(TableId tableId) {
         Table table = catalog.loadTable(TableIdentifier.parse(tableId.identifier()));
         RowType rowType = FlinkSchemaUtil.convert(table.schema());
+        List<Integer> equalityFieldIds = new ArrayList<>(table.schema().identifierFieldIds());
         RowDataTaskWriterFactory rowDataTaskWriterFactory =
                 new RowDataTaskWriterFactory(
                         table,
@@ -150,10 +151,12 @@ public class IcebergWriter
                         DEFAULT_MAX_FILE_SIZE,
                         FileFormat.fromString(DEFAULT_FILE_FORMAT),
                         new HashMap<>(),
-                        new ArrayList<>(table.schema().identifierFieldIds()),
+                        equalityFieldIds,
                         true);
         rowDataTaskWriterFactory.initialize(taskId, attemptId);
-        return rowDataTaskWriterFactory;
+        // Match the factory's actual append/delta writer selection, even for existing tables
+        // whose identifier fields differ from the incoming CDC schema's primary key.
+        return new TableWriterFactory(rowDataTaskWriterFactory, !equalityFieldIds.isEmpty());
     }
 
     @Override
@@ -161,14 +164,20 @@ public class IcebergWriter
         if (event instanceof DataChangeEvent) {
             DataChangeEvent dataChangeEvent = (DataChangeEvent) event;
             TableId tableId = dataChangeEvent.tableId();
-            writerFactoryMap.computeIfAbsent(tableId, this::getRowDataTaskWriterFactory);
-            TaskWriter<RowData> writer =
-                    writerMap.computeIfAbsent(
-                            tableId, tableId1 -> writerFactoryMap.get(tableId1).create());
+            TableWriterFactory writerFactory =
+                    writerFactoryMap.computeIfAbsent(tableId, this::getTableWriterFactory);
             TableSchemaWrapper tableSchemaWrapper = schemaMap.get(tableId);
             List<RowData> rowDataList =
                     RowDataUtils.convertDataChangeEventToRowData(
-                            dataChangeEvent, tableSchemaWrapper.getFieldGetters());
+                            dataChangeEvent,
+                            tableSchemaWrapper.getFieldGetters(),
+                            writerFactory.supportsEqualityDeletes);
+            if (rowDataList.isEmpty()) {
+                return;
+            }
+            TaskWriter<RowData> writer =
+                    writerMap.computeIfAbsent(
+                            tableId, tableId1 -> writerFactory.taskWriterFactory.create());
             for (RowData rowData : rowDataList) {
                 writer.write(rowData);
             }
@@ -193,13 +202,15 @@ public class IcebergWriter
 
     @Override
     public void flush(boolean flush) throws IOException {
-        // Clear the factory cache so the next write picks up the latest catalog schema.
-        // Writers keep running; schema-change splits are handled in flushTableWriter.
-        writerFactoryMap.clear();
+        // Keep each active writer paired with the factory that defines its delete capability.
+        // Factories without writers can reload the latest catalog schema on the next write.
+        writerFactoryMap.keySet().retainAll(writerMap.keySet());
     }
 
     private void flushTableWriter(TableId tableId) throws IOException {
         TaskWriter<RowData> writer = writerMap.remove(tableId);
+        // An ignored append-only DELETE can populate the factory without creating a writer.
+        writerFactoryMap.remove(tableId);
         // Advance even when no writer exists, to keep batchIndex in sync across subtasks.
         int batchIndex = tableBatchIndexMap.getOrDefault(tableId, 0);
         tableBatchIndexMap.put(tableId, batchIndex + 1);
@@ -216,7 +227,6 @@ public class IcebergWriter
                         batchIndex);
         temporaryWriteResult.add(writeResultWrapper);
         LOGGER.info(writeResultWrapper.buildDescription());
-        writerFactoryMap.remove(tableId);
     }
 
     private List<WriteResultWrapper> getWriteResult() throws IOException {
@@ -270,5 +280,19 @@ public class IcebergWriter
         }
 
         catalog = null;
+    }
+
+    /** Cache the writer factory and its delete capability from the same target-table schema. */
+    private static class TableWriterFactory {
+
+        private final RowDataTaskWriterFactory taskWriterFactory;
+
+        private final boolean supportsEqualityDeletes;
+
+        private TableWriterFactory(
+                RowDataTaskWriterFactory taskWriterFactory, boolean supportsEqualityDeletes) {
+            this.taskWriterFactory = taskWriterFactory;
+            this.supportsEqualityDeletes = supportsEqualityDeletes;
+        }
     }
 }
