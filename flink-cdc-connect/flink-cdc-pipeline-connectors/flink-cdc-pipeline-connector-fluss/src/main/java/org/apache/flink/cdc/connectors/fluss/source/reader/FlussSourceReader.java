@@ -40,9 +40,8 @@ import org.apache.fluss.metadata.TablePath;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nullable;
-
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -76,7 +75,7 @@ public class FlussSourceReader<T>
     private final Map<String, FlussSplitBase> activeSplits;
     private final Map<TablePath, Long> pendingRemovalRequests;
     private final Set<TablePath> subscribedTablePaths;
-    @Nullable private Set<PhysicalTablePath> subscribedPhysicalTablePaths;
+    private Set<PhysicalTablePath> subscribedPhysicalTablePaths = Collections.emptySet();
     private boolean receivedSubscriptionSnapshot;
 
     public FlussSourceReader(
@@ -268,7 +267,6 @@ public class FlussSourceReader<T>
     private boolean isActive(FlussSplitBase split) {
         return isActive(split.getTablePath())
                 && (split.getPhysicalTablePath().getPartitionName() == null
-                        || subscribedPhysicalTablePaths == null
                         || subscribedPhysicalTablePaths.contains(split.getPhysicalTablePath()));
     }
 

@@ -37,7 +37,10 @@ class TableSubscriptionEventTest {
 
         TableSubscriptionEvent event =
                 new TableSubscriptionEvent(
-                        Collections.emptySet(), Collections.emptyMap(), fencedTablePaths);
+                        Collections.emptySet(),
+                        Collections.emptyMap(),
+                        fencedTablePaths,
+                        Collections.emptySet());
         fencedTablePaths.clear();
 
         assertThat(event.getFencedTablePaths()).containsExactly(tablePath);

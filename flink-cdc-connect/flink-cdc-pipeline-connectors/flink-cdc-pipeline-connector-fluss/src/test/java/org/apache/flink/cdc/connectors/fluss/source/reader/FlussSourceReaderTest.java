@@ -106,7 +106,8 @@ class FlussSourceReaderTest {
                     new TableSubscriptionEvent(
                             Collections.singleton(restoredSplit.getTablePath()),
                             Collections.emptyMap(),
-                            Collections.singleton(restoredSplit.getTablePath())));
+                            Collections.singleton(restoredSplit.getTablePath()),
+                            Collections.emptySet()));
 
             assertThat(fetcherManager.addedSplits).isEmpty();
             assertThat(fetcherManager.removedTablePaths).isEmpty();
@@ -140,7 +141,9 @@ class FlussSourceReaderTest {
             reader.handleSourceEvents(
                     new TableSubscriptionEvent(
                             Collections.emptySet(),
-                            Collections.singletonMap(split.getTablePath(), requestId)));
+                            Collections.singletonMap(split.getTablePath(), requestId),
+                            Collections.emptySet(),
+                            Collections.emptySet()));
             assertThat(fetcherManager.removedTablePaths).containsExactly(split.getTablePath());
             assertThat(readerContext.getSentEvents()).isEmpty();
 
@@ -179,7 +182,10 @@ class FlussSourceReaderTest {
         try {
             reader.handleSourceEvents(
                     new TableSubscriptionEvent(
-                            Collections.emptySet(), Collections.singletonMap(tablePath, 1L)));
+                            Collections.emptySet(),
+                            Collections.singletonMap(tablePath, 1L),
+                            Collections.emptySet(),
+                            Collections.emptySet()));
 
             assertThat(fetcherManager.removedTablePaths).isEmpty();
             assertThat(readerContext.getSentEvents())
@@ -215,7 +221,10 @@ class FlussSourceReaderTest {
         try {
             reader.handleSourceEvents(
                     new TableSubscriptionEvent(
-                            Collections.singleton(tablePath), Collections.emptyMap()));
+                            Collections.singleton(tablePath),
+                            Collections.emptyMap(),
+                            Collections.emptySet(),
+                            Collections.emptySet()));
             reader.addSplits(Collections.singletonList(split));
             reader.snapshotState(1L);
             assertThat(readerContext.getSentEvents())
@@ -225,7 +234,10 @@ class FlussSourceReaderTest {
             readerContext.clearSentEvents();
             reader.handleSourceEvents(
                     new TableSubscriptionEvent(
-                            Collections.emptySet(), Collections.singletonMap(tablePath, 1L)));
+                            Collections.emptySet(),
+                            Collections.singletonMap(tablePath, 1L),
+                            Collections.emptySet(),
+                            Collections.emptySet()));
             reader.onSplitFinished(
                     Collections.singletonMap(
                             split.splitId(), new FlussHybridSnapshotLogSplitState(split)));
@@ -233,7 +245,10 @@ class FlussSourceReaderTest {
 
             reader.handleSourceEvents(
                     new TableSubscriptionEvent(
-                            Collections.singleton(tablePath), Collections.emptyMap()));
+                            Collections.singleton(tablePath),
+                            Collections.emptyMap(),
+                            Collections.emptySet(),
+                            Collections.emptySet()));
             reader.addSplits(Collections.singletonList(split));
             reader.snapshotState(2L);
 
@@ -352,23 +367,34 @@ class FlussSourceReaderTest {
     }
 
     @Test
-    void testLegacyTableOnlySnapshotKeepsPartitionSplits() throws Exception {
+    void testEmptyInventoryDropsOnlyPartitionedRestoredSplits() throws Exception {
         TestingReaderContext readerContext = new TestingReaderContext();
         FutureCompletingBlockingQueue<RecordsWithSplitIds<FlussSourceRecord>> queue =
                 new FutureCompletingBlockingQueue<>();
         TrackingFetcherManager fetcherManager = new TrackingFetcherManager(queue);
         FlussSourceReader<Event> reader = newReader(readerContext, queue, fetcherManager);
-        FlussLogSplit split = partitionSplit("live", 22L);
+        FlussLogSplit partitionedSplit = partitionSplit("expired", 22L);
+        FlussLogSplit unpartitionedSplit =
+                new FlussLogSplit(
+                        PhysicalTablePath.of(TablePath.of("test_db", "unpartitioned")),
+                        new TableBucket(2L, 0),
+                        20L);
 
         try {
-            reader.addSplits(Collections.singletonList(split));
+            reader.addSplits(List.of(partitionedSplit, unpartitionedSplit));
             reader.handleSourceEvents(
                     new TableSubscriptionEvent(
-                            Collections.singleton(split.getTablePath()), Collections.emptyMap()));
+                            Set.of(
+                                    partitionedSplit.getTablePath(),
+                                    unpartitionedSplit.getTablePath()),
+                            Collections.emptyMap(),
+                            Collections.emptySet(),
+                            Collections.emptySet()));
 
-            assertThat(fetcherManager.addedSplits).containsExactly(split);
+            assertThat(fetcherManager.addedSplits).containsExactly(unpartitionedSplit);
+            assertThat(fetcherManager.removedTablePaths).isEmpty();
             assertThat(fetcherManager.removedPartitionPaths).isEmpty();
-            assertThat(reader.snapshotState(1L)).containsExactly(split);
+            assertThat(reader.snapshotState(1L)).containsExactly(unpartitionedSplit);
         } finally {
             reader.close();
         }
