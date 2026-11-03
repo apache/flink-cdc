@@ -450,15 +450,17 @@ class FlussSourceEnumeratorTest {
                             fqnRegex(DATABASE_NAME, tableName));
             try {
                 enumerator.start();
-                registerAllReaders(context, enumerator);
                 runDiscoveryCycle(context);
+                FlussSourceEnumStateSerializer serializer = new FlussSourceEnumStateSerializer();
+                assertThat(enumerator.snapshotState(0L).getRemainingSplits()).isNotEmpty();
+                byte[] pendingCheckpoint = serializer.serialize(enumerator.snapshotState(0L));
+                registerAllReaders(context, enumerator);
 
                 TablePath tablePath = TablePath.of(DATABASE_NAME, tableName);
                 PhysicalTablePath droppedPartition = PhysicalTablePath.of(tablePath, "20260904");
                 PhysicalTablePath retainedPartition = PhysicalTablePath.of(tablePath, "20260905");
                 assertThat(enumerator.snapshotState(0L).getAssignedPhysicalTablePaths())
                         .containsExactlyInAnyOrder(droppedPartition, retainedPartition);
-                FlussSourceEnumStateSerializer serializer = new FlussSourceEnumStateSerializer();
                 byte[] beforeDropCheckpoint = serializer.serialize(enumerator.snapshotState(0L));
                 List<FlussSplitBase> droppedSplits =
                         context.getSplitsAssignmentSequence().stream()
@@ -492,6 +494,7 @@ class FlussSourceEnumeratorTest {
 
                 for (byte[] checkpointBytes :
                         List.of(
+                                pendingCheckpoint,
                                 beforeDropCheckpoint,
                                 serializer.serialize(enumerator.snapshotState(2L)))) {
                     FlussSourceEnumState checkpoint =
@@ -514,8 +517,18 @@ class FlussSourceEnumeratorTest {
                                                         .Configuration()));
                         try {
                             restored.start();
-                            registerAllReaders(restoredContext, restored);
-                            runDiscoveryCycle(restoredContext);
+                            if (checkpoint.getRemainingSplits().isEmpty()) {
+                                registerAllReaders(restoredContext, restored);
+                                runDiscoveryCycle(restoredContext);
+                            } else {
+                                runDiscoveryCycle(restoredContext);
+                                assertThat(restored.snapshotState(1L).getRemainingSplits())
+                                        .extracting(FlussSplitBase::getPhysicalTablePath)
+                                        .containsOnly(retainedPartition);
+                                registerAllReaders(restoredContext, restored);
+                            }
+                            assertThat(restored.snapshotState(1L).getAssignedPhysicalTablePaths())
+                                    .containsExactly(retainedPartition);
                             assertThat(
                                             latestSubscriptionEvent(restoredContext, 0)
                                                     .getSubscribedPhysicalTablePaths())

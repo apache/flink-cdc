@@ -260,7 +260,8 @@ class FlussSourceReaderTest {
         FlussLogSplit liveSplit = partitionSplit("live", 22L);
 
         try {
-            reader.addSplits(Arrays.asList(expiredSplit, liveSplit));
+            reader.addSplits(Collections.singletonList(expiredSplit));
+            reader.addSplits(Collections.singletonList(liveSplit));
             assertThat(reader.snapshotState(1L)).containsExactly(expiredSplit, liveSplit);
             assertThat(fetcherManager.addedSplits).isEmpty();
 
