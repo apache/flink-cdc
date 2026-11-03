@@ -1,7 +1,9 @@
 ---
 title: "AI Model"
-weight: 9
-type: docs
+slug: "/docs/core-concept/ai-model"
+sidebar_position: 9
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one

@@ -1,10 +1,9 @@
 ---
 title: "Building a Real-time Data Lake with Flink CDC"
-weight: 998
-type: docs
-aliases:
-- /connectors/flink-sources/tutorials/build-real-time-data-lake-tutorial.html
-
+slug: "/docs/connectors/flink-sources/tutorials/build-real-time-data-lake-tutorial"
+sidebar_position: 998
+hide_title: true
+displayed_sidebar: docs
 ---
 
 <!--
@@ -36,18 +35,19 @@ You can walk through the tutorial easily in the docker environment. The entire p
 
 The following sections will take the pipeline from MySQL to [Iceberg](https://iceberg.apache.org/) as an example. The overview of the architecture is as follows:
 
-{{< img src="/fig/real-time-data-lake-tutorial/real-time-data-lake-tutorial.png" alt="Real-time data lake with Flink CDC" >}}
+<img src="@@BASE_URL@@fig/real-time-data-lake-tutorial/real-time-data-lake-tutorial.png" alt="Real-time data lake with Flink CDC" class="doc-image">
 
 You can also use other data sources like Oracle/Postgres and sinks like Hudi to build your own pipeline.
 
 ## Preparation
-Prepare a Linux or MacOS computer with Docker installed.
+Prepare a Linux or macOS computer with Docker installed.
 
 ## Preparing JAR package required
 **Download links are available only for stable releases, SNAPSHOT dependencies need to be built based on master or release-branches by yourself.**
-- flink-sql-connector-mysql-cdc-3.0-SNAPSHOT.jar
+- [flink-sql-connector-mysql-cdc-3.7.0-1.20.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-mysql-cdc/3.7.0-1.20/flink-sql-connector-mysql-cdc-3.7.0-1.20.jar)
+- [mysql-connector-java-8.0.27.jar](https://repo.maven.apache.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar)
 - [flink-shaded-hadoop-2-uber-2.7.5-10.0.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-shaded-hadoop-2-uber/2.7.5-10.0/flink-shaded-hadoop-2-uber-2.7.5-10.0.jar)
-- [iceberg-flink-runtime-1.16-1.3.1.jar](https://repo.maven.apache.org/maven2/org/apache/iceberg/iceberg-flink-runtime-1.16/1.3.1/iceberg-flink-runtime-1.16-1.3.1.jar)
+- [iceberg-flink-runtime-1.20-1.7.2.jar](https://repo.maven.apache.org/maven2/org/apache/iceberg/iceberg-flink-runtime-1.20/1.7.2/iceberg-flink-runtime-1.20-1.7.2.jar)
 
 
 
@@ -56,7 +56,7 @@ The components required in this tutorial are all managed in containers, so we wi
 
 1. Create `Dockerfile` file using following contents:
    ```dockerfile
-   FROM flink:1.16.0-scala_2.12
+   FROM flink:1.20.5-scala_2.12
    # Place the downloaded jar packages in the lib directory at the same level.
    COPY ./lib /opt/flink/lib
    RUN apt-get update && apt-get install tree
@@ -69,7 +69,7 @@ The components required in this tutorial are all managed in containers, so we wi
       sql-client:
          user: flink:flink
          build: .
-         command: bin/sql-client.sh
+         command: tail -f /dev/null
          depends_on:
             - jobmanager
             - mysql
@@ -140,7 +140,7 @@ The components required in this tutorial are all managed in containers, so we wi
 * If you want to run with your own Flink environment, remember to download the jar packages and then put them to `FLINK_HOME/lib/`.
 * All the following commands involving `docker-compose` should be executed in the directory of the `docker-compose.yml` file.
 
-{{< img src="/fig/real-time-data-lake-tutorial/flink-ui.png" alt="Flink UI" >}}
+<img src="@@BASE_URL@@fig/real-time-data-lake-tutorial/flink-ui.png" alt="Flink UI" class="doc-image">
 
 ### Preparing data in databases
 1. Enter mysql's container:
@@ -196,12 +196,12 @@ The components required in this tutorial are all managed in containers, so we wi
 ## Creating tables using Flink DDL in Flink SQL CLI
 First, use the following command to enter the Flink SQL CLI Container:
 ```shell
-docker-compose run sql-client
+docker-compose exec sql-client /opt/flink/bin/sql-client.sh
 ```
 
 We should see the welcome screen of the CLI client:
 
-{{< img src="/fig/real-time-data-lake-tutorial/flink-sql-client.png" alt="Flink SQL Client" >}}
+<img src="@@BASE_URL@@fig/real-time-data-lake-tutorial/flink-sql-client.png" alt="Flink SQL Client" class="doc-image">
 
 Then do the following steps in Flink SQL CLI:
 
@@ -272,7 +272,7 @@ Then do the following steps in Flink SQL CLI:
    The running job can be found in [Flink UI](http://localhost:8081/#/job/running), and it looks like:
    
    
-   {{< img src="/fig/real-time-data-lake-tutorial/flink-cdc-iceberg-running-job.png" alt="CDC to Iceberg Running Job" >}}
+   <img src="@@BASE_URL@@fig/real-time-data-lake-tutorial/flink-cdc-iceberg-running-job.png" alt="CDC to Iceberg Running Job" class="doc-image">
    
    Then, we can use the following command to see the files written to Iceberg: 
    ```shell
@@ -280,7 +280,7 @@ Then do the following steps in Flink SQL CLI:
    ```
    It should look like:
 
-   {{< img src="/fig/real-time-data-lake-tutorial/files-in-iceberg.png" alt="Files in Iceberg" >}}
+   <img src="@@BASE_URL@@fig/real-time-data-lake-tutorial/files-in-iceberg.png" alt="Files in Iceberg" class="doc-image">
 
    The actual files may differ in your environment, but the structure of the directory should be similar.
 
@@ -291,7 +291,7 @@ Then do the following steps in Flink SQL CLI:
    ```
    We can see the data queried in the Flink SQL CLI:
    
-   {{< img src="/fig/real-time-data-lake-tutorial/data_in_iceberg.png" alt="Data in Iceberg" >}}
+   <img src="@@BASE_URL@@fig/real-time-data-lake-tutorial/data_in_iceberg.png" alt="Data in Iceberg" class="doc-image">
    
 3. Make some changes in the MySQL databases, and then the data in Iceberg table `all_users_sink` will also change in real time.
    
@@ -317,15 +317,13 @@ Then do the following steps in Flink SQL CLI:
    
    The final query result is as follows:
    
-   {{< img src="/fig/real-time-data-lake-tutorial/final-data-in-iceberg.png" alt="Final Data in Iceberg" >}}
+   <img src="@@BASE_URL@@fig/real-time-data-lake-tutorial/final-data-in-iceberg.png" alt="Final Data in Iceberg" class="doc-image">
 
    From the latest result in Iceberg, we can see that there is a new record of `(db_1, user_1, 111)`, and the address of `(db_1, user_2, 120)` has been updated to `Beijing`.
-   Besides, the record of `(db_2, user_2, 220)` has been deleted. The result is exactly the same with the changes we did in MySQL.
+   Besides, the record `(db_2, user_2, 220)` has been deleted. The result exactly matches the changes we made in MySQL.
    
 ## Clean up
 After finishing the tutorial, run the following command in the directory of `docker-compose.yml` to stop all containers:
 ```shell
 docker-compose down
 ```
-
-{{< top >}}

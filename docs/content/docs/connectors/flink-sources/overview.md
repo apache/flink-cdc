@@ -1,9 +1,9 @@
 ---
 title: "Overview"
-weight: 1
-type: docs
-aliases:
-- /connectors/flink-sources/overview
+slug: "/docs/connectors/flink-sources/overview"
+sidebar_position: 1
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -29,23 +29,23 @@ under the License.
 Flink CDC sources is a set of source connectors for <a href="https://flink.apache.org/">Apache Flink<sup>®</sup></a>, ingesting changes from different databases using change data capture (CDC).
 Some CDC sources integrate Debezium as the engine to capture data changes. So it can fully leverage the ability of Debezium. See more about what is [Debezium](https://github.com/debezium/debezium).
 
-You can also read [tutorials]({{< ref "docs/connectors/flink-sources/tutorials/build-streaming-etl-tutorial" >}}) about how to use these sources.
+You can also read [tutorials](tutorials/build-streaming-etl-tutorial.md) about how to use these sources.
 
-{{< img src="/fig/cdc-flow.png" width="600px" alt="Flink CDC" >}}
+<img src="@@BASE_URL@@fig/cdc-flow.png" alt="Flink CDC" width="600px" class="doc-image">
 
 ## Supported Connectors
 
 | Connector                                                                  | Database                                                                                                                                                                                                                                                                                                                                                                                                | Driver                    | Download Page                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 |----------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| [mongodb-cdc]({{< ref "docs/connectors/flink-sources/mongodb-cdc" >}})     | <li> [MongoDB](https://www.mongodb.com): 3.6, 4.x, 5.0, 6.0, 6.1, 7.0                                                                                                                                                                                                                                                                                                                                   | MongoDB Driver: 4.11.2    | [mongodb-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-mongodb-cdc) |
-| [mysql-cdc]({{< ref "docs/connectors/flink-sources/mysql-cdc" >}})         | <li> [MySQL](https://dev.mysql.com/doc): 5.7, 8.0.x, 8.4+ <li> [RDS MySQL](https://www.aliyun.com/product/rds/mysql): 5.6, 5.7, 8.0.x <li> [PolarDB MySQL](https://www.aliyun.com/product/polardb): 5.6, 5.7, 8.0.x <li> [Aurora MySQL](https://aws.amazon.com/cn/rds/aurora): 5.6, 5.7, 8.0.x <li> [MariaDB](https://mariadb.org): 10.x <li> [PolarDB X](https://github.com/ApsaraDB/galaxysql): 2.0.1 | JDBC Driver: 8.0.28       | [mysql-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-mysql-cdc) |
-| [oceanbase-cdc]({{< ref "docs/connectors/flink-sources/oceanbase-cdc" >}}) | <li> [OceanBase CE](https://open.oceanbase.com): 3.1.x, 4.x <li> [OceanBase EE](https://www.oceanbase.com/product/oceanbase): 2.x, 3.x, 4.x                                                                                                                                                                                                                                                             | OceanBase Driver: 2.4.x   | [oceanbase-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-oceanbase-cdc) |
-| [oracle-cdc]({{< ref "docs/connectors/flink-sources/oracle-cdc" >}})       | <li> [Oracle](https://www.oracle.com/index.html): 11, 12, 19, 21                                                                                                                                                                                                                                                                                                                                        | Oracle Driver: 19.3.0.0   | [oracle-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-oracle-cdc) |
-| [postgres-cdc]({{< ref "docs/connectors/flink-sources/postgres-cdc" >}})   | <li> [PostgreSQL](https://www.postgresql.org): 9.6, 10, 11, 12, 13, 14                                                                                                                                                                                                                                                                                                                                  | JDBC Driver: 42.5.1       | [postgres-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-postgres-cdc) |
-| [sqlserver-cdc]({{< ref "docs/connectors/flink-sources/sqlserver-cdc" >}}) | <li> [Sqlserver](https://www.microsoft.com/sql-server): 2012, 2014, 2016, 2017, 2019                                                                                                                                                                                                                                                                                                                    | JDBC Driver: 9.4.1.jre8   | [sqlserver-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-sqlserver-cdc) |
-| [tidb-cdc]({{< ref "docs/connectors/flink-sources/tidb-cdc" >}})           | <li> [TiDB](https://www.pingcap.com/): 5.1.x, 5.2.x, 5.3.x, 5.4.x, 6.0.0                                                                                                                                                                                                                                                                                                                                | JDBC Driver: 8.0.27       | [tidb-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-tidb-cdc) |
-| [db2-cdc]({{< ref "docs/connectors/flink-sources/db2-cdc" >}})             | <li> [Db2](https://www.ibm.com/products/db2): 11.5                                                                                                                                                                                                                                                                                                                                                      | Db2 Driver: 11.5.0.0      | [db2-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-db2-cdc) |
-| [vitess-cdc]({{< ref "docs/connectors/flink-sources/vitess-cdc" >}})       | <li> [Vitess](https://vitess.io/): 8.0.x, 9.0.x                                                                                                                                                                                                                                                                                                                                                         | MySQL JDBC Driver: 8.0.26 | [vitess-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-vitess-cdc) |
+| [mongodb-cdc](mongodb-cdc.md)     | <li> [MongoDB](https://www.mongodb.com): 3.6, 4.x, 5.0, 6.0, 6.1, 7.0                                                                                                                                                                                                                                                                                                                                   | MongoDB Driver: 4.11.2    | [mongodb-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-mongodb-cdc) |
+| [mysql-cdc](mysql-cdc.md)         | <li> [MySQL](https://dev.mysql.com/doc): 5.7, 8.0.x, 8.4+ <li> [RDS MySQL](https://www.aliyun.com/product/rds/mysql): 5.6, 5.7, 8.0.x <li> [PolarDB MySQL](https://www.aliyun.com/product/polardb): 5.6, 5.7, 8.0.x <li> [Aurora MySQL](https://aws.amazon.com/cn/rds/aurora): 5.6, 5.7, 8.0.x <li> [MariaDB](https://mariadb.org): 10.x <li> [PolarDB X](https://github.com/ApsaraDB/galaxysql): 2.0.1 | JDBC Driver: 8.0.28       | [mysql-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-mysql-cdc) |
+| [oceanbase-cdc](oceanbase-cdc.md) | <li> [OceanBase CE](https://open.oceanbase.com): 3.1.x, 4.x <li> [OceanBase EE](https://www.oceanbase.com/product/oceanbase): 2.x, 3.x, 4.x                                                                                                                                                                                                                                                             | OceanBase Driver: 2.4.x   | [oceanbase-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-oceanbase-cdc) |
+| [oracle-cdc](oracle-cdc.md)       | <li> [Oracle](https://www.oracle.com/index.html): 11, 12, 19, 21                                                                                                                                                                                                                                                                                                                                        | Oracle Driver: 19.3.0.0   | [oracle-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-oracle-cdc) |
+| [postgres-cdc](postgres-cdc.md)   | <li> [PostgreSQL](https://www.postgresql.org): 9.6, 10, 11, 12, 13, 14                                                                                                                                                                                                                                                                                                                                  | JDBC Driver: 42.5.1       | [postgres-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-postgres-cdc) |
+| [sqlserver-cdc](sqlserver-cdc.md) | <li> [SQL Server](https://www.microsoft.com/sql-server): 2012, 2014, 2016, 2017, 2019                                                                                                                                                                                                                                                                                                                    | JDBC Driver: 9.4.1.jre8   | [sqlserver-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-sqlserver-cdc) |
+| [tidb-cdc](tidb-cdc.md)           | <li> [TiDB](https://www.pingcap.com/): 5.1.x, 5.2.x, 5.3.x, 5.4.x, 6.0.0                                                                                                                                                                                                                                                                                                                                | JDBC Driver: 8.0.27       | [tidb-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-tidb-cdc) |
+| [db2-cdc](db2-cdc.md)             | <li> [Db2](https://www.ibm.com/products/db2): 11.5                                                                                                                                                                                                                                                                                                                                                      | Db2 Driver: 11.5.0.0      | [db2-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-db2-cdc) |
+| [vitess-cdc](vitess-cdc.md)       | <li> [Vitess](https://vitess.io/): 8.0.x, 9.0.x                                                                                                                                                                                                                                                                                                                                                         | MySQL JDBC Driver: 8.0.26 | [vitess-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-vitess-cdc) |
 
 ## Supported Flink Versions
 
@@ -53,6 +53,7 @@ The following table shows the version mapping between Flink CDC Connectors and F
 
 | Flink CDC Version |                Flink Version                |
 |:-----------------:|:-------------------------------------------:|
+|      3.7.\*       |               1.20.\*, 2.2.\*               |
 |      3.6.\*       |               1.20.\*, 2.2.\*               |
 |      3.5.\*       |              1.19.\*, 1.20.\*               |
 |      3.4.\*       |              1.19.\*, 1.20.\*               |
@@ -81,21 +82,21 @@ The following table shows the current features of the connector:
 
 | Connector                                                                             | No-lock Read | Parallel Read | Exactly-once Read | Incremental Snapshot Read |
 |---------------------------------------------------------------------------------------|--------------|---------------|-------------------|---------------------------|
-| [mongodb-cdc]({{< ref "docs/connectors/flink-sources/mongodb-cdc" >}})     | ✅            | ✅             | ✅ | ✅                         |
-| [mysql-cdc]({{< ref "docs/connectors/flink-sources/mysql-cdc" >}})         | ✅            | ✅             | ✅ | ✅                         |
-| [oracle-cdc]({{< ref "docs/connectors/flink-sources/oracle-cdc" >}})       | ✅            | ✅             | ✅ | ✅                         |
-| [postgres-cdc]({{< ref "docs/connectors/flink-sources/postgres-cdc" >}})   | ✅            | ✅             | ✅ | ✅                         |
-| [sqlserver-cdc]({{< ref "docs/connectors/flink-sources/sqlserver-cdc" >}}) | ✅            | ✅             | ✅ | ✅                         |
-| [oceanbase-cdc]({{< ref "docs/connectors/flink-sources/oceanbase-cdc" >}}) | ✅            | ✅             | ✅ | ✅                         |
-| [tidb-cdc]({{< ref "docs/connectors/flink-sources/tidb-cdc" >}})           | ✅            | ❌             | ❌ | ❌                         |
-| [db2-cdc]({{< ref "docs/connectors/flink-sources/db2-cdc" >}})             | ✅            | ✅             | ✅ | ✅                         |
-| [vitess-cdc]({{< ref "docs/connectors/flink-sources/vitess-cdc" >}})       | ✅            | ❌             | ❌ | ❌                         |
+| [mongodb-cdc](mongodb-cdc.md)     | ✅            | ✅             | ✅ | ✅                         |
+| [mysql-cdc](mysql-cdc.md)         | ✅            | ✅             | ✅ | ✅                         |
+| [oracle-cdc](oracle-cdc.md)       | ✅            | ✅             | ✅ | ✅                         |
+| [postgres-cdc](postgres-cdc.md)   | ✅            | ✅             | ✅ | ✅                         |
+| [sqlserver-cdc](sqlserver-cdc.md) | ✅            | ✅             | ✅ | ✅                         |
+| [oceanbase-cdc](oceanbase-cdc.md) | ✅            | ✅             | ✅ | ✅                         |
+| [tidb-cdc](tidb-cdc.md)           | ✅            | ❌             | ❌ | ❌                         |
+| [db2-cdc](db2-cdc.md)             | ✅            | ✅             | ✅ | ✅                         |
+| [vitess-cdc](vitess-cdc.md)       | ✅            | ❌             | ❌ | ❌                         |
 
 ## Usage for Table/SQL API
 
-We need several steps to setup a Flink cluster with the provided connector.
+We need several steps to set up a Flink cluster with the provided connector.
 
-1. Setup a Flink cluster with version 1.12+ and Java 8+ installed.
+1. Set up a Flink cluster with version 1.12+ and Java 8+ installed.
 2. Download the connector SQL jars from the [Downloads](https://github.com/apache/flink-cdc/releases) page (or [build yourself](#building-from-source)).
 3. Put the downloaded jars under `FLINK_HOME/lib/`.
 4. Restart the Flink cluster.
@@ -327,5 +328,3 @@ mvn clean install -DskipTests
 ```
 
 The dependencies are now available in your local `.m2` repository.
-
-{{< top >}}

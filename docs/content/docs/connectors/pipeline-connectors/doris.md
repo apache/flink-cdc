@@ -1,9 +1,9 @@
 ---
 title: "Doris"
-weight: 5
-type: docs
-aliases:
-- /connectors/pipeline-connectors/doris
+slug: "/docs/connectors/pipeline-connectors/doris"
+sidebar_position: 5
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -251,8 +251,8 @@ pipeline:
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>Create the auto partition Properties configuration of the table.<br/>
-        Currently the partition function only supports date_trunc, and the partition column supports only DATE or DATETIME types, and the version of Doris must greater than 2.1.6. See more about <a href="https://doris.apache.org/docs/table-design/data-partitioning/auto-partitioning">Doris Auto Partitioning</a><br/>
-        These properties are supported now：<br/>
+        Currently, the partition function only supports date_trunc, the partition column only supports DATE or DATETIME types, and the Doris version must be later than 2.1.6. See more about <a href="https://doris.apache.org/docs/table-design/data-partitioning/auto-partitioning">Doris Auto Partitioning</a><br/>
+        These properties are supported now:<br/>
         <code> table.create.auto-partition.properties.include</code>A collection of tables after route to include, separated by commas, supports regular expressions;<br/>
         <code> table.create.auto-partition.properties.exclude</code>A collection of tables after route to exclude, separated by commas, supports regular expressions;<br/>
         <code> table.create.auto-partition.properties.default-partition-key</code>The default partition key;<br/>
@@ -376,5 +376,3 @@ pipeline:
     </tbody>
 </table>
 </div>
-
-{{< top >}}

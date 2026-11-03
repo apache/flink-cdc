@@ -1,9 +1,9 @@
 ---
 title: "MaxCompute"
-weight: 7
-type: docs
-aliases:
-  - /connectors/maxcompute
+slug: "/docs/connectors/pipeline-connectors/maxcompute"
+sidebar_position: 7
+hide_title: true
+displayed_sidebar: docs
 ---
 
 <!--
@@ -318,5 +318,3 @@ When the connector automatically creates tables, it uses the following mapping r
     </tbody>
 </table>
 </div>
-
-{{< top >}}
