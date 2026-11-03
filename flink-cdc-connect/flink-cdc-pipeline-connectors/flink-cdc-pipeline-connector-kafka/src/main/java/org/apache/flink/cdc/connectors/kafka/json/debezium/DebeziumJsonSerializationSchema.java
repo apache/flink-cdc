@@ -458,11 +458,14 @@ public class DebeziumJsonSerializationSchema implements SerializationSchema<Even
 
     private void convertUpdateEventToRowData(
             DataChangeEvent dataChangeEvent, GenericRowData genericRowData) {
+        // REPLACE events carry only the after image, so "before" is written as null.
         genericRowData.setField(
                 BEFORE.getPosition(),
-                jsonSerializers
-                        .get(dataChangeEvent.tableId())
-                        .getRowDataFromRecordData(dataChangeEvent.before(), false));
+                dataChangeEvent.before() == null
+                        ? null
+                        : jsonSerializers
+                                .get(dataChangeEvent.tableId())
+                                .getRowDataFromRecordData(dataChangeEvent.before(), false));
         genericRowData.setField(
                 AFTER.getPosition(),
                 jsonSerializers

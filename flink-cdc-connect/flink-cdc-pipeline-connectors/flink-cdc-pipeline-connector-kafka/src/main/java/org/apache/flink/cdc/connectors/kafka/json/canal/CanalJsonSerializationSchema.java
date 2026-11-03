@@ -188,15 +188,18 @@ public class CanalJsonSerializationSchema implements SerializationSchema<Event> 
                             .serialize(reuseGenericRowData);
                 case UPDATE:
                 case REPLACE:
+                    // REPLACE events carry only the after image, so "old" is written as null.
                     reuseGenericRowData.setField(
                             0,
-                            new GenericArrayData(
-                                    new RowData[] {
-                                        jsonSerializers
-                                                .get(dataChangeEvent.tableId())
-                                                .getRowDataFromRecordData(
-                                                        dataChangeEvent.before(), false)
-                                    }));
+                            dataChangeEvent.before() == null
+                                    ? null
+                                    : new GenericArrayData(
+                                            new RowData[] {
+                                                jsonSerializers
+                                                        .get(dataChangeEvent.tableId())
+                                                        .getRowDataFromRecordData(
+                                                                dataChangeEvent.before(), false)
+                                            }));
                     reuseGenericRowData.setField(
                             1,
                             new GenericArrayData(
