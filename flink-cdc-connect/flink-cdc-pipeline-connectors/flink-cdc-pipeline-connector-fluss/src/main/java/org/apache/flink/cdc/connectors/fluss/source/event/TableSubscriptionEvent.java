@@ -19,7 +19,10 @@ package org.apache.flink.cdc.connectors.fluss.source.event;
 
 import org.apache.flink.api.connector.source.SourceEvent;
 
+import org.apache.fluss.metadata.PhysicalTablePath;
 import org.apache.fluss.metadata.TablePath;
+
+import javax.annotation.Nullable;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -35,6 +38,7 @@ public class TableSubscriptionEvent implements SourceEvent {
     private final Set<TablePath> subscribedTablePaths;
     private final Map<TablePath, Long> pendingRemovalRequests;
     private final Set<TablePath> fencedTablePaths;
+    @Nullable private final Set<PhysicalTablePath> subscribedPhysicalTablePaths;
 
     public TableSubscriptionEvent(
             Set<TablePath> subscribedTablePaths, Map<TablePath, Long> pendingRemovalRequests) {
@@ -45,11 +49,24 @@ public class TableSubscriptionEvent implements SourceEvent {
             Set<TablePath> subscribedTablePaths,
             Map<TablePath, Long> pendingRemovalRequests,
             Set<TablePath> fencedTablePaths) {
+        this(subscribedTablePaths, pendingRemovalRequests, fencedTablePaths, null);
+    }
+
+    public TableSubscriptionEvent(
+            Set<TablePath> subscribedTablePaths,
+            Map<TablePath, Long> pendingRemovalRequests,
+            Set<TablePath> fencedTablePaths,
+            @Nullable Set<PhysicalTablePath> subscribedPhysicalTablePaths) {
         this.subscribedTablePaths =
                 Collections.unmodifiableSet(new LinkedHashSet<>(subscribedTablePaths));
         this.pendingRemovalRequests =
                 Collections.unmodifiableMap(new LinkedHashMap<>(pendingRemovalRequests));
         this.fencedTablePaths = Collections.unmodifiableSet(new LinkedHashSet<>(fencedTablePaths));
+        this.subscribedPhysicalTablePaths =
+                subscribedPhysicalTablePaths == null
+                        ? null
+                        : Collections.unmodifiableSet(
+                                new LinkedHashSet<>(subscribedPhysicalTablePaths));
     }
 
     public Set<TablePath> getSubscribedTablePaths() {
@@ -64,6 +81,12 @@ public class TableSubscriptionEvent implements SourceEvent {
         return fencedTablePaths;
     }
 
+    /** Returns the complete successful discovery, or null for a table-only snapshot. */
+    @Nullable
+    public Set<PhysicalTablePath> getSubscribedPhysicalTablePaths() {
+        return subscribedPhysicalTablePaths;
+    }
+
     @Override
     public String toString() {
         return "TableSubscriptionEvent{subscribedTablePaths="
@@ -72,6 +95,8 @@ public class TableSubscriptionEvent implements SourceEvent {
                 + pendingRemovalRequests
                 + ", fencedTablePaths="
                 + fencedTablePaths
+                + ", subscribedPhysicalTablePaths="
+                + subscribedPhysicalTablePaths
                 + '}';
     }
 }

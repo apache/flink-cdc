@@ -125,6 +125,8 @@ public class FlussSourceEnumerator
     private final Map<TablePath, Long> removalFences;
     private final Map<String, FlussSplitBase> fencedFreshSplits;
     private List<TableBucketInfo> lastDiscoveredTableBuckets;
+    private final Set<TableBucket> discoveredTableBuckets;
+    private final Set<PhysicalTablePath> discoveredPhysicalTablePaths;
     private boolean sentSubscriptionSnapshot;
     private final Set<Integer> seenReaderSubtasks;
 
@@ -163,6 +165,8 @@ public class FlussSourceEnumerator
         this.removalFences = new HashMap<>();
         this.fencedFreshSplits = new HashMap<>();
         this.lastDiscoveredTableBuckets = Collections.emptyList();
+        this.discoveredTableBuckets = new HashSet<>();
+        this.discoveredPhysicalTablePaths = new HashSet<>();
         this.sentSubscriptionSnapshot = false;
         this.seenReaderSubtasks = new HashSet<>();
         assignedPhysicalTablePaths.stream()
@@ -298,13 +302,58 @@ public class FlussSourceEnumerator
 
         // Removal cleanup needs the previous discovery's buckets, absent from the new result.
         boolean subscriptionChanged = updateSubscriptions(discoveryResult.subscribedTablePaths);
+        Set<TableBucket> currentBuckets =
+                discoveryResult.tableBuckets.stream()
+                        .map(info -> info.tableBucket)
+                        .collect(Collectors.toSet());
+        boolean bucketsChanged = !discoveredTableBuckets.equals(currentBuckets);
+        discoveredTableBuckets.clear();
+        discoveredTableBuckets.addAll(currentBuckets);
+        discoveredPhysicalTablePaths.clear();
+        discoveryResult.tableBuckets.stream()
+                .map(info -> info.physicalTablePath)
+                .forEach(discoveredPhysicalTablePaths::add);
+        removeExpiredPartitions();
         lastDiscoveredTableBuckets = discoveryResult.tableBuckets;
-        if (!sentSubscriptionSnapshot || subscriptionChanged) {
+        if (!sentSubscriptionSnapshot || subscriptionChanged || bucketsChanged) {
             sendSubscriptionSnapshot();
             sentSubscriptionSnapshot = true;
         }
 
         initializeNewTableBuckets(discoveryResult.tableBuckets);
+    }
+
+    private void removeExpiredPartitions() {
+        // Clear coordinator state before sending the authoritative snapshot to readers.
+        assignedPhysicalTablePaths.removeIf(
+                path ->
+                        path.getPartitionName() != null
+                                && !discoveredPhysicalTablePaths.contains(path));
+        pendingPartitionSplitAssignment
+                .values()
+                .forEach(
+                        splits ->
+                                splits.removeIf(
+                                        split ->
+                                                !isDiscoveredPartitionBucket(
+                                                        split.getTableBucket())));
+        fencedFreshSplits
+                .entrySet()
+                .removeIf(entry -> !isDiscoveredPartitionBucket(entry.getValue().getTableBucket()));
+        consumedKvSnapshotMap
+                .values()
+                .forEach(
+                        buckets ->
+                                buckets.removeIf(bucket -> !isDiscoveredPartitionBucket(bucket)));
+        consumedKvSnapshotMap.entrySet().removeIf(entry -> entry.getValue().isEmpty());
+    }
+
+    private boolean isDiscoveredPartitionBucket(TableBucket bucket) {
+        return bucket.getPartitionId() == null || discoveredTableBuckets.contains(bucket);
+    }
+
+    private boolean isCurrentPartitionBucket(TableBucket bucket) {
+        return !sentSubscriptionSnapshot || isDiscoveredPartitionBucket(bucket);
     }
 
     private void initializeNewTableBuckets(List<TableBucketInfo> allBuckets) {
@@ -335,7 +384,7 @@ public class FlussSourceEnumerator
         initializingPhysicalTablePaths.addAll(initializingPaths);
         context.callAsync(
                 () -> initPendingBucketSplits(newBuckets),
-                (splits, error) -> handleTableBucketChanges(splits, error, initializingPaths));
+                (splits, error) -> handleTableBucketChanges(splits, error, newBuckets));
     }
 
     private boolean updateSubscriptions(Set<TablePath> currentSubscribedTablePaths) {
@@ -370,7 +419,10 @@ public class FlussSourceEnumerator
     private void sendSubscriptionSnapshot() {
         TableSubscriptionEvent event =
                 new TableSubscriptionEvent(
-                        subscribedTablePaths, pendingRemovalRequests, removalFences.keySet());
+                        subscribedTablePaths,
+                        pendingRemovalRequests,
+                        removalFences.keySet(),
+                        discoveredPhysicalTablePaths);
         for (int subtaskId : context.registeredReaders().keySet()) {
             context.sendEventToSourceReader(subtaskId, event);
         }
@@ -635,20 +687,25 @@ public class FlussSourceEnumerator
     private void handleTableBucketChanges(
             List<FlussSplitBase> newSplits,
             Throwable error,
-            Set<PhysicalTablePath> initializingPaths) {
+            List<TableBucketInfo> initializingBuckets) {
+        Set<PhysicalTablePath> initializingPaths =
+                initializingBuckets.stream()
+                        .map(info -> info.physicalTablePath)
+                        .collect(Collectors.toSet());
         initializingPhysicalTablePaths.removeAll(initializingPaths);
         if (error != null) {
             boolean hasActiveInitializingPath =
-                    initializingPaths.stream()
-                            .map(PhysicalTablePath::getTablePath)
+                    initializingBuckets.stream()
                             .anyMatch(
-                                    tablePath ->
-                                            subscribedTablePaths.contains(tablePath)
+                                    info ->
+                                            subscribedTablePaths.contains(
+                                                            info.physicalTablePath.getTablePath())
                                                     && !pendingRemovalTablePaths.contains(
-                                                            tablePath));
+                                                            info.physicalTablePath.getTablePath())
+                                                    && isCurrentPartitionBucket(info.tableBucket));
             if (!hasActiveInitializingPath) {
                 LOG.warn(
-                        "Ignoring initialization failure for unsubscribed tables {}.",
+                        "Ignoring initialization failure for removed table-buckets {}.",
                         initializingPaths,
                         error);
                 maybeClearRemovalTombstones();
@@ -667,7 +724,8 @@ public class FlussSourceEnumerator
                                 split ->
                                         subscribedTablePaths.contains(split.getTablePath())
                                                 && !pendingRemovalTablePaths.contains(
-                                                        split.getTablePath()))
+                                                        split.getTablePath())
+                                                && isCurrentPartitionBucket(split.getTableBucket()))
                         .collect(Collectors.toList());
         if (!effectiveNewSplits.isEmpty()) {
             addPartitionSplitChangeToPendingAssignments(effectiveNewSplits);
@@ -763,6 +821,9 @@ public class FlussSourceEnumerator
                                 TablePath removedTablePath = pendingRemovalBuckets.get(tableBucket);
                                 if (removedTablePath == null
                                         || !pendingRemovalTablePaths.contains(removedTablePath)) {
+                                    if (!isCurrentPartitionBucket(tableBucket)) {
+                                        return;
+                                    }
                                     addConsumedKvSnapshotBucket(
                                             event.getCheckpointId(), tableBucket);
                                 }
@@ -794,6 +855,7 @@ public class FlussSourceEnumerator
                                         subscribedTablePaths.contains(split.getTablePath())
                                                 && !pendingRemovalTablePaths.contains(
                                                         split.getTablePath())
+                                                && isCurrentPartitionBucket(split.getTableBucket())
                                                 && (!removalFences.containsKey(split.getTablePath())
                                                         || split.equals(
                                                                 fencedFreshSplits.get(
@@ -827,7 +889,10 @@ public class FlussSourceEnumerator
             context.sendEventToSourceReader(
                     subtaskId,
                     new TableSubscriptionEvent(
-                            subscribedTablePaths, pendingRemovalRequests, removalFences.keySet()));
+                            subscribedTablePaths,
+                            pendingRemovalRequests,
+                            removalFences.keySet(),
+                            discoveredPhysicalTablePaths));
         }
         assignPendingPartitionSplits(Collections.singleton(subtaskId));
     }
