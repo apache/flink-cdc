@@ -38,7 +38,6 @@ import org.apache.fluss.client.table.scanner.log.LogScanner;
 import org.apache.fluss.client.table.scanner.log.MultiTableLogScanner;
 import org.apache.fluss.client.table.scanner.log.MultiTableRecords;
 import org.apache.fluss.config.Configuration;
-import org.apache.fluss.metadata.PhysicalTablePath;
 import org.apache.fluss.metadata.TableBucket;
 import org.apache.fluss.metadata.TableInfo;
 import org.apache.fluss.metadata.TablePath;
@@ -65,7 +64,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
-import java.util.function.Predicate;
 
 /**
  * A {@link SplitReader} implementation for Fluss. It reads change log records from Fluss log
@@ -411,37 +409,13 @@ public class FlussSplitReader implements SplitReader<FlussSourceRecord, FlussSpl
 
     /** Removes all reader-side resources for the specified logical tables. */
     void removeTables(Set<TablePath> tablePaths) throws IOException {
-        removeSplits(split -> tablePaths.contains(split.getTablePath()));
-        for (TablePath tablePath : tablePaths) {
-            Table table = tables.remove(tablePath);
-            if (table != null) {
-                try {
-                    table.close();
-                } catch (Exception e) {
-                    LOG.warn("Failed to close removed table {}.", tablePath, e);
-                }
-            }
-            tableRowTypes.remove(tablePath);
-            tablePrimaryKeyNames.remove(tablePath);
-            tablePartitionKeyNames.remove(tablePath);
-        }
-    }
-
-    void removePartitions(Set<PhysicalTablePath> partitionPaths) throws IOException {
-        removeSplits(
-                split ->
-                        split.getPhysicalTablePath().getPartitionName() != null
-                                && partitionPaths.contains(split.getPhysicalTablePath()));
-    }
-
-    private void removeSplits(Predicate<FlussSplitBase> shouldRemove) throws IOException {
         Set<TableBucket> removedBuckets = new HashSet<>();
         for (Iterator<Map.Entry<TableBucket, FlussSplitBase>> iterator =
                         bucketToSplit.entrySet().iterator();
                 iterator.hasNext(); ) {
             Map.Entry<TableBucket, FlussSplitBase> entry = iterator.next();
             FlussSplitBase split = entry.getValue();
-            if (!shouldRemove.test(split)) {
+            if (!tablePaths.contains(split.getTablePath())) {
                 continue;
             }
             removedBuckets.add(entry.getKey());
@@ -460,14 +434,28 @@ public class FlussSplitReader implements SplitReader<FlussSourceRecord, FlussSpl
         }
         for (Iterator<FlussSplitBase> iterator = boundedSplits.iterator(); iterator.hasNext(); ) {
             FlussSplitBase split = iterator.next();
-            if (shouldRemove.test(split)) {
+            if (tablePaths.contains(split.getTablePath())) {
                 removedSplitIds.add(split.splitId());
                 iterator.remove();
             }
         }
-        if (currentBoundedSplit != null && shouldRemove.test(currentBoundedSplit)) {
+        if (currentBoundedSplit != null
+                && tablePaths.contains(currentBoundedSplit.getTablePath())) {
             removedSplitIds.add(currentBoundedSplit.splitId());
             closeCurrentBoundedSplit();
+        }
+        for (TablePath tablePath : tablePaths) {
+            Table table = tables.remove(tablePath);
+            if (table != null) {
+                try {
+                    table.close();
+                } catch (Exception e) {
+                    LOG.warn("Failed to close removed table {}.", tablePath, e);
+                }
+            }
+            tableRowTypes.remove(tablePath);
+            tablePrimaryKeyNames.remove(tablePath);
+            tablePartitionKeyNames.remove(tablePath);
         }
         if (!removedBuckets.isEmpty()) {
             LOG.info("Removed Fluss source table buckets {}.", removedBuckets);

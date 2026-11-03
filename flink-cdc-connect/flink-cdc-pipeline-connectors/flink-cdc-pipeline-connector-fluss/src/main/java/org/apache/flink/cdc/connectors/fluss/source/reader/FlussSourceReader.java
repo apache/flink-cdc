@@ -212,19 +212,6 @@ public class FlussSourceReader<T>
             fetcherManager.removeTables(activeRemovalTablePaths);
         }
 
-        Set<PhysicalTablePath> activeRemovalPartitionPaths =
-                activeSplits.values().stream()
-                        .filter(split -> isActive(split.getTablePath()) && !isActive(split))
-                        .map(FlussSplitBase::getPhysicalTablePath)
-                        .collect(Collectors.toSet());
-        activeSplits.values().stream()
-                .filter(split -> activeRemovalPartitionPaths.contains(split.getPhysicalTablePath()))
-                .map(FlussSplitBase::getTableBucket)
-                .forEach(reportedFinishedSnapshotBuckets::remove);
-        if (!activeRemovalPartitionPaths.isEmpty()) {
-            fetcherManager.removePartitions(activeRemovalPartitionPaths);
-        }
-
         List<FlussSplitBase> effectiveStagedSplits = new ArrayList<>();
         for (FlussSplitBase split : stagedSplits) {
             if (isActive(split)

@@ -17,10 +17,7 @@
 
 package org.apache.flink.cdc.connectors.fluss.source.reader;
 
-import org.apache.flink.api.common.eventtime.Watermark;
-import org.apache.flink.api.connector.source.ReaderOutput;
 import org.apache.flink.api.connector.source.SourceEvent;
-import org.apache.flink.api.connector.source.SourceOutput;
 import org.apache.flink.api.connector.source.SourceReaderContext;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.connectors.fluss.sink.v2.metrics.WrapperFlussMetricRegistry;
@@ -34,7 +31,6 @@ import org.apache.flink.cdc.connectors.fluss.source.split.FlussHybridSnapshotLog
 import org.apache.flink.cdc.connectors.fluss.source.split.FlussLogSplit;
 import org.apache.flink.cdc.connectors.fluss.source.split.FlussSplitBase;
 import org.apache.flink.cdc.connectors.fluss.source.split.FlussSplitState;
-import org.apache.flink.connector.base.source.reader.RecordsBySplits;
 import org.apache.flink.connector.base.source.reader.RecordsWithSplitIds;
 import org.apache.flink.connector.base.source.reader.synchronization.FutureCompletingBlockingQueue;
 import org.apache.flink.metrics.groups.SourceReaderMetricGroup;
@@ -51,7 +47,6 @@ import org.junit.jupiter.api.Test;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -274,76 +269,10 @@ class FlussSourceReaderTest {
             assertThat(fetcherManager.addedSplits).containsExactly(liveSplit);
             assertThat(reader.snapshotState(2L)).containsExactly(liveSplit);
             assertThat(fetcherManager.removedTablePaths).isEmpty();
-            assertThat(fetcherManager.removedPartitionPaths).isEmpty();
 
             reader.addSplits(Collections.singletonList(expiredSplit));
             assertThat(fetcherManager.addedSplits).containsExactly(liveSplit);
             assertThat(reader.snapshotState(3L)).containsExactly(liveSplit);
-            assertThat(readerContext.getSentEvents()).isEmpty();
-        } finally {
-            reader.close();
-        }
-    }
-
-    @Test
-    void testExpiredActivePartitionLeavesCheckpointOnlyAfterFinishedSplit() throws Exception {
-        TestingReaderContext readerContext = new TestingReaderContext();
-        FutureCompletingBlockingQueue<RecordsWithSplitIds<FlussSourceRecord>> queue =
-                new FutureCompletingBlockingQueue<>();
-        TrackingFetcherManager fetcherManager = new TrackingFetcherManager(queue);
-        TrackingRecordEmitter recordEmitter = new TrackingRecordEmitter();
-        FlussSourceReader<Event> reader =
-                new FlussSourceReader<>(
-                        queue,
-                        readerContext,
-                        new WrapperFlussMetricRegistry(
-                                readerContext.metricGroup(), Collections.emptySet()),
-                        recordEmitter,
-                        fetcherManager);
-        FlussLogSplit expiredSplit = partitionSplit("expired", 11L);
-        FlussLogSplit liveSplit = partitionSplit("live", 22L);
-        FlussLogSplit unpartitionedSplit =
-                new FlussLogSplit(
-                        PhysicalTablePath.of(TablePath.of("test_db", "unpartitioned")),
-                        new TableBucket(2L, 0),
-                        30L);
-        Set<TablePath> tables =
-                new HashSet<>(
-                        Arrays.asList(liveSplit.getTablePath(), unpartitionedSplit.getTablePath()));
-
-        try {
-            reader.handleSourceEvents(
-                    new TableSubscriptionEvent(
-                            tables,
-                            Collections.emptyMap(),
-                            Collections.emptySet(),
-                            new HashSet<>(
-                                    Arrays.asList(
-                                            expiredSplit.getPhysicalTablePath(),
-                                            liveSplit.getPhysicalTablePath()))));
-            reader.addSplits(Arrays.asList(expiredSplit, liveSplit, unpartitionedSplit));
-
-            reader.handleSourceEvents(
-                    new TableSubscriptionEvent(
-                            tables,
-                            Collections.emptyMap(),
-                            Collections.emptySet(),
-                            Collections.singleton(liveSplit.getPhysicalTablePath())));
-
-            assertThat(fetcherManager.removedPartitionPaths)
-                    .containsExactly(expiredSplit.getPhysicalTablePath());
-            assertThat(fetcherManager.removedTablePaths).isEmpty();
-            assertThat(recordEmitter.removedTables).isEmpty();
-            assertThat(reader.snapshotState(1L))
-                    .containsExactlyInAnyOrder(expiredSplit, liveSplit, unpartitionedSplit);
-
-            RecordsBySplits.Builder<FlussSourceRecord> finished = new RecordsBySplits.Builder<>();
-            finished.addFinishedSplit(expiredSplit.splitId());
-            fetcherManager.getQueue().put(0, finished.build());
-            reader.pollNext(new NoOpReaderOutput());
-
-            assertThat(reader.snapshotState(2L))
-                    .containsExactlyInAnyOrder(liveSplit, unpartitionedSplit);
             assertThat(readerContext.getSentEvents()).isEmpty();
         } finally {
             reader.close();
@@ -366,7 +295,6 @@ class FlussSourceReaderTest {
                             Collections.singleton(split.getTablePath()), Collections.emptyMap()));
 
             assertThat(fetcherManager.addedSplits).containsExactly(split);
-            assertThat(fetcherManager.removedPartitionPaths).isEmpty();
             assertThat(reader.snapshotState(1L)).containsExactly(split);
         } finally {
             reader.close();
@@ -424,7 +352,6 @@ class FlussSourceReaderTest {
     private static class TrackingFetcherManager extends FlussSourceFetcherManager {
 
         private Set<TablePath> removedTablePaths = Collections.emptySet();
-        private Set<PhysicalTablePath> removedPartitionPaths = Collections.emptySet();
         private final List<FlussSplitBase> addedSplits = new ArrayList<>();
 
         private TrackingFetcherManager(
@@ -438,55 +365,9 @@ class FlussSourceReaderTest {
         }
 
         @Override
-        void removePartitions(Set<PhysicalTablePath> partitionPaths) {
-            removedPartitionPaths = partitionPaths;
-        }
-
-        @Override
         public void addSplits(List<FlussSplitBase> splits) {
             addedSplits.addAll(splits);
         }
-    }
-
-    private static class TrackingRecordEmitter extends FlussRecordEmitter<Event> {
-
-        private final List<TablePath> removedTables = new ArrayList<>();
-
-        private TrackingRecordEmitter() {
-            super(new FlussRecordDeserializer());
-        }
-
-        @Override
-        public void removeTable(TablePath tablePath) {
-            removedTables.add(tablePath);
-            super.removeTable(tablePath);
-        }
-    }
-
-    private static class NoOpReaderOutput implements ReaderOutput<Event> {
-
-        @Override
-        public void collect(Event record) {}
-
-        @Override
-        public void collect(Event record, long timestamp) {}
-
-        @Override
-        public void emitWatermark(Watermark watermark) {}
-
-        @Override
-        public void markIdle() {}
-
-        @Override
-        public void markActive() {}
-
-        @Override
-        public SourceOutput<Event> createOutputForSplit(String splitId) {
-            return this;
-        }
-
-        @Override
-        public void releaseOutputForSplit(String splitId) {}
     }
 
     private static class TestingReaderContext implements SourceReaderContext {

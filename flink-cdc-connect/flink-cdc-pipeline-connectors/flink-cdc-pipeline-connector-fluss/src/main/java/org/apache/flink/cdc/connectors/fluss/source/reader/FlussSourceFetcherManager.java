@@ -23,16 +23,14 @@ import org.apache.flink.connector.base.source.reader.RecordsWithSplitIds;
 import org.apache.flink.connector.base.source.reader.fetcher.SplitFetcher;
 import org.apache.flink.connector.base.source.reader.fetcher.SplitFetcherTask;
 import org.apache.flink.connector.base.source.reader.synchronization.FutureCompletingBlockingQueue;
-import org.apache.flink.util.function.ThrowingConsumer;
 
-import org.apache.fluss.metadata.PhysicalTablePath;
 import org.apache.fluss.metadata.TablePath;
 
 import java.io.IOException;
 import java.util.Set;
 import java.util.function.Supplier;
 
-/** Executes table and partition removal on the connector's single fetcher thread. */
+/** Executes table removal on the connector's single fetcher thread. */
 class FlussSourceFetcherManager
         extends SingleThreadFetcherManagerAdapter<FlussSourceRecord, FlussSplitBase> {
 
@@ -46,37 +44,25 @@ class FlussSourceFetcherManager
         if (tablePaths.isEmpty()) {
             return;
         }
-        enqueueRemoval(reader -> reader.removeTables(tablePaths));
-    }
-
-    void removePartitions(Set<PhysicalTablePath> partitionPaths) {
-        if (partitionPaths.isEmpty()) {
-            return;
-        }
-        enqueueRemoval(reader -> reader.removePartitions(partitionPaths));
-    }
-
-    private void enqueueRemoval(ThrowingConsumer<FlussSplitReader, IOException> removal) {
         SplitFetcher<FlussSourceRecord, FlussSplitBase> fetcher = getRunningFetcher();
         if (fetcher == null) {
             fetcher = createSplitFetcher();
-            enqueueRemovalTask(fetcher, removal);
+            enqueueRemovalTask(fetcher, tablePaths);
             startFetcher(fetcher);
         } else {
-            enqueueRemovalTask(fetcher, removal);
+            enqueueRemovalTask(fetcher, tablePaths);
             ((FlussSplitReader) fetcher.getSplitReader()).wakeUp();
         }
     }
 
     private void enqueueRemovalTask(
-            SplitFetcher<FlussSourceRecord, FlussSplitBase> fetcher,
-            ThrowingConsumer<FlussSplitReader, IOException> removal) {
+            SplitFetcher<FlussSourceRecord, FlussSplitBase> fetcher, Set<TablePath> tablePaths) {
         FlussSplitReader splitReader = (FlussSplitReader) fetcher.getSplitReader();
         fetcher.enqueueTask(
                 new SplitFetcherTask() {
                     @Override
                     public boolean run() throws IOException {
-                        removal.accept(splitReader);
+                        splitReader.removeTables(tablePaths);
                         return true;
                     }
 
