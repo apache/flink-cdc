@@ -208,8 +208,10 @@ public class DebeziumJsonSerializationSchema implements SerializationSchema<Even
                     converter = this::convertDeleteEventToRowData;
                     break;
                 case UPDATE:
-                case REPLACE:
                     converter = this::convertUpdateEventToRowData;
+                    break;
+                case REPLACE:
+                    converter = this::convertReplaceEventToRowData;
                     break;
                 default:
                     throw new UnsupportedOperationException(
@@ -458,14 +460,28 @@ public class DebeziumJsonSerializationSchema implements SerializationSchema<Even
 
     private void convertUpdateEventToRowData(
             DataChangeEvent dataChangeEvent, GenericRowData genericRowData) {
-        // REPLACE events carry only the after image, so "before" is written as null.
         genericRowData.setField(
                 BEFORE.getPosition(),
-                dataChangeEvent.before() == null
-                        ? null
-                        : jsonSerializers
-                                .get(dataChangeEvent.tableId())
-                                .getRowDataFromRecordData(dataChangeEvent.before(), false));
+                jsonSerializers
+                        .get(dataChangeEvent.tableId())
+                        .getRowDataFromRecordData(dataChangeEvent.before(), false));
+        genericRowData.setField(
+                AFTER.getPosition(),
+                jsonSerializers
+                        .get(dataChangeEvent.tableId())
+                        .getRowDataFromRecordData(dataChangeEvent.after(), false));
+        genericRowData.setField(OPERATION.getPosition(), OP_UPDATE);
+        genericRowData.setField(
+                SOURCE.getPosition(),
+                GenericRowData.of(
+                        StringData.fromString(dataChangeEvent.tableId().getSchemaName()),
+                        StringData.fromString(dataChangeEvent.tableId().getTableName())));
+    }
+
+    private void convertReplaceEventToRowData(
+            DataChangeEvent dataChangeEvent, GenericRowData genericRowData) {
+        // REPLACE events carry only the after image, so "before" is written as null.
+        genericRowData.setField(BEFORE.getPosition(), null);
         genericRowData.setField(
                 AFTER.getPosition(),
                 jsonSerializers
