@@ -1,9 +1,9 @@
 ---
 title: "MySQL"
-weight: 2
-type: docs
-aliases:
-- /connectors/pipeline-connectors/mysql
+slug: "/docs/connectors/pipeline-connectors/mysql"
+sidebar_position: 2
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -27,7 +27,7 @@ under the License.
 # MySQL Connector
 
 MySQL connector allows reading snapshot data and incremental data from MySQL database and provides end-to-end full-database data synchronization capabilities.
-This document describes how to setup the MySQL connector.
+This document describes how to set up the MySQL connector.
 
 ## Dependencies
 
@@ -743,5 +743,3 @@ The example for different spatial data types mapping is as follows:
     </tbody>
 </table>
 </div>
-
-{{< top >}}

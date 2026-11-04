@@ -1,9 +1,9 @@
 ---
 title: "Understand Flink CDC API"
-weight: 1
-type: docs
-aliases:
-  - /developer-guide/understand-flink-cdc-api
+slug: "/docs/developer-guide/understand-flink-cdc-api"
+sidebar_position: 1
+hide_title: true
+displayed_sidebar: docs
 ---
 
 <!--
@@ -28,7 +28,7 @@ under the License.
 # Understand Flink CDC API
 
 If you are planning to build your own Flink CDC connectors, or considering
-contributing to Flink CDC, you might want to hava a deeper look at the APIs of
+contributing to Flink CDC, you might want to have a deeper look at the APIs of
 Flink CDC. This document will go through some important concepts and interfaces
 in order to help you with your development.
 
@@ -90,7 +90,7 @@ new to the framework, and `SchemaChangeEvent` must be emitted before any
 sure that the framework has been aware of the schema before processing any data
 changes.
 
-{{< img src="/fig/flow-of-events.png" alt="Flow of Events" >}}
+<img src="@@BASE_URL@@fig/flow-of-events.png" alt="Flow of Events" class="doc-image">
 
 ## Data Source
 
@@ -120,4 +120,4 @@ API.
 `MetadataApplier` will be used to handle schema changes. When the framework
 receives schema change event from source, after making some internal
 synchronizations and flushes, it will apply the schema change to
-external system via this applier. 
+external system via this applier.

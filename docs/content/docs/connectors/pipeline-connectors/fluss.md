@@ -1,9 +1,9 @@
 ---
 title: "Fluss"
-weight: 4
-type: docs
-aliases:
-- /connectors/pipeline-connectors/fluss
+slug: "/docs/connectors/pipeline-connectors/fluss"
+sidebar_position: 4
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -150,14 +150,14 @@ Pipeline Connector Options
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Pass options of Fluss table to pipeline，See <a href="https://fluss.apache.org/docs/engine-flink/options/#storage-options">Fluss table options</a>. </td>
+      <td>Pass options of Fluss table to pipeline. See <a href="https://fluss.apache.org/docs/engine-flink/options/#storage-options">Fluss table options</a>. </td>
     </tr>
     <tr>
       <td>properties.client.*</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Pass options of Fluss client to pipeline，See <a href="https://fluss.apache.org/docs/engine-flink/options/#write-options">Fluss client options</a>. </td>
+      <td>Pass options of Fluss client to pipeline. See <a href="https://fluss.apache.org/docs/engine-flink/options/#write-options">Fluss client options</a>. </td>
     </tr>
     </tbody>
 </table>    
@@ -314,5 +314,3 @@ Data Type Mapping
     </tbody>
 </table>
 </div>
-
-{{< top >}}

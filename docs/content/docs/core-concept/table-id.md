@@ -1,9 +1,9 @@
 ---
 title: "Table ID"
-weight: 4
-type: docs
-aliases:
-  - /core-concept/table-id/
+slug: "/docs/core-concept/table-id"
+sidebar_position: 4
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one

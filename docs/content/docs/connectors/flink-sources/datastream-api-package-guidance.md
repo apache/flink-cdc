@@ -1,9 +1,9 @@
 ---
 title: "DataStream API Package Guidance"
-weight: 998
-type: docs
-aliases:
-- /connectors/flink-sources/datastream-api-package-guidance
+slug: "/docs/connectors/flink-sources/datastream-api-package-guidance"
+sidebar_position: 998
+hide_title: true
+displayed_sidebar: docs
 ---
 
 <!--
@@ -53,11 +53,11 @@ This guide provides a simple `pom.xml` example for packaging DataStream job JARs
         <flink.reuseForks>true</flink.reuseForks>
 
         <!-- dependencies versions -->
-        <flink.version>1.20.3</flink.version>
+        <flink.version>1.20.5</flink.version>
         <slf4j.version>1.7.15</slf4j.version>
         <log4j.version>2.17.1</log4j.version>
         <debezium.version>1.9.8.Final</debezium.version>
-        <flink.cdc.version>3.6.0-1.20</flink.cdc.version>
+        <flink.cdc.version>3.7.0-1.20</flink.cdc.version>
     </properties>
     <dependencies>
         <dependency>
@@ -262,11 +262,11 @@ This guide provides a simple `pom.xml` example for packaging DataStream job JARs
         <flink.reuseForks>true</flink.reuseForks>
 
         <!-- dependencies versions -->
-        <flink.version>2.2.0</flink.version>
+        <flink.version>2.2.1</flink.version>
         <slf4j.version>1.7.15</slf4j.version>
         <log4j.version>2.17.1</log4j.version>
         <debezium.version>1.9.8.Final</debezium.version>
-        <flink.cdc.version>3.6.0-2.2</flink.cdc.version>
+        <flink.cdc.version>3.7.0-2.2</flink.cdc.version>
     </properties>
     <dependencies>
         <dependency>
@@ -484,5 +484,3 @@ public class CdcTest {
 }
 
 ```
-
-{{< top >}}

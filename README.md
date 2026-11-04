@@ -128,6 +128,7 @@ All artifacts use group ID `org.apache.flink`. See the [DataStream API packaging
 
 | Flink CDC | Supported Flink Versions     | Notes                                                           |
 |-----------|------------------------------|-----------------------------------------------------------------|
+| 3.7       | 1.20, 2.2                    |                                                                 |
 | 3.6       | 1.20, 2.2                    |                                                                 |
 | 3.5       | 1.19, 1.20                   |                                                                 |
 | 3.4       | 1.19, 1.20                   |                                                                 |
