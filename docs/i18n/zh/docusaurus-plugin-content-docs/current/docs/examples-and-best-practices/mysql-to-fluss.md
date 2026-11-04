@@ -67,11 +67,15 @@ jobmanager:
 taskmanager:
   memory:
     process:
-      size: 2048m
+      size: 4096m
+    task:
+      off-heap:
+        size: 1024m
   numberOfTaskSlots: 4
 ```
 
 四个 Slot 可以让并行度为二的数据摄入作业和验证查询同时运行。
+任务堆外内存用于容纳这些作业中 Fluss 客户端使用的网络和 Arrow 缓冲区。
 启动 Standalone 集群：
 
 ```shell
@@ -158,6 +162,7 @@ Flink 进程和 SQL Client 均在本机运行，通过 `localhost:9123` 访问 C
 通过 `localhost:9124` 访问 TabletServer，因此两个对外通告的地址都必须可达。
 如果客户端运行在其他计算机上，请将 `advertised.listeners` 中的 `localhost` 替换为可访问的主机名。
 示例密码和单 TabletServer 配置仅用于本地演示。
+请确保 Docker 数据磁盘有足够的可用空间：Fluss 1.0.0 默认会在数据磁盘使用率达到 85% 时拒绝写入。
 
 启动服务，等待 MySQL 健康检查通过，并查看日志确认 Fluss Coordinator 和 TabletServer 已成功启动：
 
@@ -329,26 +334,35 @@ GROUP BY customer_id;
 
 ## 验证新增字段
 
-在 MySQL 中追加一个可空字段，并更新订单：
+在 MySQL 中追加一个可空字段：
 
 ```sql
 ALTER TABLE fluss_demo.orders ADD COLUMN payment_method VARCHAR(16);
-UPDATE fluss_demo.orders SET payment_method = 'CARD' WHERE order_id = 1007;
 ```
 
-在 SQL Client 中切回批模式，查询新增字段：
+在 SQL Client 中检查新表结构，并从最新位点启动流式查询：
+先执行 `DESCRIBE`，如果尚未出现 `payment_method`，请等待并重试，确认字段已同步后再执行 `SELECT`。
 
 ```sql
-SET 'execution.runtime-mode' = 'batch';
-SET 'sql-client.execution.result-mode' = 'tableau';
+SET 'execution.runtime-mode' = 'streaming';
+SET 'sql-client.execution.result-mode' = 'changelog';
 
 DESCRIBE fluss_catalog.fluss_demo.orders;
 SELECT order_id, payment_method
 FROM fluss_catalog.fluss_demo.orders
-ORDER BY order_id;
+/*+ OPTIONS('scan.startup.mode' = 'latest') */;
 ```
 
-表结构和数据变更同步完成后，订单 1007 的 `payment_method` 应为 `CARD`，其余订单应为 `NULL`。
+等待查询正常运行后，在 MySQL 中更新订单：
+
+```sql
+UPDATE fluss_demo.orders SET payment_method = 'CARD' WHERE order_id = 1007;
+```
+
+查询应显示 `order_id = 1007`、`payment_method = CARD` 的更新记录。
+该查询仅消费启动后的变更。在 Fluss 1.0.0 中，回放旧日志批次时投影新增列可能报
+`INVALID_COLUMN_PROJECTION` 错误；从最新位点开始读取可以避开该读取路径。
+验证更新后，按 `q` 退出结果视图。
 
 作业使用 `schema.change.behavior: lenient` 处理 Fluss Sink 支持的表结构变更。
 新增列会以可空列的形式追加到 Fluss 表尾部。删除列时，Fluss 保留原列，后续写入会将该列置为 `NULL`。

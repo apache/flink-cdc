@@ -67,11 +67,15 @@ jobmanager:
 taskmanager:
   memory:
     process:
-      size: 2048m
+      size: 4096m
+    task:
+      off-heap:
+        size: 1024m
   numberOfTaskSlots: 4
 ```
 
 Four slots allow the ingestion pipeline and a verification query to run together at parallelism two.
+The task off-heap memory accommodates the Fluss client's network and Arrow buffers used by these jobs.
 Start the standalone cluster:
 
 ```shell
@@ -158,6 +162,7 @@ The Flink processes and SQL Client run on the host. They connect to the coordina
 and the tablet server at `localhost:9124`, so both advertised addresses must be reachable.
 For clients on another machine, replace `localhost` in the advertised listeners with a reachable hostname.
 The passwords and single tablet server configuration are for this local tutorial.
+Ensure the Docker data disk has enough free space: Fluss 1.0.0 rejects writes when data disk usage reaches 85% by default.
 
 Start the services, wait for the MySQL health check, and check that the Fluss coordinator and tablet server have started successfully:
 
@@ -331,26 +336,35 @@ The query keeps running; quit the result view with `q` before running the next S
 
 ## Verify adding a column
 
-In MySQL, append a nullable column and update an order:
+In MySQL, append a nullable column:
 
 ```sql
 ALTER TABLE fluss_demo.orders ADD COLUMN payment_method VARCHAR(16);
-UPDATE fluss_demo.orders SET payment_method = 'CARD' WHERE order_id = 1007;
 ```
 
-In the SQL Client, return to batch mode and query the new column:
+In the SQL Client, inspect the new schema and start a streaming query from the latest offsets:
+Run `DESCRIBE` first and repeat it until `payment_method` appears, then execute the `SELECT` statement.
 
 ```sql
-SET 'execution.runtime-mode' = 'batch';
-SET 'sql-client.execution.result-mode' = 'tableau';
+SET 'execution.runtime-mode' = 'streaming';
+SET 'sql-client.execution.result-mode' = 'changelog';
 
 DESCRIBE fluss_catalog.fluss_demo.orders;
 SELECT order_id, payment_method
 FROM fluss_catalog.fluss_demo.orders
-ORDER BY order_id;
+/*+ OPTIONS('scan.startup.mode' = 'latest') */;
 ```
 
-After the schema and data changes arrive, `payment_method` should be `CARD` for order 1007 and `NULL` for the other orders.
+Once the query is running, update the order in MySQL:
+
+```sql
+UPDATE fluss_demo.orders SET payment_method = 'CARD' WHERE order_id = 1007;
+```
+
+The query should show an update with `order_id = 1007` and `payment_method = CARD`.
+This query only reads changes made after it starts. In Fluss 1.0.0, projecting a newly added column while
+replaying older log batches can fail with `INVALID_COLUMN_PROJECTION`; using the latest offsets avoids that read path.
+Quit the result view with `q` after verifying the update.
 
 The pipeline uses `schema.change.behavior: lenient` to accommodate schema changes supported by the Fluss sink.
 Added columns are appended as nullable columns. Dropping a column preserves it in Fluss, with subsequent writes setting it to `NULL`.
