@@ -47,25 +47,49 @@ under the License.
 
 ## 准备环境
 
-1. 选择兼容的 Flink 与 Flink CDC 发行包，将 MySQL、Paimon Pipeline 连接器 JAR 放入
-   `$FLINK_CDC_HOME/lib`，并提供 MySQL JDBC 驱动和所需的 Hadoop、文件系统依赖。
-   环境准备和结果查询方式请参见 [MySQL 数据实时入湖 Paimon](mysql-to-paimon.md)。
-   原作业的 Action JAR 不能代替这些 Pipeline 连接器。
-2. MySQL 应开启 Binlog，设置 `binlog_format=ROW` 和 `binlog_row_image=FULL`，并按
-   [MySQL 连接器文档](../connectors/pipeline-connectors/mysql.md)为同步账号授权。
-   先列出原作业实际同步的表：数据库 Action 只同步有主键的表，迁移时应保留这个表集合，
-   不能认为扩大匹配范围后会自动排除无主键表。
-3. 记录原 Catalog 类型、Warehouse、目标表名、主键、分区和表属性。
-   提交客户端和 Flink 进程都必须能够访问 Warehouse。
-   分布式集群应使用共享存储，而不是某台机器的本地目录。
-4. 在 Flink 集群中开启周期性 Checkpoint，使 Paimon 能提交流式写入。
-   例如，将以下配置合并到 `config.yaml` 已有的 `execution` 节点中：
+根据下表选择 Flink 发行包及其对应的依赖。
+下载链接使用已发布的 Flink CDC 3.7.0；使用 SNAPSHOT 版本时，应从同一源码版本构建发行包和 Pipeline 连接器，
+请参见[安装 Flink CDC](../deployment/standalone.md#set-up-flink-cdc)。
 
-   ```yaml
-   execution:
-     checkpointing:
-       interval: 30s
-   ```
+| Flink 发行包 | 所需依赖 | 可选的 SQL 验证连接器 |
+|--------------|----------|----------------------|
+| [Flink 1.20.5](https://archive.apache.org/dist/flink/flink-1.20.5/flink-1.20.5-bin-scala_2.12.tgz) | [Flink CDC 3.7.0](https://archive.apache.org/dist/flink/flink-cdc-3.7.0/flink-cdc-3.7.0-1.20-bin.tar.gz)<br />[MySQL Pipeline 连接器](https://repo.maven.apache.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-mysql/3.7.0-1.20/flink-cdc-pipeline-connector-mysql-3.7.0-1.20.jar)<br />[Paimon Pipeline 连接器](https://repo.maven.apache.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-paimon/3.7.0-1.20/flink-cdc-pipeline-connector-paimon-3.7.0-1.20.jar)<br />[MySQL JDBC 8.0.27](https://repo.maven.apache.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar)<br />[Hadoop 2.8.3-10.0](https://repo.maven.apache.org/maven2/org/apache/flink/flink-shaded-hadoop-2-uber/2.8.3-10.0/flink-shaded-hadoop-2-uber-2.8.3-10.0.jar) | [面向 Flink 1.20 的 Paimon SQL 2.0.0](https://repo.maven.apache.org/maven2/org/apache/paimon/paimon-flink-1.20/2.0.0/paimon-flink-1.20-2.0.0.jar) |
+| [Flink 2.2.1](https://archive.apache.org/dist/flink/flink-2.2.1/flink-2.2.1-bin-scala_2.12.tgz) | [Flink CDC 3.7.0](https://archive.apache.org/dist/flink/flink-cdc-3.7.0/flink-cdc-3.7.0-2.2-bin.tar.gz)<br />[MySQL Pipeline 连接器](https://repo.maven.apache.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-mysql/3.7.0-2.2/flink-cdc-pipeline-connector-mysql-3.7.0-2.2.jar)<br />[Paimon Pipeline 连接器](https://repo.maven.apache.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-paimon/3.7.0-2.2/flink-cdc-pipeline-connector-paimon-3.7.0-2.2.jar)<br />[MySQL JDBC 8.0.27](https://repo.maven.apache.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar)<br />[Hadoop 2.8.3-10.0](https://repo.maven.apache.org/maven2/org/apache/flink/flink-shaded-hadoop-2-uber/2.8.3-10.0/flink-shaded-hadoop-2-uber-2.8.3-10.0.jar) | [面向 Flink 2.1 的 Paimon SQL 2.0.0](https://repo.maven.apache.org/maven2/org/apache/paimon/paimon-flink-2.1/2.0.0/paimon-flink-2.1-2.0.0.jar) |
+
+Flink CDC 3.7.0 内置 Paimon 2.0.0，其 Flink 2.2 构建使用 Paimon 的 Flink 2.1 依赖，
+所以 SQL 验证连接器也采用该依赖。使用其他 CDC 版本时，SQL 连接器应与其内置的 Paimon 版本一致。
+
+下载并解压选定的发行包，设置 `FLINK_HOME` 和 `FLINK_CDC_HOME`：
+
+```shell
+export FLINK_HOME=/path/to/flink
+export FLINK_CDC_HOME=/path/to/flink-cdc
+```
+
+将 MySQL、Paimon Pipeline 连接器 JAR 放入 `$FLINK_CDC_HOME/lib`，
+启动 Flink 前将 MySQL JDBC 驱动放入 `$FLINK_HOME/lib`。
+将 Hadoop JAR 保存为 `$FLINK_HOME/opt/flink-shaded-hadoop.jar`，下文提交命令通过 `--jar` 附加该依赖。
+需要 SQL 验证时，将可选的 Paimon SQL 连接器保存为 `$FLINK_HOME/opt/paimon-sql-connector.jar`。
+查询方式请参见 [MySQL 数据实时入湖 Paimon](mysql-to-paimon.md#验证全量快照)。
+保留原作业的 Action JAR 用于核对配置，新 Pipeline 不使用它。
+
+MySQL 应开启 Binlog，设置 `binlog_format=ROW` 和 `binlog_row_image=FULL`，并按
+[MySQL 连接器文档](../connectors/pipeline-connectors/mysql.md)为同步账号授权。
+迁移时保留原作业实际同步的表集合：数据库 Action 只同步有主键的表，
+而扩大 Pipeline 的表匹配范围不会自动排除无主键表。
+
+记录原 Catalog 类型、Warehouse、目标表名、主键、分区和表属性。
+提交客户端和 Flink 进程都必须能够访问 Warehouse。
+分布式集群应使用共享存储，而不是某台机器的本地目录。
+
+在 Flink 集群中开启周期性 Checkpoint，使 Paimon 能提交流式写入。
+例如，将以下配置合并到 `config.yaml` 已有的 `execution` 节点中：
+
+```yaml
+execution:
+  checkpointing:
+    interval: 30s
+```
 
 以下 YAML 中的地址、账号、密码占位符、时区、Warehouse 和表匹配规则都需要替换。
 通过部署环境的安全配置流程将 `'<mysql-password>'` 替换为实际密码，不要把凭证提交到代码仓库。
@@ -129,7 +153,8 @@ pipeline:
 使用 Flink CDC CLI 提交，并按部署环境需要添加文件系统依赖：
 
 ```shell
-"$FLINK_CDC_HOME/bin/flink-cdc.sh" mysql-orders-to-paimon.yaml
+"$FLINK_CDC_HOME/bin/flink-cdc.sh" mysql-orders-to-paimon.yaml \
+  --jar "$FLINK_HOME/opt/flink-shaded-hadoop.jar"
 ```
 
 主要配置变化如下：
@@ -201,7 +226,8 @@ pipeline:
 提交作业：
 
 ```shell
-"$FLINK_CDC_HOME/bin/flink-cdc.sh" mysql-shop-to-paimon.yaml
+"$FLINK_CDC_HOME/bin/flink-cdc.sh" mysql-shop-to-paimon.yaml \
+  --jar "$FLINK_HOME/opt/flink-shaded-hadoop.jar"
 ```
 
 目标表分别为 `lake_migration.ods_orders` 和 `lake_migration.ods_users`。
@@ -378,16 +404,12 @@ YAML 没有通用的 `type_mapping` 开关，应对照原目标表结构、
 
 ### 继续写入已有目标表
 
-原表续写需要独立的迁移方案，不能仅把示例中的 `lake_migration` 改成 `lake`。
-停止 Action 前，应先安排如何确认已成功提交到 Paimon 的源端位置。
-向相同目标表启动新 Writer 前，必须停止旧 Writer，并确认：
+继续写入已有目标表时，先停止 Action，再启动新 Pipeline，并确认：
 
 - 目标 Schema、字段顺序与类型、主键、分区、表属性和写入语义兼容。
-- 新 Source 从经过核实的起点覆盖切换期间的变更，且所需 Binlog 仍然保留。
+- 新 Source 从 Action 已提交到 Paimon 的源端位置开始读取，且所需 Binlog 仍然保留。
   MySQL 支持 `scan.startup.mode: specific-offset` 和相应的位点字段；
   使用要求及 Schema 历史限制请参见 [MySQL 连接器](../connectors/pipeline-connectors/mysql.md)。
 - 初始化时使用的源表 Schema 与起点处的事件兼容，尤其需要核对切换前后的 DDL。
 
-不能用 `latest-offset` 直接接续，否则可能跳过停止 Action 到启动新作业之间的变更。
-向旧表重新执行 `initial` 也不是重建表：在快照开始前已经从 MySQL 删除的记录，可能仍留在旧 Paimon 表中。
-无法可靠确认提交位点和表结构时，应采用独立目标重建并校验，不应声称可以无损原表续写。
+`initial` 快照不会清除迁移前已从 MySQL 删除的目标记录；需要全量重建时，应使用独立目标。

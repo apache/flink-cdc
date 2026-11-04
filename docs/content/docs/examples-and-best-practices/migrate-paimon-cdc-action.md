@@ -49,25 +49,50 @@ Do not change this to the old target database without planning the reading posit
 
 ## Prepare the environment
 
-1. Choose compatible Flink and Flink CDC distributions. Install the MySQL and Paimon Pipeline connector JARs
-   in `$FLINK_CDC_HOME/lib`, and provide the MySQL JDBC driver and required Hadoop/filesystem dependencies.
-   See [Real-time MySQL Ingestion into Paimon](mysql-to-paimon.md) for environment setup and verification queries.
-   The Action JAR is not a replacement for these Pipeline connectors.
-2. Enable MySQL binlog with `binlog_format=ROW` and `binlog_row_image=FULL`, and grant the synchronization
-   account the permissions described in the [MySQL connector documentation](../connectors/pipeline-connectors/mysql.md).
-   Inventory the tables actually synchronized by the old job; the database Action only synchronizes tables with primary keys.
-   Keep that table set when migrating, rather than assuming a broad pattern automatically excludes tables without primary keys.
-3. Record the original catalog type, warehouse, table names, primary keys, partitions, and table properties.
-   The warehouse must be accessible to the submitting client and Flink processes.
-   On a distributed cluster, use shared storage rather than a machine-local directory.
-4. Enable periodic checkpointing in the Flink cluster configuration so Paimon can commit streaming writes.
-   For example, merge the following into the existing `execution` section of `config.yaml`:
+Choose a Flink distribution and the corresponding dependencies from the following table.
+The links use released Flink CDC 3.7.0 artifacts. For a SNAPSHOT version, build the distribution and
+Pipeline connectors from the same source revision; see [Set up Flink CDC](../deployment/standalone.md#set-up-flink-cdc).
 
-   ```yaml
-   execution:
-     checkpointing:
-       interval: 30s
-   ```
+| Flink distribution | Required dependencies | Optional SQL verification connector |
+|--------------------|-----------------------|-------------------------------------|
+| [Flink 1.20.5](https://archive.apache.org/dist/flink/flink-1.20.5/flink-1.20.5-bin-scala_2.12.tgz) | [Flink CDC 3.7.0](https://archive.apache.org/dist/flink/flink-cdc-3.7.0/flink-cdc-3.7.0-1.20-bin.tar.gz)<br />[MySQL Pipeline connector](https://repo.maven.apache.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-mysql/3.7.0-1.20/flink-cdc-pipeline-connector-mysql-3.7.0-1.20.jar)<br />[Paimon Pipeline connector](https://repo.maven.apache.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-paimon/3.7.0-1.20/flink-cdc-pipeline-connector-paimon-3.7.0-1.20.jar)<br />[MySQL JDBC 8.0.27](https://repo.maven.apache.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar)<br />[Hadoop 2.8.3-10.0](https://repo.maven.apache.org/maven2/org/apache/flink/flink-shaded-hadoop-2-uber/2.8.3-10.0/flink-shaded-hadoop-2-uber-2.8.3-10.0.jar) | [Paimon SQL 2.0.0 for Flink 1.20](https://repo.maven.apache.org/maven2/org/apache/paimon/paimon-flink-1.20/2.0.0/paimon-flink-1.20-2.0.0.jar) |
+| [Flink 2.2.1](https://archive.apache.org/dist/flink/flink-2.2.1/flink-2.2.1-bin-scala_2.12.tgz) | [Flink CDC 3.7.0](https://archive.apache.org/dist/flink/flink-cdc-3.7.0/flink-cdc-3.7.0-2.2-bin.tar.gz)<br />[MySQL Pipeline connector](https://repo.maven.apache.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-mysql/3.7.0-2.2/flink-cdc-pipeline-connector-mysql-3.7.0-2.2.jar)<br />[Paimon Pipeline connector](https://repo.maven.apache.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-paimon/3.7.0-2.2/flink-cdc-pipeline-connector-paimon-3.7.0-2.2.jar)<br />[MySQL JDBC 8.0.27](https://repo.maven.apache.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar)<br />[Hadoop 2.8.3-10.0](https://repo.maven.apache.org/maven2/org/apache/flink/flink-shaded-hadoop-2-uber/2.8.3-10.0/flink-shaded-hadoop-2-uber-2.8.3-10.0.jar) | [Paimon SQL 2.0.0 for Flink 2.1](https://repo.maven.apache.org/maven2/org/apache/paimon/paimon-flink-2.1/2.0.0/paimon-flink-2.1-2.0.0.jar) |
+
+Flink CDC 3.7.0 bundles Paimon 2.0.0. Its Flink 2.2 build uses Paimon's Flink 2.1 artifact,
+so the SQL verification connector follows that dependency. For other CDC versions, match the SQL connector
+to the bundled Paimon version.
+
+Download and extract the selected distributions, then set `FLINK_HOME` and `FLINK_CDC_HOME`:
+
+```shell
+export FLINK_HOME=/path/to/flink
+export FLINK_CDC_HOME=/path/to/flink-cdc
+```
+
+Place the MySQL and Paimon Pipeline connector JARs in `$FLINK_CDC_HOME/lib` and the MySQL JDBC driver
+in `$FLINK_HOME/lib` before starting Flink. Save the Hadoop JAR as
+`$FLINK_HOME/opt/flink-shaded-hadoop.jar`; the submission commands below add it with `--jar`.
+For SQL verification, save the optional Paimon SQL connector as `$FLINK_HOME/opt/paimon-sql-connector.jar`.
+See [Real-time MySQL Ingestion into Paimon](mysql-to-paimon.md#verify-the-initial-snapshot) for verification queries.
+Keep the existing Action JAR for configuration reference; the new pipeline does not use it.
+
+Enable MySQL binlog with `binlog_format=ROW` and `binlog_row_image=FULL`, and grant the synchronization
+account the permissions described in the [MySQL connector documentation](../connectors/pipeline-connectors/mysql.md).
+Keep the table set synchronized by the old job: the database Action only synchronizes tables with primary keys,
+whereas a broad Pipeline table pattern does not automatically exclude tables without primary keys.
+
+Record the original catalog type, warehouse, table names, primary keys, partitions, and table properties.
+The warehouse must be accessible to the submitting client and Flink processes.
+On a distributed cluster, use shared storage rather than a machine-local directory.
+
+Enable periodic checkpointing in the Flink cluster configuration so Paimon can commit streaming writes.
+For example, merge the following into the existing `execution` section of `config.yaml`:
+
+```yaml
+execution:
+  checkpointing:
+    interval: 30s
+```
 
 In the YAML below, replace the host, account, password placeholder, timezone, warehouse, and table patterns.
 Replace `'<mysql-password>'` with the actual value through your deployment's secure configuration process;
@@ -132,7 +157,8 @@ pipeline:
 Submit it with the Flink CDC CLI, adding any filesystem dependencies required by your deployment:
 
 ```shell
-"$FLINK_CDC_HOME/bin/flink-cdc.sh" mysql-orders-to-paimon.yaml
+"$FLINK_CDC_HOME/bin/flink-cdc.sh" mysql-orders-to-paimon.yaml \
+  --jar "$FLINK_HOME/opt/flink-shaded-hadoop.jar"
 ```
 
 The configuration changes are:
@@ -205,7 +231,8 @@ pipeline:
 Submit it with:
 
 ```shell
-"$FLINK_CDC_HOME/bin/flink-cdc.sh" mysql-shop-to-paimon.yaml
+"$FLINK_CDC_HOME/bin/flink-cdc.sh" mysql-shop-to-paimon.yaml \
+  --jar "$FLINK_HOME/opt/flink-shaded-hadoop.jar"
 ```
 
 The resulting tables are `lake_migration.ods_orders` and `lake_migration.ods_users`.
@@ -391,19 +418,12 @@ used by your application. Changing a schema-evolution policy is not a substitute
 
 ### Continuing to write existing tables
 
-Treat in-place continuation as a separate migration plan, not as replacing `lake_migration` with `lake` in an example.
-Before stopping the Action, arrange how to determine the source position through which writes were successfully
-committed to Paimon. Stop the old writer before starting a new writer against the same tables.
-Validate all of the following:
+For an existing target, stop the Action before starting the pipeline and verify:
 
 - Target schema, field order and types, primary keys, partitions, table properties, and write semantics are compatible.
-- The new source starts from a verified position covering the handoff, with the required binlog still retained.
+- The new source starts from the position committed to Paimon by the Action, with the required binlog still retained.
   MySQL supports `scan.startup.mode: specific-offset` and its associated offset fields;
   see the [MySQL connector](../connectors/pipeline-connectors/mysql.md) for requirements and schema-history limitations.
 - The source schema used for initialization is compatible with events at that position, including DDL around the handoff.
 
-Do not use `latest-offset` as a shortcut: it can skip changes between stopping the Action and starting the pipeline.
-A fresh `initial` snapshot into an existing table is not a rebuild either:
-rows deleted from MySQL before the snapshot can remain in the old Paimon table.
-If the committed position and schema cannot be established reliably, use a separate target and reconciliation
-rather than claiming a lossless in-place migration.
+An `initial` snapshot does not remove rows deleted from MySQL before migration; use a separate target for a full rebuild.
