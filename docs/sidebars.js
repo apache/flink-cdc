@@ -136,6 +136,7 @@ module.exports = {
         'docs/examples-and-best-practices/index',
         'docs/examples-and-best-practices/mysql-to-paimon',
         'docs/examples-and-best-practices/mysql-to-kafka',
+        'docs/examples-and-best-practices/mysql-to-fluss',
         'docs/examples-and-best-practices/postgres-to-iceberg',
         'docs/examples-and-best-practices/table-selection-and-new-tables',
         'docs/examples-and-best-practices/metadata-and-soft-deletes',

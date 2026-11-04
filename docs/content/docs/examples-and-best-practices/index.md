@@ -38,6 +38,7 @@ This section focuses on practical data ingestion scenarios with Flink CDC YAML p
 
 - [Real-time MySQL Ingestion into Paimon](mysql-to-paimon.md): merge order tables and synchronize schema and data changes.
 - [Real-time MySQL Change Distribution to Kafka](mysql-to-kafka.md): publish table changes to separate topics and partition them by primary key.
+- [Real-time MySQL Ingestion into Fluss](mysql-to-fluss.md): synchronize orders into a primary key table, verify row and schema changes, and query paid order totals.
 - [Real-time PostgreSQL Ingestion into Iceberg](postgres-to-iceberg.md): configure logical replication and synchronize snapshots, row changes, and an added column.
 - [Table Selection and Adding Tables](table-selection-and-new-tables.md): exclude temporary tables, capture new tables, and include historical tables through savepoint restore.
 - [Metadata Columns, Computed Columns, and Soft Deletes](metadata-and-soft-deletes.md): enrich records, compute date partitions, and preserve deletion markers.
