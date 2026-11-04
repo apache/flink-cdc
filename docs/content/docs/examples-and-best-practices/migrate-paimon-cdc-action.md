@@ -26,8 +26,7 @@ under the License.
 
 # Migrate Paimon MySQL CDC Actions to Flink CDC
 
-This guide translates Apache Paimon MySQL CDC Action configurations into Apache Flink CDC YAML pipelines.
-It covers two migration paths:
+This guide converts Apache Paimon MySQL CDC Action configurations to Apache Flink CDC YAML pipelines:
 
 | Existing Action | Flink CDC pipeline |
 |-----------------|--------------------|
@@ -35,32 +34,29 @@ It covers two migration paths:
 | `mysql_sync_database` | Select MySQL tables and route each table to a Paimon database, optionally adding a prefix or suffix. |
 
 The examples retain source primary keys and use a filesystem catalog.
-Check the options accepted by your existing Action JAR before translating its configuration.
-For background on the Actions, see the [Paimon MySQL CDC documentation](https://paimon.apache.org/docs/master/cdc-ingestion/mysql-cdc/).
+Check your Action JAR's supported options against the [Paimon MySQL CDC documentation](https://paimon.apache.org/docs/master/cdc-ingestion/mysql-cdc/).
 
 :::warning
 
-This is a configuration migration, not a state migration. Do not restore a Flink CDC pipeline
-from a Paimon Action checkpoint or savepoint.
-The YAML examples start with an initial snapshot and write to the separate `lake_migration` database.
-Do not change this to the old target database without planning the reading position and validating existing tables.
+Paimon Action checkpoints and savepoints cannot restore a Flink CDC pipeline.
+The examples take an initial snapshot into a separate `lake_migration` database.
+To reuse existing tables, follow [Continuing to write existing tables](#continuing-to-write-existing-tables).
 
 :::
 
 ## Prepare the environment
 
-Choose a Flink distribution and the corresponding dependencies from the following table.
-The links use released Flink CDC 3.7.0 artifacts. For a SNAPSHOT version, build the distribution and
-Pipeline connectors from the same source revision; see [Set up Flink CDC](../deployment/standalone.md#set-up-flink-cdc).
+Choose matching distributions and dependencies below; the CDC links use release 3.7.0.
+For SNAPSHOT versions, build the distribution and Pipeline connectors from the same revision;
+see [Set up Flink CDC](../deployment/standalone.md#set-up-flink-cdc).
 
 | Flink distribution | Required dependencies | Optional SQL verification connector |
 |--------------------|-----------------------|-------------------------------------|
 | [Flink 1.20.5](https://archive.apache.org/dist/flink/flink-1.20.5/flink-1.20.5-bin-scala_2.12.tgz) | [Flink CDC 3.7.0](https://archive.apache.org/dist/flink/flink-cdc-3.7.0/flink-cdc-3.7.0-1.20-bin.tar.gz)<br />[MySQL Pipeline connector](https://repo.maven.apache.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-mysql/3.7.0-1.20/flink-cdc-pipeline-connector-mysql-3.7.0-1.20.jar)<br />[Paimon Pipeline connector](https://repo.maven.apache.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-paimon/3.7.0-1.20/flink-cdc-pipeline-connector-paimon-3.7.0-1.20.jar)<br />[MySQL JDBC 8.0.27](https://repo.maven.apache.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar)<br />[Hadoop 2.8.3-10.0](https://repo.maven.apache.org/maven2/org/apache/flink/flink-shaded-hadoop-2-uber/2.8.3-10.0/flink-shaded-hadoop-2-uber-2.8.3-10.0.jar) | [Paimon SQL 2.0.0 for Flink 1.20](https://repo.maven.apache.org/maven2/org/apache/paimon/paimon-flink-1.20/2.0.0/paimon-flink-1.20-2.0.0.jar) |
 | [Flink 2.2.1](https://archive.apache.org/dist/flink/flink-2.2.1/flink-2.2.1-bin-scala_2.12.tgz) | [Flink CDC 3.7.0](https://archive.apache.org/dist/flink/flink-cdc-3.7.0/flink-cdc-3.7.0-2.2-bin.tar.gz)<br />[MySQL Pipeline connector](https://repo.maven.apache.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-mysql/3.7.0-2.2/flink-cdc-pipeline-connector-mysql-3.7.0-2.2.jar)<br />[Paimon Pipeline connector](https://repo.maven.apache.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-paimon/3.7.0-2.2/flink-cdc-pipeline-connector-paimon-3.7.0-2.2.jar)<br />[MySQL JDBC 8.0.27](https://repo.maven.apache.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar)<br />[Hadoop 2.8.3-10.0](https://repo.maven.apache.org/maven2/org/apache/flink/flink-shaded-hadoop-2-uber/2.8.3-10.0/flink-shaded-hadoop-2-uber-2.8.3-10.0.jar) | [Paimon SQL 2.0.0 for Flink 2.1](https://repo.maven.apache.org/maven2/org/apache/paimon/paimon-flink-2.1/2.0.0/paimon-flink-2.1-2.0.0.jar) |
 
-Flink CDC 3.7.0 bundles Paimon 2.0.0. Its Flink 2.2 build uses Paimon's Flink 2.1 artifact,
-so the SQL verification connector follows that dependency. For other CDC versions, match the SQL connector
-to the bundled Paimon version.
+Flink CDC 3.7.0 bundles Paimon 2.0.0, using Paimon's Flink 2.1 artifact for Flink 2.2.
+For other CDC versions, match the SQL connector to the bundled Paimon version.
 
 Download and extract the selected distributions, then set `FLINK_HOME` and `FLINK_CDC_HOME`:
 
@@ -74,16 +70,14 @@ in `$FLINK_HOME/lib` before starting Flink. Save the Hadoop JAR as
 `$FLINK_HOME/opt/flink-shaded-hadoop.jar`; the submission commands below add it with `--jar`.
 For SQL verification, save the optional Paimon SQL connector as `$FLINK_HOME/opt/paimon-sql-connector.jar`.
 See [Real-time MySQL Ingestion into Paimon](mysql-to-paimon.md#verify-the-initial-snapshot) for verification queries.
-Keep the existing Action JAR for configuration reference; the new pipeline does not use it.
 
 Enable MySQL binlog with `binlog_format=ROW` and `binlog_row_image=FULL`, and grant the synchronization
 account the permissions described in the [MySQL connector documentation](../connectors/pipeline-connectors/mysql.md).
-Keep the table set synchronized by the old job: the database Action only synchronizes tables with primary keys,
-whereas a broad Pipeline table pattern does not automatically exclude tables without primary keys.
+Preserve the old job's table set: the database Action only synchronizes primary-key tables,
+but Pipeline table patterns do not exclude tables without primary keys.
 
 Record the original catalog type, warehouse, table names, primary keys, partitions, and table properties.
-The warehouse must be accessible to the submitting client and Flink processes.
-On a distributed cluster, use shared storage rather than a machine-local directory.
+The warehouse must be accessible to the client and Flink processes; use shared storage on distributed clusters.
 
 Enable periodic checkpointing in the Flink cluster configuration so Paimon can commit streaming writes.
 For example, merge the following into the existing `execution` section of `config.yaml`:
@@ -94,9 +88,8 @@ execution:
     interval: 30s
 ```
 
-In the YAML below, replace the host, account, password placeholder, timezone, warehouse, and table patterns.
-Replace `'<mysql-password>'` with the actual value through your deployment's secure configuration process;
-do not commit credentials. The placeholder is not a secret lookup or environment-variable expression.
+Replace the host, account, timezone, warehouse, and table patterns in the YAML below.
+`'<mysql-password>'` is a literal placeholder, not a secret reference; replace it securely and do not commit credentials.
 Reserve a non-overlapping MySQL `server-id` range for the new job, with at least one ID per source subtask.
 
 ## Migrate `mysql_sync_table`
@@ -106,8 +99,8 @@ and the original job does not add computed columns or partitions.
 
 ### Existing Action configuration
 
-The following command is a configuration reference only. Do not run a second Action during migration.
-`<action-jar>` denotes the JAR used by the original job; the shell variables represent its connection settings.
+The command below is for reference only: `<action-jar>` is the original job's JAR,
+and the shell variables are its connection settings.
 
 ```shell
 flink run <action-jar> mysql_sync_table \
@@ -124,7 +117,7 @@ flink run <action-jar> mysql_sync_table \
 
 ### Flink CDC pipeline
 
-Save this as `mysql-orders-to-paimon.yaml`. It intentionally creates `lake_migration.orders`, not `lake.orders`.
+Save the following as `mysql-orders-to-paimon.yaml`:
 
 ```yaml
 source:
@@ -154,7 +147,7 @@ pipeline:
   parallelism: 4
 ```
 
-Submit it with the Flink CDC CLI, adding any filesystem dependencies required by your deployment:
+Submit with the Flink CDC CLI and the required filesystem dependencies:
 
 ```shell
 "$FLINK_CDC_HOME/bin/flink-cdc.sh" mysql-orders-to-paimon.yaml \
@@ -166,15 +159,13 @@ The configuration changes are:
 - Combine Action `database-name` and `table-name` into `source.tables`.
 - Set the target database and table in `route.sink-table`.
 - Configure the catalog directly with `catalog.properties.*` and the table with `table.properties.*`.
-- Use `commit.user-prefix` for the commit-user prefix. It does not transfer the original job's progress.
+- Set the commit-user prefix with `commit.user-prefix`.
 
-For a new target, Flink CDC creates the database and table using the source schema and primary key.
-`initial` reads a snapshot and then continues with binlog changes.
-After a successful checkpoint and Paimon commit, check an insert, update, and delete against the target table.
+Flink CDC creates new target databases and tables using the source schema and primary key.
+`initial` reads a snapshot, then binlog changes.
 
 To merge multiple source tables, expand both `tables` and `source-table` and keep a fixed `sink-table`.
-Validate schema compatibility and ensure the output primary key is unique across all source tables;
-otherwise, rows from different tables can overwrite one another.
+Schemas must be compatible and output primary keys globally unique to avoid overwriting rows from other tables.
 
 ## Migrate `mysql_sync_database`
 
@@ -247,26 +238,24 @@ For a suffix as well, use `sink-table: lake_migration.ods_<>_cdc`.
 
 ### Table selection and routing
 
-Use `source.tables` for inclusion and `source.tables.exclude` for exclusion.
-Both match source identifiers including the database name. For example, to select all `shop` tables
-except those whose names start with `tmp_`, replace the inclusion pattern and add the exclusion:
+`source.tables` and `source.tables.exclude` match source identifiers including the database name.
+For example, to select all `shop` tables except those starting with `tmp_`, use:
 
 ```yaml
 tables: 'shop.\.*'
 tables.exclude: 'shop.tmp_\.*'
 ```
 
-These are fields inside `source`, not a complete pipeline. If used, also expand the route's
-`source-table` to `'shop.\.*'` and check that every selected table has the required primary key.
-In these expressions the unescaped dot separates database and table; `\.` is needed for a regex wildcard dot.
+Place these fields inside `source` and set the route's `source-table` to `'shop.\.*'`.
+Every selected table must have the required primary key.
+An unescaped dot separates database and table; escape regex wildcard dots as `\.`.
 
 Routing is not a filter: an unmatched source table keeps its original identifier.
-By default, all matching routes apply, so use non-overlapping rules to avoid accidentally writing a table twice.
+All matching routes apply by default; avoid overlapping rules that write a table twice.
 See [Route](../core-concept/route.md) for routing modes and naming rules.
 
-For shard merging, route same-named tables from different databases to the same target only if their schemas
-are compatible and their primary keys are globally unique.
-To preserve the source database in the target name instead, replace the route list and adjust `source.tables`:
+Shard merging requires compatible schemas and globally unique primary keys.
+To keep same-named tables from different databases separate, adjust `source.tables` and use:
 
 ```yaml
 route:
@@ -276,15 +265,14 @@ route:
     sink-table: lake_migration.shop_02_orders
 ```
 
-This separates the targets as required by an Action using `--merge_shards false`.
-For multiple tables per database, use a separate rule per database with a target such as
+This corresponds to `--merge_shards false`.
+For multiple tables, use a rule per database with a target such as
 `lake_migration.shop_01_<>` and `replace-symbol: <>`.
 
 ## Translate additional configuration
 
-The basic pipelines omit optional Action features. If the old job uses them, handle them before validating the migration.
-Do not copy every `--mysql_conf` property verbatim: the Pipeline connector and the SQL connector used by the Action
-have different configuration surfaces.
+The Pipeline connector and the Action's SQL connector accept different options.
+Translate `--mysql_conf` properties individually using the mappings below.
 
 ### Catalog and table properties
 
@@ -308,10 +296,8 @@ See the [Paimon connector](../connectors/pipeline-connectors/paimon.md) for cata
 
 ### Computed columns, primary keys, and partitions
 
-An Action's `--computed_column` expressions must be rewritten as
-[Transform](../core-concept/transform.md) projections, not copied as SQL function calls without checking their semantics.
-For example, if `create_time` is a timestamp and the partition date never changes on update,
-add this top-level section to the single-table pipeline:
+Rewrite `--computed_column` expressions as [Transform](../core-concept/transform.md) projections.
+For a timestamp `create_time` whose partition date never changes on update, add this top-level section:
 
 ```yaml
 transform:
@@ -321,21 +307,17 @@ transform:
     partition-keys: dt
 ```
 
-This example assumes the source primary key is `id`, and corresponds to a target with primary key `id,dt`
-and partition key `dt`. All key fields must exist in the projected schema.
-Check timestamp precision, timezone, function argument indexing, and null handling against the original expression.
-For partitioned primary-key tables, keep the partition fields in the target primary key and validate the actual business key.
-Do not apply this example to a job that depends on moving a key between partitions.
+With source primary key `id`, this produces target primary key `id,dt` and partition key `dt`.
+All key fields must be projected; partition fields must be part of the target primary key.
+Check the business key, timestamp precision, timezone, function indexing, and null handling against the Action.
+This example does not support moving a key between partitions.
 
-Without a primary-key override, Flink CDC retains the source primary key.
-This guide does not cover converting an Action target that intentionally discards source primary keys:
-an empty `primary-keys` value does not remove inherited primary keys.
-Do not silently replace the old job's write semantics with primary-key upserts.
+Flink CDC retains source primary keys unless overridden; an empty `primary-keys` value does not remove them.
+Migrating Action targets that discard source primary keys is outside this guide's scope.
 
-For database synchronization, apply partition rules only to source tables that contain the required fields.
-The Action's behavior of leaving other tables unpartitioned must not be replaced with one invalid shared projection.
-Alternatively, the Paimon sink's `partition.key` can configure partitions by routed target identifier;
-choose one partition configuration method per table.
+For database synchronization, apply partition rules only to tables containing the required fields;
+leave other tables unpartitioned. Alternatively, use the Paimon sink's `partition.key` by routed target identifier.
+Choose one partition configuration method per table.
 Changing YAML does not automatically migrate an existing table's keys, partitions, or bucket layout.
 
 ### Per-table properties
@@ -349,15 +331,12 @@ transform:
     table-options: 'bucket=8'
 ```
 
-These options apply at table creation and override same-named common `table.properties.*` options.
-`source-table` refers to the source identifier before routing.
-If a Transform already exists for this table, merge the property into that rule instead of adding a duplicate rule.
-Existing tables are not reconfigured by changing these creation options.
+These creation-time options override same-named `table.properties.*` options but do not reconfigure existing tables.
+`source-table` is the source identifier before routing. Merge properties into an existing Transform rule rather than duplicating it.
 
 ### Newly added tables
 
-An Action's `divided` and `combined` modes describe how it organizes its operators; there is no corresponding YAML mode.
-Choose the MySQL source behavior required by the workload:
+Action modes `divided` and `combined` have no YAML equivalent. Choose the MySQL source behavior by requirement:
 
 | Requirement | Pipeline configuration |
 |-------------|------------------------|
@@ -367,7 +346,6 @@ Choose the MySQL source behavior required by the workload:
 Do not enable both options together. The snapshot-based option is incompatible with
 `scan.incremental.snapshot.metadata.release.enabled: true`.
 See [Table Selection and Adding Tables](table-selection-and-new-tables.md) for the restore workflow.
-That workflow does not make an Action savepoint compatible with a Flink CDC pipeline.
 
 ### Source metadata
 
@@ -379,10 +357,10 @@ transform:
     projection: '*, __schema_name__ AS database_name, __table_name__ AS table_name'
 ```
 
-These are source names, not routed target names. Merge them into existing projections and avoid column-name conflicts.
+These are source names, not routed target names. Merge into existing projections without column-name conflicts.
 For `op_ts`, enable `metadata.list: op_ts` inside `source` and explicitly project `op_ts` in Transform.
-The Pipeline connector exposes milliseconds as `BIGINT`, whereas SQL metadata used by an Action exposes
-`TIMESTAMP_LTZ(3)`. Validate the conversion and timezone before writing to an existing timestamp column.
+Unlike the Action's SQL `TIMESTAMP_LTZ(3)` metadata, the Pipeline connector exposes milliseconds as `BIGINT`.
+Check conversion and timezone before writing to an existing timestamp column.
 
 ### Type mapping and schema evolution
 
@@ -395,13 +373,12 @@ There is no general YAML `type_mapping` switch. Compare the original target sche
 | `tinyint1-not-bool` | Set `source.treat-tinyint1-as-boolean.enabled: false`. |
 | `to-string`, `char-to-string` | Explicitly cast the affected columns to `STRING` in a Transform projection; check the supported casts. |
 | `bigint-unsigned-to-bigint` | MySQL `BIGINT UNSIGNED` maps to `DECIMAL(20,0)` by default. Before casting to `BIGINT`, ensure every value fits its signed range. |
-| `longtext-to-bytes`, `to-nullable` | No direct equivalent source option; assess output types and nullability rather than silently dropping the old mapping. |
+| `longtext-to-bytes`, `to-nullable` | No direct source option; review output types and nullability. |
 
 The default `pipeline.schema.change.behavior` is `lenient`.
 It retains dropped columns and handles renames by keeping the old column and adding the new one.
-This does not guarantee that every DDL or type change accepted by an Action is supported.
-Review [Schema Evolution](../core-concept/schema-evolution.md), including failure handling, and validate the DDL
-used by your application. Changing a schema-evolution policy is not a substitute for an incompatible-table filter.
+Validate your application's DDL against [Schema Evolution](../core-concept/schema-evolution.md) and its failure handling.
+Schema-evolution policies do not replace incompatible-table filtering.
 
 ## Validate and cut over
 
@@ -409,7 +386,7 @@ used by your application. Changing a schema-evolution policy is not a substitute
 
 1. Start the new pipeline against the independent migration database. Keep the old target unchanged.
 2. Wait for the snapshot to finish, the binlog stream to catch up, and the relevant data to be committed to Paimon.
-   A running job or one completed checkpoint alone does not demonstrate catch-up.
+   A completed checkpoint alone does not prove catch-up.
 3. Verify target names, column types, nullability, primary keys, partitions, and table properties.
    Compare record contents and aggregates, not just row counts.
 4. Check inserts, updates, deletes, and application-specific DDL. For merged tables, check overlapping source key values.
