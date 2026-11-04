@@ -42,6 +42,7 @@ under the License.
 - [表筛选与新增表同步](table-selection-and-new-tables.md)：排除临时表、不停机捕获新建表，并从 Savepoint 恢复以纳入历史表。
 - [元数据列、计算列与软删除](metadata-and-soft-deletes.md)：补充元数据、计算日期分区，并保留删除标记。
 - [AI Function 配置与实时文本标注](ai-text-labeling.md)：配置模型，并在摄入时完成反馈标注、摘要生成和脱敏。
+- [从 Paimon MySQL CDC Action 迁移到 Flink CDC](migrate-paimon-cdc-action.md)：改写单表和整库同步配置，并规划安全切换。
 
 作业语法和支持的连接器请参见[数据管道](../core-concept/data-pipeline.md)和
 [Pipeline 连接器](../connectors/pipeline-connectors/overview.md)。

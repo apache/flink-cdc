@@ -42,6 +42,7 @@ This section focuses on practical data ingestion scenarios with Flink CDC YAML p
 - [Table Selection and Adding Tables](table-selection-and-new-tables.md): exclude temporary tables, capture new tables, and include historical tables through savepoint restore.
 - [Metadata Columns, Computed Columns, and Soft Deletes](metadata-and-soft-deletes.md): enrich records, compute date partitions, and preserve deletion markers.
 - [AI Function Configuration and Real-time Text Labeling](ai-text-labeling.md): configure a model and label, summarize, and mask feedback during ingestion.
+- [Migrate Paimon MySQL CDC Actions to Flink CDC](migrate-paimon-cdc-action.md): translate table and database synchronization settings and plan a safe cutover.
 
 For pipeline syntax and supported connectors, see [Data Pipeline](../core-concept/data-pipeline.md)
 and [Pipeline Connectors](../connectors/pipeline-connectors/overview.md).
