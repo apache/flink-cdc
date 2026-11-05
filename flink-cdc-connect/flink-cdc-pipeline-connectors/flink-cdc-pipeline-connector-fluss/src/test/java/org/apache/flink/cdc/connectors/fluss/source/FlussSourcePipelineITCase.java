@@ -17,7 +17,11 @@
 
 package org.apache.flink.cdc.connectors.fluss.source;
 
+import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
+import org.apache.flink.api.connector.source.SourceEvent;
+import org.apache.flink.api.connector.source.SourceReader;
+import org.apache.flink.api.connector.source.SourceReaderContext;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.data.ArrayData;
 import org.apache.flink.cdc.common.data.MapData;
@@ -37,30 +41,44 @@ import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.connectors.fluss.source.deserializer.FlussRecordDeserializer;
 import org.apache.flink.cdc.connectors.fluss.source.discover.FlussDefaultDiscoverer;
 import org.apache.flink.cdc.connectors.fluss.source.discover.FlussSubscriberTableDiscoverer;
+import org.apache.flink.cdc.connectors.fluss.source.event.TableRemovalAckEvent;
+import org.apache.flink.cdc.connectors.fluss.source.split.FlussSplitBase;
 import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
+import org.apache.flink.configuration.CheckpointingOptions;
+import org.apache.flink.configuration.ExternalizedCheckpointRetention;
+import org.apache.flink.configuration.RestartStrategyOptions;
 import org.apache.flink.core.execution.JobClient;
 import org.apache.flink.core.execution.SavepointFormatType;
+import org.apache.flink.metrics.groups.SourceReaderMetricGroup;
+import org.apache.flink.runtime.minicluster.MiniCluster;
 import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.v2.DiscardingSink;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableEnvironment;
 import org.apache.flink.table.api.config.ExecutionConfigOptions;
+import org.apache.flink.test.junit5.InjectMiniCluster;
 import org.apache.flink.test.junit5.MiniClusterExtension;
 import org.apache.flink.testutils.junit.SharedObjectsExtension;
 import org.apache.flink.testutils.junit.SharedReference;
 import org.apache.flink.util.CloseableIterator;
+import org.apache.flink.util.UserCodeClassLoader;
 
 import org.apache.fluss.client.Connection;
 import org.apache.fluss.client.ConnectionFactory;
 import org.apache.fluss.client.initializer.OffsetsInitializer;
 import org.apache.fluss.config.ConfigOptions;
+import org.apache.fluss.metadata.PartitionSpec;
+import org.apache.fluss.metadata.PhysicalTablePath;
+import org.apache.fluss.metadata.TablePath;
 import org.apache.fluss.server.testutils.FlussClusterExtension;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -529,6 +547,331 @@ public class FlussSourcePipelineITCase {
                 "+I[3, After1]",
                 "+I[4, After2]",
                 "+I[5, After3]");
+    }
+
+    @ParameterizedTest
+    @CsvSource({"earliest, false", "earliest, true", "full, false", "full, true"})
+    void testCheckpointRestoreSkipsDroppedPartition(
+            String startupMode,
+            boolean dropWhileRunning,
+            @TempDir Path tmpDir,
+            @InjectMiniCluster MiniCluster miniCluster)
+            throws Exception {
+        String tableName = "partition_checkpoint_restore";
+        tBatchEnv
+                .executeSql(
+                        String.format(
+                                "CREATE TABLE %s (id INT, ds STRING, val STRING, "
+                                        + "PRIMARY KEY (id, ds) NOT ENFORCED) PARTITIONED BY (ds) "
+                                        + "WITH ('bucket.num' = '2')",
+                                tableName))
+                .await();
+        tBatchEnv
+                .executeSql(
+                        String.format(
+                                "INSERT INTO %s VALUES (1, '20260904', 'expired-before'), "
+                                        + "(2, '20260905', 'retained-before')",
+                                tableName))
+                .await();
+        SharedReference<List<Event>> beforeEvents =
+                sharedObjects.add(Collections.synchronizedList(new ArrayList<>()));
+        SharedReference<CountDownLatch> partitionRemovalAcks =
+                sharedObjects.add(new CountDownLatch(2));
+        org.apache.flink.configuration.Configuration conf =
+                new org.apache.flink.configuration.Configuration();
+        conf.set(CheckpointingOptions.CHECKPOINT_STORAGE, "filesystem");
+        conf.set(CheckpointingOptions.CHECKPOINTS_DIRECTORY, tmpDir.toUri().toString());
+        conf.set(
+                CheckpointingOptions.EXTERNALIZED_CHECKPOINT_RETENTION,
+                ExternalizedCheckpointRetention.RETAIN_ON_CANCELLATION);
+        conf.set(RestartStrategyOptions.RESTART_STRATEGY, "none");
+
+        String checkpointPath;
+        JobClient job =
+                startPartitionRestoreSource(
+                        conf, tableName, startupMode, beforeEvents, partitionRemovalAcks);
+        try {
+            awaitEvents(
+                    beforeEvents.get(),
+                    collected ->
+                            convertToStringList(
+                                            collected,
+                                            DataTypes.INT(),
+                                            DataTypes.STRING(),
+                                            DataTypes.STRING())
+                                    .containsAll(
+                                            List.of(
+                                                    "+I[1, 20260904, expired-before]",
+                                                    "+I[2, 20260905, retained-before]")),
+                    COLLECT_TIMEOUT);
+            if (dropWhileRunning) {
+                dropRestoreTestPartition(tableName);
+                tBatchEnv
+                        .executeSql(
+                                String.format(
+                                        "INSERT INTO %s VALUES (5, '20260905', 'retained-running')",
+                                        tableName))
+                        .await();
+                awaitEvents(
+                        beforeEvents.get(),
+                        collected ->
+                                convertToStringList(
+                                                collected,
+                                                DataTypes.INT(),
+                                                DataTypes.STRING(),
+                                                DataTypes.STRING())
+                                        .contains("+I[5, 20260905, retained-running]"),
+                        COLLECT_TIMEOUT);
+                assertThat(partitionRemovalAcks.get().await(60, TimeUnit.SECONDS)).isTrue();
+                assertThat(job.getJobStatus().get(60, TimeUnit.SECONDS))
+                        .isEqualTo(JobStatus.RUNNING);
+            }
+            checkpointPath =
+                    miniCluster.triggerCheckpoint(job.getJobID()).get(60, TimeUnit.SECONDS);
+            LOG.info(
+                    "Partition restore E2E [{}, dropWhileRunning={}]: completed checkpoint {}",
+                    startupMode,
+                    dropWhileRunning,
+                    checkpointPath);
+        } finally {
+            job.cancel().get(60, TimeUnit.SECONDS);
+            miniCluster.requestJobResult(job.getJobID()).get(60, TimeUnit.SECONDS);
+        }
+        assertThat(job.getJobStatus().get(60, TimeUnit.SECONDS)).isEqualTo(JobStatus.CANCELED);
+
+        if (!dropWhileRunning) {
+            dropRestoreTestPartition(tableName);
+        }
+        tBatchEnv
+                .executeSql(
+                        String.format(
+                                "INSERT INTO %s VALUES (3, '20260905', 'retained-after')",
+                                tableName))
+                .await();
+
+        conf.setString("execution.savepoint.path", checkpointPath);
+        SharedReference<List<Event>> restoredEvents =
+                sharedObjects.add(Collections.synchronizedList(new ArrayList<>()));
+        job =
+                startPartitionRestoreSource(
+                        conf, tableName, startupMode, restoredEvents, partitionRemovalAcks);
+        try {
+            awaitEvents(
+                    restoredEvents.get(),
+                    collected ->
+                            convertToStringList(
+                                            collected,
+                                            DataTypes.INT(),
+                                            DataTypes.STRING(),
+                                            DataTypes.STRING())
+                                    .contains("+I[3, 20260905, retained-after]"),
+                    COLLECT_TIMEOUT);
+            if (!dropWhileRunning) {
+                assertThat(partitionRemovalAcks.get().await(60, TimeUnit.SECONDS)).isTrue();
+            }
+            assertThat(
+                            miniCluster
+                                    .getExecutionGraph(job.getJobID())
+                                    .get(60, TimeUnit.SECONDS)
+                                    .getCheckpointStatsSnapshot()
+                                    .getLatestRestoredCheckpoint()
+                                    .getExternalPath())
+                    .isEqualTo(checkpointPath);
+            String restoredCheckpoint =
+                    miniCluster.triggerCheckpoint(job.getJobID()).get(60, TimeUnit.SECONDS);
+            tBatchEnv
+                    .executeSql(
+                            String.format(
+                                    "INSERT INTO %s VALUES (4, '20260905', 'retained-continued')",
+                                    tableName))
+                    .await();
+            awaitEvents(
+                    restoredEvents.get(),
+                    collected ->
+                            convertToStringList(
+                                            collected,
+                                            DataTypes.INT(),
+                                            DataTypes.STRING(),
+                                            DataTypes.STRING())
+                                    .contains("+I[4, 20260905, retained-continued]"),
+                    COLLECT_TIMEOUT);
+            String continuedCheckpoint =
+                    miniCluster.triggerCheckpoint(job.getJobID()).get(60, TimeUnit.SECONDS);
+            List<String> restoredData =
+                    convertToStringList(
+                            snapshotEvents(restoredEvents.get()).stream()
+                                    .filter(DataChangeEvent.class::isInstance)
+                                    .collect(Collectors.toList()),
+                            DataTypes.INT(),
+                            DataTypes.STRING(),
+                            DataTypes.STRING());
+            assertThat(restoredData)
+                    .containsExactlyInAnyOrder(
+                            "+I[3, 20260905, retained-after]",
+                            "+I[4, 20260905, retained-continued]");
+            assertThat(job.getJobStatus().get(60, TimeUnit.SECONDS)).isEqualTo(JobStatus.RUNNING);
+            LOG.info(
+                    "Partition restore E2E [{}]: restored {}, completed checkpoints {} and {}, "
+                            + "read exactly {} without replay",
+                    startupMode,
+                    checkpointPath,
+                    restoredCheckpoint,
+                    continuedCheckpoint,
+                    restoredData);
+        } finally {
+            job.cancel().get(60, TimeUnit.SECONDS);
+            miniCluster.requestJobResult(job.getJobID()).get(60, TimeUnit.SECONDS);
+        }
+    }
+
+    private void dropRestoreTestPartition(String tableName) throws Exception {
+        try (Connection connection =
+                ConnectionFactory.createConnection(FLUSS_CLUSTER_EXTENSION.getClientConfig())) {
+            TablePath tablePath = TablePath.of(DATABASE_NAME, tableName);
+            connection
+                    .getAdmin()
+                    .dropPartition(
+                            tablePath,
+                            new PartitionSpec(Collections.singletonMap("ds", "20260904")),
+                            false)
+                    .get(60, TimeUnit.SECONDS);
+            assertThat(connection.getAdmin().listPartitionInfos(tablePath).get())
+                    .extracting(info -> info.getPartitionName())
+                    .containsExactly("20260905");
+        }
+    }
+
+    private JobClient startPartitionRestoreSource(
+            org.apache.flink.configuration.Configuration conf,
+            String tableName,
+            String startupMode,
+            SharedReference<List<Event>> events,
+            SharedReference<CountDownLatch> partitionRemovalAcks)
+            throws Exception {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment(conf);
+        env.setParallelism(2);
+        // Trigger checkpoints explicitly so the restored checkpoint cannot be subsumed before
+        // cancel.
+        env.enableCheckpointing(Duration.ofHours(1).toMillis());
+        env.fromSource(
+                        new PartitionRemovalTrackingSource(
+                                FLUSS_CLUSTER_EXTENSION.getClientConfig(),
+                                tableName,
+                                startupMode,
+                                partitionRemovalAcks),
+                        WatermarkStrategy.noWatermarks(),
+                        "FlussSource",
+                        new EventTypeInfo())
+                .uid("fluss-source")
+                .map(
+                        event -> {
+                            events.get().add(event);
+                            return event;
+                        })
+                .returns(new EventTypeInfo())
+                .uid("capture-events")
+                .sinkTo(new DiscardingSink<>())
+                .uid("discard-sink");
+        return env.executeAsync("PartitionCheckpointRestore-" + startupMode);
+    }
+
+    private static class PartitionRemovalTrackingSource extends FlussSource<Event> {
+
+        private static final long serialVersionUID = 1L;
+
+        private final PhysicalTablePath removedPartition;
+        private final SharedReference<CountDownLatch> acknowledgements;
+
+        private PartitionRemovalTrackingSource(
+                org.apache.fluss.config.Configuration flussConfig,
+                String tableName,
+                String startupMode,
+                SharedReference<CountDownLatch> acknowledgements) {
+            super(
+                    new FlussDefaultDiscoverer(),
+                    flussConfig,
+                    buildSourceConfig(flussConfig, toFqnRegex(DATABASE_NAME, tableName)),
+                    "full".equals(startupMode)
+                            ? OffsetsInitializer.full()
+                            : OffsetsInitializer.earliest(),
+                    Duration.ofSeconds(1).toMillis(),
+                    new FlussRecordDeserializer());
+            this.removedPartition =
+                    PhysicalTablePath.of(TablePath.of(DATABASE_NAME, tableName), "20260904");
+            this.acknowledgements = acknowledgements;
+        }
+
+        @Override
+        public SourceReader<Event, FlussSplitBase> createReader(SourceReaderContext context) {
+            return super.createReader(
+                    new PartitionRemovalTrackingContext(
+                            context, removedPartition, acknowledgements));
+        }
+    }
+
+    private static class PartitionRemovalTrackingContext implements SourceReaderContext {
+
+        private final SourceReaderContext delegate;
+        private final PhysicalTablePath removedPartition;
+        private final SharedReference<CountDownLatch> acknowledgements;
+        private boolean acknowledged;
+
+        private PartitionRemovalTrackingContext(
+                SourceReaderContext delegate,
+                PhysicalTablePath removedPartition,
+                SharedReference<CountDownLatch> acknowledgements) {
+            this.delegate = delegate;
+            this.removedPartition = removedPartition;
+            this.acknowledgements = acknowledgements;
+        }
+
+        @Override
+        public SourceReaderMetricGroup metricGroup() {
+            return delegate.metricGroup();
+        }
+
+        @Override
+        public org.apache.flink.configuration.Configuration getConfiguration() {
+            return delegate.getConfiguration();
+        }
+
+        @Override
+        public String getLocalHostName() {
+            return delegate.getLocalHostName();
+        }
+
+        @Override
+        public int getIndexOfSubtask() {
+            return delegate.getIndexOfSubtask();
+        }
+
+        @Override
+        public void sendSplitRequest() {
+            delegate.sendSplitRequest();
+        }
+
+        @Override
+        public void sendSourceEventToCoordinator(SourceEvent sourceEvent) {
+            delegate.sendSourceEventToCoordinator(sourceEvent);
+            if (!acknowledged
+                    && sourceEvent instanceof TableRemovalAckEvent
+                    && ((TableRemovalAckEvent) sourceEvent)
+                            .getCompletedPartitionRemovalRequests()
+                            .containsKey(removedPartition)) {
+                acknowledged = true;
+                acknowledgements.get().countDown();
+            }
+        }
+
+        @Override
+        public UserCodeClassLoader getUserCodeClassLoader() {
+            return delegate.getUserCodeClassLoader();
+        }
+
+        @Override
+        public int currentParallelism() {
+            return delegate.currentParallelism();
+        }
     }
 
     @Test

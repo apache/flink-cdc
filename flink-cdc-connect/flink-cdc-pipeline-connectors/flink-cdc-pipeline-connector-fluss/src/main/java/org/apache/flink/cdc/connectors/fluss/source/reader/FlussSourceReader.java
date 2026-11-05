@@ -34,12 +34,14 @@ import org.apache.flink.connector.base.source.reader.RecordsWithSplitIds;
 import org.apache.flink.connector.base.source.reader.SingleThreadMultiplexSourceReaderBase;
 import org.apache.flink.connector.base.source.reader.synchronization.FutureCompletingBlockingQueue;
 
+import org.apache.fluss.metadata.PhysicalTablePath;
 import org.apache.fluss.metadata.TableBucket;
 import org.apache.fluss.metadata.TablePath;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -72,7 +74,9 @@ public class FlussSourceReader<T>
     private final List<FlussSplitBase> stagedSplits;
     private final Map<String, FlussSplitBase> activeSplits;
     private final Map<TablePath, Long> pendingRemovalRequests;
+    private final Map<PhysicalTablePath, Long> pendingPartitionRemovalRequests;
     private final Set<TablePath> subscribedTablePaths;
+    private Set<PhysicalTablePath> subscribedPhysicalTablePaths = Collections.emptySet();
     private boolean receivedSubscriptionSnapshot;
 
     public FlussSourceReader(
@@ -109,6 +113,7 @@ public class FlussSourceReader<T>
         this.stagedSplits = new ArrayList<>();
         this.activeSplits = new HashMap<>();
         this.pendingRemovalRequests = new HashMap<>();
+        this.pendingPartitionRemovalRequests = new HashMap<>();
         this.subscribedTablePaths = new HashSet<>();
     }
 
@@ -189,6 +194,9 @@ public class FlussSourceReader<T>
         subscribedTablePaths.addAll(event.getSubscribedTablePaths());
         pendingRemovalRequests.clear();
         pendingRemovalRequests.putAll(event.getPendingRemovalRequests());
+        pendingPartitionRemovalRequests.clear();
+        pendingPartitionRemovalRequests.putAll(event.getPendingPartitionRemovalRequests());
+        subscribedPhysicalTablePaths = event.getSubscribedPhysicalTablePaths();
 
         Set<TablePath> activeRemovalTablePaths =
                 activeSplits.values().stream()
@@ -207,11 +215,26 @@ public class FlussSourceReader<T>
             fetcherManager.removeTables(activeRemovalTablePaths);
         }
 
+        Set<PhysicalTablePath> activeRemovalPartitionPaths =
+                activeSplits.values().stream()
+                        .filter(split -> isActive(split.getTablePath()) && !isActive(split))
+                        .map(FlussSplitBase::getPhysicalTablePath)
+                        .collect(Collectors.toSet());
+        activeSplits.values().stream()
+                .filter(split -> activeRemovalPartitionPaths.contains(split.getPhysicalTablePath()))
+                .map(FlussSplitBase::getTableBucket)
+                .forEach(reportedFinishedSnapshotBuckets::remove);
+        if (!activeRemovalPartitionPaths.isEmpty()) {
+            fetcherManager.removePartitions(activeRemovalPartitionPaths);
+        }
+
         List<FlussSplitBase> effectiveStagedSplits = new ArrayList<>();
         for (FlussSplitBase split : stagedSplits) {
-            if (isActive(split.getTablePath())
+            if (isActive(split)
                     && (!firstSubscriptionSnapshot
-                            || !event.getFencedTablePaths().contains(split.getTablePath()))) {
+                            || (!event.getFencedTablePaths().contains(split.getTablePath())
+                                    && !event.getFencedPartitionPaths()
+                                            .contains(split.getPhysicalTablePath())))) {
                 effectiveStagedSplits.add(split);
             } else {
                 reportedFinishedSnapshotBuckets.remove(split.getTableBucket());
@@ -233,7 +256,7 @@ public class FlussSourceReader<T>
     private void activateSplits(List<FlussSplitBase> splits) {
         List<FlussSplitBase> activeSplits = new ArrayList<>();
         for (FlussSplitBase split : splits) {
-            if (isActive(split.getTablePath())) {
+            if (isActive(split)) {
                 activeSplits.add(split);
             }
         }
@@ -247,6 +270,13 @@ public class FlussSourceReader<T>
                 && !pendingRemovalRequests.containsKey(tablePath);
     }
 
+    private boolean isActive(FlussSplitBase split) {
+        return isActive(split.getTablePath())
+                && !pendingPartitionRemovalRequests.containsKey(split.getPhysicalTablePath())
+                && (split.getPhysicalTablePath().getPartitionName() == null
+                        || subscribedPhysicalTablePaths.contains(split.getPhysicalTablePath()));
+    }
+
     private void acknowledgeCompletedRemovals() {
         Map<TablePath, Long> completed = new HashMap<>();
         for (Map.Entry<TablePath, Long> entry : pendingRemovalRequests.entrySet()) {
@@ -257,8 +287,20 @@ public class FlussSourceReader<T>
                 completed.put(entry.getKey(), entry.getValue());
             }
         }
-        if (!completed.isEmpty()) {
-            readerContext.sendSourceEventToCoordinator(new TableRemovalAckEvent(completed));
+        Map<PhysicalTablePath, Long> completedPartitions = new HashMap<>();
+        for (Map.Entry<PhysicalTablePath, Long> entry :
+                pendingPartitionRemovalRequests.entrySet()) {
+            if (activeSplits.values().stream()
+                            .noneMatch(split -> split.getPhysicalTablePath().equals(entry.getKey()))
+                    && stagedSplits.stream()
+                            .noneMatch(
+                                    split -> split.getPhysicalTablePath().equals(entry.getKey()))) {
+                completedPartitions.put(entry.getKey(), entry.getValue());
+            }
+        }
+        if (!completed.isEmpty() || !completedPartitions.isEmpty()) {
+            readerContext.sendSourceEventToCoordinator(
+                    new TableRemovalAckEvent(completed, completedPartitions));
         }
     }
 }
