@@ -232,7 +232,7 @@ pipeline:
        <td>String</td>
        <td> Parameters of StreamLoad.
          For example: <code> sink.properties.strict_mode: true</code>.
-         Stream Load uses gzip compression by default. Set <code>sink.properties.compress_type: ""</code> to disable compression.
+         Stream Load compression is disabled by default. Set <code>sink.properties.compress_type: gz</code> to enable gzip compression.
          See more about <a href="https://doris.apache.org/docs/dev/data-operate/import/import-way/stream-load-manual"> StreamLoad Properties</a></td>
        </td>
      </tr>
@@ -268,6 +268,32 @@ pipeline:
      </tbody>
 </table>
 </div>
+
+## Stream Load Compression
+
+The Doris connector writes JSON data using Stream Load. Compression is disabled by default to preserve compatibility with older Doris servers, even though Doris Flink Connector 26.3.0 enables gzip by default.
+
+JSON Stream Load compression is supported starting from Doris 3.0.5, as described in the [Doris JSON format documentation](https://doris.apache.org/docs/3.x/data-operate/import/file-format/json/) and [Doris 3.0.5 release notes](https://github.com/apache/doris/issues/50333).
+
+| Doris server version | JSON Stream Load gzip support | Configuration |
+| --- | --- | --- |
+| 1.x / 2.x | Not supported | Keep compression disabled |
+| 3.0.0–3.0.4 | Not supported | Keep compression disabled |
+| 3.0.5 and later 3.0.x releases | Supported | Optionally set `sink.properties.compress_type: gz` |
+| 3.1.x / 4.x | Supported | Optionally set `sink.properties.compress_type: gz` |
+
+This table applies to JSON Stream Load used by this connector. CSV, Broker Load and vendor-specific backports can have different compression support. Older Doris servers may reject compressed JSON with `compress data of JSON format is not supported.`
+
+To enable gzip on a supported Doris server, add the following option to the sink configuration:
+
+```yaml
+sink:
+  type: doris
+  # Other required sink options...
+  sink.properties.compress_type: gz
+```
+
+Set `sink.properties.compress_type: ""` to explicitly disable compression.
 
 ## Data Type Mapping
 
