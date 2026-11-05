@@ -28,6 +28,9 @@ under the License.
 
 Paimon Pipeline 连接器可以用作 Pipeline 的 *Data Sink*，将数据写入 [Paimon](https://paimon.apache.org)。本文档介绍如何设置 Paimon Pipeline 连接器。
 
+替换已有 Paimon MySQL CDC Action 时，请参见
+[从 Paimon MySQL CDC Action 迁移到 Flink CDC](../../examples-and-best-practices/migrate-paimon-cdc-action.md)。
+
 ## 连接器的功能
 * 自动建表
 * 表结构变更同步
