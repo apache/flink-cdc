@@ -156,7 +156,10 @@ public class FlussSource<T> implements Source<T, FlussSplitBase, FlussSourceEnum
         WrapperFlussMetricRegistry metricRegistry =
                 new WrapperFlussMetricRegistry(readerContext.metricGroup(), Collections.emptySet());
 
-        FlussRecordEmitter<T> recordEmitter = new FlussRecordEmitter<>(deserializer);
+        FlussRecordEmitter<T> recordEmitter =
+                new FlussRecordEmitter<>(
+                        deserializer,
+                        readerContext.metricGroup().getIOMetricGroup().getNumRecordsInCounter());
         FutureCompletingBlockingQueue<RecordsWithSplitIds<FlussSourceRecord>> elementsQueue =
                 new FutureCompletingBlockingQueue<>();
         return new FlussSourceReader<>(

@@ -18,15 +18,20 @@
 package org.apache.flink.cdc.connectors.fluss.source.reader;
 
 import org.apache.flink.api.common.eventtime.Watermark;
+import org.apache.flink.api.connector.source.ReaderOutput;
 import org.apache.flink.api.connector.source.SourceOutput;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.connectors.fluss.source.deserializer.FlussDeserializer;
 import org.apache.flink.cdc.connectors.fluss.source.deserializer.FlussRecordDeserializer;
+import org.apache.flink.cdc.connectors.fluss.source.split.FlussHybridSnapshotLogSplit;
+import org.apache.flink.cdc.connectors.fluss.source.split.FlussHybridSnapshotLogSplitState;
 import org.apache.flink.cdc.connectors.fluss.source.split.FlussLogSplit;
 import org.apache.flink.cdc.connectors.fluss.source.split.FlussLogSplitState;
+import org.apache.flink.metrics.SimpleCounter;
 
 import org.apache.fluss.client.table.scanner.ScanRecord;
 import org.apache.fluss.metadata.PhysicalTablePath;
@@ -36,6 +41,7 @@ import org.apache.fluss.record.ChangeType;
 import org.apache.fluss.row.BinaryString;
 import org.apache.fluss.row.GenericRow;
 import org.apache.fluss.types.DataField;
+import org.apache.fluss.types.DataType;
 import org.apache.fluss.types.IntType;
 import org.apache.fluss.types.RowType;
 import org.apache.fluss.types.StringType;
@@ -64,14 +70,139 @@ class FlussRecordEmitterTest {
     private static final TableBucket TABLE_BUCKET = new TableBucket(TABLE_ID, 0);
 
     private FlussRecordEmitter<Event> emitter;
+    private SimpleCounter numRecordsIn;
     private FlussRecordDeserializer deserializer;
-    private SimpleReaderOutput output;
+    private SimpleReaderOutput<Event> output;
 
     @BeforeEach
     void setUp() {
         deserializer = new FlussRecordDeserializer();
-        emitter = new FlussRecordEmitter<>(deserializer);
-        output = new SimpleReaderOutput();
+        numRecordsIn = new SimpleCounter();
+        emitter = new FlussRecordEmitter<>(deserializer, numRecordsIn);
+        output = new SimpleReaderOutput<>();
+    }
+
+    @Test
+    void testProgressDoesNotEmitOrConsumePendingTableEvents() throws Exception {
+        FlussDeserializer<String> restoringDeserializer =
+                new FlussDeserializer<String>() {
+                    @Override
+                    public List<String> restoreState(
+                            TablePath tablePath, int schemaId, RowType rowType) {
+                        return Collections.singletonList("schema");
+                    }
+
+                    @Override
+                    public List<String> deserialize(
+                            FlussSourceRecord element, TablePath tablePath) {
+                        assertThat(element.isProgressOnly()).isFalse();
+                        return Collections.singletonList("row");
+                    }
+                };
+        FlussRecordEmitter<String> restoringEmitter =
+                new FlussRecordEmitter<>(restoringDeserializer, numRecordsIn);
+        SimpleReaderOutput<String> restoredOutput = new SimpleReaderOutput<>();
+        RowType rowType = rowType(field("id", new IntType(false), 1));
+        FlussLogSplit split = logSplitWithSchema(1, rowType);
+        FlussLogSplitState state = new FlussLogSplitState(split);
+        restoringEmitter.applySplit(split);
+        numRecordsIn.inc();
+        restoringEmitter.emitRecord(
+                FlussSourceRecord.forProgress(TABLE_PATH, 105L), restoredOutput, state);
+        assertThat(restoredOutput.getCollectedEvents()).isEmpty();
+        assertThat(state.toFlussSplit().getStartingOffset()).isEqualTo(105L);
+        restoringEmitter.emitRecord(
+                logRecord(1, rowType, GenericRow.of(7), 105L), restoredOutput, state);
+        assertThat(restoredOutput.getCollectedEvents()).containsExactly("schema", "row");
+        restoredOutput.clear();
+        restoringEmitter.emitRecord(
+                logRecord(1, rowType, GenericRow.of(8), 106L), restoredOutput, state);
+        assertThat(restoredOutput.getCollectedEvents()).containsExactly("row");
+    }
+
+    @Test
+    void testProgressPreservesPendingSchemaUntilARealRecord() throws Exception {
+        RowType oldType = rowType(field("id", new IntType(false), 1));
+        FlussLogSplit split = logSplitWithSchema(1, oldType);
+        FlussLogSplitState state = new FlussLogSplitState(split);
+        emitter.applySplit(split);
+        numRecordsIn.inc();
+        emitter.emitRecord(FlussSourceRecord.forProgress(TABLE_PATH, 105L), output, state);
+
+        assertThat(state.toFlussSplit().getStartingOffset()).isEqualTo(105L);
+        assertThat(state.toFlussSplit().getSchemaId()).isEqualTo(1);
+        assertThat(state.toFlussSplit().getRowType()).isEqualTo(oldType);
+        assertThat(output.getCollectedEvents()).isEmpty();
+        assertThat(numRecordsIn.getCount()).isZero();
+
+        RowType newType =
+                rowType(field("id", new IntType(false), 1), field("name", new StringType(true), 2));
+        numRecordsIn.inc();
+        emitter.emitRecord(
+                logRecord(2, newType, GenericRow.of(7, BinaryString.fromString("name")), 105L),
+                output,
+                state);
+        assertThat(output.getCollectedEvents())
+                .extracting(Event::getClass)
+                .containsExactly(
+                        CreateTableEvent.class, AddColumnEvent.class, DataChangeEvent.class);
+        assertThat(
+                        ((CreateTableEvent) output.getCollectedEvents().get(0))
+                                .getSchema()
+                                .getColumnNames())
+                .containsExactly("id");
+        assertThat(state.toFlussSplit().getStartingOffset()).isEqualTo(106L);
+        assertThat(numRecordsIn.getCount()).isEqualTo(1L);
+    }
+
+    @Test
+    void testFirstLogProgressFinishesSnapshotAndPreservesSnapshotPositionAndSchema()
+            throws Exception {
+        RowType rowType = rowType(field("id", new IntType(false), 1));
+        FlussHybridSnapshotLogSplit split =
+                new FlussHybridSnapshotLogSplit(
+                        PHYSICAL_TABLE_PATH, TABLE_BUCKET, 1L, 3L, 100L, false, 1, rowType);
+        FlussHybridSnapshotLogSplitState state = new FlussHybridSnapshotLogSplitState(split);
+        emitter.applySplit(split);
+        emitter.emitRecord(
+                new FlussSourceRecord(
+                        new ScanRecord(
+                                TABLE_ID, 1, -1L, -1L, ChangeType.INSERT, GenericRow.of(7), 1),
+                        TABLE_PATH,
+                        rowType,
+                        4L,
+                        Collections.singletonList("id")),
+                output,
+                state);
+        assertThat(state.toFlussSplit().isSnapshotFinished()).isFalse();
+        assertThat(state.toFlussSplit().getRecordsToSkip()).isEqualTo(4L);
+        output.clear();
+
+        numRecordsIn.inc();
+        emitter.emitRecord(FlussSourceRecord.forProgress(TABLE_PATH, 105L), output, state);
+        FlussHybridSnapshotLogSplit saved = state.toFlussSplit();
+        assertThat(saved.isSnapshotFinished()).isTrue();
+        assertThat(saved.getLogStartingOffset()).isEqualTo(105L);
+        assertThat(saved.getRecordsToSkip()).isEqualTo(4L);
+        assertThat(saved.getSchemaId()).isEqualTo(1);
+        assertThat(saved.getRowType()).isEqualTo(rowType);
+        assertThat(output.getCollectedEvents()).isEmpty();
+        assertThat(numRecordsIn.getCount()).isZero();
+    }
+
+    @Test
+    void testInactiveProgressDoesNotAdvanceStateOrCountAsInput() throws Exception {
+        RowType rowType = rowType(field("id", new IntType(false), 1));
+        FlussLogSplit split = logSplitWithSchema(1, rowType);
+        FlussLogSplitState state = new FlussLogSplitState(split);
+        emitter.applySplit(split);
+        emitter.removeTable(TABLE_PATH);
+        numRecordsIn.inc();
+        emitter.emitRecord(FlussSourceRecord.forProgress(TABLE_PATH, 105L), output, state);
+        assertThat(state.toFlussSplit().getStartingOffset()).isEqualTo(100L);
+        assertThat(state.toFlussSplit().getSchemaId()).isEqualTo(1);
+        assertThat(output.getCollectedEvents()).isEmpty();
+        assertThat(numRecordsIn.getCount()).isZero();
     }
 
     @Test
@@ -300,7 +431,7 @@ class FlussRecordEmitterTest {
         return new RowType(Arrays.asList(fields));
     }
 
-    private static DataField field(String name, org.apache.fluss.types.DataType type, int fieldId) {
+    private static DataField field(String name, DataType type, int fieldId) {
         return new DataField(name, type, null, fieldId);
     }
 
@@ -350,21 +481,29 @@ class FlussRecordEmitterTest {
                 partitionKeyNames);
     }
 
-    private static class SimpleReaderOutput implements SourceOutput<Event> {
+    static class SimpleReaderOutput<T> implements ReaderOutput<T> {
 
-        private final List<Event> collected = new ArrayList<>();
+        private final List<T> collected = new ArrayList<>();
 
         @Override
-        public void collect(Event record) {
+        public SourceOutput<T> createOutputForSplit(String splitId) {
+            return this;
+        }
+
+        @Override
+        public void releaseOutputForSplit(String splitId) {}
+
+        @Override
+        public void collect(T record) {
             collected.add(record);
         }
 
         @Override
-        public void collect(Event record, long timestamp) {
+        public void collect(T record, long timestamp) {
             collected.add(record);
         }
 
-        List<Event> getCollectedEvents() {
+        List<T> getCollectedEvents() {
             return collected;
         }
 
