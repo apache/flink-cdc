@@ -107,6 +107,34 @@ class IcebergWriterDeleteCapabilityTest {
 
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
+    void testUpdateChangingTargetKeyButNotCdcKeyDeletesOldRow(boolean partitioned)
+            throws Exception {
+        TableId tableId = TableId.parse("test.reassigned_key_table");
+        RecordData north = record(1L, "north");
+        RecordData east = record(1L, "east");
+
+        try (TestContext context = new TestContext()) {
+            Schema.Builder targetSchema =
+                    Schema.newBuilder()
+                            .physicalColumn("id", DataTypes.BIGINT().notNull())
+                            .physicalColumn("region", DataTypes.STRING().notNull())
+                            .primaryKey("region");
+            if (partitioned) {
+                targetSchema.partitionKey("id");
+            }
+            context.createTable(tableId, targetSchema.build(), schema(true, false));
+
+            context.writer.write(DataChangeEvent.insertEvent(tableId, north), null);
+            context.commit();
+            // The CDC key id is unchanged, but the target key region changes.
+            context.writer.write(DataChangeEvent.updateEvent(tableId, north, east), null);
+            context.commit();
+            assertThat(context.read(tableId)).containsExactly("1, east");
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
     void testExistingKeyedTargetWithoutCdcPrimaryKey(boolean partitioned) throws Exception {
         TableId tableId = TableId.parse("test.existing_keyed_table");
         RecordData north = record(1L, "north");

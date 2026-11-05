@@ -1767,6 +1767,172 @@ public class IcebergWriterTest {
         }
     }
 
+    @Test
+    public void testSamePartitionUpdatesWithinAndAcrossCheckpoints() throws Exception {
+        assertSamePartitionUpdatesLeaveOnlyLatestRow(true);
+    }
+
+    @Test
+    public void testUnpartitionedUpdatesWithinAndAcrossCheckpoints() throws Exception {
+        assertSamePartitionUpdatesLeaveOnlyLatestRow(false);
+    }
+
+    @Test
+    public void testPartitionedUpdateChangingKeyDeletesOldKey() throws Exception {
+        assertUpdateChangingKeyDeletesOldKey(true);
+    }
+
+    @Test
+    public void testUnpartitionedUpdateChangingKeyDeletesOldKey() throws Exception {
+        assertUpdateChangingKeyDeletesOldKey(false);
+    }
+
+    private void assertUpdateChangingKeyDeletesOldKey(boolean partitioned) throws Exception {
+        Map<String, String> catalogOptions = new HashMap<>();
+        catalogOptions.put("type", "hadoop");
+        catalogOptions.put(
+                "warehouse",
+                new File(temporaryFolder.toFile(), UUID.randomUUID().toString()).toString());
+        catalogOptions.put("cache-enabled", "false");
+        Catalog catalog =
+                CatalogUtil.buildIcebergCatalog(
+                        "cdc-iceberg-catalog", catalogOptions, new Configuration());
+        IcebergMetadataApplier icebergMetadataApplier = new IcebergMetadataApplier(catalogOptions);
+        IcebergWriter icebergWriter =
+                new IcebergWriter(
+                        catalogOptions,
+                        1,
+                        1,
+                        ZoneId.systemDefault(),
+                        0,
+                        UUID.randomUUID().toString(),
+                        UUID.randomUUID().toString(),
+                        new HashMap<>());
+
+        TableId tableId = TableId.parse("test.iceberg_table");
+        Schema.Builder schemaBuilder =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.BIGINT().notNull())
+                        .physicalColumn("region", DataTypes.VARCHAR(100).notNull())
+                        .primaryKey("id");
+        if (partitioned) {
+            schemaBuilder.partitionKey("region");
+        }
+        Schema schema = schemaBuilder.build();
+        CreateTableEvent createTableEvent = new CreateTableEvent(tableId, schema);
+        icebergMetadataApplier.applySchemaChange(createTableEvent);
+        icebergWriter.write(createTableEvent, null);
+
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(schema.getColumnDataTypes().toArray(new DataType[0]));
+        RecordData oldKey =
+                generator.generate(new Object[] {1L, BinaryStringData.fromString("north")});
+        RecordData newKey =
+                generator.generate(new Object[] {2L, BinaryStringData.fromString("north")});
+        IcebergCommitter committer = new IcebergCommitter(catalogOptions, new HashMap<>());
+
+        icebergWriter.write(DataChangeEvent.insertEvent(tableId, oldKey), null);
+        commit(committer, icebergWriter.prepareCommit());
+
+        // The upsert delete only covers the new key, so the old key needs an explicit delete.
+        icebergWriter.write(DataChangeEvent.updateEvent(tableId, oldKey, newKey), null);
+        commit(committer, icebergWriter.prepareCommit());
+        committer.close();
+
+        Assertions.assertThat(fetchTableContent(catalog, tableId, null))
+                .containsExactly("2, north");
+    }
+
+    private void assertSamePartitionUpdatesLeaveOnlyLatestRow(boolean partitioned)
+            throws Exception {
+        Map<String, String> catalogOptions = new HashMap<>();
+        catalogOptions.put("type", "hadoop");
+        catalogOptions.put(
+                "warehouse",
+                new File(temporaryFolder.toFile(), UUID.randomUUID().toString()).toString());
+        catalogOptions.put("cache-enabled", "false");
+        Catalog catalog =
+                CatalogUtil.buildIcebergCatalog(
+                        "cdc-iceberg-catalog", catalogOptions, new Configuration());
+        IcebergMetadataApplier icebergMetadataApplier = new IcebergMetadataApplier(catalogOptions);
+        IcebergWriter icebergWriter =
+                new IcebergWriter(
+                        catalogOptions,
+                        1,
+                        1,
+                        ZoneId.systemDefault(),
+                        0,
+                        UUID.randomUUID().toString(),
+                        UUID.randomUUID().toString(),
+                        new HashMap<>());
+
+        TableId tableId = TableId.parse("test.iceberg_table");
+        Schema.Builder schemaBuilder =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.BIGINT().notNull())
+                        .physicalColumn("region", DataTypes.VARCHAR(100).notNull())
+                        .physicalColumn("name", DataTypes.VARCHAR(100))
+                        .primaryKey("id");
+        if (partitioned) {
+            schemaBuilder.partitionKey("region");
+        }
+        Schema schema = schemaBuilder.build();
+        CreateTableEvent createTableEvent = new CreateTableEvent(tableId, schema);
+        icebergMetadataApplier.applySchemaChange(createTableEvent);
+        icebergWriter.write(createTableEvent, null);
+
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(schema.getColumnDataTypes().toArray(new DataType[0]));
+        RecordData[] versions = new RecordData[4];
+        String[] names = {"a", "b", "c", "d"};
+        for (int i = 0; i < names.length; i++) {
+            versions[i] =
+                    generator.generate(
+                            new Object[] {
+                                1L,
+                                BinaryStringData.fromString("north"),
+                                BinaryStringData.fromString(names[i])
+                            });
+        }
+        RecordData other =
+                generator.generate(
+                        new Object[] {
+                            2L,
+                            BinaryStringData.fromString("north"),
+                            BinaryStringData.fromString("x")
+                        });
+        IcebergCommitter committer = new IcebergCommitter(catalogOptions, new HashMap<>());
+
+        // Checkpoint 1: insert, then update the same key twice before committing.
+        icebergWriter.write(DataChangeEvent.insertEvent(tableId, versions[0]), null);
+        icebergWriter.write(DataChangeEvent.insertEvent(tableId, other), null);
+        icebergWriter.write(DataChangeEvent.updateEvent(tableId, versions[0], versions[1]), null);
+        icebergWriter.write(DataChangeEvent.updateEvent(tableId, versions[1], versions[2]), null);
+        commit(committer, icebergWriter.prepareCommit());
+        Assertions.assertThat(fetchTableContent(catalog, tableId, null))
+                .containsExactlyInAnyOrder("1, north, c", "2, north, x");
+
+        // Checkpoint 2: update a row that only exists in an already committed data file.
+        icebergWriter.write(DataChangeEvent.updateEvent(tableId, versions[2], versions[3]), null);
+        commit(committer, icebergWriter.prepareCommit());
+        Assertions.assertThat(fetchTableContent(catalog, tableId, null))
+                .containsExactlyInAnyOrder("1, north, d", "2, north, x");
+
+        // Checkpoint 3: delete after the updates.
+        icebergWriter.write(DataChangeEvent.deleteEvent(tableId, versions[3]), null);
+        commit(committer, icebergWriter.prepareCommit());
+        committer.close();
+        Assertions.assertThat(fetchTableContent(catalog, tableId, null))
+                .containsExactly("2, north, x");
+    }
+
+    private static void commit(
+            IcebergCommitter committer, Collection<WriteResultWrapper> writeResults)
+            throws Exception {
+        committer.commit(
+                writeResults.stream().map(MockCommitRequestImpl::new).collect(Collectors.toList()));
+    }
+
     private static long countSnapshots(Table table) {
         long count = 0;
         for (Snapshot ignored : table.snapshots()) {
