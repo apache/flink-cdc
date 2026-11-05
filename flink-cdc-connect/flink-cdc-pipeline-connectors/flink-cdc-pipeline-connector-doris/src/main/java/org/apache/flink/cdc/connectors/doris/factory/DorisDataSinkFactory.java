@@ -113,6 +113,8 @@ public class DorisDataSinkFactory implements DataSinkFactory {
 
         // set streamload properties
         Properties properties = DorisExecutionOptions.defaultsProperties();
+        // Preserve compatibility with Doris versions without JSON Stream Load compression.
+        properties.setProperty("compress_type", "");
         Map<String, String> streamLoadProp =
                 DorisDataSinkOptions.getPropertiesByPrefix(config, STREAM_LOAD_PROP_PREFIX);
         properties.putAll(streamLoadProp);
