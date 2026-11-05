@@ -27,9 +27,11 @@ import org.apache.flink.connector.base.source.reader.RecordsWithSplitIds;
 import org.apache.flink.connector.base.source.reader.splitreader.SplitReader;
 import org.apache.flink.connector.base.source.reader.splitreader.SplitsAddition;
 import org.apache.flink.connector.base.source.reader.splitreader.SplitsChange;
+import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.fluss.client.Connection;
 import org.apache.fluss.client.ConnectionFactory;
+import org.apache.fluss.client.admin.Admin;
 import org.apache.fluss.client.table.Table;
 import org.apache.fluss.client.table.scanner.MultiTableRecord;
 import org.apache.fluss.client.table.scanner.ScanRecord;
@@ -37,7 +39,10 @@ import org.apache.fluss.client.table.scanner.batch.BatchScanner;
 import org.apache.fluss.client.table.scanner.log.LogScanner;
 import org.apache.fluss.client.table.scanner.log.MultiTableLogScanner;
 import org.apache.fluss.client.table.scanner.log.MultiTableRecords;
+import org.apache.fluss.config.ConfigOptions;
 import org.apache.fluss.config.Configuration;
+import org.apache.fluss.exception.PartitionNotExistException;
+import org.apache.fluss.metadata.PhysicalTablePath;
 import org.apache.fluss.metadata.TableBucket;
 import org.apache.fluss.metadata.TableInfo;
 import org.apache.fluss.metadata.TablePath;
@@ -64,6 +69,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Predicate;
 
 /**
  * A {@link SplitReader} implementation for Fluss. It reads change log records from Fluss log
@@ -82,6 +90,7 @@ public class FlussSplitReader implements SplitReader<FlussSourceRecord, FlussSpl
     private final WrapperFlussMetricRegistry metricRegistry;
     private final FlussSourceReaderMetrics sourceReaderMetrics;
     private Connection connection;
+    private Admin admin;
     private final Map<TablePath, Table> tables;
     private final Map<TablePath, RowType> tableRowTypes;
     private final Map<TablePath, List<String>> tablePrimaryKeyNames;
@@ -91,6 +100,9 @@ public class FlussSplitReader implements SplitReader<FlussSourceRecord, FlussSpl
     // Bounded (snapshot) split reading
     private final Queue<FlussSplitBase> boundedSplits;
     private final Set<String> removedSplitIds;
+    // Signalled by the reader thread and checked by the fetcher between snapshot rows.
+    private final Set<TablePath> pendingRemovalTablePaths;
+    private final Set<PhysicalTablePath> pendingRemovalPartitionPaths;
     @Nullable private FlussSplitBase currentBoundedSplit;
     @Nullable private BatchScanner currentBatchScanner;
     @Nullable private Integer currentBatchSchemaId;
@@ -112,6 +124,8 @@ public class FlussSplitReader implements SplitReader<FlussSourceRecord, FlussSpl
         this.bucketToSplit = new HashMap<>();
         this.boundedSplits = new ArrayDeque<>();
         this.removedSplitIds = new LinkedHashSet<>();
+        this.pendingRemovalTablePaths = ConcurrentHashMap.newKeySet();
+        this.pendingRemovalPartitionPaths = ConcurrentHashMap.newKeySet();
     }
 
     @Override
@@ -183,6 +197,7 @@ public class FlussSplitReader implements SplitReader<FlussSourceRecord, FlussSpl
             connection = ConnectionFactory.createConnection(flussConfig, metricRegistry);
         }
 
+        Set<PhysicalTablePath> missingPartitions = new HashSet<>();
         for (FlussSplitBase split : splitsChanges.splits()) {
             if (!split.isHybridSnapshotLogSplit() && !split.isLogSplit()) {
                 LOG.warn("Unsupported split type: {}, skipping", split.getClass().getSimpleName());
@@ -192,14 +207,13 @@ public class FlussSplitReader implements SplitReader<FlussSourceRecord, FlussSpl
             validateTableId(split, table.getTableInfo().getTableId());
             if (split.isHybridSnapshotLogSplit()) {
                 FlussHybridSnapshotLogSplit hybrid = split.asHybridSnapshotLogSplit();
-                // If snapshot is not finished, add to pending bounded splits
-                if (!hybrid.isSnapshotFinished()) {
+                // Subscribe before queuing the snapshot so a missing partition is not scanned.
+                if (subscribeLog(split, hybrid.getLogStartingOffset(), missingPartitions)
+                        && !hybrid.isSnapshotFinished()) {
                     boundedSplits.add(split);
                 }
-                // Still need to subscribe log for after snapshot reading
-                subscribeLog(split, hybrid.getLogStartingOffset());
             } else {
-                subscribeLog(split, split.asLogSplit().getStartingOffset());
+                subscribeLog(split, split.asLogSplit().getStartingOffset(), missingPartitions);
             }
         }
     }
@@ -241,6 +255,9 @@ public class FlussSplitReader implements SplitReader<FlussSourceRecord, FlussSpl
         assert currentBoundedSplit != null;
         assert currentBatchSchemaId != null;
         assert currentBatchScanner != null;
+        if (isSnapshotRemovalRequested()) {
+            return;
+        }
         TablePath tablePath = currentBoundedSplit.getTablePath();
         RowType rowType = getRowType(tablePath);
 
@@ -252,7 +269,7 @@ public class FlussSplitReader implements SplitReader<FlussSourceRecord, FlussSpl
         }
 
         try {
-            while (batch.hasNext()) {
+            while (!isSnapshotRemovalRequested() && batch.hasNext()) {
                 InternalRow row = batch.next();
                 currentReadRecordsCount++;
                 if (snapshotRecordsToSkip > 0) {
@@ -282,6 +299,12 @@ public class FlussSplitReader implements SplitReader<FlussSourceRecord, FlussSpl
         } finally {
             batch.close();
         }
+    }
+
+    private boolean isSnapshotRemovalRequested() {
+        return pendingRemovalTablePaths.contains(currentBoundedSplit.getTablePath())
+                || pendingRemovalPartitionPaths.contains(
+                        currentBoundedSplit.getPhysicalTablePath());
     }
 
     /**
@@ -320,7 +343,8 @@ public class FlussSplitReader implements SplitReader<FlussSourceRecord, FlussSpl
     //  Log subscription
     // -------------------------------------------------------------------------
 
-    private void subscribeLog(FlussSplitBase split, long startingOffset) {
+    private boolean subscribeLog(
+            FlussSplitBase split, long startingOffset, Set<PhysicalTablePath> missingPartitions) {
         TablePath tablePath = split.getTablePath();
         TableBucket tableBucket = split.getTableBucket();
 
@@ -328,14 +352,30 @@ public class FlussSplitReader implements SplitReader<FlussSourceRecord, FlussSpl
 
         MultiTableLogScanner scanner = getOrCreateTableLogScanner();
 
-        if (tableBucket.getPartitionId() != null) {
-            scanner.subscribe(
-                    tablePath,
-                    tableBucket.getPartitionId(),
-                    tableBucket.getBucket(),
-                    startingOffset);
-        } else {
-            scanner.subscribe(tablePath, tableBucket.getBucket(), startingOffset);
+        try {
+            if (tableBucket.getPartitionId() != null) {
+                scanner.subscribe(
+                        tablePath,
+                        tableBucket.getPartitionId(),
+                        tableBucket.getBucket(),
+                        startingOffset);
+            } else {
+                scanner.subscribe(tablePath, tableBucket.getBucket(), startingOffset);
+            }
+        } catch (PartitionNotExistException e) {
+            PhysicalTablePath partitionPath = split.getPhysicalTablePath();
+            if (partitionPath.getPartitionName() == null
+                    || (!missingPartitions.contains(partitionPath)
+                            && !isPartitionMissing(partitionPath))) {
+                throw e;
+            }
+            missingPartitions.add(partitionPath);
+            removedSplitIds.add(split.splitId());
+            LOG.warn(
+                    "Finishing split {} after confirming that partition {} no longer exists.",
+                    split.splitId(),
+                    split.getPhysicalTablePath());
+            return false;
         }
 
         bucketToSplit.put(tableBucket, split);
@@ -344,6 +384,31 @@ public class FlussSplitReader implements SplitReader<FlussSourceRecord, FlussSpl
                 split.getTableBucket(),
                 split.getPhysicalTablePath(),
                 startingOffset);
+        return true;
+    }
+
+    private boolean isPartitionMissing(PhysicalTablePath partitionPath) {
+        try {
+            if (admin == null) {
+                admin = connection.getAdmin();
+            }
+            return admin
+                    .listPartitionInfos(partitionPath.getTablePath())
+                    .get(
+                            flussConfig.get(ConfigOptions.CLIENT_REQUEST_TIMEOUT).toMillis(),
+                            TimeUnit.MILLISECONDS)
+                    .stream()
+                    .noneMatch(
+                            info ->
+                                    info.getPartitionName()
+                                            .equals(partitionPath.getPartitionName()));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new FlinkRuntimeException(
+                    "Interrupted while checking partition " + partitionPath, e);
+        } catch (Exception e) {
+            throw new FlinkRuntimeException("Failed to check partition " + partitionPath, e);
+        }
     }
 
     private MultiTableLogScanner getOrCreateTableLogScanner() {
@@ -407,15 +472,14 @@ public class FlussSplitReader implements SplitReader<FlussSourceRecord, FlussSpl
         return new RowType(fields);
     }
 
-    /** Removes all reader-side resources for the specified logical tables. */
-    void removeTables(Set<TablePath> tablePaths) throws IOException {
+    private void removeSplits(Predicate<FlussSplitBase> shouldRemove) throws IOException {
         Set<TableBucket> removedBuckets = new HashSet<>();
         for (Iterator<Map.Entry<TableBucket, FlussSplitBase>> iterator =
                         bucketToSplit.entrySet().iterator();
                 iterator.hasNext(); ) {
             Map.Entry<TableBucket, FlussSplitBase> entry = iterator.next();
             FlussSplitBase split = entry.getValue();
-            if (!tablePaths.contains(split.getTablePath())) {
+            if (!shouldRemove.test(split)) {
                 continue;
             }
             removedBuckets.add(entry.getKey());
@@ -434,16 +498,23 @@ public class FlussSplitReader implements SplitReader<FlussSourceRecord, FlussSpl
         }
         for (Iterator<FlussSplitBase> iterator = boundedSplits.iterator(); iterator.hasNext(); ) {
             FlussSplitBase split = iterator.next();
-            if (tablePaths.contains(split.getTablePath())) {
+            if (shouldRemove.test(split)) {
                 removedSplitIds.add(split.splitId());
                 iterator.remove();
             }
         }
-        if (currentBoundedSplit != null
-                && tablePaths.contains(currentBoundedSplit.getTablePath())) {
+        if (currentBoundedSplit != null && shouldRemove.test(currentBoundedSplit)) {
             removedSplitIds.add(currentBoundedSplit.splitId());
             closeCurrentBoundedSplit();
         }
+        if (!removedBuckets.isEmpty()) {
+            LOG.info("Removed Fluss source table buckets {}.", removedBuckets);
+        }
+    }
+
+    /** Removes all reader-side resources for the specified logical tables. */
+    void removeTables(Set<TablePath> tablePaths) throws IOException {
+        removeSplits(split -> tablePaths.contains(split.getTablePath()));
         for (TablePath tablePath : tablePaths) {
             Table table = tables.remove(tablePath);
             if (table != null) {
@@ -457,9 +528,23 @@ public class FlussSplitReader implements SplitReader<FlussSourceRecord, FlussSpl
             tablePrimaryKeyNames.remove(tablePath);
             tablePartitionKeyNames.remove(tablePath);
         }
-        if (!removedBuckets.isEmpty()) {
-            LOG.info("Removed Fluss source table buckets {}.", removedBuckets);
-        }
+        pendingRemovalTablePaths.removeAll(tablePaths);
+    }
+
+    void removePartitions(Set<PhysicalTablePath> partitionPaths) throws IOException {
+        removeSplits(
+                split ->
+                        split.getPhysicalTablePath().getPartitionName() != null
+                                && partitionPaths.contains(split.getPhysicalTablePath()));
+        pendingRemovalPartitionPaths.removeAll(partitionPaths);
+    }
+
+    void markTablesForRemoval(Set<TablePath> tablePaths) {
+        pendingRemovalTablePaths.addAll(tablePaths);
+    }
+
+    void markPartitionsForRemoval(Set<PhysicalTablePath> partitionPaths) {
+        pendingRemovalPartitionPaths.addAll(partitionPaths);
     }
 
     @Override
@@ -488,6 +573,9 @@ public class FlussSplitReader implements SplitReader<FlussSourceRecord, FlussSpl
             } catch (Exception e) {
                 LOG.warn("Error closing table", e);
             }
+        }
+        if (admin != null) {
+            admin.close();
         }
         if (connection != null) {
             connection.close();

@@ -33,6 +33,7 @@ public class FlussSourceEnumState {
     private final List<FlussSplitBase> remainingSplits;
     private final String leaseId;
     private final Set<TablePath> pendingRemovalTablePaths;
+    private final Set<PhysicalTablePath> pendingRemovalPartitionPaths;
 
     public FlussSourceEnumState(
             Set<PhysicalTablePath> assignedPhysicalTablePaths,
@@ -46,10 +47,25 @@ public class FlussSourceEnumState {
             List<FlussSplitBase> remainingSplits,
             String leaseId,
             Set<TablePath> pendingRemovalTablePaths) {
+        this(
+                assignedPhysicalTablePaths,
+                remainingSplits,
+                leaseId,
+                pendingRemovalTablePaths,
+                Collections.emptySet());
+    }
+
+    public FlussSourceEnumState(
+            Set<PhysicalTablePath> assignedPhysicalTablePaths,
+            List<FlussSplitBase> remainingSplits,
+            String leaseId,
+            Set<TablePath> pendingRemovalTablePaths,
+            Set<PhysicalTablePath> pendingRemovalPartitionPaths) {
         this.assignedPhysicalTablePaths = assignedPhysicalTablePaths;
         this.remainingSplits = remainingSplits;
         this.leaseId = leaseId;
         this.pendingRemovalTablePaths = pendingRemovalTablePaths;
+        this.pendingRemovalPartitionPaths = pendingRemovalPartitionPaths;
     }
 
     public Set<PhysicalTablePath> getAssignedPhysicalTablePaths() {
@@ -66,5 +82,9 @@ public class FlussSourceEnumState {
 
     public Set<TablePath> getPendingRemovalTablePaths() {
         return pendingRemovalTablePaths;
+    }
+
+    public Set<PhysicalTablePath> getPendingRemovalPartitionPaths() {
+        return pendingRemovalPartitionPaths;
     }
 }

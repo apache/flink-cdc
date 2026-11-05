@@ -38,7 +38,7 @@ import java.util.Set;
 public class FlussSourceEnumStateSerializer
         implements SimpleVersionedSerializer<FlussSourceEnumState> {
 
-    private static final int VERSION = 2;
+    private static final int VERSION = 3;
     private final FlussSplitSerializer splitSerializer = new FlussSplitSerializer();
 
     @Override
@@ -76,13 +76,19 @@ public class FlussSourceEnumStateSerializer
                 out.writeUTF(tablePath.getDatabaseName());
                 out.writeUTF(tablePath.getTableName());
             }
+            out.writeInt(state.getPendingRemovalPartitionPaths().size());
+            for (PhysicalTablePath partitionPath : state.getPendingRemovalPartitionPaths()) {
+                out.writeUTF(partitionPath.getDatabaseName());
+                out.writeUTF(partitionPath.getTableName());
+                out.writeUTF(partitionPath.getPartitionName());
+            }
             return baos.toByteArray();
         }
     }
 
     @Override
     public FlussSourceEnumState deserialize(int version, byte[] serialized) throws IOException {
-        if (version != 1 && version != VERSION) {
+        if (version < 1 || version > VERSION) {
             throw new IOException("Unknown Fluss source enumerator state version: " + version);
         }
         try (ByteArrayInputStream bais = new ByteArrayInputStream(serialized);
@@ -107,14 +113,27 @@ public class FlussSourceEnumStateSerializer
             }
             String leaseId = in.readUTF();
             Set<TablePath> pendingRemovalTablePaths = new LinkedHashSet<>();
-            if (version == VERSION) {
+            if (version >= 2) {
                 int pendingRemovalCount = in.readInt();
                 for (int i = 0; i < pendingRemovalCount; i++) {
                     pendingRemovalTablePaths.add(TablePath.of(in.readUTF(), in.readUTF()));
                 }
             }
+            Set<PhysicalTablePath> pendingRemovalPartitionPaths = new LinkedHashSet<>();
+            if (version >= 3) {
+                int pendingRemovalCount = in.readInt();
+                for (int i = 0; i < pendingRemovalCount; i++) {
+                    pendingRemovalPartitionPaths.add(
+                            PhysicalTablePath.of(
+                                    TablePath.of(in.readUTF(), in.readUTF()), in.readUTF()));
+                }
+            }
             return new FlussSourceEnumState(
-                    assignedPaths, remaining, leaseId, pendingRemovalTablePaths);
+                    assignedPaths,
+                    remaining,
+                    leaseId,
+                    pendingRemovalTablePaths,
+                    pendingRemovalPartitionPaths);
         }
     }
 }

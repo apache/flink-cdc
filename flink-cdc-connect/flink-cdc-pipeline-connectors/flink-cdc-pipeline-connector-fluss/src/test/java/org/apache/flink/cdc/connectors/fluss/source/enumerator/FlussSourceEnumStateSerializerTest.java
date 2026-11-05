@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.fluss.source.enumerator;
 
 import org.apache.flink.cdc.connectors.fluss.source.split.FlussLogSplit;
 import org.apache.flink.cdc.connectors.fluss.source.split.FlussSplitBase;
+import org.apache.flink.cdc.connectors.fluss.source.split.FlussSplitSerializer;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
 
 import org.apache.fluss.metadata.PhysicalTablePath;
@@ -37,7 +38,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class FlussSourceEnumStateSerializerTest {
 
     @Test
-    void testSerializeStateInVersionTwo() throws Exception {
+    void testSerializeStateInVersionThree() throws Exception {
         PhysicalTablePath physicalTablePath =
                 PhysicalTablePath.of(TablePath.of("database", "table"));
         FlussSplitBase split = new FlussLogSplit(physicalTablePath, new TableBucket(1L, 0), 42L);
@@ -51,15 +52,16 @@ class FlussSourceEnumStateSerializerTest {
         FlussSourceEnumState restored =
                 serializer.deserialize(serializer.getVersion(), serializer.serialize(state));
 
-        assertThat(serializer.getVersion()).isEqualTo(2);
+        assertThat(serializer.getVersion()).isEqualTo(3);
         assertThat(restored.getAssignedPhysicalTablePaths()).containsExactly(physicalTablePath);
         assertThat(restored.getRemainingSplits()).containsExactly(split);
         assertThat(restored.getLeaseId()).isEqualTo("lease-id");
         assertThat(restored.getPendingRemovalTablePaths()).isEmpty();
+        assertThat(restored.getPendingRemovalPartitionPaths()).isEmpty();
     }
 
     @Test
-    void testSerializePendingRemovalTablePathsInVersionTwoState() throws Exception {
+    void testSerializePendingRemovalTablePathsInVersionThreeState() throws Exception {
         PhysicalTablePath physicalTablePath =
                 PhysicalTablePath.of(TablePath.of("database", "table"));
         TablePath pendingRemovalTablePath = TablePath.of("database", "removed_table");
@@ -75,34 +77,103 @@ class FlussSourceEnumStateSerializerTest {
         FlussSourceEnumState restored =
                 serializer.deserialize(serializer.getVersion(), serializer.serialize(state));
 
-        assertThat(serializer.getVersion()).isEqualTo(2);
+        assertThat(serializer.getVersion()).isEqualTo(3);
         assertThat(restored.getPendingRemovalTablePaths()).containsExactly(pendingRemovalTablePath);
+        assertThat(restored.getPendingRemovalPartitionPaths()).isEmpty();
     }
 
     @Test
-    void testDeserializeVersionOneStateWithoutPendingRemovalTablePaths() throws Exception {
+    void testSerializePendingTableAndPartitionRemovalsInVersionThreeState() throws Exception {
+        TablePath tablePath = TablePath.of("database", "table");
+        PhysicalTablePath assignedPartitionPath = PhysicalTablePath.of(tablePath, "retained");
+        PhysicalTablePath pendingRemovalPartitionPath = PhysicalTablePath.of(tablePath, "expired");
+        TablePath pendingRemovalTablePath = TablePath.of("database", "removed_table");
+        FlussSplitBase split =
+                new FlussLogSplit(assignedPartitionPath, new TableBucket(1L, 2L, 0), 42L);
+        FlussSourceEnumState state =
+                new FlussSourceEnumState(
+                        Collections.singleton(assignedPartitionPath),
+                        Collections.singletonList(split),
+                        "lease-id",
+                        Collections.singleton(pendingRemovalTablePath),
+                        Collections.singleton(pendingRemovalPartitionPath));
         FlussSourceEnumStateSerializer serializer = new FlussSourceEnumStateSerializer();
-        byte[] versionOneState;
-        try (ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-                DataOutputViewStreamWrapper out = new DataOutputViewStreamWrapper(bytes)) {
-            out.writeInt(0);
-            out.writeInt(0);
-            out.writeUTF("lease-id");
-            versionOneState = bytes.toByteArray();
-        }
 
-        FlussSourceEnumState restored = serializer.deserialize(1, versionOneState);
+        FlussSourceEnumState restored =
+                serializer.deserialize(serializer.getVersion(), serializer.serialize(state));
 
+        assertThat(restored.getAssignedPhysicalTablePaths()).containsExactly(assignedPartitionPath);
+        assertThat(restored.getRemainingSplits()).containsExactly(split);
+        assertThat(restored.getLeaseId()).isEqualTo("lease-id");
+        assertThat(restored.getPendingRemovalTablePaths()).containsExactly(pendingRemovalTablePath);
+        assertThat(restored.getPendingRemovalPartitionPaths())
+                .containsExactly(pendingRemovalPartitionPath);
+    }
+
+    @Test
+    void testDeserializeVersionOneStateWithoutPendingRemovals() throws Exception {
+        FlussSourceEnumStateSerializer serializer = new FlussSourceEnumStateSerializer();
+
+        FlussSourceEnumState restored = serializer.deserialize(1, serializeLegacyState(1));
+
+        PhysicalTablePath partitionPath =
+                PhysicalTablePath.of(TablePath.of("database", "table"), "retained");
+        assertThat(restored.getAssignedPhysicalTablePaths()).containsExactly(partitionPath);
+        assertThat(restored.getRemainingSplits())
+                .containsExactly(new FlussLogSplit(partitionPath, new TableBucket(1L, 2L, 0), 42L));
         assertThat(restored.getLeaseId()).isEqualTo("lease-id");
         assertThat(restored.getPendingRemovalTablePaths()).isEmpty();
+        assertThat(restored.getPendingRemovalPartitionPaths()).isEmpty();
+    }
+
+    @Test
+    void testDeserializeVersionTwoStateWithoutPendingPartitionRemovals() throws Exception {
+        FlussSourceEnumStateSerializer serializer = new FlussSourceEnumStateSerializer();
+
+        FlussSourceEnumState restored = serializer.deserialize(2, serializeLegacyState(2));
+
+        PhysicalTablePath partitionPath =
+                PhysicalTablePath.of(TablePath.of("database", "table"), "retained");
+        assertThat(restored.getAssignedPhysicalTablePaths()).containsExactly(partitionPath);
+        assertThat(restored.getRemainingSplits())
+                .containsExactly(new FlussLogSplit(partitionPath, new TableBucket(1L, 2L, 0), 42L));
+        assertThat(restored.getLeaseId()).isEqualTo("lease-id");
+        assertThat(restored.getPendingRemovalTablePaths())
+                .containsExactly(TablePath.of("database", "removed_table"));
+        assertThat(restored.getPendingRemovalPartitionPaths()).isEmpty();
     }
 
     @Test
     void testRejectUnknownStateVersion() {
         FlussSourceEnumStateSerializer serializer = new FlussSourceEnumStateSerializer();
 
-        assertThatThrownBy(() -> serializer.deserialize(3, new byte[0]))
+        assertThatThrownBy(() -> serializer.deserialize(4, new byte[0]))
                 .isInstanceOf(IOException.class)
                 .hasMessageContaining("Unknown Fluss source enumerator state version");
+    }
+
+    private static byte[] serializeLegacyState(int version) throws IOException {
+        PhysicalTablePath partitionPath =
+                PhysicalTablePath.of(TablePath.of("database", "table"), "retained");
+        FlussSplitBase split = new FlussLogSplit(partitionPath, new TableBucket(1L, 2L, 0), 42L);
+        byte[] splitBytes = new FlussSplitSerializer().serialize(split);
+        try (ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+                DataOutputViewStreamWrapper out = new DataOutputViewStreamWrapper(bytes)) {
+            out.writeInt(1);
+            out.writeUTF("database");
+            out.writeUTF("table");
+            out.writeBoolean(true);
+            out.writeUTF("retained");
+            out.writeInt(1);
+            out.writeInt(splitBytes.length);
+            out.write(splitBytes);
+            out.writeUTF("lease-id");
+            if (version >= 2) {
+                out.writeInt(1);
+                out.writeUTF("database");
+                out.writeUTF("removed_table");
+            }
+            return bytes.toByteArray();
+        }
     }
 }

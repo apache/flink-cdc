@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.fluss.source.event;
 
 import org.apache.flink.api.connector.source.SourceEvent;
 
+import org.apache.fluss.metadata.PhysicalTablePath;
 import org.apache.fluss.metadata.TablePath;
 
 import java.util.Collections;
@@ -35,21 +36,42 @@ public class TableSubscriptionEvent implements SourceEvent {
     private final Set<TablePath> subscribedTablePaths;
     private final Map<TablePath, Long> pendingRemovalRequests;
     private final Set<TablePath> fencedTablePaths;
+    private final Set<PhysicalTablePath> subscribedPhysicalTablePaths;
+    private final Map<PhysicalTablePath, Long> pendingPartitionRemovalRequests;
+    private final Set<PhysicalTablePath> fencedPartitionPaths;
 
     public TableSubscriptionEvent(
-            Set<TablePath> subscribedTablePaths, Map<TablePath, Long> pendingRemovalRequests) {
-        this(subscribedTablePaths, pendingRemovalRequests, Collections.emptySet());
+            Set<TablePath> subscribedTablePaths,
+            Map<TablePath, Long> pendingRemovalRequests,
+            Set<TablePath> fencedTablePaths,
+            Set<PhysicalTablePath> subscribedPhysicalTablePaths) {
+        this(
+                subscribedTablePaths,
+                pendingRemovalRequests,
+                fencedTablePaths,
+                subscribedPhysicalTablePaths,
+                Collections.emptyMap(),
+                Collections.emptySet());
     }
 
     public TableSubscriptionEvent(
             Set<TablePath> subscribedTablePaths,
             Map<TablePath, Long> pendingRemovalRequests,
-            Set<TablePath> fencedTablePaths) {
+            Set<TablePath> fencedTablePaths,
+            Set<PhysicalTablePath> subscribedPhysicalTablePaths,
+            Map<PhysicalTablePath, Long> pendingPartitionRemovalRequests,
+            Set<PhysicalTablePath> fencedPartitionPaths) {
         this.subscribedTablePaths =
                 Collections.unmodifiableSet(new LinkedHashSet<>(subscribedTablePaths));
         this.pendingRemovalRequests =
                 Collections.unmodifiableMap(new LinkedHashMap<>(pendingRemovalRequests));
         this.fencedTablePaths = Collections.unmodifiableSet(new LinkedHashSet<>(fencedTablePaths));
+        this.subscribedPhysicalTablePaths =
+                Collections.unmodifiableSet(new LinkedHashSet<>(subscribedPhysicalTablePaths));
+        this.pendingPartitionRemovalRequests =
+                Collections.unmodifiableMap(new LinkedHashMap<>(pendingPartitionRemovalRequests));
+        this.fencedPartitionPaths =
+                Collections.unmodifiableSet(new LinkedHashSet<>(fencedPartitionPaths));
     }
 
     public Set<TablePath> getSubscribedTablePaths() {
@@ -64,6 +86,19 @@ public class TableSubscriptionEvent implements SourceEvent {
         return fencedTablePaths;
     }
 
+    /** Returns the complete successful discovery. */
+    public Set<PhysicalTablePath> getSubscribedPhysicalTablePaths() {
+        return subscribedPhysicalTablePaths;
+    }
+
+    public Map<PhysicalTablePath, Long> getPendingPartitionRemovalRequests() {
+        return pendingPartitionRemovalRequests;
+    }
+
+    public Set<PhysicalTablePath> getFencedPartitionPaths() {
+        return fencedPartitionPaths;
+    }
+
     @Override
     public String toString() {
         return "TableSubscriptionEvent{subscribedTablePaths="
@@ -72,6 +107,12 @@ public class TableSubscriptionEvent implements SourceEvent {
                 + pendingRemovalRequests
                 + ", fencedTablePaths="
                 + fencedTablePaths
+                + ", subscribedPhysicalTablePaths="
+                + subscribedPhysicalTablePaths
+                + ", pendingPartitionRemovalRequests="
+                + pendingPartitionRemovalRequests
+                + ", fencedPartitionPaths="
+                + fencedPartitionPaths
                 + '}';
     }
 }

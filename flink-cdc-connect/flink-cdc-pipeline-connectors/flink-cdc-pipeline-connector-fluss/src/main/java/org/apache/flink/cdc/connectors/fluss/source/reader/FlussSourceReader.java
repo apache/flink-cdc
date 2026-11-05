@@ -35,6 +35,7 @@ import org.apache.flink.connector.base.source.reader.SingleThreadMultiplexSource
 import org.apache.flink.connector.base.source.reader.SingleThreadMultiplexSourceReaderBaseAdapter;
 import org.apache.flink.connector.base.source.reader.synchronization.FutureCompletingBlockingQueue;
 
+import org.apache.fluss.metadata.PhysicalTablePath;
 import org.apache.fluss.metadata.TableBucket;
 import org.apache.fluss.metadata.TablePath;
 import org.slf4j.Logger;
@@ -75,7 +76,9 @@ public class FlussSourceReader<T>
     private final List<FlussSplitBase> stagedSplits;
     private final Map<String, FlussSplitBase> activeSplits;
     private final Map<TablePath, Long> pendingRemovalRequests;
+    private final Map<PhysicalTablePath, Long> pendingPartitionRemovalRequests;
     private final Set<TablePath> subscribedTablePaths;
+    private Set<PhysicalTablePath> subscribedPhysicalTablePaths;
     private boolean receivedSubscriptionSnapshot;
 
     public FlussSourceReader(
@@ -119,7 +122,9 @@ public class FlussSourceReader<T>
         this.stagedSplits = new ArrayList<>();
         this.activeSplits = new HashMap<>();
         this.pendingRemovalRequests = new HashMap<>();
+        this.pendingPartitionRemovalRequests = new HashMap<>();
         this.subscribedTablePaths = new HashSet<>();
+        this.subscribedPhysicalTablePaths = new HashSet<>();
     }
 
     @Override
@@ -199,12 +204,16 @@ public class FlussSourceReader<T>
         subscribedTablePaths.addAll(event.getSubscribedTablePaths());
         pendingRemovalRequests.clear();
         pendingRemovalRequests.putAll(event.getPendingRemovalRequests());
+        pendingPartitionRemovalRequests.clear();
+        pendingPartitionRemovalRequests.putAll(event.getPendingPartitionRemovalRequests());
+        subscribedPhysicalTablePaths = event.getSubscribedPhysicalTablePaths();
 
         Set<TablePath> activeRemovalTablePaths =
                 activeSplits.values().stream()
                         .filter(split -> !isActive(split.getTablePath()))
                         .map(FlussSplitBase::getTablePath)
                         .collect(Collectors.toSet());
+        activeRemovalTablePaths.addAll(pendingRemovalRequests.keySet());
         activeSplits.values().stream()
                 .filter(split -> activeRemovalTablePaths.contains(split.getTablePath()))
                 .map(FlussSplitBase::getTableBucket)
@@ -217,11 +226,23 @@ public class FlussSourceReader<T>
             fetcherManager.removeTables(activeRemovalTablePaths);
         }
 
+        Set<PhysicalTablePath> activeRemovalPartitionPaths = new HashSet<>();
+        for (FlussSplitBase split : activeSplits.values()) {
+            if (isActive(split.getTablePath())
+                    && pendingPartitionRemovalRequests.containsKey(split.getPhysicalTablePath())) {
+                activeRemovalPartitionPaths.add(split.getPhysicalTablePath());
+                reportedFinishedSnapshotBuckets.remove(split.getTableBucket());
+            }
+        }
+        fetcherManager.removePartitions(activeRemovalPartitionPaths);
+
         List<FlussSplitBase> effectiveStagedSplits = new ArrayList<>();
         for (FlussSplitBase split : stagedSplits) {
-            if (isActive(split.getTablePath())
+            if (isSplitActive(split)
                     && (!firstSubscriptionSnapshot
-                            || !event.getFencedTablePaths().contains(split.getTablePath()))) {
+                            || (!event.getFencedTablePaths().contains(split.getTablePath())
+                                    && !event.getFencedPartitionPaths()
+                                            .contains(split.getPhysicalTablePath())))) {
                 effectiveStagedSplits.add(split);
             } else {
                 reportedFinishedSnapshotBuckets.remove(split.getTableBucket());
@@ -243,7 +264,7 @@ public class FlussSourceReader<T>
     private void activateSplits(List<FlussSplitBase> splits) {
         List<FlussSplitBase> activeSplits = new ArrayList<>();
         for (FlussSplitBase split : splits) {
-            if (isActive(split.getTablePath())) {
+            if (isSplitActive(split)) {
                 activeSplits.add(split);
             }
         }
@@ -257,6 +278,20 @@ public class FlussSourceReader<T>
                 && !pendingRemovalRequests.containsKey(tablePath);
     }
 
+    private boolean isSplitActive(FlussSplitBase split) {
+        if (!isActive(split.getTablePath())) {
+            return false;
+        }
+        PhysicalTablePath physicalTablePath = split.getPhysicalTablePath();
+        if (pendingPartitionRemovalRequests.containsKey(physicalTablePath)) {
+            return false;
+        }
+        if (physicalTablePath.getPartitionName() == null) {
+            return true;
+        }
+        return subscribedPhysicalTablePaths.contains(physicalTablePath);
+    }
+
     private void acknowledgeCompletedRemovals() {
         Map<TablePath, Long> completed = new HashMap<>();
         for (Map.Entry<TablePath, Long> entry : pendingRemovalRequests.entrySet()) {
@@ -267,8 +302,20 @@ public class FlussSourceReader<T>
                 completed.put(entry.getKey(), entry.getValue());
             }
         }
-        if (!completed.isEmpty()) {
-            readerContext.sendSourceEventToCoordinator(new TableRemovalAckEvent(completed));
+        Map<PhysicalTablePath, Long> completedPartitions = new HashMap<>();
+        for (Map.Entry<PhysicalTablePath, Long> entry :
+                pendingPartitionRemovalRequests.entrySet()) {
+            if (activeSplits.values().stream()
+                            .noneMatch(split -> split.getPhysicalTablePath().equals(entry.getKey()))
+                    && stagedSplits.stream()
+                            .noneMatch(
+                                    split -> split.getPhysicalTablePath().equals(entry.getKey()))) {
+                completedPartitions.put(entry.getKey(), entry.getValue());
+            }
+        }
+        if (!completed.isEmpty() || !completedPartitions.isEmpty()) {
+            readerContext.sendSourceEventToCoordinator(
+                    new TableRemovalAckEvent(completed, completedPartitions));
         }
     }
 }
