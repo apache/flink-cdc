@@ -106,7 +106,7 @@ public class MySqlChunkSplitter implements ChunkSplitter {
 
     @Override
     public void open() {
-        this.jdbcConnection = DebeziumUtils.openJdbcConnection(sourceConfig);
+        this.jdbcConnection = DebeziumUtils.openSnapshotJdbcConnection(sourceConfig);
     }
 
     @Override
