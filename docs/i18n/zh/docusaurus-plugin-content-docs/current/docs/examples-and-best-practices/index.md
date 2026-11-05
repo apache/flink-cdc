@@ -38,6 +38,7 @@ under the License.
 
 - [MySQL 数据实时入湖 Paimon](mysql-to-paimon.md)：合并订单分表，并同步表结构和数据变更。
 - [MySQL 变更实时分发投递到 Kafka](mysql-to-kafka.md)：将表变更写入独立 Topic，并按主键分区。
+- [MySQL 数据实时同步到 Fluss](mysql-to-fluss.md)：将订单同步到主键表，验证数据与表结构变更，并查询已支付订单金额。
 - [PostgreSQL 数据实时入湖 Iceberg](postgres-to-iceberg.md)：配置逻辑复制，并同步全量快照、行级变更和新增字段。
 - [表筛选与新增表同步](table-selection-and-new-tables.md)：排除临时表、不停机捕获新建表，并从 Savepoint 恢复以纳入历史表。
 - [元数据列、计算列与软删除](metadata-and-soft-deletes.md)：补充元数据、计算日期分区，并保留删除标记。
