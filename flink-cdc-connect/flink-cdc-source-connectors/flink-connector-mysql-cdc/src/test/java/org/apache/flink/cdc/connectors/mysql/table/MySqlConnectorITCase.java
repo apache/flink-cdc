@@ -1621,6 +1621,265 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
         jobClient.cancel().get();
     }
 
+    /**
+     * Integration test for ALTER statements whose default value looks like {@code _utf8mb4' 0 '}.
+     *
+     * <p>After being rewritten by the MySQL optimizer, such default values combine a character-set
+     * introducer with padding spaces inside the quotes, e.g. {@code ALTER TABLE t ADD COLUMN c
+     * TINYINT(4) DEFAULT _UTF8MB4' 0 ' COMMENT '...'}. Once the DDL is shipped through the binlog,
+     * {@code MySqlDefaultValueConverter} must parse it correctly, otherwise a NumberFormatException
+     * will fail the job.
+     *
+     * <p>Assertion mechanism: because {@link RestartStrategyUtils#configureNoRestartStrategy}
+     * disables restarts, a single failing DDL will terminate the job immediately, so the expected
+     * DELETE event can never be produced and the case fails. Therefore this case serves as both a
+     * positive verification (all DDLs are parsed successfully and the DELETE event is consumed) and
+     * a reverse reproduction (removing either the trim or the introducer-stripping logic will make
+     * the case fail).
+     */
+    @Test
+    void testAlterWithCharsetIntroducerDefaultValue() throws Exception {
+        setup(true);
+        RestartStrategyUtils.configureNoRestartStrategy(env);
+        customerDatabase.createAndInitialize();
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE default_value_test ("
+                                + " id BIGINT NOT NULL,"
+                                + " name STRING,"
+                                + " address STRING,"
+                                + " phone_number BIGINT,"
+                                + " primary key (id) not enforced"
+                                + ") WITH ("
+                                + " 'connector' = 'mysql-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'table-name' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = 'true',"
+                                + " 'server-time-zone' = 'UTC',"
+                                + " 'server-id' = '%s',"
+                                + " 'scan.incremental.snapshot.chunk.size' = '%s'"
+                                + ")",
+                        MYSQL_CONTAINER.getHost(),
+                        MYSQL_CONTAINER.getDatabasePort(),
+                        customerDatabase.getUsername(),
+                        customerDatabase.getPassword(),
+                        customerDatabase.getDatabaseName(),
+                        "default_value_test",
+                        getServerId(true),
+                        getSplitSize(true));
+        tEnv.executeSql(sourceDDL);
+        // async submit job
+        TableResult result = tEnv.executeSql("SELECT * FROM default_value_test");
+        JobClient jobClient = result.getJobClient().get();
+        waitForJobStatus(
+                jobClient,
+                Collections.singletonList(RUNNING),
+                Deadline.fromNow(Duration.ofSeconds(10)));
+        CloseableIterator<Row> iterator = result.collect();
+        waitForSnapshotStarted(iterator);
+        // Wait 1s until snapshot phase finished; DDL cannot be applied during snapshot phase.
+        List<String> actualRows = new ArrayList<>(fetchRows(iterator, 2));
+        Thread.sleep(1000L);
+
+        String[] expected =
+                new String[] {
+                    "+I[1, user1, Shanghai, 123567]",
+                    "+I[2, user2, Shanghai, 123567]",
+                    "-D[1, user1, Shanghai, 123567]"
+                };
+
+        // Ship a batch of DDLs with character-set-introducer default values via the binlog first,
+        // then trigger the DELETE. Ordering requirement (key to the reverse-reproduction ability):
+        // the DELETE must happen AFTER every DDL, so that once MySqlDefaultValueConverter fails to
+        // parse the padding inside the quotes, the SourceReader will be stuck and the -D event
+        // will never be consumed; `fetchRows` then fails the case due to the no-restart strategy
+        // combined with the missing event.
+        try (Connection connection = customerDatabase.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            // 1) introducer + no padding inside quotes -- baseline case
+            statement.execute(
+                    "alter table default_value_test add column `c_tiny_plain` TINYINT(4) DEFAULT _utf8mb4'0';");
+            // 2) introducer + padding inside quotes -- the core case of this fix
+            //    (requires the second trim after stripCharacterSetIntroducer)
+            statement.execute(
+                    "alter table default_value_test add column `c_tiny_inner_pad` TINYINT(4) DEFAULT _utf8mb4' 0 ' COMMENT 'directive business';");
+            // 3) mixed-case introducer + padding inside quotes -- verifies the regex is
+            //    case-insensitive
+            statement.execute(
+                    "alter table default_value_test add column `c_int_upper` INT DEFAULT _UTF8MB4' 1 ';");
+            // 4) INT + introducer + padding inside quotes -- reproduces the 42 case from the
+            //    original question
+            statement.execute(
+                    "alter table default_value_test add column `c_int_answer` INT DEFAULT _utf8mb4' 42 ';");
+            // 5) BIGINT + introducer + padding inside quotes
+            statement.execute(
+                    "alter table default_value_test add column `c_bigint` BIGINT DEFAULT _utf8mb4' 10086 ';");
+            // 6) DECIMAL + introducer + padding inside quotes
+            statement.execute(
+                    "alter table default_value_test add column `c_decimal` DECIMAL(8,2) DEFAULT _utf8mb4' 3.14 ';");
+            // 7) DATE + introducer + padding inside quotes -- covers the DATE branch
+            statement.execute(
+                    "alter table default_value_test add column `c_date` DATE DEFAULT _utf8mb4' 2024-01-02 ';");
+            // 8) DATETIME + introducer + padding inside quotes -- covers the TIMESTAMP branch
+            statement.execute(
+                    "alter table default_value_test add column `c_dt` DATETIME DEFAULT _utf8mb4' 2024-01-02 03:04:05 ';");
+            // 9) TINYINT(1) + introducer -- covers the boolean type going through
+            //    NUMBER_DATA_TYPES
+            statement.execute(
+                    "alter table default_value_test add column `c_bool` TINYINT(1) DEFAULT _utf8mb4'1';");
+            // 10) double-quoted literal + padding inside quotes -- directly reproduces the
+            //     `_UTF8MB4" 0 "` case from the original question
+            statement.execute(
+                    "alter table default_value_test add column `c_dq_inner_pad` TINYINT(4) DEFAULT _UTF8MB4\" 0 \" COMMENT 'directive business';");
+            // 11) double-quoted literal + DECIMAL -- covers the DECIMAL branch parsing a
+            //     double-quoted value
+            statement.execute(
+                    "alter table default_value_test add column `c_dq_decimal` DECIMAL(8,2) DEFAULT _utf8mb4\" 3.14 \";");
+            // Trigger the DELETE only after every DDL has succeeded, so the -D event can only
+            // appear after the schema evolution completes normally.
+            statement.execute("DELETE FROM default_value_test WHERE id=1;");
+        }
+        actualRows.addAll(fetchRows(iterator, expected.length - 2));
+        assertEqualsInAnyOrder(Arrays.asList(expected), actualRows);
+        jobClient.cancel().get();
+    }
+
+    /**
+     * Integration test for the <b>snapshot</b> code path when a table is created with columns whose
+     * {@code DEFAULT} clause carries a character-set introducer plus padding spaces inside the
+     * quotes (both single-quoted {@code _utf8mb4' 0 '} and double-quoted {@code _UTF8MB4" 0 "}
+     * forms).
+     *
+     * <p>Default values are parsed in two different code paths inside the connector: during the
+     * snapshot phase the schema is discovered by {@code SHOW CREATE TABLE} whose output is
+     * re-parsed by the Debezium Antlr parser, and during the incremental phase the {@code ALTER
+     * TABLE} statements coming from the binlog are parsed on the fly. Both eventually flow through
+     * {@link io.debezium.connector.mysql.MySqlDefaultValueConverter#convert}.
+     *
+     * <p>Empirically the MySQL server <b>normalizes</b> such default value expressions on the
+     * server side before persisting them, so {@code SHOW CREATE TABLE} returns the fully
+     * canonicalized form (e.g. {@code DEFAULT '0'}) regardless of what the user originally wrote.
+     * That means the snapshot path never actually observes the introducer / padding shape and
+     * cannot serve as a reverse reproduction for this bug (the reverse reproduction is exclusively
+     * covered by {@link #testAlterWithCharsetIntroducerDefaultValue()} which feeds the raw DDL to
+     * Debezium via the binlog). This case therefore acts as a <b>positive verification</b> that the
+     * current fix does not introduce any side effect on the snapshot schema discovery path: the
+     * source must reach RUNNING, the snapshot must yield the initial rows, and a subsequent binlog
+     * INSERT relying on server-side defaults must also flow through, wiring both parsing paths end
+     * to end. Combined with the no-restart strategy, any regression on the snapshot side would fail
+     * the case via {@code fetchRows} timing out.
+     */
+    @Test
+    void testSnapshotWithCharsetIntroducerDefaultValue() throws Exception {
+        setup(true);
+        RestartStrategyUtils.configureNoRestartStrategy(env);
+        customerDatabase.createAndInitialize();
+
+        // Create a dedicated table with character-set-introducer defaults BEFORE the Flink source
+        // starts, so the whole schema (including these defaults) is discovered through
+        // `SHOW CREATE TABLE` during the snapshot phase, i.e. the exact code path the review
+        // comment asks us to cover.
+        try (Connection connection = customerDatabase.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "CREATE TABLE snapshot_cs_default_test ("
+                            + " id INT NOT NULL PRIMARY KEY,"
+                            // single-quoted introducer, no padding -- baseline
+                            + " c_tiny_plain TINYINT(4) DEFAULT _utf8mb4'0',"
+                            // single-quoted introducer, padding inside quotes -- core case
+                            + " c_tiny_inner_pad TINYINT(4) DEFAULT _utf8mb4' 0 ',"
+                            // upper-case introducer, padding inside quotes
+                            + " c_int_upper INT DEFAULT _UTF8MB4' 1 ',"
+                            // INT with padding inside quotes
+                            + " c_int_answer INT DEFAULT _utf8mb4' 42 ',"
+                            // BIGINT with padding inside quotes
+                            + " c_bigint BIGINT DEFAULT _utf8mb4' 10086 ',"
+                            // DECIMAL with padding inside quotes
+                            + " c_decimal DECIMAL(8,2) DEFAULT _utf8mb4' 3.14 ',"
+                            // DATE with padding inside quotes -- exercises the DATE branch
+                            + " c_date DATE DEFAULT _utf8mb4' 2024-01-02 ',"
+                            // DATETIME with padding inside quotes -- exercises the TIMESTAMP branch
+                            + " c_dt DATETIME DEFAULT _utf8mb4' 2024-01-02 03:04:05 ',"
+                            // TINYINT(1) -- boolean going through NUMBER_DATA_TYPES
+                            + " c_bool TINYINT(1) DEFAULT _utf8mb4'1',"
+                            // double-quoted introducer, padding inside quotes -- directly
+                            // reproduces the `_UTF8MB4\" 0 \"` shape from the original bug report
+                            + " c_dq_inner_pad TINYINT(4) DEFAULT _UTF8MB4\" 0 \","
+                            // double-quoted introducer + DECIMAL branch
+                            + " c_dq_decimal DECIMAL(8,2) DEFAULT _utf8mb4\" 3.14 \""
+                            + ");");
+            // Two initial rows -- will be produced by the snapshot phase.
+            statement.execute("INSERT INTO snapshot_cs_default_test (id) VALUES (1),(2);");
+        }
+
+        // Declare Flink table with a subset of columns; we don't need to project every default
+        // column, we only need the source to build the schema successfully -- which forces every
+        // default value to be parsed. Reading `id` alongside two default-driven columns is enough
+        // to observe that (a) the schema parsed OK and (b) the values MySQL filled via those
+        // defaults survived the end-to-end path.
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE snapshot_cs_default_test ("
+                                + " id INT NOT NULL,"
+                                + " c_tiny_inner_pad TINYINT,"
+                                + " c_dq_inner_pad TINYINT,"
+                                + " primary key (id) not enforced"
+                                + ") WITH ("
+                                + " 'connector' = 'mysql-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'table-name' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = 'true',"
+                                + " 'server-time-zone' = 'UTC',"
+                                + " 'server-id' = '%s',"
+                                + " 'scan.incremental.snapshot.chunk.size' = '%s'"
+                                + ")",
+                        MYSQL_CONTAINER.getHost(),
+                        MYSQL_CONTAINER.getDatabasePort(),
+                        customerDatabase.getUsername(),
+                        customerDatabase.getPassword(),
+                        customerDatabase.getDatabaseName(),
+                        "snapshot_cs_default_test",
+                        getServerId(true),
+                        getSplitSize(true));
+        tEnv.executeSql(sourceDDL);
+
+        TableResult result = tEnv.executeSql("SELECT * FROM snapshot_cs_default_test");
+        JobClient jobClient = result.getJobClient().get();
+        // If any of the character-set-introducer defaults blows up during snapshot schema
+        // discovery the job never reaches RUNNING and this assertion fails fast.
+        waitForJobStatus(
+                jobClient,
+                Collections.singletonList(RUNNING),
+                Deadline.fromNow(Duration.ofSeconds(10)));
+        CloseableIterator<Row> iterator = result.collect();
+        waitForSnapshotStarted(iterator);
+
+        // Snapshot phase must produce the two rows inserted before source startup.
+        List<String> actualRows = new ArrayList<>(fetchRows(iterator, 2));
+        Thread.sleep(1000L);
+
+        // Insert another row through the binlog, relying on server-side defaults for every column
+        // other than `id`. This exercises the incremental path as well and, together with the
+        // snapshot rows, ties the whole two-path story together.
+        try (Connection connection = customerDatabase.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            statement.execute("INSERT INTO snapshot_cs_default_test (id) VALUES (3);");
+        }
+
+        String[] expected = new String[] {"+I[1, 0, 0]", "+I[2, 0, 0]", "+I[3, 0, 0]"};
+        actualRows.addAll(fetchRows(iterator, expected.length - 2));
+        assertEqualsInAnyOrder(Arrays.asList(expected), actualRows);
+        jobClient.cancel().get();
+    }
+
     @ParameterizedTest(name = "incrementalSnapshot = {0}")
     @ValueSource(booleans = {true, false})
     void testStartupFromSpecificBinlogFilePos(boolean incrementalSnapshot) throws Exception {
