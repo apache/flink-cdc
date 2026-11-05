@@ -141,6 +141,7 @@ module.exports = {
         'docs/examples-and-best-practices/table-selection-and-new-tables',
         'docs/examples-and-best-practices/metadata-and-soft-deletes',
         'docs/examples-and-best-practices/ai-text-labeling',
+        'docs/examples-and-best-practices/migrate-paimon-cdc-action',
       ],
     },
     {

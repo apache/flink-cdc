@@ -28,6 +28,9 @@ under the License.
 
 The Paimon Pipeline connector can be used as the *Data Sink* of the pipeline, and write data to [Paimon](https://paimon.apache.org). This document describes how to set up the Paimon Pipeline connector.
 
+To replace an existing Paimon MySQL CDC Action, see
+[Migrate Paimon MySQL CDC Actions to Flink CDC](../../examples-and-best-practices/migrate-paimon-cdc-action.md).
+
 ## What can the connector do?
 * Create table automatically if not exist
 * Schema change synchronization
