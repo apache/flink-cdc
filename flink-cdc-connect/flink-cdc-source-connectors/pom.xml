@@ -33,6 +33,7 @@ limitations under the License.
         <module>flink-connector-db2-cdc</module>
         <module>flink-connector-debezium</module>
         <module>flink-connector-mongodb-cdc</module>
+        <module>flink-connector-mariadb-cdc</module>
         <module>flink-connector-mysql-cdc</module>
         <module>flink-connector-oceanbase-cdc</module>
         <module>flink-connector-oracle-cdc</module>
