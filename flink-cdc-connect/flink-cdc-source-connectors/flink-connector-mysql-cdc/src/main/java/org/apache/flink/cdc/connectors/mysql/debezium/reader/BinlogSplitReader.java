@@ -20,6 +20,7 @@ package org.apache.flink.cdc.connectors.mysql.debezium.reader;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.connectors.mysql.debezium.task.MySqlBinlogSplitReadTask;
 import org.apache.flink.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
+import org.apache.flink.cdc.connectors.mysql.source.config.ChunkKeyCompareMode;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
 import org.apache.flink.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
@@ -93,6 +94,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
             new StoppableChangeEventSourceContext();
     private final boolean isParsingOnLineSchemaChanges;
     private final boolean isBackfillSkipped;
+    private final ChunkKeyCompareMode chunkKeyCompareMode;
     private final Map<String, List<SourceRecord>> pendingSchemaChangeEvents;
 
     private static final long READER_CLOSE_TIMEOUT = 30L;
@@ -116,6 +118,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
         this.isParsingOnLineSchemaChanges =
                 statefulTaskContext.getSourceConfig().isParseOnLineSchemaChanges();
         this.isBackfillSkipped = statefulTaskContext.getSourceConfig().isSkipSnapshotBackfill();
+        this.chunkKeyCompareMode = statefulTaskContext.getSourceConfig().getChunkKeyCompareMode();
         this.pendingSchemaChangeEvents = new HashMap<>();
     }
 
@@ -316,7 +319,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
 
                 FinishedSnapshotSplitInfo matchedSplit =
                         SplitKeyUtils.findSplitByKeyBinary(
-                                finishedSplitsInfo.get(tableId), chunkKey);
+                                finishedSplitsInfo.get(tableId), chunkKey, chunkKeyCompareMode);
 
                 return matchedSplit != null && position.isAfter(matchedSplit.getHighWatermark());
             }
@@ -381,7 +384,12 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
             }
             // Sort splits by splitStart for binary search optimization
             // Binary search requires sorted data to work correctly
-            splitsInfoMap.values().forEach(SplitKeyUtils::sortFinishedSplitInfos);
+            splitsInfoMap
+                    .values()
+                    .forEach(
+                            splits ->
+                                    SplitKeyUtils.sortFinishedSplitInfos(
+                                            splits, chunkKeyCompareMode));
         }
         this.finishedSplitsInfo = splitsInfoMap;
         this.maxSplitHighWatermarkMap = tableIdBinlogPositionMap;

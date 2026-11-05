@@ -17,8 +17,11 @@
 
 package org.apache.flink.cdc.connectors.mysql.source.utils;
 
+import org.apache.flink.cdc.connectors.mysql.source.config.ChunkKeyCompareMode;
+
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
 /** Utilities for operation on {@link Object}. */
@@ -83,12 +86,33 @@ public class ObjectUtils {
      */
     @SuppressWarnings("unchecked")
     public static int compare(Object obj1, Object obj2) {
+        return compare(obj1, obj2, ChunkKeyCompareMode.DEFAULT);
+    }
+
+    @SuppressWarnings("unchecked")
+    public static int compare(Object obj1, Object obj2, ChunkKeyCompareMode compareMode) {
         if (obj1 instanceof byte[] && obj2 instanceof byte[]) {
             return Arrays.compareUnsigned((byte[]) obj1, (byte[]) obj2);
         }
         if (obj1 instanceof Comparable && obj1.getClass().equals(obj2.getClass())) {
+            if (obj1 instanceof String && compareMode == ChunkKeyCompareMode.CASE_INSENSITIVE) {
+                return String.CASE_INSENSITIVE_ORDER.compare((String) obj1, (String) obj2);
+            }
+            if (obj1 instanceof String && compareMode == ChunkKeyCompareMode.BINARY) {
+                return Arrays.compareUnsigned(
+                        ((String) obj1).getBytes(StandardCharsets.UTF_8),
+                        ((String) obj2).getBytes(StandardCharsets.UTF_8));
+            }
             return ((Comparable) obj1).compareTo(obj2);
         } else {
+            if (compareMode == ChunkKeyCompareMode.CASE_INSENSITIVE) {
+                return obj1.toString().compareToIgnoreCase(obj2.toString());
+            }
+            if (compareMode == ChunkKeyCompareMode.BINARY) {
+                return Arrays.compareUnsigned(
+                        obj1.toString().getBytes(StandardCharsets.UTF_8),
+                        obj2.toString().getBytes(StandardCharsets.UTF_8));
+            }
             return obj1.toString().compareTo(obj2.toString());
         }
     }

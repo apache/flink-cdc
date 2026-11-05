@@ -17,6 +17,8 @@
 
 package org.apache.flink.cdc.connectors.mysql.source.utils;
 
+import org.apache.flink.cdc.connectors.mysql.source.config.ChunkKeyCompareMode;
+
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -58,5 +60,67 @@ class ObjectUtilsTest {
                 .isLessThan(0);
         Assertions.assertThat(ObjectUtils.compare(new byte[] {(byte) 0x80}, new byte[] {0x7f}))
                 .isGreaterThan(0);
+    }
+
+    @Test
+    void testCompareByteArraysIgnoresCompareMode() {
+        // byte[] comparison must stay byte-based regardless of the configured compare mode.
+        Assertions.assertThat(
+                        ObjectUtils.compare(
+                                new byte[] {0x7f},
+                                new byte[] {(byte) 0x80},
+                                ChunkKeyCompareMode.CASE_INSENSITIVE))
+                .isLessThan(0);
+        Assertions.assertThat(
+                        ObjectUtils.compare(
+                                new byte[] {(byte) 0x80},
+                                new byte[] {0x7f},
+                                ChunkKeyCompareMode.BINARY))
+                .isGreaterThan(0);
+    }
+
+    @Test
+    void testCompareStringsWithDefaultMode() {
+        // 'A' (65) sorts before 'a' (97) in Java's default String ordering.
+        Assertions.assertThat(ObjectUtils.compare("Apple", "apple", ChunkKeyCompareMode.DEFAULT))
+                .isLessThan(0);
+        Assertions.assertThat(ObjectUtils.compare("apple", "Apple", ChunkKeyCompareMode.DEFAULT))
+                .isGreaterThan(0);
+        Assertions.assertThat(ObjectUtils.compare("apple", "apple", ChunkKeyCompareMode.DEFAULT))
+                .isZero();
+    }
+
+    @Test
+    void testCompareStringsWithCaseInsensitiveMode() {
+        Assertions.assertThat(
+                        ObjectUtils.compare("Apple", "apple", ChunkKeyCompareMode.CASE_INSENSITIVE))
+                .isZero();
+        Assertions.assertThat(
+                        ObjectUtils.compare("APPLE", "apple", ChunkKeyCompareMode.CASE_INSENSITIVE))
+                .isZero();
+        Assertions.assertThat(
+                        ObjectUtils.compare(
+                                "banana", "apple", ChunkKeyCompareMode.CASE_INSENSITIVE))
+                .isGreaterThan(0);
+    }
+
+    @Test
+    void testCompareStringsWithBinaryMode() {
+        // Binary mode compares the UTF-8 bytes, so it must distinguish letter case.
+        Assertions.assertThat(ObjectUtils.compare("Apple", "apple", ChunkKeyCompareMode.BINARY))
+                .isLessThan(0);
+        Assertions.assertThat(ObjectUtils.compare("apple", "Apple", ChunkKeyCompareMode.BINARY))
+                .isGreaterThan(0);
+        Assertions.assertThat(ObjectUtils.compare("apple", "apple", ChunkKeyCompareMode.BINARY))
+                .isZero();
+    }
+
+    @Test
+    void testCompareNonStringValuesWithCompareMode() {
+        Assertions.assertThat(ObjectUtils.compare(1, 2, ChunkKeyCompareMode.DEFAULT)).isLessThan(0);
+        Assertions.assertThat(ObjectUtils.compare("a", "b", ChunkKeyCompareMode.BINARY))
+                .isLessThan(0);
+        Assertions.assertThat(ObjectUtils.compare("a", "B", ChunkKeyCompareMode.CASE_INSENSITIVE))
+                .isLessThan(0);
     }
 }
