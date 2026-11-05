@@ -232,6 +232,7 @@ pipeline:
        <td>String</td>
        <td> Parameters of StreamLoad.
          For example: <code> sink.properties.strict_mode: true</code>.
+         Stream Load uses gzip compression by default. Set <code>sink.properties.compress_type: ""</code> to disable compression.
          See more about <a href="https://doris.apache.org/docs/dev/data-operate/import/import-way/stream-load-manual"> StreamLoad Properties</a></td>
        </td>
      </tr>

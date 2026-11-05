@@ -232,6 +232,7 @@ pipeline:
       <td>String</td>
       <td>StreamLoad 的参数。
         For example: <code> sink.properties.strict_mode: true</code>.
+        Stream Load 默认使用 gzip 压缩。设置 <code>sink.properties.compress_type: ""</code> 可禁用压缩。
         查看更多关于 <a href="https://doris.apache.org/zh-CN/docs/dev/data-operate/import/import-way/stream-load-manual"> StreamLoad 的属性</a></td> 
       </td>
     </tr>
