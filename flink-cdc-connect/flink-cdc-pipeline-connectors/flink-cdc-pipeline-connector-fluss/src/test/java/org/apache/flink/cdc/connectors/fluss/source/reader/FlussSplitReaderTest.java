@@ -202,6 +202,172 @@ class FlussSplitReaderTest {
     }
 
     @Test
+    void testRemovePartitionsFinishesExpiredSplitsAndPreservesOtherPartitions() throws Exception {
+        PhysicalTablePath expiredPartition = PhysicalTablePath.of(TABLE_PATH, "expired");
+        PhysicalTablePath retainedPartition = PhysicalTablePath.of(TABLE_PATH, "retained");
+        TableBucket logBucket = new TableBucket(TABLE_ID, 11L, 0);
+        TableBucket currentSnapshotBucket = new TableBucket(TABLE_ID, 11L, 1);
+        TableBucket queuedSnapshotBucket = new TableBucket(TABLE_ID, 11L, 2);
+        TableBucket retainedLogBucket = new TableBucket(TABLE_ID, 22L, 0);
+        TableBucket retainedSnapshotBucket = new TableBucket(TABLE_ID, 22L, 1);
+        FlussLogSplit logSplit = new FlussLogSplit(expiredPartition, logBucket, 10L);
+        FlussHybridSnapshotLogSplit currentSnapshot =
+                new FlussHybridSnapshotLogSplit(expiredPartition, currentSnapshotBucket, 1L, 10L);
+        FlussHybridSnapshotLogSplit queuedSnapshot =
+                new FlussHybridSnapshotLogSplit(expiredPartition, queuedSnapshotBucket, 2L, 10L);
+        FlussLogSplit retainedLogSplit =
+                new FlussLogSplit(retainedPartition, retainedLogBucket, 20L);
+        FlussHybridSnapshotLogSplit retainedSnapshot =
+                new FlussHybridSnapshotLogSplit(retainedPartition, retainedSnapshotBucket, 3L, 20L);
+        FlussSplitReader reader = new FlussSplitReader(new Configuration(), null, null);
+        AtomicBoolean tableClosed = new AtomicBoolean();
+        AtomicBoolean batchScannerClosed = new AtomicBoolean();
+        AtomicBoolean logScannerClosed = new AtomicBoolean();
+        Set<TableBucket> unsubscribedBuckets = new HashSet<>();
+        Table table =
+                proxy(
+                        Table.class,
+                        (proxy, method, arguments) -> {
+                            if (method.getName().equals("close")) {
+                                tableClosed.set(true);
+                            }
+                            return null;
+                        });
+        MultiTableLogScanner logScanner =
+                proxy(
+                        MultiTableLogScanner.class,
+                        (proxy, method, arguments) -> {
+                            if (method.getName().equals("unsubscribe")) {
+                                assertThat(arguments).hasSize(3);
+                                assertThat(arguments[0]).isEqualTo(TABLE_PATH);
+                                unsubscribedBuckets.add(
+                                        new TableBucket(
+                                                TABLE_ID,
+                                                (Long) arguments[1],
+                                                (Integer) arguments[2]));
+                            } else if (method.getName().equals("close")) {
+                                logScannerClosed.set(true);
+                            }
+                            return null;
+                        });
+        BatchScanner batchScanner =
+                proxy(
+                        BatchScanner.class,
+                        (proxy, method, arguments) -> {
+                            if (method.getName().equals("close")) {
+                                batchScannerClosed.set(true);
+                            }
+                            return null;
+                        });
+        RowType rowType = new RowType(Collections.emptyList());
+        tableResources(reader).put(TABLE_PATH, table);
+        tableRowTypes(reader).put(TABLE_PATH, rowType);
+        tablePrimaryKeyNames(reader).put(TABLE_PATH, Collections.singletonList("id"));
+        tablePartitionKeyNames(reader).put(TABLE_PATH, Collections.singletonList("part"));
+        bucketToSplit(reader).put(logBucket, logSplit);
+        bucketToSplit(reader).put(currentSnapshotBucket, currentSnapshot);
+        bucketToSplit(reader).put(queuedSnapshotBucket, queuedSnapshot);
+        bucketToSplit(reader).put(retainedLogBucket, retainedLogSplit);
+        bucketToSplit(reader).put(retainedSnapshotBucket, retainedSnapshot);
+        boundedSplits(reader).add(queuedSnapshot);
+        boundedSplits(reader).add(retainedSnapshot);
+        setField(reader, "currentBoundedSplit", currentSnapshot);
+        setField(reader, "currentBatchScanner", batchScanner);
+        setField(reader, "currentBatchSchemaId", 1);
+        setField(reader, "currentLogScanner", logScanner);
+
+        reader.removePartitions(Collections.singleton(expiredPartition));
+
+        assertThat(reader.fetch().finishedSplits())
+                .containsExactlyInAnyOrder(
+                        logSplit.splitId(), currentSnapshot.splitId(), queuedSnapshot.splitId());
+        assertThat(unsubscribedBuckets)
+                .containsExactlyInAnyOrder(logBucket, currentSnapshotBucket, queuedSnapshotBucket);
+        assertThat(bucketToSplit(reader))
+                .containsOnlyKeys(retainedLogBucket, retainedSnapshotBucket);
+        assertThat(boundedSplits(reader)).containsExactly(retainedSnapshot);
+        assertThat(getField(reader, "currentBoundedSplit")).isNull();
+        assertThat(getField(reader, "currentBatchScanner")).isNull();
+        assertThat(getField(reader, "currentBatchSchemaId")).isNull();
+        assertThat(batchScannerClosed).isTrue();
+        assertThat(tableResources(reader)).containsEntry(TABLE_PATH, table);
+        assertThat(tableRowTypes(reader)).containsEntry(TABLE_PATH, rowType);
+        assertThat(tablePrimaryKeyNames(reader))
+                .containsEntry(TABLE_PATH, Collections.singletonList("id"));
+        assertThat(tablePartitionKeyNames(reader))
+                .containsEntry(TABLE_PATH, Collections.singletonList("part"));
+        assertThat(getField(reader, "currentLogScanner")).isSameAs(logScanner);
+        assertThat(tableClosed).isFalse();
+        assertThat(logScannerClosed).isFalse();
+
+        reader.removePartitions(Collections.singleton(expiredPartition));
+        assertThat(bucketToSplit(reader))
+                .containsOnlyKeys(retainedLogBucket, retainedSnapshotBucket);
+        assertThat(boundedSplits(reader)).containsExactly(retainedSnapshot);
+        assertThat(unsubscribedBuckets).hasSize(3);
+    }
+
+    @Test
+    void testPartitionUnsubscriptionFailurePropagates() throws Exception {
+        PhysicalTablePath partition = PhysicalTablePath.of(TABLE_PATH, "expired");
+        TableBucket tableBucket = new TableBucket(TABLE_ID, 11L, 0);
+        FlussSplitReader reader = new FlussSplitReader(new Configuration(), null, null);
+        bucketToSplit(reader).put(tableBucket, new FlussLogSplit(partition, tableBucket, 10L));
+        IllegalStateException failure = new IllegalStateException("Test unsubscribe failure");
+        setField(
+                reader,
+                "currentLogScanner",
+                proxy(
+                        MultiTableLogScanner.class,
+                        (proxy, method, arguments) -> {
+                            if (method.getName().equals("unsubscribe")) {
+                                throw failure;
+                            }
+                            return null;
+                        }));
+
+        assertThatThrownBy(() -> reader.removePartitions(Collections.singleton(partition)))
+                .isSameAs(failure);
+    }
+
+    @Test
+    void testRemovingPartitionPreservesCurrentSnapshotOfAnotherPartition() throws Exception {
+        PhysicalTablePath expiredPartition = PhysicalTablePath.of(TABLE_PATH, "expired");
+        PhysicalTablePath retainedPartition = PhysicalTablePath.of(TABLE_PATH, "retained");
+        TableBucket expiredBucket = new TableBucket(TABLE_ID, 11L, 0);
+        TableBucket retainedBucket = new TableBucket(TABLE_ID, 22L, 0);
+        FlussHybridSnapshotLogSplit expiredSnapshot =
+                new FlussHybridSnapshotLogSplit(expiredPartition, expiredBucket, 1L, 10L);
+        FlussHybridSnapshotLogSplit retainedSnapshot =
+                new FlussHybridSnapshotLogSplit(retainedPartition, retainedBucket, 2L, 20L);
+        FlussSplitReader reader = new FlussSplitReader(new Configuration(), null, null);
+        AtomicBoolean batchScannerClosed = new AtomicBoolean();
+        BatchScanner batchScanner =
+                proxy(
+                        BatchScanner.class,
+                        (proxy, method, arguments) -> {
+                            if (method.getName().equals("close")) {
+                                batchScannerClosed.set(true);
+                            }
+                            return null;
+                        });
+        bucketToSplit(reader).put(expiredBucket, expiredSnapshot);
+        bucketToSplit(reader).put(retainedBucket, retainedSnapshot);
+        boundedSplits(reader).add(expiredSnapshot);
+        setField(reader, "currentBoundedSplit", retainedSnapshot);
+        setField(reader, "currentBatchScanner", batchScanner);
+
+        reader.removePartitions(Collections.singleton(expiredPartition));
+
+        assertThat(reader.fetch().finishedSplits()).containsExactly(expiredSnapshot.splitId());
+        assertThat(bucketToSplit(reader)).containsOnlyKeys(retainedBucket);
+        assertThat(boundedSplits(reader)).isEmpty();
+        assertThat(getField(reader, "currentBoundedSplit")).isSameAs(retainedSnapshot);
+        assertThat(getField(reader, "currentBatchScanner")).isSameAs(batchScanner);
+        assertThat(batchScannerClosed).isFalse();
+    }
+
+    @Test
     void testFetcherManagerFinishesLastAssignedSplitAfterTableRemoval() throws Exception {
         TestingSplitReader reader = new TestingSplitReader();
         FlussSourceFetcherManager manager =
@@ -214,6 +380,32 @@ class FlussSplitReaderTest {
             manager.removeTables(Collections.singleton(TABLE_PATH));
             assertThat(reader.removalRequested.await(10, TimeUnit.SECONDS)).isTrue();
             assertThat(reader.removedTables).containsExactly(TABLE_PATH);
+            assertThat(reader.wakeUps).hasValue(1);
+            assertThat(awaitRecords(manager.getQueue(), lastSplit.splitId()).finishedSplits())
+                    .containsExactly(lastSplit.splitId());
+        } finally {
+            manager.close(1000L);
+        }
+    }
+
+    @Test
+    void testFetcherManagerFinishesLastAssignedSplitAfterPartitionRemoval() throws Exception {
+        TestingSplitReader reader = new TestingSplitReader();
+        FlussSourceFetcherManager manager =
+                new FlussSourceFetcherManager(new FutureCompletingBlockingQueue<>(), () -> reader);
+        PhysicalTablePath partition = PhysicalTablePath.of(TABLE_PATH, "expired");
+        FlussLogSplit lastSplit =
+                new FlussLogSplit(partition, new TableBucket(TABLE_ID, 11L, 0), 10L);
+        try {
+            manager.addSplits(Collections.singletonList(lastSplit));
+            assertThat(reader.splitAdded.await(10, TimeUnit.SECONDS)).isTrue();
+            assertThat(reader.fetchStarted.await(10, TimeUnit.SECONDS)).isTrue();
+
+            manager.removePartitions(Collections.singleton(partition));
+
+            assertThat(reader.removalRequested.await(10, TimeUnit.SECONDS)).isTrue();
+            assertThat(reader.removedPartitions).containsExactly(partition);
+            assertThat(reader.removedTables).isEmpty();
             assertThat(reader.wakeUps).hasValue(1);
             assertThat(awaitRecords(manager.getQueue(), lastSplit.splitId()).finishedSplits())
                     .containsExactly(lastSplit.splitId());
@@ -306,6 +498,7 @@ class FlussSplitReaderTest {
         private final CountDownLatch wakeUp = new CountDownLatch(1);
         private final AtomicInteger wakeUps = new AtomicInteger();
         private Set<TablePath> removedTables = Collections.emptySet();
+        private Set<PhysicalTablePath> removedPartitions = Collections.emptySet();
         private String assignedSplitId;
         private String finishedSplitId;
 
@@ -334,6 +527,13 @@ class FlussSplitReaderTest {
         @Override
         void removeTables(Set<TablePath> tablePaths) {
             removedTables = tablePaths;
+            finishedSplitId = assignedSplitId;
+            removalRequested.countDown();
+        }
+
+        @Override
+        void removePartitions(Set<PhysicalTablePath> partitions) {
+            removedPartitions = partitions;
             finishedSplitId = assignedSplitId;
             removalRequested.countDown();
         }

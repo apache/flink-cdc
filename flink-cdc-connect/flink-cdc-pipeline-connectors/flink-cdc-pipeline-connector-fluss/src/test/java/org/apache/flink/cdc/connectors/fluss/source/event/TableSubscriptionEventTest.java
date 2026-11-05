@@ -17,11 +17,14 @@
 
 package org.apache.flink.cdc.connectors.fluss.source.event;
 
+import org.apache.fluss.metadata.PhysicalTablePath;
 import org.apache.fluss.metadata.TablePath;
 import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -37,11 +40,42 @@ class TableSubscriptionEventTest {
 
         TableSubscriptionEvent event =
                 new TableSubscriptionEvent(
-                        Collections.emptySet(), Collections.emptyMap(), fencedTablePaths);
+                        Collections.emptySet(),
+                        Collections.emptyMap(),
+                        fencedTablePaths,
+                        Collections.emptySet());
         fencedTablePaths.clear();
 
         assertThat(event.getFencedTablePaths()).containsExactly(tablePath);
         assertThatThrownBy(() -> event.getFencedTablePaths().clear())
+                .isInstanceOf(UnsupportedOperationException.class);
+    }
+
+    @Test
+    void testPartitionRemovalRequestsAndFencesAreDefensivelyCopied() {
+        PhysicalTablePath partitionPath =
+                PhysicalTablePath.of(TablePath.of("test_db", "test_table"), "expired");
+        Map<PhysicalTablePath, Long> requests =
+                new HashMap<>(Collections.singletonMap(partitionPath, 7L));
+        Set<PhysicalTablePath> fences = new HashSet<>(Collections.singleton(partitionPath));
+
+        TableSubscriptionEvent event =
+                new TableSubscriptionEvent(
+                        Collections.emptySet(),
+                        Collections.emptyMap(),
+                        Collections.emptySet(),
+                        Collections.emptySet(),
+                        requests,
+                        fences);
+        requests.clear();
+        fences.clear();
+
+        assertThat(event.getPendingPartitionRemovalRequests())
+                .containsExactlyEntriesOf(Collections.singletonMap(partitionPath, 7L));
+        assertThat(event.getFencedPartitionPaths()).containsExactly(partitionPath);
+        assertThatThrownBy(() -> event.getPendingPartitionRemovalRequests().clear())
+                .isInstanceOf(UnsupportedOperationException.class);
+        assertThatThrownBy(() -> event.getFencedPartitionPaths().clear())
                 .isInstanceOf(UnsupportedOperationException.class);
     }
 }

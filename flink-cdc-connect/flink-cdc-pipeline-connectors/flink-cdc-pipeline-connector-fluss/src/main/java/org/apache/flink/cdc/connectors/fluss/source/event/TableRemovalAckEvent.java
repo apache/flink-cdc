@@ -19,30 +19,48 @@ package org.apache.flink.cdc.connectors.fluss.source.event;
 
 import org.apache.flink.api.connector.source.SourceEvent;
 
+import org.apache.fluss.metadata.PhysicalTablePath;
 import org.apache.fluss.metadata.TablePath;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/** Acknowledges completed table-removal requests from a source reader. */
+/** Acknowledges completed table and partition removal requests from a source reader. */
 public class TableRemovalAckEvent implements SourceEvent {
 
     private static final long serialVersionUID = 1L;
 
     private final Map<TablePath, Long> completedRemovalRequests;
+    private final Map<PhysicalTablePath, Long> completedPartitionRemovalRequests;
 
     public TableRemovalAckEvent(Map<TablePath, Long> completedRemovalRequests) {
+        this(completedRemovalRequests, Collections.emptyMap());
+    }
+
+    public TableRemovalAckEvent(
+            Map<TablePath, Long> completedRemovalRequests,
+            Map<PhysicalTablePath, Long> completedPartitionRemovalRequests) {
         this.completedRemovalRequests =
                 Collections.unmodifiableMap(new LinkedHashMap<>(completedRemovalRequests));
+        this.completedPartitionRemovalRequests =
+                Collections.unmodifiableMap(new LinkedHashMap<>(completedPartitionRemovalRequests));
     }
 
     public Map<TablePath, Long> getCompletedRemovalRequests() {
         return completedRemovalRequests;
     }
 
+    public Map<PhysicalTablePath, Long> getCompletedPartitionRemovalRequests() {
+        return completedPartitionRemovalRequests;
+    }
+
     @Override
     public String toString() {
-        return "TableRemovalAckEvent{completedRemovalRequests=" + completedRemovalRequests + '}';
+        return "TableRemovalAckEvent{completedRemovalRequests="
+                + completedRemovalRequests
+                + ", completedPartitionRemovalRequests="
+                + completedPartitionRemovalRequests
+                + '}';
     }
 }
