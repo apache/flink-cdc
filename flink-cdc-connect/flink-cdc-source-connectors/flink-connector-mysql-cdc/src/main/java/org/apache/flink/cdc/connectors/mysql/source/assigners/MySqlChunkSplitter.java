@@ -331,7 +331,8 @@ public class MySqlChunkSplitter implements ChunkSplitter {
         return splits;
     }
 
-    private Object nextChunkEnd(
+    @VisibleForTesting
+    Object nextChunkEnd(
             JdbcConnection jdbc,
             Object previousChunkEnd,
             TableId tableId,
@@ -348,6 +349,9 @@ public class MySqlChunkSplitter implements ChunkSplitter {
                         chunkSize,
                         previousChunkEnd,
                         sourceConfig.getChunkKeyCompareMode());
+        if (chunkEnd == null) {
+            return null;
+        }
         if (Objects.equals(previousChunkEnd, chunkEnd)) {
             // we don't allow equal chunk start and end,
             // should query the next one larger than chunkEnd

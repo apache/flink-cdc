@@ -95,8 +95,7 @@ public class ObjectUtils {
             return Arrays.compareUnsigned((byte[]) obj1, (byte[]) obj2);
         }
         if (obj1 instanceof Comparable && obj1.getClass().equals(obj2.getClass())) {
-            if (obj1 instanceof String
-                    && compareMode == ChunkKeyCompareMode.CASE_INSENSITIVE) {
+            if (obj1 instanceof String && compareMode == ChunkKeyCompareMode.CASE_INSENSITIVE) {
                 return String.CASE_INSENSITIVE_ORDER.compare((String) obj1, (String) obj2);
             }
             if (obj1 instanceof String && compareMode == ChunkKeyCompareMode.BINARY) {
