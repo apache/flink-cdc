@@ -67,6 +67,7 @@ public class MySqlDataSource implements DataSource {
                                 RelationalDatabaseConnectorConfig.INCLUDE_SCHEMA_COMMENTS.name(),
                                 false);
         boolean isTableIdCaseInsensitive = MySqlSchemaUtils.isTableIdCaseInsensitive(sourceConfig);
+
         MySqlEventDeserializer deserializer =
                 new MySqlEventDeserializer(
                         DebeziumChangelogMode.ALL,
@@ -74,7 +75,8 @@ public class MySqlDataSource implements DataSource {
                         readableMetadataList,
                         includeComments,
                         sourceConfig.isTreatTinyInt1AsBoolean(),
-                        isTableIdCaseInsensitive);
+                        isTableIdCaseInsensitive,
+                        sourceConfig.isScanReadChangelogAsAppendOnly());
 
         MySqlSource<Event> source =
                 new MySqlSource<>(
@@ -102,7 +104,9 @@ public class MySqlDataSource implements DataSource {
 
     @Override
     public SupportedMetadataColumn[] supportedMetadataColumns() {
-        return new SupportedMetadataColumn[] {new OpTsMetadataColumn()};
+        return new SupportedMetadataColumn[] {
+            new OpTsMetadataColumn(), new RowKindMetadataColumn()
+        };
     }
 
     @Override
