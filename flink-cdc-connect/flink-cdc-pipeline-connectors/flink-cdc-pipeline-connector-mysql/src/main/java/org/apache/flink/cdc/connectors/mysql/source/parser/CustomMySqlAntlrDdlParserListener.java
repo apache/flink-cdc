@@ -25,7 +25,6 @@ import io.debezium.connector.mysql.antlr.MySqlAntlrDdlParser;
 import io.debezium.connector.mysql.antlr.listener.AlterTableParserListener;
 import io.debezium.connector.mysql.antlr.listener.AlterViewParserListener;
 import io.debezium.connector.mysql.antlr.listener.CreateAndAlterDatabaseParserListener;
-import io.debezium.connector.mysql.antlr.listener.CreateTableParserListener;
 import io.debezium.connector.mysql.antlr.listener.CreateUniqueIndexParserListener;
 import io.debezium.connector.mysql.antlr.listener.CreateViewParserListener;
 import io.debezium.connector.mysql.antlr.listener.DropDatabaseParserListener;
@@ -82,7 +81,7 @@ public class CustomMySqlAntlrDdlParserListener extends MySqlParserBaseListener
         // initialize listeners
         listeners.add(new CreateAndAlterDatabaseParserListener(parser));
         listeners.add(new DropDatabaseParserListener(parser));
-        listeners.add(new CreateTableParserListener(parser, listeners));
+        listeners.add(new CustomCreateTableParserListener(parser, listeners));
         listeners.add(
                 new CustomAlterTableParserListener(
                         parser, listeners, parsedEvents, tinyInt1isBit, isTableIdCaseInsensitive));
