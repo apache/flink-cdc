@@ -187,8 +187,17 @@ public class PostgresStreamingChangeEventSource
 
             this.lastCompletelyProcessedLsn = replicationStream.get().startLsn();
 
-            if (walPosition.searchingEnabled()) {
-                searchWalPosition(context, stream, walPosition);
+            // Only search for the WAL resume position when the stored offset has actually
+            // processed a position. On a fresh start (nothing processed yet) the search loop
+            // would block forever waiting for a decoded message: on an idle publication no WAL
+            // is produced, and the heartbeat action query that would generate some only runs
+            // from the main streaming loop, which this search precedes. Skipping the search here
+            // still starts streaming from the stored LSN, so no events are missed. This mirrors
+            // the fix Debezium shipped in 2.7, which added the hasCompletelyProcessedPosition()
+            // guard to searchingEnabled(); it relies on the DBZ-6635 heartbeat fix backported in
+            // processMessages(), so the heartbeat action query can generate WAL meanwhile.
+            if (walPosition.searchingEnabled() && offsetContext.hasCompletelyProcessedPosition()) {
+                searchWalPosition(context, partition, offsetContext, stream, walPosition);
                 try {
                     if (!isInPreSnapshotCatchUpStreaming(offsetContext)) {
                         connection.commit();
@@ -356,9 +365,12 @@ public class PostgresStreamingChangeEventSource
                 noMessageIterations = 0;
                 lsnFlushingAllowed = true;
             } else {
-                if (offsetContext.hasCompletelyProcessedPosition()) {
-                    dispatcher.dispatchHeartbeatEvent(partition, offsetContext);
-                }
+                // Dispatch heartbeats also before any WAL message was processed (backport of
+                // Debezium DBZ-6635, shipped in 2.4): on a fresh start over an idle publication
+                // this is the only path that runs the heartbeat action query, which in turn
+                // generates the WAL that lets streaming make progress. Without it, skipping the
+                // WAL-position search below would only move the stall into this loop.
+                dispatcher.dispatchHeartbeatEvent(partition, offsetContext);
                 noMessageIterations++;
                 if (noMessageIterations >= THROTTLE_NO_MESSAGE_BEFORE_PAUSE) {
                     noMessageIterations = 0;
@@ -380,6 +392,8 @@ public class PostgresStreamingChangeEventSource
 
     private void searchWalPosition(
             ChangeEventSourceContext context,
+            PostgresPartition partition,
+            PostgresOffsetContext offsetContext,
             final ReplicationStream stream,
             final WalPositionLocator walPosition)
             throws SQLException, InterruptedException {
@@ -399,6 +413,9 @@ public class PostgresStreamingChangeEventSource
             if (receivedMessage) {
                 noMessageIterations = 0;
             } else {
+                // Dispatch heartbeats while searching so that the heartbeat action query can
+                // generate WAL on an idle publication and let the search terminate (Debezium 2.7).
+                dispatcher.dispatchHeartbeatEvent(partition, offsetContext);
                 noMessageIterations++;
                 if (noMessageIterations >= THROTTLE_NO_MESSAGE_BEFORE_PAUSE) {
                     noMessageIterations = 0;

@@ -20,7 +20,6 @@ package org.apache.flink.cdc.connectors.fluss.sink.v2;
 import org.apache.flink.api.connector.sink2.Sink;
 import org.apache.flink.api.connector.sink2.SinkWriter;
 import org.apache.flink.api.connector.sink2.WriterInitContext;
-import org.apache.flink.runtime.metrics.groups.InternalSinkWriterMetricGroup;
 
 import org.apache.fluss.config.Configuration;
 
@@ -49,7 +48,7 @@ public class FlussSink<InputT> implements Sink<InputT> {
     public SinkWriter<InputT> createWriter(InitContext context) throws IOException {
         FlussSinkWriter<InputT> flinkSinkWriter =
                 new FlussSinkWriter<>(flussConfig, context.getMailboxExecutor(), serializer);
-        flinkSinkWriter.initialize(InternalSinkWriterMetricGroup.wrap(context.metricGroup()));
+        flinkSinkWriter.initialize(context.metricGroup());
         return flinkSinkWriter;
     }
 
@@ -57,7 +56,7 @@ public class FlussSink<InputT> implements Sink<InputT> {
     public SinkWriter<InputT> createWriter(WriterInitContext context) throws IOException {
         FlussSinkWriter<InputT> flinkSinkWriter =
                 new FlussSinkWriter<>(flussConfig, context.getMailboxExecutor(), serializer);
-        flinkSinkWriter.initialize(InternalSinkWriterMetricGroup.wrap(context.metricGroup()));
+        flinkSinkWriter.initialize(context.metricGroup());
         return flinkSinkWriter;
     }
 }

@@ -76,6 +76,7 @@ import static io.debezium.connector.AbstractSourceInfo.SCHEMA_NAME_KEY;
 import static io.debezium.connector.AbstractSourceInfo.TABLE_NAME_KEY;
 import static io.debezium.connector.postgresql.PostgresConnectorConfig.DROP_SLOT_ON_STOP;
 import static io.debezium.connector.postgresql.PostgresConnectorConfig.PLUGIN_NAME;
+import static io.debezium.connector.postgresql.PostgresConnectorConfig.PUBLICATION_AUTOCREATE_MODE;
 import static io.debezium.connector.postgresql.PostgresConnectorConfig.SLOT_NAME;
 import static io.debezium.connector.postgresql.PostgresConnectorConfig.SNAPSHOT_MODE;
 import static io.debezium.connector.postgresql.PostgresObjectUtils.createReplicationConnection;
@@ -144,6 +145,12 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                                     .with(DROP_SLOT_ON_STOP.name(), true)
                                     // Disable heartbeat event in snapshot split fetcher
                                     .with(Heartbeat.HEARTBEAT_INTERVAL, 0)
+                                    // Never touch the shared publication in backfill tasks;
+                                    // filtered mode would shrink it to this split's single table
+                                    // and other tables' changes would be dropped by pgoutput
+                                    .with(
+                                            PUBLICATION_AUTOCREATE_MODE.name(),
+                                            PostgresConnectorConfig.AutoCreateMode.DISABLED)
                                     .build());
         } else {
 

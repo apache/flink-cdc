@@ -165,6 +165,15 @@ public class UniqueDatabase {
         }
     }
 
+    /** Creates a publication for tests that bypass the source enumerator. */
+    public void createPublication(String publicationName) throws SQLException {
+        try (Connection connection = PostgresTestBase.getJdbcConnection(container, databaseName);
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    String.format("CREATE PUBLICATION %s FOR ALL TABLES", publicationName));
+        }
+    }
+
     /** Drop the database if it is existing. */
     public void dropDatabase() {
         try {

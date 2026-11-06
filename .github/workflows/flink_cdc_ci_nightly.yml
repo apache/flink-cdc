@@ -27,7 +27,7 @@ jobs:
   license_check:
     if: github.repository == 'apache/flink-cdc'
     name: License Check
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Check out repository code
         uses: actions/checkout@v6

@@ -23,6 +23,7 @@ import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
+import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
@@ -36,17 +37,39 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNoException;
 
 /** Tests for {@link HudiMetadataApplier}. */
 class HudiMetadataApplierTest {
 
     @TempDir public static java.nio.file.Path temporaryFolder;
+
+    @Test
+    void testAcceptedSchemaEvolutionTypes() {
+        Configuration config = new Configuration();
+        config.set(HudiConfig.PATH, temporaryFolder.toString());
+        HudiMetadataApplier metadataApplier = new HudiMetadataApplier(config);
+
+        assertThat(metadataApplier.acceptsSchemaEvolutionType(SchemaChangeEventType.TRUNCATE_TABLE))
+                .isFalse();
+        assertThat(metadataApplier.acceptsSchemaEvolutionType(SchemaChangeEventType.DROP_TABLE))
+                .isFalse();
+
+        metadataApplier.setAcceptedSchemaEvolutionTypes(
+                EnumSet.of(SchemaChangeEventType.CREATE_TABLE));
+
+        assertThat(metadataApplier.acceptsSchemaEvolutionType(SchemaChangeEventType.CREATE_TABLE))
+                .isTrue();
+        assertThat(metadataApplier.acceptsSchemaEvolutionType(SchemaChangeEventType.ADD_COLUMN))
+                .isFalse();
+    }
 
     @Test
     void testApplySchemaChange() throws Exception {

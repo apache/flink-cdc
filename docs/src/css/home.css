@@ -1,0 +1,284 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+.index-wrapper .bg-purple {
+  background: linear-gradient(90deg, #c67dd6 0%, #8a77d3 100%);
+}
+.index-wrapper svg {
+  vertical-align: middle;
+}
+.index-wrapper .link-as-button {
+  display: inline-block;
+  transform: translate(0, 0) rotate(0) skewX(0) skewY(0) scaleX(1) scaleY(1);
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 300ms;
+  border-radius: 9999px;
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+}
+.index-wrapper .link-as-button:hover {
+  transform: translate(0, 0) rotate(0) skewX(0) skewY(0) scaleX(1.05)
+    scaleY(1.05);
+}
+.index-wrapper .header-1 {
+  font-size: 2.5rem;
+  line-height: 1;
+  margin-top: 0;
+  margin-bottom: 0;
+}
+.index-wrapper .container {
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+}
+.index-wrapper .top-container {
+  padding: 1.5rem;
+}
+.index-wrapper .top-container .container {
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+  align-items: center;
+}
+.index-wrapper .flex {
+  display: flex;
+}
+.index-wrapper .flex-wrap {
+  flex-wrap: wrap;
+}
+.index-wrapper .flex-col {
+  flex-direction: column;
+}
+.index-wrapper .flex-row {
+  flex-direction: row;
+}
+.index-wrapper .flex-shrink {
+  flex-shrink: 1;
+}
+.index-wrapper .flex-grow {
+  flex-grow: 1;
+}
+.index-wrapper .text-center {
+  text-align: center;
+}
+.index-wrapper .items-start {
+  align-items: flex-start;
+}
+.index-wrapper .justify-center {
+  justify-content: center;
+}
+.index-wrapper .justify-between {
+  justify-content: space-between;
+}
+.index-wrapper .w-1\/2 {
+  width: 50%;
+}
+.index-wrapper .w-3\/4 {
+  width: 75%;
+}
+.index-wrapper .w-4\/5 {
+  width: 80%;
+}
+.index-wrapper .w-full {
+  width: 100%;
+}
+.index-wrapper .text-3xl {
+  font-size: 1.875rem;
+  line-height: 2.25rem;
+}
+.index-wrapper .text-xl {
+  font-size: 1.25rem;
+  line-height: 1.75rem;
+}
+.index-wrapper .text-lg {
+  font-size: 1.125rem;
+  line-height: 1.75rem;
+}
+.index-wrapper .text-sm {
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+.index-wrapper .font-bold {
+  font-weight: 700;
+}
+.index-wrapper .leading-normal {
+  line-height: 1.5;
+}
+.index-wrapper .leading-tight {
+  line-height: 1.25;
+}
+.index-wrapper .bg-white {
+  background-color: #fff;
+}
+.index-wrapper .border-none {
+  border-style: none;
+}
+.index-wrapper .mx-auto {
+  margin-left: auto;
+  margin-right: auto;
+}
+.index-wrapper .ml-0 {
+  margin-left: 0;
+}
+.index-wrapper .gap-6 {
+  margin-bottom: 1.5rem;
+}
+.index-wrapper .p-0 {
+  padding: 0;
+}
+.index-wrapper .px-6 {
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+}
+.index-wrapper .px-8 {
+  padding-left: 2rem;
+  padding-right: 2rem;
+}
+.index-wrapper .py-6 {
+  padding-top: 1.5rem;
+  padding-bottom: 1.5rem;
+}
+.index-wrapper .py-8 {
+  padding-top: 2rem;
+  padding-bottom: 2rem;
+}
+.index-wrapper .py-12 {
+  padding-top: 3rem;
+  padding-bottom: 3rem;
+}
+.index-wrapper .m-8 {
+  margin: 2rem;
+}
+.index-wrapper .my-0 {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+.index-wrapper .my-4 {
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+}
+.index-wrapper .mt-1 {
+  margin-top: 0.25rem;
+}
+.index-wrapper .mt-6 {
+  margin-top: 1.5rem;
+}
+.index-wrapper .mt-8 {
+  margin-top: 2rem;
+}
+.index-wrapper .-mt-8 {
+  margin-top: -2rem;
+}
+.index-wrapper .absolute {
+  position: absolute;
+}
+.index-wrapper .relative {
+  position: relative;
+}
+.index-wrapper .bottom-0 {
+  bottom: 0;
+}
+.index-wrapper .h-40 {
+  height: 10rem;
+}
+.index-wrapper .basis-1\/12 {
+  flex-basis: 8.333333%;
+}
+.index-wrapper .basis-10\/12 {
+  flex-basis: 83.333333%;
+}
+.index-wrapper .opacity-50 {
+  opacity: 0.5;
+}
+.index-wrapper h1,
+.index-wrapper h2 {
+  border-bottom: none !important;
+}
+.index-wrapper .divider {
+  background: #bf74f1;
+  margin-left: auto;
+  margin-right: auto;
+  opacity: 0.25;
+  width: 75%;
+  height: 0.125rem;
+}
+.index-wrapper .divider.w-1\/2 {
+  width: 50%;
+}
+.index-wrapper .divider.opacity-50 {
+  opacity: 0.5;
+}
+.index-wrapper .text-white {
+  color: #fff !important;
+}
+.index-wrapper .text-black {
+  color: #000 !important;
+}
+.index-wrapper .text-primary {
+  color: #bf74f1;
+}
+@media (min-width: 768px) {
+  .index-wrapper .md\:w-1\/2 {
+    width: 50%;
+  }
+  .index-wrapper .md\:w-1\/3 {
+    width: 33.333333%;
+  }
+  .index-wrapper .md\:w-3\/5 {
+    width: 60%;
+  }
+  .index-wrapper .md\:flex-row {
+    flex-direction: row;
+  }
+  .index-wrapper .md\:text-left {
+    text-align: left;
+  }
+  .index-wrapper .link-as-button {
+    margin-left: 0;
+    margin-right: 0;
+  }
+}
+@media (min-width: 1280px) {
+  .index-wrapper .xl\:mt-0 {
+    margin-top: 0;
+  }
+  .index-wrapper .xl\:ml-16 {
+    margin-left: 4rem;
+  }
+  .index-wrapper .xl\:items-start {
+    align-items: flex-start;
+  }
+  .index-wrapper .xl\:text-left {
+    text-align: left;
+  }
+  .index-wrapper .xl\:flex-row {
+    flex-direction: row;
+  }
+  .index-wrapper .xl\:justify-between {
+    justify-content: space-between;
+  }
+  .index-wrapper .xl\:w-\[max-content\] {
+    width: max-content;
+  }
+  .index-wrapper .xl\:min-w-\[max-content\] {
+    min-width: max-content;
+  }
+  .index-wrapper .xl\:my-auto {
+    margin-top: auto;
+    margin-bottom: auto;
+  }
+}

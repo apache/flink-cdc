@@ -33,11 +33,17 @@ import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
+import java.util.Map;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Test for {@link FlussDataSinkFactory}. */
-public class FlussDataSinkFactoryTest {
+class FlussDataSinkFactoryTest {
     @Test
     void testCreateDataSink() {
         DataSinkFactory sinkFactory =
@@ -70,8 +76,20 @@ public class FlussDataSinkFactoryTest {
                 .isInstanceOf(ForwardHashFunctionProvider.class);
     }
 
-    @Test
-    void testUnsupportedOption() {
+    @ParameterizedTest
+    @ValueSource(
+            strings = {
+                "unsupported_key",
+                "properties.unsupported.option",
+                "properties.paimon",
+                "properties.paimonx.option",
+                "properties.iceberg",
+                "properties.icebergx.option",
+                "properties.icerberg.option",
+                "paimon.file.format",
+                "iceberg.write.format.default"
+            })
+    void testUnsupportedOption(String option) {
         DataSinkFactory sinkFactory =
                 FactoryDiscoveryUtils.getFactoryByIdentifier("fluss", DataSinkFactory.class);
         Assertions.assertThat(sinkFactory).isInstanceOf(FlussDataSinkFactory.class);
@@ -80,7 +98,7 @@ public class FlussDataSinkFactoryTest {
                 Configuration.fromMap(
                         ImmutableMap.<String, String>builder()
                                 .put(FlussDataSinkOptions.BOOTSTRAP_SERVERS.key(), "localhost:9123")
-                                .put("unsupported_key", "unsupported_value")
+                                .put(option, "unsupported_value")
                                 .build());
 
         Assertions.assertThatThrownBy(
@@ -94,7 +112,74 @@ public class FlussDataSinkFactoryTest {
                 .hasMessageContaining(
                         "Unsupported options found for 'fluss'.\n\n"
                                 + "Unsupported options:\n\n"
-                                + "unsupported_key");
+                                + option);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "paimon.file.format, orc",
+        "paimon.deletion-vectors.enabled, true",
+        "paimon.unknown-option, unknown-value",
+        "iceberg.write.format.default, parquet",
+        "iceberg.unknown-option, unknown-value",
+        "hudi.unknown-option, unknown-value",
+        "lance.unknown-option, unknown-value"
+    })
+    void testDataLakeProperties(String option, String value) {
+        Configuration conf =
+                Configuration.fromMap(
+                        ImmutableMap.<String, String>builder()
+                                .put(FlussDataSinkOptions.BOOTSTRAP_SERVERS.key(), "localhost:9123")
+                                .put("properties.table.datalake.enabled", "true")
+                                .put("properties.table.datalake.freshness", "30s")
+                                .put("properties." + option, value)
+                                .put("properties.client.writer.acks", "all")
+                                .build());
+
+        DataSink dataSink =
+                new FlussDataSinkFactory()
+                        .createDataSink(
+                                new FactoryHelper.DefaultContext(
+                                        conf,
+                                        conf,
+                                        Thread.currentThread().getContextClassLoader()));
+
+        Map<String, String> expectedTableProperties =
+                ImmutableMap.of(
+                        "table.datalake.enabled",
+                        "true",
+                        "table.datalake.freshness",
+                        "30s",
+                        option,
+                        value);
+        assertThat(dataSink.getMetadataApplier())
+                .extracting("tableProperties")
+                .isEqualTo(expectedTableProperties);
+        assertThat(dataSink)
+                .extracting("flussClientConfig")
+                .isEqualTo(
+                        org.apache.fluss.config.Configuration.fromMap(
+                                ImmutableMap.of(
+                                        "bootstrap.servers", "localhost:9123",
+                                        "client.writer.acks", "all")));
+    }
+
+    @Test
+    void testDataLakePropertiesRequireBootstrapServers() {
+        Configuration conf =
+                Configuration.fromMap(ImmutableMap.of("properties.paimon.file.format", "orc"));
+
+        assertThatThrownBy(
+                        () ->
+                                new FlussDataSinkFactory()
+                                        .createDataSink(
+                                                new FactoryHelper.DefaultContext(
+                                                        conf,
+                                                        conf,
+                                                        Thread.currentThread()
+                                                                .getContextClassLoader())))
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining("Missing required options are:\n\nbootstrap.servers");
     }
 
     @Test

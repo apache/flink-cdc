@@ -175,6 +175,62 @@ class IncrementalSourceReaderTest {
         reader.close();
     }
 
+    @Test
+    void testReaderDiscardsAlreadyReceivedPrefixOfPartiallyReceivedMetaGroup() throws Exception {
+        // A reader restored in the middle of meta group synchronization holds a partial last
+        // group. With a meta group size of 10, a reader holding 13 split infos requests group 1
+        // (infos 10..19) and must discard the 3 infos it already holds. Split ids are chosen so
+        // that their lexicographic order (":0, :1, :10, :11, :12, :2, ...") differs from the
+        // assignment order.
+        TestingReaderContext readerContext = new TestingReaderContext();
+        TestingIncrementalSourceReader reader = createReader(readerContext);
+        reader.start();
+
+        List<FinishedSnapshotSplitInfo> receivedInfos = new ArrayList<>();
+        for (int i = 0; i < 13; i++) {
+            receivedInfos.add(finishedSplitInfo(i));
+        }
+        StreamSplit partialSplit =
+                new StreamSplit(
+                        STREAM_SPLIT_ID,
+                        new TestOffset(100L),
+                        null,
+                        receivedInfos,
+                        new HashMap<>(),
+                        21);
+        reader.addSplits(Collections.singletonList(partialSplit));
+
+        List<byte[]> group1 = new ArrayList<>();
+        for (int i = 10; i < 20; i++) {
+            group1.add(finishedSplitInfo(i).serialize());
+        }
+        reader.handleSourceEvents(
+                new StreamSplitMetaEvent(partialSplit.splitId(), 1, group1, 21, 1));
+
+        // appendFinishedSplitInfos does not keep the order of the infos, so only check that every
+        // split info is held exactly once
+        List<String> expectedSplitIds = new ArrayList<>();
+        for (int i = 0; i < 20; i++) {
+            expectedSplitIds.add(TABLE_ID + ":" + i);
+        }
+        assertThat(reader.getUncompletedStreamSplit(partialSplit.splitId()))
+                .extracting(StreamSplit::getFinishedSnapshotSplitInfos)
+                .asList()
+                .extracting(info -> ((FinishedSnapshotSplitInfo) info).getSplitId())
+                .containsExactlyInAnyOrderElementsOf(expectedSplitIds);
+        reader.close();
+    }
+
+    private static FinishedSnapshotSplitInfo finishedSplitInfo(int chunkId) {
+        return new FinishedSnapshotSplitInfo(
+                TABLE_ID,
+                TABLE_ID + ":" + chunkId,
+                new Object[] {chunkId},
+                new Object[] {chunkId + 1},
+                new TestOffset(50L),
+                TEST_OFFSET_FACTORY);
+    }
+
     private static TestingIncrementalSourceReader createReader(TestingReaderContext readerContext) {
         return new TestingIncrementalSourceReader(
                 new TrackingRecordEmitter(new SourceReaderMetrics(readerContext.metricGroup())),
@@ -210,6 +266,10 @@ class IncrementalSourceReaderTest {
 
         private SourceSplitState initialize(SourceSplitBase split) {
             return initializedState(split);
+        }
+
+        private StreamSplit getUncompletedStreamSplit(String splitId) {
+            return uncompletedStreamSplits.get(splitId);
         }
     }
 

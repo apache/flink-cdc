@@ -25,6 +25,7 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.IntType;
 import org.apache.flink.cdc.runtime.operators.schema.common.ExistingTableSchemaExpander;
@@ -33,8 +34,12 @@ import org.apache.flink.table.api.ValidationException;
 import org.apache.fluss.client.Connection;
 import org.apache.fluss.client.ConnectionFactory;
 import org.apache.fluss.client.admin.Admin;
+import org.apache.fluss.exception.InvalidAlterTableException;
 import org.apache.fluss.exception.InvalidConfigException;
+import org.apache.fluss.exception.TableNotExistException;
+import org.apache.fluss.exception.UnknownServerException;
 import org.apache.fluss.metadata.DatabaseDescriptor;
+import org.apache.fluss.metadata.TableChange;
 import org.apache.fluss.metadata.TableDescriptor;
 import org.apache.fluss.metadata.TableInfo;
 import org.apache.fluss.metadata.TablePath;
@@ -44,25 +49,38 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.lang.reflect.Proxy;
+import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Stream;
 
 import static org.apache.flink.cdc.connectors.fluss.utils.FlussConversions.toFlussSchema;
+import static org.apache.flink.cdc.connectors.fluss.utils.FlussConversions.toFlussType;
+import static org.apache.fluss.config.ConfigOptions.DEFAULT_REPLICATION_FACTOR;
+import static org.apache.fluss.config.ConfigOptions.TABLE_LOG_TTL;
 import static org.apache.fluss.config.ConfigOptions.TABLE_REPLICATION_FACTOR;
 import static org.apache.fluss.types.DataTypeChecks.equalsWithFieldId;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Test for {@link FlussMetaDataApplier}. */
-public class FlussMetadataApplierTest {
+class FlussMetadataApplierTest {
     @RegisterExtension
     private static final FlussClusterExtension FLUSS_CLUSTER_EXTENSION =
             FlussClusterExtension.builder().setNumOfTabletServers(3).build();
@@ -120,8 +138,8 @@ public class FlussMetadataApplierTest {
                     "row_col"
                 };
 
-        org.apache.flink.cdc.common.types.DataType[] cdcDataTypes =
-                new org.apache.flink.cdc.common.types.DataType[] {
+        DataType[] cdcDataTypes =
+                new DataType[] {
                     DataTypes.BINARY(10),
                     DataTypes.VARBINARY(10),
                     DataTypes.BYTES(),
@@ -296,8 +314,7 @@ public class FlussMetadataApplierTest {
     void testUnsupportedType() throws Exception {
         String[] fieldNames = new String[] {"timestamp_tz_col"};
 
-        org.apache.flink.cdc.common.types.DataType[] cdcDataTypes =
-                new org.apache.flink.cdc.common.types.DataType[] {DataTypes.TIMESTAMP_TZ()};
+        DataType[] cdcDataTypes = new DataType[] {DataTypes.TIMESTAMP_TZ()};
 
         try (FlussMetaDataApplier applier =
                 new FlussMetaDataApplier(
@@ -600,7 +617,8 @@ public class FlussMetadataApplierTest {
                                                     Collections.singletonList(
                                                             AddColumnEvent.last(oldColumn)))))
                     .rootCause()
-                    .hasMessageContaining("Column name already exists.");
+                    .hasMessageContaining("Column name already exists in table")
+                    .hasMessageContaining("with type INT, but ADD COLUMN requests STRING");
             applier.applySchemaChange(
                     new AddColumnEvent(
                             tableId, Collections.singletonList(AddColumnEvent.last(newColumn))));
@@ -612,6 +630,433 @@ public class FlussMetadataApplierTest {
                                     .column("name", org.apache.fluss.types.DataTypes.INT())
                                     .column("newColumn", org.apache.fluss.types.DataTypes.STRING())
                                     .build());
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void testReplayAddColumns(boolean partiallyApplied) throws Exception {
+        TableId tableId = TableId.tableId(DATABASE_NAME, "replay_columns");
+        TablePath tablePath = new TablePath(DATABASE_NAME, "replay_columns");
+        Column name = Column.physicalColumn("name", DataTypes.VARCHAR(100));
+        Column details =
+                Column.physicalColumn(
+                        "details",
+                        DataTypes.ROW(DataTypes.FIELD("amount", DataTypes.DECIMAL(10, 2))));
+        AddColumnEvent event =
+                new AddColumnEvent(
+                        tableId,
+                        Arrays.asList(AddColumnEvent.last(name), AddColumnEvent.last(details)));
+        try (FlussMetaDataApplier applier =
+                new FlussMetaDataApplier(
+                        FLUSS_CLUSTER_EXTENSION.getClientConfig(),
+                        Collections.emptyMap(),
+                        Collections.emptyMap(),
+                        Collections.emptyMap())) {
+            applier.applySchemaChange(
+                    new CreateTableEvent(
+                            tableId,
+                            Schema.newBuilder().physicalColumn("id", DataTypes.INT()).build()));
+            applier.applySchemaChange(
+                    partiallyApplied
+                            ? new AddColumnEvent(
+                                    tableId, Collections.singletonList(AddColumnEvent.last(name)))
+                            : event);
+        }
+
+        // A restored job has a new applier, but the external schema has not rolled back.
+        try (FlussMetaDataApplier restoredApplier =
+                new FlussMetaDataApplier(
+                        FLUSS_CLUSTER_EXTENSION.getClientConfig(),
+                        Collections.emptyMap(),
+                        Collections.emptyMap(),
+                        Collections.emptyMap())) {
+            restoredApplier.applySchemaChange(event);
+            TableInfo afterReplay = admin.getTableInfo(tablePath).get();
+            assertThat(afterReplay.getSchema())
+                    .isEqualTo(
+                            toFlussSchema(
+                                    Schema.newBuilder()
+                                            .physicalColumn("id", DataTypes.INT())
+                                            .physicalColumn("name", DataTypes.STRING())
+                                            .column(details)
+                                            .build()));
+            restoredApplier.applySchemaChange(event);
+            assertThat(admin.getTableInfo(tablePath).get().getSchemaId())
+                    .isEqualTo(afterReplay.getSchemaId());
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void testReplayAddColumnsWithStaleSchema(boolean partiallyApplied) throws Exception {
+        TableId tableId = TableId.tableId(DATABASE_NAME, "stale_columns");
+        TablePath tablePath = new TablePath(DATABASE_NAME, "stale_columns");
+        Column first = Column.physicalColumn("a", DataTypes.INT());
+        Column second = Column.physicalColumn("b", DataTypes.INT());
+        AddColumnEvent event =
+                new AddColumnEvent(
+                        tableId,
+                        Arrays.asList(AddColumnEvent.last(first), AddColumnEvent.last(second)));
+        List<TableChange> changes = addIntColumns("a", "b");
+        try (FlussMetaDataApplier applier =
+                new FlussMetaDataApplier(
+                        FLUSS_CLUSTER_EXTENSION.getClientConfig(),
+                        Collections.emptyMap(),
+                        Collections.emptyMap(),
+                        Collections.emptyMap())) {
+            applier.applySchemaChange(
+                    new CreateTableEvent(
+                            tableId,
+                            Schema.newBuilder().physicalColumn("id", DataTypes.INT()).build()));
+            TableInfo staleTableInfo = admin.getTableInfo(tablePath).get();
+            applier.applySchemaChange(
+                    partiallyApplied
+                            ? new AddColumnEvent(
+                                    tableId, Collections.singletonList(AddColumnEvent.last(first)))
+                            : event);
+            AtomicBoolean returnStaleSchema = new AtomicBoolean(true);
+            Admin staleAdmin =
+                    (Admin)
+                            Proxy.newProxyInstance(
+                                    Admin.class.getClassLoader(),
+                                    new Class<?>[] {Admin.class},
+                                    (proxy, method, args) -> {
+                                        if (method.getName().equals("getTableInfo")
+                                                && returnStaleSchema.getAndSet(false)) {
+                                            return CompletableFuture.completedFuture(
+                                                    staleTableInfo);
+                                        }
+                                        return method.invoke(admin, args);
+                                    });
+
+            applier.applyAddColumnChanges(staleAdmin, tablePath, changes);
+
+            TableInfo afterReplay = admin.getTableInfo(tablePath).get();
+            assertThat(afterReplay.getSchema())
+                    .isEqualTo(
+                            toFlussSchema(
+                                    Schema.newBuilder()
+                                            .physicalColumn("id", DataTypes.INT())
+                                            .column(first)
+                                            .column(second)
+                                            .build()));
+            applier.applySchemaChange(event);
+            assertThat(admin.getTableInfo(tablePath).get().getSchemaId())
+                    .isEqualTo(afterReplay.getSchemaId());
+        }
+    }
+
+    @Test
+    @Timeout(30)
+    void testReplayAddColumnFailsWhenSchemaRemainsStale() throws Exception {
+        TableId tableId = TableId.tableId(DATABASE_NAME, "persistently_stale_schema");
+        TablePath tablePath = new TablePath(DATABASE_NAME, "persistently_stale_schema");
+        try (FlussMetaDataApplier applier =
+                new FlussMetaDataApplier(
+                        FLUSS_CLUSTER_EXTENSION.getClientConfig(),
+                        Collections.emptyMap(),
+                        Collections.emptyMap(),
+                        Collections.emptyMap())) {
+            applier.applySchemaChange(
+                    new CreateTableEvent(
+                            tableId,
+                            Schema.newBuilder().physicalColumn("id", DataTypes.INT()).build()));
+            TableInfo staleTableInfo = admin.getTableInfo(tablePath).get();
+            List<TableChange> changes = addIntColumns("a");
+            admin.alterTable(tablePath, changes, false).get();
+            TableInfo beforeReplay = admin.getTableInfo(tablePath).get();
+            AtomicInteger schemaReads = new AtomicInteger();
+            AtomicInteger alterCalls = new AtomicInteger();
+            Admin staleAdmin =
+                    (Admin)
+                            Proxy.newProxyInstance(
+                                    Admin.class.getClassLoader(),
+                                    new Class<?>[] {Admin.class},
+                                    (proxy, method, args) -> {
+                                        if (method.getName().equals("getTableInfo")) {
+                                            schemaReads.incrementAndGet();
+                                            return CompletableFuture.completedFuture(
+                                                    staleTableInfo);
+                                        }
+                                        if (method.getName().equals("alterTable")) {
+                                            alterCalls.incrementAndGet();
+                                        }
+                                        return method.invoke(admin, args);
+                                    });
+
+            assertThatThrownBy(() -> applier.applyAddColumnChanges(staleAdmin, tablePath, changes))
+                    .rootCause()
+                    .isInstanceOf(InvalidAlterTableException.class)
+                    .hasMessageContaining("Column a already exists");
+            assertThat(schemaReads.get()).isBetween(2, 4);
+            assertThat(alterCalls.get()).isEqualTo(1);
+            assertThat(admin.getTableInfo(tablePath).get().getSchemaId())
+                    .isEqualTo(beforeReplay.getSchemaId());
+        }
+    }
+
+    @Test
+    void testReplayAddColumnsPropagatesConcurrentAdditionFailure() throws Exception {
+        TableId tableId = TableId.tableId(DATABASE_NAME, "concurrent_addition");
+        TablePath tablePath = new TablePath(DATABASE_NAME, "concurrent_addition");
+        try (FlussMetaDataApplier applier =
+                new FlussMetaDataApplier(
+                        FLUSS_CLUSTER_EXTENSION.getClientConfig(),
+                        Collections.emptyMap(),
+                        Collections.emptyMap(),
+                        Collections.emptyMap())) {
+            applier.applySchemaChange(
+                    new CreateTableEvent(
+                            tableId,
+                            Schema.newBuilder().physicalColumn("id", DataTypes.INT()).build()));
+            admin.alterTable(tablePath, addIntColumns("a"), false).get();
+            AtomicInteger schemaReads = new AtomicInteger();
+            AtomicInteger alterCalls = new AtomicInteger();
+            Admin racingAdmin =
+                    (Admin)
+                            Proxy.newProxyInstance(
+                                    Admin.class.getClassLoader(),
+                                    new Class<?>[] {Admin.class},
+                                    (proxy, method, args) -> {
+                                        if (method.getName().equals("alterTable")
+                                                && alterCalls.incrementAndGet() == 2) {
+                                            // Another writer adds b after we have observed a.
+                                            admin.alterTable(tablePath, addIntColumns("b"), false)
+                                                    .get();
+                                        }
+                                        if (method.getName().equals("getTableInfo")) {
+                                            schemaReads.incrementAndGet();
+                                        }
+                                        return method.invoke(admin, args);
+                                    });
+
+            assertThatThrownBy(
+                            () ->
+                                    applier.applyAddColumnChanges(
+                                            racingAdmin, tablePath, addIntColumns("a", "b")))
+                    .rootCause()
+                    .isInstanceOf(InvalidAlterTableException.class)
+                    .hasMessageContaining("Column b already exists");
+
+            TableInfo afterReplay = admin.getTableInfo(tablePath).get();
+            assertThat(afterReplay.getSchema())
+                    .isEqualTo(
+                            toFlussSchema(
+                                    Schema.newBuilder()
+                                            .physicalColumn("id", DataTypes.INT())
+                                            .physicalColumn("a", DataTypes.INT())
+                                            .physicalColumn("b", DataTypes.INT())
+                                            .build()));
+            assertThat(alterCalls.get()).isEqualTo(2);
+            assertThat(schemaReads.get()).isEqualTo(1);
+            applier.applyAddColumnChanges(admin, tablePath, addIntColumns("a", "b"));
+            assertThat(admin.getTableInfo(tablePath).get().getSchemaId())
+                    .isEqualTo(afterReplay.getSchemaId());
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void testSchemaReadRetryPropagatesInterruption(boolean pendingRead) throws Exception {
+        TableId tableId = TableId.tableId(DATABASE_NAME, "interrupted_schema_read");
+        TablePath tablePath = new TablePath(DATABASE_NAME, "interrupted_schema_read");
+        try (FlussMetaDataApplier applier =
+                new FlussMetaDataApplier(
+                        FLUSS_CLUSTER_EXTENSION.getClientConfig(),
+                        Collections.emptyMap(),
+                        Collections.emptyMap(),
+                        Collections.emptyMap())) {
+            applier.applySchemaChange(
+                    new CreateTableEvent(
+                            tableId,
+                            Schema.newBuilder().physicalColumn("id", DataTypes.INT()).build()));
+            TableInfo staleTableInfo = admin.getTableInfo(tablePath).get();
+            admin.alterTable(tablePath, addIntColumns("a"), false).get();
+            AtomicInteger schemaReads = new AtomicInteger();
+            Admin interruptedAdmin =
+                    (Admin)
+                            Proxy.newProxyInstance(
+                                    Admin.class.getClassLoader(),
+                                    new Class<?>[] {Admin.class},
+                                    (proxy, method, args) -> {
+                                        if (method.getName().equals("getTableInfo")) {
+                                            schemaReads.incrementAndGet();
+                                            Thread.currentThread().interrupt();
+                                            return pendingRead
+                                                    ? new CompletableFuture<>()
+                                                    : CompletableFuture.completedFuture(
+                                                            staleTableInfo);
+                                        }
+                                        return method.invoke(admin, args);
+                                    });
+            try {
+                assertThatThrownBy(
+                                () ->
+                                        applier.applyAddColumnChanges(
+                                                interruptedAdmin, tablePath, addIntColumns("a")))
+                        .isInstanceOf(InterruptedException.class);
+                assertThat(schemaReads.get()).isEqualTo(1);
+            } finally {
+                Thread.interrupted();
+            }
+        }
+    }
+
+    private static List<TableChange> addIntColumns(String... names) {
+        List<TableChange> changes = new ArrayList<>();
+        for (String name : names) {
+            changes.add(
+                    TableChange.addColumn(
+                            name,
+                            toFlussType(DataTypes.INT()),
+                            null,
+                            TableChange.ColumnPosition.last()));
+        }
+        return changes;
+    }
+
+    @ParameterizedTest
+    @MethodSource("conflictingColumnTypes")
+    void testReplayAddColumnWithConflictingType(DataType requestedType) throws Exception {
+        TableId tableId = TableId.tableId(DATABASE_NAME, "conflicting_columns");
+        TablePath tablePath = new TablePath(DATABASE_NAME, "conflicting_columns");
+        try (FlussMetaDataApplier applier =
+                new FlussMetaDataApplier(
+                        FLUSS_CLUSTER_EXTENSION.getClientConfig(),
+                        Collections.emptyMap(),
+                        Collections.emptyMap(),
+                        Collections.emptyMap())) {
+            applier.applySchemaChange(
+                    new CreateTableEvent(
+                            tableId,
+                            Schema.newBuilder()
+                                    .physicalColumn("amount", DataTypes.DECIMAL(10, 2))
+                                    .build()));
+            TableInfo beforeReplay = admin.getTableInfo(tablePath).get();
+            AddColumnEvent event =
+                    new AddColumnEvent(
+                            tableId,
+                            Arrays.asList(
+                                    AddColumnEvent.last(
+                                            Column.physicalColumn("missing", DataTypes.INT())),
+                                    AddColumnEvent.last(
+                                            Column.physicalColumn("amount", requestedType))));
+            assertThatThrownBy(() -> applier.applySchemaChange(event))
+                    .rootCause()
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("Column amount already exists in table")
+                    .hasMessageContaining("but ADD COLUMN requests");
+            TableInfo afterReplay = admin.getTableInfo(tablePath).get();
+            assertThat(afterReplay.getSchema()).isEqualTo(beforeReplay.getSchema());
+            assertThat(afterReplay.getSchemaId()).isEqualTo(beforeReplay.getSchemaId());
+        }
+    }
+
+    private static Stream<DataType> conflictingColumnTypes() {
+        return Stream.of(
+                DataTypes.STRING(),
+                DataTypes.DECIMAL(12, 2),
+                DataTypes.DECIMAL(10, 3),
+                DataTypes.DECIMAL(10, 2).notNull());
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    @Timeout(30)
+    void testInvalidAddColumnIsNotIgnored(boolean partiallyApplied) throws Exception {
+        TableId tableId = TableId.tableId(DATABASE_NAME, "invalid_columns");
+        TablePath tablePath = new TablePath(DATABASE_NAME, "invalid_columns");
+        try (FlussMetaDataApplier applier =
+                new FlussMetaDataApplier(
+                        FLUSS_CLUSTER_EXTENSION.getClientConfig(),
+                        Collections.emptyMap(),
+                        Collections.emptyMap(),
+                        Collections.emptyMap())) {
+            applier.applySchemaChange(
+                    new CreateTableEvent(
+                            tableId,
+                            Schema.newBuilder().physicalColumn("id", DataTypes.INT()).build()));
+            TableInfo beforeAddition = admin.getTableInfo(tablePath).get();
+            List<AddColumnEvent.ColumnWithPosition> columns = new ArrayList<>();
+            if (partiallyApplied) {
+                columns.add(AddColumnEvent.last(Column.physicalColumn("id", DataTypes.INT())));
+            }
+            columns.add(
+                    AddColumnEvent.last(
+                            Column.physicalColumn("required", DataTypes.INT().notNull())));
+
+            assertThatThrownBy(
+                            () -> applier.applySchemaChange(new AddColumnEvent(tableId, columns)))
+                    .rootCause()
+                    .isInstanceOf(UnknownServerException.class)
+                    .hasMessageContaining("Column required must be nullable");
+            TableInfo afterAddition = admin.getTableInfo(tablePath).get();
+            assertThat(afterAddition.getSchema()).isEqualTo(beforeAddition.getSchema());
+            assertThat(afterAddition.getSchemaId()).isEqualTo(beforeAddition.getSchemaId());
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource({"false, false", "true, false", "true, true"})
+    @Timeout(30)
+    void testDuplicateAddColumnsAreRejected(boolean columnExists, boolean addMissingColumn)
+            throws Exception {
+        TableId tableId = TableId.tableId(DATABASE_NAME, "duplicate_additions");
+        TablePath tablePath = new TablePath(DATABASE_NAME, "duplicate_additions");
+        try (FlussMetaDataApplier applier =
+                new FlussMetaDataApplier(
+                        FLUSS_CLUSTER_EXTENSION.getClientConfig(),
+                        Collections.emptyMap(),
+                        Collections.emptyMap(),
+                        Collections.emptyMap())) {
+            Schema.Builder schema = Schema.newBuilder().physicalColumn("id", DataTypes.INT());
+            if (columnExists) {
+                schema.physicalColumn("name", DataTypes.STRING());
+            }
+            applier.applySchemaChange(new CreateTableEvent(tableId, schema.build()));
+            TableInfo beforeAddition = admin.getTableInfo(tablePath).get();
+            List<AddColumnEvent.ColumnWithPosition> additions =
+                    new ArrayList<>(
+                            Collections.nCopies(
+                                    2,
+                                    AddColumnEvent.last(
+                                            Column.physicalColumn("name", DataTypes.STRING()))));
+            if (addMissingColumn) {
+                additions.add(AddColumnEvent.last(Column.physicalColumn("age", DataTypes.INT())));
+            }
+            AddColumnEvent event = new AddColumnEvent(tableId, additions);
+            assertThatThrownBy(() -> applier.applySchemaChange(event))
+                    .rootCause()
+                    .isInstanceOf(InvalidAlterTableException.class)
+                    .hasMessageContaining("Column name already exists");
+            TableInfo afterAddition = admin.getTableInfo(tablePath).get();
+            assertThat(afterAddition.getSchema()).isEqualTo(beforeAddition.getSchema());
+            assertThat(afterAddition.getSchemaId()).isEqualTo(beforeAddition.getSchemaId());
+        }
+    }
+
+    @Test
+    void testAddColumnToMissingTable() throws Exception {
+        TableId tableId = TableId.tableId(DATABASE_NAME, "missing_table");
+        try (FlussMetaDataApplier applier =
+                new FlussMetaDataApplier(
+                        FLUSS_CLUSTER_EXTENSION.getClientConfig(),
+                        Collections.emptyMap(),
+                        Collections.emptyMap(),
+                        Collections.emptyMap())) {
+            assertThatThrownBy(
+                            () ->
+                                    applier.applySchemaChange(
+                                            new AddColumnEvent(
+                                                    tableId,
+                                                    Collections.singletonList(
+                                                            AddColumnEvent.last(
+                                                                    Column.physicalColumn(
+                                                                            "id",
+                                                                            DataTypes.INT()))))))
+                    .rootCause()
+                    .isInstanceOf(TableNotExistException.class);
         }
     }
 
@@ -730,6 +1175,37 @@ public class FlussMetadataApplierTest {
     }
 
     @Test
+    void testCreateTableWithDataLakeProperties() throws Exception {
+        Map<String, String> tableProperties = new HashMap<>();
+        tableProperties.put("paimon.file.format", "orc");
+        tableProperties.put("iceberg.write.format.default", "parquet");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.BIGINT().notNull())
+                        .primaryKey("id")
+                        .build();
+        TableId tableId = TableId.tableId(DATABASE_NAME, "table1");
+
+        try (FlussMetaDataApplier applier =
+                new FlussMetaDataApplier(
+                        FLUSS_CLUSTER_EXTENSION.getClientConfig(),
+                        tableProperties,
+                        Collections.emptyMap(),
+                        Collections.emptyMap())) {
+            applier.applySchemaChange(new CreateTableEvent(tableId, schema));
+
+            TableDescriptor tableDescriptor =
+                    admin.getTableInfo(new TablePath(DATABASE_NAME, "table1"))
+                            .get()
+                            .toTableDescriptor();
+            assertThat(tableDescriptor.getCustomProperties())
+                    .containsExactlyInAnyOrderEntriesOf(tableProperties);
+            assertThat(tableDescriptor.getProperties())
+                    .doesNotContainKeys("paimon.file.format", "iceberg.write.format.default");
+        }
+    }
+
+    @Test
     void testCreateTableWithTableOptions() throws Exception {
         Schema schema =
                 Schema.newBuilder()
@@ -760,6 +1236,80 @@ public class FlussMetadataApplierTest {
             applier.applySchemaChange(createTableEvent);
             TableInfo tableInfo = admin.getTableInfo(new TablePath(DATABASE_NAME, "table1")).get();
             assertThat(tableInfo.getProperties().get(TABLE_REPLICATION_FACTOR)).isEqualTo(5);
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void testCreateTableWithSchemaOptions(boolean hasSinkOptions) throws Exception {
+        Map<String, String> tableProperties =
+                hasSinkOptions
+                        ? Map.of(TABLE_REPLICATION_FACTOR.key(), "3", TABLE_LOG_TTL.key(), "7 d")
+                        : Collections.emptyMap();
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT().notNull())
+                        .primaryKey("id")
+                        .option(TABLE_REPLICATION_FACTOR.key(), "2")
+                        .build();
+        TableId tableId = TableId.tableId(DATABASE_NAME, "table1");
+        try (FlussMetaDataApplier applier =
+                new FlussMetaDataApplier(
+                        FLUSS_CLUSTER_EXTENSION.getClientConfig(),
+                        tableProperties,
+                        Collections.emptyMap(),
+                        Collections.emptyMap())) {
+            applier.applySchemaChange(new CreateTableEvent(tableId, schema));
+            TableInfo tableInfo = admin.getTableInfo(new TablePath(DATABASE_NAME, "table1")).get();
+            assertThat(tableInfo.getProperties().get(TABLE_REPLICATION_FACTOR)).isEqualTo(2);
+            if (hasSinkOptions) {
+                assertThat(tableInfo.getProperties().get(TABLE_LOG_TTL))
+                        .isEqualTo(Duration.ofDays(7));
+            }
+            assertThat(schema.options())
+                    .containsExactlyEntriesOf(
+                            Collections.singletonMap(TABLE_REPLICATION_FACTOR.key(), "2"));
+
+            Schema schemaWithoutOptions =
+                    Schema.newBuilder()
+                            .physicalColumn("id", DataTypes.INT().notNull())
+                            .primaryKey("id")
+                            .build();
+            applier.applySchemaChange(
+                    new CreateTableEvent(
+                            TableId.tableId(DATABASE_NAME, "table2"), schemaWithoutOptions));
+            TableInfo otherTableInfo =
+                    admin.getTableInfo(new TablePath(DATABASE_NAME, "table2")).get();
+            assertThat(otherTableInfo.getProperties().get(TABLE_REPLICATION_FACTOR))
+                    .isEqualTo(hasSinkOptions ? 3 : DEFAULT_REPLICATION_FACTOR.defaultValue());
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"key", "properties.table.replication.factor"})
+    void testCreateTableWithInvalidSchemaOptions(String optionKey) throws Exception {
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT().notNull())
+                        .primaryKey("id")
+                        .option(optionKey, "2")
+                        .build();
+        try (FlussMetaDataApplier applier =
+                new FlussMetaDataApplier(
+                        FLUSS_CLUSTER_EXTENSION.getClientConfig(),
+                        Collections.emptyMap(),
+                        Collections.emptyMap(),
+                        Collections.emptyMap())) {
+            assertThatThrownBy(
+                            () ->
+                                    applier.applySchemaChange(
+                                            new CreateTableEvent(
+                                                    TableId.tableId(DATABASE_NAME, "table1"),
+                                                    schema)))
+                    .rootCause()
+                    .isExactlyInstanceOf(InvalidConfigException.class)
+                    .hasMessageContaining("'" + optionKey + "' is not a Fluss table property");
+            assertThat(admin.tableExists(new TablePath(DATABASE_NAME, "table1")).get()).isFalse();
         }
     }
 }

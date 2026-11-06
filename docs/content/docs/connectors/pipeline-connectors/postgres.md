@@ -1,9 +1,9 @@
 ---
 title: "Postgres"
-weight: 2
-type: docs
-aliases:
-- /connectors/pipeline-connectors/Postgres
+slug: "/docs/connectors/pipeline-connectors/postgres"
+sidebar_position: 2
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -27,7 +27,7 @@ under the License.
 # Postgres Connector
 
 Postgres connector allows reading snapshot data and incremental data from Postgres database and provides end-to-end full-database data synchronization capabilities.
-This document describes how to setup the Postgres connector.
+This document describes how to set up the Postgres connector.
 
 ## Example
 
@@ -167,7 +167,7 @@ pipeline:
       <td>optional</td>
       <td style="word-wrap: break-word;">initial</td>
       <td>String</td>
-      <td> Optional startup mode for Postgres CDC consumer, valid enumerations are "initial"，"latest-offset"，"committed-offset"or"snapshot"。</td>
+      <td> Optional startup mode for Postgres CDC consumer, valid enumerations are "initial", "latest-offset", "committed-offset" or "snapshot".</td>
     </tr>
   <tr>
       <td>scan.incremental.close-idle-reader.enabled</td>
@@ -320,7 +320,7 @@ pipeline:
 
 
 Note:
-1. The configuration option tables specifies the tables to be captured by Postgres CDC, in the format db.schema1.table1,db.schema2.table2. All db values must be the same, as the PostgreSQL connection URL requires a single database name. Currently, CDC only supports connecting to one database.
+1. The `tables` configuration option specifies the tables to be captured by Postgres CDC, in the format db.schema1.table1,db.schema2.table2. All db values must be the same, as the PostgreSQL connection URL requires a single database name. Currently, CDC only supports connecting to one database.
 
 ## Startup Reading Position
 
@@ -430,7 +430,7 @@ transform:
     <thead>
       <tr>
         <th class="text-left">PostgreSQL type<a href="https://www.postgresql.org/docs/12/datatype.html"></a></th>
-        <th class="text-left">CDC type<a href="{% link dev/table/types.md %}"></a></th>
+        <th class="text-left">CDC type</th>
       </tr>
     </thead>
     <tbody>
@@ -533,10 +533,10 @@ transform:
 </table>
 </div>
 
-Note: Since the Debezium version does not support multidimensional arrays, only PostgresSQL single-dimensional arrays are currently supported, such as :'ARRAY[1,2,3]', 'int[]'.
+Note: Since the Debezium version does not support multidimensional arrays, only PostgreSQL single-dimensional arrays are currently supported, such as :'ARRAY[1,2,3]', 'int[]'.
 
 ### Temporal types Mapping
-Other than PostgreSQL’s TIMESTAMPTZ data types, which contain time zone information, how temporal types are mapped depends on the value of <code>debezium.the time.precision.mode</code> connector configuration property. The following sections describe these mappings:
+Other than PostgreSQL’s TIMESTAMPTZ data types, which contain time zone information, how temporal types are mapped depends on the value of <code>debezium.time.precision.mode</code> connector configuration property. The following sections describe these mappings:
 - debezium.time.precision.mode=adaptive
 - debezium.time.precision.mode=adaptive_time_microseconds
 - debezium.time.precision.mode=connect 
@@ -551,7 +551,7 @@ When the <code>debezium.time.precision.mode</code> property is set to the defaul
     <thead>
       <tr>
         <th class="text-left">PostgreSQL type<a href="https://www.postgresql.org/docs/12/datatype.html"></a></th>
-        <th class="text-left">CDC type<a href="{% link dev/table/types.md %}"></a></th>
+        <th class="text-left">CDC type</th>
       </tr>
     </thead>
     <tbody>
@@ -584,7 +584,7 @@ When the `debezium.time.precision.mode` property is set to the value `adaptive_t
     <thead>
       <tr>
         <th class="text-left">PostgreSQL type<a href="https://www.postgresql.org/docs/12/datatype.html"></a></th>
-        <th class="text-left">CDC type<a href="{% link dev/table/types.md %}"></a></th>
+        <th class="text-left">CDC type</th>
       </tr>
     </thead>
     <tbody>
@@ -617,7 +617,7 @@ When the <code>debezium.time.precision.mode</code> property is set to the defaul
     <thead>
       <tr>
         <th class="text-left">PostgreSQL type<a href="https://www.postgresql.org/docs/12/datatype.html"></a></th>
-        <th class="text-left">CDC type<a href="{% link dev/table/types.md %}"></a></th>
+        <th class="text-left">CDC type</th>
       </tr>
     </thead>
     <tbody>
@@ -651,7 +651,7 @@ When the <code>debezium.decimal.handling.mode</code> property is set to precise,
     <thead>
       <tr>
         <th class="text-left">PostgreSQL type<a href="https://www.postgresql.org/docs/12/datatype.html"></a></th>
-        <th class="text-left">CDC type<a href="{% link dev/table/types.md %}"></a></th>
+        <th class="text-left">CDC type</th>
       </tr>
     </thead>
     <tbody>
@@ -691,7 +691,7 @@ When the <code>debezium.decimal.handling.mode</code> property is set to double, 
     <thead>
       <tr>
         <th class="text-left">PostgreSQL type<a href="https://www.postgresql.org/docs/12/datatype.html"></a></th>
-        <th class="text-left">CDC type<a href="{% link dev/table/types.md %}"></a></th>
+        <th class="text-left">CDC type</th>
       </tr>
     </thead>
     <tbody>
@@ -720,7 +720,7 @@ The last possible setting for the <code>debezium.decimal.handling.mode</code> co
     <thead>
       <tr>
         <th class="text-left">PostgreSQL type<a href="https://www.postgresql.org/docs/12/datatype.html"></a></th>
-        <th class="text-left">CDC type<a href="{% link dev/table/types.md %}"></a></th>
+        <th class="text-left">CDC type</th>
       </tr>
     </thead>
     <tbody>
@@ -754,7 +754,7 @@ When the <code>debezium.hstore.handling.mode</code> property is set to json (the
     <thead>
       <tr>
         <th class="text-left">PostgreSQL type<a href="https://www.postgresql.org/docs/12/datatype.html"></a></th>
-        <th class="text-left">CDC type<a href="{% link dev/table/types.md %}"></a></th>
+        <th class="text-left">CDC type</th>
       </tr>
     </thead>
     <tbody>
@@ -779,7 +779,7 @@ PostgreSQL has data types that can store IPv4, IPv6, and MAC addresses. It is be
     <thead>
       <tr>
         <th class="text-left">PostgreSQL type<a href="https://www.postgresql.org/docs/12/datatype.html"></a></th>
-        <th class="text-left">CDC type<a href="{% link dev/table/types.md %}"></a></th>
+        <th class="text-left">CDC type</th>
       </tr>
     </thead>
     <tbody>
@@ -834,5 +834,3 @@ The former is used for small-area planar data, while the latter is used for larg
     </tbody>
 </table>
 </div>
-
-{{< top >}}

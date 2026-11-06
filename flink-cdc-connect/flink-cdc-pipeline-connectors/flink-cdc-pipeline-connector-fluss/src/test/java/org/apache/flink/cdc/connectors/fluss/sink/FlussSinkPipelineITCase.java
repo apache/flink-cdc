@@ -57,6 +57,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -707,6 +709,58 @@ public class FlussSinkPipelineITCase {
                 TABLE_1,
                 Arrays.asList(
                         "+I[1, a, null, null]", "+I[2, b, null, null]", "+I[3, c, null, cc]"));
+    }
+
+    @ParameterizedTest
+    @CsvSource({"true,true", "true,false", "false,true", "false,false"})
+    void testWriteAfterAddColumnReplay(boolean primaryKeyTable, boolean partiallyApplied)
+            throws Exception {
+        tBatchEnv
+                .executeSql(
+                        String.format(
+                                "CREATE TABLE %s.%s (payload STRING, id STRING NOT NULL, b STRING%s%s)",
+                                TABLE_1.getSchemaName(),
+                                TABLE_1.getTableName(),
+                                partiallyApplied ? "" : ", a STRING",
+                                primaryKeyTable ? ", PRIMARY KEY (id) NOT ENFORCED" : ""))
+                .await();
+
+        Schema.Builder schemaBuilder =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.STRING().notNull())
+                        .physicalColumn("payload", DataTypes.STRING());
+        if (primaryKeyTable) {
+            schemaBuilder.primaryKey("id");
+        }
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(
+                        RowType.of(
+                                DataTypes.STRING().notNull(),
+                                DataTypes.STRING(),
+                                DataTypes.STRING(),
+                                DataTypes.STRING()));
+        List<Event> events =
+                Arrays.asList(
+                        new CreateTableEvent(TABLE_1, schemaBuilder.build()),
+                        new AddColumnEvent(
+                                TABLE_1,
+                                Arrays.asList(
+                                        AddColumnEvent.last(
+                                                Column.physicalColumn("a", DataTypes.STRING())),
+                                        AddColumnEvent.last(
+                                                Column.physicalColumn("b", DataTypes.STRING())))),
+                        DataChangeEvent.insertEvent(
+                                TABLE_1,
+                                generator.generate(
+                                        new Object[] {
+                                            BinaryStringData.fromString("1"),
+                                            BinaryStringData.fromString("value-1"),
+                                            BinaryStringData.fromString("a-101"),
+                                            BinaryStringData.fromString("b-202")
+                                        })));
+
+        composeAndExecuteInEvolveMode(Collections.singletonList(events));
+        checkResult(TABLE_1, Collections.singletonList("+I[value-1, 1, b-202, a-101]"));
     }
 
     private void composeAndExecuteInEvolveMode(List<List<Event>> customSourceEvents)

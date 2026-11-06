@@ -1,9 +1,9 @@
 ---
 title: "TiDB"
-weight: 8
-type: docs
-aliases:
-- /connectors/flink-sources/tidb-cdc
+slug: "/docs/connectors/flink-sources/tidb-cdc"
+sidebar_position: 8
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -26,16 +26,22 @@ under the License.
 
 # TiDB CDC Connector
 
-The TiDB CDC connector allows for reading snapshot data and incremental data from TiDB database. This document describes how to setup the TiDB CDC connector to run SQL queries against TiDB databases.
+The TiDB CDC connector allows for reading snapshot data and incremental data from TiDB database. This document describes how to set up the TiDB CDC connector to run SQL queries against TiDB databases.
 
 Dependencies
 ------------
 
-In order to setup the TiDB CDC connector, the following table provides dependency information for both projects using a build automation tool (such as Maven or SBT) and SQL Client with SQL JAR bundles.
+To set up the TiDB CDC connector, the following table provides dependency information for both projects using a build automation tool (such as Maven or SBT) and SQL Client with SQL JAR bundles.
 
 ### Maven dependency
 
-{{< artifact flink-connector-tidb-cdc >}}
+```xml
+<dependency>
+    <groupId>org.apache.flink</groupId>
+    <artifactId>flink-connector-tidb-cdc</artifactId>
+    <version>@@VERSION@@</version>
+</dependency>
+```
 
 ### SQL Client JAR
 
@@ -317,7 +323,7 @@ Data Type Mapping
     <thead>
       <tr>
         <th class="text-left">TiDB type<a href="https://dev.tidb.com/doc/man/8.0/en/data-types.html"></a></th>
-        <th class="text-left">Flink SQL type<a href="{% link dev/table/types.md %}"></a></th>
+        <th class="text-left">Flink SQL type</th>
         <th class="text-left">NOTE</th>
       </tr>
     </thead>
@@ -499,5 +505,3 @@ Data Type Mapping
     </tbody>
 </table>
 </div>
-
-{{< top >}}

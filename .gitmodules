@@ -1,6 +1,3 @@
-[submodule "docs/themes/book"]
-	path = docs/themes/book
-	url = https://github.com/alex-shpak/hugo-book
 [submodule ".github/actions/get-workflow-origin"]
 	path = .github/actions/get-workflow-origin
 	url = https://github.com/potiuk/get-workflow-origin

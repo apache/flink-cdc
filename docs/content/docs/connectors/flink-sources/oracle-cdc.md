@@ -1,9 +1,9 @@
 ---
 title: "Oracle"
-weight: 3
-type: docs
-aliases:
-- /connectors/flink-sources/oracle-cdc
+slug: "/docs/connectors/flink-sources/oracle-cdc"
+sidebar_position: 3
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -26,16 +26,22 @@ under the License.
 
 # Oracle CDC Connector
 
-The Oracle CDC connector allows for reading snapshot data and incremental data from Oracle database. This document describes how to setup the Oracle CDC connector to run SQL queries against Oracle databases.
+The Oracle CDC connector allows for reading snapshot data and incremental data from Oracle database. This document describes how to set up the Oracle CDC connector to run SQL queries against Oracle databases.
 
 Dependencies
 ------------
 
-In order to setup the Oracle CDC connector, the following table provides dependency information for both projects using a build automation tool (such as Maven or SBT) and SQL Client with SQL JAR bundles.
+To set up the Oracle CDC connector, the following table provides dependency information for both projects using a build automation tool (such as Maven or SBT) and SQL Client with SQL JAR bundles.
 
 ### Maven dependency
 
-{{< artifact flink-connector-oracle-cdc >}}
+```xml
+<dependency>
+    <groupId>org.apache.flink</groupId>
+    <artifactId>flink-connector-oracle-cdc</artifactId>
+    <version>@@VERSION@@</version>
+</dependency>
+```
 
 ### SQL Client JAR
 
@@ -351,8 +357,8 @@ Connector Options
       <td>optional</td>
       <td style="word-wrap: break-word;">initial</td>
       <td>String</td>
-      <td>Optional startup mode for Oracle CDC consumer, valid enumerations are "initial"
-           , "latest-offset" , specific-offset. 
+      <td>Optional startup mode for Oracle CDC consumer, valid enumerations are "initial",
+           "latest-offset", specific-offset.
            Please see <a href="#startup-reading-position">Startup Reading Position</a> section for more detailed information.</td>
     </tr>
     <tr>
@@ -625,7 +631,7 @@ $ ./bin/flink run \
       --from-savepoint /tmp/flink-savepoints/savepoint-cca7bc-bb1e257f0dab \
       ./FlinkCDCExample.jar
 ```
-**Note:** Please refer the doc [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.20/docs/deployment/cli/#command-line-interface) for more details.
+**Note:** Please refer to [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.20/docs/deployment/cli/#command-line-interface) for more details.
 
 ### DataStream Source
 
@@ -778,7 +784,7 @@ Data Type Mapping
     <thead>
       <tr>
         <th class="text-left"><a href="https://docs.oracle.com/en/database/oracle/oracle-database/21/sqlrf/Data-Types.html">Oracle type</a></th>
-        <th class="text-left">Flink SQL type<a href="{% link dev/table/types.md %}"></a></th>
+        <th class="text-left">Flink SQL type</th>
       </tr>
     </thead>
     <tbody>
@@ -880,5 +886,3 @@ Data Type Mapping
     </tbody>
 </table>
 </div>
-
-{{< top >}}

@@ -1,9 +1,9 @@
 ---
 title: "SQL Server"
-weight: 2
-type: docs
-aliases:
-- /connectors/pipeline-connectors/sqlserver
+slug: "/docs/connectors/pipeline-connectors/sqlserver"
+sidebar_position: 2
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -474,5 +474,3 @@ The config option `scan.startup.mode` specifies the startup mode for SQL Server 
 ### Single Database
 
 All entries in `tables` must belong to the same database. The database must be a single fixed name, while schema and table support regular expressions to match multiple objects.
-
-{{< top >}}

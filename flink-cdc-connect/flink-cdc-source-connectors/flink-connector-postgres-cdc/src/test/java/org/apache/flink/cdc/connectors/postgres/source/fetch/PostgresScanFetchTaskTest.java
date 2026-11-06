@@ -45,10 +45,12 @@ import org.apache.flink.table.types.DataType;
 
 import io.debezium.connector.postgresql.connection.PostgresConnection;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -56,6 +58,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 
+import static io.debezium.connector.postgresql.connection.ReplicationConnection.Builder.DEFAULT_PUBLICATION_NAME;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Tests for {@link PostgresScanFetchTask}. */
@@ -75,10 +78,14 @@ class PostgresScanFetchTaskTest extends PostgresTestBase {
                     POSTGRES_CONTAINER.getUsername(),
                     POSTGRES_CONTAINER.getPassword());
 
+    @BeforeEach
+    void before() throws SQLException {
+        customDatabase.createAndInitialize();
+        customDatabase.createPublication(DEFAULT_PUBLICATION_NAME);
+    }
+
     @Test
     void testChangingDataInSnapshotScan() throws Exception {
-        customDatabase.createAndInitialize();
-
         TestTableId tableId = new TestTableId(schemaName, tableName);
         String[] changingDataSql =
                 new String[] {
@@ -112,7 +119,6 @@ class PostgresScanFetchTaskTest extends PostgresTestBase {
 
     @Test
     void testInsertDataInSnapshotScan() throws Exception {
-        customDatabase.createAndInitialize();
         TestTableId tableId = new TestTableId(schemaName, tableName);
         String[] insertDataSql =
                 new String[] {
@@ -145,7 +151,6 @@ class PostgresScanFetchTaskTest extends PostgresTestBase {
 
     @Test
     void testDeleteDataInSnapshotScan() throws Exception {
-        customDatabase.createAndInitialize();
         TestTableId tableId = new TestTableId(schemaName, tableName);
         String[] deleteDataSql =
                 new String[] {
@@ -170,8 +175,6 @@ class PostgresScanFetchTaskTest extends PostgresTestBase {
 
     @Test
     void testSnapshotScanSkipBackfillWithPostLowWatermark() throws Exception {
-        customDatabase.createAndInitialize();
-
         TestTableId tableId = new TestTableId(schemaName, tableName);
         String[] changingDataSql =
                 new String[] {
@@ -207,8 +210,6 @@ class PostgresScanFetchTaskTest extends PostgresTestBase {
 
     @Test
     void testSnapshotScanSkipBackfillWithPreHighWatermark() throws Exception {
-        customDatabase.createAndInitialize();
-
         TestTableId tableId = new TestTableId(schemaName, tableName);
         String[] changingDataSql =
                 new String[] {
@@ -244,8 +245,6 @@ class PostgresScanFetchTaskTest extends PostgresTestBase {
 
     @Test
     void testMultipleSplitsWithBackfill() throws Exception {
-        customDatabase.createAndInitialize();
-
         TestTableId tableId = new TestTableId(schemaName, tableName);
         PostgresSourceConfigFactory sourceConfigFactory =
                 getMockPostgresSourceConfigFactory(
@@ -295,7 +294,6 @@ class PostgresScanFetchTaskTest extends PostgresTestBase {
 
     @Test
     void testSnapshotFetchSize() throws Exception {
-        customDatabase.createAndInitialize();
         PostgresSourceConfigFactory sourceConfigFactory =
                 getMockPostgresSourceConfigFactory(
                         customDatabase, schemaName, tableName, null, 10, true);

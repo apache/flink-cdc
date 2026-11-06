@@ -138,6 +138,20 @@ class DebeziumJsonSerializationSchemaTest {
                         "{\"before\":{\"col1\":\"1\",\"col2\":\"1\"},\"after\":{\"col1\":\"1\",\"col2\":\"x\"},\"op\":\"u\",\"source\":{\"db\":\"default_schema\",\"table\":\"table1\"}}");
         actual = mapper.readTree(serializationSchema.serialize(updateEvent));
         assertThat(actual).isEqualTo(expected);
+
+        DataChangeEvent replaceEvent =
+                DataChangeEvent.replaceEvent(
+                        TABLE_1,
+                        generator.generate(
+                                new Object[] {
+                                    BinaryStringData.fromString("1"),
+                                    BinaryStringData.fromString("y")
+                                }));
+        expected =
+                mapper.readTree(
+                        "{\"before\":null,\"after\":{\"col1\":\"1\",\"col2\":\"y\"},\"op\":\"u\",\"source\":{\"db\":\"default_schema\",\"table\":\"table1\"}}");
+        actual = mapper.readTree(serializationSchema.serialize(replaceEvent));
+        assertThat(actual).isEqualTo(expected);
     }
 
     @Test

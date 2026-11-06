@@ -1,9 +1,9 @@
 ---
 title: "CdcUp Quickstart Guide"
-weight: 3
-type: docs
-aliases:
-- /get-started/quickstart/cdc-up-quickstart-guide
+slug: "/docs/get-started/quickstart-for-1.20/cdc-up-quickstart-guide"
+sidebar_position: 3
+hide_title: true
+displayed_sidebar: docs
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -74,7 +74,7 @@ Commands:
   1.17.2
   1.18.1
   1.19.3
-‣ 1.20.3
+‣ 1.20.5
 ```
 
 Use the arrow keys to navigate and press Enter to select specified Flink and CDC version, source, and sink connectors.
