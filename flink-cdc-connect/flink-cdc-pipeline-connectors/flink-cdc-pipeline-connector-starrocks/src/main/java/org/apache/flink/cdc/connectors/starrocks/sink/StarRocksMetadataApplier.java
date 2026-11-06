@@ -61,14 +61,27 @@ public class StarRocksMetadataApplier implements MetadataApplier {
     private final SchemaChangeConfig schemaChangeConfig;
     private boolean isOpened;
     private Set<SchemaChangeEventType> enabledSchemaEvolutionTypes;
+    private final boolean multiTableTransactionEnabled;
+
+    /** Database of the first applied schema change event, used for cross-database validation. */
+    private transient String firstDatabase;
 
     public StarRocksMetadataApplier(
             StarRocksEnrichedCatalog catalog,
             TableCreateConfig tableCreateConfig,
             SchemaChangeConfig schemaChangeConfig) {
+        this(catalog, tableCreateConfig, schemaChangeConfig, false);
+    }
+
+    public StarRocksMetadataApplier(
+            StarRocksEnrichedCatalog catalog,
+            TableCreateConfig tableCreateConfig,
+            SchemaChangeConfig schemaChangeConfig,
+            boolean multiTableTransactionEnabled) {
         this.catalog = catalog;
         this.tableCreateConfig = tableCreateConfig;
         this.schemaChangeConfig = schemaChangeConfig;
+        this.multiTableTransactionEnabled = multiTableTransactionEnabled;
         this.isOpened = false;
         this.enabledSchemaEvolutionTypes = getSupportedSchemaEvolutionTypes();
     }
@@ -105,6 +118,9 @@ public class StarRocksMetadataApplier implements MetadataApplier {
             catalog.open();
         }
 
+        if (multiTableTransactionEnabled) {
+            checkSingleDatabase(schemaChangeEvent);
+        }
         SchemaChangeEventVisitor.voidVisit(
                 schemaChangeEvent,
                 this::applyAddColumn,
@@ -122,6 +138,27 @@ public class StarRocksMetadataApplier implements MetadataApplier {
                             "AlterTableCommentEvent is not supported by StarRocks connector yet. Event: {}",
                             alterTableCommentEvent);
                 });
+    }
+
+    /**
+     * Multi-table transaction stream load shares one StarRocks transaction among tables, which only
+     * works within a single database. Fail fast when schema change events target more than one
+     * database.
+     */
+    private void checkSingleDatabase(SchemaChangeEvent schemaChangeEvent) {
+        String database = schemaChangeEvent.tableId().getSchemaName();
+        if (firstDatabase == null) {
+            firstDatabase = database;
+        } else if (!firstDatabase.equals(database)) {
+            throw new IllegalArgumentException(
+                    String.format(
+                            "Multi-table transaction stream load requires all target tables to be in the same "
+                                    + "database, but found tables in both '%s' and '%s'. Please adjust the routes "
+                                    + "to a single database or disable option '%s'.",
+                            firstDatabase,
+                            database,
+                            StarRocksDataSinkOptions.SINK_MULTI_TABLE_TRANSACTION_ENABLED.key()));
+        }
     }
 
     private void applyCreateTable(CreateTableEvent createTableEvent) throws SchemaEvolveException {

@@ -33,7 +33,9 @@ import java.util.List;
 @Testcontainers
 public class StarRocksContainer extends JdbcDatabaseContainer<StarRocksContainer> {
 
-    private static final String DOCKER_IMAGE_NAME = "starrocks/allin1-ubuntu:3.5.10";
+    private static final String DOCKER_IMAGE_NAME_PREFIX = "starrocks/allin1-ubuntu:";
+
+    private static final String DEFAULT_IMAGE_VERSION = "3.5.10";
 
     // exposed ports
     public static final int FE_HTTP_SERVICE_PORT = 8080;
@@ -47,13 +49,17 @@ public class StarRocksContainer extends JdbcDatabaseContainer<StarRocksContainer
     public static final Network NETWORK = Network.newNetwork();
 
     public StarRocksContainer() {
-        super(DockerImageName.parse(DOCKER_IMAGE_NAME));
+        this(DEFAULT_IMAGE_VERSION);
+    }
+
+    public StarRocksContainer(String version) {
+        super(DockerImageName.parse(DOCKER_IMAGE_NAME_PREFIX + version));
         setExposedPorts(Arrays.asList(FE_HTTP_SERVICE_PORT, FE_QUERY_PORT));
         setNetwork(NETWORK);
     }
 
     public StarRocksContainer(Network network) {
-        super(DockerImageName.parse(DOCKER_IMAGE_NAME));
+        super(DockerImageName.parse(DOCKER_IMAGE_NAME_PREFIX + DEFAULT_IMAGE_VERSION));
         setExposedPorts(Arrays.asList(FE_HTTP_SERVICE_PORT, FE_QUERY_PORT));
         setNetwork(network);
     }
