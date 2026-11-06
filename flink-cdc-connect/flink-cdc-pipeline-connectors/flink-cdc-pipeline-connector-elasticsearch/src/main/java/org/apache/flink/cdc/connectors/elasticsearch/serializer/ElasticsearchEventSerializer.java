@@ -72,7 +72,7 @@ public class ElasticsearchEventSerializer implements ElementConverter<Event, Bul
     /** ZoneId from pipeline config to support timestamp with local time zone. */
     private final ZoneId pipelineZoneId;
 
-    private final Map<TableId, String> shardingKey;
+    private final Map<String, String> shardingKey;
     private final String shardingSeparator;
 
     public ElasticsearchEventSerializer(ZoneId zoneId) {
@@ -80,7 +80,7 @@ public class ElasticsearchEventSerializer implements ElementConverter<Event, Bul
     }
 
     public ElasticsearchEventSerializer(
-            ZoneId zoneId, Map<TableId, String> shardingKey, String shardingSeparator) {
+            ZoneId zoneId, Map<String, String> shardingKey, String shardingSeparator) {
         this.pipelineZoneId = zoneId;
         this.shardingKey = shardingKey;
         this.shardingSeparator = shardingSeparator;
@@ -169,13 +169,14 @@ public class ElasticsearchEventSerializer implements ElementConverter<Event, Bul
     }
 
     public String tableSharding(TableId tableId, Schema schema, Map<String, Object> valueMap) {
+        String identifier = tableId.identifier();
         Object value = null;
-        if (shardingKey.containsKey(tableId)) {
-            value = valueMap.get(shardingKey.get(tableId));
+        if (shardingKey.containsKey(identifier)) {
+            value = valueMap.get(shardingKey.get(identifier));
         } else if (!schema.partitionKeys().isEmpty()) {
             value = valueMap.get(schema.partitionKeys().get(0));
         }
-        return value != null ? tableId.toString() + shardingSeparator + value : tableId.toString();
+        return value != null ? identifier + shardingSeparator + value : identifier;
     }
 
     private Object[] generateUniqueId(RecordData recordData, Schema schema, TableId tableId) {

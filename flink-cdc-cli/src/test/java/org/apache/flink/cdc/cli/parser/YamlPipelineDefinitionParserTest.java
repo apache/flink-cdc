@@ -19,8 +19,11 @@ package org.apache.flink.cdc.cli.parser;
 
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
+import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.ExistingTableSchemaExpansionMode;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
+import org.apache.flink.cdc.common.route.RouteRule;
+import org.apache.flink.cdc.common.route.TableIdRouter;
 import org.apache.flink.cdc.composer.definition.ModelDef;
 import org.apache.flink.cdc.composer.definition.PipelineDef;
 import org.apache.flink.cdc.composer.definition.RouteDef;
@@ -39,9 +42,11 @@ import org.junit.jupiter.api.Test;
 import java.net.URL;
 import java.time.Duration;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Set;
 
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.ADD_COLUMN;
@@ -54,6 +59,7 @@ import static org.apache.flink.cdc.common.event.SchemaChangeEventType.RENAME_COL
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.TRUNCATE_TABLE;
 import static org.apache.flink.cdc.common.pipeline.PipelineOptions.PIPELINE_LOCAL_TIME_ZONE;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
 
 /** Unit test for {@link org.apache.flink.cdc.cli.parser.YamlPipelineDefinitionParser}. */
@@ -189,6 +195,68 @@ class YamlPipelineDefinitionParserTest {
         YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
         PipelineDef pipelineDef = parser.parse(new Path(resource.toURI()), new Configuration());
         assertThat(pipelineDef).isEqualTo(fullDefWithRouteRepSym);
+    }
+
+    @Test
+    void testReplacementSymbolPreservesTableIdComponents() throws Exception {
+        List<RouteDef> routes =
+                parseRoutes(
+                        "  - source-table: source_db.\\.*\n"
+                                + "    sink-table: target_db.<>\n"
+                                + "    replace-symbol: <>\n");
+
+        assertThat(routes)
+                .containsExactly(new RouteDef("source_db.\\.*", "target_db.<>", "<>", null));
+        assertThat(toTableIdRouter(routes).route(TableId.tableId("source_db", "daily.archive")))
+                .extracting(TableId::getNamespace, TableId::getSchemaName, TableId::getTableName)
+                .containsExactly(tuple(null, "target_db", "daily.archive"));
+    }
+
+    @Test
+    void testCaptureGroupPreservesTableIdComponentsWithoutReplacementSymbol() throws Exception {
+        List<RouteDef> routes =
+                parseRoutes("  - source-table: '(\\.*)'\n" + "    sink-table: target_db.$1\n");
+
+        assertThat(routes.get(0).getReplaceSymbol()).isEmpty();
+        assertThat(toTableIdRouter(routes).route(TableId.tableId("daily", "archive")))
+                .extracting(TableId::getNamespace, TableId::getSchemaName, TableId::getTableName)
+                .containsExactly(tuple(null, "target_db", "daily.archive"));
+    }
+
+    @Test
+    void testCaptureGroupPreservesReplacementSeparatorEscapes() throws Exception {
+        List<RouteDef> routes =
+                parseRoutes(
+                        "  - source-table: 'source_db.(\\.*)'\n"
+                                + "    sink-table: 'target_db\\.$1'\n");
+
+        assertThat(routes.get(0).getReplaceSymbol()).isEmpty();
+        for (String table : List.of("daily", "daily.archive")) {
+            assertThat(toTableIdRouter(routes).route(TableId.tableId("source_db", table)))
+                    .extracting(
+                            TableId::getNamespace, TableId::getSchemaName, TableId::getTableName)
+                    .containsExactly(tuple(null, "target_db", table));
+        }
+    }
+
+    private static List<RouteDef> parseRoutes(String routeBody) throws Exception {
+        return new YamlPipelineDefinitionParser()
+                .parse(
+                        "source:\n  type: values\nsink:\n  type: values\nroute:\n" + routeBody,
+                        new Configuration())
+                .getRoute();
+    }
+
+    private static TableIdRouter toTableIdRouter(List<RouteDef> routes) {
+        List<RouteRule> rules = new ArrayList<>();
+        for (RouteDef route : routes) {
+            rules.add(
+                    new RouteRule(
+                            route.getSourceTable(),
+                            route.getSinkTable(),
+                            route.getReplaceSymbol().orElse(null)));
+        }
+        return new TableIdRouter(rules);
     }
 
     @Test
