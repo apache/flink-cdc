@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.sqlserver;
 
 import org.apache.flink.cdc.connectors.sqlserver.source.SqlServerSourceTestBase;
 import org.apache.flink.cdc.connectors.sqlserver.source.config.SqlServerSourceConfigFactory;
+import org.apache.flink.cdc.connectors.sqlserver.testutils.SqlServerTestUtils;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.test.util.AbstractTestBase;
 
@@ -79,6 +80,7 @@ public class SqlServerTestBase extends AbstractTestBase {
     static void startContainers() throws Exception {
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(MSSQL_SERVER_CONTAINER)).join();
+        SqlServerTestUtils.waitForSqlServerAgent(MSSQL_SERVER_CONTAINER);
         LOG.info("Containers are started.");
     }
 

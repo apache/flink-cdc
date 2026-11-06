@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.tests;
 
 import org.apache.flink.cdc.common.test.utils.JdbcProxy;
 import org.apache.flink.cdc.common.test.utils.TestUtils;
+import org.apache.flink.cdc.connectors.sqlserver.testutils.SqlServerTestUtils;
 import org.apache.flink.cdc.connectors.tests.utils.FlinkContainerTestEnvironment;
 
 import org.assertj.core.api.Assertions;
@@ -80,6 +81,7 @@ class SqlServerE2eITCase extends FlinkContainerTestEnvironment {
         super.before();
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(SQL_SERVER_CONTAINER)).join();
+        SqlServerTestUtils.waitForSqlServerAgent(SQL_SERVER_CONTAINER);
         LOG.info("Containers are started.");
         initializeSqlServerTable("sqlserver_inventory");
     }

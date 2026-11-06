@@ -20,6 +20,7 @@ package org.apache.flink.cdc.pipeline.tests.stage2;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.time.Deadline;
 import org.apache.flink.cdc.common.test.utils.TestUtils;
+import org.apache.flink.cdc.connectors.sqlserver.testutils.SqlServerTestUtils;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
 
 import org.assertj.core.api.Assertions;
@@ -86,6 +87,7 @@ public class SqlServerE2eITCase extends PipelineTestEnvironment {
         super.before();
         LOG.info("Starting SQL Server containers...");
         Startables.deepStart(Stream.of(SQL_SERVER_CONTAINER)).join();
+        SqlServerTestUtils.waitForSqlServerAgent(SQL_SERVER_CONTAINER);
         LOG.info("SQL Server containers are started.");
         initializeSqlServerTable("sqlserver_inventory");
     }
