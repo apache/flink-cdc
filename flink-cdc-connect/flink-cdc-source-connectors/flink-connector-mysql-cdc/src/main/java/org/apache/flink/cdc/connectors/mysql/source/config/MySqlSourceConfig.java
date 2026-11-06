@@ -33,6 +33,8 @@ import javax.annotation.Nullable;
 
 import java.io.Serializable;
 import java.time.Duration;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -74,6 +76,7 @@ public class MySqlSourceConfig implements Serializable {
     public static boolean useLegacyJsonFormat = true;
     private final boolean assignUnboundedChunkFirst;
     private final boolean releaseSnapshotMetadataEnabled;
+    private final Map<String, String> snapshotFilters;
 
     // --------------------------------------------------------------------------------------------
     // Debezium Configurations
@@ -115,7 +118,8 @@ public class MySqlSourceConfig implements Serializable {
             boolean treatTinyInt1AsBoolean,
             boolean useLegacyJsonFormat,
             boolean assignUnboundedChunkFirst,
-            boolean releaseSnapshotMetadataEnabled) {
+            boolean releaseSnapshotMetadataEnabled,
+            Map<String, String> snapshotFilters) {
         this.hostname = checkNotNull(hostname);
         this.port = port;
         this.username = checkNotNull(username);
@@ -164,6 +168,7 @@ public class MySqlSourceConfig implements Serializable {
         this.useLegacyJsonFormat = useLegacyJsonFormat;
         this.assignUnboundedChunkFirst = assignUnboundedChunkFirst;
         this.releaseSnapshotMetadataEnabled = releaseSnapshotMetadataEnabled;
+        this.snapshotFilters = Collections.unmodifiableMap(new LinkedHashMap<>(snapshotFilters));
     }
 
     public String getHostname() {
@@ -308,5 +313,9 @@ public class MySqlSourceConfig implements Serializable {
 
     public boolean isTreatTinyInt1AsBoolean() {
         return treatTinyInt1AsBoolean;
+    }
+
+    public Map<String, String> getSnapshotFilters() {
+        return snapshotFilters;
     }
 }

@@ -22,6 +22,8 @@ import org.apache.flink.table.types.logical.RowType;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
 
+import javax.annotation.Nullable;
+
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.sql.Connection;
@@ -38,12 +40,15 @@ public class StatementUtils {
 
     private StatementUtils() {}
 
-    public static Object[] queryMinMax(JdbcConnection jdbc, TableId tableId, String columnName)
+    public static Object[] queryMinMax(
+            JdbcConnection jdbc, TableId tableId, String columnName, @Nullable String filter)
             throws SQLException {
         final String minMaxQuery =
                 String.format(
                         "SELECT MIN(%s), MAX(%s) FROM %s",
-                        quote(columnName), quote(columnName), quote(tableId));
+                        quote(columnName),
+                        quote(columnName),
+                        filter != null ? quote(tableId) + " WHERE " + filter : quote(tableId));
         return jdbc.queryAndMap(
                 minMaxQuery,
                 rs -> {
@@ -55,6 +60,29 @@ public class StatementUtils {
                                         minMaxQuery));
                     }
                     return rowToArray(rs, 2);
+                });
+    }
+
+    public static Long queryRowCnt(
+            JdbcConnection jdbc, TableId tableId, String columnName, @Nullable String filter)
+            throws SQLException {
+
+        if (filter == null) {
+            return queryApproximateRowCnt(jdbc, tableId);
+        }
+
+        final String cntQuery =
+                String.format("SELECT COUNT(1) FROM %s WHERE (%s)", quote(tableId), filter);
+        return jdbc.queryAndMap(
+                cntQuery,
+                rs -> {
+                    if (!rs.next()) {
+                        // this should never happen
+                        throw new SQLException(
+                                String.format(
+                                        "No result returned after running query [%s]", cntQuery));
+                    }
+                    return rs.getLong(1);
                 });
     }
 
@@ -97,12 +125,20 @@ public class StatementUtils {
     }
 
     public static Object queryMin(
-            JdbcConnection jdbc, TableId tableId, String columnName, Object excludedLowerBound)
+            JdbcConnection jdbc,
+            TableId tableId,
+            String columnName,
+            Object excludedLowerBound,
+            @Nullable String filter)
             throws SQLException {
         final String minQuery =
                 String.format(
                         "SELECT MIN(%s) FROM %s WHERE %s > ?",
-                        quote(columnName), quote(tableId), quote(columnName));
+                        quote(columnName),
+                        quote(tableId),
+                        filter != null
+                                ? "(" + filter + ") AND " + quote(columnName)
+                                : quote(columnName));
         return jdbc.prepareQueryAndMap(
                 minQuery,
                 ps -> setSafeObject(ps, 1, excludedLowerBound),
@@ -122,7 +158,8 @@ public class StatementUtils {
             TableId tableId,
             String splitColumnName,
             int chunkSize,
-            Object includedLowerBound)
+            Object includedLowerBound,
+            @Nullable String filter)
             throws SQLException {
         String quotedColumn = quote(splitColumnName);
         String query =
@@ -133,7 +170,7 @@ public class StatementUtils {
                         quotedColumn,
                         quotedColumn,
                         quote(tableId),
-                        quotedColumn,
+                        filter != null ? "(" + filter + ") AND " + quotedColumn : quotedColumn,
                         quotedColumn,
                         chunkSize);
         return jdbc.prepareQueryAndMap(
@@ -151,8 +188,12 @@ public class StatementUtils {
     }
 
     public static String buildSplitScanQuery(
-            TableId tableId, RowType pkRowType, boolean isFirstSplit, boolean isLastSplit) {
-        return buildSplitQuery(tableId, pkRowType, isFirstSplit, isLastSplit, -1, true);
+            TableId tableId,
+            RowType pkRowType,
+            boolean isFirstSplit,
+            boolean isLastSplit,
+            @Nullable String filter) {
+        return buildSplitQuery(tableId, pkRowType, isFirstSplit, isLastSplit, -1, true, filter);
     }
 
     private static String buildSplitQuery(
@@ -161,8 +202,9 @@ public class StatementUtils {
             boolean isFirstSplit,
             boolean isLastSplit,
             int limitSize,
-            boolean isScanningData) {
-        final String condition;
+            boolean isScanningData,
+            @Nullable String filter) {
+        String condition;
 
         if (isFirstSplit && isLastSplit) {
             condition = null;
@@ -190,6 +232,10 @@ public class StatementUtils {
             sql.append(" AND ");
             addPrimaryKeyColumnsToCondition(pkRowType, sql, " <= ?");
             condition = sql.toString();
+        }
+
+        if (filter != null) {
+            condition = condition == null ? filter : "(" + filter + ") AND " + condition;
         }
 
         if (isScanningData) {

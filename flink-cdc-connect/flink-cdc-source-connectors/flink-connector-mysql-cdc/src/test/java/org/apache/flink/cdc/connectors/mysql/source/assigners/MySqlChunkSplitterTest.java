@@ -135,7 +135,7 @@ class MySqlChunkSplitterTest {
         int chunkSize = 5;
 
         Object result =
-                splitter.nextChunkEnd(jdbc, previousChunkEnd, tableId, "id", max, chunkSize);
+                splitter.nextChunkEnd(jdbc, previousChunkEnd, tableId, "id", max, chunkSize, null);
 
         // when queryNextChunkMax returns null, nextChunkEnd should also return null
         // instead of propagating the null further and causing errors

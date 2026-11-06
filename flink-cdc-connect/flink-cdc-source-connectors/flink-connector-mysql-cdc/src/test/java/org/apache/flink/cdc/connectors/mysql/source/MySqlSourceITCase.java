@@ -79,6 +79,7 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.sql.SQLException;
 import java.time.Duration;
@@ -462,7 +463,7 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
         RestartStrategyUtils.configureFixedDelayRestartStrategy(env, 1, 0);
 
         // The sleeping source will sleep awhile after send per record
-        MySqlSource<RowData> sleepingSource = buildSleepingSource(tableName, chunkColumnName);
+        MySqlSource<RowData> sleepingSource = buildSleepingSource(tableName, chunkColumnName, null);
         DataStreamSource<RowData> source =
                 env.fromSource(sleepingSource, WatermarkStrategy.noWatermarks(), "selfSource");
 
@@ -531,6 +532,230 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
         assertEqualsInAnyOrder(
                 Arrays.asList(expectedSnapshotData),
                 fetchRowData(iterator, expectedSnapshotData.length));
+        Assertions.assertThat(hasNextData(iterator)).isFalse();
+        jobClient.cancel().get();
+    }
+
+    @ParameterizedTest
+    @MethodSource("parameters")
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    void testSnapshotFilters(String tableName, String chunkColumnName) throws Exception {
+        customDatabase.createAndInitialize();
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.setParallelism(DEFAULT_PARALLELISM);
+        env.enableCheckpointing(5000L);
+        RestartStrategyUtils.configureFixedDelayRestartStrategy(env, 1, 0);
+
+        // Filter user with `id > 200`
+        // The sleeping source will sleep awhile after send per record
+        MySqlSource<RowData> sleepingSource =
+                buildSleepingSource(tableName, chunkColumnName, "id > 200");
+        DataStreamSource<RowData> source =
+                env.fromSource(sleepingSource, WatermarkStrategy.noWatermarks(), "selfSource");
+
+        String[] expectedSnapshotData =
+                new String[] {
+                    "+I[1009, user_10, Shanghai, 123567891234]",
+                    "+I[1010, user_11, Shanghai, 123567891234]",
+                    "+I[1011, user_12, Shanghai, 123567891234]",
+                    "+I[1012, user_13, Shanghai, 123567891234]",
+                    "+I[1013, user_14, Shanghai, 123567891234]",
+                    "+I[1014, user_15, Shanghai, 123567891234]",
+                    "+I[1015, user_16, Shanghai, 123567891234]",
+                    "+I[1016, user_17, Shanghai, 123567891234]",
+                    "+I[1017, user_18, Shanghai, 123567891234]",
+                    "+I[1018, user_19, Shanghai, 123567891234]",
+                    "+I[1019, user_20, Shanghai, 123567891234]",
+                    "+I[2000, user_21, Shanghai, 123567891234]"
+                };
+        CollectResultIterator<RowData> iterator = addCollector(env, source);
+        JobClient jobClient = env.executeAsync("snapshotSplitTest");
+        iterator.setJobClient(jobClient);
+        JobID jobId = jobClient.getJobID();
+
+        // Trigger failover once some snapshot records has been sent by sleeping source
+        if (iterator.hasNext()) {
+            triggerFailover(
+                    FailoverType.JM,
+                    jobId,
+                    miniClusterResource.get().getMiniCluster(),
+                    () -> sleepMs(100));
+        }
+
+        // Check all snapshot records are sent with exactly-once semantics
+        assertEqualsInAnyOrder(
+                Arrays.asList(expectedSnapshotData),
+                fetchRowData(iterator, expectedSnapshotData.length));
+        Assertions.assertThat(hasNextData(iterator)).isFalse();
+        jobClient.cancel().get();
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void testSnapshotFiltersWithDMLPreHighWatermark(boolean skipSnapshotBackfill) throws Exception {
+        customDatabase.createAndInitialize();
+        TestTable customerTable =
+                new TestTable(customDatabase, "customers", TestTableSchemas.CUSTOMERS);
+        String tableId = customerTable.getTableId();
+        try (MySqlConnection connection = getConnection()) {
+            connection.execute("DELETE FROM " + tableId + " WHERE id NOT IN (101, 102, 103, 109)");
+        }
+
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.setParallelism(1);
+        MySqlSource<RowData> source =
+                MySqlSource.<RowData>builder()
+                        .hostname(customDatabase.getHost())
+                        .port(customDatabase.getDatabasePort())
+                        .username(customDatabase.getUsername())
+                        .password(customDatabase.getPassword())
+                        .serverTimeZone("UTC")
+                        .databaseList(customDatabase.getDatabaseName())
+                        .tableList(tableId)
+                        .deserializer(customerTable.getDeserializer())
+                        .snapshotFilters(tableId, "address = 'Shanghai'")
+                        .skipSnapshotBackfill(skipSnapshotBackfill)
+                        .startupOptions(StartupOptions.initial())
+                        .build();
+
+        SnapshotPhaseHooks hooks = new SnapshotPhaseHooks();
+        hooks.setPreLowWatermarkAction(
+                (connection, split) -> {
+                    connection.execute(
+                            "UPDATE "
+                                    + tableId
+                                    + " SET address = 'Pittsburgh' WHERE id IN (102, 109)");
+                });
+        hooks.setPreHighWatermarkAction(
+                (connection, split) -> {
+                    connection.setAutoCommit(false);
+                    // Row 101 leaves the predicate; row 102 enters it. Row 109 remains excluded.
+                    connection.execute(
+                            "UPDATE " + tableId + " SET address = 'Pittsburgh' WHERE id = 101",
+                            "UPDATE " + tableId + " SET address = 'Shanghai' WHERE id = 102");
+                    connection.commit();
+                });
+        source.setSnapshotHooks(hooks);
+
+        List<String> expected =
+                skipSnapshotBackfill
+                        ? Arrays.asList(
+                                "+I[101, user_1, Shanghai, 123567891234]",
+                                "+I[103, user_3, Shanghai, 123567891234]",
+                                "-U[101, user_1, Shanghai, 123567891234]",
+                                "+U[101, user_1, Pittsburgh, 123567891234]",
+                                "-U[102, user_2, Pittsburgh, 123567891234]",
+                                "+U[102, user_2, Shanghai, 123567891234]")
+                        : Arrays.asList(
+                                "+I[101, user_1, Pittsburgh, 123567891234]",
+                                "+I[102, user_2, Shanghai, 123567891234]",
+                                "+I[103, user_3, Shanghai, 123567891234]");
+        try (CloseableIterator<RowData> iterator =
+                env.fromSource(source, WatermarkStrategy.noWatermarks(), "Filtered snapshot source")
+                        .executeAndCollect()) {
+            assertThat(fetchRowData(iterator, expected.size(), customerTable::stringify))
+                    .containsExactlyInAnyOrderElementsOf(expected);
+            assertThat(hasNextData(iterator)).isFalse();
+        }
+    }
+
+    @Test
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    void testSnapshotFiltersMultipleTables() throws Exception {
+        customDatabase.createAndInitialize();
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.setParallelism(DEFAULT_PARALLELISM);
+        env.enableCheckpointing(5000L);
+        RestartStrategyUtils.configureFixedDelayRestartStrategy(env, 1, 0);
+
+        ResolvedSchema physicalSchema =
+                new ResolvedSchema(
+                        Arrays.asList(
+                                Column.physical("id", DataTypes.BIGINT().notNull()),
+                                Column.physical("name", DataTypes.STRING()),
+                                Column.physical("address", DataTypes.STRING()),
+                                Column.physical("phone_number", DataTypes.STRING())),
+                        new ArrayList<>(),
+                        UniqueConstraint.primaryKey("pk", Collections.singletonList("id")));
+        RowType physicalDataType =
+                (RowType) physicalSchema.toPhysicalRowDataType().getLogicalType();
+        final TypeInformation<RowData> typeInfo = InternalTypeInfo.of(physicalDataType);
+        RowDataDebeziumDeserializeSchema deserializer =
+                RowDataDebeziumDeserializeSchema.newBuilder()
+                        .setPhysicalRowType(physicalDataType)
+                        .setMetadataConverters(new MetadataConverter[0])
+                        .setResultTypeInfo(typeInfo)
+                        .setServerTimeZone(ZoneId.of("UTC"))
+                        .setUserDefinedConverterFactory(
+                                MySqlDeserializationConverterFactory.instance())
+                        .build();
+
+        // Apply different filters to customers (id > 200) and customers_1 (id < 200)
+        MySqlSource<RowData> source =
+                MySqlSource.<RowData>builder()
+                        .hostname(MYSQL_CONTAINER.getHost())
+                        .port(MYSQL_CONTAINER.getDatabasePort())
+                        .databaseList(customDatabase.getDatabaseName())
+                        .tableList(
+                                customDatabase.getDatabaseName() + ".customers",
+                                customDatabase.getDatabaseName() + ".customers_1")
+                        .username(customDatabase.getUsername())
+                        .password(customDatabase.getPassword())
+                        .serverTimeZone("UTC")
+                        .serverId(getServerId())
+                        .splitSize(8096)
+                        .fetchSize(1024)
+                        .connectTimeout(Duration.ofSeconds(30))
+                        .debeziumProperties(new Properties())
+                        .startupOptions(StartupOptions.initial())
+                        .deserializer(deserializer)
+                        .snapshotFilters(
+                                customDatabase.getDatabaseName() + ".customers", "id > 200")
+                        .snapshotFilters(
+                                customDatabase.getDatabaseName() + ".customers_1", "id < 200")
+                        .build();
+
+        DataStreamSource<RowData> stream =
+                env.fromSource(source, WatermarkStrategy.noWatermarks(), "multiTableSource");
+
+        // customers with id > 200: 1009-1019, 2000 (12 rows)
+        // customers_1 with id < 200: 101, 102, 103, 109, 110, 111, 118, 121, 123 (9 rows)
+        int expectedCount = 12 + 9;
+
+        CollectResultIterator<RowData> iterator = addCollector(env, stream);
+        JobClient jobClient = env.executeAsync("snapshotFiltersMultiTableTest");
+        iterator.setJobClient(jobClient);
+
+        List<String> actual = fetchRowData(iterator, expectedCount);
+        // customers: id > 200
+        assertThat(actual)
+                .containsAll(
+                        Arrays.asList(
+                                "+I[1009, user_10, Shanghai, 123567891234]",
+                                "+I[1010, user_11, Shanghai, 123567891234]",
+                                "+I[1011, user_12, Shanghai, 123567891234]",
+                                "+I[1012, user_13, Shanghai, 123567891234]",
+                                "+I[1013, user_14, Shanghai, 123567891234]",
+                                "+I[1014, user_15, Shanghai, 123567891234]",
+                                "+I[1015, user_16, Shanghai, 123567891234]",
+                                "+I[1016, user_17, Shanghai, 123567891234]",
+                                "+I[1017, user_18, Shanghai, 123567891234]",
+                                "+I[1018, user_19, Shanghai, 123567891234]",
+                                "+I[1019, user_20, Shanghai, 123567891234]",
+                                "+I[2000, user_21, Shanghai, 123567891234]"));
+        // customers_1: id < 200
+        assertThat(actual)
+                .containsAll(
+                        Arrays.asList(
+                                "+I[101, user_1, Shanghai, 123567891234]",
+                                "+I[102, user_2, Shanghai, 123567891234]",
+                                "+I[103, user_3, Shanghai, 123567891234]",
+                                "+I[109, user_4, Shanghai, 123567891234]",
+                                "+I[110, user_5, Shanghai, 123567891234]",
+                                "+I[111, user_6, Shanghai, 123567891234]",
+                                "+I[118, user_7, Shanghai, 123567891234]",
+                                "+I[121, user_8, Shanghai, 123567891234]",
+                                "+I[123, user_9, Shanghai, 123567891234]"));
         Assertions.assertThat(hasNextData(iterator)).isFalse();
         jobClient.cancel().get();
     }
@@ -1080,7 +1305,8 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
         return iterator;
     }
 
-    private MySqlSource<RowData> buildSleepingSource(String tableName, String chunkColumnName) {
+    private MySqlSource<RowData> buildSleepingSource(
+            String tableName, String chunkColumnName, String snapshotFilter) {
         ResolvedSchema physicalSchema =
                 new ResolvedSchema(
                         Arrays.asList(
@@ -1132,6 +1358,7 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
                 .chunkKeyColumn(
                         new ObjectPath(customDatabase.getDatabaseName(), tableName),
                         chunkColumnName)
+                .snapshotFilters(customDatabase.getDatabaseName() + "." + tableName, snapshotFilter)
                 .build();
     }
 
