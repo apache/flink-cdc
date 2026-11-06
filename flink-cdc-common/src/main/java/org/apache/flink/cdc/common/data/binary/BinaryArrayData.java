@@ -23,6 +23,7 @@ import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.MapData;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.StringData;
+import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.ZonedTimestampData;
 import org.apache.flink.cdc.common.types.DataType;
@@ -146,8 +147,11 @@ public final class BinaryArrayData extends BinarySection implements ArrayData {
             case INTEGER:
             case FLOAT:
             case DATE:
-            case TIME_WITHOUT_TIME_ZONE:
                 return 4;
+            case TIME_WITHOUT_TIME_ZONE:
+                // All precisions share the same eight-byte slot holding
+                // Long.MIN_VALUE | nanoOfDay, so that no precision-dependent layout is needed.
+                return 8;
             default:
                 throw new IllegalArgumentException();
         }
@@ -158,6 +162,17 @@ public final class BinaryArrayData extends BinarySection implements ArrayData {
 
     /** The position to start storing array elements. */
     private int elementOffset;
+
+    /**
+     * Lazily derived flag telling whether the {@code TIME} elements of this array were written by a
+     * pre-upgrade version of CDC, when such elements still occupied a 4-byte millisecond slot
+     * instead of the current 8-byte {@code Long.MIN_VALUE | nanoOfDay} slot.
+     *
+     * <p>The flag is derived from the payload itself (see {@link #usesLegacyMillisSlots()}) and
+     * must be reset in {@link #pointTo(MemorySegment[], int, int)} because {@link BinaryArrayData}
+     * instances are reused (e.g. by {@code ArrayDataSerializer} and {@link BinaryMapData}).
+     */
+    private Boolean legacyMillisSlots;
 
     public BinaryArrayData() {}
 
@@ -184,6 +199,9 @@ public final class BinaryArrayData extends BinarySection implements ArrayData {
         this.size = size;
         super.pointTo(segments, offset, sizeInBytes);
         this.elementOffset = offset + calculateHeaderInBytes(this.size);
+        // BinaryArrayData instances are reused, so the lazily derived flag must not survive a
+        // repoint to a different payload.
+        this.legacyMillisSlots = null;
     }
 
     @Override
@@ -224,6 +242,56 @@ public final class BinaryArrayData extends BinarySection implements ArrayData {
     public int getInt(int pos) {
         assertIndexIsValid(pos);
         return BinarySegmentUtils.getInt(segments, getElementOffset(pos, 4));
+    }
+
+    @Override
+    public TimeData getTime(int pos) {
+        assertIndexIsValid(pos);
+        if (usesLegacyMillisSlots()) {
+            return TimeData.fromMillisOfDay(
+                    BinarySegmentUtils.getInt(segments, getElementOffset(pos, 4)));
+        }
+        long encoded = BinarySegmentUtils.getLong(segments, getElementOffset(pos, 8));
+        if (encoded < 0) {
+            return TimeData.fromNanoOfDay(encoded & Long.MAX_VALUE);
+        }
+        // A slot whose tag bit is clear comes from the pre-upgrade layout: the value sits in the
+        // low
+        // four bytes and the high four bytes are zero padding. This is the only way to read a
+        // single-element legacy array, whose payload length is identical to the current layout.
+        return TimeData.fromMillisOfDay((int) encoded);
+    }
+
+    /**
+     * Derives, from the payload itself, whether the {@code TIME} elements of this array are stored
+     * in the pre-upgrade 4-byte millisecond slot layout.
+     *
+     * <p>A {@code TIME} array has no variable-length part, so {@code sizeInBytes} exactly describes
+     * the fixed-length layout: {@code roundUpTo8(header + slotSize * size)}. The pre-upgrade code
+     * always used a 4-byte slot, and the current code always uses an 8-byte slot, so a payload that
+     * is smaller than the current layout must have been written with 4-byte slots. The check is
+     * exact for every array with more than one element; a single-element legacy array has the same
+     * rounded payload length as the current layout, and {@link #getTime(int)} falls back to the
+     * slot's tag bit for it.
+     *
+     * <p>The value is cached because it is read for every element; it is invalidated by {@link
+     * #pointTo(MemorySegment[], int, int)}.
+     */
+    private boolean usesLegacyMillisSlots() {
+        if (legacyMillisSlots == null) {
+            int currentLayoutSize = roundUpTo8(calculateHeaderInBytes(size) + 8 * size);
+            legacyMillisSlots = sizeInBytes < currentLayoutSize;
+        }
+        return legacyMillisSlots;
+    }
+
+    /**
+     * Rounds the number of bytes up to the next multiple of 8, mirroring {@code
+     * AbstractBinaryWriter#roundNumberOfBytesToNearestWord} which is not visible from this module.
+     */
+    private static int roundUpTo8(int numBytes) {
+        int remainder = numBytes & 0x07;
+        return remainder == 0 ? numBytes : numBytes + (8 - remainder);
     }
 
     public void setInt(int pos, int value) {

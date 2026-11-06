@@ -66,12 +66,16 @@ public class GenericRecordDataSerializer {
     private static final byte TAG_ZONED_TIMESTAMP = 12;
     private static final byte TAG_LOCAL_ZONED_TIMESTAMP = 13;
     private static final byte TAG_DATE = 14;
+
+    /** Legacy TIME encoding, millisecond-of-day; still read, no longer written. */
     private static final byte TAG_TIME = 15;
+
     private static final byte TAG_GENERIC_RECORD = 16;
     private static final byte TAG_BINARY_RECORD = 17;
     private static final byte TAG_ARRAY = 18;
     private static final byte TAG_MAP = 19;
     private static final byte TAG_VARIANT = 20;
+    private static final byte TAG_TIME_NANO = 21;
 
     private GenericRecordDataSerializer() {}
 
@@ -177,8 +181,8 @@ public class GenericRecordDataSerializer {
             target.writeByte(TAG_DATE);
             target.writeInt(((DateData) field).toEpochDay());
         } else if (field instanceof TimeData) {
-            target.writeByte(TAG_TIME);
-            target.writeInt(((TimeData) field).toMillisOfDay());
+            target.writeByte(TAG_TIME_NANO);
+            target.writeLong(((TimeData) field).toNanoOfDay());
         } else if (field instanceof GenericRecordData) {
             target.writeByte(TAG_GENERIC_RECORD);
             serialize((GenericRecordData) field, target);
@@ -260,6 +264,8 @@ public class GenericRecordDataSerializer {
                 return DateData.fromEpochDay(source.readInt());
             case TAG_TIME:
                 return TimeData.fromMillisOfDay(source.readInt());
+            case TAG_TIME_NANO:
+                return TimeData.fromNanoOfDay(source.readLong());
             case TAG_GENERIC_RECORD:
                 return deserialize(source);
             case TAG_BINARY_RECORD:
