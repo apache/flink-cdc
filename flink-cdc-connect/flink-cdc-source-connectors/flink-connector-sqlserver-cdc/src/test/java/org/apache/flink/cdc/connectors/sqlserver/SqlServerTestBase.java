@@ -66,7 +66,7 @@ public class SqlServerTestBase extends AbstractTestBase {
                     + "EXEC sys.sp_cdc_disable_db";
 
     public static final MSSQLServerContainer<?> MSSQL_SERVER_CONTAINER =
-            new MSSQLServerContainer<>("mcr.microsoft.com/mssql/server:2019-latest")
+            new MSSQLServerContainer<>("mcr.microsoft.com/mssql/server:2025-latest")
                     .withPassword("Password!")
                     .withEnv("MSSQL_AGENT_ENABLED", "true")
                     .withEnv("MSSQL_PID", "Standard")

@@ -66,7 +66,7 @@ public class SqlServerE2eITCase extends PipelineTestEnvironment {
 
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
     private static final String INTER_CONTAINER_SQL_SERVER_ALIAS = "mssqlserver";
-    private static final String MSSQL_SERVER_IMAGE = "mcr.microsoft.com/mssql/server:2019-latest";
+    private static final String MSSQL_SERVER_IMAGE = "mcr.microsoft.com/mssql/server:2025-latest";
 
     @Container
     public static final MSSQLServerContainer<?> SQL_SERVER_CONTAINER =

@@ -60,7 +60,7 @@ class SqlServerE2eITCase extends FlinkContainerTestEnvironment {
     private static final Path sqlServerCdcJar =
             TestUtils.getResource("sqlserver-cdc-connector.jar");
     private static final Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
-    public static final String MSSQL_SERVER_IMAGE = "mcr.microsoft.com/mssql/server:2019-latest";
+    public static final String MSSQL_SERVER_IMAGE = "mcr.microsoft.com/mssql/server:2025-latest";
 
     @Container
     public static final MSSQLServerContainer<?> SQL_SERVER_CONTAINER =
