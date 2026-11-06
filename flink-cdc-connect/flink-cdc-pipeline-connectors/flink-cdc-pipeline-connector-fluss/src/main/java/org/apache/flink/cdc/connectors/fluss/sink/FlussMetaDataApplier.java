@@ -31,6 +31,7 @@ import org.apache.flink.cdc.common.sink.ExistingTableSchemaExpansionSupport;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.table.api.ValidationException;
+import org.apache.flink.util.IOUtils;
 
 import org.apache.fluss.client.Connection;
 import org.apache.fluss.client.ConnectionFactory;
@@ -73,6 +74,9 @@ public class FlussMetaDataApplier implements MetadataApplier, ExistingTableSchem
     // Zero jitter keeps the backoff sequence deterministic for tests.
     private static final ExponentialBackoff SCHEMA_READ_BACKOFF =
             new ExponentialBackoff(100L, 2, 400L, 0.0);
+    private transient Connection connection;
+    private transient Admin admin;
+
     private final Configuration flussClientConfig;
     private final Map<String, String> tableProperties;
     private final Map<String, List<String>> bucketKeysMap;
@@ -117,10 +121,10 @@ public class FlussMetaDataApplier implements MetadataApplier, ExistingTableSchem
     }
 
     @Override
-    public Optional<Schema> getExistingTableSchema(TableId tableId) {
+    public synchronized Optional<Schema> getExistingTableSchema(TableId tableId) {
         TablePath tablePath = new TablePath(tableId.getSchemaName(), tableId.getTableName());
-        try (Connection connection = ConnectionFactory.createConnection(flussClientConfig);
-                Admin admin = connection.getAdmin()) {
+        try {
+            Admin admin = getOrCreateAdmin();
             if (!admin.tableExists(tablePath).get()) {
                 return Optional.empty();
             }
@@ -146,7 +150,7 @@ public class FlussMetaDataApplier implements MetadataApplier, ExistingTableSchem
     }
 
     @Override
-    public void applySchemaChange(SchemaChangeEvent schemaChangeEvent) {
+    public synchronized void applySchemaChange(SchemaChangeEvent schemaChangeEvent) {
         LOG.info("fluss metadata applier receive schemaChangeEvent {}", schemaChangeEvent);
         if (schemaChangeEvent instanceof CreateTableEvent) {
             CreateTableEvent createTableEvent = (CreateTableEvent) schemaChangeEvent;
@@ -165,8 +169,8 @@ public class FlussMetaDataApplier implements MetadataApplier, ExistingTableSchem
     }
 
     private void applyCreateTable(CreateTableEvent event) {
-        try (Connection connection = ConnectionFactory.createConnection(flussClientConfig);
-                Admin admin = connection.getAdmin()) {
+        try {
+            Admin admin = getOrCreateAdmin();
             TableId tableId = event.tableId();
             TablePath tablePath = new TablePath(tableId.getSchemaName(), tableId.getTableName());
             String tableIdentifier = tablePath.getDatabaseName() + "." + tablePath.getTableName();
@@ -194,8 +198,8 @@ public class FlussMetaDataApplier implements MetadataApplier, ExistingTableSchem
     }
 
     private void applyDropTable(DropTableEvent event) {
-        try (Connection connection = ConnectionFactory.createConnection(flussClientConfig);
-                Admin admin = connection.getAdmin()) {
+        try {
+            Admin admin = getOrCreateAdmin();
             TableId tableId = event.tableId();
             TablePath tablePath = new TablePath(tableId.getSchemaName(), tableId.getTableName());
             admin.dropTable(tablePath, true).get();
@@ -227,8 +231,8 @@ public class FlussMetaDataApplier implements MetadataApplier, ExistingTableSchem
                                             TableChange.ColumnPosition.last()));
                         });
 
-        try (Connection connection = ConnectionFactory.createConnection(flussClientConfig);
-                Admin admin = connection.getAdmin()) {
+        try {
+            Admin admin = getOrCreateAdmin();
             TableId tableId = event.tableId();
             TablePath tablePath = new TablePath(tableId.getSchemaName(), tableId.getTableName());
             applyAddColumnChanges(admin, tablePath, tableChanges);
@@ -240,6 +244,33 @@ public class FlussMetaDataApplier implements MetadataApplier, ExistingTableSchem
             LOG.error("Failed to apply schema change {}", event, e);
             throw new RuntimeException(e);
         }
+    }
+
+    private Admin getOrCreateAdmin() throws Exception {
+        if (admin == null) {
+            Connection newConnection = ConnectionFactory.createConnection(flussClientConfig);
+            try {
+                admin = newConnection.getAdmin();
+                connection = newConnection;
+            } catch (Exception e) {
+                try {
+                    newConnection.close();
+                } catch (Exception closeException) {
+                    e.addSuppressed(closeException);
+                }
+                throw e;
+            }
+        }
+        return admin;
+    }
+
+    @Override
+    public synchronized void close() throws Exception {
+        Connection connectionToClose = connection;
+        Admin adminToClose = admin;
+        connection = null;
+        admin = null;
+        IOUtils.closeAll(adminToClose, connectionToClose);
     }
 
     @VisibleForTesting
