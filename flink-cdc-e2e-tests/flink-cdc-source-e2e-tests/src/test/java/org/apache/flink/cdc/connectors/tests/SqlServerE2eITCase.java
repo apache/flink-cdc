@@ -70,6 +70,9 @@ class SqlServerE2eITCase extends FlinkContainerTestEnvironment {
                     .withEnv("MSSQL_PID", "Standard")
                     .withNetwork(NETWORK)
                     .withNetworkAliases(INTER_CONTAINER_SQL_SERVER_ALIAS)
+                    // SQL Server 2025 occasionally crashes during startup on CI; retry with a
+                    // fresh container.
+                    .withStartupAttempts(3)
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
 
     @BeforeEach

@@ -70,6 +70,9 @@ public abstract class SqlServerSourceTestBase extends TestLogger {
                     .withPassword("Password!")
                     .withEnv("MSSQL_AGENT_ENABLED", "true")
                     .withEnv("MSSQL_PID", "Standard")
+                    // SQL Server 2025 occasionally crashes during startup on CI; retry with a
+                    // fresh container.
+                    .withStartupAttempts(3)
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
     protected static final int DEFAULT_PARALLELISM = 4;
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
