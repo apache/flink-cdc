@@ -160,6 +160,46 @@ class SchemaUtilsTest {
                                 "AFTER type AddColumnEvent error: Column %s does not exist in table %s",
                                 "col10", tableId));
 
+        // add duplicate column should be ignored (idempotency)
+        addedColumns = new ArrayList<>();
+        addedColumns.add(
+                new AddColumnEvent.ColumnWithPosition(
+                        Column.physicalColumn("col3", DataTypes.STRING()),
+                        AddColumnEvent.ColumnPosition.LAST,
+                        null));
+        addColumnEvent = new AddColumnEvent(tableId, addedColumns);
+        schema = SchemaUtils.applySchemaChangeEvent(schema, addColumnEvent);
+        Assertions.assertThat(schema)
+                .isEqualTo(
+                        Schema.newBuilder()
+                                .physicalColumn("col0", DataTypes.STRING())
+                                .physicalColumn("col1", DataTypes.STRING())
+                                .physicalColumn("col2", DataTypes.STRING())
+                                .physicalColumn("col4", DataTypes.STRING())
+                                .physicalColumn("col5", DataTypes.STRING())
+                                .physicalColumn("col3", DataTypes.STRING())
+                                .build());
+
+        // add duplicate column in FIRST position should be ignored
+        addedColumns = new ArrayList<>();
+        addedColumns.add(
+                new AddColumnEvent.ColumnWithPosition(
+                        Column.physicalColumn("col0", DataTypes.STRING()),
+                        AddColumnEvent.ColumnPosition.FIRST,
+                        null));
+        addColumnEvent = new AddColumnEvent(tableId, addedColumns);
+        schema = SchemaUtils.applySchemaChangeEvent(schema, addColumnEvent);
+        Assertions.assertThat(schema)
+                .isEqualTo(
+                        Schema.newBuilder()
+                                .physicalColumn("col0", DataTypes.STRING())
+                                .physicalColumn("col1", DataTypes.STRING())
+                                .physicalColumn("col2", DataTypes.STRING())
+                                .physicalColumn("col4", DataTypes.STRING())
+                                .physicalColumn("col5", DataTypes.STRING())
+                                .physicalColumn("col3", DataTypes.STRING())
+                                .build());
+
         // drop columns
         DropColumnEvent dropColumnEvent =
                 new DropColumnEvent(tableId, Arrays.asList("col3", "col5"));
