@@ -120,6 +120,13 @@ Pipeline Connector Options
       <td>用于建立与 Fluss 集群初始连接的主机/端口对列表。 </td>
     </tr>
     <tr>
+      <td>schema.evolution.auto-add-columns</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">true</td>
+      <td>Boolean</td>
+      <td>Sink 是否自动向已有 Fluss 表加列。设为 <code>false</code> 时，Sink 只校验目标 Schema，不执行 ADD COLUMN DDL，详见<a href="#自动加列">自动加列</a>。</td>
+    </tr>
+    <tr>
       <td>sink.partitioning.strategy</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">DEFAULT</td>
@@ -193,6 +200,26 @@ sink:
 
 * 支持 Fluss 主键表和日志表。
 
+### 自动加列
+
+`schema.evolution.auto-add-columns` 控制 Sink 是否自动向已有 Fluss 表加列，默认值为 `true`。
+
+设为 `false` 时，Sink 只校验目标 Schema，不执行 ADD COLUMN DDL，包括由
+`existing-table.schema-expansion.mode` 派生的 ADD 事件。建表和其他 Schema 变更行为保持不变。
+
+对于已有表，Sink 会校验初始 Schema 和每个转发到 Sink 的 ADD 事件。目标表必须包含 Pipeline 的所有列，
+Fluss 类型须一致，且可空性兼容。Fluss Schema 转换会将主键列归一化为 NOT NULL；对于其他列，
+可空的 Pipeline 列不能写入目标表的 NOT NULL 列。只有目标表包含的列必须可空，
+因为 Sink 会向这些列写入 null。列名区分大小写；目标表可以调整列顺序，也可以包含额外的可空列。校验失败时作业会失败。
+恢复后，每张表在首个事件到达 Writer 前校验；没有事件的表会等到收到事件时才校验。
+
+如果目标 Schema 读取或校验失败，作业会失败，并按 Flink 配置的重启策略处理。
+Sink 不会在校验过程中重试 Schema 读取。
+
+Pipeline 必须转发 ADD 事件，才能完成校验并更新后续数据映射。请使用会传播加列的 Schema 变更行为，
+且不要通过 `include.schema.changes` 或 `exclude.schema.changes` 排除 `add.column`。例如，
+`schema.change.behavior: IGNORE` 会丢弃 ADD 事件。`existing-table.schema-expansion.mode` 的既有检查仍独立生效。
+
 ### 数据湖表参数
 
 要自动创建启用湖存储的 Fluss 表，可以使用以下 Sink 配置：
@@ -238,7 +265,7 @@ Flink CDC 允许支持的数据湖前缀下的任意参数名和值，由 Fluss 
   * 数据分布由 `bucket.key` 选项控制。对于主键表，若未指定分桶键，则分桶键默认为主键（不含分区键）；对于无主键的日志表，若未指定分桶键，则数据将随机分配到各个桶中。 
 
 * 支持在 `lenient` 模式下进行 Schema 变更同步，通过 `schema.change.behavior: lenient` 配置。支持以下 Schema 变更事件：
-  * **新增列** — 新列会追加到 Fluss 表中。
+  * **新增列** — 默认追加到 Fluss 表中；`schema.evolution.auto-add-columns: false` 时只校验目标 Schema，不执行加列。
   * **删除列** — 在 lenient 模式下不会真正删除列，而是忽略该删除操作，后续写入时将该列的值设为 null。
   * **重命名列** — 在 lenient 模式下，此操作会被转换为新增列 + 将旧列类型修改为可空的序列。
   * **修改列类型** — 不支持。

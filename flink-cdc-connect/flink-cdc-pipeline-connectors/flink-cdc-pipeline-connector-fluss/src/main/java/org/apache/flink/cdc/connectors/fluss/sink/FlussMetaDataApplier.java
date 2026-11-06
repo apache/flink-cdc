@@ -77,6 +77,7 @@ public class FlussMetaDataApplier implements MetadataApplier, ExistingTableSchem
     private final Map<String, String> tableProperties;
     private final Map<String, List<String>> bucketKeysMap;
     private final Map<String, Integer> bucketNumMap;
+    private final boolean autoAddColumns;
     private Set<SchemaChangeEventType> enabledEventTypes =
             new HashSet<>(Arrays.asList(CREATE_TABLE, DROP_TABLE));
 
@@ -85,10 +86,20 @@ public class FlussMetaDataApplier implements MetadataApplier, ExistingTableSchem
             Map<String, String> tableProperties,
             Map<String, List<String>> bucketKeysMap,
             Map<String, Integer> bucketNumMap) {
+        this(flussClientConfig, tableProperties, bucketKeysMap, bucketNumMap, true);
+    }
+
+    public FlussMetaDataApplier(
+            Configuration flussClientConfig,
+            Map<String, String> tableProperties,
+            Map<String, List<String>> bucketKeysMap,
+            Map<String, Integer> bucketNumMap,
+            boolean autoAddColumns) {
         this.flussClientConfig = flussClientConfig;
         this.tableProperties = tableProperties;
         this.bucketKeysMap = bucketKeysMap;
         this.bucketNumMap = bucketNumMap;
+        this.autoAddColumns = autoAddColumns;
     }
 
     @Override
@@ -186,6 +197,12 @@ public class FlussMetaDataApplier implements MetadataApplier, ExistingTableSchem
                         inferredFlussTable,
                         currentTableInfo,
                         bucketKeysMap.containsKey(tableIdentifier));
+                if (!autoAddColumns) {
+                    FlussSchemaValidator.validateSchema(
+                            inferredFlussTable.getSchema(),
+                            currentTableInfo.getSchema(),
+                            tablePath);
+                }
             }
         } catch (Exception e) {
             LOG.error("Failed to apply schema change {}", event, e);
@@ -206,6 +223,23 @@ public class FlussMetaDataApplier implements MetadataApplier, ExistingTableSchem
     }
 
     private void applyAddColumnTable(AddColumnEvent event) {
+        if (!autoAddColumns) {
+            TableId tableId = event.tableId();
+            TablePath tablePath = new TablePath(tableId.getSchemaName(), tableId.getTableName());
+            try (Connection connection = createConnection();
+                    Admin admin = connection.getAdmin()) {
+                FlussSchemaValidator.validateAddedColumns(
+                        event, admin.getTableInfo(tablePath).get().getSchema(), tablePath);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException(e);
+            } catch (Exception e) {
+                LOG.error("Failed to validate schema change {}", event, e);
+                throw new RuntimeException(e);
+            }
+            return;
+        }
+
         List<TableChange> tableChanges = new ArrayList<>();
         event.getAddedColumns()
                 .forEach(
@@ -227,7 +261,7 @@ public class FlussMetaDataApplier implements MetadataApplier, ExistingTableSchem
                                             TableChange.ColumnPosition.last()));
                         });
 
-        try (Connection connection = ConnectionFactory.createConnection(flussClientConfig);
+        try (Connection connection = createConnection();
                 Admin admin = connection.getAdmin()) {
             TableId tableId = event.tableId();
             TablePath tablePath = new TablePath(tableId.getSchemaName(), tableId.getTableName());
@@ -240,6 +274,11 @@ public class FlussMetaDataApplier implements MetadataApplier, ExistingTableSchem
             LOG.error("Failed to apply schema change {}", event, e);
             throw new RuntimeException(e);
         }
+    }
+
+    @VisibleForTesting
+    Connection createConnection() {
+        return ConnectionFactory.createConnection(flussClientConfig);
     }
 
     @VisibleForTesting

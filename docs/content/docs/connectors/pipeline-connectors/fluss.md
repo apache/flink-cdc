@@ -122,6 +122,13 @@ Pipeline Connector Options
       <td>The bootstrap servers for the Fluss sink connection. </td>
     </tr>
     <tr>
+      <td>schema.evolution.auto-add-columns</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">true</td>
+      <td>Boolean</td>
+      <td>Whether the sink automatically adds columns to existing Fluss tables. When set to <code>false</code>, the sink validates the target schema without issuing ADD COLUMN DDL; see <a href="#automatic-column-addition">Automatic column addition</a>.</td>
+    </tr>
+    <tr>
       <td>sink.partitioning.strategy</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">DEFAULT</td>
@@ -198,6 +205,33 @@ Continue to configure bucket keys and bucket counts with the sink options `bucke
 
 * Support Fluss primary key table and log table.
 
+### Automatic column addition
+
+`schema.evolution.auto-add-columns` controls whether the sink automatically adds columns to
+existing Fluss tables and defaults to `true`.
+
+When set to `false`, the sink validates the target schema without issuing ADD COLUMN DDL,
+including for ADD events derived by `existing-table.schema-expansion.mode`. Table creation and
+other schema change behavior are unchanged.
+
+For an existing table, the sink checks the initial schema and each forwarded ADD event. Every
+pipeline column must exist in the target with the same Fluss type and a compatible nullability.
+Fluss schema conversion normalizes primary key columns to NOT NULL. For other columns, a nullable
+pipeline column cannot write to a NOT NULL target column. Target-only columns must be
+nullable because the sink writes null for them. Column names are case-sensitive. The sink supports
+different column orders and target-only nullable columns. If validation fails, the job fails.
+On recovery, each table is checked before its first event reaches the writer; idle tables are not
+checked until they receive an event.
+
+If the target schema read or validation fails, the job fails and the configured Flink restart
+strategy applies. The sink does not retry schema reads during validation.
+
+The pipeline must forward ADD events for this validation and subsequent data mapping to work.
+Use a schema change behavior that propagates additions, and do not exclude `add.column` using
+`include.schema.changes` or `exclude.schema.changes`. In particular,
+`schema.change.behavior: IGNORE` drops ADD events. Existing
+`existing-table.schema-expansion.mode` checks still apply independently.
+
 ### Data lake table properties
 
 To create Fluss tables with lakehouse storage enabled, configure the Fluss sink as follows:
@@ -251,7 +285,7 @@ their existing expiry and close handling remain in effect.
   * The distribution keys are controlled by option `bucket.key`. For primary key table and a bucket key is not specified, the bucket key will be used as primary key(excluding the partition key). For log table has no primary key and the bucket key is not specified, the data will be distributed to each bucket randomly. 
 
 * Supports schema change synchronization in `lenient` mode with `schema.change.behavior: lenient`. The following schema change events are supported:
-  * **Add column** — new columns are appended to the Fluss table.
+  * **Add column** — by default, new columns are appended to the Fluss table. When `schema.evolution.auto-add-columns` is `false`, the sink validates the target schema instead of adding columns.
   * **Drop column** — the column is not physically removed in lenient mode. The drop operation is ignored, and subsequent writes will set the column value to null.
   * **Rename column** — in lenient mode, this is translated into an add-new-column + alter-old-column-type-to-nullable sequence.
   * **Alter column type** — not supported. 

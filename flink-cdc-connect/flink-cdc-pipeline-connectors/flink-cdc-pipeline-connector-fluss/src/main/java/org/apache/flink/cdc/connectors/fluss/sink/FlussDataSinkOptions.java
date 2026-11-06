@@ -33,6 +33,13 @@ public class FlussDataSinkOptions {
                     .noDefaultValue()
                     .withDescription("The bootstrap servers for the Fluss sink connection.");
 
+    public static final ConfigOption<Boolean> SCHEMA_EVOLUTION_AUTO_ADD_COLUMNS =
+            ConfigOptions.key("schema.evolution.auto-add-columns")
+                    .booleanType()
+                    .defaultValue(true)
+                    .withDescription(
+                            "Whether the sink adds columns to existing Fluss tables automatically.");
+
     public static final ConfigOption<SinkPartitioningStrategy> SINK_PARTITIONING_STRATEGY =
             ConfigOptions.key("sink.partitioning.strategy")
                     .enumType(SinkPartitioningStrategy.class)

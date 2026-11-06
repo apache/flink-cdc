@@ -34,6 +34,7 @@ import org.apache.flink.cdc.connectors.fluss.sink.v2.FlussRowWithOp;
 
 import org.apache.fluss.client.Connection;
 import org.apache.fluss.client.table.Table;
+import org.apache.fluss.metadata.TableInfo;
 import org.apache.fluss.metadata.TablePath;
 import org.apache.fluss.types.DataType;
 
@@ -53,8 +54,17 @@ import static org.apache.flink.cdc.connectors.fluss.utils.FlussConversions.toFlu
 public class FlussEventSerializationSchema implements FlussEventSerializer<Event> {
     private static final long serialVersionUID = 1L;
 
+    private final boolean autoAddColumns;
     private transient Map<TableId, TableSchemaInfo> schemaMaps;
     private transient Connection connection;
+
+    public FlussEventSerializationSchema() {
+        this(true);
+    }
+
+    public FlussEventSerializationSchema(boolean autoAddColumns) {
+        this.autoAddColumns = autoAddColumns;
+    }
 
     @Override
     public void open(Connection connection) {
@@ -76,10 +86,13 @@ public class FlussEventSerializationSchema implements FlussEventSerializer<Event
     }
 
     private void applySchemaChangeEvent(SchemaChangeEvent event) {
+        if (!autoAddColumns) {
+            validateAndApplySchemaChangeEvent(event);
+            return;
+        }
         TableId tableId = event.tableId();
         if (event instanceof CreateTableEvent) {
-            org.apache.flink.cdc.common.schema.Schema newSchema =
-                    ((CreateTableEvent) event).getSchema();
+            Schema newSchema = ((CreateTableEvent) event).getSchema();
             // if the table is not exist or the schema is changed, update the table info.
             if (!schemaMaps.containsKey(tableId)
                     || !sameSchemaIgnoreCommentAndDefaultValue(
@@ -116,6 +129,43 @@ public class FlussEventSerializationSchema implements FlussEventSerializer<Event
                             "Schema change type %s not supported. Only CreateTableEvent and AddColumnEvent are allowed at the moment.",
                             event.getClass()));
         }
+    }
+
+    private void validateAndApplySchemaChangeEvent(SchemaChangeEvent event) {
+        TableId tableId = event.tableId();
+        TablePath tablePath = getTablePath(tableId);
+        Schema newSchema;
+        if (event instanceof CreateTableEvent) {
+            newSchema = ((CreateTableEvent) event).getSchema();
+        } else if (event instanceof AddColumnEvent) {
+            TableSchemaInfo schemaInfo = schemaMaps.get(tableId);
+            if (schemaInfo == null) {
+                throw new IllegalStateException(
+                        "Cannot apply AddColumnEvent for table "
+                                + tableId
+                                + ": table schema not found. Ensure CreateTableEvent is processed before AddColumnEvent.");
+            }
+            newSchema = schemaInfo.upstreamCdcSchema;
+        } else {
+            throw new UnsupportedOperationException(
+                    String.format(
+                            "Schema change type %s not supported. Only CreateTableEvent and AddColumnEvent are allowed at the moment.",
+                            event.getClass()));
+        }
+
+        TableInfo tableInfo = connection.getTable(tablePath).getTableInfo();
+        if (event instanceof AddColumnEvent) {
+            FlussSchemaValidator.validateAddedColumns(
+                    (AddColumnEvent) event, tableInfo.getSchema(), tablePath);
+            if (!SchemaUtils.isSchemaChangeEventRedundant(newSchema, event)) {
+                newSchema = SchemaUtils.applySchemaChangeEvent(newSchema, event);
+            }
+        }
+        FlussSchemaValidator.validateSchema(
+                toFlussSchema(newSchema), tableInfo.getSchema(), tablePath);
+        schemaMaps.put(
+                tableId,
+                new TableSchemaInfo(tableInfo.getSchemaId(), newSchema, tableInfo.getSchema()));
     }
 
     private FlussEvent applyDataChangeEvent(DataChangeEvent record) {
@@ -164,13 +214,13 @@ public class FlussEventSerializationSchema implements FlussEventSerializer<Event
 
     private static class TableSchemaInfo {
         int schemaId;
-        org.apache.flink.cdc.common.schema.Schema upstreamCdcSchema;
+        Schema upstreamCdcSchema;
         org.apache.fluss.metadata.Schema downstreamFlussSchema;
         Map<Integer, Integer> indexMapping;
 
         private TableSchemaInfo(
                 int schemaId,
-                org.apache.flink.cdc.common.schema.Schema upstreamCdcSchema,
+                Schema upstreamCdcSchema,
                 org.apache.fluss.metadata.Schema downstreamFlussSchema) {
             this.schemaId = schemaId;
             this.upstreamCdcSchema = upstreamCdcSchema;
