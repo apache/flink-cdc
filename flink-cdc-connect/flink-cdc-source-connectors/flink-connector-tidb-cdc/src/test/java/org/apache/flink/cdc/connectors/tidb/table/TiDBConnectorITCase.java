@@ -36,6 +36,7 @@ import org.slf4j.LoggerFactory;
 import java.sql.Connection;
 import java.sql.Statement;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -56,6 +57,7 @@ class TiDBConnectorITCase extends TiDBTestBase {
     @BeforeEach
     public void before() {
         TestValuesTableFactory.clearAllData();
+        tEnv.getConfig().set("table.exec.sink.require-on-conflict", "false");
         env.setParallelism(1);
     }
 
@@ -384,18 +386,24 @@ class TiDBConnectorITCase extends TiDBTestBase {
         waitForSinkSize("sink", 10);
 
         List<String> expected =
-                Arrays.asList(
-                        "+I(inventory,products,101,scooter,Small 2-wheel scooter,3.1400000000)",
-                        "+I(inventory,products,102,car battery,12V car battery,8.1000000000)",
-                        "+I(inventory,products,103,12-pack drill bits,12-pack of drill bits with sizes ranging from #40 to #3,0.8000000000)",
-                        "+I(inventory,products,104,hammer,12oz carpenter's hammer,0.7500000000)",
-                        "+I(inventory,products,105,hammer,14oz carpenter's hammer,0.8750000000)",
-                        "+I(inventory,products,106,hammer,16oz carpenter's hammer,1.0000000000)",
-                        "+I(inventory,products,107,rocks,box of assorted rocks,5.3000000000)",
-                        "+I(inventory,products,108,jacket,water resistent black wind breaker,0.1000000000)",
-                        "+I(inventory,products,109,spare tire,24 inch spare tire,22.2000000000)",
-                        "+U(inventory,products,106,hammer,18oz carpenter hammer,1.0000000000)",
-                        "-U(inventory,products,106,hammer,16oz carpenter's hammer,1.0000000000)");
+                new ArrayList<>(
+                        Arrays.asList(
+                                "+I(inventory,products,101,scooter,Small 2-wheel scooter,3.1400000000)",
+                                "+I(inventory,products,102,car battery,12V car battery,8.1000000000)",
+                                "+I(inventory,products,103,12-pack drill bits,12-pack of drill bits with sizes ranging from #40 to #3,0.8000000000)",
+                                "+I(inventory,products,104,hammer,12oz carpenter's hammer,0.7500000000)",
+                                "+I(inventory,products,105,hammer,14oz carpenter's hammer,0.8750000000)",
+                                "+I(inventory,products,106,hammer,16oz carpenter's hammer,1.0000000000)",
+                                "+I(inventory,products,107,rocks,box of assorted rocks,5.3000000000)",
+                                "+I(inventory,products,108,jacket,water resistent black wind breaker,0.1000000000)",
+                                "+I(inventory,products,109,spare tire,24 inch spare tire,22.2000000000)"));
+        if ("flink2".equals(System.getProperty("flink.profile"))) {
+            expected.add("-D(inventory,products,106,hammer,16oz carpenter's hammer,1.0000000000)");
+            expected.add("+I(inventory,products,106,hammer,18oz carpenter hammer,1.0000000000)");
+        } else {
+            expected.add("+U(inventory,products,106,hammer,18oz carpenter hammer,1.0000000000)");
+            expected.add("-U(inventory,products,106,hammer,16oz carpenter's hammer,1.0000000000)");
+        }
         List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
         assertEqualsInAnyOrder(expected, actual);
         result.getJobClient().get().cancel().get();
